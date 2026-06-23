@@ -1,6 +1,6 @@
 [package]
 name = "coilbox"
-version = "0.1.0"
+version = "0.0.0"
 description = "coilbox"
 edition = "2021"
 license = "MIT"
