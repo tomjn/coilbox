@@ -4,11 +4,13 @@ name: release
 # The pr-downloader sidecars are committed under src-tauri/binaries/ per target
 # triple, so tauri-build bundles them automatically — no per-OS fetch needed.
 #
-# macOS is arm64-only by design (Apple Silicon). The committed aarch64-apple-darwin
-# binary is a local build that links Homebrew dylibs (e.g. minizip), so for a
-# distributable artifact it should be a static/self-contained build. The macOS job
-# below rebuilds pr-downloader from source on the runner; adjust if you switch to
-# committing a portable mac binary.
+# All platforms use the committed sidecars under src-tauri/binaries/ — no per-OS
+# fetch or build. macOS is arm64-only by design (Apple Silicon).
+#
+# KNOWN LIMITATION: the committed macOS binary links Homebrew dylibs (e.g.
+# minizip), so the bundled sidecar needs those present at runtime. A portable mac
+# release needs a static/self-contained pr-downloader build (or bundling its
+# dylibs into the .app) — a future hardening step, not done here.
 
 on:
   push:
@@ -40,16 +42,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Rebuild macOS pr-downloader sidecar from source
-        if: matrix.platform == 'macos-14'
-        run: |
-          brew install cmake minizip
-          git clone --depth 1 https://github.com/beyond-all-reason/pr-downloader.git /tmp/prd
-          cmake -S /tmp/prd -B /tmp/prd/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build /tmp/prd/build --target pr-downloader -j
-          cp /tmp/prd/build/src/pr-downloader src-tauri/binaries/pr-downloader-aarch64-apple-darwin
-          chmod +x src-tauri/binaries/pr-downloader-aarch64-apple-darwin
 
       - name: Install dependencies
         run: bun install
