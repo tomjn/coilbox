@@ -1,0 +1,11 @@
+@import "tailwindcss";
+/* Generate the frame's utility classes from its published build (Tailwind v4 ignores node_modules by default). */
+@source "../node_modules/@picoframe/frame/dist";
+@import "@picoframe/frame/theme.css";
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}

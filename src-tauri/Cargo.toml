@@ -1,0 +1,14 @@
+[package]
+name = "coilbox"
+version = "0.0.0"
+description = "coilbox"
+edition = "2021"
+license = "MIT"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+picoframe-core = "0.0.2"
+tauri-plugin-coilbox-prdownloader = { path = "../crates/tauri-plugin-coilbox-prdownloader" }

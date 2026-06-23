@@ -1,0 +1,7 @@
+node_modules
+dist
+.DS_Store
+
+# Rust / Tauri (workspace target lives at the repo root)
+/target
+src-tauri/target

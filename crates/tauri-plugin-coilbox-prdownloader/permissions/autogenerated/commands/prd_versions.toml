@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-prd-versions"
+description = "Enables the prd_versions command without any pre-configured scope."
+commands.allow = ["prd_versions"]
+
+[[permission]]
+identifier = "deny-prd-versions"
+description = "Denies the prd_versions command without any pre-configured scope."
+commands.deny = ["prd_versions"]

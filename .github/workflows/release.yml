@@ -1,0 +1,61 @@
+name: release
+
+# Build Coilbox for macOS, Linux, and Windows on a version tag (or manually).
+# The pr-downloader sidecars are committed under src-tauri/binaries/ per target
+# triple, so tauri-build bundles them automatically — no per-OS fetch needed.
+#
+# CAVEAT (macOS): the committed aarch64-apple-darwin binary is a local build that
+# links Homebrew dylibs (e.g. minizip) and is arm64-only. For a distributable mac
+# artifact it should be a static/self-contained build (and an x86_64 build added).
+# Until then the macOS job below rebuilds pr-downloader from source on the runner;
+# adjust if you switch to committing a portable mac binary.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-14 # arm64
+          - platform: ubuntu-22.04
+          - platform: windows-latest
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Rebuild macOS pr-downloader sidecar from source
+        if: matrix.platform == 'macos-14'
+        run: |
+          brew install cmake minizip
+          git clone --depth 1 https://github.com/beyond-all-reason/pr-downloader.git /tmp/prd
+          cmake -S /tmp/prd -B /tmp/prd/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/prd/build --target pr-downloader -j
+          cp /tmp/prd/build/src/pr-downloader src-tauri/binaries/pr-downloader-aarch64-apple-darwin
+          chmod +x src-tauri/binaries/pr-downloader-aarch64-apple-darwin
+
+      - name: Install dependencies
+        run: bun install
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Coilbox ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false
