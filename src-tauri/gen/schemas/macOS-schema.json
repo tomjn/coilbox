@@ -231,6 +231,108 @@
           "markdownDescription": "Denies the prd_versions command without any pre-configured scope."
         },
         {
+          "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-config-get`\n- `allow-us-config-set`\n- `allow-us-seed-sql`",
+          "type": "string",
+          "const": "coilbox-uberstress:default",
+          "markdownDescription": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-config-get`\n- `allow-us-config-set`\n- `allow-us-seed-sql`"
+        },
+        {
+          "description": "Enables the us_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-cancel",
+          "markdownDescription": "Enables the us_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the us_config_get command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-config-get",
+          "markdownDescription": "Enables the us_config_get command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the us_config_set command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-config-set",
+          "markdownDescription": "Enables the us_config_set command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the us_history command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-history",
+          "markdownDescription": "Enables the us_history command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the us_report command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-report",
+          "markdownDescription": "Enables the us_report command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the us_run command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-run",
+          "markdownDescription": "Enables the us_run command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the us_scenarios command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-scenarios",
+          "markdownDescription": "Enables the us_scenarios command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the us_seed_sql command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-seed-sql",
+          "markdownDescription": "Enables the us_seed_sql command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-cancel",
+          "markdownDescription": "Denies the us_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_config_get command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-config-get",
+          "markdownDescription": "Denies the us_config_get command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_config_set command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-config-set",
+          "markdownDescription": "Denies the us_config_set command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_history command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-history",
+          "markdownDescription": "Denies the us_history command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_report command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-report",
+          "markdownDescription": "Denies the us_report command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_run command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-run",
+          "markdownDescription": "Denies the us_run command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_scenarios command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-scenarios",
+          "markdownDescription": "Denies the us_scenarios command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_seed_sql command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-seed-sql",
+          "markdownDescription": "Denies the us_seed_sql command without any pre-configured scope."
+        },
+        {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",
           "type": "string",
           "const": "core:default",

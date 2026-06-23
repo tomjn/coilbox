@@ -27,7 +27,7 @@
     }
   },
   "bundle": {
-    "externalBin": ["binaries/pr-downloader"],
+    "externalBin": ["binaries/pr-downloader", "binaries/uberstress"],
     "active": true,
     "targets": "all",
     "icon": [

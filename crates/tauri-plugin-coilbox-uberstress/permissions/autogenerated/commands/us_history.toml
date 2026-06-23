@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-us-history"
+description = "Enables the us_history command without any pre-configured scope."
+commands.allow = ["us_history"]
+
+[[permission]]
+identifier = "deny-us-history"
+description = "Denies the us_history command without any pre-configured scope."
+commands.deny = ["us_history"]

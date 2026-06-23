@@ -335,6 +335,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-coilbox-prdownloader",
+ "tauri-plugin-coilbox-uberstress",
 ]
 
 [[package]]
@@ -3345,6 +3346,17 @@ dependencies = [
  "flate2",
  "picoframe-core",
  "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-coilbox-uberstress"
+version = "0.0.0"
+dependencies = [
+ "picoframe-core",
  "serde",
  "serde_json",
  "tauri",

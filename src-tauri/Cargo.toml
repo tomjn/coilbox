@@ -12,3 +12,4 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 picoframe-core = "0.0.2"
 tauri-plugin-coilbox-prdownloader = { path = "../crates/tauri-plugin-coilbox-prdownloader" }
+tauri-plugin-coilbox-uberstress = { path = "../crates/tauri-plugin-coilbox-uberstress" }

@@ -1,0 +1,18 @@
+[package]
+name = "tauri-plugin-coilbox-uberstress"
+version = "0.0.0"
+description = "uberstress load-test sidecar plugin for Coilbox (Rust half). ACL identifier: coilbox-uberstress"
+edition = "2021"
+license = "MIT"
+# Tauri requires `links` to equal `package.name`. The ACL identifier is this
+# name with the `tauri-plugin-` prefix stripped -> `coilbox-uberstress`.
+links = "tauri-plugin-coilbox-uberstress"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+picoframe-core = "0.0.2"

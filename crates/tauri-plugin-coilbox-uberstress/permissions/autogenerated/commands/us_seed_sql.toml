@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-us-seed-sql"
+description = "Enables the us_seed_sql command without any pre-configured scope."
+commands.allow = ["us_seed_sql"]
+
+[[permission]]
+identifier = "deny-us-seed-sql"
+description = "Denies the us_seed_sql command without any pre-configured scope."
+commands.deny = ["us_seed_sql"]
