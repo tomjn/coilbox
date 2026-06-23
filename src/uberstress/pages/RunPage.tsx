@@ -23,6 +23,7 @@ import {
 } from "../bindings";
 import { CheckField, Field } from "./components/Field";
 import SeedSqlDialog from "./components/SeedSqlDialog";
+import { Select } from "./components/ui";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -195,18 +196,13 @@ export default function RunPage() {
 
   const scenarioInput =
     scenarios.length > 0 ? (
-      <select
-        value={scenario}
-        onChange={(e) => setScenario(e.target.value)}
-        disabled={running}
-        className="h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
+      <Select value={scenario} onChange={(e) => setScenario(e.target.value)} disabled={running}>
         {scenarios.map((s) => (
           <option key={s} value={s}>
             {s}
           </option>
         ))}
-      </select>
+      </Select>
     ) : (
       <Input value={scenario} onChange={(e) => setScenario(e.target.value)} disabled={running} />
     );
@@ -267,11 +263,10 @@ export default function RunPage() {
           {needsAddr && (
             <div className="space-y-2">
               <Field label="Target server">
-                <select
+                <Select
                   value={serverChoice}
                   onChange={(e) => setServerChoice(e.target.value)}
                   disabled={running}
-                  className="h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {cfg?.servers.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -279,7 +274,7 @@ export default function RunPage() {
                     </option>
                   ))}
                   <option value={MANUAL}>Manual address…</option>
-                </select>
+                </Select>
               </Field>
               {serverChoice === MANUAL && (
                 <Field label="Address">

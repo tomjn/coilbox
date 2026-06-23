@@ -3,6 +3,7 @@ import { AlertCircle, Check, Copy, Database, Loader2, X } from "lucide-react";
 import { useState } from "react";
 import { usSeedSql } from "../../bindings";
 import { Field } from "./Field";
+import { Textarea } from "./ui";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -121,10 +122,10 @@ export default function SeedSqlDialog({
                   {copied ? "Copied" : "Copy"}
                 </Button>
               </div>
-              <textarea
+              <Textarea
                 readOnly
                 value={sql}
-                className="h-64 w-full resize-none rounded-md border border-border bg-muted/40 p-3 font-mono text-xs"
+                className="h-64 resize-none bg-muted/40 font-mono text-xs"
                 onFocus={(e) => e.currentTarget.select()}
               />
             </div>

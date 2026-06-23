@@ -3,6 +3,7 @@ import { AlertCircle, History, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { type Report, type ReportSummary, usHistory, usReport } from "../bindings";
 import { CompareBars, LatencyBars, TrendChart } from "./components/ReportCharts";
+import { Select } from "./components/ui";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -207,13 +208,10 @@ export default function HistoryPage() {
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Compare p99 with</h3>
-                    <select
+                    <Select
                       value={compareFile}
                       onChange={(e) => selectCompare(e.target.value)}
-                      className={cn(
-                        "h-8 rounded-md border border-input bg-transparent px-2 text-xs",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      )}
+                      className="h-8 text-xs"
                     >
                       <option value="">Select a run…</option>
                       {compareOptions.map((r) => (
@@ -221,7 +219,7 @@ export default function HistoryPage() {
                           {(r.gitRef || r.commitSha?.slice(0, 12) || "adhoc")} · {fmtWhen(r.startedAt)}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                   {compareReport && (
                     <CompareBars
