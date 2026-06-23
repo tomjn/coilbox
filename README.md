@@ -37,9 +37,10 @@ The frame, CLI, and plugin contract come from the published `@picoframe/*` packa
 (Linux/Windows) and built from source for macOS (no official macOS build exists).
 The binaries are committed under `src-tauri/binaries/pr-downloader-<target-triple>`.
 
-> **Note:** the committed macOS (`aarch64-apple-darwin`) binary is a local build
-> that links Homebrew dylibs and is arm64-only; for distribution it needs a
-> static/self-contained build (the release CI rebuilds it from source).
+> **Note:** macOS is arm64-only (Apple Silicon) by design. The committed
+> `aarch64-apple-darwin` binary is a local build that links Homebrew dylibs, so
+> for distribution it needs a static/self-contained build (the release CI rebuilds
+> it from source).
 
 ## Licensing
 

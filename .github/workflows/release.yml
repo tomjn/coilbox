@@ -4,11 +4,11 @@ name: release
 # The pr-downloader sidecars are committed under src-tauri/binaries/ per target
 # triple, so tauri-build bundles them automatically — no per-OS fetch needed.
 #
-# CAVEAT (macOS): the committed aarch64-apple-darwin binary is a local build that
-# links Homebrew dylibs (e.g. minizip) and is arm64-only. For a distributable mac
-# artifact it should be a static/self-contained build (and an x86_64 build added).
-# Until then the macOS job below rebuilds pr-downloader from source on the runner;
-# adjust if you switch to committing a portable mac binary.
+# macOS is arm64-only by design (Apple Silicon). The committed aarch64-apple-darwin
+# binary is a local build that links Homebrew dylibs (e.g. minizip), so for a
+# distributable artifact it should be a static/self-contained build. The macOS job
+# below rebuilds pr-downloader from source on the runner; adjust if you switch to
+# committing a portable mac binary.
 
 on:
   push:
