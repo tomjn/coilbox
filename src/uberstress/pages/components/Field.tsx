@@ -1,6 +1,6 @@
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@picoframe/frame";
 import type { ReactNode } from "react";
-import { Checkbox } from "./ui";
 
 /** A labelled form field. Wrapping the control in the <label> associates them. */
 export function Field({
@@ -37,7 +37,7 @@ export function CheckField({
 }) {
   return (
     <label className="flex items-start gap-2.5 text-sm">
-      <Checkbox checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5" />
+      <Checkbox checked={checked} onCheckedChange={(v) => onChange(v === true)} className="mt-0.5" />
       <span className="flex flex-col gap-0.5">
         <span className="font-medium leading-none">{label}</span>
         {hint && <span className="text-xs leading-snug text-muted-foreground">{hint}</span>}

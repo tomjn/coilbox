@@ -22,8 +22,8 @@ import {
   usScenarios,
 } from "../bindings";
 import { CheckField, Field } from "./components/Field";
+import { OptionSelect } from "./components/OptionSelect";
 import SeedSqlDialog from "./components/SeedSqlDialog";
-import { Select } from "./components/ui";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -196,13 +196,12 @@ export default function RunPage() {
 
   const scenarioInput =
     scenarios.length > 0 ? (
-      <Select value={scenario} onChange={(e) => setScenario(e.target.value)} disabled={running}>
-        {scenarios.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </Select>
+      <OptionSelect
+        value={scenario}
+        onValueChange={setScenario}
+        disabled={running}
+        options={scenarios.map((s) => ({ value: s, label: s }))}
+      />
     ) : (
       <Input value={scenario} onChange={(e) => setScenario(e.target.value)} disabled={running} />
     );
@@ -263,18 +262,15 @@ export default function RunPage() {
           {needsAddr && (
             <div className="space-y-2">
               <Field label="Target server">
-                <Select
+                <OptionSelect
                   value={serverChoice}
-                  onChange={(e) => setServerChoice(e.target.value)}
+                  onValueChange={setServerChoice}
                   disabled={running}
-                >
-                  {cfg?.servers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name || s.addr} ({s.addr})
-                    </option>
-                  ))}
-                  <option value={MANUAL}>Manual address…</option>
-                </Select>
+                  options={[
+                    ...(cfg?.servers.map((s) => ({ value: s.id, label: `${s.name || s.addr} (${s.addr})` })) ?? []),
+                    { value: MANUAL, label: "Manual address…" },
+                  ]}
+                />
               </Field>
               {serverChoice === MANUAL && (
                 <Field label="Address">

@@ -3,7 +3,7 @@ import { AlertCircle, History, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { type Report, type ReportSummary, usHistory, usReport } from "../bindings";
 import { CompareBars, LatencyBars, TrendChart } from "./components/ReportCharts";
-import { Select } from "./components/ui";
+import { OptionSelect } from "./components/OptionSelect";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -208,18 +208,17 @@ export default function HistoryPage() {
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Compare p99 with</h3>
-                    <Select
+                    <OptionSelect
                       value={compareFile}
-                      onChange={(e) => selectCompare(e.target.value)}
-                      className="h-8 text-xs"
-                    >
-                      <option value="">Select a run…</option>
-                      {compareOptions.map((r) => (
-                        <option key={r.file} value={r.file}>
-                          {(r.gitRef || r.commitSha?.slice(0, 12) || "adhoc")} · {fmtWhen(r.startedAt)}
-                        </option>
-                      ))}
-                    </Select>
+                      onValueChange={selectCompare}
+                      size="sm"
+                      className="w-auto text-xs"
+                      placeholder="Select a run…"
+                      options={compareOptions.map((r) => ({
+                        value: r.file,
+                        label: `${r.gitRef || r.commitSha?.slice(0, 12) || "adhoc"} · ${fmtWhen(r.startedAt)}`,
+                      }))}
+                    />
                   </div>
                   {compareReport && (
                     <CompareBars

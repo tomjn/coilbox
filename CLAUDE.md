@@ -1,11 +1,23 @@
-Always prefer shadcn components over native input controls. picoframe
-(`@picoframe/frame`) is built on shadcn, so its exports `Button`, `Input`, and
-`cn` are the shadcn primitives — use those rather than native elements.
+## UI components
 
-For controls the frame doesn't export (`select`, `checkbox`, `textarea`), use
-the token-styled wrappers in `src/uberstress/pages/components/ui.tsx`
-(`Select`, `Checkbox`, `Textarea`) — they match `Input`'s styling and are native
-underneath, the same approach picoframe takes for `Input`.
+Prefer picoframe's components over native elements or hand-rolled ones. picoframe
+ships UI through **two channels**:
+
+- **`@picoframe/frame` (npm)** exports only `Button`, `Input`, and `cn` — the
+  primitives importable directly in plugin code. By design it will never export
+  the other inputs.
+- **`@picoframe` shadcn registry** provides everything else (`select`,
+  `checkbox`, `textarea`, `label`, `radio-group`, `switch`, `slider`, `form`,
+  `dialog`, `tooltip`, `popover`, `collapsible`). These are shadcn *source*
+  components: pull them with `npx shadcn@latest add @picoframe/<name>`, which
+  copies the file into `src/components/ui/`. `components.json` is already wired to
+  the registry; the `@/` alias resolves to `src/`.
+
+So: import `Button`/`Input` from `@picoframe/frame`; add anything else from the
+registry. Don't reach for native `<select>`/`<input type=checkbox>`/`<textarea>`
+or restyle your own. `src/uberstress/pages/components/OptionSelect.tsx` is a thin
+local wrapper that composes the registry `Select` for the simple options-list
+case.
 
 ## Releases
 

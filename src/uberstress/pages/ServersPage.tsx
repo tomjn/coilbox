@@ -3,7 +3,7 @@ import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Server, Trash2 } from "
 import { useCallback, useEffect, useState } from "react";
 import { type Config, usConfigGet, usConfigSet, usScenarios } from "../bindings";
 import { CheckField, Field } from "./components/Field";
-import { Select } from "./components/ui";
+import { OptionSelect } from "./components/OptionSelect";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -190,16 +190,11 @@ export default function ServersPage() {
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Field label="Scenario">
               {scenarios.length > 0 ? (
-                <Select
+                <OptionSelect
                   value={cfg.defaults.scenario}
-                  onChange={(e) => patchDefaults({ scenario: e.target.value })}
-                >
-                  {scenarios.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </Select>
+                  onValueChange={(v) => patchDefaults({ scenario: v })}
+                  options={scenarios.map((s) => ({ value: s, label: s }))}
+                />
               ) : (
                 <Input
                   value={cfg.defaults.scenario}

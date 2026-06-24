@@ -1,9 +1,9 @@
 import { Button, Input } from "@picoframe/frame";
 import { AlertCircle, Check, Copy, Database, Loader2, X } from "lucide-react";
 import { useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
 import { usSeedSql } from "../../bindings";
 import { Field } from "./Field";
-import { Textarea } from "./ui";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
