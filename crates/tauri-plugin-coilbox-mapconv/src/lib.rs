@@ -35,6 +35,12 @@ fn missing(name: &str) -> String {
     )
 }
 
+/// Resolve a bundled sidecar via the app's resource dir (or the dev env override).
+fn sidecar_path<R: Runtime>(app: &AppHandle<R>, name: &str) -> Option<PathBuf> {
+    let base = app.path().resource_dir().ok();
+    resolve_sidecar(base.as_deref(), name)
+}
+
 /// The plugin's settings-file path under app-data.
 fn settings_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     let base = app
@@ -118,9 +124,9 @@ fn run_blocking(
 /// `mc_probe` — report which sidecars are bundled, without spawning anything
 /// (these getopt binaries have no clean `--version`). Lets the UI warn up front.
 #[tauri::command]
-async fn mc_probe() -> CliResult {
-    let compile = resolve_sidecar("mapcompile").is_some();
-    let decompile = resolve_sidecar("mapdecompile").is_some();
+async fn mc_probe<R: Runtime>(app: AppHandle<R>) -> CliResult {
+    let compile = sidecar_path(&app, "mapcompile").is_some();
+    let decompile = sidecar_path(&app, "mapdecompile").is_some();
     CliResult::ok(json!({ "available": compile && decompile, "compile": compile, "decompile": decompile }))
 }
 
@@ -157,14 +163,15 @@ async fn mc_suggest_sources(texture_path: String) -> CliResult {
 /// `mc_compile` — run `mapcompile` in `out_dir`, streaming output. Success means
 /// exit 0 AND `<out_dir>/<outSuffix>.smf` exists.
 #[tauri::command]
-async fn mc_compile(
+async fn mc_compile<R: Runtime>(
+    app: AppHandle<R>,
     reg: State<'_, SharedRegistry>,
     opts: CompileOpts,
     out_dir: String,
     run_id: String,
     on_log: Channel<LogLine>,
 ) -> Result<CliResult, ()> {
-    let bin = match resolve_sidecar("mapcompile") {
+    let bin = match sidecar_path(&app, "mapcompile") {
         Some(b) => b,
         None => return Ok(CliResult::err(missing("mapcompile"))),
     };
@@ -227,13 +234,14 @@ fn prepare_decompile(input: &Path, on_log: &Channel<LogLine>) -> Result<(PathBuf
 /// writes the images there. Resolves with the output directory, the parsed SMF
 /// header, and the extracted minimap as a data URL.
 #[tauri::command]
-async fn mc_decompile(
+async fn mc_decompile<R: Runtime>(
+    app: AppHandle<R>,
     reg: State<'_, SharedRegistry>,
     input_path: String,
     run_id: String,
     on_log: Channel<LogLine>,
 ) -> Result<CliResult, ()> {
-    let bin = match resolve_sidecar("mapdecompile") {
+    let bin = match sidecar_path(&app, "mapdecompile") {
         Some(b) => b,
         None => return Ok(CliResult::err(missing("mapdecompile"))),
     };

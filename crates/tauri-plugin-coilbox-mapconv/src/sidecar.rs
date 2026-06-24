@@ -9,23 +9,23 @@
 //! (`-noclamp`, `-smooth`) are lone tokens with no value. Never use `=`.
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Resolve a bundled sidecar by base name (`"mapcompile"` | `"mapdecompile"`).
 /// The env override `MAPCONV_<NAME>_SIDECAR` (e.g. `MAPCONV_MAPCOMPILE_SIDECAR`)
-/// wins — handy for `tauri dev` and tests where the binaries are not bundled next
-/// to the dev executable. Otherwise look next to the current executable for
-/// `<name>` (`.exe` on Windows), as Tauri's `externalBin` bundling arranges.
-pub fn resolve_sidecar(name: &str) -> Option<PathBuf> {
+/// wins — handy for `tauri dev` and tests. Otherwise look in the bundled
+/// `mapconv/` resource folder, where the binary sits beside its `libs/` (the
+/// mac/Windows binaries load DevIL etc. via `@executable_path/libs`, so they
+/// must stay in that folder — hence a resource dir, not `externalBin`).
+pub fn resolve_sidecar(resource_dir: Option<&Path>, name: &str) -> Option<PathBuf> {
     let env_key = format!("MAPCONV_{}_SIDECAR", name.to_uppercase());
     if let Ok(p) = std::env::var(&env_key) {
         if !p.is_empty() {
             return Some(PathBuf::from(p));
         }
     }
-    let exe = std::env::current_exe().ok()?;
-    let dir = exe.parent()?;
-    let candidate = dir.join(format!("{name}{}", std::env::consts::EXE_SUFFIX));
+    let exe_name = format!("{name}{}", std::env::consts::EXE_SUFFIX);
+    let candidate = resource_dir?.join("mapconv").join(exe_name);
     candidate.exists().then_some(candidate)
 }
 

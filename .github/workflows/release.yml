@@ -28,19 +28,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # `smcng_platform` selects the SpringMapConvNG release asset; `triple`/`exe`
-          # name the bundled mapconv sidecars to match Tauri's externalBin convention.
+          # `smcng_platform` selects the SpringMapConvNG release asset; `exe` is the
+          # binary suffix on Windows.
           - platform: macos-14 # arm64
             smcng_platform: macos-arm64
-            triple: aarch64-apple-darwin
             exe: ""
           - platform: ubuntu-22.04
             smcng_platform: linux-x86_64
-            triple: x86_64-unknown-linux-gnu
             exe: ""
           - platform: windows-latest
             smcng_platform: windows-x86_64
-            triple: x86_64-pc-windows-msvc
             exe: ".exe"
     runs-on: ${{ matrix.platform }}
     steps:
@@ -71,12 +68,10 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      # Fetch the pinned SpringMapConvNG release and place the two sidecars under
-      # src-tauri/binaries/ with target-triple names so tauri-build bundles them
-      # (these are gitignored, not committed, unlike the other sidecars).
-      # NOTE: the Windows asset also ships DevIL DLLs (IL.dll/ILU.dll). externalBin
-      # does not carry sibling DLLs, so a portable Windows build needs them bundled
-      # (bundle.resources) or DevIL static-linked upstream — tracked as an open item.
+      # Fetch the pinned SpringMapConvNG release and extract its binaries + libs/
+      # into src-tauri/mapconv/, bundled as a Tauri resource folder. The binaries
+      # load image libs (DevIL etc.) via @executable_path/libs, so libs/ must sit
+      # beside them — externalBin can't carry a folder. gitignored, not committed.
       - name: Fetch SpringMapConvNG sidecars
         shell: bash
         env:
@@ -85,14 +80,12 @@ jobs:
           set -euo pipefail
           VER="$(tr -d '[:space:]' < scripts/springmapconvng-version.txt)"
           ASSET="SpringMapConvNG-${VER}-${{ matrix.smcng_platform }}.tar.gz"
-          TRIPLE="${{ matrix.triple }}"
           EXE="${{ matrix.exe }}"
-          mkdir -p src-tauri/binaries smcng_tmp
+          rm -rf src-tauri/mapconv smcng_tmp
+          mkdir -p src-tauri/mapconv smcng_tmp
           gh release download "$VER" --repo tomjn/SpringMapConvNG --pattern "$ASSET" --dir smcng_tmp
-          tar -xzf "smcng_tmp/${ASSET}" -C smcng_tmp
-          cp "smcng_tmp/mapcompile${EXE}"   "src-tauri/binaries/mapcompile-${TRIPLE}${EXE}"
-          cp "smcng_tmp/mapdecompile${EXE}" "src-tauri/binaries/mapdecompile-${TRIPLE}${EXE}"
-          chmod +x "src-tauri/binaries/mapcompile-${TRIPLE}${EXE}" "src-tauri/binaries/mapdecompile-${TRIPLE}${EXE}" || true
+          tar -xzf "smcng_tmp/${ASSET}" -C src-tauri/mapconv
+          chmod +x "src-tauri/mapconv/mapcompile${EXE}" "src-tauri/mapconv/mapdecompile${EXE}" || true
 
       - uses: tauri-apps/tauri-action@v0
         env:
