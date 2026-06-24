@@ -1,4 +1,4 @@
-import { Button, Input, cn } from "@picoframe/frame";
+import { Button, Input, cn, useDrawer } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
   AlertCircle,
@@ -11,19 +11,11 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import {
-  type Config,
-  type LogLine,
-  type Report,
-  type RunOpts,
-  usCancel,
-  usConfigGet,
-  usRun,
-  usScenarios,
-} from "../bindings";
+import { type LogLine, type Report, type RunOpts, usCancel, usRun, usScenarios } from "../bindings";
+import { useUberstressConfig } from "../config";
 import { CheckField, Field } from "./components/Field";
 import { OptionSelect } from "./components/OptionSelect";
-import SeedSqlDialog from "./components/SeedSqlDialog";
+import SeedSqlForm from "./components/SeedSqlForm";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -57,20 +49,21 @@ function ResultSummary({ report, file }: { report: Report; file: string }) {
 
 /** Drive a load/bench test against a server, streaming live output. */
 export default function RunPage() {
-  const [cfg, setCfg] = useState<Config | null>(null);
+  // Config is reactive from the frame settings store; seeds the form below.
+  const [cfg] = useUberstressConfig();
+  const drawer = useDrawer();
   const [scenarios, setScenarios] = useState<string[]>([]);
-  const [configError, setConfigError] = useState<string | null>(null);
 
   const [mode, setMode] = useState<"load" | "bench">("load");
-  const [serverChoice, setServerChoice] = useState<string>(MANUAL);
+  const [serverChoice, setServerChoice] = useState<string>(() => cfg.servers[0]?.id ?? MANUAL);
   const [manualAddr, setManualAddr] = useState("127.0.0.1:8200");
   const [launch, setLaunch] = useState(true);
 
-  // Core knobs.
-  const [scenario, setScenario] = useState("login-storm");
-  const [conns, setConns] = useState(100);
-  const [duration, setDuration] = useState("30s");
-  const [ramp, setRamp] = useState("10s");
+  // Core knobs, seeded once from saved defaults.
+  const [scenario, setScenario] = useState(() => cfg.defaults.scenario);
+  const [conns, setConns] = useState(() => cfg.defaults.conns);
+  const [duration, setDuration] = useState(() => cfg.defaults.duration);
+  const [ramp, setRamp] = useState(() => cfg.defaults.ramp);
   const [register, setRegister] = useState(true);
   const [refLabel, setRefLabel] = useState("");
 
@@ -90,32 +83,15 @@ export default function RunPage() {
   const [logLines, setLogLines] = useState<LogLine[]>([]);
   const [result, setResult] = useState<{ report: Report; file: string } | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
-  const [showSql, setShowSql] = useState(false);
 
   const runIdRef = useRef<string | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Load config + scenarios; seed the form from saved defaults.
+  // Populate the scenario dropdown (best-effort; falls back to free text).
   useEffect(() => {
-    (async () => {
-      try {
-        const { config } = await usConfigGet(undefined);
-        setCfg(config);
-        setScenario(config.defaults.scenario);
-        setConns(config.defaults.conns);
-        setDuration(config.defaults.duration);
-        setRamp(config.defaults.ramp);
-        if (config.servers.length > 0) setServerChoice(config.servers[0].id);
-      } catch (e) {
-        setConfigError(errMessage(e));
-      }
-      try {
-        const { scenarios } = await usScenarios(undefined);
-        setScenarios(scenarios);
-      } catch {
-        // best-effort; scenario falls back to free text
-      }
-    })();
+    usScenarios(undefined)
+      .then(({ scenarios }) => setScenarios(scenarios))
+      .catch(() => {});
   }, []);
 
   // Auto-scroll the log to the newest line.
@@ -124,7 +100,7 @@ export default function RunPage() {
   }, [logLines]);
 
   const effectiveAddr =
-    serverChoice === MANUAL ? manualAddr : (cfg?.servers.find((s) => s.id === serverChoice)?.addr ?? manualAddr);
+    serverChoice === MANUAL ? manualAddr : (cfg.servers.find((s) => s.id === serverChoice)?.addr ?? manualAddr);
 
   // load always needs an addr; bench needs one only when not launching locally.
   const needsAddr = mode === "load" || (mode === "bench" && !launch);
@@ -149,7 +125,7 @@ export default function RunPage() {
       pingInterval,
       refLabel: refLabel.trim() || undefined,
     };
-    if (mode === "bench" && cfg) {
+    if (mode === "bench") {
       opts.launch = launch;
       opts.serverDir = cfg.bench.serverDir;
       opts.serverPython = cfg.bench.serverPython;
@@ -217,17 +193,27 @@ export default function RunPage() {
             Drive a scenario against a lobby server (load) or launch one locally and benchmark it (bench).
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setShowSql(true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            drawer.open({
+              title: "Generate seed SQL",
+              description: "Pre-seed accounts so a load test can run with registration off.",
+              width: "44rem",
+              content: (
+                <SeedSqlForm
+                  defaultCount={Math.max(conns, 2000)}
+                  defaultPrefix={userPrefix}
+                  defaultPassword={password}
+                />
+              ),
+            })
+          }
+        >
           <Database /> Seed SQL
         </Button>
       </header>
-
-      {configError && (
-        <p className="flex items-start gap-2 border-b border-destructive/40 bg-destructive/10 px-6 py-3 text-sm text-destructive">
-          <AlertCircle size={15} className="mt-px shrink-0" />
-          {configError}
-        </p>
-      )}
 
       <div className="grid min-h-0 flex-1 grid-cols-[28rem_1fr]">
         {/* Left: form */}
@@ -267,7 +253,7 @@ export default function RunPage() {
                   onValueChange={setServerChoice}
                   disabled={running}
                   options={[
-                    ...(cfg?.servers.map((s) => ({ value: s.id, label: `${s.name || s.addr} (${s.addr})` })) ?? []),
+                    ...cfg.servers.map((s) => ({ value: s.id, label: `${s.name || s.addr} (${s.addr})` })),
                     { value: MANUAL, label: "Manual address…" },
                   ]}
                 />
@@ -450,14 +436,6 @@ export default function RunPage() {
         </div>
       </div>
 
-      {showSql && (
-        <SeedSqlDialog
-          defaultCount={Math.max(conns, 2000)}
-          defaultPrefix={userPrefix}
-          defaultPassword={password}
-          onClose={() => setShowSql(false)}
-        />
-      )}
     </div>
   );
 }

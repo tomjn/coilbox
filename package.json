@@ -10,8 +10,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@picoframe/frame": "^0.0.5",
-    "@picoframe/plugin-sdk": "^0.0.2",
+    "@picoframe/frame": "^0.0.7",
+    "@picoframe/plugin-sdk": "^0.0.3",
     "@tauri-apps/api": "^2.11.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.21.0",

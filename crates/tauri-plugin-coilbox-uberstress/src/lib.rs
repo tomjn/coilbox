@@ -4,13 +4,13 @@
 //! persist the server list/config, and generate seed SQL. Results are returned as
 //! a [`CliResult`] envelope, matching every other picoframe plugin.
 
-mod config;
 mod report;
+mod settings;
 mod sidecar;
 
-use config::{load_config, save_config, Config};
 use picoframe_core::CliResult;
 use report::{list_report_files, parse_scenarios, Report, ReportSummary};
+use settings::{load_settings, save_settings, Settings};
 use serde_json::json;
 use sidecar::{build_args, resolve_sidecar, LogLine, RunOpts};
 use std::collections::HashMap;
@@ -31,14 +31,14 @@ const SIDECAR_MISSING: &str =
 /// run in flight. A run removes its own entry when it finishes reaping.
 type SharedRegistry = Arc<Mutex<HashMap<String, Child>>>;
 
-/// Resolve the plugin's config-file path and results directory under app-data.
+/// Resolve the plugin's settings-file path and results directory under app-data.
 fn data_dirs<R: Runtime>(app: &AppHandle<R>) -> Result<(PathBuf, PathBuf), String> {
     let base = app
         .path()
         .app_data_dir()
         .map_err(|e| format!("could not resolve app data dir: {e}"))?
         .join("uberstress");
-    Ok((base.join("config.json"), base.join("results")))
+    Ok((base.join("settings.json"), base.join("results")))
 }
 
 /// Run the sidecar to completion and capture its output (for short commands like
@@ -223,28 +223,30 @@ async fn us_report<R: Runtime>(app: AppHandle<R>, file: String) -> Result<CliRes
     })
 }
 
-/// `us_config_get` — load the persisted config (defaults if absent).
+/// `us_settings_load` — read the whole settings map, backing the frame's
+/// `SettingsStorage` adapter at app boot.
 #[tauri::command]
-async fn us_config_get<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
-    let (cfg_path, _) = match data_dirs(&app) {
+async fn us_settings_load<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
+    let (settings_path, _) = match data_dirs(&app) {
         Ok(d) => d,
         Err(e) => return Ok(CliResult::err(e)),
     };
-    Ok(match load_config(&cfg_path) {
-        Ok(cfg) => CliResult::ok(json!({ "config": cfg })),
+    Ok(match load_settings(&settings_path) {
+        Ok(entries) => CliResult::ok(json!({ "entries": entries })),
         Err(e) => CliResult::err(e),
     })
 }
 
-/// `us_config_set` — persist the config and echo it back.
+/// `us_settings_save` — persist the whole settings map. The adapter sends the
+/// full map on every change, so this is an atomic overwrite (no merge races).
 #[tauri::command]
-async fn us_config_set<R: Runtime>(app: AppHandle<R>, config: Config) -> Result<CliResult, ()> {
-    let (cfg_path, _) = match data_dirs(&app) {
+async fn us_settings_save<R: Runtime>(app: AppHandle<R>, entries: Settings) -> Result<CliResult, ()> {
+    let (settings_path, _) = match data_dirs(&app) {
         Ok(d) => d,
         Err(e) => return Ok(CliResult::err(e)),
     };
-    Ok(match save_config(&cfg_path, &config) {
-        Ok(()) => CliResult::ok(json!({ "config": config })),
+    Ok(match save_settings(&settings_path, &entries) {
+        Ok(()) => CliResult::ok(json!({})),
         Err(e) => CliResult::err(e),
     })
 }
@@ -285,8 +287,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             us_cancel,
             us_history,
             us_report,
-            us_config_get,
-            us_config_set,
+            us_settings_load,
+            us_settings_save,
             us_seed_sql
         ])
         .build()

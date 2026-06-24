@@ -9,8 +9,8 @@ Allows the uberstress plugin's commands (scenarios, run, cancel, history, report
 - `allow-us-cancel`
 - `allow-us-history`
 - `allow-us-report`
-- `allow-us-config-get`
-- `allow-us-config-set`
+- `allow-us-settings-load`
+- `allow-us-settings-save`
 - `allow-us-seed-sql`
 
 ## Permission Table
@@ -226,6 +226,58 @@ Enables the us_seed_sql command without any pre-configured scope.
 <td>
 
 Denies the us_seed_sql command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-uberstress:allow-us-settings-load`
+
+</td>
+<td>
+
+Enables the us_settings_load command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-uberstress:deny-us-settings-load`
+
+</td>
+<td>
+
+Denies the us_settings_load command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-uberstress:allow-us-settings-save`
+
+</td>
+<td>
+
+Enables the us_settings_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-uberstress:deny-us-settings-save`
+
+</td>
+<td>
+
+Denies the us_settings_save command without any pre-configured scope.
 
 </td>
 </tr>

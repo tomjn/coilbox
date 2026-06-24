@@ -231,10 +231,10 @@
           "markdownDescription": "Denies the prd_versions command without any pre-configured scope."
         },
         {
-          "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-config-get`\n- `allow-us-config-set`\n- `allow-us-seed-sql`",
+          "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`",
           "type": "string",
           "const": "coilbox-uberstress:default",
-          "markdownDescription": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-config-get`\n- `allow-us-config-set`\n- `allow-us-seed-sql`"
+          "markdownDescription": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`"
         },
         {
           "description": "Enables the us_cancel command without any pre-configured scope.",
@@ -285,6 +285,18 @@
           "markdownDescription": "Enables the us_seed_sql command without any pre-configured scope."
         },
         {
+          "description": "Enables the us_settings_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-settings-load",
+          "markdownDescription": "Enables the us_settings_load command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the us_settings_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-settings-save",
+          "markdownDescription": "Enables the us_settings_save command without any pre-configured scope."
+        },
+        {
           "description": "Denies the us_cancel command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-uberstress:deny-us-cancel",
@@ -331,6 +343,18 @@
           "type": "string",
           "const": "coilbox-uberstress:deny-us-seed-sql",
           "markdownDescription": "Denies the us_seed_sql command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_settings_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-settings-load",
+          "markdownDescription": "Denies the us_settings_load command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_settings_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-settings-save",
+          "markdownDescription": "Denies the us_settings_save command without any pre-configured scope."
         },
         {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",

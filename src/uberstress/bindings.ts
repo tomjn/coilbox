@@ -146,14 +146,15 @@ export const usReport = defineCommand<{ file: string }, { report: Report }>(
   "us_report",
 );
 
-export const usConfigGet = defineCommand<undefined, { config: Config }>(
+/** Whole settings map (opaque JSON-encoded string values), for the frame's SettingsStorage. */
+export const usSettingsLoad = defineCommand<undefined, { entries: Record<string, string> }>(
   "coilbox-uberstress",
-  "us_config_get",
+  "us_settings_load",
 );
 
-export const usConfigSet = defineCommand<{ config: Config }, { config: Config }>(
+export const usSettingsSave = defineCommand<{ entries: Record<string, string> }, Record<string, never>>(
   "coilbox-uberstress",
-  "us_config_set",
+  "us_settings_save",
 );
 
 export const usSeedSql = defineCommand<

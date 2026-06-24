@@ -391,10 +391,34 @@
           "markdownDescription": "Denies the us_seed_sql command without any pre-configured scope."
         },
         {
-          "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-config-get`\n- `allow-us-config-set`\n- `allow-us-seed-sql`",
+          "description": "Enables the us_settings_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-us-settings-load",
+          "markdownDescription": "Enables the us_settings_load command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_settings_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-us-settings-load",
+          "markdownDescription": "Denies the us_settings_load command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the us_settings_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-us-settings-save",
+          "markdownDescription": "Enables the us_settings_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_settings_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-us-settings-save",
+          "markdownDescription": "Denies the us_settings_save command without any pre-configured scope."
+        },
+        {
+          "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-config-get`\n- `allow-us-config-set`\n- `allow-us-seed-sql`"
+          "markdownDescription": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`"
         }
       ]
     }

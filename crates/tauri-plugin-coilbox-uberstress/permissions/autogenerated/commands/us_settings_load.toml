@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-us-settings-load"
+description = "Enables the us_settings_load command without any pre-configured scope."
+commands.allow = ["us_settings_load"]
+
+[[permission]]
+identifier = "deny-us-settings-load"
+description = "Denies the us_settings_load command without any pre-configured scope."
+commands.deny = ["us_settings_load"]

@@ -8,7 +8,7 @@ permissions = [
   "allow-us-cancel",
   "allow-us-history",
   "allow-us-report",
-  "allow-us-config-get",
-  "allow-us-config-set",
+  "allow-us-settings-load",
+  "allow-us-settings-save",
   "allow-us-seed-sql",
 ]

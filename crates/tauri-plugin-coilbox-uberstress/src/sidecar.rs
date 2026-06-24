@@ -7,9 +7,36 @@
 //! executable at runtime. We resolve it there rather than via the shell plugin so
 //! the ACL grant stays uniform (`coilbox-uberstress:default`, no shell scope).
 
-use crate::config::DbConfig;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+/// Database connection settings for bench mode. Sent from the frontend inside
+/// `RunOpts`; serialized camelCase to match the frame settings the UI persists.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DbConfig {
+    pub driver: String,
+    pub host: String,
+    pub port: i64,
+    pub user: String,
+    pub password: String,
+    pub name: String,
+    pub mysql_bin: String,
+}
+
+impl Default for DbConfig {
+    fn default() -> Self {
+        DbConfig {
+            driver: "mysql+pymysql".into(),
+            host: "127.0.0.1".into(),
+            port: 3306,
+            user: "root".into(),
+            password: "root".into(),
+            name: "uberstress_ab".into(),
+            mysql_bin: "mysql".into(),
+        }
+    }
+}
 
 /// Resolve the sidecar path. `UBERSTRESS_SIDECAR` overrides everything (handy for
 /// `tauri dev` and tests); otherwise look next to the current executable for
