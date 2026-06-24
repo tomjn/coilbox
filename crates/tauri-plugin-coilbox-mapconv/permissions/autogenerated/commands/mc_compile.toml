@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mc-compile"
+description = "Enables the mc_compile command without any pre-configured scope."
+commands.allow = ["mc_compile"]
+
+[[permission]]
+identifier = "deny-mc-compile"
+description = "Denies the mc_compile command without any pre-configured scope."
+commands.deny = ["mc_compile"]

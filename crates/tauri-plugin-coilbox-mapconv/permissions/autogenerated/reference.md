@@ -1,0 +1,178 @@
+## Default Permission
+
+Allows the mapconv plugin's commands (probe, compile, decompile, cancel, settings).
+
+#### This default permission set includes the following:
+
+- `allow-mc-probe`
+- `allow-mc-compile`
+- `allow-mc-decompile`
+- `allow-mc-cancel`
+- `allow-mc-settings-load`
+- `allow-mc-settings-save`
+
+## Permission Table
+
+<table>
+<tr>
+<th>Identifier</th>
+<th>Description</th>
+</tr>
+
+
+<tr>
+<td>
+
+`coilbox-mapconv:allow-mc-cancel`
+
+</td>
+<td>
+
+Enables the mc_cancel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:deny-mc-cancel`
+
+</td>
+<td>
+
+Denies the mc_cancel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:allow-mc-compile`
+
+</td>
+<td>
+
+Enables the mc_compile command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:deny-mc-compile`
+
+</td>
+<td>
+
+Denies the mc_compile command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:allow-mc-decompile`
+
+</td>
+<td>
+
+Enables the mc_decompile command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:deny-mc-decompile`
+
+</td>
+<td>
+
+Denies the mc_decompile command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:allow-mc-probe`
+
+</td>
+<td>
+
+Enables the mc_probe command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:deny-mc-probe`
+
+</td>
+<td>
+
+Denies the mc_probe command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:allow-mc-settings-load`
+
+</td>
+<td>
+
+Enables the mc_settings_load command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:deny-mc-settings-load`
+
+</td>
+<td>
+
+Denies the mc_settings_load command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:allow-mc-settings-save`
+
+</td>
+<td>
+
+Enables the mc_settings_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:deny-mc-settings-save`
+
+</td>
+<td>
+
+Denies the mc_settings_save command without any pre-configured scope.
+
+</td>
+</tr>
+</table>

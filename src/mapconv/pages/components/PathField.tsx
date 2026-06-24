@@ -1,0 +1,64 @@
+import { Button, Input, cn } from "@picoframe/frame";
+import { open } from "@tauri-apps/plugin-dialog";
+import { FolderOpen } from "lucide-react";
+import { Field } from "./Field";
+
+/**
+ * A path field: a read-only text input showing the selected path plus a Browse
+ * button that opens the native OS picker (`@tauri-apps/plugin-dialog`). We use
+ * native pickers because a web view cannot enumerate the filesystem itself; the
+ * surrounding option panels are hosted in side drawers instead of modal dialogs.
+ *
+ * Pass `directory` to pick a folder, or `filters` to constrain file types.
+ */
+export function PathField({
+  label,
+  hint,
+  value,
+  onChange,
+  disabled,
+  directory = false,
+  filters,
+  defaultPath,
+  className,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (path: string) => void;
+  disabled?: boolean;
+  directory?: boolean;
+  filters?: { name: string; extensions: string[] }[];
+  defaultPath?: string;
+  className?: string;
+}) {
+  async function browse() {
+    const picked = await open({
+      title: `Select ${label}`,
+      directory,
+      multiple: false,
+      filters: directory ? undefined : filters,
+      defaultPath: defaultPath || value || undefined,
+    });
+    // `open` returns null on cancel, a string for a single selection.
+    if (typeof picked === "string") onChange(picked);
+  }
+
+  return (
+    <Field label={label} hint={hint} className={className}>
+      <div className="flex gap-2">
+        <Input value={value} readOnly placeholder="(none)" className="font-mono text-xs" disabled={disabled} />
+        <Button
+          type="button"
+          variant="outline"
+          onClick={browse}
+          disabled={disabled}
+          aria-label={`Browse for ${label}`}
+          className={cn("shrink-0")}
+        >
+          <FolderOpen /> Browse
+        </Button>
+      </div>
+    </Field>
+  );
+}
