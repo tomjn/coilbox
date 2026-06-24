@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mc-probe"
+description = "Enables the mc_probe command without any pre-configured scope."
+commands.allow = ["mc_probe"]
+
+[[permission]]
+identifier = "deny-mc-probe"
+description = "Denies the mc_probe command without any pre-configured scope."
+commands.deny = ["mc_probe"]

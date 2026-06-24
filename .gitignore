@@ -5,3 +5,8 @@ dist
 # Rust / Tauri (workspace target lives at the repo root)
 /target
 src-tauri/target
+
+# mapconv sidecars are fetched from SpringMapConvNG releases at build time
+# (see scripts/fetch-mapconv.sh + .github/workflows/release.yml), not committed.
+# Bundled as a Tauri resource folder (binaries + their libs/).
+src-tauri/mapconv/

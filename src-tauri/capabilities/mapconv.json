@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "mapconv",
+  "description": "Grants the mapconv plugin's default commands and native file pickers to the main window.",
+  "windows": ["main"],
+  "permissions": ["coilbox-mapconv:default", "dialog:allow-open"]
+}

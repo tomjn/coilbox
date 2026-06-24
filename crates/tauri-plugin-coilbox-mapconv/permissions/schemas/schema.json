@@ -295,106 +295,106 @@
       "type": "string",
       "oneOf": [
         {
-          "description": "Enables the us_cancel command without any pre-configured scope.",
+          "description": "Enables the mc_cancel command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-us-cancel",
-          "markdownDescription": "Enables the us_cancel command without any pre-configured scope."
+          "const": "allow-mc-cancel",
+          "markdownDescription": "Enables the mc_cancel command without any pre-configured scope."
         },
         {
-          "description": "Denies the us_cancel command without any pre-configured scope.",
+          "description": "Denies the mc_cancel command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-us-cancel",
-          "markdownDescription": "Denies the us_cancel command without any pre-configured scope."
+          "const": "deny-mc-cancel",
+          "markdownDescription": "Denies the mc_cancel command without any pre-configured scope."
         },
         {
-          "description": "Enables the us_history command without any pre-configured scope.",
+          "description": "Enables the mc_compile command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-us-history",
-          "markdownDescription": "Enables the us_history command without any pre-configured scope."
+          "const": "allow-mc-compile",
+          "markdownDescription": "Enables the mc_compile command without any pre-configured scope."
         },
         {
-          "description": "Denies the us_history command without any pre-configured scope.",
+          "description": "Denies the mc_compile command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-us-history",
-          "markdownDescription": "Denies the us_history command without any pre-configured scope."
+          "const": "deny-mc-compile",
+          "markdownDescription": "Denies the mc_compile command without any pre-configured scope."
         },
         {
-          "description": "Enables the us_report command without any pre-configured scope.",
+          "description": "Enables the mc_decompile command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-us-report",
-          "markdownDescription": "Enables the us_report command without any pre-configured scope."
+          "const": "allow-mc-decompile",
+          "markdownDescription": "Enables the mc_decompile command without any pre-configured scope."
         },
         {
-          "description": "Denies the us_report command without any pre-configured scope.",
+          "description": "Denies the mc_decompile command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-us-report",
-          "markdownDescription": "Denies the us_report command without any pre-configured scope."
+          "const": "deny-mc-decompile",
+          "markdownDescription": "Denies the mc_decompile command without any pre-configured scope."
         },
         {
-          "description": "Enables the us_run command without any pre-configured scope.",
+          "description": "Enables the mc_open_path command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-us-run",
-          "markdownDescription": "Enables the us_run command without any pre-configured scope."
+          "const": "allow-mc-open-path",
+          "markdownDescription": "Enables the mc_open_path command without any pre-configured scope."
         },
         {
-          "description": "Denies the us_run command without any pre-configured scope.",
+          "description": "Denies the mc_open_path command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-us-run",
-          "markdownDescription": "Denies the us_run command without any pre-configured scope."
+          "const": "deny-mc-open-path",
+          "markdownDescription": "Denies the mc_open_path command without any pre-configured scope."
         },
         {
-          "description": "Enables the us_scenarios command without any pre-configured scope.",
+          "description": "Enables the mc_probe command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-us-scenarios",
-          "markdownDescription": "Enables the us_scenarios command without any pre-configured scope."
+          "const": "allow-mc-probe",
+          "markdownDescription": "Enables the mc_probe command without any pre-configured scope."
         },
         {
-          "description": "Denies the us_scenarios command without any pre-configured scope.",
+          "description": "Denies the mc_probe command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-us-scenarios",
-          "markdownDescription": "Denies the us_scenarios command without any pre-configured scope."
+          "const": "deny-mc-probe",
+          "markdownDescription": "Denies the mc_probe command without any pre-configured scope."
         },
         {
-          "description": "Enables the us_seed_sql command without any pre-configured scope.",
+          "description": "Enables the mc_settings_load command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-us-seed-sql",
-          "markdownDescription": "Enables the us_seed_sql command without any pre-configured scope."
+          "const": "allow-mc-settings-load",
+          "markdownDescription": "Enables the mc_settings_load command without any pre-configured scope."
         },
         {
-          "description": "Denies the us_seed_sql command without any pre-configured scope.",
+          "description": "Denies the mc_settings_load command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-us-seed-sql",
-          "markdownDescription": "Denies the us_seed_sql command without any pre-configured scope."
+          "const": "deny-mc-settings-load",
+          "markdownDescription": "Denies the mc_settings_load command without any pre-configured scope."
         },
         {
-          "description": "Enables the us_settings_load command without any pre-configured scope.",
+          "description": "Enables the mc_settings_save command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-us-settings-load",
-          "markdownDescription": "Enables the us_settings_load command without any pre-configured scope."
+          "const": "allow-mc-settings-save",
+          "markdownDescription": "Enables the mc_settings_save command without any pre-configured scope."
         },
         {
-          "description": "Denies the us_settings_load command without any pre-configured scope.",
+          "description": "Denies the mc_settings_save command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-us-settings-load",
-          "markdownDescription": "Denies the us_settings_load command without any pre-configured scope."
+          "const": "deny-mc-settings-save",
+          "markdownDescription": "Denies the mc_settings_save command without any pre-configured scope."
         },
         {
-          "description": "Enables the us_settings_save command without any pre-configured scope.",
+          "description": "Enables the mc_suggest_sources command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-us-settings-save",
-          "markdownDescription": "Enables the us_settings_save command without any pre-configured scope."
+          "const": "allow-mc-suggest-sources",
+          "markdownDescription": "Enables the mc_suggest_sources command without any pre-configured scope."
         },
         {
-          "description": "Denies the us_settings_save command without any pre-configured scope.",
+          "description": "Denies the mc_suggest_sources command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-us-settings-save",
-          "markdownDescription": "Denies the us_settings_save command without any pre-configured scope."
+          "const": "deny-mc-suggest-sources",
+          "markdownDescription": "Denies the mc_suggest_sources command without any pre-configured scope."
         },
         {
-          "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`",
+          "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`"
+          "markdownDescription": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`"
         }
       ]
     }

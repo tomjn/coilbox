@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mc-cancel"
+description = "Enables the mc_cancel command without any pre-configured scope."
+commands.allow = ["mc_cancel"]
+
+[[permission]]
+identifier = "deny-mc-cancel"
+description = "Denies the mc_cancel command without any pre-configured scope."
+commands.deny = ["mc_cancel"]

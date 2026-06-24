@@ -51,58 +51,6 @@ Denies the us_cancel command without any pre-configured scope.
 <tr>
 <td>
 
-`coilbox-uberstress:allow-us-config-get`
-
-</td>
-<td>
-
-Enables the us_config_get command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`coilbox-uberstress:deny-us-config-get`
-
-</td>
-<td>
-
-Denies the us_config_get command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`coilbox-uberstress:allow-us-config-set`
-
-</td>
-<td>
-
-Enables the us_config_set command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`coilbox-uberstress:deny-us-config-set`
-
-</td>
-<td>
-
-Denies the us_config_set command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
 `coilbox-uberstress:allow-us-history`
 
 </td>

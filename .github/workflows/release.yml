@@ -28,9 +28,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # `smcng_platform` selects the SpringMapConvNG release asset; `exe` is the
+          # binary suffix on Windows.
           - platform: macos-14 # arm64
+            smcng_platform: macos-arm64
+            exe: ""
           - platform: ubuntu-22.04
+            smcng_platform: linux-x86_64
+            exe: ""
           - platform: windows-latest
+            smcng_platform: windows-x86_64
+            exe: ".exe"
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +67,25 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+
+      # Fetch the pinned SpringMapConvNG release and extract its binaries + libs/
+      # into src-tauri/mapconv/, bundled as a Tauri resource folder. The binaries
+      # load image libs (DevIL etc.) via @executable_path/libs, so libs/ must sit
+      # beside them — externalBin can't carry a folder. gitignored, not committed.
+      - name: Fetch SpringMapConvNG sidecars
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VER="$(tr -d '[:space:]' < scripts/springmapconvng-version.txt)"
+          ASSET="SpringMapConvNG-${VER}-${{ matrix.smcng_platform }}.tar.gz"
+          EXE="${{ matrix.exe }}"
+          rm -rf src-tauri/mapconv smcng_tmp
+          mkdir -p src-tauri/mapconv smcng_tmp
+          gh release download "$VER" --repo tomjn/SpringMapConvNG --pattern "$ASSET" --dir smcng_tmp
+          tar -xzf "smcng_tmp/${ASSET}" -C src-tauri/mapconv
+          chmod +x "src-tauri/mapconv/mapcompile${EXE}" "src-tauri/mapconv/mapdecompile${EXE}" || true
 
       - uses: tauri-apps/tauri-action@v0
         env:

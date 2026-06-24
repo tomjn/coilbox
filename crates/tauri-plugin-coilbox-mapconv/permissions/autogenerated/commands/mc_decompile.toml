@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mc-decompile"
+description = "Enables the mc_decompile command without any pre-configured scope."
+commands.allow = ["mc_decompile"]
+
+[[permission]]
+identifier = "deny-mc-decompile"
+description = "Denies the mc_decompile command without any pre-configured scope."
+commands.deny = ["mc_decompile"]
