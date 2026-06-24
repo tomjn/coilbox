@@ -39,6 +39,7 @@
     ],
     "macOS": {
       "signingIdentity": "-",
+      "entitlements": "entitlements.plist",
       "dmg": {
         "windowSize": { "width": 700, "height": 450 },
         "appPosition": { "x": 200, "y": 195 },
