@@ -139,7 +139,7 @@ export default function DecompilePage() {
         </p>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[28rem_1fr]">
+      <div className="grid min-h-0 flex-1 grid-cols-[28rem_minmax(0,1fr)]">
         {/* Left: form. The whole column is a drop target while dragging. */}
         <div
           className={cn(
@@ -176,12 +176,12 @@ export default function DecompilePage() {
         </div>
 
         {/* Right: live log + result */}
-        <div className="flex min-h-0 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-col">
           {result && (
             <div className="border-b border-border bg-card/50 p-4">
               <div className="flex items-start gap-2 text-sm">
                 <CheckCircle2 size={15} className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400" />
-                <span>
+                <span className="min-w-0 break-all">
                   Extracted into <span className="font-mono text-xs">{result.directory}</span>
                 </span>
               </div>

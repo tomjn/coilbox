@@ -179,7 +179,7 @@ export default function CompilePage() {
         </p>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[28rem_1fr]">
+      <div className="grid min-h-0 flex-1 grid-cols-[28rem_minmax(0,1fr)]">
         {/* Left: form */}
         <div className="min-h-0 space-y-5 overflow-auto border-r border-border px-6 py-5">
           <PathField
@@ -243,12 +243,12 @@ export default function CompilePage() {
         </div>
 
         {/* Right: live log + result */}
-        <div className="flex min-h-0 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-col">
           {result && (
             <div className="border-b border-border bg-card/50 px-4 py-3">
               <div className="flex items-start gap-2 text-sm">
                 <CheckCircle2 size={15} className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400" />
-                <span>
+                <span className="min-w-0 break-all">
                   Compiled <span className="font-mono text-xs">{result.smfPath}</span>
                 </span>
               </div>
