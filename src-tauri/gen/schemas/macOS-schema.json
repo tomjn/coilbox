@@ -243,18 +243,6 @@
           "markdownDescription": "Enables the us_cancel command without any pre-configured scope."
         },
         {
-          "description": "Enables the us_config_get command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-uberstress:allow-us-config-get",
-          "markdownDescription": "Enables the us_config_get command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the us_config_set command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-uberstress:allow-us-config-set",
-          "markdownDescription": "Enables the us_config_set command without any pre-configured scope."
-        },
-        {
           "description": "Enables the us_history command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-uberstress:allow-us-history",
@@ -301,18 +289,6 @@
           "type": "string",
           "const": "coilbox-uberstress:deny-us-cancel",
           "markdownDescription": "Denies the us_cancel command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the us_config_get command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-uberstress:deny-us-config-get",
-          "markdownDescription": "Denies the us_config_get command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the us_config_set command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-uberstress:deny-us-config-set",
-          "markdownDescription": "Denies the us_config_set command without any pre-configured scope."
         },
         {
           "description": "Denies the us_history command without any pre-configured scope.",
