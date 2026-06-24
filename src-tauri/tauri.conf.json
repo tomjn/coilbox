@@ -41,8 +41,8 @@
       "signingIdentity": "-",
       "dmg": {
         "windowSize": { "width": 700, "height": 450 },
-        "appPosition": { "x": 200, "y": 230 },
-        "applicationFolderPosition": { "x": 500, "y": 230 }
+        "appPosition": { "x": 200, "y": 195 },
+        "applicationFolderPosition": { "x": 500, "y": 195 }
       }
     }
   }
