@@ -1,8 +1,9 @@
 import { Button, Input } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
-import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Hammer, Loader2, Play, Square } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, FolderOpen, Hammer, Loader2, Play, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type CompileOpts, type CompressionType, type LogLine, mcCancel, mcCompile, mcProbe, mcSuggestSources } from "../bindings";
+import { useLocation } from "react-router";
+import { type CompileOpts, type CompressionType, type LogLine, mcCancel, mcCompile, mcOpenPath, mcProbe, mcSuggestSources } from "../bindings";
 import { useMapconvConfig } from "../config";
 import AdvancedOptions, { type AdvancedCompileOpts, defaultAdvanced } from "./components/AdvancedOptions";
 import { Field } from "./components/Field";
@@ -37,6 +38,7 @@ function countAdvanced(a: AdvancedCompileOpts): number {
 /** Build a `.smf`/`.smt` from source images via the `mapcompile` sidecar. */
 export default function CompilePage() {
   const [cfg, setCfg] = useMapconvConfig();
+  const location = useLocation();
 
   const [maintexture, setMaintexture] = useState("");
   const [outDir, setOutDir] = useState("");
@@ -142,6 +144,20 @@ export default function CompilePage() {
     }
   }
 
+  // Arriving from the Decompile page's "Recompile": seed the texture (+ siblings
+  // via pickTexture) and output folder from the freshly decompiled directory.
+  useEffect(() => {
+    const dir = (location.state as { recompileDir?: string } | null)?.recompileDir;
+    if (!dir) return;
+    const sep = dir.includes("\\") ? "\\" : "/";
+    const i = Math.max(dir.lastIndexOf("/"), dir.lastIndexOf("\\"));
+    setOutDir(dir);
+    setOutSuffix((i >= 0 ? dir.slice(i + 1) : dir).replace(/-decompiled$/, ""));
+    void pickTexture(`${dir}${sep}texture.png`);
+    // run once on mount for the incoming navigation state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const advancedCount = countAdvanced(advanced);
 
   return (
@@ -229,11 +245,21 @@ export default function CompilePage() {
         {/* Right: live log + result */}
         <div className="flex min-h-0 flex-col">
           {result && (
-            <div className="flex items-start gap-2 border-b border-border bg-card/50 px-4 py-3 text-sm">
-              <CheckCircle2 size={15} className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400" />
-              <span>
-                Compiled <span className="font-mono text-xs">{result.smfPath}</span>
-              </span>
+            <div className="border-b border-border bg-card/50 px-4 py-3">
+              <div className="flex items-start gap-2 text-sm">
+                <CheckCircle2 size={15} className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <span>
+                  Compiled <span className="font-mono text-xs">{result.smfPath}</span>
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => mcOpenPath({ path: outDir }).catch(() => {})}
+              >
+                <FolderOpen /> Show in folder
+              </Button>
             </div>
           )}
           {runError && (

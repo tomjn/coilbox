@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "mc_compile",
     "mc_decompile",
     "mc_cancel",
+    "mc_open_path",
     "mc_settings_load",
     "mc_settings_save",
 ];

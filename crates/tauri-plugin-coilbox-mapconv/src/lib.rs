@@ -282,6 +282,27 @@ async fn mc_cancel(reg: State<'_, SharedRegistry>, run_id: String) -> Result<Cli
     })
 }
 
+/// `mc_open_path` — open a folder (or file's location) in the OS file manager,
+/// so the user can get at the decompiled/compiled output.
+#[tauri::command]
+async fn mc_open_path(path: String) -> CliResult {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return CliResult::err(format!("path does not exist: {path}"));
+    }
+    #[cfg(target_os = "macos")]
+    let spawned = Command::new("open").arg(&p).spawn();
+    #[cfg(target_os = "windows")]
+    let spawned = Command::new("explorer").arg(&p).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let spawned = Command::new("xdg-open").arg(&p).spawn();
+
+    match spawned {
+        Ok(_) => CliResult::ok(json!({ "opened": true })),
+        Err(e) => CliResult::err(format!("could not open path: {e}")),
+    }
+}
+
 /// `mc_settings_load` — read the whole settings map, backing the frame's
 /// `SettingsStorage` adapter at app boot.
 #[tauri::command]
@@ -323,6 +344,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mc_compile,
             mc_decompile,
             mc_cancel,
+            mc_open_path,
             mc_settings_load,
             mc_settings_save
         ])

@@ -9,6 +9,7 @@ Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile
 - `allow-mc-compile`
 - `allow-mc-decompile`
 - `allow-mc-cancel`
+- `allow-mc-open-path`
 - `allow-mc-settings-load`
 - `allow-mc-settings-save`
 
@@ -95,6 +96,32 @@ Enables the mc_decompile command without any pre-configured scope.
 <td>
 
 Denies the mc_decompile command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:allow-mc-open-path`
+
+</td>
+<td>
+
+Enables the mc_open_path command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:deny-mc-open-path`
+
+</td>
+<td>
+
+Denies the mc_open_path command without any pre-configured scope.
 
 </td>
 </tr>

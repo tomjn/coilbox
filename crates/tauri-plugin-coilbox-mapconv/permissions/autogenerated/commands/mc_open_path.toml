@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mc-open-path"
+description = "Enables the mc_open_path command without any pre-configured scope."
+commands.allow = ["mc_open_path"]
+
+[[permission]]
+identifier = "deny-mc-open-path"
+description = "Denies the mc_open_path command without any pre-configured scope."
+commands.deny = ["mc_open_path"]

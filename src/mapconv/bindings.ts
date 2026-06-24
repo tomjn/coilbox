@@ -88,6 +88,12 @@ export const mcCancel = defineCommand<{ runId: string }, { cancelled: boolean }>
   "mc_cancel",
 );
 
+/** Open a folder in the OS file manager (Finder/Explorer/file manager). */
+export const mcOpenPath = defineCommand<{ path: string }, { opened: boolean }>(
+  "coilbox-mapconv",
+  "mc_open_path",
+);
+
 /** Whole settings map (opaque JSON-encoded string values), for the frame's SettingsStorage. */
 export const mcSettingsLoad = defineCommand<undefined, { entries: Record<string, string> }>(
   "coilbox-mapconv",

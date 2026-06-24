@@ -1,9 +1,10 @@
 import { Button, cn } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { AlertCircle, CheckCircle2, Loader2, PackageOpen, Play, Square } from "lucide-react";
+import { AlertCircle, CheckCircle2, FolderOpen, Hammer, Loader2, PackageOpen, Play, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type LogLine, type MapInfo, mcCancel, mcDecompile, mcProbe } from "../bindings";
+import { useNavigate } from "react-router";
+import { type LogLine, type MapInfo, mcCancel, mcDecompile, mcOpenPath, mcProbe } from "../bindings";
 import { useMapconvConfig } from "../config";
 import { PathField } from "./components/PathField";
 
@@ -25,6 +26,7 @@ type Result = { directory: string; mapInfo?: MapInfo | null; minimap?: string | 
 /** Extract source images from a `.smf`, or a `.sdz`/`.sd7` archive. */
 export default function DecompilePage() {
   const [cfg, setCfg] = useMapconvConfig();
+  const navigate = useNavigate();
 
   const [inputPath, setInputPath] = useState("");
   const [running, setRunning] = useState(false);
@@ -195,6 +197,18 @@ export default function DecompilePage() {
                   {result.mapInfo && <MapFacts info={result.mapInfo} />}
                 </div>
               )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => mcOpenPath({ path: result.directory }).catch(() => {})}>
+                  <FolderOpen /> Show in folder
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate("/mapconv", { state: { recompileDir: result.directory } })}
+                >
+                  <Hammer /> Recompile
+                </Button>
+              </div>
             </div>
           )}
           {runError && (

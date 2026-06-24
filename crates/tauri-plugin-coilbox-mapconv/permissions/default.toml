@@ -8,6 +8,7 @@ permissions = [
   "allow-mc-compile",
   "allow-mc-decompile",
   "allow-mc-cancel",
+  "allow-mc-open-path",
   "allow-mc-settings-load",
   "allow-mc-settings-save",
 ]
