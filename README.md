@@ -7,6 +7,21 @@ Coilbox is a [Tauri](https://tauri.app) v2 app that composes picoframe plugins. 
 first tool is **pr-downloader**: browse the Spring/Recoil rapid content repositories
 and download a tag through a bundled `pr-downloader` sidecar.
 
+## Install
+
+Download the build for your OS from [Releases](https://github.com/tomjn/coilbox/releases).
+
+**macOS:** the app is ad-hoc signed but **not notarized** (no Apple Developer
+account), so Gatekeeper blocks it on first launch. After copying Coilbox to
+Applications, clear the download quarantine:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Coilbox.app
+```
+
+(or right-click the app → Open, then confirm in System Settings → Privacy &
+Security). This is a one-time step per download.
+
 ## Develop
 
 ```sh
