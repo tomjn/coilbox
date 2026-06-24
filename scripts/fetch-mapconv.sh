@@ -39,9 +39,17 @@ cp "$TMP/mapcompile${EXE}" "$BIN/mapcompile-${TRIPLE}${EXE}"
 cp "$TMP/mapdecompile${EXE}" "$BIN/mapdecompile-${TRIPLE}${EXE}"
 chmod +x "$BIN/mapcompile-${TRIPLE}${EXE}" "$BIN/mapdecompile-${TRIPLE}${EXE}" 2>/dev/null || true
 
+# The mac/Windows binaries load bundled image libs via @executable_path/libs
+# (DevIL etc.), so the libs/ folder must sit next to them. Keep it.
+if [ -d "$TMP/libs" ]; then
+  rm -rf "$BIN/libs"
+  cp -R "$TMP/libs" "$BIN/libs"
+fi
+
 echo "Installed:"
 echo "  $BIN/mapcompile-${TRIPLE}${EXE}"
 echo "  $BIN/mapdecompile-${TRIPLE}${EXE}"
+[ -d "$BIN/libs" ] && echo "  $BIN/libs/ (bundled image libraries)"
 echo
 echo "For 'bun tauri dev' (binaries are not copied next to the dev exe), export:"
 echo "  export MAPCONV_MAPCOMPILE_SIDECAR=$BIN/mapcompile-${TRIPLE}${EXE}"

@@ -10,3 +10,4 @@ src-tauri/target
 # (see scripts/fetch-mapconv.sh + .github/workflows/release.yml), not committed.
 src-tauri/binaries/mapcompile-*
 src-tauri/binaries/mapdecompile-*
+src-tauri/binaries/libs/
