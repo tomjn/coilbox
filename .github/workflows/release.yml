@@ -51,7 +51,10 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          # libdevil-dev provides libIL.so.1 / libILU.so.1 so linuxdeploy can
+          # resolve and bundle the mapconv sidecars' DevIL deps into the AppImage
+          # (the linux SpringMapConvNG build links system DevIL, not bundled libs).
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdevil-dev
 
       # The release version comes from the git tag, not hand-maintained in source.
       # In source the bundle version is a 0.0.0 placeholder; on a tag build we
