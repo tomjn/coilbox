@@ -1,48 +1,90 @@
-import { Button } from "@picoframe/frame";
+import { Button, cn } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { AlertCircle, CheckCircle2, Loader2, PackageOpen, Play, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type DecompileOpts, type LogLine, mcCancel, mcDecompile, mcProbe } from "../bindings";
+import { type LogLine, type MapInfo, mcCancel, mcDecompile, mcProbe } from "../bindings";
 import { useMapconvConfig } from "../config";
-import { Field } from "./components/Field";
 import { PathField } from "./components/PathField";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-const SMF_FILTERS = [{ name: "Spring map", extensions: ["smf"] }];
+const INPUT_FILTERS = [{ name: "Spring map or archive", extensions: ["smf", "sdz", "sd7"] }];
+const ACCEPTS = /\.(smf|sdz|sd7)$/i;
 
-/** Split a native path into [parent dir, basename] (handles / and \). */
-function splitPath(p: string): [string, string] {
+/** The parent dir of a native path (handles both / and \ separators). */
+function dirname(p: string): string {
   const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-  return i >= 0 ? [p.slice(0, i), p.slice(i + 1)] : ["", p];
+  return i >= 0 ? p.slice(0, i) : "";
 }
 
-/** Extract source images from a `.smf` via the `mapdecompile` sidecar. */
+type Result = { directory: string; mapInfo?: MapInfo | null; minimap?: string | null };
+
+/** Extract source images from a `.smf`, or a `.sdz`/`.sd7` archive. */
 export default function DecompilePage() {
   const [cfg, setCfg] = useMapconvConfig();
 
-  const [smfPath, setSmfPath] = useState("");
+  const [inputPath, setInputPath] = useState("");
   const [running, setRunning] = useState(false);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
-  const [result, setResult] = useState<{ directory: string } | null>(null);
+  const [result, setResult] = useState<Result | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [probe, setProbe] = useState<{ available: boolean; compile: boolean; decompile: boolean } | null>(null);
 
+  const [dragging, setDragging] = useState(false);
+
   const runIdRef = useRef<string | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
+  // Mirror `running` into a ref so the (mount-once) drop listener sees the
+  // current value without re-subscribing.
+  const runningRef = useRef(running);
+  runningRef.current = running;
 
   useEffect(() => {
     mcProbe(undefined).then(setProbe).catch(() => {});
+  }, []);
+
+  // Native file drop (Tauri exposes real paths; HTML5 drag-drop can't in a webview).
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        const p = event.payload;
+        if (p.type === "enter" || p.type === "over") {
+          setDragging(true);
+        } else if (p.type === "leave") {
+          setDragging(false);
+        } else if (p.type === "drop") {
+          setDragging(false);
+          if (runningRef.current) return;
+          const file = p.paths.find((f) => ACCEPTS.test(f));
+          if (file) {
+            setInputPath(file);
+            setRunError(null);
+          } else if (p.paths.length) {
+            setRunError("Drop a .smf, .sdz, or .sd7 file.");
+          }
+        }
+      })
+      .then((fn) => {
+        if (active) unlisten = fn;
+        else fn();
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+      unlisten?.();
+    };
   }, []);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ block: "end" });
   }, [logLines]);
 
-  const [directory, mapfile] = splitPath(smfPath);
-  const canRun = !running && smfPath !== "" && directory !== "";
+  const canRun = !running && inputPath !== "";
 
   async function run() {
     setRunning(true);
@@ -53,11 +95,10 @@ export default function DecompilePage() {
     runIdRef.current = runId;
     const onLog = new Channel<LogLine>();
     onLog.onmessage = (line) => setLogLines((prev) => [...prev, line]);
-    const opts: DecompileOpts = { directory, mapfile };
     try {
-      const res = await mcDecompile({ opts, runId, onLog });
-      setResult({ directory: res.directory });
-      if (cfg.rememberDirs) setCfg({ ...cfg, lastSmfDir: directory });
+      const res = await mcDecompile({ inputPath, runId, onLog });
+      setResult({ directory: res.directory, mapInfo: res.mapInfo, minimap: res.minimap });
+      if (cfg.rememberDirs) setCfg({ ...cfg, lastSmfDir: dirname(inputPath) });
     } catch (e) {
       setRunError(errMessage(e));
     } finally {
@@ -83,8 +124,8 @@ export default function DecompilePage() {
           <PackageOpen size={18} /> Decompile map
         </h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          Extract the source images (texture, heightmap, metal/type maps, features) from a Spring <code>.smf</code> into
-          its folder.
+          Extract the source images (texture, heightmap, metal/type maps, features) from a Spring <code>.smf</code>, or
+          from a packaged <code>.sdz</code>/<code>.sd7</code> archive (extracted automatically).
         </p>
       </header>
 
@@ -97,24 +138,22 @@ export default function DecompilePage() {
       )}
 
       <div className="grid min-h-0 flex-1 grid-cols-[28rem_1fr]">
-        {/* Left: form */}
-        <div className="min-h-0 space-y-5 overflow-auto border-r border-border px-6 py-5">
+        {/* Left: form. The whole column is a drop target while dragging. */}
+        <div
+          className={cn(
+            "min-h-0 space-y-5 overflow-auto border-r border-border px-6 py-5 transition-colors",
+            dragging && "bg-primary/5 ring-2 ring-inset ring-primary/60",
+          )}
+        >
           <PathField
-            label="Map file (.smf)"
-            hint="source images are written next to it"
-            value={smfPath}
-            onChange={setSmfPath}
+            label="Map (.smf / .sdz / .sd7)"
+            hint="browse, or drag a .smf/.sdz/.sd7 onto the window · archives are extracted then decompiled"
+            value={inputPath}
+            onChange={setInputPath}
             disabled={running}
-            filters={SMF_FILTERS}
+            filters={INPUT_FILTERS}
             defaultPath={cfg.lastSmfDir}
           />
-          {smfPath && (
-            <Field label="Output folder" hint="the .smf's folder; mapdecompile writes here">
-              <p className="rounded-md border border-border bg-card/40 px-3 py-2 font-mono text-xs text-muted-foreground">
-                {directory || "(current folder)"}
-              </p>
-            </Field>
-          )}
 
           <div className="flex items-center gap-2 pt-1">
             {running ? (
@@ -137,11 +176,25 @@ export default function DecompilePage() {
         {/* Right: live log + result */}
         <div className="flex min-h-0 flex-col">
           {result && (
-            <div className="flex items-start gap-2 border-b border-border bg-card/50 px-4 py-3 text-sm">
-              <CheckCircle2 size={15} className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400" />
-              <span>
-                Extracted into <span className="font-mono text-xs">{result.directory}</span>
-              </span>
+            <div className="border-b border-border bg-card/50 p-4">
+              <div className="flex items-start gap-2 text-sm">
+                <CheckCircle2 size={15} className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <span>
+                  Extracted into <span className="font-mono text-xs">{result.directory}</span>
+                </span>
+              </div>
+              {(result.minimap || result.mapInfo) && (
+                <div className="mt-3 flex flex-wrap items-start gap-4">
+                  {result.minimap && (
+                    <img
+                      src={result.minimap}
+                      alt="Map minimap"
+                      className="h-32 w-32 rounded-md border border-border object-cover"
+                    />
+                  )}
+                  {result.mapInfo && <MapFacts info={result.mapInfo} />}
+                </div>
+              )}
             </div>
           )}
           {runError && (
@@ -174,5 +227,24 @@ export default function DecompilePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Compact facts read from the SMF header. */
+function MapFacts({ info }: { info: MapInfo }) {
+  const rows: [string, string][] = [
+    ["Size", `${info.mapx} × ${info.mapy} squares`],
+    ["World", `${info.worldWidth} × ${info.worldHeight} elmos`],
+    ["Height", `${info.minHeight} → ${info.maxHeight}`],
+  ];
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+      {rows.map(([k, v]) => (
+        <div key={k} className="contents">
+          <dt className="text-muted-foreground">{k}</dt>
+          <dd className="font-mono text-xs">{v}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

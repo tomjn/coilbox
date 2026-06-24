@@ -4,15 +4,17 @@
 //! over a Tauri [`Channel`]. Results are returned as a [`CliResult`] envelope,
 //! matching every other picoframe plugin.
 
+mod archive;
 mod settings;
 mod sidecar;
+mod smf;
 
 use picoframe_core::CliResult;
 use serde_json::json;
 use settings::{load_settings, save_settings, Settings};
 use sidecar::{build_compile_args, build_decompile_args, match_sources, resolve_sidecar, CompileOpts, DecompileOpts, LogLine};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use tauri::{
@@ -41,6 +43,22 @@ fn settings_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
         .map_err(|e| format!("could not resolve app data dir: {e}"))?
         .join("mapconv");
     Ok(base.join("settings.json"))
+}
+
+/// Standard base64 (no line breaks), for embedding the extracted minimap as a
+/// `data:` URL the webview can render without an asset-protocol grant.
+fn base64_encode(data: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    for chunk in data.chunks(3) {
+        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+        let n = (b[0] as u32) << 16 | (b[1] as u32) << 8 | b[2] as u32;
+        out.push(ALPHABET[(n >> 18 & 63) as usize] as char);
+        out.push(ALPHABET[(n >> 12 & 63) as usize] as char);
+        out.push(if chunk.len() > 1 { ALPHABET[(n >> 6 & 63) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 2 { ALPHABET[(n & 63) as usize] as char } else { '=' });
+    }
+    out
 }
 
 /// Read one pipe line-by-line, forwarding each line to the frontend channel.
@@ -182,12 +200,36 @@ async fn mc_compile(
     })
 }
 
-/// `mc_decompile` — run `mapdecompile`, which chdir's into `directory` and
-/// extracts source images there. Resolves with the directory + exit code.
+/// Resolve the decompile target into a `(directory, mapfile)` pair, extracting a
+/// `.sdz`/`.sd7` archive next to itself first. Runs on the blocking thread.
+fn prepare_decompile(input: &Path, on_log: &Channel<LogLine>) -> Result<(PathBuf, String), String> {
+    let ext = input.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let smf = match ext.as_str() {
+        "smf" => input.to_path_buf(),
+        "sdz" | "sd7" => {
+            let stem = input.file_stem().and_then(|s| s.to_str()).unwrap_or("map");
+            let dest = input.parent().unwrap_or_else(|| Path::new(".")).join(format!("{stem}-decompiled"));
+            let _ = on_log.send(LogLine { stream: "out".into(), line: format!("Extracting {}…", input.display()) });
+            archive::extract_archive(input, &dest)?;
+            let smf = archive::find_smf(&dest).ok_or("no .smf found inside the archive")?;
+            let _ = on_log.send(LogLine { stream: "out".into(), line: format!("Found map {}", smf.display()) });
+            smf
+        }
+        other => return Err(format!("unsupported input: .{other} (expected .smf, .sdz or .sd7)")),
+    };
+    let dir = smf.parent().map(|p| p.to_path_buf()).ok_or("map file has no parent directory")?;
+    let name = smf.file_name().and_then(|n| n.to_str()).ok_or("invalid map filename")?.to_string();
+    Ok((dir, name))
+}
+
+/// `mc_decompile` — extract source images from a `.smf`, or from a `.sdz`/`.sd7`
+/// archive (extracted first). mapdecompile chdir's into the map's directory and
+/// writes the images there. Resolves with the output directory, the parsed SMF
+/// header, and the extracted minimap as a data URL.
 #[tauri::command]
 async fn mc_decompile(
     reg: State<'_, SharedRegistry>,
-    opts: DecompileOpts,
+    input_path: String,
     run_id: String,
     on_log: Channel<LogLine>,
 ) -> Result<CliResult, ()> {
@@ -195,22 +237,31 @@ async fn mc_decompile(
         Some(b) => b,
         None => return Ok(CliResult::err(missing("mapdecompile"))),
     };
-    let directory = opts.directory.clone();
-    let args = build_decompile_args(&opts);
     let reg = reg.inner().clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        run_blocking(bin, args, None, run_id, reg, on_log)
+        let (directory, mapfile) = prepare_decompile(Path::new(&input_path), &on_log)?;
+        let opts = DecompileOpts { directory: directory.to_string_lossy().to_string(), mapfile: mapfile.clone() };
+        let status = run_blocking(bin, build_decompile_args(&opts), None, run_id, reg, on_log)?;
+        Ok::<_, String>((directory, mapfile, status))
     })
     .await;
 
     Ok(match result {
-        Ok(Ok(status)) => {
+        Ok(Ok((directory, mapfile, status))) => {
             let code = status.code().unwrap_or(-1);
-            if status.success() {
-                CliResult::ok(json!({ "directory": directory, "exitCode": code }))
-            } else {
-                CliResult::err(format!("mapdecompile exited with code {code}"))
+            if !status.success() {
+                return Ok(CliResult::err(format!("mapdecompile exited with code {code}")));
             }
+            let map_info = std::fs::read(directory.join(&mapfile)).ok().and_then(|b| smf::parse_smf_header(&b).ok());
+            let minimap = std::fs::read(directory.join("minimap.png"))
+                .ok()
+                .map(|b| format!("data:image/png;base64,{}", base64_encode(&b)));
+            CliResult::ok(json!({
+                "directory": directory.to_string_lossy(),
+                "exitCode": code,
+                "mapInfo": map_info,
+                "minimap": minimap,
+            }))
         }
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("decompile task failed: {e}")),

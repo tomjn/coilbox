@@ -41,10 +41,15 @@ export interface CompileOpts {
   features?: string; // -features
 }
 
-/** A `mapdecompile` request. `mapfile` is a basename, not a path. */
-export interface DecompileOpts {
-  directory: string; // -directory
-  mapfile: string; // -mapfile
+/** Basic map facts parsed from the `.smf` header after a decompile. */
+export interface MapInfo {
+  mapx: number;
+  mapy: number;
+  squareSize: number;
+  minHeight: number;
+  maxHeight: number;
+  worldWidth: number;
+  worldHeight: number;
 }
 
 /** Plugin config, persisted through the frame settings store. */
@@ -74,8 +79,8 @@ export const mcCompile = defineCommand<
 >("coilbox-mapconv", "mc_compile");
 
 export const mcDecompile = defineCommand<
-  { opts: DecompileOpts; runId: string; onLog: Channel<LogLine> },
-  { directory: string; exitCode: number }
+  { inputPath: string; runId: string; onLog: Channel<LogLine> },
+  { directory: string; exitCode: number; mapInfo?: MapInfo | null; minimap?: string | null }
 >("coilbox-mapconv", "mc_decompile");
 
 export const mcCancel = defineCommand<{ runId: string }, { cancelled: boolean }>(
