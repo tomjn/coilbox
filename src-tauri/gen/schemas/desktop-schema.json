@@ -177,10 +177,10 @@
       "description": "Permission identifier",
       "oneOf": [
         {
-          "description": "Allows the mapconv plugin's commands (probe, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
+          "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
           "type": "string",
           "const": "coilbox-mapconv:default",
-          "markdownDescription": "Allows the mapconv plugin's commands (probe, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`"
+          "markdownDescription": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`"
         },
         {
           "description": "Enables the mc_cancel command without any pre-configured scope.",
@@ -219,6 +219,12 @@
           "markdownDescription": "Enables the mc_settings_save command without any pre-configured scope."
         },
         {
+          "description": "Enables the mc_suggest_sources command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-mapconv:allow-mc-suggest-sources",
+          "markdownDescription": "Enables the mc_suggest_sources command without any pre-configured scope."
+        },
+        {
           "description": "Denies the mc_cancel command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-mapconv:deny-mc-cancel",
@@ -253,6 +259,12 @@
           "type": "string",
           "const": "coilbox-mapconv:deny-mc-settings-save",
           "markdownDescription": "Denies the mc_settings_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mc_suggest_sources command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-mapconv:deny-mc-suggest-sources",
+          "markdownDescription": "Denies the mc_suggest_sources command without any pre-configured scope."
         },
         {
           "description": "Allows the prdownloader plugin's commands (version, rapid browsing, download).\n#### This default permission set includes:\n\n- `allow-prd-version`\n- `allow-prd-repos`\n- `allow-prd-versions`\n- `allow-prd-download`",

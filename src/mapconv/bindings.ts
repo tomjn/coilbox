@@ -62,6 +62,12 @@ export const mcProbe = defineCommand<
   { available: boolean; compile: boolean; decompile: boolean }
 >("coilbox-mapconv", "mc_probe");
 
+/** Conventional sibling source files found next to a chosen main texture. */
+export const mcSuggestSources = defineCommand<
+  { texturePath: string },
+  { heightmap?: string; metalmap?: string; typemap?: string; minimap?: string; vegmap?: string; features?: string }
+>("coilbox-mapconv", "mc_suggest_sources");
+
 export const mcCompile = defineCommand<
   { opts: CompileOpts; outDir: string; runId: string; onLog: Channel<LogLine> },
   { smfPath: string; outSuffix: string }

@@ -367,10 +367,22 @@
           "markdownDescription": "Denies the mc_settings_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the mapconv plugin's commands (probe, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
+          "description": "Enables the mc_suggest_sources command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mc-suggest-sources",
+          "markdownDescription": "Enables the mc_suggest_sources command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mc_suggest_sources command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mc-suggest-sources",
+          "markdownDescription": "Denies the mc_suggest_sources command without any pre-configured scope."
+        },
+        {
+          "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the mapconv plugin's commands (probe, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`"
+          "markdownDescription": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`"
         }
       ]
     }

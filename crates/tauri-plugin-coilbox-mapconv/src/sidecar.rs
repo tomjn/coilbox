@@ -8,7 +8,7 @@
 //! flags are TWO argv tokens (`-t` then the value), and boolean flags
 //! (`-noclamp`, `-smooth`) are lone tokens with no value. Never use `=`.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Resolve a bundled sidecar by base name (`"mapcompile"` | `"mapdecompile"`).
@@ -134,6 +134,44 @@ pub fn build_compile_args(o: &CompileOpts) -> Vec<String> {
     a
 }
 
+/// Conventional sibling source files we can auto-prefill from the texture's
+/// folder. Filenames mirror what `mapdecompile` writes (heightmap.png, etc.).
+#[derive(Serialize, Default, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SuggestedSources {
+    pub heightmap: Option<String>,
+    pub metalmap: Option<String>,
+    pub typemap: Option<String>,
+    pub minimap: Option<String>,
+    pub vegmap: Option<String>,
+    pub features: Option<String>,
+}
+
+const IMAGE_EXTS: &[&str] = &["png", "bmp", "tga", "jpg", "jpeg", "tif", "tiff"];
+
+/// First image file in `files` whose stem matches one of `stems` (case-insensitive).
+fn pick_image(files: &[String], stems: &[&str]) -> Option<String> {
+    files.iter().find_map(|f| {
+        let lower = f.to_lowercase();
+        let (stem, ext) = lower.rsplit_once('.')?;
+        (IMAGE_EXTS.contains(&ext) && stems.contains(&stem)).then(|| f.clone())
+    })
+}
+
+/// Given the filenames present in the texture's folder, pick the conventional
+/// source file for each optional field. Pure (no IO) so it can be unit-tested;
+/// the command joins these to absolute paths.
+pub fn match_sources(files: &[String]) -> SuggestedSources {
+    SuggestedSources {
+        heightmap: pick_image(files, &["heightmap", "height"]),
+        metalmap: pick_image(files, &["metalmap", "metal"]),
+        typemap: pick_image(files, &["typemap", "type"]),
+        minimap: pick_image(files, &["minimap"]),
+        vegmap: pick_image(files, &["vegmap", "vegetationmap"]),
+        features: files.iter().find(|f| f.to_lowercase() == "features.txt").cloned(),
+    }
+}
+
 /// Build the `mapdecompile` argument vector.
 pub fn build_decompile_args(o: &DecompileOpts) -> Vec<String> {
     vec![
@@ -219,6 +257,33 @@ mod tests {
         let a = build_compile_args(&o);
         assert!(a.windows(2).any(|w| w[0] == "-maxh" && w[1] == "2000.5"));
         assert!(a.windows(2).any(|w| w[0] == "-minh" && w[1] == "-500"));
+    }
+
+    #[test]
+    fn match_sources_picks_conventional_siblings() {
+        let files = vec![
+            "texture.png".into(),
+            "heightmap.png".into(),
+            "metalmap.png".into(),
+            "typemap.png".into(),
+            "minimap.png".into(),
+            "features.txt".into(),
+            "readme.md".into(),
+        ];
+        let s = match_sources(&files);
+        assert_eq!(s.heightmap.as_deref(), Some("heightmap.png"));
+        assert_eq!(s.metalmap.as_deref(), Some("metalmap.png"));
+        assert_eq!(s.typemap.as_deref(), Some("typemap.png"));
+        assert_eq!(s.minimap.as_deref(), Some("minimap.png"));
+        assert_eq!(s.features.as_deref(), Some("features.txt"));
+        // No vegmap present, and the texture itself is never matched as a source.
+        assert_eq!(s.vegmap, None);
+    }
+
+    #[test]
+    fn match_sources_empty_when_nothing_matches() {
+        let s = match_sources(&["texture.png".into(), "notes.txt".into()]);
+        assert_eq!(s, SuggestedSources::default());
     }
 
     /// Decompile is exactly the two flag pairs, mapfile passed through verbatim

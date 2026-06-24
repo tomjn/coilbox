@@ -10,7 +10,7 @@ mod sidecar;
 use picoframe_core::CliResult;
 use serde_json::json;
 use settings::{load_settings, save_settings, Settings};
-use sidecar::{build_compile_args, build_decompile_args, resolve_sidecar, CompileOpts, DecompileOpts, LogLine};
+use sidecar::{build_compile_args, build_decompile_args, match_sources, resolve_sidecar, CompileOpts, DecompileOpts, LogLine};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -104,6 +104,36 @@ async fn mc_probe() -> CliResult {
     let compile = resolve_sidecar("mapcompile").is_some();
     let decompile = resolve_sidecar("mapdecompile").is_some();
     CliResult::ok(json!({ "available": compile && decompile, "compile": compile, "decompile": decompile }))
+}
+
+/// `mc_suggest_sources` — given a chosen main texture, scan its folder for
+/// conventional sibling source files (heightmap.png, metalmap.png, …) and return
+/// the matches as absolute paths so the UI can prefill empty fields.
+#[tauri::command]
+async fn mc_suggest_sources(texture_path: String) -> CliResult {
+    let p = PathBuf::from(&texture_path);
+    let dir = match p.parent() {
+        Some(d) => d.to_path_buf(),
+        None => return CliResult::ok(json!({})),
+    };
+    let mut files = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for e in rd.flatten() {
+            if let Some(name) = e.file_name().to_str() {
+                files.push(name.to_string());
+            }
+        }
+    }
+    let s = match_sources(&files);
+    let abs = |o: Option<String>| o.map(|f| dir.join(f).to_string_lossy().to_string());
+    CliResult::ok(json!({
+        "heightmap": abs(s.heightmap),
+        "metalmap": abs(s.metalmap),
+        "typemap": abs(s.typemap),
+        "minimap": abs(s.minimap),
+        "vegmap": abs(s.vegmap),
+        "features": abs(s.features),
+    }))
 }
 
 /// `mc_compile` — run `mapcompile` in `out_dir`, streaming output. Success means
@@ -238,6 +268,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         })
         .invoke_handler(tauri::generate_handler![
             mc_probe,
+            mc_suggest_sources,
             mc_compile,
             mc_decompile,
             mc_cancel,

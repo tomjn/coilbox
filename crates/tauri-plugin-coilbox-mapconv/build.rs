@@ -4,6 +4,7 @@
 // `coilbox-mapconv:default`.
 const COMMANDS: &[&str] = &[
     "mc_probe",
+    "mc_suggest_sources",
     "mc_compile",
     "mc_decompile",
     "mc_cancel",

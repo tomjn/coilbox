@@ -3,7 +3,7 @@ import type { Config } from "./bindings";
 
 /** Default config: no remembered dirs yet, "no compression" default, remember on. */
 export const defaultConfig: Config = {
-  defaultCompressionType: 1,
+  defaultCompressionType: 4,
   rememberDirs: true,
 };
 

@@ -1,10 +1,11 @@
 ## Default Permission
 
-Allows the mapconv plugin's commands (probe, compile, decompile, cancel, settings).
+Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).
 
 #### This default permission set includes the following:
 
 - `allow-mc-probe`
+- `allow-mc-suggest-sources`
 - `allow-mc-compile`
 - `allow-mc-decompile`
 - `allow-mc-cancel`
@@ -172,6 +173,32 @@ Enables the mc_settings_save command without any pre-configured scope.
 <td>
 
 Denies the mc_settings_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:allow-mc-suggest-sources`
+
+</td>
+<td>
+
+Enables the mc_suggest_sources command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:deny-mc-suggest-sources`
+
+</td>
+<td>
+
+Denies the mc_suggest_sources command without any pre-configured scope.
 
 </td>
 </tr>

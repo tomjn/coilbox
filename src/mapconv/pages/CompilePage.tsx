@@ -1,10 +1,10 @@
-import { Button, Input, useDrawer } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
-import { AlertCircle, CheckCircle2, Hammer, Loader2, Play, Settings2, Square } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Hammer, Loader2, Play, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type CompileOpts, type CompressionType, type LogLine, mcCancel, mcCompile, mcProbe } from "../bindings";
+import { type CompileOpts, type CompressionType, type LogLine, mcCancel, mcCompile, mcProbe, mcSuggestSources } from "../bindings";
 import { useMapconvConfig } from "../config";
-import CompileOptionsForm, { type AdvancedCompileOpts, defaultAdvanced } from "./components/CompileOptionsForm";
+import AdvancedOptions, { type AdvancedCompileOpts, defaultAdvanced } from "./components/AdvancedOptions";
 import { Field } from "./components/Field";
 import { OptionSelect } from "./components/OptionSelect";
 import { PathField } from "./components/PathField";
@@ -37,13 +37,13 @@ function countAdvanced(a: AdvancedCompileOpts): number {
 /** Build a `.smf`/`.smt` from source images via the `mapcompile` sidecar. */
 export default function CompilePage() {
   const [cfg, setCfg] = useMapconvConfig();
-  const drawer = useDrawer();
 
   const [maintexture, setMaintexture] = useState("");
   const [outDir, setOutDir] = useState("");
   const [outSuffix, setOutSuffix] = useState("");
   const [ct, setCt] = useState(() => String(cfg.defaultCompressionType));
   const [advanced, setAdvanced] = useState<AdvancedCompileOpts>(defaultAdvanced);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [running, setRunning] = useState(false);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
@@ -117,40 +117,42 @@ export default function CompilePage() {
     }
   }
 
-  function openOptions() {
-    drawer.open({
-      title: "Compile options",
-      description: "Optional source maps, height range, and compression tuning.",
-      width: "40rem",
-      content: (
-        <CompileOptionsForm
-          initial={advanced}
-          defaultPath={cfg.lastTextureDir}
-          onApply={(a) => {
-            setAdvanced(a);
-            drawer.close();
-          }}
-        />
-      ),
-    });
+  // On texture pick, auto-prefill any empty optional fields from conventional
+  // siblings in the same folder (heightmap.png, metalmap.png, …). Never
+  // overwrites a field the user already set; reveals Advanced if it found any.
+  async function pickTexture(path: string) {
+    setMaintexture(path);
+    if (!path) return;
+    try {
+      const s = await mcSuggestSources({ texturePath: path });
+      let found = false;
+      setAdvanced((a) => {
+        const merged = { ...a };
+        for (const k of ["heightmap", "metalmap", "typemap", "minimap", "vegmap", "features"] as const) {
+          if (!merged[k] && s[k]) {
+            merged[k] = s[k] as string;
+            found = true;
+          }
+        }
+        return merged;
+      });
+      if (found) setShowAdvanced(true);
+    } catch {
+      // best-effort; leave fields as-is
+    }
   }
 
   const advancedCount = countAdvanced(advanced);
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-        <div className="space-y-1">
-          <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
-            <Hammer size={18} /> Compile map
-          </h1>
-          <p className="max-w-prose text-sm text-muted-foreground">
-            Build a Spring <code>.smf</code>/<code>.smt</code> from a main texture and optional source maps.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={openOptions} disabled={running}>
-          <Settings2 /> Compile options{advancedCount > 0 ? ` (${advancedCount})` : ""}
-        </Button>
+      <header className="border-b border-border px-6 py-4">
+        <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
+          <Hammer size={18} /> Compile map
+        </h1>
+        <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+          Build a Spring <code>.smf</code>/<code>.smt</code> from a main texture and optional source maps.
+        </p>
       </header>
 
       {probe && !probe.compile && (
@@ -166,9 +168,9 @@ export default function CompilePage() {
         <div className="min-h-0 space-y-5 overflow-auto border-r border-border px-6 py-5">
           <PathField
             label="Main texture (-t)"
-            hint="required; dimensions divisible by 1024"
+            hint="required · PNG/TGA/BMP image, dimensions divisible by 1024 · siblings auto-fill below"
             value={maintexture}
-            onChange={setMaintexture}
+            onChange={pickTexture}
             disabled={running}
             filters={TEXTURE_FILTERS}
             defaultPath={cfg.lastTextureDir}
@@ -188,6 +190,23 @@ export default function CompilePage() {
           <Field label="Compression type (-ct)">
             <OptionSelect value={ct} onValueChange={setCt} disabled={running} options={CT_OPTIONS} />
           </Field>
+
+          {/* Advanced options: optional maps, height range, compression tuning. */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
+              {showAdvanced ? <ChevronDown size={15} /> : <ChevronRight size={15} />} Advanced options
+              {advancedCount > 0 ? ` (${advancedCount})` : ""}
+            </button>
+            {showAdvanced && (
+              <div className="mt-4">
+                <AdvancedOptions value={advanced} onChange={setAdvanced} defaultPath={cfg.lastTextureDir} disabled={running} />
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-2 pt-1">
             {running ? (
