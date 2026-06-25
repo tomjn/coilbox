@@ -190,8 +190,8 @@ async fn mc_suggest_sources(texture_path: String) -> CliResult {
 /// runtime since large textures are CPU/IO heavy.
 #[tauri::command]
 async fn mc_image_info(path: String) -> CliResult {
-    let result = tauri::async_runtime::spawn_blocking(
-        move || -> Result<(u32, u32, String), String> {
+    let result =
+        tauri::async_runtime::spawn_blocking(move || -> Result<(u32, u32, String), String> {
             let img = image::open(&path).map_err(|e| format!("could not read image: {e}"))?;
             let (width, height) = img.dimensions();
             let thumb = img.thumbnail(320, 320);
@@ -201,9 +201,8 @@ async fn mc_image_info(path: String) -> CliResult {
                 .map_err(|e| format!("could not encode thumbnail: {e}"))?;
             let data_url = format!("data:image/png;base64,{}", base64_encode(&buf.into_inner()));
             Ok((width, height, data_url))
-        },
-    )
-    .await;
+        })
+        .await;
     match result {
         Ok(Ok((width, height, thumb))) => {
             CliResult::ok(json!({ "width": width, "height": height, "thumb": thumb }))
