@@ -5,7 +5,7 @@
     "": {
       "name": "coilbox",
       "dependencies": {
-        "@picoframe/frame": "^0.0.7",
+        "@picoframe/frame": "^0.0.8",
         "@picoframe/plugin-sdk": "^0.0.3",
         "@tauri-apps/api": "^2.11.0",
         "@tauri-apps/plugin-dialog": "^2.7.1",
@@ -79,7 +79,7 @@
 
     "@oxc-project/types": ["@oxc-project/types@0.137.0", "", {}, "sha512-WT+Gb24i8hmvo85AIv2oEYouEXkRlKAlT9WaCa3TfLgNCN+GhrJOGZuIlMouAh38Qe4QOx26eUOVsq70qXrywA=="],
 
-    "@picoframe/frame": ["@picoframe/frame@0.0.7", "", { "dependencies": { "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.16.0", "radix-ui": "^1.6.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@picoframe/plugin-sdk": "*", "@tauri-apps/api": "^2.11.0", "react": "^19.0.0", "react-dom": "^19.0.0", "react-router": "^7.6.0" } }, "sha512-w4Q0aKprNADB7ohSqUr5slsf0cNtKXSk/iKFpuNJikV2qqJ1NN+e8K8uJ41N6/oD2eJOfeNci1b7NDTAIraGug=="],
+    "@picoframe/frame": ["@picoframe/frame@0.0.8", "", { "dependencies": { "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.16.0", "radix-ui": "^1.6.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@picoframe/plugin-sdk": "*", "@tauri-apps/api": "^2.11.0", "react": "^19.0.0", "react-dom": "^19.0.0", "react-router": "^7.6.0" } }, "sha512-8IFVPBx5GFKO+4Q6SMdQ3UW6tdo5kOm5dSIP6qHKxFuurftlY93l9UhD0ensqebZKK0q4EcwBDzy3B0RLpxHgQ=="],
 
     "@picoframe/plugin-sdk": ["@picoframe/plugin-sdk@0.0.3", "", { "peerDependencies": { "@tauri-apps/api": "^2.11.0", "react": "^19.0.0" } }, "sha512-GkGS3EIHtEXidT6DhyMg89PHvb4EMJe/ccsdvluGvXgkfqunB+vu22MrUTHeswr2CKkRdcDXZ+IqCXoj6ub1nA=="],
 
