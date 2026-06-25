@@ -15,13 +15,16 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   type LogLine,
+  type MapAppearance,
   type MapInfo,
   mcCancel,
   mcDecompile,
   mcOpenPath,
   mcProbe,
+  mcReadMapinfo,
 } from "../bindings";
 import { useMapconvConfig } from "../config";
+import { MapPreview3D } from "./components/MapPreview3D";
 import { PathField } from "./components/PathField";
 
 function errMessage(e: unknown): string {
@@ -39,10 +42,17 @@ function dirname(p: string): string {
   return i >= 0 ? p.slice(0, i) : "";
 }
 
+/** Join a directory and filename using the directory's native separator. */
+function joinPath(dir: string, name: string): string {
+  const sep = dir.includes("\\") ? "\\" : "/";
+  return `${dir}${sep}${name}`;
+}
+
 type Result = {
   directory: string;
   mapInfo?: MapInfo | null;
   minimap?: string | null;
+  appearance?: MapAppearance | null;
 };
 
 /** Extract source images from a `.smf`, or a `.sdz`/`.sd7` archive. */
@@ -128,10 +138,15 @@ export default function DecompilePage() {
     onLog.onmessage = (line) => setLogLines((prev) => [...prev, line]);
     try {
       const res = await mcDecompile({ inputPath, runId, onLog });
+      // Best-effort mapinfo.lua read for metadata + preview appearance hints.
+      const appearance = await mcReadMapinfo({ path: res.directory }).catch(
+        () => null,
+      );
       setResult({
         directory: res.directory,
         mapInfo: res.mapInfo,
         minimap: res.minimap,
+        appearance,
       });
       if (cfg.rememberDirs) setCfg({ ...cfg, lastSmfDir: dirname(inputPath) });
     } catch (e) {
@@ -223,6 +238,28 @@ export default function DecompilePage() {
                   <span className="font-mono text-xs">{result.directory}</span>
                 </span>
               </div>
+              {result.appearance?.name && (
+                <div className="mt-3">
+                  <h2 className="text-sm font-semibold leading-tight">
+                    {result.appearance.name}
+                    {result.appearance.version && (
+                      <span className="ml-1.5 font-normal text-muted-foreground">
+                        v{result.appearance.version}
+                      </span>
+                    )}
+                  </h2>
+                  {result.appearance.description && (
+                    <p className="mt-0.5 max-w-prose text-xs text-muted-foreground">
+                      {result.appearance.description}
+                    </p>
+                  )}
+                  {result.appearance.author && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      by {result.appearance.author}
+                    </p>
+                  )}
+                </div>
+              )}
               {(result.minimap || result.mapInfo) && (
                 <div className="mt-3 flex flex-wrap items-start gap-4">
                   {result.minimap && (
@@ -234,6 +271,24 @@ export default function DecompilePage() {
                   )}
                   {result.mapInfo && <MapFacts info={result.mapInfo} />}
                 </div>
+              )}
+              {result.mapInfo && (
+                <MapPreview3D
+                  className="mt-3"
+                  heightmapPath={joinPath(result.directory, "heightmap.png")}
+                  texturePath={joinPath(result.directory, "texture.png")}
+                  // Prefer the mapinfo.lua range (what the engine uses) over the
+                  // baked-in SMF header, falling back when there's no mapinfo.lua.
+                  minHeight={
+                    result.appearance?.minHeight ?? result.mapInfo.minHeight
+                  }
+                  maxHeight={
+                    result.appearance?.maxHeight ?? result.mapInfo.maxHeight
+                  }
+                  worldWidth={result.mapInfo.worldWidth}
+                  worldHeight={result.mapInfo.worldHeight}
+                  appearance={result.appearance}
+                />
               )}
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mc-read-mapinfo"
+description = "Enables the mc_read_mapinfo command without any pre-configured scope."
+commands.allow = ["mc_read_mapinfo"]
+
+[[permission]]
+identifier = "deny-mc-read-mapinfo"
+description = "Denies the mc_read_mapinfo command without any pre-configured scope."
+commands.deny = ["mc_read_mapinfo"]
