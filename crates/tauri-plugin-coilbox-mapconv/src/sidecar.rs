@@ -44,23 +44,23 @@ pub struct LogLine {
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct CompileOpts {
-    pub maintexture: String, // -t (required, absolute path)
-    pub out_suffix: String,  // -o (required, bare basename)
-    pub heightmap: Option<String>, // -h
-    pub maxh: Option<f64>,         // -maxh
-    pub minh: Option<f64>,         // -minh
-    pub metalmap: Option<String>,  // -m
-    pub typemap: Option<String>,   // -z
-    pub minimap: Option<String>,   // -minimap
-    pub vegmap: Option<String>,    // -v
+    pub maintexture: String,           // -t (required, absolute path)
+    pub out_suffix: String,            // -o (required, bare basename)
+    pub heightmap: Option<String>,     // -h
+    pub maxh: Option<f64>,             // -maxh
+    pub minh: Option<f64>,             // -minh
+    pub metalmap: Option<String>,      // -m
+    pub typemap: Option<String>,       // -z
+    pub minimap: Option<String>,       // -minimap
+    pub vegmap: Option<String>,        // -v
     pub compression_type: Option<i64>, // -ct (1-4)
-    pub ccount: Option<i64>,       // -ccount
-    pub th: Option<f64>,           // -th
+    pub ccount: Option<i64>,           // -ccount
+    pub th: Option<f64>,               // -th
     #[serde(default)]
     pub noclamp: bool, // -noclamp (lone flag)
     #[serde(default)]
     pub smooth: bool, // -smooth (lone flag)
-    pub features: Option<String>, // -features
+    pub features: Option<String>,      // -features
 }
 
 /// A `mapdecompile` request. `mapfile` is a filename, NOT a path: mapdecompile
@@ -76,11 +76,12 @@ pub struct DecompileOpts {
 /// flags push a lone token. atof/atoi parse integer-looking floats fine, so
 /// plain `f64::to_string()` (which may drop a trailing `.0`) is acceptable.
 pub fn build_compile_args(o: &CompileOpts) -> Vec<String> {
-    let mut a = Vec::new();
-    a.push("-t".into());
-    a.push(o.maintexture.clone());
-    a.push("-o".into());
-    a.push(o.out_suffix.clone());
+    let mut a = vec![
+        "-t".into(),
+        o.maintexture.clone(),
+        "-o".into(),
+        o.out_suffix.clone(),
+    ];
     if let Some(v) = &o.heightmap {
         a.push("-h".into());
         a.push(v.clone());
@@ -168,7 +169,10 @@ pub fn match_sources(files: &[String]) -> SuggestedSources {
         typemap: pick_image(files, &["typemap", "type"]),
         minimap: pick_image(files, &["minimap"]),
         vegmap: pick_image(files, &["vegmap", "vegetationmap"]),
-        features: files.iter().find(|f| f.to_lowercase() == "features.txt").cloned(),
+        features: files
+            .iter()
+            .find(|f| f.to_lowercase() == "features.txt")
+            .cloned(),
     }
 }
 
@@ -219,7 +223,19 @@ mod tests {
     #[test]
     fn compile_optional_flags_omitted_when_none() {
         let a = build_compile_args(&base_compile());
-        for flag in ["-h", "-maxh", "-minh", "-m", "-z", "-minimap", "-v", "-ct", "-ccount", "-th", "-features"] {
+        for flag in [
+            "-h",
+            "-maxh",
+            "-minh",
+            "-m",
+            "-z",
+            "-minimap",
+            "-v",
+            "-ct",
+            "-ccount",
+            "-th",
+            "-features",
+        ] {
             assert!(!a.contains(&flag.to_string()), "{flag} should be absent");
         }
     }

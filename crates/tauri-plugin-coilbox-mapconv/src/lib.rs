@@ -12,7 +12,10 @@ mod smf;
 use picoframe_core::CliResult;
 use serde_json::json;
 use settings::{load_settings, save_settings, Settings};
-use sidecar::{build_compile_args, build_decompile_args, match_sources, resolve_sidecar, CompileOpts, DecompileOpts, LogLine};
+use sidecar::{
+    build_compile_args, build_decompile_args, match_sources, resolve_sidecar, CompileOpts,
+    DecompileOpts, LogLine,
+};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -55,14 +58,26 @@ fn settings_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
 /// `data:` URL the webview can render without an asset-protocol grant.
 fn base64_encode(data: &[u8]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
-        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+        let b = [
+            chunk[0],
+            *chunk.get(1).unwrap_or(&0),
+            *chunk.get(2).unwrap_or(&0),
+        ];
         let n = (b[0] as u32) << 16 | (b[1] as u32) << 8 | b[2] as u32;
         out.push(ALPHABET[(n >> 18 & 63) as usize] as char);
         out.push(ALPHABET[(n >> 12 & 63) as usize] as char);
-        out.push(if chunk.len() > 1 { ALPHABET[(n >> 6 & 63) as usize] as char } else { '=' });
-        out.push(if chunk.len() > 2 { ALPHABET[(n & 63) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 1 {
+            ALPHABET[(n >> 6 & 63) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            ALPHABET[(n & 63) as usize] as char
+        } else {
+            '='
+        });
     }
     out
 }
@@ -73,7 +88,10 @@ fn stream_pipe<Rd: std::io::Read>(rd: Rd, stream: &str, log: Channel<LogLine>) {
     for line in std::io::BufReader::new(rd).lines() {
         match line {
             Ok(l) => {
-                let _ = log.send(LogLine { stream: stream.into(), line: l });
+                let _ = log.send(LogLine {
+                    stream: stream.into(),
+                    line: l,
+                });
             }
             Err(_) => break,
         }
@@ -92,7 +110,9 @@ fn run_blocking(
     on_log: Channel<LogLine>,
 ) -> Result<std::process::ExitStatus, String> {
     let mut cmd = Command::new(&bin);
-    cmd.args(&args).stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     if let Some(d) = &cwd {
         cmd.current_dir(d);
     }
@@ -127,7 +147,9 @@ fn run_blocking(
 async fn mc_probe<R: Runtime>(app: AppHandle<R>) -> CliResult {
     let compile = sidecar_path(&app, "mapcompile").is_some();
     let decompile = sidecar_path(&app, "mapdecompile").is_some();
-    CliResult::ok(json!({ "available": compile && decompile, "compile": compile, "decompile": decompile }))
+    CliResult::ok(
+        json!({ "available": compile && decompile, "compile": compile, "decompile": decompile }),
+    )
 }
 
 /// `mc_suggest_sources` — given a chosen main texture, scan its folder for
@@ -194,7 +216,10 @@ async fn mc_compile<R: Runtime>(
             if status.success() && smf.exists() {
                 CliResult::ok(json!({ "smfPath": smf.to_string_lossy(), "outSuffix": suffix }))
             } else if status.success() {
-                CliResult::err(format!("mapcompile finished but {} was not written", smf.display()))
+                CliResult::err(format!(
+                    "mapcompile finished but {} was not written",
+                    smf.display()
+                ))
             } else {
                 CliResult::err(match status.code() {
                     Some(c) => format!("mapcompile exited with code {c}"),
@@ -210,22 +235,46 @@ async fn mc_compile<R: Runtime>(
 /// Resolve the decompile target into a `(directory, mapfile)` pair, extracting a
 /// `.sdz`/`.sd7` archive next to itself first. Runs on the blocking thread.
 fn prepare_decompile(input: &Path, on_log: &Channel<LogLine>) -> Result<(PathBuf, String), String> {
-    let ext = input.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let ext = input
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
     let smf = match ext.as_str() {
         "smf" => input.to_path_buf(),
         "sdz" | "sd7" => {
             let stem = input.file_stem().and_then(|s| s.to_str()).unwrap_or("map");
-            let dest = input.parent().unwrap_or_else(|| Path::new(".")).join(format!("{stem}-decompiled"));
-            let _ = on_log.send(LogLine { stream: "out".into(), line: format!("Extracting {}…", input.display()) });
+            let dest = input
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(format!("{stem}-decompiled"));
+            let _ = on_log.send(LogLine {
+                stream: "out".into(),
+                line: format!("Extracting {}…", input.display()),
+            });
             archive::extract_archive(input, &dest)?;
             let smf = archive::find_smf(&dest).ok_or("no .smf found inside the archive")?;
-            let _ = on_log.send(LogLine { stream: "out".into(), line: format!("Found map {}", smf.display()) });
+            let _ = on_log.send(LogLine {
+                stream: "out".into(),
+                line: format!("Found map {}", smf.display()),
+            });
             smf
         }
-        other => return Err(format!("unsupported input: .{other} (expected .smf, .sdz or .sd7)")),
+        other => {
+            return Err(format!(
+                "unsupported input: .{other} (expected .smf, .sdz or .sd7)"
+            ))
+        }
     };
-    let dir = smf.parent().map(|p| p.to_path_buf()).ok_or("map file has no parent directory")?;
-    let name = smf.file_name().and_then(|n| n.to_str()).ok_or("invalid map filename")?.to_string();
+    let dir = smf
+        .parent()
+        .map(|p| p.to_path_buf())
+        .ok_or("map file has no parent directory")?;
+    let name = smf
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or("invalid map filename")?
+        .to_string();
     Ok((dir, name))
 }
 
@@ -248,7 +297,10 @@ async fn mc_decompile<R: Runtime>(
     let reg = reg.inner().clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let (directory, mapfile) = prepare_decompile(Path::new(&input_path), &on_log)?;
-        let opts = DecompileOpts { directory: directory.to_string_lossy().to_string(), mapfile: mapfile.clone() };
+        let opts = DecompileOpts {
+            directory: directory.to_string_lossy().to_string(),
+            mapfile: mapfile.clone(),
+        };
         let status = run_blocking(bin, build_decompile_args(&opts), None, run_id, reg, on_log)?;
         Ok::<_, String>((directory, mapfile, status))
     })
@@ -258,9 +310,13 @@ async fn mc_decompile<R: Runtime>(
         Ok(Ok((directory, mapfile, status))) => {
             let code = status.code().unwrap_or(-1);
             if !status.success() {
-                return Ok(CliResult::err(format!("mapdecompile exited with code {code}")));
+                return Ok(CliResult::err(format!(
+                    "mapdecompile exited with code {code}"
+                )));
             }
-            let map_info = std::fs::read(directory.join(&mapfile)).ok().and_then(|b| smf::parse_smf_header(&b).ok());
+            let map_info = std::fs::read(directory.join(&mapfile))
+                .ok()
+                .and_then(|b| smf::parse_smf_header(&b).ok());
             let minimap = std::fs::read(directory.join("minimap.png"))
                 .ok()
                 .map(|b| format!("data:image/png;base64,{}", base64_encode(&b)));
@@ -327,7 +383,10 @@ async fn mc_settings_load<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()
 
 /// `mc_settings_save` — persist the whole settings map (atomic overwrite).
 #[tauri::command]
-async fn mc_settings_save<R: Runtime>(app: AppHandle<R>, entries: Settings) -> Result<CliResult, ()> {
+async fn mc_settings_save<R: Runtime>(
+    app: AppHandle<R>,
+    entries: Settings,
+) -> Result<CliResult, ()> {
     let path = match settings_path(&app) {
         Ok(p) => p,
         Err(e) => return Ok(CliResult::err(e)),

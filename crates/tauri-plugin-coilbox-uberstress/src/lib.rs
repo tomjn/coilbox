@@ -10,8 +10,8 @@ mod sidecar;
 
 use picoframe_core::CliResult;
 use report::{list_report_files, parse_scenarios, Report, ReportSummary};
-use settings::{load_settings, save_settings, Settings};
 use serde_json::json;
+use settings::{load_settings, save_settings, Settings};
 use sidecar::{build_args, resolve_sidecar, LogLine, RunOpts};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -70,7 +70,10 @@ fn stream_pipe<Rd: std::io::Read>(rd: Rd, stream: &str, log: Channel<LogLine>) {
     for line in std::io::BufReader::new(rd).lines() {
         match line {
             Ok(l) => {
-                let _ = log.send(LogLine { stream: stream.into(), line: l });
+                let _ = log.send(LogLine {
+                    stream: stream.into(),
+                    line: l,
+                });
             }
             Err(_) => break,
         }
@@ -132,7 +135,10 @@ fn run_blocking(
     let content = std::fs::read_to_string(&newest).map_err(|e| e.to_string())?;
     let rep: Report =
         serde_json::from_str(&content).map_err(|e| format!("could not parse report: {e}"))?;
-    let name = newest.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let name = newest
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
     Ok((name, rep))
 }
 
@@ -195,9 +201,16 @@ async fn us_history<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
     };
     let mut runs = Vec::new();
     for f in list_report_files(&results_dir) {
-        let Ok(content) = std::fs::read_to_string(&f) else { continue };
-        let Ok(rep) = serde_json::from_str::<Report>(&content) else { continue };
-        let name = f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let Ok(content) = std::fs::read_to_string(&f) else {
+            continue;
+        };
+        let Ok(rep) = serde_json::from_str::<Report>(&content) else {
+            continue;
+        };
+        let name = f
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
         runs.push(ReportSummary::from_report(&name, &rep));
     }
     Ok(CliResult::ok(json!({ "runs": runs })))
@@ -240,7 +253,10 @@ async fn us_settings_load<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()
 /// `us_settings_save` — persist the whole settings map. The adapter sends the
 /// full map on every change, so this is an atomic overwrite (no merge races).
 #[tauri::command]
-async fn us_settings_save<R: Runtime>(app: AppHandle<R>, entries: Settings) -> Result<CliResult, ()> {
+async fn us_settings_save<R: Runtime>(
+    app: AppHandle<R>,
+    entries: Settings,
+) -> Result<CliResult, ()> {
     let (settings_path, _) = match data_dirs(&app) {
         Ok(d) => d,
         Err(e) => return Ok(CliResult::err(e)),

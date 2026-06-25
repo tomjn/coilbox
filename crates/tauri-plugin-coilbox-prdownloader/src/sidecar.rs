@@ -57,7 +57,11 @@ pub fn parse_download(stdout: &str, stderr: &str, exit_code: Option<i32>) -> Dow
         .filter(|l| !l.is_empty())
         .collect();
     let contains = |needle: &str| {
-        combined.iter().rev().find(|l| l.to_lowercase().contains(needle)).copied()
+        combined
+            .iter()
+            .rev()
+            .find(|l| l.to_lowercase().contains(needle))
+            .copied()
     };
 
     if exit_code == Some(0) {
@@ -65,7 +69,10 @@ pub fn parse_download(stdout: &str, stderr: &str, exit_code: Option<i32>) -> Dow
             .or_else(|| contains("download"))
             .map(str::to_string)
             .unwrap_or_else(|| "Download finished.".to_string());
-        DownloadOutcome { success: true, message }
+        DownloadOutcome {
+            success: true,
+            message,
+        }
     } else {
         let message = contains("error")
             .or_else(|| contains("failed"))
@@ -74,7 +81,10 @@ pub fn parse_download(stdout: &str, stderr: &str, exit_code: Option<i32>) -> Dow
                 Some(c) => format!("pr-downloader exited with code {c}."),
                 None => "pr-downloader was terminated.".to_string(),
             });
-        DownloadOutcome { success: false, message }
+        DownloadOutcome {
+            success: false,
+            message,
+        }
     }
 }
 
@@ -92,7 +102,10 @@ mod tests {
 
     #[test]
     fn version_falls_back_to_first_line() {
-        assert_eq!(parse_version("\n  weird-output  \n").as_deref(), Some("weird-output"));
+        assert_eq!(
+            parse_version("\n  weird-output  \n").as_deref(),
+            Some("weird-output")
+        );
     }
 
     #[test]

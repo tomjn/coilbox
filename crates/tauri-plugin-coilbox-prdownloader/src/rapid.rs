@@ -46,7 +46,10 @@ pub fn parse_repos(body: &str) -> Vec<Repo> {
             if name.is_empty() || url.is_empty() {
                 return None;
             }
-            Some(Repo { name: name.to_string(), url: url.to_string() })
+            Some(Repo {
+                name: name.to_string(),
+                url: url.to_string(),
+            })
         })
         .collect()
 }
@@ -69,8 +72,15 @@ pub fn parse_versions(body: &str) -> Vec<Version> {
             }
             let _md5 = parts.next();
             let _depends = parts.next();
-            let name = parts.next().map(str::trim).filter(|s| !s.is_empty()).unwrap_or(tag);
-            Some(Version { tag: tag.to_string(), name: name.to_string() })
+            let name = parts
+                .next()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or(tag);
+            Some(Version {
+                tag: tag.to_string(),
+                name: name.to_string(),
+            })
         })
         .collect()
 }
@@ -87,7 +97,13 @@ mod tests {
                     dev-game,https://repos.springrts.com/dev-game,,\n";
         let repos = parse_repos(body);
         assert_eq!(repos.len(), 3);
-        assert_eq!(repos[1], Repo { name: "bar".into(), url: "https://repos.springrts.com/bar".into() });
+        assert_eq!(
+            repos[1],
+            Repo {
+                name: "bar".into(),
+                url: "https://repos.springrts.com/bar".into()
+            }
+        );
     }
 
     #[test]

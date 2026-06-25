@@ -67,7 +67,12 @@ pub struct ReportSummary {
 impl ReportSummary {
     /// Build a summary from a parsed report and its source filename.
     pub fn from_report(file: &str, rep: &Report) -> Self {
-        let p99_of = |cmd: &str| rep.commands.iter().find(|c| c.command == cmd).map(|c| c.p99_ms);
+        let p99_of = |cmd: &str| {
+            rep.commands
+                .iter()
+                .find(|c| c.command == cmd)
+                .map(|c| c.p99_ms)
+        };
         ReportSummary {
             file: file.to_string(),
             scenario: rep.scenario.clone(),
@@ -123,7 +128,7 @@ pub fn list_report_files(dir: &Path) -> Vec<PathBuf> {
             .collect(),
         Err(_) => return Vec::new(),
     };
-    entries.sort_by(|a, b| b.0.cmp(&a.0));
+    entries.sort_by_key(|b| std::cmp::Reverse(b.0));
     entries.into_iter().map(|(_, p)| p).collect()
 }
 
@@ -172,7 +177,8 @@ mod tests {
 
     #[test]
     fn report_without_optionals_deserializes() {
-        let json = r#"{"scenario":"chat","addr":"x","duration_sec":1.0,"commands":[],"counters":{}}"#;
+        let json =
+            r#"{"scenario":"chat","addr":"x","duration_sec":1.0,"commands":[],"counters":{}}"#;
         let rep: Report = serde_json::from_str(json).unwrap();
         assert_eq!(rep.git_ref, None);
         assert_eq!(rep.params.len(), 0);

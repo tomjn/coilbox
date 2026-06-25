@@ -29,7 +29,9 @@ async fn fetch_gz(url: String) -> Result<String, String> {
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
     let mut decoder = flate2::read::GzDecoder::new(&bytes[..]);
     let mut body = String::new();
-    decoder.read_to_string(&mut body).map_err(|e| format!("gunzip failed: {e}"))?;
+    decoder
+        .read_to_string(&mut body)
+        .map_err(|e| format!("gunzip failed: {e}"))?;
     Ok(body)
 }
 
@@ -61,7 +63,9 @@ async fn prd_version() -> CliResult {
 /// `prd_repos` — list rapid repositories from a master index (default springrts).
 #[tauri::command]
 async fn prd_repos(master_url: Option<String>) -> CliResult {
-    let base = master_url.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| DEFAULT_MASTER.into());
+    let base = master_url
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_MASTER.into());
     let url = format!("{}/repos.gz", base.trim_end_matches('/'));
     match fetch_gz(url).await {
         Ok(body) => CliResult::ok(json!({ "repos": rapid::parse_repos(&body) })),
@@ -114,6 +118,11 @@ async fn prd_download(tag: String, write_path: Option<String>) -> CliResult {
 /// `plugin:coilbox-prdownloader|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-prdownloader")
-        .invoke_handler(tauri::generate_handler![prd_version, prd_repos, prd_versions, prd_download])
+        .invoke_handler(tauri::generate_handler![
+            prd_version,
+            prd_repos,
+            prd_versions,
+            prd_download
+        ])
         .build()
 }
