@@ -23,7 +23,9 @@ export async function createTauriSettingsStorage(): Promise<SettingsStorage> {
   const persist = () => {
     const entries = Object.fromEntries(cache);
     queue = queue.then(() =>
-      usSettingsSave({ entries }).catch((e) => console.error("uberstress: settings save failed", e)),
+      usSettingsSave({ entries }).catch((e) =>
+        console.error("uberstress: settings save failed", e),
+      ),
     );
   };
 

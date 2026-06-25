@@ -22,16 +22,44 @@ const uberstressPlugin: FramePlugin = {
       label: "uberstress",
       order: 30,
       items: [
-        { id: "uberstress.run", label: "Run", to: "/uberstress", end: true, order: 0, icon: Zap },
-        { id: "uberstress.history", label: "History", to: "/uberstress/history", order: 1, icon: History },
+        {
+          id: "uberstress.run",
+          label: "Run",
+          to: "/uberstress",
+          end: true,
+          order: 0,
+          icon: Zap,
+        },
+        {
+          id: "uberstress.history",
+          label: "History",
+          to: "/uberstress/history",
+          order: 1,
+          icon: History,
+        },
       ],
     },
   ],
   routes: [
-    { path: "uberstress", lazy: () => import("./pages/RunPage"), crumb: "uberstress" },
-    { path: "uberstress/history", lazy: () => import("./pages/HistoryPage"), crumb: "History" },
+    {
+      path: "uberstress",
+      lazy: () => import("./pages/RunPage"),
+      crumb: "uberstress",
+    },
+    {
+      path: "uberstress/history",
+      lazy: () => import("./pages/HistoryPage"),
+      crumb: "History",
+    },
   ],
-  settings: [{ id: "uberstress", title: "uberstress", icon: Server, Component: UberstressSettings }],
+  settings: [
+    {
+      id: "uberstress",
+      title: "uberstress",
+      icon: Server,
+      Component: UberstressSettings,
+    },
+  ],
 };
 
 export default uberstressPlugin;

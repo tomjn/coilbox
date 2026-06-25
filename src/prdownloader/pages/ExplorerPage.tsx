@@ -1,7 +1,21 @@
-import { Button, Input, cn } from "@picoframe/frame";
-import { AlertCircle, CheckCircle2, Download, FolderOpen, Loader2, Package } from "lucide-react";
+import { Button, cn, Input } from "@picoframe/frame";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Download,
+  FolderOpen,
+  Loader2,
+  Package,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { type Repo, type Version, prdDownload, prdRepos, prdVersion, prdVersions } from "../bindings";
+import {
+  prdDownload,
+  prdRepos,
+  prdVersion,
+  prdVersions,
+  type Repo,
+  type Version,
+} from "../bindings";
 
 const DEFAULT_MASTER = "https://repos.springrts.com";
 
@@ -47,7 +61,13 @@ function SidecarWarning() {
   );
 }
 
-function EmptyState({ icon: Icon, children }: { icon: typeof Package; children: React.ReactNode }) {
+function EmptyState({
+  icon: Icon,
+  children,
+}: {
+  icon: typeof Package;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
       <Icon size={28} className="opacity-40" />
@@ -69,7 +89,10 @@ export default function ExplorerPage() {
   const [versionsError, setVersionsError] = useState<string | null>(null);
 
   const [downloading, setDownloading] = useState<string | null>(null);
-  const [downloadResult, setDownloadResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [downloadResult, setDownloadResult] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
 
   async function loadRepos() {
     setReposLoading(true);
@@ -78,7 +101,9 @@ export default function ExplorerPage() {
     setVersions(null);
     setDownloadResult(null);
     try {
-      const { repos } = await prdRepos({ masterUrl: masterUrl.trim() || DEFAULT_MASTER });
+      const { repos } = await prdRepos({
+        masterUrl: masterUrl.trim() || DEFAULT_MASTER,
+      });
       setRepos(repos);
     } catch (e) {
       setRepos(null);
@@ -124,7 +149,8 @@ export default function ExplorerPage() {
         <div className="space-y-1">
           <h1 className="text-lg font-semibold leading-none">pr-downloader</h1>
           <p className="max-w-prose text-sm text-muted-foreground">
-            Browse Spring/Recoil rapid content and download a tag through the bundled sidecar.
+            Browse Spring/Recoil rapid content and download a tag through the
+            bundled sidecar.
           </p>
         </div>
         <form
@@ -157,7 +183,9 @@ export default function ExplorerPage() {
         <aside className="flex min-h-0 flex-col border-r border-border bg-card/30">
           <div className="flex items-center justify-between px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <span>Repositories</span>
-            {repos && <span className="font-normal normal-case">{repos.length}</span>}
+            {repos && (
+              <span className="font-normal normal-case">{repos.length}</span>
+            )}
           </div>
           <div className="min-h-0 flex-1 overflow-auto">
             {reposError && (
@@ -167,7 +195,9 @@ export default function ExplorerPage() {
               </p>
             )}
             {!repos && !reposError && (
-              <EmptyState icon={Package}>Load a rapid master to list its repositories.</EmptyState>
+              <EmptyState icon={Package}>
+                Load a rapid master to list its repositories.
+              </EmptyState>
             )}
             {repos?.map((repo) => (
               <button
@@ -176,10 +206,14 @@ export default function ExplorerPage() {
                 onClick={() => selectRepo(repo)}
                 className={cn(
                   "flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                  selected?.name === repo.name && "bg-accent font-medium text-accent-foreground",
+                  selected?.name === repo.name &&
+                    "bg-accent font-medium text-accent-foreground",
                 )}
               >
-                <FolderOpen size={15} className="shrink-0 text-muted-foreground" />
+                <FolderOpen
+                  size={15}
+                  className="shrink-0 text-muted-foreground"
+                />
                 <span className="truncate">{repo.name}</span>
               </button>
             ))}
@@ -189,18 +223,25 @@ export default function ExplorerPage() {
         {/* Right: versions in the selected repository */}
         <section className="flex min-h-0 flex-col">
           {!selected ? (
-            <EmptyState icon={FolderOpen}>Select a repository to see its downloadable versions.</EmptyState>
+            <EmptyState icon={FolderOpen}>
+              Select a repository to see its downloadable versions.
+            </EmptyState>
           ) : (
             <>
               <div className="flex items-center gap-2 border-b border-border px-6 py-3">
                 <Package size={16} className="text-muted-foreground" />
                 <h2 className="font-medium">{selected.name}</h2>
-                {versions && <span className="text-sm text-muted-foreground">· {versions.length} versions</span>}
+                {versions && (
+                  <span className="text-sm text-muted-foreground">
+                    · {versions.length} versions
+                  </span>
+                )}
               </div>
               <div className="min-h-0 flex-1 overflow-auto">
                 {versionsLoading && (
                   <p className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-                    <Loader2 size={15} className="animate-spin" /> loading versions…
+                    <Loader2 size={15} className="animate-spin" /> loading
+                    versions…
                   </p>
                 )}
                 {versionsError && (
@@ -209,13 +250,22 @@ export default function ExplorerPage() {
                     {versionsError}
                   </p>
                 )}
-                {versions?.length === 0 && <EmptyState icon={Package}>No versions in this repository.</EmptyState>}
+                {versions?.length === 0 && (
+                  <EmptyState icon={Package}>
+                    No versions in this repository.
+                  </EmptyState>
+                )}
                 <ul className="divide-y divide-border">
                   {versions?.map((v) => (
-                    <li key={v.tag} className="flex items-center justify-between gap-3 px-6 py-2.5">
+                    <li
+                      key={v.tag}
+                      className="flex items-center justify-between gap-3 px-6 py-2.5"
+                    >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{v.name}</p>
-                        <p className="truncate font-mono text-xs text-muted-foreground">{v.tag}</p>
+                        <p className="truncate font-mono text-xs text-muted-foreground">
+                          {v.tag}
+                        </p>
                       </div>
                       <Button
                         variant="outline"
@@ -224,7 +274,11 @@ export default function ExplorerPage() {
                         disabled={downloading !== null}
                         aria-label={`Download ${v.tag}`}
                       >
-                        {downloading === v.tag ? <Loader2 className="animate-spin" /> : <Download />}
+                        {downloading === v.tag ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Download />
+                        )}
                         {downloading === v.tag ? "Downloading…" : "Download"}
                       </Button>
                     </li>
@@ -244,11 +298,16 @@ export default function ExplorerPage() {
               )}
             >
               {downloadResult.ok ? (
-                <CheckCircle2 size={16} className="mt-px shrink-0 text-emerald-500" />
+                <CheckCircle2
+                  size={16}
+                  className="mt-px shrink-0 text-emerald-500"
+                />
               ) : (
                 <AlertCircle size={16} className="mt-px shrink-0" />
               )}
-              <span className="min-w-0 break-words">{downloadResult.message}</span>
+              <span className="min-w-0 break-words">
+                {downloadResult.message}
+              </span>
             </div>
           )}
         </section>

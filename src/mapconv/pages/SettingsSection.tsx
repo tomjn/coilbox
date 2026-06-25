@@ -20,21 +20,34 @@ const CT_OPTIONS = [
  */
 export default function MapconvSettings() {
   const [cfg, setCfg] = useMapconvConfig();
-  const [probe, setProbe] = useState<{ available: boolean; compile: boolean; decompile: boolean } | null>(null);
+  const [probe, setProbe] = useState<{
+    available: boolean;
+    compile: boolean;
+    decompile: boolean;
+  } | null>(null);
 
   useEffect(() => {
-    mcProbe(undefined).then(setProbe).catch(() => {});
+    mcProbe(undefined)
+      .then(setProbe)
+      .catch(() => {});
   }, []);
 
   return (
     <div className="space-y-8">
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Defaults</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Defaults
+        </h2>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Default compression type" hint="seeds the Compile page">
             <OptionSelect
               value={String(cfg.defaultCompressionType)}
-              onValueChange={(v) => setCfg({ ...cfg, defaultCompressionType: Number(v) as CompressionType })}
+              onValueChange={(v) =>
+                setCfg({
+                  ...cfg,
+                  defaultCompressionType: Number(v) as CompressionType,
+                })
+              }
               options={CT_OPTIONS}
             />
           </Field>
@@ -48,9 +61,12 @@ export default function MapconvSettings() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">SpringMapConvNG sidecars</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          SpringMapConvNG sidecars
+        </h2>
         <p className="text-xs text-muted-foreground">
-          The compile/decompile features shell out to the bundled SpringMapConvNG binaries.
+          The compile/decompile features shell out to the bundled
+          SpringMapConvNG binaries.
         </p>
         <ul className="space-y-1.5 text-sm">
           <SidecarRow label="mapcompile" ok={probe?.compile} />
@@ -65,12 +81,17 @@ function SidecarRow({ label, ok }: { label: string; ok?: boolean }) {
   return (
     <li className="flex items-center gap-2">
       {ok ? (
-        <CheckCircle2 size={15} className="text-emerald-600 dark:text-emerald-400" />
+        <CheckCircle2
+          size={15}
+          className="text-emerald-600 dark:text-emerald-400"
+        />
       ) : (
         <XCircle size={15} className="text-muted-foreground" />
       )}
       <code className="text-xs">{label}</code>
-      <span className="text-xs text-muted-foreground">{ok === undefined ? "checking…" : ok ? "available" : "not found"}</span>
+      <span className="text-xs text-muted-foreground">
+        {ok === undefined ? "checking…" : ok ? "available" : "not found"}
+      </span>
     </li>
   );
 }

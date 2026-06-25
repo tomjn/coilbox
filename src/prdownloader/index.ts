@@ -16,11 +16,24 @@ const prdownloaderPlugin: FramePlugin = {
       label: "pr-downloader",
       order: 20,
       items: [
-        { id: "prdownloader.browse", label: "Browse", to: "/prdownloader", end: true, order: 0, icon: Package },
+        {
+          id: "prdownloader.browse",
+          label: "Browse",
+          to: "/prdownloader",
+          end: true,
+          order: 0,
+          icon: Package,
+        },
       ],
     },
   ],
-  routes: [{ path: "prdownloader", lazy: () => import("./pages/ExplorerPage"), crumb: "pr-downloader" }],
+  routes: [
+    {
+      path: "prdownloader",
+      lazy: () => import("./pages/ExplorerPage"),
+      crumb: "pr-downloader",
+    },
+  ],
 };
 
 export default prdownloaderPlugin;

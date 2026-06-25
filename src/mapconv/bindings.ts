@@ -70,7 +70,14 @@ export const mcProbe = defineCommand<
 /** Conventional sibling source files found next to a chosen main texture. */
 export const mcSuggestSources = defineCommand<
   { texturePath: string },
-  { heightmap?: string; metalmap?: string; typemap?: string; minimap?: string; vegmap?: string; features?: string }
+  {
+    heightmap?: string;
+    metalmap?: string;
+    typemap?: string;
+    minimap?: string;
+    vegmap?: string;
+    features?: string;
+  }
 >("coilbox-mapconv", "mc_suggest_sources");
 
 export const mcCompile = defineCommand<
@@ -80,13 +87,18 @@ export const mcCompile = defineCommand<
 
 export const mcDecompile = defineCommand<
   { inputPath: string; runId: string; onLog: Channel<LogLine> },
-  { directory: string; exitCode: number; mapInfo?: MapInfo | null; minimap?: string | null }
+  {
+    directory: string;
+    exitCode: number;
+    mapInfo?: MapInfo | null;
+    minimap?: string | null;
+  }
 >("coilbox-mapconv", "mc_decompile");
 
-export const mcCancel = defineCommand<{ runId: string }, { cancelled: boolean }>(
-  "coilbox-mapconv",
-  "mc_cancel",
-);
+export const mcCancel = defineCommand<
+  { runId: string },
+  { cancelled: boolean }
+>("coilbox-mapconv", "mc_cancel");
 
 /** Open a folder in the OS file manager (Finder/Explorer/file manager). */
 export const mcOpenPath = defineCommand<{ path: string }, { opened: boolean }>(
@@ -95,12 +107,12 @@ export const mcOpenPath = defineCommand<{ path: string }, { opened: boolean }>(
 );
 
 /** Whole settings map (opaque JSON-encoded string values), for the frame's SettingsStorage. */
-export const mcSettingsLoad = defineCommand<undefined, { entries: Record<string, string> }>(
-  "coilbox-mapconv",
-  "mc_settings_load",
-);
+export const mcSettingsLoad = defineCommand<
+  undefined,
+  { entries: Record<string, string> }
+>("coilbox-mapconv", "mc_settings_load");
 
-export const mcSettingsSave = defineCommand<{ entries: Record<string, string> }, Record<string, never>>(
-  "coilbox-mapconv",
-  "mc_settings_save",
-);
+export const mcSettingsSave = defineCommand<
+  { entries: Record<string, string> },
+  Record<string, never>
+>("coilbox-mapconv", "mc_settings_save");

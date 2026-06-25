@@ -1,4 +1,4 @@
-import { Button, Input, cn, useDrawer } from "@picoframe/frame";
+import { Button, cn, Input, useDrawer } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
   AlertCircle,
@@ -11,7 +11,14 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type LogLine, type Report, type RunOpts, usCancel, usRun, usScenarios } from "../bindings";
+import {
+  type LogLine,
+  type Report,
+  type RunOpts,
+  usCancel,
+  usRun,
+  usScenarios,
+} from "../bindings";
 import { useUberstressConfig } from "../config";
 import { CheckField, Field } from "./components/Field";
 import { OptionSelect } from "./components/OptionSelect";
@@ -25,7 +32,9 @@ const MANUAL = "__manual__";
 
 /** Headline metrics for the just-finished run. */
 function ResultSummary({ report, file }: { report: Report; file: string }) {
-  const headline = report.commands.filter((c) => c.command === "LOGIN" || c.command === "PING");
+  const headline = report.commands.filter(
+    (c) => c.command === "LOGIN" || c.command === "PING",
+  );
   return (
     <div className="space-y-3 rounded-md border border-border bg-card/50 p-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -35,14 +44,20 @@ function ResultSummary({ report, file }: { report: Report; file: string }) {
         </span>
       </div>
       <div className="flex flex-wrap gap-4 text-sm">
-        {(headline.length > 0 ? headline : report.commands.slice(0, 3)).map((c) => (
-          <div key={c.command} className="space-y-0.5">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">{c.command} p99</p>
-            <p className="font-mono">{c.p99_ms.toFixed(2)} ms</p>
-          </div>
-        ))}
+        {(headline.length > 0 ? headline : report.commands.slice(0, 3)).map(
+          (c) => (
+            <div key={c.command} className="space-y-0.5">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                {c.command} p99
+              </p>
+              <p className="font-mono">{c.p99_ms.toFixed(2)} ms</p>
+            </div>
+          ),
+        )}
       </div>
-      <p className="text-xs text-muted-foreground">Open the History page for the full breakdown and charts.</p>
+      <p className="text-xs text-muted-foreground">
+        Open the History page for the full breakdown and charts.
+      </p>
     </div>
   );
 }
@@ -55,7 +70,9 @@ export default function RunPage() {
   const [scenarios, setScenarios] = useState<string[]>([]);
 
   const [mode, setMode] = useState<"load" | "bench">("load");
-  const [serverChoice, setServerChoice] = useState<string>(() => cfg.servers[0]?.id ?? MANUAL);
+  const [serverChoice, setServerChoice] = useState<string>(
+    () => cfg.servers[0]?.id ?? MANUAL,
+  );
   const [manualAddr, setManualAddr] = useState("127.0.0.1:8200");
   const [launch, setLaunch] = useState(true);
 
@@ -81,7 +98,9 @@ export default function RunPage() {
 
   const [running, setRunning] = useState(false);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
-  const [result, setResult] = useState<{ report: Report; file: string } | null>(null);
+  const [result, setResult] = useState<{ report: Report; file: string } | null>(
+    null,
+  );
   const [runError, setRunError] = useState<string | null>(null);
 
   const runIdRef = useRef<string | null>(null);
@@ -95,16 +114,22 @@ export default function RunPage() {
   }, []);
 
   // Auto-scroll the log to the newest line.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: logLines is the trigger that should re-run the scroll, not read in the body
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ block: "end" });
   }, [logLines]);
 
   const effectiveAddr =
-    serverChoice === MANUAL ? manualAddr : (cfg.servers.find((s) => s.id === serverChoice)?.addr ?? manualAddr);
+    serverChoice === MANUAL
+      ? manualAddr
+      : (cfg.servers.find((s) => s.id === serverChoice)?.addr ?? manualAddr);
 
   // load always needs an addr; bench needs one only when not launching locally.
   const needsAddr = mode === "load" || (mode === "bench" && !launch);
-  const canRun = !running && (!needsAddr || effectiveAddr.trim().length > 0) && scenario.trim().length > 0;
+  const canRun =
+    !running &&
+    (!needsAddr || effectiveAddr.trim().length > 0) &&
+    scenario.trim().length > 0;
 
   function buildOpts(): RunOpts {
     const opts: RunOpts = {
@@ -179,7 +204,11 @@ export default function RunPage() {
         options={scenarios.map((s) => ({ value: s, label: s }))}
       />
     ) : (
-      <Input value={scenario} onChange={(e) => setScenario(e.target.value)} disabled={running} />
+      <Input
+        value={scenario}
+        onChange={(e) => setScenario(e.target.value)}
+        disabled={running}
+      />
     );
 
   return (
@@ -190,7 +219,8 @@ export default function RunPage() {
             <Zap size={18} /> Run load test
           </h1>
           <p className="max-w-prose text-sm text-muted-foreground">
-            Drive a scenario against a lobby server (load) or launch one locally and benchmark it (bench).
+            Drive a scenario against a lobby server (load) or launch one locally
+            and benchmark it (bench).
           </p>
         </div>
         <Button
@@ -199,7 +229,8 @@ export default function RunPage() {
           onClick={() =>
             drawer.open({
               title: "Generate seed SQL",
-              description: "Pre-seed accounts so a load test can run with registration off.",
+              description:
+                "Pre-seed accounts so a load test can run with registration off.",
               width: "44rem",
               content: (
                 <SeedSqlForm
@@ -228,7 +259,9 @@ export default function RunPage() {
                 onClick={() => setMode(m)}
                 className={cn(
                   "rounded px-3 py-1 capitalize transition-colors",
-                  mode === m ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground",
+                  mode === m
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {m}
@@ -253,7 +286,10 @@ export default function RunPage() {
                   onValueChange={setServerChoice}
                   disabled={running}
                   options={[
-                    ...cfg.servers.map((s) => ({ value: s.id, label: `${s.name || s.addr} (${s.addr})` })),
+                    ...cfg.servers.map((s) => ({
+                      value: s.id,
+                      label: `${s.name || s.addr} (${s.addr})`,
+                    })),
                     { value: MANUAL, label: "Manual address…" },
                   ]}
                 />
@@ -287,7 +323,11 @@ export default function RunPage() {
               />
             </Field>
             <Field label="Ref label" hint="optional; tags the report">
-              <Input value={refLabel} onChange={(e) => setRefLabel(e.target.value)} disabled={running} />
+              <Input
+                value={refLabel}
+                onChange={(e) => setRefLabel(e.target.value)}
+                disabled={running}
+              />
             </Field>
             <Field label="Duration" hint="e.g. 30s">
               <Input
@@ -320,18 +360,35 @@ export default function RunPage() {
               onClick={() => setShowAdvanced((v) => !v)}
               className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
-              {showAdvanced ? <ChevronDown size={15} /> : <ChevronRight size={15} />} Advanced options
+              {showAdvanced ? (
+                <ChevronDown size={15} />
+              ) : (
+                <ChevronRight size={15} />
+              )}{" "}
+              Advanced options
             </button>
             {showAdvanced && (
               <div className="mt-3 grid grid-cols-2 gap-4">
                 <Field label="User prefix">
-                  <Input value={userPrefix} onChange={(e) => setUserPrefix(e.target.value)} disabled={running} />
+                  <Input
+                    value={userPrefix}
+                    onChange={(e) => setUserPrefix(e.target.value)}
+                    disabled={running}
+                  />
                 </Field>
                 <Field label="Password">
-                  <Input value={password} onChange={(e) => setPassword(e.target.value)} disabled={running} />
+                  <Input
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={running}
+                  />
                 </Field>
                 <Field label="Channel" hint="chat scenarios">
-                  <Input value={channel} onChange={(e) => setChannel(e.target.value)} disabled={running} />
+                  <Input
+                    value={channel}
+                    onChange={(e) => setChannel(e.target.value)}
+                    disabled={running}
+                  />
                 </Field>
                 <Field label="Channels">
                   <Input
@@ -343,7 +400,11 @@ export default function RunPage() {
                   />
                 </Field>
                 <Field label="Say interval">
-                  <Input value={sayInterval} onChange={(e) => setSayInterval(e.target.value)} disabled={running} />
+                  <Input
+                    value={sayInterval}
+                    onChange={(e) => setSayInterval(e.target.value)}
+                    disabled={running}
+                  />
                 </Field>
                 <Field label="Battle hosts">
                   <Input
@@ -364,10 +425,18 @@ export default function RunPage() {
                   />
                 </Field>
                 <Field label="Ping interval">
-                  <Input value={pingInterval} onChange={(e) => setPingInterval(e.target.value)} disabled={running} />
+                  <Input
+                    value={pingInterval}
+                    onChange={(e) => setPingInterval(e.target.value)}
+                    disabled={running}
+                  />
                 </Field>
                 {mode === "bench" && (
-                  <Field label="Compare to" hint="path to a prior report.json" className="col-span-2">
+                  <Field
+                    label="Compare to"
+                    hint="path to a prior report.json"
+                    className="col-span-2"
+                  >
                     <Input
                       value={compareTo}
                       onChange={(e) => setCompareTo(e.target.value)}
@@ -422,9 +491,13 @@ export default function RunPage() {
               <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
                 {logLines.map((l, i) => (
                   <div
-                    // log lines are append-only; index is a stable key here
+                    // biome-ignore lint/suspicious/noArrayIndexKey: log lines are append-only; index is a stable key
                     key={i}
-                    className={l.stream === "err" ? "text-amber-600 dark:text-amber-400" : "text-foreground/90"}
+                    className={
+                      l.stream === "err"
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-foreground/90"
+                    }
                   >
                     {l.line}
                   </div>
@@ -435,7 +508,6 @@ export default function RunPage() {
           </div>
         </div>
       </div>
-
     </div>
   );
 }

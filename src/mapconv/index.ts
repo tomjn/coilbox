@@ -1,5 +1,5 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Hammer, Map, PackageOpen } from "lucide-react";
+import { Hammer, Map as MapIcon, PackageOpen } from "lucide-react";
 import MapconvSettings from "./pages/SettingsSection";
 
 /**
@@ -22,16 +22,44 @@ const mapconvPlugin: FramePlugin = {
       label: "mapconv",
       order: 40,
       items: [
-        { id: "mapconv.compile", label: "Compile", to: "/mapconv", end: true, order: 0, icon: Hammer },
-        { id: "mapconv.decompile", label: "Decompile", to: "/mapconv/decompile", order: 1, icon: PackageOpen },
+        {
+          id: "mapconv.compile",
+          label: "Compile",
+          to: "/mapconv",
+          end: true,
+          order: 0,
+          icon: Hammer,
+        },
+        {
+          id: "mapconv.decompile",
+          label: "Decompile",
+          to: "/mapconv/decompile",
+          order: 1,
+          icon: PackageOpen,
+        },
       ],
     },
   ],
   routes: [
-    { path: "mapconv", lazy: () => import("./pages/CompilePage"), crumb: "mapconv" },
-    { path: "mapconv/decompile", lazy: () => import("./pages/DecompilePage"), crumb: "Decompile" },
+    {
+      path: "mapconv",
+      lazy: () => import("./pages/CompilePage"),
+      crumb: "mapconv",
+    },
+    {
+      path: "mapconv/decompile",
+      lazy: () => import("./pages/DecompilePage"),
+      crumb: "Decompile",
+    },
   ],
-  settings: [{ id: "mapconv", title: "mapconv", icon: Map, Component: MapconvSettings }],
+  settings: [
+    {
+      id: "mapconv",
+      title: "mapconv",
+      icon: MapIcon,
+      Component: MapconvSettings,
+    },
+  ],
 };
 
 export default mapconvPlugin;

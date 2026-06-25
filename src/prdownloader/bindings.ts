@@ -23,17 +23,17 @@ export const prdVersion = defineCommand<undefined, { version: string }>(
   "prd_version",
 );
 
-export const prdRepos = defineCommand<{ masterUrl?: string }, { repos: Repo[] }>(
-  "coilbox-prdownloader",
-  "prd_repos",
-);
+export const prdRepos = defineCommand<
+  { masterUrl?: string },
+  { repos: Repo[] }
+>("coilbox-prdownloader", "prd_repos");
 
-export const prdVersions = defineCommand<{ repoUrl: string }, { versions: Version[] }>(
-  "coilbox-prdownloader",
-  "prd_versions",
-);
+export const prdVersions = defineCommand<
+  { repoUrl: string },
+  { versions: Version[] }
+>("coilbox-prdownloader", "prd_versions");
 
-export const prdDownload = defineCommand<{ tag: string; writePath?: string }, { message: string; tag: string }>(
-  "coilbox-prdownloader",
-  "prd_download",
-);
+export const prdDownload = defineCommand<
+  { tag: string; writePath?: string },
+  { message: string; tag: string }
+>("coilbox-prdownloader", "prd_download");

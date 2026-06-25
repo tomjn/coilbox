@@ -1,7 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
-import { Textarea } from "@/components/ui/textarea";
 import { AlertCircle, Check, Copy, Database, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
 import { usSeedSql } from "../../bindings";
 import { Field } from "./Field";
 
@@ -55,8 +55,8 @@ export default function SeedSqlForm({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Run the output against the server&apos;s database, then run a scenario with{" "}
-        <span className="font-mono text-xs">register</span> unchecked.
+        Run the output against the server&apos;s database, then run a scenario
+        with <span className="font-mono text-xs">register</span> unchecked.
       </p>
 
       <form
@@ -67,13 +67,26 @@ export default function SeedSqlForm({
         }}
       >
         <Field label="Account count" hint="≥ max connections">
-          <Input type="number" min={1} value={count} onChange={(e) => setCount(Number(e.target.value))} />
+          <Input
+            type="number"
+            min={1}
+            value={count}
+            onChange={(e) => setCount(Number(e.target.value))}
+          />
         </Field>
         <Field label="User prefix">
-          <Input value={prefix} onChange={(e) => setPrefix(e.target.value)} className="font-mono text-xs" />
+          <Input
+            value={prefix}
+            onChange={(e) => setPrefix(e.target.value)}
+            className="font-mono text-xs"
+          />
         </Field>
         <Field label="Password">
-          <Input value={password} onChange={(e) => setPassword(e.target.value)} className="font-mono text-xs" />
+          <Input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="font-mono text-xs"
+          />
         </Field>
         <div className="sm:col-span-3">
           <Button type="submit" disabled={loading}>
@@ -93,7 +106,9 @@ export default function SeedSqlForm({
       {sql && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SQL</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              SQL
+            </span>
             <Button variant="outline" size="sm" onClick={copy}>
               {copied ? <Check /> : <Copy />}
               {copied ? "Copied" : "Copy"}

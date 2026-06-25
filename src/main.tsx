@@ -14,6 +14,10 @@ const settingsStorage = await createTauriSettingsStorage();
 
 createRoot(root).render(
   <StrictMode>
-    <AppFrame plugins={plugins} title="Coilbox" settingsStorage={settingsStorage} />
+    <AppFrame
+      plugins={plugins}
+      title="Coilbox"
+      settingsStorage={settingsStorage}
+    />
   </StrictMode>,
 );
