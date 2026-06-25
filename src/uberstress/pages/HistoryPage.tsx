@@ -1,6 +1,7 @@
 import { cn } from "@picoframe/frame";
 import { AlertCircle, History, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useLocation } from "react-router";
 import {
   type Report,
   type ReportSummary,
@@ -13,15 +14,17 @@ import {
   LatencyBars,
   TrendChart,
 } from "./components/ReportCharts";
+import {
+  ConfigPanel,
+  CountersPanel,
+  EarlyTerminationNotice,
+  fmtWhen,
+  ReportHeader,
+  SummaryBand,
+} from "./components/ReportDetail";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
-}
-
-function fmtWhen(iso: string): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
 /** Compact provenance line: ref or short SHA, server version. */
@@ -38,6 +41,7 @@ function CommandTable({ report }: { report: Report }) {
         <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
           <th className="py-2 pr-4 font-medium">Command</th>
           <th className="py-2 pr-4 text-right font-medium">Count</th>
+          <th className="py-2 pr-4 text-right font-medium">Err</th>
           <th className="py-2 pr-4 text-right font-medium">p50</th>
           <th className="py-2 pr-4 text-right font-medium">p95</th>
           <th className="py-2 pr-4 text-right font-medium">p99</th>
@@ -50,6 +54,14 @@ function CommandTable({ report }: { report: Report }) {
           <tr key={c.command} className="border-b border-border/50">
             <td className="py-1.5 pr-4 font-sans">{c.command}</td>
             <td className="py-1.5 pr-4 text-right">{c.count}</td>
+            <td
+              className={cn(
+                "py-1.5 pr-4 text-right",
+                (c.error_count ?? 0) > 0 && "text-destructive",
+              )}
+            >
+              {c.error_count ?? 0}
+            </td>
             <td className="py-1.5 pr-4 text-right">{c.p50_ms.toFixed(2)}</td>
             <td className="py-1.5 pr-4 text-right">{c.p95_ms.toFixed(2)}</td>
             <td className="py-1.5 pr-4 text-right">{c.p99_ms.toFixed(2)}</td>
@@ -72,6 +84,7 @@ export default function HistoryPage() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [compareFile, setCompareFile] = useState<string>("");
   const [compareReport, setCompareReport] = useState<Report | null>(null);
+  const location = useLocation();
 
   const loadHistory = useCallback(async () => {
     setListError(null);
@@ -103,6 +116,12 @@ export default function HistoryPage() {
       setReportLoading(false);
     }
   }, []);
+
+  // Arriving from the Run page's "View results": preselect that run.
+  useEffect(() => {
+    const file = (location.state as { selectFile?: string } | null)?.selectFile;
+    if (file) selectRun(file);
+  }, [location.state, selectRun]);
 
   async function selectCompare(file: string) {
     setCompareFile(file);
@@ -207,19 +226,15 @@ export default function HistoryPage() {
             </p>
           ) : report ? (
             <div className="space-y-6 p-6">
-              <div className="space-y-1">
-                <h2 className="text-base font-semibold">
-                  {report.scenario}{" "}
-                  <span className="font-normal text-muted-foreground">
-                    · {report.addr}
-                  </span>
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {fmtWhen(report.started_at)} ·{" "}
-                  {report.duration_sec.toFixed(1)}s
-                  {report.server_version ? ` · ${report.server_version}` : ""}
-                </p>
-              </div>
+              <ReportHeader report={report} />
+
+              <EarlyTerminationNotice report={report} />
+
+              {/* Derived headline figures */}
+              <SummaryBand report={report} />
+
+              {/* Scenario knobs this run used */}
+              {report.params && <ConfigPanel params={report.params} />}
 
               {/* Per-command latency */}
               <div className="space-y-2">
@@ -277,20 +292,7 @@ export default function HistoryPage() {
 
               <CommandTable report={report} />
 
-              {Object.keys(report.counters).length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Counters
-                  </h3>
-                  <div className="flex flex-wrap gap-2 font-mono text-xs">
-                    {Object.entries(report.counters).map(([k, v]) => (
-                      <span key={k} className="rounded bg-muted px-2 py-1">
-                        {k}={v}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <CountersPanel counters={report.counters} />
             </div>
           ) : null}
         </section>
