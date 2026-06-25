@@ -17,10 +17,12 @@ import {
   type CompileOpts,
   type CompressionType,
   type LogLine,
+  type MapAppearance,
   mcCancel,
   mcCompile,
   mcOpenPath,
   mcProbe,
+  mcReadMapinfo,
   mcSuggestSources,
 } from "../bindings";
 import { useMapconvConfig } from "../config";
@@ -30,6 +32,7 @@ import AdvancedOptions, {
 } from "./components/AdvancedOptions";
 import { Field } from "./components/Field";
 import { LearnMore, WIKI } from "./components/Help";
+import { MapPreview3D } from "./components/MapPreview3D";
 import { OptionSelect } from "./components/OptionSelect";
 import { PathField } from "./components/PathField";
 
@@ -55,6 +58,12 @@ const CT_OPTIONS = [
 function dirname(p: string): string {
   const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
   return i >= 0 ? p.slice(0, i) : "";
+}
+
+/** Parse a numeric form string, falling back when empty/invalid. */
+function numOr(s: string, fallback: number): number {
+  const n = Number(s);
+  return s.trim() === "" || Number.isNaN(n) ? fallback : n;
 }
 
 /** How many optional flags the user has set, for the drawer button badge. */
@@ -94,11 +103,18 @@ export default function CompilePage() {
     width: number;
     height: number;
   } | null>(null);
+  const [appearance, setAppearance] = useState<MapAppearance | null>(null);
 
   // mapcompile requires the texture's dimensions to be a multiple of 1024.
   const textureSizeBad =
     textureInfo != null &&
     (textureInfo.width % 1024 !== 0 || textureInfo.height % 1024 !== 0);
+
+  // A min height at or above max is nonsensical — flat at best, inverted at worst.
+  const heightRangeBad =
+    advanced.minh.trim() !== "" &&
+    advanced.maxh.trim() !== "" &&
+    Number(advanced.minh) >= Number(advanced.maxh);
 
   const [running, setRunning] = useState(false);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
@@ -191,7 +207,30 @@ export default function CompilePage() {
   async function pickTexture(path: string) {
     setMaintexture(path);
     setTextureInfo(null);
+    setAppearance(null);
     if (!path) return;
+    // Read mapinfo.lua (or .smf-header fallback) for the height range + the
+    // appearance hints the 3D preview uses. Prefill the height fields only when
+    // empty, so we never clobber values the user typed; reveal Advanced if found.
+    mcReadMapinfo({ path })
+      .then((info) => {
+        setAppearance(info);
+        if (info.minHeight != null || info.maxHeight != null) {
+          setAdvanced((a) => ({
+            ...a,
+            minh:
+              a.minh.trim() === "" && info.minHeight != null
+                ? String(info.minHeight)
+                : a.minh,
+            maxh:
+              a.maxh.trim() === "" && info.maxHeight != null
+                ? String(info.maxHeight)
+                : a.maxh,
+          }));
+          setShowAdvanced(true);
+        }
+      })
+      .catch(() => {});
     try {
       const s = await mcSuggestSources({ texturePath: path });
       let found = false;
@@ -364,6 +403,17 @@ export default function CompilePage() {
             )}
           </div>
 
+          {heightRangeBad && (
+            <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-300">
+              <AlertCircle size={14} className="mt-px shrink-0" />
+              <span>
+                Min height ({advanced.minh}) is at or above max height (
+                {advanced.maxh}) — the terrain will be flat or inverted. Set min
+                below max.
+              </span>
+            </p>
+          )}
+
           <div className="flex items-center gap-2 pt-1">
             {running ? (
               <Button variant="outline" onClick={cancel}>
@@ -382,8 +432,21 @@ export default function CompilePage() {
           </div>
         </div>
 
-        {/* Right: live log + result */}
+        {/* Right: live preview + log + result */}
         <div className="flex min-h-0 min-w-0 flex-col">
+          {maintexture !== "" && advanced.heightmap !== "" && textureInfo && (
+            <div className="border-b border-border bg-card/50 p-4">
+              <MapPreview3D
+                heightmapPath={advanced.heightmap}
+                texturePath={maintexture}
+                minHeight={numOr(advanced.minh, 0)}
+                maxHeight={numOr(advanced.maxh, 1)}
+                worldWidth={textureInfo.width}
+                worldHeight={textureInfo.height}
+                appearance={appearance}
+              />
+            </div>
+          )}
           {result && (
             <div className="border-b border-border bg-card/50 px-4 py-3">
               <div className="flex items-start gap-2 text-sm">

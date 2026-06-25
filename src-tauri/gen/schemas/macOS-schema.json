@@ -177,10 +177,10 @@
       "description": "Permission identifier",
       "oneOf": [
         {
-          "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
+          "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
           "type": "string",
           "const": "coilbox-mapconv:default",
-          "markdownDescription": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`"
+          "markdownDescription": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`"
         },
         {
           "description": "Enables the mc_cancel command without any pre-configured scope.",
@@ -223,6 +223,12 @@
           "type": "string",
           "const": "coilbox-mapconv:allow-mc-probe",
           "markdownDescription": "Enables the mc_probe command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mc_read_mapinfo command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-mapconv:allow-mc-read-mapinfo",
+          "markdownDescription": "Enables the mc_read_mapinfo command without any pre-configured scope."
         },
         {
           "description": "Enables the mc_settings_load command without any pre-configured scope.",
@@ -283,6 +289,12 @@
           "type": "string",
           "const": "coilbox-mapconv:deny-mc-probe",
           "markdownDescription": "Denies the mc_probe command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mc_read_mapinfo command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-mapconv:deny-mc-read-mapinfo",
+          "markdownDescription": "Denies the mc_read_mapinfo command without any pre-configured scope."
         },
         {
           "description": "Denies the mc_settings_load command without any pre-configured scope.",

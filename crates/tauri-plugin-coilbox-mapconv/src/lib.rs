@@ -5,6 +5,7 @@
 //! matching every other picoframe plugin.
 
 mod archive;
+mod mapinfo;
 mod settings;
 mod sidecar;
 mod smf;
@@ -183,18 +184,87 @@ async fn mc_suggest_sources(texture_path: String) -> CliResult {
     }))
 }
 
+/// First `.smf` found directly inside any of `dirs` (the height fallback for
+/// maps without a `mapinfo.lua`).
+fn find_smf_near(dirs: &[PathBuf]) -> Option<PathBuf> {
+    for d in dirs {
+        if let Ok(rd) = std::fs::read_dir(d) {
+            for e in rd.flatten() {
+                let p = e.path();
+                if p.extension()
+                    .and_then(|x| x.to_str())
+                    .is_some_and(|x| x.eq_ignore_ascii_case("smf"))
+                {
+                    return Some(p);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// `mc_read_mapinfo` — best-effort read of a map's `mapinfo.lua` near `path` (a
+/// chosen texture file, or a decompiled directory). Searches that location and
+/// its parent for `mapinfo.lua` and pulls metadata + height + appearance hints.
+/// If the height range is missing (old maps with no `mapinfo.lua`), it falls
+/// back to a sibling `.smf` header. All fields are optional; callers prefill /
+/// decorate with whatever is present.
+#[tauri::command]
+async fn mc_read_mapinfo(path: String) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let p = PathBuf::from(&path);
+        let base = if p.is_dir() {
+            p.clone()
+        } else {
+            p.parent().map(Path::to_path_buf).unwrap_or(p)
+        };
+        let mut dirs = vec![base.clone()];
+        if let Some(parent) = base.parent() {
+            dirs.push(parent.to_path_buf());
+        }
+
+        let mut info = mapinfo::MapAppearance::default();
+        for d in &dirs {
+            if let Ok(src) = std::fs::read_to_string(d.join("mapinfo.lua")) {
+                info = mapinfo::parse_appearance(&src);
+                break;
+            }
+        }
+        if info.min_height.is_none() || info.max_height.is_none() {
+            if let Some(smf) = find_smf_near(&dirs) {
+                if let Ok(h) = std::fs::read(&smf)
+                    .map_err(|e| e.to_string())
+                    .and_then(|b| smf::parse_smf_header(&b))
+                {
+                    info.min_height.get_or_insert(h.min_height as f64);
+                    info.max_height.get_or_insert(h.max_height as f64);
+                }
+            }
+        }
+        info
+    })
+    .await;
+    match result {
+        Ok(info) => CliResult::ok(serde_json::to_value(info).unwrap_or_else(|_| json!({}))),
+        Err(e) => CliResult::err(format!("mapinfo task failed: {e}")),
+    }
+}
+
 /// `mc_image_info` — decode the image at `path` and return its true pixel
 /// dimensions plus a small downscaled PNG thumbnail as a `data:` URL. Lets the UI
 /// preview chosen source assets and validate texture sizing (multiple of 1024)
-/// up front, without an asset-protocol grant. Runs the decode off the async
-/// runtime since large textures are CPU/IO heavy.
+/// up front, without an asset-protocol grant. `max` is the thumbnail's longest
+/// side (default 320; the 3D preview asks for larger so the heightmap displaces
+/// with enough detail). Runs the decode off the async runtime since large
+/// textures are CPU/IO heavy.
 #[tauri::command]
-async fn mc_image_info(path: String) -> CliResult {
+async fn mc_image_info(path: String, max: Option<u32>) -> CliResult {
+    let max = max.unwrap_or(320).max(1);
     let result =
         tauri::async_runtime::spawn_blocking(move || -> Result<(u32, u32, String), String> {
             let img = image::open(&path).map_err(|e| format!("could not read image: {e}"))?;
             let (width, height) = img.dimensions();
-            let thumb = img.thumbnail(320, 320);
+            let thumb = img.thumbnail(max, max);
             let mut buf = std::io::Cursor::new(Vec::new());
             thumb
                 .write_to(&mut buf, image::ImageFormat::Png)
@@ -460,6 +530,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             mc_probe,
             mc_suggest_sources,
+            mc_read_mapinfo,
             mc_image_info,
             mc_compile,
             mc_decompile,

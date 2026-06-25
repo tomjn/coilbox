@@ -52,6 +52,27 @@ export interface MapInfo {
   worldHeight: number;
 }
 
+/**
+ * Best-effort subset of a map's `mapinfo.lua` (plus an `.smf`-header height
+ * fallback for old maps). Every field may be `null` when not found as a literal.
+ * Colours are RGB triples in 0–1; `sunDir` is a direction vector.
+ */
+export interface MapAppearance {
+  name?: string | null;
+  description?: string | null;
+  author?: string | null;
+  version?: string | null;
+  minHeight?: number | null;
+  maxHeight?: number | null;
+  voidWater?: boolean | null;
+  waterColor?: [number, number, number] | null;
+  waterAlpha?: number | null;
+  skyColor?: [number, number, number] | null;
+  fogColor?: [number, number, number] | null;
+  sunDir?: [number, number, number] | null;
+  sunColor?: [number, number, number] | null;
+}
+
 /** Plugin config, persisted through the frame settings store. */
 export interface Config {
   lastTextureDir?: string;
@@ -80,9 +101,24 @@ export const mcSuggestSources = defineCommand<
   }
 >("coilbox-mapconv", "mc_suggest_sources");
 
-/** Decode an image to its true pixel size plus a small preview thumbnail (data URL). */
+/**
+ * Read a map's `mapinfo.lua` (searching `path`'s folder and its parent; `path`
+ * may be a chosen texture file or a decompiled directory). Returns metadata,
+ * height range, and appearance hints, falling back to a sibling `.smf` header
+ * for the height range when there's no `mapinfo.lua`.
+ */
+export const mcReadMapinfo = defineCommand<{ path: string }, MapAppearance>(
+  "coilbox-mapconv",
+  "mc_read_mapinfo",
+);
+
+/**
+ * Decode an image to its true pixel size plus a small preview thumbnail (data
+ * URL). `max` sets the thumbnail's longest side (default 320 server-side); the
+ * 3D preview asks for a larger heightmap so displacement has enough detail.
+ */
 export const mcImageInfo = defineCommand<
-  { path: string },
+  { path: string; max?: number },
   { width: number; height: number; thumb: string }
 >("coilbox-mapconv", "mc_image_info");
 

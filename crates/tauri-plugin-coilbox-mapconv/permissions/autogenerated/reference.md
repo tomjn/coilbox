@@ -6,6 +6,7 @@ Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile
 
 - `allow-mc-probe`
 - `allow-mc-suggest-sources`
+- `allow-mc-read-mapinfo`
 - `allow-mc-image-info`
 - `allow-mc-compile`
 - `allow-mc-decompile`
@@ -202,6 +203,32 @@ Enables the mc_probe command without any pre-configured scope.
 <td>
 
 Denies the mc_probe command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:allow-mc-read-mapinfo`
+
+</td>
+<td>
+
+Enables the mc_read_mapinfo command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:deny-mc-read-mapinfo`
+
+</td>
+<td>
+
+Denies the mc_read_mapinfo command without any pre-configured scope.
 
 </td>
 </tr>
