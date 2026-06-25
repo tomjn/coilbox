@@ -232,7 +232,10 @@ async fn mc_read_mapinfo(path: String) -> CliResult {
         }
         if info.min_height.is_none() || info.max_height.is_none() {
             if let Some(smf) = find_smf_near(&dirs) {
-                if let Ok(h) = std::fs::read(&smf).map_err(|e| e.to_string()).and_then(|b| smf::parse_smf_header(&b)) {
+                if let Ok(h) = std::fs::read(&smf)
+                    .map_err(|e| e.to_string())
+                    .and_then(|b| smf::parse_smf_header(&b))
+                {
                     info.min_height.get_or_insert(h.min_height as f64);
                     info.max_height.get_or_insert(h.max_height as f64);
                 }

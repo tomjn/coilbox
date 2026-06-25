@@ -106,7 +106,10 @@ fn scan_vec3(lower: &str, key: &str) -> Option<[f32; 3]> {
     let s = lower[value_at(lower, key)?..].trim_start();
     let inner = s.strip_prefix('{')?;
     let inner = &inner[..inner.find('}')?];
-    let nums: Vec<f32> = inner.split(',').filter_map(|p| p.trim().parse().ok()).collect();
+    let nums: Vec<f32> = inner
+        .split(',')
+        .filter_map(|p| p.trim().parse().ok())
+        .collect();
     (nums.len() >= 3).then(|| [nums[0], nums[1], nums[2]])
 }
 
@@ -206,7 +209,10 @@ mod tests {
     fn parses_metadata_and_height() {
         let a = parse_appearance(TMA);
         assert_eq!(a.name.as_deref(), Some("TMA20XR"));
-        assert_eq!(a.description.as_deref(), Some("The new optimized TMA | BAR Certified"));
+        assert_eq!(
+            a.description.as_deref(),
+            Some("The new optimized TMA | BAR Certified")
+        );
         assert_eq!(a.author.as_deref(), Some("IceXuick"));
         assert_eq!(a.version.as_deref(), Some("2.1"));
         assert_eq!(a.min_height, Some(-300.0));
