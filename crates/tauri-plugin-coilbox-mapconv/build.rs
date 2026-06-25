@@ -5,10 +5,12 @@
 const COMMANDS: &[&str] = &[
     "mc_probe",
     "mc_suggest_sources",
+    "mc_image_info",
     "mc_compile",
     "mc_decompile",
     "mc_cancel",
     "mc_open_path",
+    "mc_open_url",
     "mc_settings_load",
     "mc_settings_save",
 ];

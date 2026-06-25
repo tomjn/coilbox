@@ -1,6 +1,8 @@
 import { Button, cn, Input } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
+import type { ReactNode } from "react";
+import { AssetPreview } from "./AssetPreview";
 import { Field } from "./Field";
 
 /**
@@ -14,6 +16,8 @@ import { Field } from "./Field";
 export function PathField({
   label,
   hint,
+  help,
+  learnMore,
   value,
   onChange,
   disabled,
@@ -21,9 +25,13 @@ export function PathField({
   filters,
   defaultPath,
   className,
+  preview = false,
+  onInfo,
 }: {
   label: string;
   hint?: string;
+  help?: ReactNode;
+  learnMore?: string;
   value: string;
   onChange: (path: string) => void;
   disabled?: boolean;
@@ -31,6 +39,9 @@ export function PathField({
   filters?: { name: string; extensions: string[] }[];
   defaultPath?: string;
   className?: string;
+  /** Show a thumbnail + dimensions of the selected image. */
+  preview?: boolean;
+  onInfo?: (info: { width: number; height: number }) => void;
 }) {
   async function browse() {
     const picked = await open({
@@ -45,7 +56,13 @@ export function PathField({
   }
 
   return (
-    <Field label={label} hint={hint} className={className}>
+    <Field
+      label={label}
+      hint={hint}
+      help={help}
+      learnMore={learnMore}
+      className={className}
+    >
       <div className="flex gap-2">
         <Input
           value={value}
@@ -76,6 +93,7 @@ export function PathField({
           <FolderOpen /> Browse
         </Button>
       </div>
+      {preview && value && <AssetPreview path={value} onInfo={onInfo} />}
     </Field>
   );
 }

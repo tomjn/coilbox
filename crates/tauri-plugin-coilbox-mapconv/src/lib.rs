@@ -9,6 +9,7 @@ mod settings;
 mod sidecar;
 mod smf;
 
+use image::GenericImageView;
 use picoframe_core::CliResult;
 use serde_json::json;
 use settings::{load_settings, save_settings, Settings};
@@ -180,6 +181,35 @@ async fn mc_suggest_sources(texture_path: String) -> CliResult {
         "vegmap": abs(s.vegmap),
         "features": abs(s.features),
     }))
+}
+
+/// `mc_image_info` — decode the image at `path` and return its true pixel
+/// dimensions plus a small downscaled PNG thumbnail as a `data:` URL. Lets the UI
+/// preview chosen source assets and validate texture sizing (multiple of 1024)
+/// up front, without an asset-protocol grant. Runs the decode off the async
+/// runtime since large textures are CPU/IO heavy.
+#[tauri::command]
+async fn mc_image_info(path: String) -> CliResult {
+    let result =
+        tauri::async_runtime::spawn_blocking(move || -> Result<(u32, u32, String), String> {
+            let img = image::open(&path).map_err(|e| format!("could not read image: {e}"))?;
+            let (width, height) = img.dimensions();
+            let thumb = img.thumbnail(320, 320);
+            let mut buf = std::io::Cursor::new(Vec::new());
+            thumb
+                .write_to(&mut buf, image::ImageFormat::Png)
+                .map_err(|e| format!("could not encode thumbnail: {e}"))?;
+            let data_url = format!("data:image/png;base64,{}", base64_encode(&buf.into_inner()));
+            Ok((width, height, data_url))
+        })
+        .await;
+    match result {
+        Ok(Ok((width, height, thumb))) => {
+            CliResult::ok(json!({ "width": width, "height": height, "thumb": thumb }))
+        }
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("image task failed: {e}")),
+    }
 }
 
 /// `mc_compile` — run `mapcompile` in `out_dir`, streaming output. Success means
@@ -367,6 +397,28 @@ async fn mc_open_path(path: String) -> CliResult {
     }
 }
 
+/// `mc_open_url` — open an external http(s) URL (e.g. a mapping wiki help page)
+/// in the OS default browser. Unlike `mc_open_path` it does no filesystem check;
+/// the scheme is restricted to http/https so we never hand an arbitrary scheme
+/// to the shell opener.
+#[tauri::command]
+async fn mc_open_url(url: String) -> CliResult {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return CliResult::err(format!("refusing to open non-http url: {url}"));
+    }
+    #[cfg(target_os = "macos")]
+    let spawned = Command::new("open").arg(&url).spawn();
+    #[cfg(target_os = "windows")]
+    let spawned = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let spawned = Command::new("xdg-open").arg(&url).spawn();
+
+    match spawned {
+        Ok(_) => CliResult::ok(json!({ "opened": true })),
+        Err(e) => CliResult::err(format!("could not open url: {e}")),
+    }
+}
+
 /// `mc_settings_load` — read the whole settings map, backing the frame's
 /// `SettingsStorage` adapter at app boot.
 #[tauri::command]
@@ -408,10 +460,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             mc_probe,
             mc_suggest_sources,
+            mc_image_info,
             mc_compile,
             mc_decompile,
             mc_cancel,
             mc_open_path,
+            mc_open_url,
             mc_settings_load,
             mc_settings_save
         ])

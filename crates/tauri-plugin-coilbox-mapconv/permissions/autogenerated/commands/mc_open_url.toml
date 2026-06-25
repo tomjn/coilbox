@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mc-open-url"
+description = "Enables the mc_open_url command without any pre-configured scope."
+commands.allow = ["mc_open_url"]
+
+[[permission]]
+identifier = "deny-mc-open-url"
+description = "Denies the mc_open_url command without any pre-configured scope."
+commands.deny = ["mc_open_url"]
