@@ -20,7 +20,12 @@ export const defaultConfig: Config = {
     },
     dbReset: true,
   },
-  defaults: { scenario: "login-storm", conns: 100, duration: "30s", ramp: "10s" },
+  defaults: {
+    scenario: "login-storm",
+    conns: 100,
+    duration: "30s",
+    ramp: "10s",
+  },
 };
 
 /**

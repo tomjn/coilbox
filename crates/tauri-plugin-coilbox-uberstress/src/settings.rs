@@ -21,7 +21,8 @@ pub fn load_settings(path: &Path) -> Result<Settings, String> {
 /// Write the full settings map to `path`, creating the parent dir if needed.
 pub fn save_settings(path: &Path, settings: &Settings) -> Result<(), String> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("could not create settings dir: {e}"))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("could not create settings dir: {e}"))?;
     }
     let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
     std::fs::write(path, json).map_err(|e| format!("could not write settings: {e}"))
@@ -48,6 +49,9 @@ mod tests {
         s.insert("uberstress.config".into(), r#"{"servers":[]}"#.into());
         save_settings(&p, &s).unwrap();
         let back = load_settings(&p).unwrap();
-        assert_eq!(back.get("uberstress.config").map(String::as_str), Some(r#"{"servers":[]}"#));
+        assert_eq!(
+            back.get("uberstress.config").map(String::as_str),
+            Some(r#"{"servers":[]}"#)
+        );
     }
 }

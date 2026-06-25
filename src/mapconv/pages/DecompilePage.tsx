@@ -1,10 +1,26 @@
 import { Button, cn } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { AlertCircle, CheckCircle2, FolderOpen, Hammer, Loader2, PackageOpen, Play, Square } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  FolderOpen,
+  Hammer,
+  Loader2,
+  PackageOpen,
+  Play,
+  Square,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { type LogLine, type MapInfo, mcCancel, mcDecompile, mcOpenPath, mcProbe } from "../bindings";
+import {
+  type LogLine,
+  type MapInfo,
+  mcCancel,
+  mcDecompile,
+  mcOpenPath,
+  mcProbe,
+} from "../bindings";
 import { useMapconvConfig } from "../config";
 import { PathField } from "./components/PathField";
 
@@ -12,7 +28,9 @@ function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-const INPUT_FILTERS = [{ name: "Spring map or archive", extensions: ["smf", "sdz", "sd7"] }];
+const INPUT_FILTERS = [
+  { name: "Spring map or archive", extensions: ["smf", "sdz", "sd7"] },
+];
 const ACCEPTS = /\.(smf|sdz|sd7)$/i;
 
 /** The parent dir of a native path (handles both / and \ separators). */
@@ -21,7 +39,11 @@ function dirname(p: string): string {
   return i >= 0 ? p.slice(0, i) : "";
 }
 
-type Result = { directory: string; mapInfo?: MapInfo | null; minimap?: string | null };
+type Result = {
+  directory: string;
+  mapInfo?: MapInfo | null;
+  minimap?: string | null;
+};
 
 /** Extract source images from a `.smf`, or a `.sdz`/`.sd7` archive. */
 export default function DecompilePage() {
@@ -33,7 +55,11 @@ export default function DecompilePage() {
   const [logLines, setLogLines] = useState<LogLine[]>([]);
   const [result, setResult] = useState<Result | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
-  const [probe, setProbe] = useState<{ available: boolean; compile: boolean; decompile: boolean } | null>(null);
+  const [probe, setProbe] = useState<{
+    available: boolean;
+    compile: boolean;
+    decompile: boolean;
+  } | null>(null);
 
   const [dragging, setDragging] = useState(false);
 
@@ -45,7 +71,9 @@ export default function DecompilePage() {
   runningRef.current = running;
 
   useEffect(() => {
-    mcProbe(undefined).then(setProbe).catch(() => {});
+    mcProbe(undefined)
+      .then(setProbe)
+      .catch(() => {});
   }, []);
 
   // Native file drop (Tauri exposes real paths; HTML5 drag-drop can't in a webview).
@@ -82,6 +110,7 @@ export default function DecompilePage() {
     };
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: logLines is the trigger that should re-run the scroll, not read in the body
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ block: "end" });
   }, [logLines]);
@@ -99,7 +128,11 @@ export default function DecompilePage() {
     onLog.onmessage = (line) => setLogLines((prev) => [...prev, line]);
     try {
       const res = await mcDecompile({ inputPath, runId, onLog });
-      setResult({ directory: res.directory, mapInfo: res.mapInfo, minimap: res.minimap });
+      setResult({
+        directory: res.directory,
+        mapInfo: res.mapInfo,
+        minimap: res.minimap,
+      });
       if (cfg.rememberDirs) setCfg({ ...cfg, lastSmfDir: dirname(inputPath) });
     } catch (e) {
       setRunError(errMessage(e));
@@ -126,16 +159,17 @@ export default function DecompilePage() {
           <PackageOpen size={18} /> Decompile map
         </h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          Extract the source images (texture, heightmap, metal/type maps, features) from a Spring <code>.smf</code>, or
-          from a packaged <code>.sdz</code>/<code>.sd7</code> archive (extracted automatically).
+          Extract the source images (texture, heightmap, metal/type maps,
+          features) from a Spring <code>.smf</code>, or from a packaged{" "}
+          <code>.sdz</code>/<code>.sd7</code> archive (extracted automatically).
         </p>
       </header>
 
       {probe && !probe.decompile && (
         <p className="flex items-start gap-2 border-b border-amber-500/40 bg-amber-500/10 px-6 py-3 text-sm text-amber-700 dark:text-amber-400">
           <AlertCircle size={15} className="mt-px shrink-0" />
-          The <code>mapdecompile</code> sidecar was not found. Bundle SpringMapConvNG or set{" "}
-          <code>MAPCONV_MAPDECOMPILE_SIDECAR</code>.
+          The <code>mapdecompile</code> sidecar was not found. Bundle
+          SpringMapConvNG or set <code>MAPCONV_MAPDECOMPILE_SIDECAR</code>.
         </p>
       )}
 
@@ -180,9 +214,13 @@ export default function DecompilePage() {
           {result && (
             <div className="border-b border-border bg-card/50 p-4">
               <div className="flex items-start gap-2 text-sm">
-                <CheckCircle2 size={15} className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <CheckCircle2
+                  size={15}
+                  className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400"
+                />
                 <span className="min-w-0 break-all">
-                  Extracted into <span className="font-mono text-xs">{result.directory}</span>
+                  Extracted into{" "}
+                  <span className="font-mono text-xs">{result.directory}</span>
                 </span>
               </div>
               {(result.minimap || result.mapInfo) && (
@@ -198,13 +236,23 @@ export default function DecompilePage() {
                 </div>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => mcOpenPath({ path: result.directory }).catch(() => {})}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    mcOpenPath({ path: result.directory }).catch(() => {})
+                  }
+                >
                   <FolderOpen /> Show in folder
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate("/mapconv", { state: { recompileDir: result.directory } })}
+                  onClick={() =>
+                    navigate("/mapconv", {
+                      state: { recompileDir: result.directory },
+                    })
+                  }
                 >
                   <Hammer /> Recompile
                 </Button>
@@ -227,9 +275,13 @@ export default function DecompilePage() {
               <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
                 {logLines.map((l, i) => (
                   <div
-                    // log lines are append-only; index is a stable key here
+                    // biome-ignore lint/suspicious/noArrayIndexKey: log lines are append-only; index is a stable key
                     key={i}
-                    className={l.stream === "err" ? "text-amber-600 dark:text-amber-400" : "text-foreground/90"}
+                    className={
+                      l.stream === "err"
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-foreground/90"
+                    }
                   >
                     {l.line}
                   </div>

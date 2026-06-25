@@ -1,11 +1,33 @@
 import { Button, Input } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
-import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, FolderOpen, Hammer, Loader2, Play, Square } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  FolderOpen,
+  Hammer,
+  Loader2,
+  Play,
+  Square,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
-import { type CompileOpts, type CompressionType, type LogLine, mcCancel, mcCompile, mcOpenPath, mcProbe, mcSuggestSources } from "../bindings";
+import {
+  type CompileOpts,
+  type CompressionType,
+  type LogLine,
+  mcCancel,
+  mcCompile,
+  mcOpenPath,
+  mcProbe,
+  mcSuggestSources,
+} from "../bindings";
 import { useMapconvConfig } from "../config";
-import AdvancedOptions, { type AdvancedCompileOpts, defaultAdvanced } from "./components/AdvancedOptions";
+import AdvancedOptions, {
+  type AdvancedCompileOpts,
+  defaultAdvanced,
+} from "./components/AdvancedOptions";
 import { Field } from "./components/Field";
 import { OptionSelect } from "./components/OptionSelect";
 import { PathField } from "./components/PathField";
@@ -14,7 +36,12 @@ function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-const TEXTURE_FILTERS = [{ name: "Images", extensions: ["png", "bmp", "tga", "jpg", "jpeg", "tif", "tiff"] }];
+const TEXTURE_FILTERS = [
+  {
+    name: "Images",
+    extensions: ["png", "bmp", "tga", "jpg", "jpeg", "tif", "tiff"],
+  },
+];
 
 const CT_OPTIONS = [
   { value: "1", label: "1 — No compression" },
@@ -31,8 +58,23 @@ function dirname(p: string): string {
 
 /** How many optional flags the user has set, for the drawer button badge. */
 function countAdvanced(a: AdvancedCompileOpts): number {
-  const strings = [a.heightmap, a.metalmap, a.typemap, a.minimap, a.vegmap, a.features, a.maxh, a.minh, a.th, a.ccount];
-  return strings.filter((s) => s.trim() !== "").length + (a.noclamp ? 1 : 0) + (a.smooth ? 1 : 0);
+  const strings = [
+    a.heightmap,
+    a.metalmap,
+    a.typemap,
+    a.minimap,
+    a.vegmap,
+    a.features,
+    a.maxh,
+    a.minh,
+    a.th,
+    a.ccount,
+  ];
+  return (
+    strings.filter((s) => s.trim() !== "").length +
+    (a.noclamp ? 1 : 0) +
+    (a.smooth ? 1 : 0)
+  );
 }
 
 /** Build a `.smf`/`.smt` from source images via the `mapcompile` sidecar. */
@@ -44,27 +86,36 @@ export default function CompilePage() {
   const [outDir, setOutDir] = useState("");
   const [outSuffix, setOutSuffix] = useState("");
   const [ct, setCt] = useState(() => String(cfg.defaultCompressionType));
-  const [advanced, setAdvanced] = useState<AdvancedCompileOpts>(defaultAdvanced);
+  const [advanced, setAdvanced] =
+    useState<AdvancedCompileOpts>(defaultAdvanced);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [running, setRunning] = useState(false);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
   const [result, setResult] = useState<{ smfPath: string } | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
-  const [probe, setProbe] = useState<{ available: boolean; compile: boolean; decompile: boolean } | null>(null);
+  const [probe, setProbe] = useState<{
+    available: boolean;
+    compile: boolean;
+    decompile: boolean;
+  } | null>(null);
 
   const runIdRef = useRef<string | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    mcProbe(undefined).then(setProbe).catch(() => {});
+    mcProbe(undefined)
+      .then(setProbe)
+      .catch(() => {});
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: logLines is the trigger that should re-run the scroll, not read in the body
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ block: "end" });
   }, [logLines]);
 
-  const canRun = !running && maintexture !== "" && outDir !== "" && outSuffix.trim() !== "";
+  const canRun =
+    !running && maintexture !== "" && outDir !== "" && outSuffix.trim() !== "";
 
   function buildOpts(): CompileOpts {
     const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
@@ -100,7 +151,12 @@ export default function CompilePage() {
     try {
       const res = await mcCompile({ opts: buildOpts(), outDir, runId, onLog });
       setResult({ smfPath: res.smfPath });
-      if (cfg.rememberDirs) setCfg({ ...cfg, lastTextureDir: dirname(maintexture), lastOutDir: outDir });
+      if (cfg.rememberDirs)
+        setCfg({
+          ...cfg,
+          lastTextureDir: dirname(maintexture),
+          lastOutDir: outDir,
+        });
     } catch (e) {
       setRunError(errMessage(e));
     } finally {
@@ -130,7 +186,14 @@ export default function CompilePage() {
       let found = false;
       setAdvanced((a) => {
         const merged = { ...a };
-        for (const k of ["heightmap", "metalmap", "typemap", "minimap", "vegmap", "features"] as const) {
+        for (const k of [
+          "heightmap",
+          "metalmap",
+          "typemap",
+          "minimap",
+          "vegmap",
+          "features",
+        ] as const) {
           if (!merged[k] && s[k]) {
             merged[k] = s[k] as string;
             found = true;
@@ -146,8 +209,10 @@ export default function CompilePage() {
 
   // Arriving from the Decompile page's "Recompile": seed the texture (+ siblings
   // via pickTexture) and output folder from the freshly decompiled directory.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount for the incoming navigation state
   useEffect(() => {
-    const dir = (location.state as { recompileDir?: string } | null)?.recompileDir;
+    const dir = (location.state as { recompileDir?: string } | null)
+      ?.recompileDir;
     if (!dir) return;
     const sep = dir.includes("\\") ? "\\" : "/";
     const i = Math.max(dir.lastIndexOf("/"), dir.lastIndexOf("\\"));
@@ -167,15 +232,16 @@ export default function CompilePage() {
           <Hammer size={18} /> Compile map
         </h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          Build a Spring <code>.smf</code>/<code>.smt</code> from a main texture and optional source maps.
+          Build a Spring <code>.smf</code>/<code>.smt</code> from a main texture
+          and optional source maps.
         </p>
       </header>
 
       {probe && !probe.compile && (
         <p className="flex items-start gap-2 border-b border-amber-500/40 bg-amber-500/10 px-6 py-3 text-sm text-amber-700 dark:text-amber-400">
           <AlertCircle size={15} className="mt-px shrink-0" />
-          The <code>mapcompile</code> sidecar was not found. Bundle SpringMapConvNG or set{" "}
-          <code>MAPCONV_MAPCOMPILE_SIDECAR</code>.
+          The <code>mapcompile</code> sidecar was not found. Bundle
+          SpringMapConvNG or set <code>MAPCONV_MAPCOMPILE_SIDECAR</code>.
         </p>
       )}
 
@@ -200,11 +266,24 @@ export default function CompilePage() {
             directory
             defaultPath={cfg.lastOutDir}
           />
-          <Field label="Output name (-o)" hint="basename for the .smf/.smt (no extension)">
-            <Input value={outSuffix} onChange={(e) => setOutSuffix(e.target.value)} disabled={running} placeholder="mymap" />
+          <Field
+            label="Output name (-o)"
+            hint="basename for the .smf/.smt (no extension)"
+          >
+            <Input
+              value={outSuffix}
+              onChange={(e) => setOutSuffix(e.target.value)}
+              disabled={running}
+              placeholder="mymap"
+            />
           </Field>
           <Field label="Compression type (-ct)">
-            <OptionSelect value={ct} onValueChange={setCt} disabled={running} options={CT_OPTIONS} />
+            <OptionSelect
+              value={ct}
+              onValueChange={setCt}
+              disabled={running}
+              options={CT_OPTIONS}
+            />
           </Field>
 
           {/* Advanced options: optional maps, height range, compression tuning. */}
@@ -214,12 +293,22 @@ export default function CompilePage() {
               onClick={() => setShowAdvanced((v) => !v)}
               className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
-              {showAdvanced ? <ChevronDown size={15} /> : <ChevronRight size={15} />} Advanced options
+              {showAdvanced ? (
+                <ChevronDown size={15} />
+              ) : (
+                <ChevronRight size={15} />
+              )}{" "}
+              Advanced options
               {advancedCount > 0 ? ` (${advancedCount})` : ""}
             </button>
             {showAdvanced && (
               <div className="mt-4">
-                <AdvancedOptions value={advanced} onChange={setAdvanced} defaultPath={cfg.lastTextureDir} disabled={running} />
+                <AdvancedOptions
+                  value={advanced}
+                  onChange={setAdvanced}
+                  defaultPath={cfg.lastTextureDir}
+                  disabled={running}
+                />
               </div>
             )}
           </div>
@@ -247,9 +336,13 @@ export default function CompilePage() {
           {result && (
             <div className="border-b border-border bg-card/50 px-4 py-3">
               <div className="flex items-start gap-2 text-sm">
-                <CheckCircle2 size={15} className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <CheckCircle2
+                  size={15}
+                  className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400"
+                />
                 <span className="min-w-0 break-all">
-                  Compiled <span className="font-mono text-xs">{result.smfPath}</span>
+                  Compiled{" "}
+                  <span className="font-mono text-xs">{result.smfPath}</span>
                 </span>
               </div>
               <Button
@@ -278,9 +371,13 @@ export default function CompilePage() {
               <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
                 {logLines.map((l, i) => (
                   <div
-                    // log lines are append-only; index is a stable key here
+                    // biome-ignore lint/suspicious/noArrayIndexKey: log lines are append-only; index is a stable key
                     key={i}
-                    className={l.stream === "err" ? "text-amber-600 dark:text-amber-400" : "text-foreground/90"}
+                    className={
+                      l.stream === "err"
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-foreground/90"
+                    }
                   >
                     {l.line}
                   </div>

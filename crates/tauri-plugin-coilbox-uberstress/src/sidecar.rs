@@ -259,8 +259,12 @@ mod tests {
         assert_eq!(a[0], "load");
         assert_eq!(a[1], "--addr");
         assert_eq!(a[2], "10.0.0.1:8200");
-        assert!(a.windows(2).any(|w| w[0] == "--scenario" && w[1] == "login-storm"));
-        assert!(a.windows(2).any(|w| w[0] == "--results" && w[1] == "/data/results"));
+        assert!(a
+            .windows(2)
+            .any(|w| w[0] == "--scenario" && w[1] == "login-storm"));
+        assert!(a
+            .windows(2)
+            .any(|w| w[0] == "--results" && w[1] == "/data/results"));
         assert!(a.contains(&"--register=true".to_string()));
         assert!(a.windows(2).any(|w| w[0] == "--ref" && w[1] == "my-run"));
     }
@@ -285,8 +289,12 @@ mod tests {
         let a = build_args(&o, "/r");
         assert_eq!(a[0], "bench");
         assert!(a.contains(&"--launch=true".to_string()));
-        assert!(a.windows(2).any(|w| w[0] == "--server-dir" && w[1] == "/srv/uberserver"));
-        assert!(a.windows(2).any(|w| w[0] == "--db-name" && w[1] == "uberstress_ab"));
+        assert!(a
+            .windows(2)
+            .any(|w| w[0] == "--server-dir" && w[1] == "/srv/uberserver"));
+        assert!(a
+            .windows(2)
+            .any(|w| w[0] == "--db-name" && w[1] == "uberstress_ab"));
         assert!(a.contains(&"--db-reset=true".to_string()));
         // No --addr when launching locally.
         assert!(!a.contains(&"--addr".to_string()));
@@ -300,7 +308,9 @@ mod tests {
         o.addr = "1.2.3.4:8300".into();
         let a = build_args(&o, "/r");
         assert!(a.contains(&"--launch=false".to_string()));
-        assert!(a.windows(2).any(|w| w[0] == "--addr" && w[1] == "1.2.3.4:8300"));
+        assert!(a
+            .windows(2)
+            .any(|w| w[0] == "--addr" && w[1] == "1.2.3.4:8300"));
         assert!(!a.contains(&"--server-dir".to_string()));
     }
 }

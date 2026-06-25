@@ -15,13 +15,17 @@ pub fn extract_archive(archive: &Path, dest: &Path) -> Result<(), String> {
         .to_lowercase();
     match ext.as_str() {
         "sdz" | "zip" => {
-            let file = std::fs::File::open(archive).map_err(|e| format!("could not open archive: {e}"))?;
-            let mut zip = zip::ZipArchive::new(file).map_err(|e| format!("invalid zip/sdz: {e}"))?;
+            let file =
+                std::fs::File::open(archive).map_err(|e| format!("could not open archive: {e}"))?;
+            let mut zip =
+                zip::ZipArchive::new(file).map_err(|e| format!("invalid zip/sdz: {e}"))?;
             // `extract` resolves each entry via enclosed_name, guarding against
             // path-traversal ("zip slip").
-            zip.extract(dest).map_err(|e| format!("failed to extract sdz: {e}"))
+            zip.extract(dest)
+                .map_err(|e| format!("failed to extract sdz: {e}"))
         }
-        "sd7" | "7z" => sevenz_rust2::decompress_file(archive, dest).map_err(|e| format!("failed to extract sd7: {e}")),
+        "sd7" | "7z" => sevenz_rust2::decompress_file(archive, dest)
+            .map_err(|e| format!("failed to extract sd7: {e}")),
         other => Err(format!("unsupported archive type: .{other}")),
     }
 }
@@ -32,18 +36,28 @@ pub fn find_smf(root: &Path) -> Option<PathBuf> {
     let mut all = Vec::new();
     walk_smf(root, &mut all);
     all.iter()
-        .find(|p| p.components().any(|c| c.as_os_str().to_string_lossy().eq_ignore_ascii_case("maps")))
+        .find(|p| {
+            p.components()
+                .any(|c| c.as_os_str().to_string_lossy().eq_ignore_ascii_case("maps"))
+        })
         .cloned()
         .or_else(|| all.into_iter().next())
 }
 
 fn walk_smf(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in rd.flatten() {
         let p = entry.path();
         if p.is_dir() {
             walk_smf(&p, out);
-        } else if p.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("smf")).unwrap_or(false) {
+        } else if p
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("smf"))
+            .unwrap_or(false)
+        {
             out.push(p);
         }
     }
@@ -65,7 +79,8 @@ mod tests {
 
         let file = std::fs::File::create(&sdz).unwrap();
         let mut zip = zip::ZipWriter::new(file);
-        let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let opts = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
         zip.add_directory("maps/", opts).unwrap();
         zip.start_file("maps/MyMap.smf", opts).unwrap();
         zip.write_all(b"spring map file\0dummy").unwrap();
@@ -77,7 +92,10 @@ mod tests {
         extract_archive(&sdz, &dest).unwrap();
         let smf = find_smf(&dest).expect("should find the extracted .smf");
         assert!(smf.ends_with("maps/MyMap.smf"), "found {smf:?}");
-        assert!(dest.join("maps/MyMap.smt").exists(), "the .smt should extract too");
+        assert!(
+            dest.join("maps/MyMap.smt").exists(),
+            "the .smt should extract too"
+        );
     }
 
     /// Round-trip a real .sd7 (7-zip): compress a maps/ tree, extract it, and
@@ -97,6 +115,11 @@ mod tests {
         let dest = base.join("out");
         extract_archive(&sd7, &dest).unwrap();
         let smf = find_smf(&dest).expect("should find the extracted .smf");
-        assert!(smf.to_string_lossy().to_lowercase().ends_with("maps/mymap.smf"), "found {smf:?}");
+        assert!(
+            smf.to_string_lossy()
+                .to_lowercase()
+                .ends_with("maps/mymap.smf"),
+            "found {smf:?}"
+        );
     }
 }

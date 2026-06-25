@@ -1,4 +1,4 @@
-import { Button, Input, cn } from "@picoframe/frame";
+import { Button, cn, Input } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
 import { Field } from "./Field";
@@ -47,7 +47,13 @@ export function PathField({
   return (
     <Field label={label} hint={hint} className={className}>
       <div className="flex gap-2">
-        <Input value={value} readOnly placeholder="(none)" className="font-mono text-xs" disabled={disabled} />
+        <Input
+          value={value}
+          readOnly
+          placeholder="(none)"
+          className="font-mono text-xs"
+          disabled={disabled}
+        />
         {value && !disabled && (
           <Button
             type="button"

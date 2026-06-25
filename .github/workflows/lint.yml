@@ -1,0 +1,50 @@
+name: lint
+
+# Lint and format checks for pull requests (and pushes to main). Covers both
+# source surfaces: the TypeScript/React frontend (Biome + tsc) and the Rust
+# workspace (rustfmt + clippy). No release concerns here — clippy compiles
+# source but does not bundle, so the SpringMapConvNG sidecars and a built
+# frontend (dist/) are not needed.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  frontend:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Biome (lint + format check)
+        run: bunx biome ci .
+      - name: Typecheck
+        run: bun run typecheck
+
+  rust:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      # clippy must compile the Tauri crate before it can lint it, so the same
+      # system libraries the release build needs are required here too.
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdevil-dev
+      - uses: Swatinem/rust-cache@v2
+      # tauri-build verifies that declared bundle resources exist. The mapconv
+      # folder is normally fetched from a SpringMapConvNG release at build time
+      # (gitignored, see release.yml); clippy only needs the path to exist, not
+      # its contents, so an empty placeholder satisfies the check.
+      - name: Placeholder mapconv resource dir
+        run: mkdir -p src-tauri/mapconv
+      - name: Rustfmt
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings

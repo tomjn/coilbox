@@ -1,9 +1,18 @@
 import { cn } from "@picoframe/frame";
 import { AlertCircle, History, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { type Report, type ReportSummary, usHistory, usReport } from "../bindings";
-import { CompareBars, LatencyBars, TrendChart } from "./components/ReportCharts";
+import {
+  type Report,
+  type ReportSummary,
+  usHistory,
+  usReport,
+} from "../bindings";
 import { OptionSelect } from "./components/OptionSelect";
+import {
+  CompareBars,
+  LatencyBars,
+  TrendChart,
+} from "./components/ReportCharts";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -108,7 +117,9 @@ export default function HistoryPage() {
   }
 
   // Same-scenario runs power the trend chart and the compare picker.
-  const sameScenario = report ? (runs ?? []).filter((r) => r.scenario === report.scenario) : [];
+  const sameScenario = report
+    ? (runs ?? []).filter((r) => r.scenario === report.scenario)
+    : [];
   const compareOptions = sameScenario.filter((r) => r.file !== selected);
 
   return (
@@ -117,7 +128,8 @@ export default function HistoryPage() {
         <div className="space-y-1">
           <h1 className="text-lg font-semibold leading-none">Run history</h1>
           <p className="max-w-prose text-sm text-muted-foreground">
-            Past load-test reports, newest first. Select a run to see its latency breakdown.
+            Past load-test reports, newest first. Select a run to see its
+            latency breakdown.
           </p>
         </div>
       </header>
@@ -127,7 +139,9 @@ export default function HistoryPage() {
         <aside className="flex min-h-0 flex-col border-r border-border bg-card/30">
           <div className="flex items-center justify-between px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <span>Runs</span>
-            {runs && <span className="font-normal normal-case">{runs.length}</span>}
+            {runs && (
+              <span className="font-normal normal-case">{runs.length}</span>
+            )}
           </div>
           <div className="min-h-0 flex-1 overflow-auto">
             {listError && (
@@ -139,7 +153,9 @@ export default function HistoryPage() {
             {runs?.length === 0 && !listError && (
               <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
                 <History size={28} className="opacity-40" />
-                <p className="max-w-xs">No runs yet. Run a load test to populate history.</p>
+                <p className="max-w-xs">
+                  No runs yet. Run a load test to populate history.
+                </p>
               </div>
             )}
             {runs?.map((r) => (
@@ -153,15 +169,21 @@ export default function HistoryPage() {
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium">{r.scenario}</span>
+                  <span className="truncate text-sm font-medium">
+                    {r.scenario}
+                  </span>
                   {r.errorCount > 0 && (
                     <span className="shrink-0 rounded bg-destructive/15 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
                       {r.errorCount} err
                     </span>
                   )}
                 </div>
-                <span className="truncate text-xs text-muted-foreground">{provenance(r)}</span>
-                <span className="text-xs text-muted-foreground">{fmtWhen(r.startedAt)}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {provenance(r)}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {fmtWhen(r.startedAt)}
+                </span>
               </button>
             ))}
           </div>
@@ -187,10 +209,14 @@ export default function HistoryPage() {
             <div className="space-y-6 p-6">
               <div className="space-y-1">
                 <h2 className="text-base font-semibold">
-                  {report.scenario} <span className="font-normal text-muted-foreground">· {report.addr}</span>
+                  {report.scenario}{" "}
+                  <span className="font-normal text-muted-foreground">
+                    · {report.addr}
+                  </span>
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  {fmtWhen(report.started_at)} · {report.duration_sec.toFixed(1)}s
+                  {fmtWhen(report.started_at)} ·{" "}
+                  {report.duration_sec.toFixed(1)}s
                   {report.server_version ? ` · ${report.server_version}` : ""}
                 </p>
               </div>
@@ -207,7 +233,9 @@ export default function HistoryPage() {
               {compareOptions.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Compare p99 with</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Compare p99 with
+                    </h3>
                     <OptionSelect
                       value={compareFile}
                       onValueChange={selectCompare}
@@ -224,8 +252,14 @@ export default function HistoryPage() {
                     <CompareBars
                       a={report}
                       b={compareReport}
-                      labelA={report.ref || report.commit_sha?.slice(0, 8) || "this"}
-                      labelB={compareReport.ref || compareReport.commit_sha?.slice(0, 8) || "other"}
+                      labelA={
+                        report.ref || report.commit_sha?.slice(0, 8) || "this"
+                      }
+                      labelB={
+                        compareReport.ref ||
+                        compareReport.commit_sha?.slice(0, 8) ||
+                        "other"
+                      }
                     />
                   )}
                 </div>
@@ -245,7 +279,9 @@ export default function HistoryPage() {
 
               {Object.keys(report.counters).length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Counters</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Counters
+                  </h3>
                   <div className="flex flex-wrap gap-2 font-mono text-xs">
                     {Object.entries(report.counters).map(([k, v]) => (
                       <span key={k} className="rounded bg-muted px-2 py-1">
