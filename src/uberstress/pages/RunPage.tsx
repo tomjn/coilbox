@@ -2,6 +2,7 @@ import { Button, cn, Input, useDrawer } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
   AlertCircle,
+  BarChart3,
   ChevronDown,
   ChevronRight,
   Database,
@@ -11,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import {
   type LogLine,
   type Report,
@@ -20,8 +22,14 @@ import {
   usScenarios,
 } from "../bindings";
 import { useUberstressConfig } from "../config";
+import {
+  parseDurationSec,
+  parseProgressLine,
+  type RunProgress as RunProgressData,
+} from "../reportMetrics";
 import { CheckField, Field } from "./components/Field";
 import { OptionSelect } from "./components/OptionSelect";
+import { EarlyTerminationNotice } from "./components/ReportDetail";
 import SeedSqlForm from "./components/SeedSqlForm";
 
 function errMessage(e: unknown): string {
@@ -55,9 +63,96 @@ function ResultSummary({ report, file }: { report: Report; file: string }) {
           ),
         )}
       </div>
-      <p className="text-xs text-muted-foreground">
-        Open the History page for the full breakdown and charts.
-      </p>
+    </div>
+  );
+}
+
+function phaseLabel(elapsed: number, rampSec: number, durSec: number): string {
+  if (elapsed < rampSec) return "ramping up";
+  if (elapsed < rampSec + durSec) return "steady load";
+  return "finishing";
+}
+
+/** One live telemetry figure under the progress bar. */
+function LiveStat({
+  label,
+  value,
+  emphasis,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div>
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <span className={cn("ml-1.5 font-mono", emphasis && "text-destructive")}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Progress shown while a run is in flight. The bar is time-based (derived from
+ * the configured ramp + duration). Once the sidecar emits live telemetry it is
+ * shown beneath the bar, superseding the time estimate as the source of truth.
+ */
+function RunProgress({
+  elapsed,
+  rampSec,
+  durSec,
+  live,
+}: {
+  elapsed: number;
+  rampSec: number | null;
+  durSec: number | null;
+  live: RunProgressData | null;
+}) {
+  const windowSec = rampSec != null && durSec != null ? rampSec + durSec : null;
+  const pct = windowSec ? Math.min((elapsed / windowSec) * 100, 100) : null;
+  const phase =
+    rampSec != null && durSec != null
+      ? phaseLabel(elapsed, rampSec, durSec)
+      : "running";
+  return (
+    <div className="space-y-2 border-b border-border p-4">
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="flex items-center gap-1.5">
+          <Loader2 size={14} className="animate-spin" /> {phase}
+        </span>
+        <span className="font-mono text-xs text-muted-foreground">
+          {elapsed.toFixed(0)}s{windowSec ? ` / ~${windowSec.toFixed(0)}s` : ""}
+        </span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
+        {pct === null ? (
+          <div className="h-full w-1/3 animate-pulse rounded bg-accent" />
+        ) : (
+          <div
+            className="h-full rounded bg-accent transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        )}
+      </div>
+      {live ? (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <LiveStat label="Sent" value={live.sent.toLocaleString()} />
+          <LiveStat label="Rate" value={`${live.rate.toFixed(0)}/s`} />
+          <LiveStat
+            label="Errors"
+            value={live.errors.toLocaleString()}
+            emphasis={live.errors > 0}
+          />
+        </div>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">
+          Estimated from ramp + duration; live metrics appear once the run is
+          under way.
+        </p>
+      )}
     </div>
   );
 }
@@ -67,6 +162,7 @@ export default function RunPage() {
   // Config is reactive from the frame settings store; seeds the form below.
   const [cfg] = useUberstressConfig();
   const drawer = useDrawer();
+  const navigate = useNavigate();
   const [scenarios, setScenarios] = useState<string[]>([]);
 
   const [mode, setMode] = useState<"load" | "bench">("load");
@@ -102,6 +198,9 @@ export default function RunPage() {
     null,
   );
   const [runError, setRunError] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [progress, setProgress] = useState<RunProgressData | null>(null);
+  const [showLog, setShowLog] = useState(true);
 
   const runIdRef = useRef<string | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
@@ -118,6 +217,18 @@ export default function RunPage() {
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ block: "end" });
   }, [logLines]);
+
+  // Tick an elapsed-time estimate while a run is in flight.
+  useEffect(() => {
+    if (!running) return;
+    const start = Date.now();
+    setElapsed(0);
+    const id = setInterval(() => setElapsed((Date.now() - start) / 1000), 250);
+    return () => clearInterval(id);
+  }, [running]);
+
+  const rampSec = parseDurationSec(ramp);
+  const durSec = parseDurationSec(duration);
 
   const effectiveAddr =
     serverChoice === MANUAL
@@ -170,10 +281,18 @@ export default function RunPage() {
     setResult(null);
     setRunError(null);
     setLogLines([]);
+    setProgress(null);
     const runId = crypto.randomUUID();
     runIdRef.current = runId;
     const onLog = new Channel<LogLine>();
-    onLog.onmessage = (line) => setLogLines((prev) => [...prev, line]);
+    onLog.onmessage = (line) => {
+      const p = parseProgressLine(line.line);
+      if (p) {
+        setProgress(p);
+        return;
+      }
+      setLogLines((prev) => [...prev, line]);
+    };
     try {
       const res = await usRun({ opts: buildOpts(), runId, onLog });
       setResult({ report: res.report, file: res.reportFile });
@@ -313,7 +432,7 @@ export default function RunPage() {
             <Field label="Scenario" className="col-span-2">
               {scenarioInput}
             </Field>
-            <Field label="Connections">
+            <Field label="Concurrent connections">
               <Input
                 type="number"
                 min={1}
@@ -329,7 +448,10 @@ export default function RunPage() {
                 disabled={running}
               />
             </Field>
-            <Field label="Duration" hint="e.g. 30s">
+            <Field
+              label="Hold time"
+              hint="hold connections after login, e.g. 30s"
+            >
               <Input
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
@@ -470,9 +592,28 @@ export default function RunPage() {
 
         {/* Right: live log + result */}
         <div className="flex min-h-0 flex-col">
+          {running && (
+            <RunProgress
+              elapsed={elapsed}
+              rampSec={rampSec}
+              durSec={durSec}
+              live={progress}
+            />
+          )}
           {result && (
-            <div className="border-b border-border p-4">
+            <div className="space-y-3 border-b border-border p-4">
               <ResultSummary report={result.report} file={result.file} />
+              <EarlyTerminationNotice report={result.report} />
+              <Button
+                size="sm"
+                onClick={() =>
+                  navigate("/uberstress/history", {
+                    state: { selectFile: result.file },
+                  })
+                }
+              >
+                <BarChart3 /> View results
+              </Button>
             </div>
           )}
           {runError && (
@@ -481,31 +622,46 @@ export default function RunPage() {
               {runError}
             </p>
           )}
-          <div className="min-h-0 flex-1 overflow-auto bg-card/20 p-4">
-            {logLines.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-                <Zap size={26} className="opacity-30" />
-                <p>Run output streams here.</p>
-              </div>
-            ) : (
-              <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
-                {logLines.map((l, i) => (
-                  <div
-                    // biome-ignore lint/suspicious/noArrayIndexKey: log lines are append-only; index is a stable key
-                    key={i}
-                    className={
-                      l.stream === "err"
-                        ? "text-amber-600 dark:text-amber-400"
-                        : "text-foreground/90"
-                    }
-                  >
-                    {l.line}
-                  </div>
-                ))}
-                <div ref={logEndRef} />
-              </pre>
+          <button
+            type="button"
+            onClick={() => setShowLog((v) => !v)}
+            className="flex shrink-0 items-center gap-1 border-b border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+          >
+            {showLog ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            Output
+            {logLines.length > 0 && (
+              <span className="font-normal normal-case">
+                ({logLines.length} lines)
+              </span>
             )}
-          </div>
+          </button>
+          {showLog && (
+            <div className="min-h-0 flex-1 overflow-auto bg-card/20 p-4">
+              {logLines.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                  <Zap size={26} className="opacity-30" />
+                  <p>Run output streams here.</p>
+                </div>
+              ) : (
+                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
+                  {logLines.map((l, i) => (
+                    <div
+                      // biome-ignore lint/suspicious/noArrayIndexKey: log lines are append-only; index is a stable key
+                      key={i}
+                      className={
+                        l.stream === "err"
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-foreground/90"
+                      }
+                    >
+                      {l.line}
+                    </div>
+                  ))}
+                  <div ref={logEndRef} />
+                </pre>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

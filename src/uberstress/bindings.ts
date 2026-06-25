@@ -12,6 +12,8 @@ import type { Channel } from "@tauri-apps/api/core";
 export interface CmdStat {
   command: string;
   count: number;
+  /** Failed attempts of this command. Absent on reports saved before this field existed. */
+  error_count?: number;
   p50_ms: number;
   p95_ms: number;
   p99_ms: number;

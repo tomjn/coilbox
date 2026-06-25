@@ -14,6 +14,11 @@ use std::path::{Path, PathBuf};
 pub struct CmdStat {
     pub command: String,
     pub count: i64,
+    /// Failed attempts of this command. `default` so reports written before the
+    /// field existed still deserialize (and so it survives the round-trip to the
+    /// frontend, which is otherwise dropped as an unknown field).
+    #[serde(default)]
+    pub error_count: i64,
     #[serde(rename = "p50_ms")]
     pub p50_ms: f64,
     #[serde(rename = "p95_ms")]
@@ -159,7 +164,7 @@ mod tests {
             "started_at": "2026-06-23T10:37:38Z",
             "duration_sec": 12.55,
             "commands": [
-                {"command":"LOGIN","count":30,"p50_ms":13.8,"p95_ms":25.3,"p99_ms":36.0,"max_ms":36.0,"per_second":2.39},
+                {"command":"LOGIN","count":30,"error_count":5,"p50_ms":13.8,"p95_ms":25.3,"p99_ms":36.0,"max_ms":36.0,"per_second":2.39},
                 {"command":"PING","count":124,"p50_ms":0.56,"p95_ms":1.26,"p99_ms":5.87,"max_ms":5.95,"per_second":9.87}
             ],
             "counters": {"login_ok":30,"seed_ok":30,"dial_error":2,"timeout":1}
@@ -168,6 +173,13 @@ mod tests {
         assert_eq!(rep.scenario, "login-storm");
         assert_eq!(rep.git_ref.as_deref(), Some("local-test"));
         assert_eq!(rep.commands.len(), 2);
+        // error_count is read when present and defaults to 0 when absent, and
+        // must survive re-serialization to the frontend (the round-trip that the
+        // IPC layer performs).
+        assert_eq!(rep.commands[0].error_count, 5);
+        assert_eq!(rep.commands[1].error_count, 0);
+        let reserialized = serde_json::to_string(&rep).unwrap();
+        assert!(reserialized.contains("\"error_count\":5"));
 
         let s = ReportSummary::from_report("login-storm__df52682cf580__x.json", &rep);
         assert_eq!(s.login_p99_ms, Some(36.0));
