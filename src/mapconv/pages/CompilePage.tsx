@@ -29,6 +29,7 @@ import AdvancedOptions, {
   defaultAdvanced,
 } from "./components/AdvancedOptions";
 import { Field } from "./components/Field";
+import { LearnMore, WIKI } from "./components/Help";
 import { OptionSelect } from "./components/OptionSelect";
 import { PathField } from "./components/PathField";
 
@@ -89,6 +90,15 @@ export default function CompilePage() {
   const [advanced, setAdvanced] =
     useState<AdvancedCompileOpts>(defaultAdvanced);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [textureInfo, setTextureInfo] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+
+  // mapcompile requires the texture's dimensions to be a multiple of 1024.
+  const textureSizeBad =
+    textureInfo != null &&
+    (textureInfo.width % 1024 !== 0 || textureInfo.height % 1024 !== 0);
 
   const [running, setRunning] = useState(false);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
@@ -180,6 +190,7 @@ export default function CompilePage() {
   // overwrites a field the user already set; reveals Advanced if it found any.
   async function pickTexture(path: string) {
     setMaintexture(path);
+    setTextureInfo(null);
     if (!path) return;
     try {
       const s = await mcSuggestSources({ texturePath: path });
@@ -233,7 +244,11 @@ export default function CompilePage() {
         </h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
           Build a Spring <code>.smf</code>/<code>.smt</code> from a main texture
-          and optional source maps.
+          and optional source maps.{" "}
+          <span className="inline-flex gap-3">
+            <LearnMore href={WIKI.tutorial} label="Beginner guide" />
+            <LearnMore href={WIKI.main} label="Mapping wiki" />
+          </span>
         </p>
       </header>
 
@@ -250,13 +265,36 @@ export default function CompilePage() {
         <div className="min-h-0 space-y-5 overflow-auto border-r border-border px-6 py-5">
           <PathField
             label="Main texture (-t)"
-            hint="required · PNG/TGA/BMP image, dimensions divisible by 1024 · siblings auto-fill below"
+            hint="required · the map's diffuse colour image · sets the map size · siblings auto-fill below"
+            help={
+              <span>
+                The diffuse colour image painted across the whole map. Its width
+                and height set the map's size and{" "}
+                <strong>must each be a multiple of 1024</strong> (e.g. 1024,
+                2048, 8192). Name companion images <code>heightmap.png</code>,{" "}
+                <code>metalmap.png</code>, etc. in the same folder and they
+                auto-fill below.
+              </span>
+            }
+            learnMore={WIKI.diffuse}
             value={maintexture}
             onChange={pickTexture}
             disabled={running}
             filters={TEXTURE_FILTERS}
             defaultPath={cfg.lastTextureDir}
+            preview
+            onInfo={setTextureInfo}
           />
+          {textureSizeBad && textureInfo && (
+            <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-300">
+              <AlertCircle size={14} className="mt-px shrink-0" />
+              <span>
+                Texture is {textureInfo.width} × {textureInfo.height}px — each
+                side must be a multiple of 1024. mapcompile will likely reject
+                it. <LearnMore href={WIKI.sizes} label="Map sizes" />
+              </span>
+            </p>
+          )}
           <PathField
             label="Output folder"
             hint="where the .smf/.smt are written"
@@ -277,7 +315,20 @@ export default function CompilePage() {
               placeholder="mymap"
             />
           </Field>
-          <Field label="Compression type (-ct)">
+          <Field
+            label="Compression type (-ct)"
+            hint="4 (high quality fast) is a good default"
+            help={
+              <span>
+                How the <code>.smt</code> tile texture is compressed — a
+                trade-off of file size, speed and quality:
+                <br />1 — none (largest file, fastest build)
+                <br />2 — fast (compares the last N tiles)
+                <br />3 — insane (compares the whole map; smallest, very slow)
+                <br />4 — high quality fast (recommended)
+              </span>
+            }
+          >
             <OptionSelect
               value={ct}
               onValueChange={setCt}

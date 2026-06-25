@@ -5,10 +5,12 @@ description = "Allows the mapconv plugin's commands (probe, suggest-sources, com
 permissions = [
   "allow-mc-probe",
   "allow-mc-suggest-sources",
+  "allow-mc-image-info",
   "allow-mc-compile",
   "allow-mc-decompile",
   "allow-mc-cancel",
   "allow-mc-open-path",
+  "allow-mc-open-url",
   "allow-mc-settings-load",
   "allow-mc-settings-save",
 ]

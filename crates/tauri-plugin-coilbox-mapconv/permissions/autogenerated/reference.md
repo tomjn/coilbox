@@ -6,10 +6,12 @@ Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile
 
 - `allow-mc-probe`
 - `allow-mc-suggest-sources`
+- `allow-mc-image-info`
 - `allow-mc-compile`
 - `allow-mc-decompile`
 - `allow-mc-cancel`
 - `allow-mc-open-path`
+- `allow-mc-open-url`
 - `allow-mc-settings-load`
 - `allow-mc-settings-save`
 
@@ -103,6 +105,32 @@ Denies the mc_decompile command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-mapconv:allow-mc-image-info`
+
+</td>
+<td>
+
+Enables the mc_image_info command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:deny-mc-image-info`
+
+</td>
+<td>
+
+Denies the mc_image_info command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-mapconv:allow-mc-open-path`
 
 </td>
@@ -122,6 +150,32 @@ Enables the mc_open_path command without any pre-configured scope.
 <td>
 
 Denies the mc_open_path command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:allow-mc-open-url`
+
+</td>
+<td>
+
+Enables the mc_open_url command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-mapconv:deny-mc-open-url`
+
+</td>
+<td>
+
+Denies the mc_open_url command without any pre-configured scope.
 
 </td>
 </tr>

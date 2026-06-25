@@ -1,5 +1,6 @@
 import { Input } from "@picoframe/frame";
 import { CheckField, Field } from "./Field";
+import { WIKI } from "./Help";
 import { PathField } from "./PathField";
 
 /** Image file filters shared by the optional map pickers. */
@@ -70,52 +71,105 @@ export default function AdvancedOptions({
         </h3>
         <PathField
           label="Heightmap (-h)"
-          hint="grayscale image (PNG/TGA/BMP); black = min height, white = max height"
+          hint="grayscale; white = high, black = low"
+          help={
+            <span>
+              Defines the terrain elevation. A grayscale image where{" "}
+              <strong>white is the highest point and black the lowest</strong>.
+              Greys are heights in between. It should be{" "}
+              <code>(texture ÷ 8) + 1</code> pixels on each side (e.g. an 8192px
+              texture needs a 1025px heightmap).
+            </span>
+          }
+          learnMore={WIKI.height}
           value={value.heightmap}
           onChange={(v) => set({ heightmap: v })}
           disabled={disabled}
           filters={IMAGE_FILTERS}
           defaultPath={defaultPath}
+          preview
         />
         <PathField
           label="Metal map (-m)"
-          hint="grayscale image; brightness = metal density"
+          hint="red channel marks metal deposits"
+          help={
+            <span>
+              Marks where reclaimable/extractable metal is. The{" "}
+              <strong>red channel</strong> sets metal density (brighter red =
+              more); paint small red spots where you want metal spots in game.
+            </span>
+          }
+          learnMore={WIKI.metal}
           value={value.metalmap}
           onChange={(v) => set({ metalmap: v })}
           disabled={disabled}
           filters={IMAGE_FILTERS}
           defaultPath={defaultPath}
+          preview
         />
         <PathField
           label="Type map (-z)"
-          hint="grayscale image; terrain-type index per pixel"
+          hint="terrain-type index per pixel"
+          help={
+            <span>
+              Assigns a terrain type per pixel (each pixel value is an index
+              into the map's terrain types, which set speed/hardness for units).
+            </span>
+          }
+          learnMore={WIKI.terraintype}
           value={value.typemap}
           onChange={(v) => set({ typemap: v })}
           disabled={disabled}
           filters={IMAGE_FILTERS}
           defaultPath={defaultPath}
+          preview
         />
         <PathField
           label="Minimap (-minimap)"
-          hint="image (PNG/TGA/BMP); optional preview"
+          hint="the small overview image shown in-lobby and in-game"
+          help={
+            <span>
+              The low-resolution overview image players see in the lobby and the
+              in-game minimap. If omitted, the engine can derive one from the
+              texture.
+            </span>
+          }
+          learnMore={WIKI.minimap}
           value={value.minimap}
           onChange={(v) => set({ minimap: v })}
           disabled={disabled}
           filters={IMAGE_FILTERS}
           defaultPath={defaultPath}
+          preview
         />
         <PathField
           label="Vegetation map (-v)"
-          hint="grayscale image; vegetation density"
+          hint="grayscale; brightness = grass density"
+          help={
+            <span>
+              Controls where engine grass/vegetation grows. A grayscale image
+              where brighter = denser grass.
+            </span>
+          }
+          learnMore={WIKI.grass}
           value={value.vegmap}
           onChange={(v) => set({ vegmap: v })}
           disabled={disabled}
           filters={IMAGE_FILTERS}
           defaultPath={defaultPath}
+          preview
         />
         <PathField
           label="Features file (-features)"
           hint="text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
+          help={
+            <span>
+              Places map features (trees, rocks, wreckage). A text file with one
+              feature per line: <code>[tdfname] [x] [y] [z] [rotation]</code>,
+              where tdfname is the feature's definition name.
+            </span>
+          }
+          learnMore={WIKI.features}
           value={value.features}
           onChange={(v) => set({ features: v })}
           disabled={disabled}
@@ -128,7 +182,17 @@ export default function AdvancedOptions({
           Height range
         </h3>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Min height (-minh)" hint="height at black; default 0">
+          <Field
+            label="Min height (-minh)"
+            hint="world height at black; default 0"
+            help={
+              <span>
+                The in-world height (in map units) that pure black in the
+                heightmap maps to — the map's lowest point. Below 0 is
+                underwater.
+              </span>
+            }
+          >
             <Input
               type="number"
               value={value.minh}
@@ -137,7 +201,17 @@ export default function AdvancedOptions({
               placeholder="0"
             />
           </Field>
-          <Field label="Max height (-maxh)" hint="height at white; default 1">
+          <Field
+            label="Max height (-maxh)"
+            hint="world height at white; default 1"
+            help={
+              <span>
+                The in-world height (in map units) that pure white maps to — the
+                map's highest point. The gap between min and max sets how steep
+                the terrain is.
+              </span>
+            }
+          >
             <Input
               type="number"
               value={value.maxh}

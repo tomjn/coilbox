@@ -80,6 +80,12 @@ export const mcSuggestSources = defineCommand<
   }
 >("coilbox-mapconv", "mc_suggest_sources");
 
+/** Decode an image to its true pixel size plus a small preview thumbnail (data URL). */
+export const mcImageInfo = defineCommand<
+  { path: string },
+  { width: number; height: number; thumb: string }
+>("coilbox-mapconv", "mc_image_info");
+
 export const mcCompile = defineCommand<
   { opts: CompileOpts; outDir: string; runId: string; onLog: Channel<LogLine> },
   { smfPath: string; outSuffix: string }
@@ -104,6 +110,12 @@ export const mcCancel = defineCommand<
 export const mcOpenPath = defineCommand<{ path: string }, { opened: boolean }>(
   "coilbox-mapconv",
   "mc_open_path",
+);
+
+/** Open an external http(s) URL (e.g. a wiki help page) in the OS browser. */
+export const mcOpenUrl = defineCommand<{ url: string }, { opened: boolean }>(
+  "coilbox-mapconv",
+  "mc_open_url",
 );
 
 /** Whole settings map (opaque JSON-encoded string values), for the frame's SettingsStorage. */
