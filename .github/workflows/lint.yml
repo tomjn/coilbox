@@ -38,6 +38,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdevil-dev
       - uses: Swatinem/rust-cache@v2
+      # tauri-build verifies that declared bundle resources exist. The mapconv
+      # folder is normally fetched from a SpringMapConvNG release at build time
+      # (gitignored, see release.yml); clippy only needs the path to exist, not
+      # its contents, so an empty placeholder satisfies the check.
+      - name: Placeholder mapconv resource dir
+        run: mkdir -p src-tauri/mapconv
       - name: Rustfmt
         run: cargo fmt --all --check
       - name: Clippy
