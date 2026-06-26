@@ -43,7 +43,10 @@ pub fn compile_bos(source: &str, include_dir: &Path) -> Result<Vec<u8>, String> 
                 compile_inner(&source, &include_dir)
             }))
             .unwrap_or_else(|p| {
-                Err(format!("internal compiler error: {}", panic_message(p.as_ref())))
+                Err(format!(
+                    "internal compiler error: {}",
+                    panic_message(p.as_ref())
+                ))
             })
         })
         .map_err(|e| format!("could not start compiler thread: {e}"))?
@@ -93,24 +96,28 @@ async fn anim_cob_disasm(path: String) -> CliResult {
 #[tauri::command]
 async fn anim_bos2cob(path: String, output: Option<String>, overwrite: Option<bool>) -> CliResult {
     let overwrite = overwrite.unwrap_or(false);
-    let result = tauri::async_runtime::spawn_blocking(move || -> Result<(String, usize, bool), String> {
-        let source = std::fs::read_to_string(&path)
-            .map_err(|e| format!("could not read {path}: {e}"))?;
-        let src_path = Path::new(&path);
-        let include_dir = src_path.parent().unwrap_or_else(|| Path::new("."));
-        // Compile first so compile errors surface regardless of the output state.
-        let bytes = compile_bos(&source, include_dir)?;
-        let out_path = output.unwrap_or_else(|| {
-            src_path.with_extension("cob").to_string_lossy().into_owned()
-        });
-        if Path::new(&out_path).exists() && !overwrite {
-            return Ok((out_path, bytes.len(), true)); // ask before overwriting
-        }
-        std::fs::write(&out_path, &bytes)
-            .map_err(|e| format!("could not write {out_path}: {e}"))?;
-        Ok((out_path, bytes.len(), false))
-    })
-    .await;
+    let result =
+        tauri::async_runtime::spawn_blocking(move || -> Result<(String, usize, bool), String> {
+            let source = std::fs::read_to_string(&path)
+                .map_err(|e| format!("could not read {path}: {e}"))?;
+            let src_path = Path::new(&path);
+            let include_dir = src_path.parent().unwrap_or_else(|| Path::new("."));
+            // Compile first so compile errors surface regardless of the output state.
+            let bytes = compile_bos(&source, include_dir)?;
+            let out_path = output.unwrap_or_else(|| {
+                src_path
+                    .with_extension("cob")
+                    .to_string_lossy()
+                    .into_owned()
+            });
+            if Path::new(&out_path).exists() && !overwrite {
+                return Ok((out_path, bytes.len(), true)); // ask before overwriting
+            }
+            std::fs::write(&out_path, &bytes)
+                .map_err(|e| format!("could not write {out_path}: {e}"))?;
+            Ok((out_path, bytes.len(), false))
+        })
+        .await;
     match result {
         Ok(Ok((out_path, len, needs_overwrite))) => CliResult::ok(json!({
             "output": out_path,
@@ -122,40 +129,8 @@ async fn anim_bos2cob(path: String, output: Option<String>, overwrite: Option<bo
     }
 }
 
-/// `anim_reveal` — reveal a file in the OS file manager (selecting it where the
-/// platform supports it), so the user can get at the compiled `.cob` or the
-/// `.cob` they disassembled.
-#[tauri::command]
-async fn anim_reveal(path: String) -> CliResult {
-    let p = std::path::PathBuf::from(&path);
-    if !p.exists() {
-        return CliResult::err(format!("path does not exist: {path}"));
-    }
-    #[cfg(target_os = "macos")]
-    let spawned = std::process::Command::new("open").arg("-R").arg(&p).spawn();
-    #[cfg(target_os = "windows")]
-    let spawned = std::process::Command::new("explorer")
-        .arg(format!("/select,{}", p.display()))
-        .spawn();
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let spawned = {
-        // xdg-open has no "select"; open the containing folder instead.
-        let dir = p.parent().unwrap_or_else(|| std::path::Path::new("."));
-        std::process::Command::new("xdg-open").arg(dir).spawn()
-    };
-
-    match spawned {
-        Ok(_) => CliResult::ok(json!({ "revealed": true })),
-        Err(e) => CliResult::err(format!("could not reveal path: {e}")),
-    }
-}
-
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-anim")
-        .invoke_handler(tauri::generate_handler![
-            anim_cob_disasm,
-            anim_bos2cob,
-            anim_reveal
-        ])
+        .invoke_handler(tauri::generate_handler![anim_cob_disasm, anim_bos2cob])
         .build()
 }

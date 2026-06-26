@@ -319,22 +319,10 @@
           "markdownDescription": "Denies the anim_cob_disasm command without any pre-configured scope."
         },
         {
-          "description": "Enables the anim_reveal command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-anim-reveal",
-          "markdownDescription": "Enables the anim_reveal command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the anim_reveal command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-anim-reveal",
-          "markdownDescription": "Denies the anim_reveal command without any pre-configured scope."
-        },
-        {
-          "description": "Allows the animation plugin's commands (COB disassembly, BOS->COB compilation, reveal-in-folder).\n#### This default permission set includes:\n\n- `allow-anim-cob-disasm`\n- `allow-anim-bos2cob`\n- `allow-anim-reveal`",
+          "description": "Allows the animation plugin's commands (COB disassembly and BOS->COB compilation).\n#### This default permission set includes:\n\n- `allow-anim-cob-disasm`\n- `allow-anim-bos2cob`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the animation plugin's commands (COB disassembly, BOS->COB compilation, reveal-in-folder).\n#### This default permission set includes:\n\n- `allow-anim-cob-disasm`\n- `allow-anim-bos2cob`\n- `allow-anim-reveal`"
+          "markdownDescription": "Allows the animation plugin's commands (COB disassembly and BOS->COB compilation).\n#### This default permission set includes:\n\n- `allow-anim-cob-disasm`\n- `allow-anim-bos2cob`"
         }
       ]
     }

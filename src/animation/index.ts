@@ -1,5 +1,5 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Binary, FileCode2 } from "lucide-react";
+import { Binary, BookOpen, Code2, FileCode2, ScrollText } from "lucide-react";
 
 /**
  * The animation plugin: tools for Spring/Recoil unit-script animation. v0.4
@@ -30,6 +30,32 @@ const animationPlugin: FramePlugin = {
           to: "/animation/cob",
           order: 1,
           icon: Binary,
+        },
+        // External references — shown on the home launcher only (sidebar: false),
+        // opened in the system browser via the Tauri opener.
+        {
+          id: "animation.guide-skeletor-ik",
+          label: "Skeletor IK Animation Guide",
+          href: "https://docs.google.com/document/d/1-oMLkWHBhfN6a3a5aEZU6X02lY4aZE52nZRtrvIe4cM/edit?tab=t.0#heading=h.ria8yldeo799",
+          icon: BookOpen,
+          sidebar: false,
+          order: 2,
+        },
+        {
+          id: "animation.skeletor-s3o",
+          label: "Skeletor S3O",
+          href: "https://github.com/Beherith/Skeletor_S3O",
+          icon: Code2,
+          sidebar: false,
+          order: 3,
+        },
+        {
+          id: "animation.lua-animations",
+          label: "Lua Animations",
+          href: "https://springrts.com/wiki/Animation-LuaScripting",
+          icon: ScrollText,
+          sidebar: false,
+          order: 4,
         },
       ],
     },

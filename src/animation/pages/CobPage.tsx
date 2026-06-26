@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ask, open } from "@tauri-apps/plugin-dialog";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   AlertCircle,
   Binary,
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
-import { animBos2cob, animCobDisasm, animReveal } from "../bindings";
+import { animBos2cob, animCobDisasm } from "../bindings";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -69,11 +70,18 @@ export default function CobPage() {
           kind: "warning",
         });
         if (yes) await compile(p, true);
-        else setBanner({ kind: "info", text: "Kept the existing .cob — not overwritten." });
+        else
+          setBanner({
+            kind: "info",
+            text: "Kept the existing .cob — not overwritten.",
+          });
         return;
       }
       setRevealTarget(res.output);
-      setBanner({ kind: "success", text: `Compiled to ${res.output} (${res.bytes} bytes).` });
+      setBanner({
+        kind: "success",
+        text: `Compiled to ${res.output} (${res.bytes} bytes).`,
+      });
       await disassemble(res.output);
     } catch (e) {
       setBanner({ kind: "error", text: errMessage(e) });
@@ -110,7 +118,7 @@ export default function CobPage() {
   async function reveal() {
     if (!revealTarget) return;
     try {
-      await animReveal({ path: revealTarget });
+      await revealItemInDir(revealTarget);
     } catch (e) {
       setBanner({ kind: "error", text: errMessage(e) });
     }
@@ -150,7 +158,8 @@ export default function CobPage() {
           const cob = p.paths.find((f) => COB.test(f));
           if (bos) void compile(bos);
           else if (cob) void loadCob(cob);
-          else if (p.paths.length) setBanner({ kind: "error", text: "Drop a .bos or .cob file." });
+          else if (p.paths.length)
+            setBanner({ kind: "error", text: "Drop a .bos or .cob file." });
         }
       })
       .then((fn) => {
@@ -180,16 +189,36 @@ export default function CobPage() {
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={rerun} disabled={!path || busy}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={rerun}
+            disabled={!path || busy}
+          >
             <RefreshCw /> Re-run
           </Button>
-          <Button variant="outline" size="sm" onClick={reveal} disabled={!revealTarget || busy}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={reveal}
+            disabled={!revealTarget || busy}
+          >
             <FolderSearch /> Reveal in folder
           </Button>
-          <Button variant="outline" size="sm" onClick={browseBos} disabled={busy}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={browseBos}
+            disabled={busy}
+          >
             <Hammer /> Compile .bos…
           </Button>
-          <Button variant="outline" size="sm" onClick={browseCob} disabled={busy}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={browseCob}
+            disabled={busy}
+          >
             <FolderOpen /> Open .cob…
           </Button>
         </div>

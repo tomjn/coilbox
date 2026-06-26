@@ -1,12 +1,11 @@
 ## Default Permission
 
-Allows the animation plugin's commands (COB disassembly, BOS->COB compilation, reveal-in-folder).
+Allows the animation plugin's commands (COB disassembly and BOS->COB compilation).
 
 #### This default permission set includes the following:
 
 - `allow-anim-cob-disasm`
 - `allow-anim-bos2cob`
-- `allow-anim-reveal`
 
 ## Permission Table
 
@@ -65,32 +64,6 @@ Enables the anim_cob_disasm command without any pre-configured scope.
 <td>
 
 Denies the anim_cob_disasm command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`coilbox-anim:allow-anim-reveal`
-
-</td>
-<td>
-
-Enables the anim_reveal command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`coilbox-anim:deny-anim-reveal`
-
-</td>
-<td>
-
-Denies the anim_reveal command without any pre-configured scope.
 
 </td>
 </tr>

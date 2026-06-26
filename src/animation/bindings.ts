@@ -21,9 +21,3 @@ export const animBos2cob = defineCommand<
   { path: string; output?: string; overwrite?: boolean },
   { output: string; bytes: number; needsOverwrite: boolean }
 >("coilbox-anim", "anim_bos2cob");
-
-/** Reveal a file in the OS file manager (selects it where supported). */
-export const animReveal = defineCommand<{ path: string }, { revealed: boolean }>(
-  "coilbox-anim",
-  "anim_reveal",
-);

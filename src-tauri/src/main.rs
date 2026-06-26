@@ -77,7 +77,8 @@ fn main() {
 
     let mut builder = tauri::Builder::default()
         .plugin(picoframe_core::init())
-        .plugin(tauri_plugin_dialog::init());
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init());
     // picoframe:plugins-start
     builder = builder.plugin(tauri_plugin_coilbox_prdownloader::init());
     builder = builder.plugin(tauri_plugin_coilbox_uberstress::init());
