@@ -59,6 +59,9 @@ pub struct Report {
 pub struct ReportSummary {
     pub file: String,
     pub scenario: String,
+    /// Target address the run hit (e.g. `127.0.0.1:8300`) — used to tell apart
+    /// same-scenario runs against different servers, and to filter the list.
+    pub addr: String,
     pub git_ref: Option<String>,
     pub commit_sha: Option<String>,
     pub server_version: Option<String>,
@@ -81,6 +84,7 @@ impl ReportSummary {
         ReportSummary {
             file: file.to_string(),
             scenario: rep.scenario.clone(),
+            addr: rep.addr.clone(),
             git_ref: rep.git_ref.clone(),
             commit_sha: rep.commit_sha.clone(),
             server_version: rep.server_version.clone(),

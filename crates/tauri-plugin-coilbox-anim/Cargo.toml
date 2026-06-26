@@ -1,0 +1,18 @@
+[package]
+name = "tauri-plugin-coilbox-anim"
+version = "0.0.0"
+description = "BOS/COB unit-script animation tooling for Coilbox (Rust half) — a port of BARScriptCompiler. ACL identifier: coilbox-anim"
+edition = "2021"
+license = "MIT"
+# Tauri requires `links` to equal `package.name`. The ACL identifier is this
+# name with the `tauri-plugin-` prefix stripped -> `coilbox-anim`.
+links = "tauri-plugin-coilbox-anim"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+picoframe-core = "0.0.2"

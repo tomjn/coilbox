@@ -1,9 +1,11 @@
 import { Button, cn } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { open } from "@tauri-apps/plugin-dialog";
 import {
   AlertCircle,
   CheckCircle2,
+  FolderInput,
   FolderOpen,
   Hammer,
   Loader2,
@@ -15,7 +17,6 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   type LogLine,
-  type MapAppearance,
   type MapInfo,
   mcCancel,
   mcDecompile,
@@ -24,6 +25,8 @@ import {
   mcReadMapinfo,
 } from "../bindings";
 import { useMapconvConfig } from "../config";
+import { type DecompileResult, useDecompileDraft } from "../drafts";
+import { useMapProjects } from "../projects";
 import { MapPreview3D } from "./components/MapPreview3D";
 import { PathField } from "./components/PathField";
 
@@ -34,7 +37,9 @@ function errMessage(e: unknown): string {
 const INPUT_FILTERS = [
   { name: "Spring map or archive", extensions: ["smf", "sdz", "sd7"] },
 ];
-const ACCEPTS = /\.(smf|sdz|sd7)$/i;
+// A `.sdd` is a directory archive — it can't be picked via the file dialog's
+// filters (handled by the separate folder button), but it can be dragged in.
+const ACCEPTS = /\.(smf|sdz|sd7|sdd)$/i;
 
 /** The parent dir of a native path (handles both / and \ separators). */
 function dirname(p: string): string {
@@ -48,22 +53,28 @@ function joinPath(dir: string, name: string): string {
   return `${dir}${sep}${name}`;
 }
 
-type Result = {
-  directory: string;
-  mapInfo?: MapInfo | null;
-  minimap?: string | null;
-  appearance?: MapAppearance | null;
-};
+/** The last path segment (handles both / and \ separators). */
+function basename(p: string): string {
+  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  return i >= 0 ? p.slice(i + 1) : p;
+}
+
+/** The decompile result panel's data (shared with the persisted draft). */
+type Result = DecompileResult;
 
 /** Extract source images from a `.smf`, or a `.sdz`/`.sd7` archive. */
 export default function DecompilePage() {
   const [cfg, setCfg] = useMapconvConfig();
+  const [draft, setDraft] = useDecompileDraft();
+  const { upsertProject } = useMapProjects();
   const navigate = useNavigate();
 
-  const [inputPath, setInputPath] = useState("");
+  // Seed from the persisted draft so the input + result panel (with its
+  // path-driven preview) survive navigation and restarts.
+  const [inputPath, setInputPath] = useState(() => draft.inputPath);
   const [running, setRunning] = useState(false);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
-  const [result, setResult] = useState<Result | null>(null);
+  const [result, setResult] = useState<Result | null>(() => draft.result);
   const [runError, setRunError] = useState<string | null>(null);
   const [probe, setProbe] = useState<{
     available: boolean;
@@ -105,7 +116,7 @@ export default function DecompilePage() {
             setInputPath(file);
             setRunError(null);
           } else if (p.paths.length) {
-            setRunError("Drop a .smf, .sdz, or .sd7 file.");
+            setRunError("Drop a .smf, .sdz, .sd7, or .sdd folder.");
           }
         }
       })
@@ -124,6 +135,13 @@ export default function DecompilePage() {
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ block: "end" });
   }, [logLines]);
+
+  // Persist input + result so the panel and its preview survive navigation.
+  // Transient run state (logs, running, probe) is intentionally not persisted.
+  useEffect(() => {
+    const id = setTimeout(() => setDraft({ inputPath, result }), 400);
+    return () => clearTimeout(id);
+  }, [inputPath, result, setDraft]);
 
   const canRun = !running && inputPath !== "";
 
@@ -148,12 +166,33 @@ export default function DecompilePage() {
         minimap: res.minimap,
         appearance,
       });
+      // Record (or refresh) this map as a project. mapdecompile writes
+      // texture.png into the directory, so that's a reliable preview.
+      upsertProject({
+        folderPath: res.directory,
+        name: appearance?.name || basename(res.directory),
+        kind: "decompiled",
+        previewPath: joinPath(res.directory, "texture.png"),
+      });
       if (cfg.rememberDirs) setCfg({ ...cfg, lastSmfDir: dirname(inputPath) });
     } catch (e) {
       setRunError(errMessage(e));
     } finally {
       setRunning(false);
       runIdRef.current = null;
+    }
+  }
+
+  async function browseFolder() {
+    const picked = await open({
+      title: "Select a .sdd map folder",
+      directory: true,
+      multiple: false,
+      defaultPath: cfg.lastSmfDir,
+    });
+    if (typeof picked === "string") {
+      setInputPath(picked);
+      setRunError(null);
     }
   }
 
@@ -175,8 +214,10 @@ export default function DecompilePage() {
         </h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
           Extract the source images (texture, heightmap, metal/type maps,
-          features) from a Spring <code>.smf</code>, or from a packaged{" "}
-          <code>.sdz</code>/<code>.sd7</code> archive (extracted automatically).
+          features) from a Spring <code>.smf</code>, from a packaged{" "}
+          <code>.sdz</code>/<code>.sd7</code> archive (extracted automatically
+          to a <code>.sdd</code> folder), or from an existing <code>.sdd</code>{" "}
+          directory archive.
         </p>
       </header>
 
@@ -197,14 +238,24 @@ export default function DecompilePage() {
           )}
         >
           <PathField
-            label="Map (.smf / .sdz / .sd7)"
-            hint="browse, or drag a .smf/.sdz/.sd7 onto the window · archives are extracted then decompiled"
+            label="Map (.smf / .sdz / .sd7 / .sdd)"
+            hint="browse a file, drag one onto the window, or pick a .sdd folder · archives are extracted then decompiled"
             value={inputPath}
             onChange={setInputPath}
             disabled={running}
             filters={INPUT_FILTERS}
             defaultPath={cfg.lastSmfDir}
           />
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={browseFolder}
+            disabled={running}
+          >
+            <FolderInput /> Pick a .sdd folder…
+          </Button>
 
           <div className="flex items-center gap-2 pt-1">
             {running ? (

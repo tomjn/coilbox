@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).
+Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL, results dir, import/export).
 
 #### This default permission set includes the following:
 
@@ -12,6 +12,9 @@ Allows the uberstress plugin's commands (scenarios, run, cancel, history, report
 - `allow-us-settings-load`
 - `allow-us-settings-save`
 - `allow-us-seed-sql`
+- `allow-us-results-dir`
+- `allow-us-export-report`
+- `allow-us-import-report`
 
 ## Permission Table
 
@@ -51,6 +54,32 @@ Denies the us_cancel command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-uberstress:allow-us-export-report`
+
+</td>
+<td>
+
+Enables the us_export_report command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-uberstress:deny-us-export-report`
+
+</td>
+<td>
+
+Denies the us_export_report command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-uberstress:allow-us-history`
 
 </td>
@@ -77,6 +106,32 @@ Denies the us_history command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-uberstress:allow-us-import-report`
+
+</td>
+<td>
+
+Enables the us_import_report command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-uberstress:deny-us-import-report`
+
+</td>
+<td>
+
+Denies the us_import_report command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-uberstress:allow-us-report`
 
 </td>
@@ -96,6 +151,32 @@ Enables the us_report command without any pre-configured scope.
 <td>
 
 Denies the us_report command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-uberstress:allow-us-results-dir`
+
+</td>
+<td>
+
+Enables the us_results_dir command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-uberstress:deny-us-results-dir`
+
+</td>
+<td>
+
+Denies the us_results_dir command without any pre-configured scope.
 
 </td>
 </tr>

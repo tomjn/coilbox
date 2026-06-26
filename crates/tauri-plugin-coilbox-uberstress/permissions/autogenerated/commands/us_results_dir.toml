@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-us-results-dir"
+description = "Enables the us_results_dir command without any pre-configured scope."
+commands.allow = ["us_results_dir"]
+
+[[permission]]
+identifier = "deny-us-results-dir"
+description = "Denies the us_results_dir command without any pre-configured scope."
+commands.deny = ["us_results_dir"]

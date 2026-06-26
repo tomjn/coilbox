@@ -39,6 +39,8 @@ export interface Report {
 export interface ReportSummary {
   file: string;
   scenario: string;
+  /** Target address the run hit (e.g. `127.0.0.1:8300`). */
+  addr: string;
   gitRef?: string;
   commitSha?: string;
   serverVersion?: string;
@@ -146,6 +148,24 @@ export const usHistory = defineCommand<undefined, { runs: ReportSummary[] }>(
 export const usReport = defineCommand<{ file: string }, { report: Report }>(
   "coilbox-uberstress",
   "us_report",
+);
+
+/** Absolute path of the results directory (created if missing), for opening it. */
+export const usResultsDir = defineCommand<undefined, { path: string }>(
+  "coilbox-uberstress",
+  "us_results_dir",
+);
+
+/** Copy a saved report to a destination path the user picked. */
+export const usExportReport = defineCommand<
+  { file: string; dest: string },
+  { dest: string }
+>("coilbox-uberstress", "us_export_report");
+
+/** Import an external report JSON into history (validated). Returns its filename. */
+export const usImportReport = defineCommand<{ src: string }, { file: string }>(
+  "coilbox-uberstress",
+  "us_import_report",
 );
 
 /** Whole settings map (opaque JSON-encoded string values), for the frame's SettingsStorage. */

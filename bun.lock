@@ -5,10 +5,11 @@
     "": {
       "name": "coilbox",
       "dependencies": {
-        "@picoframe/frame": "^0.0.8",
-        "@picoframe/plugin-sdk": "^0.0.3",
+        "@picoframe/frame": "^0.0.9",
+        "@picoframe/plugin-sdk": "^0.0.4",
         "@tauri-apps/api": "^2.11.0",
         "@tauri-apps/plugin-dialog": "^2.7.1",
+        "@tauri-apps/plugin-opener": "^2.5.0",
         "clsx": "^2.1.1",
         "lucide-react": "^1.21.0",
         "radix-ui": "^1.6.0",
@@ -83,9 +84,9 @@
 
     "@oxc-project/types": ["@oxc-project/types@0.137.0", "", {}, "sha512-WT+Gb24i8hmvo85AIv2oEYouEXkRlKAlT9WaCa3TfLgNCN+GhrJOGZuIlMouAh38Qe4QOx26eUOVsq70qXrywA=="],
 
-    "@picoframe/frame": ["@picoframe/frame@0.0.8", "", { "dependencies": { "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.16.0", "radix-ui": "^1.6.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@picoframe/plugin-sdk": "*", "@tauri-apps/api": "^2.11.0", "react": "^19.0.0", "react-dom": "^19.0.0", "react-router": "^7.6.0" } }, "sha512-8IFVPBx5GFKO+4Q6SMdQ3UW6tdo5kOm5dSIP6qHKxFuurftlY93l9UhD0ensqebZKK0q4EcwBDzy3B0RLpxHgQ=="],
+    "@picoframe/frame": ["@picoframe/frame@0.0.9", "", { "dependencies": { "@tauri-apps/plugin-opener": "^2.5.0", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.16.0", "radix-ui": "^1.6.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@picoframe/plugin-sdk": "*", "@tauri-apps/api": "^2.11.0", "react": "^19.0.0", "react-dom": "^19.0.0", "react-router": "^7.6.0" } }, "sha512-sGFi7wsYceO7rXXqc/3Wx7b8u7PTXc+R5VKp7kT6U7BFbtT/vaV2KA59xAOwAqGGtSEM8pbJPDv28BIvwWsENA=="],
 
-    "@picoframe/plugin-sdk": ["@picoframe/plugin-sdk@0.0.3", "", { "peerDependencies": { "@tauri-apps/api": "^2.11.0", "react": "^19.0.0" } }, "sha512-GkGS3EIHtEXidT6DhyMg89PHvb4EMJe/ccsdvluGvXgkfqunB+vu22MrUTHeswr2CKkRdcDXZ+IqCXoj6ub1nA=="],
+    "@picoframe/plugin-sdk": ["@picoframe/plugin-sdk@0.0.4", "", { "peerDependencies": { "@tauri-apps/api": "^2.11.0", "react": "^19.0.0" } }, "sha512-1x00q4Hul5seYygqYxEfd7uLAjxM92WSHmd8gdRJu1loZeR+tGziXyXlAbCLb+ptE6qj6kFSCJ8uHZI03Cu6aQ=="],
 
     "@radix-ui/number": ["@radix-ui/number@1.1.2", "", {}, "sha512-ceTwaxc4I5IOi97DgCotl3pqiyRGvffcc0oOsE2dQYaJOFIDsDt4VWG6xEbg1QePv9QWausCEIppud/tJ1wNig=="],
 
@@ -302,6 +303,8 @@
     "@tauri-apps/cli-win32-x64-msvc": ["@tauri-apps/cli-win32-x64-msvc@2.11.3", "", { "os": "win32", "cpu": "x64" }, "sha512-GlciF75GdbseajOyib2aCHwE3BXIqZ1liGKWLFRvCdN5wm8h8hFssEVKQ/6E+2jsMLg9v7LCTb983YFnn0QSww=="],
 
     "@tauri-apps/plugin-dialog": ["@tauri-apps/plugin-dialog@2.7.1", "", { "dependencies": { "@tauri-apps/api": "^2.11.0" } }, "sha512-OK1UBXYt+ojcmxMktzzuyonYIFta8CmAASpX+CA+DTGK24KlHjhYI6x2iOJ/TjZF4N7/ACK1oFmEOjIY9IhzOQ=="],
+
+    "@tauri-apps/plugin-opener": ["@tauri-apps/plugin-opener@2.5.4", "", { "dependencies": { "@tauri-apps/api": "^2.11.0" } }, "sha512-1HnPkb+AmgO29HBazm4uPLKB+r7zzcTBW1d0fyYp1uP+jwtpoiNDGKMMzz58SFp49nOIrxdE3aUJtT57lfO9CQ=="],
 
     "@tweenjs/tween.js": ["@tweenjs/tween.js@23.1.3", "", {}, "sha512-vJmvvwFxYuGnF2axRtPYocag6Clbb5YS7kLL+SO/TeVFzHqDIWrNKYtcsPMibjDx9O+bu+psAy9NKfWklassUA=="],
 

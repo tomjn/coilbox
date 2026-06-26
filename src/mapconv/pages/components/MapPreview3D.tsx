@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { Checkbox } from "@/components/ui/checkbox";
-import { type MapAppearance, mcImageInfo } from "../../bindings";
+import type { MapAppearance } from "../../bindings";
+import { getImageInfo } from "../../imageCache";
 
 type Rgb = [number, number, number];
 
@@ -60,6 +61,10 @@ export function MapPreview3D({
   className?: string;
 }) {
   const [srcs, setSrcs] = useState<Srcs | null>(null);
+  // True once the three.js scene is actually on screen. Drives the "building"
+  // overlay so it stays up through both the image fetch and the build (and while
+  // waiting on dimensions), rather than vanishing the moment the data lands.
+  const [built, setBuilt] = useState(false);
   const [failed, setFailed] = useState(false);
   const [water, setWater] = useState(true);
   const [wireframe, setWireframe] = useState(false);
@@ -92,8 +97,8 @@ export function MapPreview3D({
     setFailed(false);
     if (!heightmapPath || !texturePath) return;
     Promise.all([
-      mcImageInfo({ path: heightmapPath, max: HEIGHT_MAX }),
-      mcImageInfo({ path: texturePath, max: TEXTURE_MAX }),
+      getImageInfo(heightmapPath, HEIGHT_MAX),
+      getImageInfo(texturePath, TEXTURE_MAX),
     ])
       .then(([h, t]) => {
         if (!cancelled) setSrcs({ height: h.thumb, texture: t.thumb });
@@ -231,10 +236,12 @@ export function MapPreview3D({
       observer = new ResizeObserver(resize);
       observer.observe(container);
       resize();
+      if (!cancelled) setBuilt(true);
     })();
 
     return () => {
       cancelled = true;
+      setBuilt(false);
       observer?.disconnect();
       if (controls) {
         if (renderRef.current)
@@ -303,7 +310,7 @@ export function MapPreview3D({
     >
       <div ref={containerRef} className="absolute inset-0" />
 
-      {srcs && (
+      {built && (
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
@@ -314,14 +321,14 @@ export function MapPreview3D({
         </button>
       )}
 
-      {!srcs && (
+      {!built && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
           <Loader2 size={22} className="animate-spin opacity-40" />
-          Building 3D preview…
+          {srcs ? "Building 3D preview…" : "Loading map preview…"}
         </div>
       )}
 
-      {srcs && (
+      {built && (
         <>
           <div className="absolute right-2 top-2 flex flex-col gap-1.5 rounded-md border border-border bg-card/80 px-2.5 py-2 text-xs backdrop-blur">
             {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control (implicit label association) */}

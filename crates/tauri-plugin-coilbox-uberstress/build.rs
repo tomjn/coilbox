@@ -11,6 +11,9 @@ const COMMANDS: &[&str] = &[
     "us_settings_load",
     "us_settings_save",
     "us_seed_sql",
+    "us_results_dir",
+    "us_export_report",
+    "us_import_report",
 ];
 
 fn main() {

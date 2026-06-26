@@ -1,12 +1,25 @@
-import { cn } from "@picoframe/frame";
-import { AlertCircle, History, Loader2 } from "lucide-react";
+import { Button, cn } from "@picoframe/frame";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { openPath } from "@tauri-apps/plugin-opener";
+import {
+  AlertCircle,
+  Download,
+  FolderOpen,
+  History,
+  Loader2,
+  Play,
+  Upload,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import {
   type Report,
   type ReportSummary,
+  usExportReport,
   usHistory,
+  usImportReport,
   usReport,
+  usResultsDir,
 } from "../bindings";
 import { OptionSelect } from "./components/OptionSelect";
 import {
@@ -22,6 +35,8 @@ import {
   ReportHeader,
   SummaryBand,
 } from "./components/ReportDetail";
+
+const ALL = "__all__";
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -84,7 +99,10 @@ export default function HistoryPage() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [compareFile, setCompareFile] = useState<string>("");
   const [compareReport, setCompareReport] = useState<Report | null>(null);
+  const [typeFilter, setTypeFilter] = useState(ALL);
+  const [serverFilter, setServerFilter] = useState(ALL);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const loadHistory = useCallback(async () => {
     setListError(null);
@@ -135,9 +153,79 @@ export default function HistoryPage() {
     }
   }
 
+  // Open the results directory in the OS file manager.
+  async function openFolder() {
+    try {
+      const { path } = await usResultsDir(undefined);
+      await openPath(path);
+    } catch (e) {
+      setListError(errMessage(e));
+    }
+  }
+
+  // Import an external report JSON into history, then select it.
+  async function importReport() {
+    try {
+      const picked = await open({
+        title: "Import a run report",
+        multiple: false,
+        filters: [{ name: "Report JSON", extensions: ["json"] }],
+      });
+      if (typeof picked !== "string") return;
+      const { file } = await usImportReport({ src: picked });
+      await loadHistory();
+      await selectRun(file);
+    } catch (e) {
+      setListError(errMessage(e));
+    }
+  }
+
+  // Export the selected run to a path the user picks.
+  async function exportReport() {
+    if (!selected) return;
+    try {
+      const dest = await save({
+        title: "Export run report",
+        defaultPath: selected,
+        filters: [{ name: "Report JSON", extensions: ["json"] }],
+      });
+      if (!dest) return;
+      await usExportReport({ file: selected, dest });
+    } catch (e) {
+      setReportError(errMessage(e));
+    }
+  }
+
+  // Re-run this run's test: open the Run page prefilled with its scenario,
+  // target, and params (the user picks/confirms the server and launches).
+  function rerunTest() {
+    if (!report) return;
+    navigate("/uberstress", {
+      state: {
+        rerun: {
+          scenario: report.scenario,
+          addr: report.addr,
+          params: report.params ?? {},
+        },
+      },
+    });
+  }
+
+  // Filter the list by scenario ("type") and target address ("server").
+  const allRuns = runs ?? [];
+  const types = Array.from(new Set(allRuns.map((r) => r.scenario))).sort();
+  const servers = Array.from(
+    new Set(allRuns.map((r) => r.addr).filter(Boolean)),
+  ).sort();
+  const filteredRuns = allRuns.filter(
+    (r) =>
+      (typeFilter === ALL || r.scenario === typeFilter) &&
+      (serverFilter === ALL || r.addr === serverFilter),
+  );
+
   // Same-scenario runs power the trend chart and the compare picker.
   const sameScenario = report
-    ? (runs ?? []).filter((r) => r.scenario === report.scenario)
+    ? allRuns.filter((r) => r.scenario === report.scenario)
     : [];
   const compareOptions = sameScenario.filter((r) => r.file !== selected);
 
@@ -151,6 +239,14 @@ export default function HistoryPage() {
             latency breakdown.
           </p>
         </div>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" size="sm" onClick={importReport}>
+            <Upload /> Import
+          </Button>
+          <Button variant="outline" size="sm" onClick={openFolder}>
+            <FolderOpen /> Open folder
+          </Button>
+        </div>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-[22rem_1fr]">
@@ -159,9 +255,37 @@ export default function HistoryPage() {
           <div className="flex items-center justify-between px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <span>Runs</span>
             {runs && (
-              <span className="font-normal normal-case">{runs.length}</span>
+              <span className="font-normal normal-case">
+                {filteredRuns.length === allRuns.length
+                  ? allRuns.length
+                  : `${filteredRuns.length} / ${allRuns.length}`}
+              </span>
             )}
           </div>
+          {allRuns.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 border-b border-border/50 px-3 py-2">
+              <OptionSelect
+                size="sm"
+                className="text-xs"
+                value={typeFilter}
+                onValueChange={setTypeFilter}
+                options={[
+                  { value: ALL, label: "All types" },
+                  ...types.map((t) => ({ value: t, label: t })),
+                ]}
+              />
+              <OptionSelect
+                size="sm"
+                className="text-xs"
+                value={serverFilter}
+                onValueChange={setServerFilter}
+                options={[
+                  { value: ALL, label: "All servers" },
+                  ...servers.map((s) => ({ value: s, label: s })),
+                ]}
+              />
+            </div>
+          )}
           <div className="min-h-0 flex-1 overflow-auto">
             {listError && (
               <p className="m-3 flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
@@ -177,7 +301,12 @@ export default function HistoryPage() {
                 </p>
               </div>
             )}
-            {runs?.map((r) => (
+            {allRuns.length > 0 && filteredRuns.length === 0 && (
+              <p className="p-6 text-center text-sm text-muted-foreground">
+                No runs match the filters.
+              </p>
+            )}
+            {filteredRuns.map((r) => (
               <button
                 type="button"
                 key={r.file}
@@ -197,6 +326,11 @@ export default function HistoryPage() {
                     </span>
                   )}
                 </div>
+                {r.addr && (
+                  <span className="truncate font-mono text-xs text-muted-foreground">
+                    {r.addr}
+                  </span>
+                )}
                 <span className="truncate text-xs text-muted-foreground">
                   {provenance(r)}
                 </span>
@@ -226,7 +360,17 @@ export default function HistoryPage() {
             </p>
           ) : report ? (
             <div className="space-y-6 p-6">
-              <ReportHeader report={report} />
+              <div className="flex items-start justify-between gap-4">
+                <ReportHeader report={report} />
+                <div className="flex shrink-0 gap-2">
+                  <Button variant="outline" size="sm" onClick={rerunTest}>
+                    <Play /> Re-run
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={exportReport}>
+                    <Download /> Export
+                  </Button>
+                </div>
+              </div>
 
               <EarlyTerminationNotice report={report} />
 

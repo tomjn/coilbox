@@ -14,4 +14,6 @@ picoframe-core = "0.0.2"
 tauri-plugin-coilbox-prdownloader = { path = "../crates/tauri-plugin-coilbox-prdownloader" }
 tauri-plugin-coilbox-uberstress = { path = "../crates/tauri-plugin-coilbox-uberstress" }
 tauri-plugin-coilbox-mapconv = { path = "../crates/tauri-plugin-coilbox-mapconv" }
+tauri-plugin-coilbox-anim = { path = "../crates/tauri-plugin-coilbox-anim" }
 tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"

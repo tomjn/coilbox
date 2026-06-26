@@ -1,0 +1,7 @@
+# Files the `tauri dev` watcher should ignore (gitignore syntax).
+#
+# Compiled COB output: the anim plugin writes `<name>.cob` next to the `.bos`
+# being compiled. When that source lives inside a watched crate (e.g. the
+# anim crate's test fixtures), the new `.cob` would otherwise trigger a dev
+# rebuild + app restart. Compiler output is never a build input, so ignore it.
+*.cob

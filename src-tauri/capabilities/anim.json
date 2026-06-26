@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "anim",
+  "description": "Grants the animation plugin's default commands and native file pickers to the main window.",
+  "windows": ["main"],
+  "permissions": [
+    "coilbox-anim:default",
+    "dialog:allow-open",
+    "dialog:allow-ask",
+    {
+      "identifier": "opener:allow-reveal-item-in-dir",
+      "allow": [{ "path": "$HOME/**" }]
+    }
+  ]
+}

@@ -13,10 +13,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@picoframe/frame": "^0.0.8",
-    "@picoframe/plugin-sdk": "^0.0.3",
+    "@picoframe/frame": "^0.0.9",
+    "@picoframe/plugin-sdk": "^0.0.4",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-opener": "^2.5.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.21.0",
     "radix-ui": "^1.6.0",

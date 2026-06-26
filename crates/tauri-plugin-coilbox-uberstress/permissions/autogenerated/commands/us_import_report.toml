@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-us-import-report"
+description = "Enables the us_import_report command without any pre-configured scope."
+commands.allow = ["us_import_report"]
+
+[[permission]]
+identifier = "deny-us-import-report"
+description = "Denies the us_import_report command without any pre-configured scope."
+commands.deny = ["us_import_report"]

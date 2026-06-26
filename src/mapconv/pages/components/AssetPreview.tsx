@@ -1,6 +1,6 @@
-import { ImageOff } from "lucide-react";
+import { ImageOff, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { mcImageInfo } from "../../bindings";
+import { getImageInfo } from "../../imageCache";
 
 /**
  * Thumbnail + true pixel dimensions for a chosen image asset. Decodes via the
@@ -28,7 +28,7 @@ export function AssetPreview({
     setInfo(null);
     setFailed(false);
     if (!path) return;
-    mcImageInfo({ path })
+    getImageInfo(path)
       .then((r) => {
         if (cancelled) return;
         setInfo(r);
@@ -49,7 +49,21 @@ export function AssetPreview({
       </p>
     );
   }
-  if (!info) return null;
+  if (!info) {
+    return (
+      <div className="flex items-center gap-3">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded border border-border bg-muted/30">
+          <Loader2
+            size={16}
+            className="animate-spin text-muted-foreground/50"
+          />
+        </div>
+        <span className="font-mono text-xs text-muted-foreground">
+          generating preview…
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="flex items-center gap-3">
       <img

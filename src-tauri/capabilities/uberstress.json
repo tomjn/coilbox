@@ -1,7 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "uberstress",
-  "description": "Grants the uberstress plugin's default commands to the main window.",
+  "description": "Grants the uberstress plugin's default commands plus native file dialogs and folder opening to the main window.",
   "windows": ["main"],
-  "permissions": ["coilbox-uberstress:default"]
+  "permissions": [
+    "coilbox-uberstress:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [{ "path": "$APPDATA/**" }]
+    }
+  ]
 }
