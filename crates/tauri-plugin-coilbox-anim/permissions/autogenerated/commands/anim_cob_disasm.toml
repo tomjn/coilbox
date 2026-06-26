@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-anim-cob-disasm"
+description = "Enables the anim_cob_disasm command without any pre-configured scope."
+commands.allow = ["anim_cob_disasm"]
+
+[[permission]]
+identifier = "deny-anim-cob-disasm"
+description = "Denies the anim_cob_disasm command without any pre-configured scope."
+commands.deny = ["anim_cob_disasm"]

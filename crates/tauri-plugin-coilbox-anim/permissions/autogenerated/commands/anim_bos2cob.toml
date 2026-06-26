@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-anim-bos2cob"
+description = "Enables the anim_bos2cob command without any pre-configured scope."
+commands.allow = ["anim_bos2cob"]
+
+[[permission]]
+identifier = "deny-anim-bos2cob"
+description = "Denies the anim_bos2cob command without any pre-configured scope."
+commands.deny = ["anim_bos2cob"]

@@ -177,6 +177,48 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Allows the animation plugin's commands (COB disassembly, BOS->COB compilation, reveal-in-folder).\n#### This default permission set includes:\n\n- `allow-anim-cob-disasm`\n- `allow-anim-bos2cob`\n- `allow-anim-reveal`",
+          "type": "string",
+          "const": "coilbox-anim:default",
+          "markdownDescription": "Allows the animation plugin's commands (COB disassembly, BOS->COB compilation, reveal-in-folder).\n#### This default permission set includes:\n\n- `allow-anim-cob-disasm`\n- `allow-anim-bos2cob`\n- `allow-anim-reveal`"
+        },
+        {
+          "description": "Enables the anim_bos2cob command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-anim:allow-anim-bos2cob",
+          "markdownDescription": "Enables the anim_bos2cob command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the anim_cob_disasm command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-anim:allow-anim-cob-disasm",
+          "markdownDescription": "Enables the anim_cob_disasm command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the anim_reveal command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-anim:allow-anim-reveal",
+          "markdownDescription": "Enables the anim_reveal command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the anim_bos2cob command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-anim:deny-anim-bos2cob",
+          "markdownDescription": "Denies the anim_bos2cob command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the anim_cob_disasm command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-anim:deny-anim-cob-disasm",
+          "markdownDescription": "Denies the anim_cob_disasm command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the anim_reveal command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-anim:deny-anim-reveal",
+          "markdownDescription": "Denies the anim_reveal command without any pre-configured scope."
+        },
+        {
           "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
           "type": "string",
           "const": "coilbox-mapconv:default",

@@ -1,4 +1,5 @@
 import { type FramePlugin, framePlugin } from "@picoframe/frame";
+import animationPlugin from "./animation";
 import mapconvPlugin from "./mapconv";
 // picoframe:imports-start
 import prdownloaderPlugin from "./prdownloader";
@@ -12,5 +13,6 @@ export const plugins: FramePlugin[] = [
   prdownloaderPlugin,
   uberstressPlugin,
   mapconvPlugin,
+  animationPlugin,
   // picoframe:plugins-end
 ];

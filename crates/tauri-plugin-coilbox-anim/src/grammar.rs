@@ -1,0 +1,190 @@
+//! Grammar tables — transcribed verbatim from `bos2cob_py3.py`:
+//! `ELEMENTS_DICT` (L556-565), `ATOMS_DICT` keys (L567-572) and `PARSER_DICT`
+//! (L574-690). The generic parser in `parser.rs` walks these.
+
+/// Keyword terminals (`ELEMENTS_DICT['keyword']`). Matched case-insensitively.
+pub const KEYWORDS: &[&str] = &[
+    "piece", "static", "var", "while", "for", "if", "else", "return", "call", "start", "script",
+    "spin", "stop", "turn", "move", "scale", "wait", "from", "to", "along", "around", "x", "y",
+    "z", "axis", "speed", "now", "accelerate", "decelerate", "hide", "show", "set", "get",
+    "explode", "signal", "mask", "emit", "sfx", "type", "sleep", "attach", "drop", "unit", "rand",
+    "unknown_unit_value", "dont", "cache", "shade", "shadow", "play", "sound",
+];
+
+/// Symbol terminals (`ELEMENTS_DICT['symbol']`). Matched case-insensitively
+/// (so the word-operators `xor`/`or`/`and`/`not` accept any casing).
+pub const SYMBOLS: &[&str] = &[
+    "{", "}", "(", ")", "[", "]", ",", ";", "+", "-", "*", "/", "%", "&", "|", "^", "<", ">", "=",
+    "!", "xor", "or", "and", "not",
+];
+
+// Atom rule names (`ATOMS_DICT` keys: `_integerConstant`, `_floatConstant`,
+// `_stringConstant`, `_identifier`) are matched directly in `parser::parse`.
+
+/// `PARSER_DICT[rule]` → tuple of alternatives, each a tuple of child symbols.
+/// A child symbol ending in `~` means zero-or-more, `?` means optional.
+pub fn rule(name: &str) -> Option<&'static [&'static [&'static str]]> {
+    Some(match name {
+        "_file" => &[&["_declaration~"]],
+        "_declaration" => &[&["_pieceDec"], &["_staticVarDec"], &["_funcDec"]],
+        "_pieceDec" => &[&["piece", "_pieceName", "_commaPiece~", ";"]],
+        "_commaPiece" => &[&[",", "_pieceName"]],
+        "_pieceName" => &[&["_identifier"]],
+        "_staticVarDec" => &[&["static", "-", "var", "_varName", "_commaVar~", ";"]],
+        "_commaVar" => &[&[",", "_varName"]],
+        "_varName" => &[&["_identifier"]],
+        "_funcDec" => &[&["_funcName", "(", "_argumentList", ")", "_statementBlock"]],
+        "_funcName" => &[&["_identifier"]],
+        "_argumentList" => &[&["_arguments?"]],
+        "_arguments" => &[&["_varName", "_commaVar~"]],
+        "_statement" => &[
+            &["_keywordStatement", ";"],
+            &["_varStatement", ";"],
+            &["_ifStatement"],
+            &["_whileStatement"],
+            &["_forStatement"],
+            &["_assignStatement", ";"],
+            &[";"],
+        ],
+        "_assignStatement" => &[
+            &["_varName", "=", "_expression"],
+            &["_incStatement"],
+            &["_decStatement"],
+        ],
+        "_incStatement" => &[&["+", "+", "_varName"]],
+        "_decStatement" => &[&["-", "-", "_varName"]],
+        "_ifStatement" => &[&["if", "(", "_expression", ")", "_statementBlock", "_elseBlock?"]],
+        "_elseBlock" => &[&["else", "_statementBlock"]],
+        "_whileStatement" => &[&["while", "(", "_expression", ")", "_statementBlock"]],
+        "_forStatement" => &[&[
+            "for", "(", "_expression", ";", "_expression", ";", "_expression", ";?", ")",
+            "_statementBlock",
+        ]],
+        "_statementBlock" => &[&["{", "_statement~", "}"], &["_statement"]],
+        "_keywordStatement" => &[
+            &["_callStatement"],
+            &["_startStatement"],
+            &["_spinStatement"],
+            &["_stopSpinStatement"],
+            &["_turnStatement"],
+            &["_moveStatement"],
+            &["_scaleStatement"],
+            &["_waitForTurnStatement"],
+            &["_waitForMoveStatement"],
+            &["_waitForScaleStatement"],
+            &["_emitSfxStatement"],
+            &["_sleepStatement"],
+            &["_hideStatement"],
+            &["_showStatement"],
+            &["_explodeStatement"],
+            &["_signalStatement"],
+            &["_setSignalMaskStatement"],
+            &["_setStatement"],
+            &["_getStatement"],
+            &["_attachUnitStatement"],
+            &["_dropUnitStatement"],
+            &["_returnStatement"],
+            &["_playSoundStatement"],
+            &["_cacheStatement"],
+            &["_dontCacheStatement"],
+            &["_dontShadowStatement"],
+            &["_dontShadeStatement"],
+        ],
+        "_varStatement" => &[&["var", "_arguments"]],
+        "_callStatement" => &[&["call", "-", "script", "_funcName", "(", "_expressionList", ")"]],
+        "_startStatement" => &[&["start", "-", "script", "_funcName", "(", "_expressionList", ")"]],
+        "_spinStatement" => {
+            &[&["spin", "_pieceName", "around", "_axis", "speed", "_expression", "_optionalAcceleration"]]
+        }
+        "_optionalAcceleration" => &[&["_acceleration?"]],
+        "_acceleration" => &[&["accelerate", "_expression"]],
+        "_stopSpinStatement" => {
+            &[&["stop", "-", "spin", "_pieceName", "around", "_axis", "_optionalDeceleration"]]
+        }
+        "_optionalDeceleration" => &[&["_deceleration?"]],
+        "_deceleration" => &[&["decelerate", "_expression"]],
+        "_turnStatement" => &[&["turn", "_pieceName", "to", "_axis", "_expression", "_speedNow"]],
+        "_moveStatement" => &[&["move", "_pieceName", "to", "_axis", "_expression", "_speedNow"]],
+        "_scaleStatement" => &[&["scale", "_pieceName", "to", "_axis", "_expression", "_speedNow"]],
+        "_speedNow" => &[&["now"], &["speed", "_expression"]],
+        "_waitForTurnStatement" => &[&["wait", "-", "for", "-", "turn", "_pieceName", "around", "_axis"]],
+        "_waitForMoveStatement" => &[&["wait", "-", "for", "-", "move", "_pieceName", "along", "_axis"]],
+        "_waitForScaleStatement" => &[&["wait", "-", "for", "-", "scale", "_pieceName", "along", "_axis"]],
+        "_emitSfxStatement" => &[&["emit", "-", "sfx", "_expression", "from", "_pieceName"]],
+        "_sleepStatement" => &[&["sleep", "_expression"]],
+        "_hideStatement" => &[&["hide", "_pieceName"]],
+        "_showStatement" => &[&["show", "_pieceName"]],
+        "_explodeStatement" => &[&["explode", "_pieceName", "type", "_expression"]],
+        "_signalStatement" => &[&["signal", "_expression"]],
+        "_setSignalMaskStatement" => &[&["set", "-", "signal", "-", "mask", "_expression"]],
+        "_setStatement" => &[&["set", "_expression", "to", "_expression"]],
+        "_getStatement" => &[&["_get"]],
+        "_attachUnitStatement" => &[&["attach", "-", "unit", "_expression", "to", "_expression"]],
+        "_dropUnitStatement" => &[&["drop", "-", "unit", "_expression"]],
+        "_returnStatement" => &[&["return", "_optionalExpression"]],
+        "_cacheStatement" => &[&["cache", "_pieceName"]],
+        "_dontCacheStatement" => &[&["dont", "-", "cache", "_pieceName"]],
+        "_dontShadowStatement" => &[&["dont", "-", "shadow", "_pieceName"]],
+        "_dontShadeStatement" => &[&["dont", "-", "shade", "_pieceName"]],
+        "_playSoundStatement" => {
+            &[&["play", "-", "sound", "(", "_stringConstant", "_commaExpression", ")"]]
+        }
+        "_axis" => &[&["_axisLetter", "-", "axis"]],
+        "_axisLetter" => &[&["x"], &["y"], &["z"]],
+        "_expressionList" => &[&["_expressions?"]],
+        "_expressions" => &[&["_expression", "_commaExpression~"]],
+        "_commaExpression" => &[&[",", "_expression"]],
+        "_optionalCommaExpression" => &[&["_commaExpression?"]],
+        "_expression" => &[&["_term", "_opterm~"]],
+        "_optionalExpression" => &[&["_expression?"]],
+        "_term" => &[
+            &["_get"],
+            &["_rand"],
+            &["(", "_expression", ")"],
+            &["_unaryOp", "_term"],
+            &["_varName"],
+            &["_constant"],
+        ],
+        "_get" => &[
+            &[
+                "get", "_term", "(", "_expression", "_optionalCommaExpression",
+                "_optionalCommaExpression", "_optionalCommaExpression", ")",
+            ],
+            &["get", "_term"],
+        ],
+        "_rand" => &[&["rand", "(", "_expression", ",", "_expression", ")"]],
+        "_opterm" => &[&["_op", "_term"]],
+        "_unaryOp" => &[&["!"], &["NOT"]],
+        "_op" => &[
+            &["=", "="],
+            &["<", "="],
+            &[">", "="],
+            &["!", "="],
+            &["^", "^"],
+            &["|", "|"],
+            &["&", "&"],
+            &["+"],
+            &["-"],
+            &["*"],
+            &["/"],
+            &["%"],
+            &["&"],
+            &["|"],
+            &["^"],
+            &["<"],
+            &[">"],
+            &["XOR"],
+            &["OR"],
+            &["AND"],
+        ],
+        "_constant" => &[
+            &["<", "_signedFloatConstant", ">"],
+            &["[", "_signedFloatConstant", "]"],
+            &["_signedFloatConstant"],
+            &["_signedIntegerConstant"],
+        ],
+        "_signedFloatConstant" => &[&["-", "_floatConstant"], &["_floatConstant"]],
+        "_signedIntegerConstant" => &[&["-", "_integerConstant"], &["_integerConstant"]],
+        _ => return None,
+    })
+}

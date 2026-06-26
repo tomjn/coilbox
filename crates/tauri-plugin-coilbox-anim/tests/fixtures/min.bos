@@ -1,0 +1,19 @@
+piece base, turret;
+
+static-var foo;
+
+Create()
+{
+	foo = 1 + 2;
+	hide turret;
+	show base;
+}
+
+Killed(severity, corpsetype)
+{
+	if (severity < 50)
+	{
+		explode base type 1;
+	}
+	return (0);
+}

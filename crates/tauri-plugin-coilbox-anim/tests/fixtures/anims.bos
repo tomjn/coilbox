@@ -1,0 +1,25 @@
+piece base, turret, barrel;
+static-var s;
+
+Anims()
+{
+	spin barrel around y-axis speed <300> accelerate <10>;
+	stop-spin barrel around y-axis decelerate <5>;
+	scale base to x-axis [2] speed [1];
+	wait-for-move base along y-axis;
+	wait-for-scale base along x-axis;
+	cache turret;
+	dont-cache turret;
+	dont-shade turret;
+	dont-shadow turret;
+	move turret to z-axis [5] speed [2];
+	attach-unit s to 1;
+	drop-unit s;
+	s = s == 2;
+	s = s != 3;
+	s = s <= 4;
+	s = !s;
+	s = s and 1;
+	s = s or 0;
+	s = s xor 1;
+}

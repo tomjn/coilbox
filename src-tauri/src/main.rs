@@ -82,6 +82,7 @@ fn main() {
     builder = builder.plugin(tauri_plugin_coilbox_prdownloader::init());
     builder = builder.plugin(tauri_plugin_coilbox_uberstress::init());
     builder = builder.plugin(tauri_plugin_coilbox_mapconv::init());
+    builder = builder.plugin(tauri_plugin_coilbox_anim::init());
     // picoframe:plugins-end
     builder
         .run(tauri::generate_context!())

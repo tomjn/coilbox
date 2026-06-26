@@ -1,0 +1,67 @@
+#define ACTIVATION 1
+#define UNIT_HEIGHT 2
+#define PIECE_XZ 3
+
+piece base, turret, barrel, flare;
+
+static-var gun, ammo, restore_delay;
+
+Create()
+{
+	gun = 0;
+	restore_delay = 4 / 2;
+	hide flare;
+	spin barrel around y-axis speed <300>;
+	move base to y-axis [10] now;
+	turn turret to y-axis <90> speed <60>;
+}
+
+AimWeapon1(heading, pitch)
+{
+	signal 2;
+	set-signal-mask 2;
+	turn turret to y-axis heading speed <120>;
+	turn barrel to x-axis pitch speed <90>;
+	wait-for-turn turret around y-axis;
+	wait-for-turn barrel around x-axis;
+	++ammo;
+	return (1);
+}
+
+FireWeapon1()
+{
+	emit-sfx 1024 from flare;
+	gun = gun + 1 * 2;
+	if (gun >= 4)
+	{
+		gun = 0;
+	}
+	else
+	{
+		gun = gun + 1;
+	}
+	while (ammo > 0)
+	{
+		--ammo;
+	}
+	start-script RestoreAfterDelay(restore_delay, gun);
+	sleep 350;
+}
+
+RestoreAfterDelay(delay, which)
+{
+	set ACTIVATION to 1;
+	turn turret to y-axis 0 speed <30>;
+	call-script SomeFunc(delay, which, 7);
+}
+
+SomeFunc(a, b, c)
+{
+	gun = rand(1, 10);
+	gun = get UNIT_HEIGHT;
+	get PIECE_XZ(0, 0, 0);
+	explode base type 1;
+	gun = !ammo;
+	gun = 2.5;
+	gun = 1 / 2;
+}
