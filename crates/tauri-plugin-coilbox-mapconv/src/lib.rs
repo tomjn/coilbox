@@ -250,29 +250,105 @@ async fn mc_read_mapinfo(path: String) -> CliResult {
     }
 }
 
+/// A cached thumbnail: the command's full result, stored as one JSON file per
+/// cache key so a restart can return it without re-decoding the source.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ThumbEntry {
+    width: u32,
+    height: u32,
+    thumb: String,
+}
+
+/// Cache key for a thumbnail — stable across runs, but invalidated when the
+/// source file's mtime or size changes (so an edited/recompiled image refreshes).
+/// `None` when the file can't be stat'd, which simply disables caching for it.
+fn thumb_cache_key(path: &str, max: u32) -> Option<String> {
+    use std::hash::{Hash, Hasher};
+    let meta = std::fs::metadata(path).ok()?;
+    let mtime = meta
+        .modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    path.hash(&mut h);
+    max.hash(&mut h);
+    mtime.hash(&mut h);
+    meta.len().hash(&mut h);
+    Some(format!("{:016x}", h.finish()))
+}
+
+/// Decode `path` into (width, height, thumbnail-as-data-URL).
+fn generate_thumb(path: &str, max: u32) -> Result<(u32, u32, String), String> {
+    let img = image::open(path).map_err(|e| format!("could not read image: {e}"))?;
+    let (width, height) = img.dimensions();
+    let thumb = img.thumbnail(max, max);
+    let mut buf = std::io::Cursor::new(Vec::new());
+    thumb
+        .write_to(&mut buf, image::ImageFormat::Png)
+        .map_err(|e| format!("could not encode thumbnail: {e}"))?;
+    let data_url = format!("data:image/png;base64,{}", base64_encode(&buf.into_inner()));
+    Ok((width, height, data_url))
+}
+
+/// Thumbnail with an on-disk cache (one JSON file per path+mtime+size+max) under
+/// `cache_dir`, so a cold start doesn't re-decode every source image. Any cache
+/// miss or failure falls back to a plain decode, then best-effort writes the
+/// result back.
+fn image_info_cached(
+    path: &str,
+    max: u32,
+    cache_dir: Option<&Path>,
+) -> Result<(u32, u32, String), String> {
+    let cache_file = cache_dir
+        .zip(thumb_cache_key(path, max))
+        .map(|(dir, key)| dir.join(format!("{key}.json")));
+
+    if let Some(file) = &cache_file {
+        if let Ok(bytes) = std::fs::read(file) {
+            if let Ok(e) = serde_json::from_slice::<ThumbEntry>(&bytes) {
+                return Ok((e.width, e.height, e.thumb));
+            }
+        }
+    }
+
+    let (width, height, thumb) = generate_thumb(path, max)?;
+
+    if let Some(file) = &cache_file {
+        if let Some(dir) = file.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if let Ok(bytes) = serde_json::to_vec(&ThumbEntry {
+            width,
+            height,
+            thumb: thumb.clone(),
+        }) {
+            let _ = std::fs::write(file, bytes);
+        }
+    }
+    Ok((width, height, thumb))
+}
+
 /// `mc_image_info` — decode the image at `path` and return its true pixel
 /// dimensions plus a small downscaled PNG thumbnail as a `data:` URL. Lets the UI
 /// preview chosen source assets and validate texture sizing (multiple of 1024)
 /// up front, without an asset-protocol grant. `max` is the thumbnail's longest
 /// side (default 320; the 3D preview asks for larger so the heightmap displaces
-/// with enough detail). Runs the decode off the async runtime since large
-/// textures are CPU/IO heavy.
+/// with enough detail). Results are cached on disk (keyed by file mtime/size) so
+/// reopening a page — or relaunching the app — doesn't re-decode large textures.
 #[tauri::command]
-async fn mc_image_info(path: String, max: Option<u32>) -> CliResult {
+async fn mc_image_info<R: Runtime>(app: AppHandle<R>, path: String, max: Option<u32>) -> CliResult {
     let max = max.unwrap_or(320).max(1);
-    let result =
-        tauri::async_runtime::spawn_blocking(move || -> Result<(u32, u32, String), String> {
-            let img = image::open(&path).map_err(|e| format!("could not read image: {e}"))?;
-            let (width, height) = img.dimensions();
-            let thumb = img.thumbnail(max, max);
-            let mut buf = std::io::Cursor::new(Vec::new());
-            thumb
-                .write_to(&mut buf, image::ImageFormat::Png)
-                .map_err(|e| format!("could not encode thumbnail: {e}"))?;
-            let data_url = format!("data:image/png;base64,{}", base64_encode(&buf.into_inner()));
-            Ok((width, height, data_url))
-        })
-        .await;
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .ok()
+        .map(|d| d.join("mapconv-thumbs"));
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        image_info_cached(&path, max, cache_dir.as_deref())
+    })
+    .await;
     match result {
         Ok(Ok((width, height, thumb))) => {
             CliResult::ok(json!({ "width": width, "height": height, "thumb": thumb }))
@@ -335,6 +411,26 @@ async fn mc_compile<R: Runtime>(
 /// Resolve the decompile target into a `(directory, mapfile)` pair, extracting a
 /// `.sdz`/`.sd7` archive next to itself first. Runs on the blocking thread.
 fn prepare_decompile(input: &Path, on_log: &Channel<LogLine>) -> Result<(PathBuf, String), String> {
+    // A directory input (e.g. a `.sdd` directory archive, or any extracted map
+    // tree) is used in place — no extraction, just locate the inner `.smf`.
+    if input.is_dir() {
+        let smf = archive::find_smf(input).ok_or("no .smf found inside the directory")?;
+        let _ = on_log.send(LogLine {
+            stream: "out".into(),
+            line: format!("Found map {}", smf.display()),
+        });
+        let dir = smf
+            .parent()
+            .map(|p| p.to_path_buf())
+            .ok_or("map file has no parent directory")?;
+        let name = smf
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or("invalid map filename")?
+            .to_string();
+        return Ok((dir, name));
+    }
+
     let ext = input
         .extension()
         .and_then(|e| e.to_str())
@@ -347,7 +443,7 @@ fn prepare_decompile(input: &Path, on_log: &Channel<LogLine>) -> Result<(PathBuf
             let dest = input
                 .parent()
                 .unwrap_or_else(|| Path::new("."))
-                .join(format!("{stem}-decompiled"));
+                .join(format!("{stem}.sdd"));
             let _ = on_log.send(LogLine {
                 stream: "out".into(),
                 line: format!("Extracting {}…", input.display()),
@@ -362,7 +458,7 @@ fn prepare_decompile(input: &Path, on_log: &Channel<LogLine>) -> Result<(PathBuf
         }
         other => {
             return Err(format!(
-                "unsupported input: .{other} (expected .smf, .sdz or .sd7)"
+                "unsupported input: .{other} (expected .smf, .sdz, .sd7 or a .sdd directory)"
             ))
         }
     };

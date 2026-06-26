@@ -1,5 +1,12 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Hammer, Map as MapIcon, PackageOpen } from "lucide-react";
+import {
+  BookOpen,
+  Code2,
+  Hammer,
+  LayoutGrid,
+  Map as MapIcon,
+  PackageOpen,
+} from "lucide-react";
 import MapconvSettings from "./pages/SettingsSection";
 
 /**
@@ -23,24 +30,54 @@ const mapconvPlugin: FramePlugin = {
       order: 40,
       items: [
         {
+          id: "mapconv.projects",
+          label: "Projects",
+          to: "/mapconv/projects",
+          order: 0,
+          icon: LayoutGrid,
+        },
+        {
           id: "mapconv.compile",
           label: "Compile",
           to: "/mapconv",
           end: true,
-          order: 0,
+          order: 1,
           icon: Hammer,
         },
         {
           id: "mapconv.decompile",
           label: "Decompile",
           to: "/mapconv/decompile",
-          order: 1,
+          order: 2,
           icon: PackageOpen,
+        },
+        // External reference — home launcher only (sidebar: false), opened in
+        // the system browser via the Tauri opener.
+        {
+          id: "mapconv.mapping-wiki",
+          label: "Mapping Wiki",
+          href: "https://springrts.com/wiki/Mapdev:Main",
+          icon: BookOpen,
+          sidebar: false,
+          order: 3,
+        },
+        {
+          id: "mapconv.s3o-blender-tools",
+          label: "S3O Blender Tools",
+          href: "https://github.com/ChrisFloofyKitsune/s3o-blender-tools/",
+          icon: Code2,
+          sidebar: false,
+          order: 4,
         },
       ],
     },
   ],
   routes: [
+    {
+      path: "mapconv/projects",
+      lazy: () => import("./pages/ProjectsPage"),
+      crumb: "Projects",
+    },
     {
       path: "mapconv",
       lazy: () => import("./pages/CompilePage"),

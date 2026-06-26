@@ -26,6 +26,8 @@ import {
   mcSuggestSources,
 } from "../bindings";
 import { useMapconvConfig } from "../config";
+import { useCompileDraft } from "../drafts";
+import { useMapProjects } from "../projects";
 import AdvancedOptions, {
   type AdvancedCompileOpts,
   defaultAdvanced,
@@ -60,6 +62,12 @@ function dirname(p: string): string {
   return i >= 0 ? p.slice(0, i) : "";
 }
 
+/** The last path segment (handles both / and \ separators). */
+function basename(p: string): string {
+  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  return i >= 0 ? p.slice(i + 1) : p;
+}
+
 /** Parse a numeric form string, falling back when empty/invalid. */
 function numOr(s: string, fallback: number): number {
   const n = Number(s);
@@ -90,14 +98,22 @@ function countAdvanced(a: AdvancedCompileOpts): number {
 /** Build a `.smf`/`.smt` from source images via the `mapcompile` sidecar. */
 export default function CompilePage() {
   const [cfg, setCfg] = useMapconvConfig();
+  const [draft, setDraft] = useCompileDraft();
+  const { upsertProject } = useMapProjects();
   const location = useLocation();
 
-  const [maintexture, setMaintexture] = useState("");
-  const [outDir, setOutDir] = useState("");
-  const [outSuffix, setOutSuffix] = useState("");
-  const [ct, setCt] = useState(() => String(cfg.defaultCompressionType));
-  const [advanced, setAdvanced] =
-    useState<AdvancedCompileOpts>(defaultAdvanced);
+  // Seed from the persisted draft so the form (and its path-driven preview)
+  // survives navigation and restarts. The debounced effect below writes it back.
+  const [maintexture, setMaintexture] = useState(() => draft.maintexture);
+  const [outDir, setOutDir] = useState(() => draft.outDir);
+  const [outSuffix, setOutSuffix] = useState(() => draft.outSuffix);
+  const [ct, setCt] = useState(
+    () => draft.ct ?? String(cfg.defaultCompressionType),
+  );
+  const [advanced, setAdvanced] = useState<AdvancedCompileOpts>(() => ({
+    ...defaultAdvanced,
+    ...draft.advanced,
+  }));
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [textureInfo, setTextureInfo] = useState<{
     width: number;
@@ -140,6 +156,16 @@ export default function CompilePage() {
     logEndRef.current?.scrollIntoView({ block: "end" });
   }, [logLines]);
 
+  // Persist the working draft (debounced — one write after typing settles, not
+  // per keystroke). Transient run state (logs, result, probe) is intentionally
+  // not persisted.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setDraft({ maintexture, outDir, outSuffix, ct, advanced });
+    }, 400);
+    return () => clearTimeout(id);
+  }, [maintexture, outDir, outSuffix, ct, advanced, setDraft]);
+
   const canRun =
     !running && maintexture !== "" && outDir !== "" && outSuffix.trim() !== "";
 
@@ -175,8 +201,18 @@ export default function CompilePage() {
     const onLog = new Channel<LogLine>();
     onLog.onmessage = (line) => setLogLines((prev) => [...prev, line]);
     try {
-      const res = await mcCompile({ opts: buildOpts(), outDir, runId, onLog });
+      const opts = buildOpts();
+      const res = await mcCompile({ opts, outDir, runId, onLog });
       setResult({ smfPath: res.smfPath });
+      // Record (or refresh) this map as a project, remembering its compile
+      // options. The source texture is a reliable preview for compile projects.
+      upsertProject({
+        folderPath: outDir,
+        name: outSuffix.trim() || basename(outDir),
+        kind: "compile",
+        compileOpts: opts,
+        previewPath: maintexture || undefined,
+      });
       if (cfg.rememberDirs)
         setCfg({
           ...cfg,
@@ -257,12 +293,44 @@ export default function CompilePage() {
     }
   }
 
-  // Arriving from the Decompile page's "Recompile": seed the texture (+ siblings
-  // via pickTexture) and output folder from the freshly decompiled directory.
+  // Seed from incoming navigation state (once, on mount):
+  // - `seedOpts`: a Projects "Compile" action — restore the full form from a
+  //   project's remembered options.
+  // - `recompileDir`: the Decompile page's "Recompile" (or a decompiled
+  //   project) — seed the texture (+ siblings via pickTexture) and output folder.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount for the incoming navigation state
   useEffect(() => {
-    const dir = (location.state as { recompileDir?: string } | null)
-      ?.recompileDir;
+    const st = location.state as {
+      recompileDir?: string;
+      seedOpts?: CompileOpts;
+      seedOutDir?: string;
+    } | null;
+    if (st?.seedOpts) {
+      const o = st.seedOpts;
+      // Setting the texture re-renders the PathField preview, which re-fetches
+      // the dimensions the 3D preview needs — no pickTexture (it would clobber
+      // the remembered sibling paths by re-prefilling).
+      setMaintexture(o.maintexture);
+      setOutSuffix(o.outSuffix);
+      if (st.seedOutDir) setOutDir(st.seedOutDir);
+      if (o.compressionType) setCt(String(o.compressionType));
+      setAdvanced({
+        heightmap: o.heightmap ?? "",
+        metalmap: o.metalmap ?? "",
+        typemap: o.typemap ?? "",
+        minimap: o.minimap ?? "",
+        vegmap: o.vegmap ?? "",
+        features: o.features ?? "",
+        maxh: o.maxh != null ? String(o.maxh) : "",
+        minh: o.minh != null ? String(o.minh) : "",
+        th: o.th != null ? String(o.th) : "",
+        ccount: o.ccount != null ? String(o.ccount) : "",
+        noclamp: o.noclamp,
+        smooth: o.smooth,
+      });
+      return;
+    }
+    const dir = st?.recompileDir;
     if (!dir) return;
     const sep = dir.includes("\\") ? "\\" : "/";
     const i = Math.max(dir.lastIndexOf("/"), dir.lastIndexOf("\\"));
@@ -434,15 +502,17 @@ export default function CompilePage() {
 
         {/* Right: live preview + log + result */}
         <div className="flex min-h-0 min-w-0 flex-col">
-          {maintexture !== "" && advanced.heightmap !== "" && textureInfo && (
+          {maintexture !== "" && advanced.heightmap !== "" && (
             <div className="border-b border-border bg-card/50 p-4">
               <MapPreview3D
                 heightmapPath={advanced.heightmap}
                 texturePath={maintexture}
                 minHeight={numOr(advanced.minh, 0)}
                 maxHeight={numOr(advanced.maxh, 1)}
-                worldWidth={textureInfo.width}
-                worldHeight={textureInfo.height}
+                // Dimensions arrive with the texture decode; the preview shows a
+                // loading state until they're known (worldWidth/Height > 0).
+                worldWidth={textureInfo?.width ?? 0}
+                worldHeight={textureInfo?.height ?? 0}
                 appearance={appearance}
               />
             </div>
