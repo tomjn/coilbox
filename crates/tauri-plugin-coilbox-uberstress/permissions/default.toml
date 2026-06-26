@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL)."
+description = "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL, results dir, import/export)."
 permissions = [
   "allow-us-scenarios",
   "allow-us-run",
@@ -11,4 +11,7 @@ permissions = [
   "allow-us-settings-load",
   "allow-us-settings-save",
   "allow-us-seed-sql",
+  "allow-us-results-dir",
+  "allow-us-export-report",
+  "allow-us-import-report",
 ]

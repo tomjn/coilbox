@@ -12,7 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import {
   type LogLine,
   type Report,
@@ -163,6 +163,7 @@ export default function RunPage() {
   const [cfg] = useUberstressConfig();
   const drawer = useDrawer();
   const navigate = useNavigate();
+  const location = useLocation();
   const [scenarios, setScenarios] = useState<string[]>([]);
 
   const [mode, setMode] = useState<"load" | "bench">("load");
@@ -211,6 +212,66 @@ export default function RunPage() {
       .then(({ scenarios }) => setScenarios(scenarios))
       .catch(() => {});
   }, []);
+
+  // Prefill from a History "Re-run": apply the saved scenario, target, and
+  // params once, then let the user pick the server and launch.
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current) return;
+    const rr = (
+      location.state as {
+        rerun?: {
+          scenario: string;
+          addr: string;
+          params: Record<string, string>;
+        };
+      } | null
+    )?.rerun;
+    if (!rr) return;
+    prefilled.current = true;
+
+    setScenario(rr.scenario);
+    const match = cfg.servers.find((s) => s.addr === rr.addr);
+    if (match) {
+      setServerChoice(match.id);
+    } else if (rr.addr) {
+      setServerChoice(MANUAL);
+      setManualAddr(rr.addr);
+    }
+
+    const p = rr.params ?? {};
+    const setNum = (k: string, set: (n: number) => void) => {
+      const v = p[k];
+      if (v != null && v !== "") set(Number(v));
+    };
+    const setStr = (k: string, set: (s: string) => void) => {
+      const v = p[k];
+      if (v != null) set(v);
+    };
+    setNum("conns", setConns);
+    setStr("duration", setDuration);
+    setStr("ramp", setRamp);
+    if (p.register != null) setRegister(p.register !== "false");
+    setStr("user_prefix", setUserPrefix);
+    setStr("password", setPassword);
+    setStr("channel", setChannel);
+    setNum("channels", setChannels);
+    setStr("say_interval", setSayInterval);
+    setNum("battle_hosts", setBattleHosts);
+    setNum("pingers", setPingers);
+    setStr("ping_interval", setPingInterval);
+    const advancedKeys = [
+      "user_prefix",
+      "password",
+      "channel",
+      "channels",
+      "say_interval",
+      "battle_hosts",
+      "pingers",
+      "ping_interval",
+    ];
+    if (advancedKeys.some((k) => p[k] != null)) setShowAdvanced(true);
+  }, [location.state, cfg.servers]);
 
   // Auto-scroll the log to the newest line.
   // biome-ignore lint/correctness/useExhaustiveDependencies: logLines is the trigger that should re-run the scroll, not read in the body

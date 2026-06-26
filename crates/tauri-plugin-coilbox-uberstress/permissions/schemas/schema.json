@@ -307,6 +307,18 @@
           "markdownDescription": "Denies the us_cancel command without any pre-configured scope."
         },
         {
+          "description": "Enables the us_export_report command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-us-export-report",
+          "markdownDescription": "Enables the us_export_report command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_export_report command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-us-export-report",
+          "markdownDescription": "Denies the us_export_report command without any pre-configured scope."
+        },
+        {
           "description": "Enables the us_history command without any pre-configured scope.",
           "type": "string",
           "const": "allow-us-history",
@@ -319,6 +331,18 @@
           "markdownDescription": "Denies the us_history command without any pre-configured scope."
         },
         {
+          "description": "Enables the us_import_report command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-us-import-report",
+          "markdownDescription": "Enables the us_import_report command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_import_report command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-us-import-report",
+          "markdownDescription": "Denies the us_import_report command without any pre-configured scope."
+        },
+        {
           "description": "Enables the us_report command without any pre-configured scope.",
           "type": "string",
           "const": "allow-us-report",
@@ -329,6 +353,18 @@
           "type": "string",
           "const": "deny-us-report",
           "markdownDescription": "Denies the us_report command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the us_results_dir command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-us-results-dir",
+          "markdownDescription": "Enables the us_results_dir command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_results_dir command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-us-results-dir",
+          "markdownDescription": "Denies the us_results_dir command without any pre-configured scope."
         },
         {
           "description": "Enables the us_run command without any pre-configured scope.",
@@ -391,10 +427,10 @@
           "markdownDescription": "Denies the us_settings_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`",
+          "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL, results dir, import/export).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`\n- `allow-us-results-dir`\n- `allow-us-export-report`\n- `allow-us-import-report`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`"
+          "markdownDescription": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL, results dir, import/export).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`\n- `allow-us-results-dir`\n- `allow-us-export-report`\n- `allow-us-import-report`"
         }
       ]
     }

@@ -135,6 +135,174 @@
           "type": "object",
           "allOf": [
             {
+              "if": {
+                "properties": {
+                  "identifier": {
+                    "anyOf": [
+                      {
+                        "description": "This permission set allows opening `mailto:`, `tel:`, `https://` and `http://` urls using their default application\nas well as reveal file in directories using default file explorer\n#### This default permission set includes:\n\n- `allow-open-url`\n- `allow-reveal-item-in-dir`\n- `allow-default-urls`",
+                        "type": "string",
+                        "const": "opener:default",
+                        "markdownDescription": "This permission set allows opening `mailto:`, `tel:`, `https://` and `http://` urls using their default application\nas well as reveal file in directories using default file explorer\n#### This default permission set includes:\n\n- `allow-open-url`\n- `allow-reveal-item-in-dir`\n- `allow-default-urls`"
+                      },
+                      {
+                        "description": "This enables opening `mailto:`, `tel:`, `https://` and `http://` urls using their default application.",
+                        "type": "string",
+                        "const": "opener:allow-default-urls",
+                        "markdownDescription": "This enables opening `mailto:`, `tel:`, `https://` and `http://` urls using their default application."
+                      },
+                      {
+                        "description": "Enables the open_path command without any pre-configured scope.",
+                        "type": "string",
+                        "const": "opener:allow-open-path",
+                        "markdownDescription": "Enables the open_path command without any pre-configured scope."
+                      },
+                      {
+                        "description": "Enables the open_url command without any pre-configured scope.",
+                        "type": "string",
+                        "const": "opener:allow-open-url",
+                        "markdownDescription": "Enables the open_url command without any pre-configured scope."
+                      },
+                      {
+                        "description": "Enables the reveal_item_in_dir command without any pre-configured scope.",
+                        "type": "string",
+                        "const": "opener:allow-reveal-item-in-dir",
+                        "markdownDescription": "Enables the reveal_item_in_dir command without any pre-configured scope."
+                      },
+                      {
+                        "description": "Denies the open_path command without any pre-configured scope.",
+                        "type": "string",
+                        "const": "opener:deny-open-path",
+                        "markdownDescription": "Denies the open_path command without any pre-configured scope."
+                      },
+                      {
+                        "description": "Denies the open_url command without any pre-configured scope.",
+                        "type": "string",
+                        "const": "opener:deny-open-url",
+                        "markdownDescription": "Denies the open_url command without any pre-configured scope."
+                      },
+                      {
+                        "description": "Denies the reveal_item_in_dir command without any pre-configured scope.",
+                        "type": "string",
+                        "const": "opener:deny-reveal-item-in-dir",
+                        "markdownDescription": "Denies the reveal_item_in_dir command without any pre-configured scope."
+                      }
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "allow": {
+                    "items": {
+                      "title": "OpenerScopeEntry",
+                      "description": "Opener scope entry.",
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "url"
+                          ],
+                          "properties": {
+                            "app": {
+                              "description": "An application to open this url with, for example: firefox.",
+                              "allOf": [
+                                {
+                                  "$ref": "#/definitions/Application"
+                                }
+                              ]
+                            },
+                            "url": {
+                              "description": "A URL that can be opened by the webview when using the Opener APIs.\n\nWildcards can be used following the UNIX glob pattern.\n\nExamples:\n\n- \"https://*\" : allows all HTTPS origin\n\n- \"https://*.github.com/tauri-apps/tauri\": allows any subdomain of \"github.com\" with the \"tauri-apps/api\" path\n\n- \"https://myapi.service.com/users/*\": allows access to any URLs that begins with \"https://myapi.service.com/users/\"",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "path"
+                          ],
+                          "properties": {
+                            "app": {
+                              "description": "An application to open this path with, for example: xdg-open.",
+                              "allOf": [
+                                {
+                                  "$ref": "#/definitions/Application"
+                                }
+                              ]
+                            },
+                            "path": {
+                              "description": "A path that can be opened by the webview when using the Opener APIs.\n\nThe pattern can start with a variable that resolves to a system base directory. The variables are: `$AUDIO`, `$CACHE`, `$CONFIG`, `$DATA`, `$LOCALDATA`, `$DESKTOP`, `$DOCUMENT`, `$DOWNLOAD`, `$EXE`, `$FONT`, `$HOME`, `$PICTURE`, `$PUBLIC`, `$RUNTIME`, `$TEMPLATE`, `$VIDEO`, `$RESOURCE`, `$APP`, `$LOG`, `$TEMP`, `$APPCONFIG`, `$APPDATA`, `$APPLOCALDATA`, `$APPCACHE`, `$APPLOG`.",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "deny": {
+                    "items": {
+                      "title": "OpenerScopeEntry",
+                      "description": "Opener scope entry.",
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "url"
+                          ],
+                          "properties": {
+                            "app": {
+                              "description": "An application to open this url with, for example: firefox.",
+                              "allOf": [
+                                {
+                                  "$ref": "#/definitions/Application"
+                                }
+                              ]
+                            },
+                            "url": {
+                              "description": "A URL that can be opened by the webview when using the Opener APIs.\n\nWildcards can be used following the UNIX glob pattern.\n\nExamples:\n\n- \"https://*\" : allows all HTTPS origin\n\n- \"https://*.github.com/tauri-apps/tauri\": allows any subdomain of \"github.com\" with the \"tauri-apps/api\" path\n\n- \"https://myapi.service.com/users/*\": allows access to any URLs that begins with \"https://myapi.service.com/users/\"",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "path"
+                          ],
+                          "properties": {
+                            "app": {
+                              "description": "An application to open this path with, for example: xdg-open.",
+                              "allOf": [
+                                {
+                                  "$ref": "#/definitions/Application"
+                                }
+                              ]
+                            },
+                            "path": {
+                              "description": "A path that can be opened by the webview when using the Opener APIs.\n\nThe pattern can start with a variable that resolves to a system base directory. The variables are: `$AUDIO`, `$CACHE`, `$CONFIG`, `$DATA`, `$LOCALDATA`, `$DESKTOP`, `$DOCUMENT`, `$DOWNLOAD`, `$EXE`, `$FONT`, `$HOME`, `$PICTURE`, `$PUBLIC`, `$RUNTIME`, `$TEMPLATE`, `$VIDEO`, `$RESOURCE`, `$APP`, `$LOG`, `$TEMP`, `$APPCONFIG`, `$APPDATA`, `$APPLOCALDATA`, `$APPCACHE`, `$APPLOG`.",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "properties": {
+                "identifier": {
+                  "description": "Identifier of the permission or permission set.",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/Identifier"
+                    }
+                  ]
+                }
+              }
+            },
+            {
               "properties": {
                 "identifier": {
                   "description": "Identifier of the permission or permission set.",
@@ -177,10 +345,10 @@
       "description": "Permission identifier",
       "oneOf": [
         {
-          "description": "Allows the animation plugin's commands (COB disassembly, BOS->COB compilation, reveal-in-folder).\n#### This default permission set includes:\n\n- `allow-anim-cob-disasm`\n- `allow-anim-bos2cob`\n- `allow-anim-reveal`",
+          "description": "Allows the animation plugin's commands (COB disassembly and BOS->COB compilation).\n#### This default permission set includes:\n\n- `allow-anim-cob-disasm`\n- `allow-anim-bos2cob`",
           "type": "string",
           "const": "coilbox-anim:default",
-          "markdownDescription": "Allows the animation plugin's commands (COB disassembly, BOS->COB compilation, reveal-in-folder).\n#### This default permission set includes:\n\n- `allow-anim-cob-disasm`\n- `allow-anim-bos2cob`\n- `allow-anim-reveal`"
+          "markdownDescription": "Allows the animation plugin's commands (COB disassembly and BOS->COB compilation).\n#### This default permission set includes:\n\n- `allow-anim-cob-disasm`\n- `allow-anim-bos2cob`"
         },
         {
           "description": "Enables the anim_bos2cob command without any pre-configured scope.",
@@ -195,12 +363,6 @@
           "markdownDescription": "Enables the anim_cob_disasm command without any pre-configured scope."
         },
         {
-          "description": "Enables the anim_reveal command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-anim:allow-anim-reveal",
-          "markdownDescription": "Enables the anim_reveal command without any pre-configured scope."
-        },
-        {
           "description": "Denies the anim_bos2cob command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-anim:deny-anim-bos2cob",
@@ -211,12 +373,6 @@
           "type": "string",
           "const": "coilbox-anim:deny-anim-cob-disasm",
           "markdownDescription": "Denies the anim_cob_disasm command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the anim_reveal command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-anim:deny-anim-reveal",
-          "markdownDescription": "Denies the anim_reveal command without any pre-configured scope."
         },
         {
           "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
@@ -411,10 +567,10 @@
           "markdownDescription": "Denies the prd_versions command without any pre-configured scope."
         },
         {
-          "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`",
+          "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL, results dir, import/export).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`\n- `allow-us-results-dir`\n- `allow-us-export-report`\n- `allow-us-import-report`",
           "type": "string",
           "const": "coilbox-uberstress:default",
-          "markdownDescription": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`"
+          "markdownDescription": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL, results dir, import/export).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`\n- `allow-us-results-dir`\n- `allow-us-export-report`\n- `allow-us-import-report`"
         },
         {
           "description": "Enables the us_cancel command without any pre-configured scope.",
@@ -423,16 +579,34 @@
           "markdownDescription": "Enables the us_cancel command without any pre-configured scope."
         },
         {
+          "description": "Enables the us_export_report command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-export-report",
+          "markdownDescription": "Enables the us_export_report command without any pre-configured scope."
+        },
+        {
           "description": "Enables the us_history command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-uberstress:allow-us-history",
           "markdownDescription": "Enables the us_history command without any pre-configured scope."
         },
         {
+          "description": "Enables the us_import_report command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-import-report",
+          "markdownDescription": "Enables the us_import_report command without any pre-configured scope."
+        },
+        {
           "description": "Enables the us_report command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-uberstress:allow-us-report",
           "markdownDescription": "Enables the us_report command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the us_results_dir command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:allow-us-results-dir",
+          "markdownDescription": "Enables the us_results_dir command without any pre-configured scope."
         },
         {
           "description": "Enables the us_run command without any pre-configured scope.",
@@ -471,16 +645,34 @@
           "markdownDescription": "Denies the us_cancel command without any pre-configured scope."
         },
         {
+          "description": "Denies the us_export_report command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-export-report",
+          "markdownDescription": "Denies the us_export_report command without any pre-configured scope."
+        },
+        {
           "description": "Denies the us_history command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-uberstress:deny-us-history",
           "markdownDescription": "Denies the us_history command without any pre-configured scope."
         },
         {
+          "description": "Denies the us_import_report command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-import-report",
+          "markdownDescription": "Denies the us_import_report command without any pre-configured scope."
+        },
+        {
           "description": "Denies the us_report command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-uberstress:deny-us-report",
           "markdownDescription": "Denies the us_report command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the us_results_dir command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-uberstress:deny-us-results-dir",
+          "markdownDescription": "Denies the us_results_dir command without any pre-configured scope."
         },
         {
           "description": "Denies the us_run command without any pre-configured scope.",
@@ -2593,6 +2785,54 @@
           "type": "string",
           "const": "dialog:deny-save",
           "markdownDescription": "Denies the save command without any pre-configured scope."
+        },
+        {
+          "description": "This permission set allows opening `mailto:`, `tel:`, `https://` and `http://` urls using their default application\nas well as reveal file in directories using default file explorer\n#### This default permission set includes:\n\n- `allow-open-url`\n- `allow-reveal-item-in-dir`\n- `allow-default-urls`",
+          "type": "string",
+          "const": "opener:default",
+          "markdownDescription": "This permission set allows opening `mailto:`, `tel:`, `https://` and `http://` urls using their default application\nas well as reveal file in directories using default file explorer\n#### This default permission set includes:\n\n- `allow-open-url`\n- `allow-reveal-item-in-dir`\n- `allow-default-urls`"
+        },
+        {
+          "description": "This enables opening `mailto:`, `tel:`, `https://` and `http://` urls using their default application.",
+          "type": "string",
+          "const": "opener:allow-default-urls",
+          "markdownDescription": "This enables opening `mailto:`, `tel:`, `https://` and `http://` urls using their default application."
+        },
+        {
+          "description": "Enables the open_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "opener:allow-open-path",
+          "markdownDescription": "Enables the open_path command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the open_url command without any pre-configured scope.",
+          "type": "string",
+          "const": "opener:allow-open-url",
+          "markdownDescription": "Enables the open_url command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the reveal_item_in_dir command without any pre-configured scope.",
+          "type": "string",
+          "const": "opener:allow-reveal-item-in-dir",
+          "markdownDescription": "Enables the reveal_item_in_dir command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the open_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "opener:deny-open-path",
+          "markdownDescription": "Denies the open_path command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the open_url command without any pre-configured scope.",
+          "type": "string",
+          "const": "opener:deny-open-url",
+          "markdownDescription": "Denies the open_url command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the reveal_item_in_dir command without any pre-configured scope.",
+          "type": "string",
+          "const": "opener:deny-reveal-item-in-dir",
+          "markdownDescription": "Denies the reveal_item_in_dir command without any pre-configured scope."
         }
       ]
     },
@@ -2687,6 +2927,23 @@
           "enum": [
             "iOS"
           ]
+        }
+      ]
+    },
+    "Application": {
+      "description": "Opener scope application.",
+      "anyOf": [
+        {
+          "description": "Open in default application.",
+          "type": "null"
+        },
+        {
+          "description": "If true, allow open with any application.",
+          "type": "boolean"
+        },
+        {
+          "description": "Allow specific application to open with.",
+          "type": "string"
         }
       ]
     }
