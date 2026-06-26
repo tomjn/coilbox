@@ -87,7 +87,7 @@ fn deeply_nested_input_errors_gracefully() {
 /// A simple author mistake (undefined variable) is a normal, surfaced error.
 #[test]
 fn unknown_variable_is_a_clean_error() {
-    let err = tauri_plugin_coilbox_anim::compile_bos("piece p; F(){ a = 1; }", &fixtures())
-        .unwrap_err();
+    let err =
+        tauri_plugin_coilbox_anim::compile_bos("piece p; F(){ a = 1; }", &fixtures()).unwrap_err();
     assert!(err.contains("Var not found"), "unexpected error: {err}");
 }

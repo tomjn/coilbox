@@ -81,5 +81,9 @@ pub fn opcode(name: &str) -> Option<u32> {
 /// Mnemonic for an instruction word, or `None` if it isn't a known opcode.
 /// Returns the *last* matching entry so shared values resolve like Python `rop`.
 pub fn mnemonic(value: u32) -> Option<&'static str> {
-    OPCODES.iter().rev().find(|(_, v)| *v == value).map(|(n, _)| *n)
+    OPCODES
+        .iter()
+        .rev()
+        .find(|(_, v)| *v == value)
+        .map(|(n, _)| *n)
 }

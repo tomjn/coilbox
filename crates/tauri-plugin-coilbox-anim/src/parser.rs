@@ -97,7 +97,8 @@ fn parse_int(pump: &mut Pump, node: &mut Node) -> bool {
     if let Some(hex) = token.strip_prefix("0x") {
         return match i64::from_str_radix(hex, 16) {
             Ok(v) => {
-                node.children.push(Node::leaf("integerConstant", v.to_string()));
+                node.children
+                    .push(Node::leaf("integerConstant", v.to_string()));
                 true
             }
             Err(_) => false,
@@ -132,8 +133,10 @@ fn parse_string(pump: &mut Pump, node: &mut Node) -> bool {
         return false;
     }
     if token.starts_with('"') {
-        node.children
-            .push(Node::leaf("stringConstant", token.trim_matches('"').to_string()));
+        node.children.push(Node::leaf(
+            "stringConstant",
+            token.trim_matches('"').to_string(),
+        ));
         return true;
     }
     false
@@ -188,8 +191,8 @@ fn parse(pump: &mut Pump, node: &mut Node, block_type: &str, depth: usize) -> bo
         return false;
     }
 
-    let alternatives = grammar::rule(block_type)
-        .unwrap_or_else(|| panic!("grammar: unknown rule {block_type}"));
+    let alternatives =
+        grammar::rule(block_type).unwrap_or_else(|| panic!("grammar: unknown rule {block_type}"));
     let node_type = block_type.trim_matches(|c| c == '?' || c == '%' || c == '_');
     let mut current = Node::new(node_type);
 
@@ -276,7 +279,12 @@ mod tests {
         let func_count = file
             .children
             .iter()
-            .filter(|d| d.children.first().map(|c| c.ntype == "funcDec").unwrap_or(false))
+            .filter(|d| {
+                d.children
+                    .first()
+                    .map(|c| c.ntype == "funcDec")
+                    .unwrap_or(false)
+            })
             .count();
         assert_eq!(func_count, 2, "{root:#?}");
         assert!(find(&root, "staticVarDec").is_some());

@@ -91,9 +91,7 @@ pub fn decode(buf: &[u8]) -> Result<DecodedCob, String> {
         .collect::<Result<_, _>>()?;
 
     let starts: Vec<usize> = (0..header.num_scripts as usize)
-        .map(|i| {
-            read_u32(buf, header.off_script_code_index as usize + 4 * i).map(|v| v as usize)
-        })
+        .map(|i| read_u32(buf, header.off_script_code_index as usize + 4 * i).map(|v| v as usize))
         .collect::<Result<_, _>>()?;
 
     let scripts = script_names
@@ -102,7 +100,10 @@ pub fn decode(buf: &[u8]) -> Result<DecodedCob, String> {
         .map(|(i, name)| {
             let start = starts[i];
             let end = starts.get(i + 1).copied().unwrap_or(code.len());
-            (name, code[start.min(code.len())..end.min(code.len())].to_vec())
+            (
+                name,
+                code[start.min(code.len())..end.min(code.len())].to_vec(),
+            )
         })
         .collect();
 

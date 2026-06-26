@@ -12,14 +12,14 @@
 
 use std::path::Path;
 
-/// The disassembler is internal; this test calls it through the compiled crate's
-/// test build by including the source modules directly.
-#[path = "../src/opcodes.rs"]
-mod opcodes;
 #[path = "../src/cob.rs"]
 mod cob;
 #[path = "../src/disasm.rs"]
 mod disasm;
+/// The disassembler is internal; this test calls it through the compiled crate's
+/// test build by including the source modules directly.
+#[path = "../src/opcodes.rs"]
+mod opcodes;
 
 #[test]
 fn disassembles_golden_min_cob() {

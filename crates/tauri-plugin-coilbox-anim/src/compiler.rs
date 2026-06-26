@@ -206,7 +206,8 @@ impl Compiler {
 
         self.total_offset += self.code.len() as u32 / 4;
         let name = node.children[0].get_text();
-        self.functions_code.insert(name, std::mem::take(&mut self.code));
+        self.functions_code
+            .insert(name, std::mem::take(&mut self.code));
         Ok(())
     }
 
@@ -480,9 +481,7 @@ impl Compiler {
         self.emit(&op_bytes("PUSH_CONSTANT"));
         let value: i64 = if node.children.len() == 1 {
             let text = node.get_text();
-            let f: f64 = text
-                .parse()
-                .map_err(|_| format!("bad constant: {text}"))?;
+            let f: f64 = text.parse().map_err(|_| format!("bad constant: {text}"))?;
             f.round_ties_even() as i64
         } else {
             let inner: f64 = node.children[1]

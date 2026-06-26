@@ -104,7 +104,11 @@ pub fn tokenize(code: &str) -> Vec<String> {
 
         // A bare newline ends a preprocessor directive unless the line is
         // continued (`\` or `\` + CR before the newline).
-        if !is_line_comment && !is_multi_line_comment && !is_in_quotation && is_preprocessor && c == '\n'
+        if !is_line_comment
+            && !is_multi_line_comment
+            && !is_in_quotation
+            && is_preprocessor
+            && c == '\n'
         {
             let prev1_not_backslash = idx < 1 || chars[idx - 1] != '\\';
             let prev2 = if idx >= 2 {
@@ -177,11 +181,59 @@ mod tests {
     fn tokenizes_min_bos_like_reference() {
         let src = include_str!("../tests/fixtures/min.bos");
         let expected = [
-            "piece", "base", ",", "turret", ";", "static", "-", "var", "foo", ";", "Create", "(",
-            ")", "{", "foo", "=", "1", "+", "2", ";", "hide", "turret", ";", "show", "base", ";",
-            "}", "Killed", "(", "severity", ",", "corpsetype", ")", "{", "if", "(", "severity",
-            "<", "50", ")", "{", "explode", "base", "type", "1", ";", "}", "return", "(", "0", ")",
-            ";", "}",
+            "piece",
+            "base",
+            ",",
+            "turret",
+            ";",
+            "static",
+            "-",
+            "var",
+            "foo",
+            ";",
+            "Create",
+            "(",
+            ")",
+            "{",
+            "foo",
+            "=",
+            "1",
+            "+",
+            "2",
+            ";",
+            "hide",
+            "turret",
+            ";",
+            "show",
+            "base",
+            ";",
+            "}",
+            "Killed",
+            "(",
+            "severity",
+            ",",
+            "corpsetype",
+            ")",
+            "{",
+            "if",
+            "(",
+            "severity",
+            "<",
+            "50",
+            ")",
+            "{",
+            "explode",
+            "base",
+            "type",
+            "1",
+            ";",
+            "}",
+            "return",
+            "(",
+            "0",
+            ")",
+            ";",
+            "}",
         ];
         assert_eq!(tokenize(src), expected);
     }
