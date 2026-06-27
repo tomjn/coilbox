@@ -179,6 +179,24 @@ async fn dl_springfiles_list(category: String) -> CliResult {
     }
 }
 
+/// `dl_springfiles_engines` — springfiles engines for the current platform,
+/// deduped to one row per version (the download id `--download-engine` wants).
+#[tauri::command]
+async fn dl_springfiles_engines() -> CliResult {
+    let token = sources::springfiles_engine_token();
+    let url = sources::springfiles_list_url("engine");
+    match fetch_text(url).await {
+        Ok(body) => match serde_json::from_str::<Vec<sources::SpringFile>>(&body) {
+            Ok(all) => {
+                let engines = sources::engines_for_platform(all, token);
+                CliResult::ok(json!({ "engines": engines, "platform": std::env::consts::OS }))
+            }
+            Err(e) => CliResult::err(format!("could not parse springfiles engines: {e}")),
+        },
+        Err(e) => CliResult::err(format!("failed to fetch springfiles engines: {e}")),
+    }
+}
+
 /// `dl_bar_maps` — the Beyond All Reason validated maps list (with thumbnails).
 #[tauri::command]
 async fn dl_bar_maps() -> CliResult {
@@ -361,6 +379,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_versions,
             dl_download,
             dl_springfiles_list,
+            dl_springfiles_engines,
             dl_bar_maps,
             dl_download_map,
             dl_download_file,

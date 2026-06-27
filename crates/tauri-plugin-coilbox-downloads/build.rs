@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "dl_versions",
     "dl_download",
     "dl_springfiles_list",
+    "dl_springfiles_engines",
     "dl_bar_maps",
     "dl_download_map",
     "dl_download_file",

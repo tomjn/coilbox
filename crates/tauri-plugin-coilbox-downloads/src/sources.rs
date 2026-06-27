@@ -14,10 +14,51 @@ pub struct SpringFile {
     pub name: String,
     pub filename: String,
     pub category: String,
+    /// Version string — populated for engines (e.g. `2025.01.6`), empty for maps.
+    pub version: String,
     pub size: u64,
     pub mirrors: Vec<String>,
     /// Thumbnail/preview image URLs (present when queried with `images=on`).
     pub mapimages: Vec<String>,
+}
+
+/// A platform-matched springfiles engine, deduped to one entry per version.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpringfilesEngine {
+    pub version: String,
+    pub filename: String,
+    pub size: u64,
+}
+
+/// The springfiles engine `category` token for the current platform, e.g.
+/// `linux64` (matches `engine_linux64`). Engines are listed per-OS so we filter
+/// to the running one.
+pub fn springfiles_engine_token() -> &'static str {
+    match std::env::consts::OS {
+        "windows" => "windows64",
+        "macos" => "macosx",
+        _ => "linux64",
+    }
+}
+
+/// Filter springfiles engine results to `token`'s platform and dedupe to one per
+/// version (newest first). `--download-engine` takes only the version, so the
+/// per-file variants (minimal/full) collapse to a single row.
+pub fn engines_for_platform(all: Vec<SpringFile>, token: &str) -> Vec<SpringfilesEngine> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out: Vec<SpringfilesEngine> = all
+        .into_iter()
+        .filter(|f| f.category.contains(token) && !f.version.is_empty())
+        .filter(|f| seen.insert(f.version.clone()))
+        .map(|f| SpringfilesEngine {
+            version: f.version,
+            filename: f.filename,
+            size: f.size,
+        })
+        .collect();
+    out.sort_by(|a, b| b.version.cmp(&a.version));
+    out
 }
 
 /// Preview images for a BAR map; `preview` is a full HTTPS thumbnail URL.
@@ -139,6 +180,22 @@ mod tests {
         assert_eq!(v[0].springname, "Comet");
         assert_eq!(v[0].mirrors, vec!["http://m/comet.sd7"]);
         assert_eq!(v[0].mapimages.len(), 1);
+    }
+
+    #[test]
+    fn engines_for_platform_filters_and_dedupes() {
+        let json = r#"[
+            {"name":"spring","filename":"a_linux.7z","category":"engine_linux64","version":"2025.01.6","size":10},
+            {"name":"spring","filename":"a_linux_full.7z","category":"engine_linux64","version":"2025.01.6","size":20},
+            {"name":"spring","filename":"a_win.7z","category":"engine_windows64","version":"2025.01.6","size":15},
+            {"name":"spring","filename":"b_linux.7z","category":"engine_linux64","version":"2024.12.1","size":12}
+        ]"#;
+        let all: Vec<SpringFile> = serde_json::from_str(json).unwrap();
+        let engines = engines_for_platform(all, "linux64");
+        // One per version, windows excluded, newest first.
+        assert_eq!(engines.len(), 2);
+        assert_eq!(engines[0].version, "2025.01.6");
+        assert_eq!(engines[1].version, "2024.12.1");
     }
 
     #[test]

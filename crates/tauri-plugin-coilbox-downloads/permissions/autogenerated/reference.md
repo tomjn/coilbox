@@ -9,6 +9,7 @@ Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR
 - `allow-dl-versions`
 - `allow-dl-download`
 - `allow-dl-springfiles-list`
+- `allow-dl-springfiles-engines`
 - `allow-dl-bar-maps`
 - `allow-dl-download-map`
 - `allow-dl-download-file`
@@ -229,6 +230,32 @@ Enables the dl_repos command without any pre-configured scope.
 <td>
 
 Denies the dl_repos command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:allow-dl-springfiles-engines`
+
+</td>
+<td>
+
+Enables the dl_springfiles_engines command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-springfiles-engines`
+
+</td>
+<td>
+
+Denies the dl_springfiles_engines command without any pre-configured scope.
 
 </td>
 </tr>

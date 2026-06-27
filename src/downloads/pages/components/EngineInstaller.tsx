@@ -6,7 +6,7 @@ import {
   dlDownloadEngineRecoil,
   dlDownloadEngineSpring,
   dlRecoilEngines,
-  dlSpringfilesList,
+  dlSpringfilesEngines,
 } from "../../bindings";
 import { useWriteRootPath } from "../../config";
 import { OptionSelect } from "./OptionSelect";
@@ -71,12 +71,12 @@ export function EngineInstaller() {
           })),
         );
       } else {
-        const { results } = await dlSpringfilesList({ category: "engine" });
+        const { engines } = await dlSpringfilesEngines(undefined);
         setItems(
-          results.map((f) => ({
-            key: f.springname,
-            title: f.name || f.springname,
-            subtitle: f.size ? fmtSize(f.size) : undefined,
+          engines.map((e) => ({
+            key: e.version,
+            title: e.version,
+            subtitle: fmtSize(e.size),
           })),
         );
       }

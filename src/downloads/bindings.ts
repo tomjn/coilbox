@@ -71,6 +71,19 @@ export const dlSpringfilesList = defineCommand<
   { results: SpringFile[] }
 >("coilbox-downloads", "dl_springfiles_list");
 
+/** A platform-matched springfiles engine (one per version). */
+export interface SpringfilesEngine {
+  version: string;
+  filename: string;
+  size: number;
+}
+
+/** springfiles engines for the current platform, deduped to one per version. */
+export const dlSpringfilesEngines = defineCommand<
+  undefined,
+  { engines: SpringfilesEngine[]; platform: string }
+>("coilbox-downloads", "dl_springfiles_engines");
+
 /** The Beyond All Reason validated maps list (with thumbnails). */
 export const dlBarMaps = defineCommand<undefined, { maps: BarMap[] }>(
   "coilbox-downloads",
