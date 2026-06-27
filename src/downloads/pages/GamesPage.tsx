@@ -10,6 +10,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   dlDownloadFile,
+  dlInstalledContent,
   dlSpringfilesList,
   type SpringFile,
 } from "../bindings";
@@ -66,6 +67,25 @@ export default function GamesPage() {
     load();
   }, [load]);
 
+  // Lowercased filenames already present in the configured write root's games/.
+  const [installed, setInstalled] = useState<Set<string>>(new Set());
+  const refreshInstalled = useCallback(async () => {
+    if (!writePath) {
+      setInstalled(new Set());
+      return;
+    }
+    try {
+      const { games } = await dlInstalledContent({ writePath });
+      setInstalled(new Set(games));
+    } catch {
+      setInstalled(new Set());
+    }
+  }, [writePath]);
+
+  useEffect(() => {
+    refreshInstalled();
+  }, [refreshInstalled]);
+
   async function download(game: SpringFile) {
     if (!writePath || !game.mirrors[0]) return;
     setDownloading(game.springname);
@@ -77,6 +97,7 @@ export default function GamesPage() {
         filename: game.filename,
       });
       setResult({ ok: true, message });
+      await refreshInstalled();
     } catch (e) {
       setResult({ ok: false, message: errMessage(e) });
     } finally {
@@ -182,35 +203,50 @@ export default function GamesPage() {
         )}
         {sorted && sorted.length > 0 && (
           <ul className="divide-y divide-border">
-            {sorted.map((g) => (
-              <li
-                key={g.springname}
-                className="flex items-center justify-between gap-3 px-6 py-2.5"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {g.name || g.springname}
-                  </p>
-                  <p className="truncate font-mono text-xs text-muted-foreground">
-                    {g.filename}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => download(g)}
-                  disabled={downloading !== null || !writePath || !g.mirrors[0]}
-                  aria-label={`Download ${g.name || g.springname}`}
+            {sorted.map((g) => {
+              const isInstalled = installed.has(g.filename.toLowerCase());
+              return (
+                <li
+                  key={g.springname}
+                  className="flex items-center justify-between gap-3 px-6 py-2.5"
                 >
-                  {downloading === g.springname ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Download />
-                  )}
-                  {downloading === g.springname ? "Downloading…" : "Download"}
-                </Button>
-              </li>
-            ))}
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 text-sm font-medium">
+                      {isInstalled && (
+                        <CheckCircle2
+                          size={13}
+                          className="shrink-0 text-emerald-500"
+                        />
+                      )}
+                      <span className="truncate">{g.name || g.springname}</span>
+                    </p>
+                    <p className="truncate font-mono text-xs text-muted-foreground">
+                      {g.filename}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => download(g)}
+                    disabled={
+                      downloading !== null || !writePath || !g.mirrors[0]
+                    }
+                    aria-label={`${isInstalled ? "Re-download" : "Download"} ${g.name || g.springname}`}
+                  >
+                    {downloading === g.springname ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <Download />
+                    )}
+                    {downloading === g.springname
+                      ? "Downloading…"
+                      : isInstalled
+                        ? "Re-download"
+                        : "Download"}
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

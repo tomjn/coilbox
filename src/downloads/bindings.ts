@@ -106,6 +106,15 @@ export const dlDownloadFile = defineCommand<
   { message: string; path: string }
 >("coilbox-downloads", "dl_download_file");
 
+/**
+ * Lowercased filenames already present in `<writePath>/maps` and `/games`, for
+ * marking installed items. Compare against a source's `filename` (lowercased).
+ */
+export const dlInstalledContent = defineCommand<
+  { writePath: string },
+  { maps: string[]; games: string[] }
+>("coilbox-downloads", "dl_installed_content");
+
 /** A Recoil engine release matching the running platform. */
 export interface EngineRelease {
   version: string;

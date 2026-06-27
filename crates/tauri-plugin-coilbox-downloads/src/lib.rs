@@ -136,7 +136,7 @@ async fn dl_download(
             let stderr = String::from_utf8_lossy(&out.stderr);
             let outcome = sidecar::parse_download(&stdout, &stderr, out.status.code());
             if outcome.success {
-                CliResult::ok(json!({ "message": outcome.message, "tag": tag }))
+                CliResult::ok(json!({ "message": format!("Downloaded {tag}"), "tag": tag }))
             } else {
                 CliResult::err(outcome.message)
             }
@@ -237,7 +237,9 @@ async fn dl_download_map(
             let stderr = String::from_utf8_lossy(&out.stderr);
             let outcome = sidecar::parse_download(&stdout, &stderr, out.status.code());
             if outcome.success {
-                CliResult::ok(json!({ "message": outcome.message, "springName": spring_name }))
+                CliResult::ok(
+                    json!({ "message": format!("Downloaded {spring_name}"), "springName": spring_name }),
+                )
             } else {
                 CliResult::err(outcome.message)
             }
@@ -360,12 +362,40 @@ async fn dl_download_engine_spring(version: String, write_path: Option<String>) 
             let stderr = String::from_utf8_lossy(&out.stderr);
             let outcome = sidecar::parse_download(&stdout, &stderr, out.status.code());
             if outcome.success {
-                CliResult::ok(json!({ "message": outcome.message, "version": version }))
+                CliResult::ok(
+                    json!({ "message": format!("Installed engine {version}"), "version": version }),
+                )
             } else {
                 CliResult::err(outcome.message)
             }
         }
     }
+}
+
+/// Lowercased filenames of the regular files directly inside `dir` (empty if the
+/// directory is missing). Used to mark already-installed content.
+fn list_filenames(dir: &std::path::Path) -> Vec<String> {
+    match std::fs::read_dir(dir) {
+        Ok(rd) => rd
+            .flatten()
+            .filter(|e| e.path().is_file())
+            .filter_map(|e| e.file_name().to_str().map(str::to_lowercase))
+            .collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// `dl_installed_content` — filenames present in `<write_path>/maps` and
+/// `<write_path>/games`, so the browse screens can mark items already installed
+/// in the configured content root. Names are lowercased for case-insensitive
+/// matching against a source's `filename`.
+#[tauri::command]
+async fn dl_installed_content(write_path: String) -> CliResult {
+    let root = std::path::Path::new(&write_path);
+    CliResult::ok(json!({
+        "maps": list_filenames(&root.join("maps")),
+        "games": list_filenames(&root.join("games")),
+    }))
 }
 
 /// Build the plugin. Registered as `"coilbox-downloads"` (crate name minus
@@ -385,7 +415,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_download_file,
             dl_recoil_engines,
             dl_download_engine_recoil,
-            dl_download_engine_spring
+            dl_download_engine_spring,
+            dl_installed_content
         ])
         .build()
 }
