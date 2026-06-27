@@ -21,6 +21,32 @@ pub struct SpringFileMetadata {
     pub height: f64,
 }
 
+/// springfiles returns `""` (an empty string) instead of an empty array when a
+/// list field has no value. Accept the real array or fall back to empty.
+fn de_string_vec<'de, D>(d: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let v = serde_json::Value::deserialize(d)?;
+    match v {
+        serde_json::Value::Array(_) => serde_json::from_value(v).map_err(serde::de::Error::custom),
+        _ => Ok(Vec::new()),
+    }
+}
+
+/// Likewise, `metadata` is `""` (not `{}`) when a map has none. Accept the object
+/// or fall back to default metadata.
+fn de_metadata<'de, D>(d: D) -> Result<SpringFileMetadata, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let v = serde_json::Value::deserialize(d)?;
+    match v {
+        serde_json::Value::Object(_) => serde_json::from_value(v).map_err(serde::de::Error::custom),
+        _ => Ok(SpringFileMetadata::default()),
+    }
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct SpringFile {
@@ -31,10 +57,13 @@ pub struct SpringFile {
     /// Version string — populated for engines (e.g. `2025.01.6`), empty for maps.
     pub version: String,
     pub size: u64,
+    #[serde(deserialize_with = "de_string_vec")]
     pub mirrors: Vec<String>,
     /// Thumbnail/preview image URLs (present when queried with `images=on`).
+    #[serde(deserialize_with = "de_string_vec")]
     pub mapimages: Vec<String>,
     /// Map metadata (author + dimensions) when queried with `metadata=1`.
+    #[serde(deserialize_with = "de_metadata")]
     pub metadata: SpringFileMetadata,
 }
 
@@ -199,6 +228,16 @@ mod tests {
         assert_eq!(v[0].springname, "Comet");
         assert_eq!(v[0].mirrors, vec!["http://m/comet.sd7"]);
         assert_eq!(v[0].mapimages.len(), 1);
+    }
+
+    #[test]
+    fn springfile_tolerates_empty_string_fields() {
+        // springfiles uses "" instead of []/{} for empty list/metadata fields.
+        let json = r#"[{"springname":"X","name":"X","filename":"x.sd7","category":"map","size":1,"mirrors":"","mapimages":"","metadata":""}]"#;
+        let v: Vec<SpringFile> = serde_json::from_str(json).unwrap();
+        assert!(v[0].mirrors.is_empty());
+        assert!(v[0].mapimages.is_empty());
+        assert_eq!(v[0].metadata.author, "");
     }
 
     #[test]
