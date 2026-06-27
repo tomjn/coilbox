@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-remove-root"
+description = "Enables the content_remove_root command without any pre-configured scope."
+commands.allow = ["content_remove_root"]
+
+[[permission]]
+identifier = "deny-content-remove-root"
+description = "Denies the content_remove_root command without any pre-configured scope."
+commands.deny = ["content_remove_root"]

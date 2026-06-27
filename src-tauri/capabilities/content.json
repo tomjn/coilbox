@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "content",
+  "description": "Grants the content plugin's default commands and the native folder picker to the main window.",
+  "windows": ["main"],
+  "permissions": ["coilbox-content:default", "dialog:allow-open"]
+}

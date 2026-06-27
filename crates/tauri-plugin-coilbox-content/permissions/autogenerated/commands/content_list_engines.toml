@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-list-engines"
+description = "Enables the content_list_engines command without any pre-configured scope."
+commands.allow = ["content_list_engines"]
+
+[[permission]]
+identifier = "deny-content-list-engines"
+description = "Denies the content_list_engines command without any pre-configured scope."
+commands.deny = ["content_list_engines"]
