@@ -211,14 +211,8 @@ export default function GamesPage() {
                   className="flex items-center justify-between gap-3 px-6 py-2.5"
                 >
                   <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 text-sm font-medium">
-                      {isInstalled && (
-                        <CheckCircle2
-                          size={13}
-                          className="shrink-0 text-emerald-500"
-                        />
-                      )}
-                      <span className="truncate">{g.name || g.springname}</span>
+                    <p className="truncate text-sm font-medium">
+                      {g.name || g.springname}
                     </p>
                     <p className="truncate font-mono text-xs text-muted-foreground">
                       {g.filename}
@@ -229,19 +223,28 @@ export default function GamesPage() {
                     size="sm"
                     onClick={() => download(g)}
                     disabled={
-                      downloading !== null || !writePath || !g.mirrors[0]
+                      downloading !== null ||
+                      !writePath ||
+                      !g.mirrors[0] ||
+                      isInstalled
                     }
-                    aria-label={`${isInstalled ? "Re-download" : "Download"} ${g.name || g.springname}`}
+                    aria-label={
+                      isInstalled
+                        ? `${g.name || g.springname} already downloaded`
+                        : `Download ${g.name || g.springname}`
+                    }
                   >
                     {downloading === g.springname ? (
                       <Loader2 className="animate-spin" />
+                    ) : isInstalled ? (
+                      <CheckCircle2 />
                     ) : (
                       <Download />
                     )}
                     {downloading === g.springname
                       ? "Downloading…"
                       : isInstalled
-                        ? "Re-download"
+                        ? "Already downloaded"
                         : "Download"}
                   </Button>
                 </li>

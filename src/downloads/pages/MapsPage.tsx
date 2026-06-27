@@ -285,16 +285,10 @@ export default function MapsPage() {
                   <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
                     <div className="min-w-0">
                       <p
-                        className="flex items-center gap-1.5 text-sm font-medium"
+                        className="truncate text-sm font-medium"
                         title={it.title}
                       >
-                        {isInstalled && (
-                          <CheckCircle2
-                            size={13}
-                            className="shrink-0 text-emerald-500"
-                          />
-                        )}
-                        <span className="truncate">{it.title}</span>
+                        {it.title}
                       </p>
                       {it.subtitle && (
                         <p className="truncate text-xs text-muted-foreground">
@@ -307,18 +301,24 @@ export default function MapsPage() {
                       size="sm"
                       className="mt-auto w-full"
                       onClick={() => download(it.springName)}
-                      disabled={downloading !== null}
-                      aria-label={`${isInstalled ? "Re-download" : "Download"} ${it.title}`}
+                      disabled={downloading !== null || isInstalled}
+                      aria-label={
+                        isInstalled
+                          ? `${it.title} already downloaded`
+                          : `Download ${it.title}`
+                      }
                     >
                       {downloading === it.springName ? (
                         <Loader2 className="animate-spin" />
+                      ) : isInstalled ? (
+                        <CheckCircle2 />
                       ) : (
                         <Download />
                       )}
                       {downloading === it.springName
                         ? "Downloading…"
                         : isInstalled
-                          ? "Re-download"
+                          ? "Already downloaded"
                           : "Download"}
                     </Button>
                   </div>
