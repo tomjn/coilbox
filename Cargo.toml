@@ -7,4 +7,5 @@ members = [
   "crates/tauri-plugin-coilbox-uberstress",
   "crates/tauri-plugin-coilbox-mapconv",
   "crates/tauri-plugin-coilbox-anim",
+  "crates/tauri-plugin-coilbox-content",
 ]

@@ -552,6 +552,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-coilbox-anim",
+ "tauri-plugin-coilbox-content",
  "tauri-plugin-coilbox-mapconv",
  "tauri-plugin-coilbox-prdownloader",
  "tauri-plugin-coilbox-uberstress",
@@ -4035,6 +4036,17 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-coilbox-anim"
+version = "0.0.0"
+dependencies = [
+ "picoframe-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-coilbox-content"
 version = "0.0.0"
 dependencies = [
  "picoframe-core",

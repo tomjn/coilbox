@@ -1,0 +1,14 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines)."
+permissions = [
+  "allow-content-candidates",
+  "allow-content-state-load",
+  "allow-content-rescan",
+  "allow-content-scan-root",
+  "allow-content-add-root",
+  "allow-content-remove-root",
+  "allow-content-list-engines",
+  "allow-content-verify-engine",
+]

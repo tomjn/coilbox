@@ -375,6 +375,108 @@
           "markdownDescription": "Denies the anim_cob_disasm command without any pre-configured scope."
         },
         {
+          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`",
+          "type": "string",
+          "const": "coilbox-content:default",
+          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`"
+        },
+        {
+          "description": "Enables the content_add_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-add-root",
+          "markdownDescription": "Enables the content_add_root command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_candidates command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-candidates",
+          "markdownDescription": "Enables the content_candidates command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_list_engines command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-list-engines",
+          "markdownDescription": "Enables the content_list_engines command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_remove_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-remove-root",
+          "markdownDescription": "Enables the content_remove_root command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_rescan command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-rescan",
+          "markdownDescription": "Enables the content_rescan command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_scan_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-scan-root",
+          "markdownDescription": "Enables the content_scan_root command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_state_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-state-load",
+          "markdownDescription": "Enables the content_state_load command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_verify_engine command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-verify-engine",
+          "markdownDescription": "Enables the content_verify_engine command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_add_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-add-root",
+          "markdownDescription": "Denies the content_add_root command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_candidates command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-candidates",
+          "markdownDescription": "Denies the content_candidates command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_list_engines command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-list-engines",
+          "markdownDescription": "Denies the content_list_engines command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_remove_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-remove-root",
+          "markdownDescription": "Denies the content_remove_root command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_rescan command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-rescan",
+          "markdownDescription": "Denies the content_rescan command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_scan_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-scan-root",
+          "markdownDescription": "Denies the content_scan_root command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_state_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-state-load",
+          "markdownDescription": "Denies the content_state_load command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_verify_engine command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-verify-engine",
+          "markdownDescription": "Denies the content_verify_engine command without any pre-configured scope."
+        },
+        {
           "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
           "type": "string",
           "const": "coilbox-mapconv:default",
