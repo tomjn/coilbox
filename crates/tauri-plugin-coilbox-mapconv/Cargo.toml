@@ -16,6 +16,9 @@ tauri = { version = "2" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 picoframe-core = "0.0.2"
+# Sandboxed Spring Lua evaluator: reads mapinfo.lua by evaluating it (following
+# VFS.Include etc.), with the literal scanner kept as a fallback.
+coilbox-springlua = { path = "../coilbox-springlua" }
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 sevenz-rust2 = "0.21.1"
 # Decode source images (texture/heightmap/...) to read true dimensions and build
