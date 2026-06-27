@@ -1,9 +1,9 @@
 import { type FramePlugin, framePlugin } from "@picoframe/frame";
 import animationPlugin from "./animation";
 import contentPlugin from "./content";
-import mapconvPlugin from "./mapconv";
 // picoframe:imports-start
-import prdownloaderPlugin from "./prdownloader";
+import downloadsPlugin from "./downloads";
+import mapconvPlugin from "./mapconv";
 import uberstressPlugin from "./uberstress";
 // picoframe:imports-end
 
@@ -11,7 +11,7 @@ import uberstressPlugin from "./uberstress";
 export const plugins: FramePlugin[] = [
   framePlugin,
   // picoframe:plugins-start
-  prdownloaderPlugin,
+  downloadsPlugin,
   uberstressPlugin,
   mapconvPlugin,
   animationPlugin,

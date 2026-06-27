@@ -295,58 +295,58 @@
       "type": "string",
       "oneOf": [
         {
-          "description": "Enables the prd_download command without any pre-configured scope.",
+          "description": "Enables the dl_download command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-prd-download",
-          "markdownDescription": "Enables the prd_download command without any pre-configured scope."
+          "const": "allow-dl-download",
+          "markdownDescription": "Enables the dl_download command without any pre-configured scope."
         },
         {
-          "description": "Denies the prd_download command without any pre-configured scope.",
+          "description": "Denies the dl_download command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-prd-download",
-          "markdownDescription": "Denies the prd_download command without any pre-configured scope."
+          "const": "deny-dl-download",
+          "markdownDescription": "Denies the dl_download command without any pre-configured scope."
         },
         {
-          "description": "Enables the prd_repos command without any pre-configured scope.",
+          "description": "Enables the dl_repos command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-prd-repos",
-          "markdownDescription": "Enables the prd_repos command without any pre-configured scope."
+          "const": "allow-dl-repos",
+          "markdownDescription": "Enables the dl_repos command without any pre-configured scope."
         },
         {
-          "description": "Denies the prd_repos command without any pre-configured scope.",
+          "description": "Denies the dl_repos command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-prd-repos",
-          "markdownDescription": "Denies the prd_repos command without any pre-configured scope."
+          "const": "deny-dl-repos",
+          "markdownDescription": "Denies the dl_repos command without any pre-configured scope."
         },
         {
-          "description": "Enables the prd_version command without any pre-configured scope.",
+          "description": "Enables the dl_version command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-prd-version",
-          "markdownDescription": "Enables the prd_version command without any pre-configured scope."
+          "const": "allow-dl-version",
+          "markdownDescription": "Enables the dl_version command without any pre-configured scope."
         },
         {
-          "description": "Denies the prd_version command without any pre-configured scope.",
+          "description": "Denies the dl_version command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-prd-version",
-          "markdownDescription": "Denies the prd_version command without any pre-configured scope."
+          "const": "deny-dl-version",
+          "markdownDescription": "Denies the dl_version command without any pre-configured scope."
         },
         {
-          "description": "Enables the prd_versions command without any pre-configured scope.",
+          "description": "Enables the dl_versions command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-prd-versions",
-          "markdownDescription": "Enables the prd_versions command without any pre-configured scope."
+          "const": "allow-dl-versions",
+          "markdownDescription": "Enables the dl_versions command without any pre-configured scope."
         },
         {
-          "description": "Denies the prd_versions command without any pre-configured scope.",
+          "description": "Denies the dl_versions command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-prd-versions",
-          "markdownDescription": "Denies the prd_versions command without any pre-configured scope."
+          "const": "deny-dl-versions",
+          "markdownDescription": "Denies the dl_versions command without any pre-configured scope."
         },
         {
-          "description": "Allows the prdownloader plugin's commands (version, rapid browsing, download).\n#### This default permission set includes:\n\n- `allow-prd-version`\n- `allow-prd-repos`\n- `allow-prd-versions`\n- `allow-prd-download`",
+          "description": "Allows the downloads plugin's commands (version, rapid browsing, download).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the prdownloader plugin's commands (version, rapid browsing, download).\n#### This default permission set includes:\n\n- `allow-prd-version`\n- `allow-prd-repos`\n- `allow-prd-versions`\n- `allow-prd-download`"
+          "markdownDescription": "Allows the downloads plugin's commands (version, rapid browsing, download).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`"
         }
       ]
     }

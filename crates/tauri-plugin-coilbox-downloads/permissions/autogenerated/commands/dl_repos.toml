@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-dl-repos"
+description = "Enables the dl_repos command without any pre-configured scope."
+commands.allow = ["dl_repos"]
+
+[[permission]]
+identifier = "deny-dl-repos"
+description = "Denies the dl_repos command without any pre-configured scope."
+commands.deny = ["dl_repos"]

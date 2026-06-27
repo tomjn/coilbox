@@ -13,27 +13,27 @@ export interface Version {
 }
 
 /**
- * Typed bindings to `plugin:coilbox-prdownloader|*`. The first `defineCommand`
+ * Typed bindings to `plugin:coilbox-downloads|*`. The first `defineCommand`
  * argument is the Tauri ACL identifier (crate name minus `tauri-plugin-`), not
  * the npm package name. Argument keys are camelCase; Tauri maps them to the
  * crate's snake_case parameters.
  */
-export const prdVersion = defineCommand<undefined, { version: string }>(
-  "coilbox-prdownloader",
-  "prd_version",
+export const dlVersion = defineCommand<undefined, { version: string }>(
+  "coilbox-downloads",
+  "dl_version",
 );
 
-export const prdRepos = defineCommand<
-  { masterUrl?: string },
-  { repos: Repo[] }
->("coilbox-prdownloader", "prd_repos");
+export const dlRepos = defineCommand<{ masterUrl?: string }, { repos: Repo[] }>(
+  "coilbox-downloads",
+  "dl_repos",
+);
 
-export const prdVersions = defineCommand<
+export const dlVersions = defineCommand<
   { repoUrl: string },
   { versions: Version[] }
->("coilbox-prdownloader", "prd_versions");
+>("coilbox-downloads", "dl_versions");
 
-export const prdDownload = defineCommand<
+export const dlDownload = defineCommand<
   { tag: string; writePath?: string },
   { message: string; tag: string }
->("coilbox-prdownloader", "prd_download");
+>("coilbox-downloads", "dl_download");

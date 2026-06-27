@@ -6,13 +6,14 @@ import {
   FolderOpen,
   Loader2,
   Package,
+  Search,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  prdDownload,
-  prdRepos,
-  prdVersion,
-  prdVersions,
+  dlDownload,
+  dlRepos,
+  dlVersion,
+  dlVersions,
   type Repo,
   type Version,
 } from "../bindings";
@@ -34,7 +35,7 @@ function SidecarWarning() {
 
   const check = useCallback(async () => {
     try {
-      await prdVersion(undefined);
+      await dlVersion(undefined);
       setError(null);
     } catch (e) {
       setError(errMessage(e));
@@ -82,11 +83,13 @@ export default function ExplorerPage() {
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [reposLoading, setReposLoading] = useState(false);
   const [reposError, setReposError] = useState<string | null>(null);
+  const [repoFilter, setRepoFilter] = useState("");
 
   const [selected, setSelected] = useState<Repo | null>(null);
   const [versions, setVersions] = useState<Version[] | null>(null);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [versionsError, setVersionsError] = useState<string | null>(null);
+  const [versionFilter, setVersionFilter] = useState("");
 
   const [downloading, setDownloading] = useState<string | null>(null);
   const [downloadResult, setDownloadResult] = useState<{
@@ -101,7 +104,7 @@ export default function ExplorerPage() {
     setVersions(null);
     setDownloadResult(null);
     try {
-      const { repos } = await prdRepos({
+      const { repos } = await dlRepos({
         masterUrl: masterUrl.trim() || DEFAULT_MASTER,
       });
       setRepos(repos);
@@ -118,9 +121,10 @@ export default function ExplorerPage() {
     setVersions(null);
     setVersionsError(null);
     setVersionsLoading(true);
+    setVersionFilter("");
     setDownloadResult(null);
     try {
-      const { versions } = await prdVersions({ repoUrl: repo.url });
+      const { versions } = await dlVersions({ repoUrl: repo.url });
       setVersions(versions);
     } catch (e) {
       setVersionsError(errMessage(e));
@@ -133,7 +137,7 @@ export default function ExplorerPage() {
     setDownloading(tag);
     setDownloadResult(null);
     try {
-      const { message } = await prdDownload({ tag });
+      const { message } = await dlDownload({ tag });
       setDownloadResult({ ok: true, message });
     } catch (e) {
       setDownloadResult({ ok: false, message: errMessage(e) });
@@ -142,12 +146,29 @@ export default function ExplorerPage() {
     }
   }
 
+  const filteredRepos = useMemo(() => {
+    if (!repos) return null;
+    const q = repoFilter.trim().toLowerCase();
+    if (!q) return repos;
+    return repos.filter((r) => r.name.toLowerCase().includes(q));
+  }, [repos, repoFilter]);
+
+  const filteredVersions = useMemo(() => {
+    if (!versions) return null;
+    const q = versionFilter.trim().toLowerCase();
+    if (!q) return versions;
+    return versions.filter(
+      (v) =>
+        v.name.toLowerCase().includes(q) || v.tag.toLowerCase().includes(q),
+    );
+  }, [versions, versionFilter]);
+
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar */}
       <header className="flex flex-col gap-4 border-b border-border px-6 py-4">
         <div className="space-y-1">
-          <h1 className="text-lg font-semibold leading-none">pr-downloader</h1>
+          <h1 className="text-lg font-semibold leading-none">Downloads</h1>
           <p className="max-w-prose text-sm text-muted-foreground">
             Browse Spring/Recoil rapid content and download a tag through the
             bundled sidecar.
@@ -184,9 +205,29 @@ export default function ExplorerPage() {
           <div className="flex items-center justify-between px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <span>Repositories</span>
             {repos && (
-              <span className="font-normal normal-case">{repos.length}</span>
+              <span className="font-normal normal-case">
+                {repoFilter.trim() && filteredRepos
+                  ? `${filteredRepos.length} / ${repos.length}`
+                  : repos.length}
+              </span>
             )}
           </div>
+          {repos && repos.length > 0 && (
+            <div className="relative px-3 pb-2">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                type="text"
+                value={repoFilter}
+                onChange={(e) => setRepoFilter(e.target.value)}
+                placeholder="Filter repositories…"
+                aria-label="Filter repositories"
+                className="h-8 pl-7 text-xs"
+              />
+            </div>
+          )}
           <div className="min-h-0 flex-1 overflow-auto">
             {reposError && (
               <p className="m-3 flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
@@ -199,7 +240,12 @@ export default function ExplorerPage() {
                 Load a rapid master to list its repositories.
               </EmptyState>
             )}
-            {repos?.map((repo) => (
+            {repos && filteredRepos?.length === 0 && (
+              <p className="px-4 py-3 text-xs text-muted-foreground">
+                No repositories match “{repoFilter.trim()}”.
+              </p>
+            )}
+            {filteredRepos?.map((repo) => (
               <button
                 type="button"
                 key={repo.name}
@@ -233,8 +279,28 @@ export default function ExplorerPage() {
                 <h2 className="font-medium">{selected.name}</h2>
                 {versions && (
                   <span className="text-sm text-muted-foreground">
-                    · {versions.length} versions
+                    ·{" "}
+                    {versionFilter.trim() && filteredVersions
+                      ? `${filteredVersions.length} / ${versions.length}`
+                      : versions.length}{" "}
+                    versions
                   </span>
+                )}
+                {versions && versions.length > 0 && (
+                  <div className="relative ml-auto">
+                    <Search
+                      size={14}
+                      className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      type="text"
+                      value={versionFilter}
+                      onChange={(e) => setVersionFilter(e.target.value)}
+                      placeholder="Filter versions…"
+                      aria-label="Filter versions"
+                      className="h-8 w-56 pl-7 text-xs"
+                    />
+                  </div>
                 )}
               </div>
               <div className="min-h-0 flex-1 overflow-auto">
@@ -255,8 +321,15 @@ export default function ExplorerPage() {
                     No versions in this repository.
                   </EmptyState>
                 )}
+                {versions &&
+                  versions.length > 0 &&
+                  filteredVersions?.length === 0 && (
+                    <EmptyState icon={Search}>
+                      No versions match “{versionFilter.trim()}”.
+                    </EmptyState>
+                  )}
                 <ul className="divide-y divide-border">
-                  {versions?.map((v) => (
+                  {filteredVersions?.map((v) => (
                     <li
                       key={v.tag}
                       className="flex items-center justify-between gap-3 px-6 py-2.5"

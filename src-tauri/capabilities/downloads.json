@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "downloads",
+  "description": "Grants the downloads plugin's default commands to the main window.",
+  "windows": ["main"],
+  "permissions": ["coilbox-downloads:default"]
+}

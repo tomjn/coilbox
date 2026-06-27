@@ -1,0 +1,10 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows the downloads plugin's commands (version, rapid browsing, download)."
+permissions = [
+  "allow-dl-version",
+  "allow-dl-repos",
+  "allow-dl-versions",
+  "allow-dl-download",
+]

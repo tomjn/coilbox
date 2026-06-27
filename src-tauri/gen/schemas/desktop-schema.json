@@ -477,6 +477,60 @@
           "markdownDescription": "Denies the content_verify_engine command without any pre-configured scope."
         },
         {
+          "description": "Allows the downloads plugin's commands (version, rapid browsing, download).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`",
+          "type": "string",
+          "const": "coilbox-downloads:default",
+          "markdownDescription": "Allows the downloads plugin's commands (version, rapid browsing, download).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`"
+        },
+        {
+          "description": "Enables the dl_download command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:allow-dl-download",
+          "markdownDescription": "Enables the dl_download command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the dl_repos command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:allow-dl-repos",
+          "markdownDescription": "Enables the dl_repos command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the dl_version command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:allow-dl-version",
+          "markdownDescription": "Enables the dl_version command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the dl_versions command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:allow-dl-versions",
+          "markdownDescription": "Enables the dl_versions command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_download command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:deny-dl-download",
+          "markdownDescription": "Denies the dl_download command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_repos command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:deny-dl-repos",
+          "markdownDescription": "Denies the dl_repos command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_version command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:deny-dl-version",
+          "markdownDescription": "Denies the dl_version command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_versions command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:deny-dl-versions",
+          "markdownDescription": "Denies the dl_versions command without any pre-configured scope."
+        },
+        {
           "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
           "type": "string",
           "const": "coilbox-mapconv:default",
@@ -613,60 +667,6 @@
           "type": "string",
           "const": "coilbox-mapconv:deny-mc-suggest-sources",
           "markdownDescription": "Denies the mc_suggest_sources command without any pre-configured scope."
-        },
-        {
-          "description": "Allows the prdownloader plugin's commands (version, rapid browsing, download).\n#### This default permission set includes:\n\n- `allow-prd-version`\n- `allow-prd-repos`\n- `allow-prd-versions`\n- `allow-prd-download`",
-          "type": "string",
-          "const": "coilbox-prdownloader:default",
-          "markdownDescription": "Allows the prdownloader plugin's commands (version, rapid browsing, download).\n#### This default permission set includes:\n\n- `allow-prd-version`\n- `allow-prd-repos`\n- `allow-prd-versions`\n- `allow-prd-download`"
-        },
-        {
-          "description": "Enables the prd_download command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-prdownloader:allow-prd-download",
-          "markdownDescription": "Enables the prd_download command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the prd_repos command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-prdownloader:allow-prd-repos",
-          "markdownDescription": "Enables the prd_repos command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the prd_version command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-prdownloader:allow-prd-version",
-          "markdownDescription": "Enables the prd_version command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the prd_versions command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-prdownloader:allow-prd-versions",
-          "markdownDescription": "Enables the prd_versions command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the prd_download command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-prdownloader:deny-prd-download",
-          "markdownDescription": "Denies the prd_download command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the prd_repos command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-prdownloader:deny-prd-repos",
-          "markdownDescription": "Denies the prd_repos command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the prd_version command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-prdownloader:deny-prd-version",
-          "markdownDescription": "Denies the prd_version command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the prd_versions command without any pre-configured scope.",
-          "type": "string",
-          "const": "coilbox-prdownloader:deny-prd-versions",
-          "markdownDescription": "Denies the prd_versions command without any pre-configured scope."
         },
         {
           "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL, results dir, import/export).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`\n- `allow-us-results-dir`\n- `allow-us-export-report`\n- `allow-us-import-report`",

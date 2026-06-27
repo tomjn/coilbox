@@ -1,4 +1,5 @@
-//! pr-downloader sidecar plugin (Rust half). Proves the picoframe sidecar path:
+//! Downloads plugin (Rust half), wrapping the pr-downloader sidecar. Proves the
+//! picoframe sidecar path:
 //! a bundled `externalBin` binary the crate shells out to, with results returned
 //! as a [`CliResult`]. Adds rapid-repo browsing (HTTP + gzip) so the frontend can
 //! list downloadable content before downloading a tag.
@@ -44,10 +45,10 @@ async fn run_sidecar(args: Vec<String>) -> Result<std::process::Output, String> 
         .map_err(|e| format!("failed to run pr-downloader: {e}"))
 }
 
-/// `prd_version` — run the sidecar's `--version`, proving the binary is bundled
+/// `dl_version` — run the sidecar's `--version`, proving the binary is bundled
 /// and runnable across the IPC boundary.
 #[tauri::command]
-async fn prd_version() -> CliResult {
+async fn dl_version() -> CliResult {
     match run_sidecar(vec!["--version".into()]).await {
         Err(e) => CliResult::err(e),
         Ok(out) => {
@@ -60,9 +61,9 @@ async fn prd_version() -> CliResult {
     }
 }
 
-/// `prd_repos` — list rapid repositories from a master index (default springrts).
+/// `dl_repos` — list rapid repositories from a master index (default springrts).
 #[tauri::command]
-async fn prd_repos(master_url: Option<String>) -> CliResult {
+async fn dl_repos(master_url: Option<String>) -> CliResult {
     let base = master_url
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| DEFAULT_MASTER.into());
@@ -73,9 +74,9 @@ async fn prd_repos(master_url: Option<String>) -> CliResult {
     }
 }
 
-/// `prd_versions` — list downloadable tags within one rapid repository.
+/// `dl_versions` — list downloadable tags within one rapid repository.
 #[tauri::command]
-async fn prd_versions(repo_url: String) -> CliResult {
+async fn dl_versions(repo_url: String) -> CliResult {
     if repo_url.trim().is_empty() {
         return CliResult::err("repo_url is required");
     }
@@ -86,10 +87,10 @@ async fn prd_versions(repo_url: String) -> CliResult {
     }
 }
 
-/// `prd_download` — download a rapid tag via the sidecar, parsing its log output
+/// `dl_download` — download a rapid tag via the sidecar, parsing its log output
 /// into a success/error envelope.
 #[tauri::command]
-async fn prd_download(tag: String, write_path: Option<String>) -> CliResult {
+async fn dl_download(tag: String, write_path: Option<String>) -> CliResult {
     if tag.trim().is_empty() {
         return CliResult::err("tag is required");
     }
@@ -113,16 +114,16 @@ async fn prd_download(tag: String, write_path: Option<String>) -> CliResult {
     }
 }
 
-/// Build the plugin. Registered as `"coilbox-prdownloader"` (crate name minus
+/// Build the plugin. Registered as `"coilbox-downloads"` (crate name minus
 /// the `tauri-plugin-` prefix); the frontend invokes
-/// `plugin:coilbox-prdownloader|<cmd>`.
+/// `plugin:coilbox-downloads|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
-    Builder::new("coilbox-prdownloader")
+    Builder::new("coilbox-downloads")
         .invoke_handler(tauri::generate_handler![
-            prd_version,
-            prd_repos,
-            prd_versions,
-            prd_download
+            dl_version,
+            dl_repos,
+            dl_versions,
+            dl_download
         ])
         .build()
 }
