@@ -3,8 +3,11 @@
 //! prefill compile and scale the 3D preview), and appearance hints (water
 //! colour/visibility, sky/sun) so the preview resembles the real map.
 //!
-//! `mapinfo.lua` is arbitrary Lua, so this is deliberately a small *literal
-//! scanner*, NOT a Lua evaluator. It:
+//! There are two readers here. [`eval_appearance`] is preferred: it evaluates
+//! `mapinfo.lua` in a sandboxed Spring Lua VM (`coilbox-springlua`), so it
+//! handles computed values and `VFS.Include`d siblings. [`parse_appearance`] is
+//! the **fallback** literal scanner, used when evaluation fails (a file reaching
+//! for engine globals we don't stub, or Lua the VM rejects). It:
 //!   - strips `--` line comments first (so a commented-out `--planeColor = {…}`
 //!     is ignored),
 //!   - matches keys as whole words, case-insensitively (the engine lowercases
@@ -12,13 +15,16 @@
 //!   - reads scalar / boolean / `{r,g,b}` vector / quoted-string literals,
 //!     tolerating multi-line arrays and trailing commas.
 //!
-//! Anything computed, `require`d, or absent is simply omitted; callers fall back
-//! (e.g. to the `.smf` header for the height range). A real Lua eval is the path
-//! if these are ever exposed for *editing*. Limitations: a `--` inside a string
-//! value truncates it, and the first whole-word `name =` wins (the map's, which
-//! by convention precedes the per-terrain-type `name =` entries).
+//! Anything computed, `require`d, or absent is simply omitted by the scanner;
+//! callers fall back further (e.g. to the `.smf` header for the height range).
+//! Scanner limitations: a `--` inside a string value truncates it, and the
+//! first whole-word `name =` wins (the map's, which by convention precedes the
+//! per-terrain-type `name =` entries).
 
-use serde::Serialize;
+use std::path::Path;
+
+use coilbox_springlua::SpringLua;
+use serde::{Deserialize, Serialize};
 
 /// The subset of `mapinfo.lua` we surface. Every field is optional — present
 /// only when found as a literal.
@@ -142,6 +148,82 @@ pub fn parse_appearance(src: &str) -> MapAppearance {
     }
 }
 
+/// The nested shape of `mapinfo.lua` we deserialize from the evaluated table.
+/// Keys are lowercase because `coilbox-springlua` applies the engine's
+/// `lowerkeys` first; unknown keys (e.g. `terrainTypes`) are ignored.
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct MapInfoRaw {
+    name: Option<String>,
+    description: Option<String>,
+    author: Option<String>,
+    version: Option<String>,
+    voidwater: Option<bool>,
+    smf: Smf,
+    water: Water,
+    atmosphere: Atmosphere,
+    lighting: Lighting,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct Smf {
+    minheight: Option<f64>,
+    maxheight: Option<f64>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct Water {
+    surfacecolor: Option<[f32; 3]>,
+    planecolor: Option<[f32; 3]>,
+    surfacealpha: Option<f32>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct Atmosphere {
+    skycolor: Option<[f32; 3]>,
+    fogcolor: Option<[f32; 3]>,
+    suncolor: Option<[f32; 3]>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct Lighting {
+    sundir: Option<[f32; 3]>,
+}
+
+impl From<MapInfoRaw> for MapAppearance {
+    fn from(r: MapInfoRaw) -> Self {
+        MapAppearance {
+            name: r.name,
+            description: r.description,
+            author: r.author,
+            version: r.version,
+            min_height: r.smf.minheight,
+            max_height: r.smf.maxheight,
+            void_water: r.voidwater,
+            // surfaceColor wins over planeColor, matching the scanner.
+            water_color: r.water.surfacecolor.or(r.water.planecolor),
+            water_alpha: r.water.surfacealpha,
+            sky_color: r.atmosphere.skycolor,
+            fog_color: r.atmosphere.fogcolor,
+            sun_dir: r.lighting.sundir,
+            sun_color: r.atmosphere.suncolor,
+        }
+    }
+}
+
+/// Evaluate `mapinfo.lua` (`src`) in a sandboxed Spring Lua VM rooted at `root`
+/// (so `VFS.Include` resolves siblings). Returns `None` on any eval/sandbox
+/// error — callers fall back to [`parse_appearance`].
+pub fn eval_appearance(root: &Path, src: &str) -> Option<MapAppearance> {
+    let lua = SpringLua::new(root).ok()?;
+    let raw: MapInfoRaw = lua.eval_to(src, "mapinfo.lua").ok()?;
+    Some(raw.into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,5 +341,17 @@ mod tests {
     #[test]
     fn empty_on_no_match() {
         assert_eq!(parse_appearance("return {}"), MapAppearance::default());
+    }
+
+    // TMA is a `local mapinfo = {…}` block; wrapping it with `return mapinfo`
+    // makes it a real evaluable file. The eval path must agree with the scanner
+    // on a file both can read. (ATG is a non-returning loose fragment — only the
+    // scanner handles that, which is exactly its fallback role.)
+    #[test]
+    fn eval_path_matches_scanner() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let src = format!("{TMA}\nreturn mapinfo");
+        let evaled = eval_appearance(root, &src).expect("TMA evaluates");
+        assert_eq!(evaled, parse_appearance(TMA));
     }
 }

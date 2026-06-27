@@ -226,7 +226,10 @@ async fn mc_read_mapinfo(path: String) -> CliResult {
         let mut info = mapinfo::MapAppearance::default();
         for d in &dirs {
             if let Ok(src) = std::fs::read_to_string(d.join("mapinfo.lua")) {
-                info = mapinfo::parse_appearance(&src);
+                // Evaluate first (handles computed values + VFS.Include);
+                // fall back to the literal scanner if evaluation fails.
+                info = mapinfo::eval_appearance(d, &src)
+                    .unwrap_or_else(|| mapinfo::parse_appearance(&src));
                 break;
             }
         }
