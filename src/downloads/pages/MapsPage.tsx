@@ -15,7 +15,7 @@ import {
   dlInstalledContent,
   dlSpringfilesList,
 } from "../bindings";
-import { useWriteRootPath } from "../config";
+import { useContentRootPaths, useWriteRootPath } from "../config";
 import { OptionSelect } from "./components/OptionSelect";
 import { EmptyState, errMessage } from "./components/states";
 
@@ -104,20 +104,21 @@ export default function MapsPage() {
     load(source);
   }, [source, load]);
 
-  // Lowercased filenames already present in the configured write root's maps/.
+  // Lowercased map filenames already present in any detected content root.
+  const rootPaths = useContentRootPaths();
   const [installed, setInstalled] = useState<Set<string>>(new Set());
   const refreshInstalled = useCallback(async () => {
-    if (!writePath) {
+    if (rootPaths.length === 0) {
       setInstalled(new Set());
       return;
     }
     try {
-      const { maps } = await dlInstalledContent({ writePath });
+      const { maps } = await dlInstalledContent({ paths: rootPaths });
       setInstalled(new Set(maps));
     } catch {
       setInstalled(new Set());
     }
-  }, [writePath]);
+  }, [rootPaths]);
 
   useEffect(() => {
     refreshInstalled();
@@ -311,7 +312,7 @@ export default function MapsPage() {
                       {downloading === it.springName ? (
                         <Loader2 className="animate-spin" />
                       ) : isInstalled ? (
-                        <CheckCircle2 />
+                        <CheckCircle2 className="text-emerald-500" />
                       ) : (
                         <Download />
                       )}

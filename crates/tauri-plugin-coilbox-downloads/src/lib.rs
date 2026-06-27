@@ -385,16 +385,22 @@ fn list_filenames(dir: &std::path::Path) -> Vec<String> {
     }
 }
 
-/// `dl_installed_content` — filenames present in `<write_path>/maps` and
-/// `<write_path>/games`, so the browse screens can mark items already installed
-/// in the configured content root. Names are lowercased for case-insensitive
-/// matching against a source's `filename`.
+/// `dl_installed_content` — filenames present in `<path>/maps` and `<path>/games`
+/// across every given content root, so the browse screens can mark items already
+/// installed anywhere (not just the write root — e.g. a skylobby data dir). Names
+/// are lowercased and deduped for case-insensitive matching against `filename`.
 #[tauri::command]
-async fn dl_installed_content(write_path: String) -> CliResult {
-    let root = std::path::Path::new(&write_path);
+async fn dl_installed_content(paths: Vec<String>) -> CliResult {
+    let mut maps = std::collections::BTreeSet::new();
+    let mut games = std::collections::BTreeSet::new();
+    for p in &paths {
+        let root = std::path::Path::new(p);
+        maps.extend(list_filenames(&root.join("maps")));
+        games.extend(list_filenames(&root.join("games")));
+    }
     CliResult::ok(json!({
-        "maps": list_filenames(&root.join("maps")),
-        "games": list_filenames(&root.join("games")),
+        "maps": maps.into_iter().collect::<Vec<_>>(),
+        "games": games.into_iter().collect::<Vec<_>>(),
     }))
 }
 

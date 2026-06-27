@@ -14,7 +14,7 @@ import {
   dlSpringfilesList,
   type SpringFile,
 } from "../bindings";
-import { useWriteRootPath } from "../config";
+import { useContentRootPaths, useWriteRootPath } from "../config";
 import { OptionSelect } from "./components/OptionSelect";
 import { EmptyState, errMessage } from "./components/states";
 
@@ -67,20 +67,21 @@ export default function GamesPage() {
     load();
   }, [load]);
 
-  // Lowercased filenames already present in the configured write root's games/.
+  // Lowercased game filenames already present in any detected content root.
+  const rootPaths = useContentRootPaths();
   const [installed, setInstalled] = useState<Set<string>>(new Set());
   const refreshInstalled = useCallback(async () => {
-    if (!writePath) {
+    if (rootPaths.length === 0) {
       setInstalled(new Set());
       return;
     }
     try {
-      const { games } = await dlInstalledContent({ writePath });
+      const { games } = await dlInstalledContent({ paths: rootPaths });
       setInstalled(new Set(games));
     } catch {
       setInstalled(new Set());
     }
-  }, [writePath]);
+  }, [rootPaths]);
 
   useEffect(() => {
     refreshInstalled();
@@ -237,7 +238,7 @@ export default function GamesPage() {
                     {downloading === g.springname ? (
                       <Loader2 className="animate-spin" />
                     ) : isInstalled ? (
-                      <CheckCircle2 />
+                      <CheckCircle2 className="text-emerald-500" />
                     ) : (
                       <Download />
                     )}

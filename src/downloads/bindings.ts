@@ -107,11 +107,12 @@ export const dlDownloadFile = defineCommand<
 >("coilbox-downloads", "dl_download_file");
 
 /**
- * Lowercased filenames already present in `<writePath>/maps` and `/games`, for
- * marking installed items. Compare against a source's `filename` (lowercased).
+ * Lowercased filenames already present in `<path>/maps` and `/games` across every
+ * given content root, for marking installed items. Compare against a source's
+ * `filename` (lowercased).
  */
 export const dlInstalledContent = defineCommand<
-  { writePath: string },
+  { paths: string[] },
   { maps: string[]; games: string[] }
 >("coilbox-downloads", "dl_installed_content");
 
