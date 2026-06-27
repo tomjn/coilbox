@@ -14,7 +14,19 @@ import {
   type SpringFile,
 } from "../bindings";
 import { useWriteRootPath } from "../config";
+import { OptionSelect } from "./components/OptionSelect";
 import { EmptyState, errMessage } from "./components/states";
+
+type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
+
+const SORT_OPTIONS = [
+  { value: "name-asc", label: "Name A–Z" },
+  { value: "name-desc", label: "Name Z–A" },
+  { value: "size-desc", label: "Largest" },
+  { value: "size-asc", label: "Smallest" },
+];
+
+const gameName = (g: SpringFile) => g.name || g.springname;
 
 /**
  * Games: download games from springfiles into the configured content root.
@@ -29,6 +41,7 @@ export default function GamesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [sort, setSort] = useState<SortKey>("name-asc");
   const [downloading, setDownloading] = useState<string | null>(null);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
     null,
@@ -82,6 +95,24 @@ export default function GamesPage() {
     );
   }, [games, filter]);
 
+  const sorted = useMemo(() => {
+    if (!filtered) return null;
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      switch (sort) {
+        case "name-desc":
+          return gameName(b).localeCompare(gameName(a));
+        case "size-desc":
+          return (b.size ?? 0) - (a.size ?? 0);
+        case "size-asc":
+          return (a.size ?? 0) - (b.size ?? 0);
+        default:
+          return gameName(a).localeCompare(gameName(b));
+      }
+    });
+    return arr;
+  }, [filtered, sort]);
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex flex-col gap-3 border-b border-border px-6 py-4">
@@ -107,6 +138,12 @@ export default function GamesPage() {
               className="h-9 pl-7"
             />
           </div>
+          <OptionSelect
+            value={sort}
+            onValueChange={(v) => setSort(v as SortKey)}
+            className="w-36"
+            options={SORT_OPTIONS}
+          />
           {games && (
             <span className="text-sm text-muted-foreground">
               {filter.trim() && filtered
@@ -136,16 +173,16 @@ export default function GamesPage() {
             {error}
           </p>
         )}
-        {filtered && filtered.length === 0 && (
+        {sorted && sorted.length === 0 && (
           <EmptyState icon={Gamepad2}>
             {filter.trim()
               ? `No games match “${filter.trim()}”.`
               : "No games found."}
           </EmptyState>
         )}
-        {filtered && filtered.length > 0 && (
+        {sorted && sorted.length > 0 && (
           <ul className="divide-y divide-border">
-            {filtered.map((g) => (
+            {sorted.map((g) => (
               <li
                 key={g.springname}
                 className="flex items-center justify-between gap-3 px-6 py-2.5"

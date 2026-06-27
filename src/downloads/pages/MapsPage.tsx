@@ -30,7 +30,11 @@ interface MapItem {
   title: string;
   subtitle?: string;
   thumb?: string;
+  /** Bytes, when the source reports it (springfiles); used for size sorting. */
+  size?: number;
 }
+
+type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
 
 function barSubtitle(m: BarMap): string {
   const parts: string[] = [];
@@ -48,6 +52,7 @@ export default function MapsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [sort, setSort] = useState<SortKey>("name-asc");
   const [downloading, setDownloading] = useState<string | null>(null);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
     null,
@@ -79,6 +84,7 @@ export default function MapsPage() {
               ? `${(f.size / 1_048_576).toFixed(1)} MB`
               : undefined,
             thumb: f.mapimages[0],
+            size: f.size,
           })),
         );
       }
@@ -122,6 +128,35 @@ export default function MapsPage() {
     );
   }, [items, filter]);
 
+  const sorted = useMemo(() => {
+    if (!filtered) return null;
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      switch (sort) {
+        case "name-desc":
+          return b.title.localeCompare(a.title);
+        case "size-desc":
+          return (b.size ?? 0) - (a.size ?? 0);
+        case "size-asc":
+          return (a.size ?? 0) - (b.size ?? 0);
+        default:
+          return a.title.localeCompare(b.title);
+      }
+    });
+    return arr;
+  }, [filtered, sort]);
+
+  const sortOptions = [
+    { value: "name-asc", label: "Name A–Z" },
+    { value: "name-desc", label: "Name Z–A" },
+    ...(source === "springfiles"
+      ? [
+          { value: "size-desc", label: "Largest" },
+          { value: "size-asc", label: "Smallest" },
+        ]
+      : []),
+  ];
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex flex-col gap-3 border-b border-border px-6 py-4">
@@ -135,7 +170,10 @@ export default function MapsPage() {
         <div className="flex flex-wrap items-center gap-2">
           <OptionSelect
             value={source}
-            onValueChange={(v) => setSource(v as Source)}
+            onValueChange={(v) => {
+              setSource(v as Source);
+              setSort("name-asc");
+            }}
             className="w-48"
             options={[
               { value: "bar", label: "Beyond All Reason" },
@@ -156,6 +194,12 @@ export default function MapsPage() {
               className="h-9 pl-7"
             />
           </div>
+          <OptionSelect
+            value={sort}
+            onValueChange={(v) => setSort(v as SortKey)}
+            className="w-36"
+            options={sortOptions}
+          />
           {items && (
             <span className="text-sm text-muted-foreground">
               {filter.trim() && filtered
@@ -185,16 +229,16 @@ export default function MapsPage() {
             {error}
           </p>
         )}
-        {filtered && filtered.length === 0 && (
+        {sorted && sorted.length === 0 && (
           <EmptyState icon={MapIcon}>
             {filter.trim()
               ? `No maps match “${filter.trim()}”.`
               : "No maps found."}
           </EmptyState>
         )}
-        {filtered && filtered.length > 0 && (
+        {sorted && sorted.length > 0 && (
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
-            {filtered.map((it) => (
+            {sorted.map((it) => (
               <li
                 key={it.springName}
                 className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
