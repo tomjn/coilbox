@@ -5,7 +5,7 @@
 //! executable at runtime (and in the target dir during `tauri dev`). We resolve it
 //! there rather than going through the shell plugin, so the plugin's ACL grant
 //! stays uniform with every other picoframe plugin (just
-//! `coilbox-prdownloader:default`, no extra shell-execute scope).
+//! `coilbox-downloads:default`, no extra shell-execute scope).
 
 use std::path::PathBuf;
 

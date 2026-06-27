@@ -1,12 +1,12 @@
 [package]
-name = "tauri-plugin-coilbox-prdownloader"
+name = "tauri-plugin-coilbox-downloads"
 version = "0.0.0"
-description = "pr-downloader sidecar plugin for Coilbox (Rust half). ACL identifier: coilbox-prdownloader"
+description = "Downloads plugin for Coilbox (Rust half), wrapping the pr-downloader sidecar. ACL identifier: coilbox-downloads"
 edition = "2021"
 license = "MIT"
 # Tauri requires `links` to equal `package.name`. The ACL identifier is this
-# name with the `tauri-plugin-` prefix stripped -> `coilbox-prdownloader`.
-links = "tauri-plugin-coilbox-prdownloader"
+# name with the `tauri-plugin-` prefix stripped -> `coilbox-downloads`.
+links = "tauri-plugin-coilbox-downloads"
 
 [build-dependencies]
 tauri-plugin = { version = "2", features = ["build"] }

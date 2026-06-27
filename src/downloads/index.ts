@@ -2,24 +2,24 @@ import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Package } from "lucide-react";
 
 /**
- * The prdownloader plugin's frontend half. Contributes a nav group and a single
+ * The downloads plugin's frontend half. Contributes a nav group and a single
  * lazy route: a rapid-repo explorer that lists downloadable content and triggers
  * downloads through the bundled `pr-downloader` sidecar. Pair it with the
- * `tauri-plugin-coilbox-prdownloader` crate (ACL id `coilbox-prdownloader`).
+ * `tauri-plugin-coilbox-downloads` crate (ACL id `coilbox-downloads`).
  */
-const prdownloaderPlugin: FramePlugin = {
-  id: "prdownloader",
+const downloadsPlugin: FramePlugin = {
+  id: "downloads",
   version: "0.0.0",
   nav: [
     {
-      id: "prdownloader",
-      label: "pr-downloader",
+      id: "downloads",
+      label: "Downloads",
       order: 20,
       items: [
         {
-          id: "prdownloader.browse",
-          label: "Browse",
-          to: "/prdownloader",
+          id: "downloads.browse",
+          label: "Browse Rapid",
+          to: "/downloads",
           end: true,
           order: 0,
           icon: Package,
@@ -29,11 +29,11 @@ const prdownloaderPlugin: FramePlugin = {
   ],
   routes: [
     {
-      path: "prdownloader",
+      path: "downloads",
       lazy: () => import("./pages/ExplorerPage"),
-      crumb: "pr-downloader",
+      crumb: "Downloads",
     },
   ],
 };
 
-export default prdownloaderPlugin;
+export default downloadsPlugin;

@@ -553,8 +553,8 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-coilbox-anim",
  "tauri-plugin-coilbox-content",
+ "tauri-plugin-coilbox-downloads",
  "tauri-plugin-coilbox-mapconv",
- "tauri-plugin-coilbox-prdownloader",
  "tauri-plugin-coilbox-uberstress",
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
@@ -4057,6 +4057,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-coilbox-downloads"
+version = "0.0.0"
+dependencies = [
+ "flate2",
+ "picoframe-core",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
 name = "tauri-plugin-coilbox-mapconv"
 version = "0.0.0"
 dependencies = [
@@ -4069,19 +4082,6 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "zip",
-]
-
-[[package]]
-name = "tauri-plugin-coilbox-prdownloader"
-version = "0.0.0"
-dependencies = [
- "flate2",
- "picoframe-core",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tauri",
- "tauri-plugin",
 ]
 
 [[package]]

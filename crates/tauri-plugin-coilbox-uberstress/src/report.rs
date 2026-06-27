@@ -2,7 +2,7 @@
 //! text output. The field layout mirrors `internal/metrics/report.go` exactly so
 //! we deserialize the files uberstress already writes (we never write them).
 //! Parsing logic lives here as pure functions, kept apart from the IPC layer so
-//! it stays unit-testable (the same split prdownloader uses in `rapid.rs`).
+//! it stays unit-testable (the same split the downloads plugin uses in `rapid.rs`).
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
