@@ -91,3 +91,29 @@ export const dlDownloadFile = defineCommand<
   { url: string; destDir: string; filename: string },
   { message: string; path: string }
 >("coilbox-downloads", "dl_download_file");
+
+/** A Recoil engine release matching the running platform. */
+export interface EngineRelease {
+  version: string;
+  assetUrl: string;
+  size: number;
+  prerelease: boolean;
+}
+
+/** Recoil engine releases for the current platform (empty on macOS). */
+export const dlRecoilEngines = defineCommand<
+  undefined,
+  { releases: EngineRelease[]; platform: string }
+>("coilbox-downloads", "dl_recoil_engines");
+
+/** Install a Recoil engine release into `<writePath>/engine/<version>/`. */
+export const dlDownloadEngineRecoil = defineCommand<
+  { version: string; assetUrl: string; writePath: string },
+  { message: string; path: string }
+>("coilbox-downloads", "dl_download_engine_recoil");
+
+/** Download a classic Spring engine via the sidecar's `--download-engine`. */
+export const dlDownloadEngineSpring = defineCommand<
+  { version: string; writePath?: string },
+  { message: string; version: string }
+>("coilbox-downloads", "dl_download_engine_spring");

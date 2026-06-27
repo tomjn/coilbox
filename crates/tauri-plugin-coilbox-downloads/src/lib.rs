@@ -240,6 +240,116 @@ async fn dl_download_file(url: String, dest_dir: String, filename: String) -> Cl
     }
 }
 
+/// GitHub's API rejects requests without a `User-Agent`; set one explicitly.
+async fn fetch_github(url: &str) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent("coilbox")
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+    let resp = resp.error_for_status().map_err(|e| e.to_string())?;
+    resp.text().await.map_err(|e| e.to_string())
+}
+
+/// `dl_recoil_engines` — Recoil engine releases whose assets match the running
+/// platform (`amd64-<os>.7z`). Empty on platforms with no official build (macOS).
+#[tauri::command]
+async fn dl_recoil_engines() -> CliResult {
+    let os = std::env::consts::OS;
+    let Some(suffix) = sources::recoil_asset_suffix() else {
+        return CliResult::ok(json!({ "releases": [], "platform": os }));
+    };
+    match fetch_github(sources::RECOIL_RELEASES_URL).await {
+        Ok(body) => match serde_json::from_str::<Vec<sources::GithubRelease>>(&body) {
+            Ok(rels) => {
+                let releases: Vec<_> = rels
+                    .iter()
+                    .filter_map(|r| sources::match_engine_release(r, suffix))
+                    .collect();
+                CliResult::ok(json!({ "releases": releases, "platform": os }))
+            }
+            Err(e) => CliResult::err(format!("could not parse Recoil releases: {e}")),
+        },
+        Err(e) => CliResult::err(format!("failed to fetch Recoil releases: {e}")),
+    }
+}
+
+/// Download a Recoil `.7z` release and extract it into `<write_path>/engine/<version>/`.
+async fn install_recoil_engine(
+    version: &str,
+    asset_url: &str,
+    write_path: &str,
+) -> Result<String, String> {
+    let engine_root = std::path::Path::new(write_path).join("engine");
+    let dest = engine_root.join(version);
+    std::fs::create_dir_all(&dest)
+        .map_err(|e| format!("could not create {}: {e}", dest.display()))?;
+
+    let resp = reqwest::get(asset_url).await.map_err(|e| e.to_string())?;
+    let resp = resp.error_for_status().map_err(|e| e.to_string())?;
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    let tmp = engine_root.join(format!(".{version}.7z"));
+    std::fs::write(&tmp, &bytes).map_err(|e| format!("could not write engine archive: {e}"))?;
+
+    let tmp_for_extract = tmp.clone();
+    let dest_for_extract = dest.clone();
+    let extracted = tauri::async_runtime::spawn_blocking(move || {
+        sevenz_rust2::decompress_file(&tmp_for_extract, &dest_for_extract)
+            .map_err(|e| format!("failed to extract engine archive: {e}"))
+    })
+    .await
+    .map_err(|e| format!("extract task failed: {e}"))?;
+    let _ = std::fs::remove_file(&tmp);
+    extracted?;
+    Ok(dest.display().to_string())
+}
+
+/// `dl_download_engine_recoil` — install a Recoil engine release into the chosen
+/// content root's `engine/<version>/` (download + 7z extract).
+#[tauri::command]
+async fn dl_download_engine_recoil(
+    version: String,
+    asset_url: String,
+    write_path: String,
+) -> CliResult {
+    if version.trim().is_empty() || asset_url.trim().is_empty() || write_path.trim().is_empty() {
+        return CliResult::err("version, asset_url and write_path are required");
+    }
+    match install_recoil_engine(&version, &asset_url, &write_path).await {
+        Ok(dir) => {
+            CliResult::ok(json!({ "message": format!("Installed engine {version}"), "path": dir }))
+        }
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `dl_download_engine_spring` — download a classic Spring engine via the sidecar's
+/// `--download-engine`, which resolves the per-platform build and extracts it.
+#[tauri::command]
+async fn dl_download_engine_spring(version: String, write_path: Option<String>) -> CliResult {
+    if version.trim().is_empty() {
+        return CliResult::err("version is required");
+    }
+    let mut args = vec!["--download-engine".to_string(), version.clone()];
+    if let Some(wp) = write_path.filter(|s| !s.trim().is_empty()) {
+        args.push("--filesystem-writepath".to_string());
+        args.push(wp);
+    }
+    match run_sidecar(args).await {
+        Err(e) => CliResult::err(e),
+        Ok(out) => {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let outcome = sidecar::parse_download(&stdout, &stderr, out.status.code());
+            if outcome.success {
+                CliResult::ok(json!({ "message": outcome.message, "version": version }))
+            } else {
+                CliResult::err(outcome.message)
+            }
+        }
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-downloads"` (crate name minus
 /// the `tauri-plugin-` prefix); the frontend invokes
 /// `plugin:coilbox-downloads|<cmd>`.
@@ -253,7 +363,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_springfiles_list,
             dl_bar_maps,
             dl_download_map,
-            dl_download_file
+            dl_download_file,
+            dl_recoil_engines,
+            dl_download_engine_recoil,
+            dl_download_engine_spring
         ])
         .build()
 }

@@ -12,6 +12,9 @@ Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR
 - `allow-dl-bar-maps`
 - `allow-dl-download-map`
 - `allow-dl-download-file`
+- `allow-dl-recoil-engines`
+- `allow-dl-download-engine-recoil`
+- `allow-dl-download-engine-spring`
 
 ## Permission Table
 
@@ -77,6 +80,58 @@ Denies the dl_download command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-downloads:allow-dl-download-engine-recoil`
+
+</td>
+<td>
+
+Enables the dl_download_engine_recoil command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-download-engine-recoil`
+
+</td>
+<td>
+
+Denies the dl_download_engine_recoil command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:allow-dl-download-engine-spring`
+
+</td>
+<td>
+
+Enables the dl_download_engine_spring command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-download-engine-spring`
+
+</td>
+<td>
+
+Denies the dl_download_engine_spring command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-downloads:allow-dl-download-file`
 
 </td>
@@ -122,6 +177,32 @@ Enables the dl_download_map command without any pre-configured scope.
 <td>
 
 Denies the dl_download_map command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:allow-dl-recoil-engines`
+
+</td>
+<td>
+
+Enables the dl_recoil_engines command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-recoil-engines`
+
+</td>
+<td>
+
+Denies the dl_recoil_engines command without any pre-configured scope.
 
 </td>
 </tr>

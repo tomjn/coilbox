@@ -11,4 +11,7 @@ permissions = [
   "allow-dl-bar-maps",
   "allow-dl-download-map",
   "allow-dl-download-file",
+  "allow-dl-recoil-engines",
+  "allow-dl-download-engine-recoil",
+  "allow-dl-download-engine-spring",
 ]

@@ -11,6 +11,9 @@ const COMMANDS: &[&str] = &[
     "dl_bar_maps",
     "dl_download_map",
     "dl_download_file",
+    "dl_recoil_engines",
+    "dl_download_engine_recoil",
+    "dl_download_engine_spring",
 ];
 
 fn main() {

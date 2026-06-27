@@ -20,3 +20,5 @@ picoframe-core = "0.0.2"
 # rustls-tls avoids an OpenSSL build dependency across platforms.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 flate2 = "1"
+# Extract Recoil engine release archives (.7z). Same crate the mapconv plugin uses.
+sevenz-rust2 = "0.21.1"
