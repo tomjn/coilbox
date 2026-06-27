@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the dl_bar_maps command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-dl-bar-maps",
+          "markdownDescription": "Enables the dl_bar_maps command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_bar_maps command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-dl-bar-maps",
+          "markdownDescription": "Denies the dl_bar_maps command without any pre-configured scope."
+        },
+        {
           "description": "Enables the dl_download command without any pre-configured scope.",
           "type": "string",
           "const": "allow-dl-download",
@@ -307,6 +319,30 @@
           "markdownDescription": "Denies the dl_download command without any pre-configured scope."
         },
         {
+          "description": "Enables the dl_download_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-dl-download-file",
+          "markdownDescription": "Enables the dl_download_file command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_download_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-dl-download-file",
+          "markdownDescription": "Denies the dl_download_file command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the dl_download_map command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-dl-download-map",
+          "markdownDescription": "Enables the dl_download_map command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_download_map command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-dl-download-map",
+          "markdownDescription": "Denies the dl_download_map command without any pre-configured scope."
+        },
+        {
           "description": "Enables the dl_repos command without any pre-configured scope.",
           "type": "string",
           "const": "allow-dl-repos",
@@ -317,6 +353,18 @@
           "type": "string",
           "const": "deny-dl-repos",
           "markdownDescription": "Denies the dl_repos command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the dl_springfiles_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-dl-springfiles-list",
+          "markdownDescription": "Enables the dl_springfiles_list command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_springfiles_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-dl-springfiles-list",
+          "markdownDescription": "Denies the dl_springfiles_list command without any pre-configured scope."
         },
         {
           "description": "Enables the dl_version command without any pre-configured scope.",
@@ -343,10 +391,10 @@
           "markdownDescription": "Denies the dl_versions command without any pre-configured scope."
         },
         {
-          "description": "Allows the downloads plugin's commands (version, rapid browsing, download).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`",
+          "description": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-bar-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the downloads plugin's commands (version, rapid browsing, download).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`"
+          "markdownDescription": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-bar-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`"
         }
       ]
     }

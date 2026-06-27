@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-dl-springfiles-list"
+description = "Enables the dl_springfiles_list command without any pre-configured scope."
+commands.allow = ["dl_springfiles_list"]
+
+[[permission]]
+identifier = "deny-dl-springfiles-list"
+description = "Denies the dl_springfiles_list command without any pre-configured scope."
+commands.deny = ["dl_springfiles_list"]

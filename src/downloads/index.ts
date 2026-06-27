@@ -1,5 +1,5 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Download, Package } from "lucide-react";
+import { Download, Gamepad2, Map as MapIcon, Package } from "lucide-react";
 import DownloadsSettings from "./pages/SettingsSection";
 
 /**
@@ -30,6 +30,20 @@ const downloadsPlugin: FramePlugin = {
           order: 0,
           icon: Package,
         },
+        {
+          id: "downloads.maps",
+          label: "Maps",
+          to: "/downloads/maps",
+          order: 1,
+          icon: MapIcon,
+        },
+        {
+          id: "downloads.games",
+          label: "Games",
+          to: "/downloads/games",
+          order: 2,
+          icon: Gamepad2,
+        },
       ],
     },
   ],
@@ -37,7 +51,17 @@ const downloadsPlugin: FramePlugin = {
     {
       path: "downloads",
       lazy: () => import("./pages/ExplorerPage"),
-      crumb: "Downloads",
+      crumb: "Browse Rapid",
+    },
+    {
+      path: "downloads/maps",
+      lazy: () => import("./pages/MapsPage"),
+      crumb: "Maps",
+    },
+    {
+      path: "downloads/games",
+      lazy: () => import("./pages/GamesPage"),
+      crumb: "Games",
     },
   ],
   settings: [
