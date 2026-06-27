@@ -37,6 +37,21 @@ export function useDownloadsConfig() {
 }
 
 /**
+ * All detected content-root paths. Used to detect already-installed content
+ * across every folder (not just the write root) — e.g. a map present in a
+ * skylobby data dir still counts as installed.
+ */
+export function useContentRootPaths(): string[] {
+  const [paths, setPaths] = useState<string[]>([]);
+  useEffect(() => {
+    contentStateLoad(undefined)
+      .then(({ state }) => setPaths(state.roots.map((r) => r.path)))
+      .catch(() => setPaths([]));
+  }, []);
+  return paths;
+}
+
+/**
  * Resolve the configured write-root id (Downloads settings) to its on-disk path,
  * via the content plugin's detected roots. Shared by every download screen so
  * they all write into the same chosen folder. `undefined` when none is set or

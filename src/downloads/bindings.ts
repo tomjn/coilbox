@@ -48,6 +48,8 @@ export interface SpringFile {
   mirrors: string[];
   /** Thumbnail/preview image URLs (may be empty, e.g. for games). */
   mapimages: string[];
+  /** Map author + dimensions (from `metadata=1`); empty/0 for non-maps. */
+  metadata: { author: string; width: number; height: number };
 }
 
 /** A Beyond All Reason map from the validated maps list. */
@@ -105,6 +107,16 @@ export const dlDownloadFile = defineCommand<
   { url: string; destDir: string; filename: string },
   { message: string; path: string }
 >("coilbox-downloads", "dl_download_file");
+
+/**
+ * Lowercased filenames already present in `<path>/maps` and `/games` across every
+ * given content root, for marking installed items. Compare against a source's
+ * `filename` (lowercased).
+ */
+export const dlInstalledContent = defineCommand<
+  { paths: string[] },
+  { maps: string[]; games: string[] }
+>("coilbox-downloads", "dl_installed_content");
 
 /** A Recoil engine release matching the running platform. */
 export interface EngineRelease {

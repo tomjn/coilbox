@@ -15,4 +15,5 @@ permissions = [
   "allow-dl-recoil-engines",
   "allow-dl-download-engine-recoil",
   "allow-dl-download-engine-spring",
+  "allow-dl-installed-content",
 ]

@@ -16,6 +16,7 @@ Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR
 - `allow-dl-recoil-engines`
 - `allow-dl-download-engine-recoil`
 - `allow-dl-download-engine-spring`
+- `allow-dl-installed-content`
 
 ## Permission Table
 
@@ -178,6 +179,32 @@ Enables the dl_download_map command without any pre-configured scope.
 <td>
 
 Denies the dl_download_map command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:allow-dl-installed-content`
+
+</td>
+<td>
+
+Enables the dl_installed_content command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-installed-content`
+
+</td>
+<td>
+
+Denies the dl_installed_content command without any pre-configured scope.
 
 </td>
 </tr>
