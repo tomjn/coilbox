@@ -7,6 +7,20 @@ use serde::{Deserialize, Serialize};
 /// One entry from the springfiles `json.php` catalog. Field names match the
 /// springfiles JSON (all lowercase) and pass straight through to the frontend.
 /// Unknown fields (md5, timestamp, metadata, ...) are ignored.
+/// Map metadata from springfiles' `metadata=1` query. Source keys are
+/// capitalised (`Author`, `Width`, `Height`); accepted via serde aliases and
+/// re-emitted as lowercase for the frontend. Empty/zero for non-map entries.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
+pub struct SpringFileMetadata {
+    #[serde(alias = "Author")]
+    pub author: String,
+    #[serde(alias = "Width")]
+    pub width: f64,
+    #[serde(alias = "Height")]
+    pub height: f64,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct SpringFile {
@@ -20,6 +34,8 @@ pub struct SpringFile {
     pub mirrors: Vec<String>,
     /// Thumbnail/preview image URLs (present when queried with `images=on`).
     pub mapimages: Vec<String>,
+    /// Map metadata (author + dimensions) when queried with `metadata=1`.
+    pub metadata: SpringFileMetadata,
 }
 
 /// A platform-matched springfiles engine, deduped to one entry per version.
@@ -183,6 +199,18 @@ mod tests {
         assert_eq!(v[0].springname, "Comet");
         assert_eq!(v[0].mirrors, vec!["http://m/comet.sd7"]);
         assert_eq!(v[0].mapimages.len(), 1);
+    }
+
+    #[test]
+    fn springfile_captures_map_metadata() {
+        let json = r#"[{"springname":"Comet","name":"Comet","filename":"comet.sd7","category":"map","size":1,"metadata":{"Author":"raaar","Width":12.0,"Height":20.0}}]"#;
+        let v: Vec<SpringFile> = serde_json::from_str(json).unwrap();
+        assert_eq!(v[0].metadata.author, "raaar");
+        assert_eq!(v[0].metadata.width, 12.0);
+        assert_eq!(v[0].metadata.height, 20.0);
+        // Re-serialised as lowercase for the frontend.
+        let out = serde_json::to_string(&v[0]).unwrap();
+        assert!(out.contains("\"author\":\"raaar\""));
     }
 
     #[test]

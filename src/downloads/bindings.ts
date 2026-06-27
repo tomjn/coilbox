@@ -48,6 +48,8 @@ export interface SpringFile {
   mirrors: string[];
   /** Thumbnail/preview image URLs (may be empty, e.g. for games). */
   mapimages: string[];
+  /** Map author + dimensions (from `metadata=1`); empty/0 for non-maps. */
+  metadata: { author: string; width: number; height: number };
 }
 
 /** A Beyond All Reason map from the validated maps list. */
