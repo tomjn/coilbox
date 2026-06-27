@@ -532,6 +532,28 @@ async fn content_verify_engine<R: Runtime>(
     Ok(CliResult::ok(json!({ "engine": engine })))
 }
 
+/// `content_open_path` — reveal a content folder (or an engine's directory) in
+/// the OS file manager. Runs the platform open command directly instead of the
+/// frontend opener plugin, so any user content root opens regardless of the
+/// opener capability's path scope (which can't enumerate arbitrary user folders).
+#[tauri::command]
+async fn content_open_path(path: String) -> Result<CliResult, ()> {
+    if !Path::new(&path).exists() {
+        return Ok(CliResult::err(format!("path does not exist: {path}")));
+    }
+    let program = if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(target_os = "windows") {
+        "explorer"
+    } else {
+        "xdg-open"
+    };
+    match std::process::Command::new(program).arg(&path).spawn() {
+        Ok(_) => Ok(CliResult::ok(json!({}))),
+        Err(e) => Ok(CliResult::err(format!("failed to open {path}: {e}"))),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -544,7 +566,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_add_root,
             content_remove_root,
             content_list_engines,
-            content_verify_engine
+            content_verify_engine,
+            content_open_path
         ])
         .build()
 }

@@ -1,10 +1,10 @@
-import { openPath } from "@tauri-apps/plugin-opener";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { EngineInstaller } from "../../downloads/pages/components/EngineInstaller";
 import {
   type ContentState,
+  contentOpenPath,
   contentVerifyEngine,
   type Engine,
 } from "../bindings";
@@ -56,7 +56,7 @@ export default function EnginesSection() {
   };
 
   const openEngine = (path: string) => {
-    openPath(path).catch((e) => setActionError(msg(e)));
+    contentOpenPath({ path }).catch((e) => setActionError(msg(e)));
   };
 
   const groups = (state?.roots ?? []).filter((r) => r.engines.length > 0);

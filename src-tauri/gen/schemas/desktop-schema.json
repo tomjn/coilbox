@@ -375,10 +375,10 @@
           "markdownDescription": "Denies the anim_cob_disasm command without any pre-configured scope."
         },
         {
-          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`",
+          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`",
           "type": "string",
           "const": "coilbox-content:default",
-          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`"
+          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`"
         },
         {
           "description": "Enables the content_add_root command without any pre-configured scope.",
@@ -397,6 +397,12 @@
           "type": "string",
           "const": "coilbox-content:allow-content-list-engines",
           "markdownDescription": "Enables the content_list_engines command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_open_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-open-path",
+          "markdownDescription": "Enables the content_open_path command without any pre-configured scope."
         },
         {
           "description": "Enables the content_remove_root command without any pre-configured scope.",
@@ -445,6 +451,12 @@
           "type": "string",
           "const": "coilbox-content:deny-content-list-engines",
           "markdownDescription": "Denies the content_list_engines command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_open_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-open-path",
+          "markdownDescription": "Denies the content_open_path command without any pre-configured scope."
         },
         {
           "description": "Denies the content_remove_root command without any pre-configured scope.",

@@ -118,3 +118,13 @@ export const contentVerifyEngine = defineCommand<
   { path: string },
   { engine: Engine }
 >("coilbox-content", "content_verify_engine");
+
+/**
+ * Reveal a content folder / engine directory in the OS file manager. Runs the
+ * platform open command in Rust, so it works for any path (unlike the frontend
+ * opener plugin, which is gated by a capability path scope).
+ */
+export const contentOpenPath = defineCommand<{ path: string }, unknown>(
+  "coilbox-content",
+  "content_open_path",
+);

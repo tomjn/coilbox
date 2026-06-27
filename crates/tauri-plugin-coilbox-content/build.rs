@@ -11,6 +11,7 @@ const COMMANDS: &[&str] = &[
     "content_remove_root",
     "content_list_engines",
     "content_verify_engine",
+    "content_open_path",
 ];
 
 fn main() {

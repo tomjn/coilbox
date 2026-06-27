@@ -1,12 +1,12 @@
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
 import { AlertCircle, FolderPlus, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   type ContentState,
   contentAddRoot,
+  contentOpenPath,
   contentRemoveRoot,
   contentRescan,
   contentScanRoot,
@@ -120,7 +120,7 @@ export default function FoldersSection() {
   };
 
   const openRoot = (path: string) => {
-    openPath(path).catch((e) => setActionError(msg(e)));
+    contentOpenPath({ path }).catch((e) => setActionError(msg(e)));
   };
 
   const roots = state?.roots ?? [];

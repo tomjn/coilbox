@@ -12,6 +12,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-remove-root`
 - `allow-content-list-engines`
 - `allow-content-verify-engine`
+- `allow-content-open-path`
 
 ## Permission Table
 
@@ -96,6 +97,32 @@ Enables the content_list_engines command without any pre-configured scope.
 <td>
 
 Denies the content_list_engines command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-open-path`
+
+</td>
+<td>
+
+Enables the content_open_path command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-open-path`
+
+</td>
+<td>
+
+Denies the content_open_path command without any pre-configured scope.
 
 </td>
 </tr>
