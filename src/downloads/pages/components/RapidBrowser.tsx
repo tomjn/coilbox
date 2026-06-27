@@ -8,7 +8,7 @@ import {
   Package,
   Search,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   dlDownload,
   dlRepos,
@@ -89,7 +89,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     message: string;
   } | null>(null);
 
-  async function loadRepos(url = masterUrl) {
+  const loadRepos = useCallback(async (url: string) => {
     setReposLoading(true);
     setReposError(null);
     setSelected(null);
@@ -106,7 +106,15 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     } finally {
       setReposLoading(false);
     }
-  }
+  }, []);
+
+  // Auto-load the initial master once on mount so there's no "Load repos" click.
+  const autoLoaded = useRef(false);
+  useEffect(() => {
+    if (autoLoaded.current || cfg.rapidRepos.length === 0) return;
+    autoLoaded.current = true;
+    loadRepos(masterUrl);
+  }, [cfg.rapidRepos, masterUrl, loadRepos]);
 
   async function selectRepo(repo: Repo) {
     setSelected(repo);
@@ -177,7 +185,10 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                 label: r.name || r.url,
               }))}
             />
-            <Button onClick={() => loadRepos()} disabled={reposLoading}>
+            <Button
+              onClick={() => loadRepos(masterUrl)}
+              disabled={reposLoading}
+            >
               {reposLoading && <Loader2 className="animate-spin" />}
               {reposLoading ? "Loading…" : "Load repos"}
             </Button>
