@@ -15,6 +15,7 @@ const COMMANDS: &[&str] = &[
     "dl_recoil_engines",
     "dl_download_engine_recoil",
     "dl_download_engine_spring",
+    "dl_installed_content",
 ];
 
 fn main() {

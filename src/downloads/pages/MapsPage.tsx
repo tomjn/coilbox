@@ -12,9 +12,10 @@ import {
   type BarMap,
   dlBarMaps,
   dlDownloadMap,
+  dlInstalledContent,
   dlSpringfilesList,
 } from "../bindings";
-import { useWriteRootPath } from "../config";
+import { useContentRootPaths, useWriteRootPath } from "../config";
 import { OptionSelect } from "./components/OptionSelect";
 import { EmptyState, errMessage } from "./components/states";
 
@@ -30,6 +31,8 @@ interface MapItem {
   title: string;
   subtitle?: string;
   thumb?: string;
+  /** On-disk archive name, lowercased for installed-detection matching. */
+  filename: string;
   /** Bytes, when the source reports it (springfiles); used for size sorting. */
   size?: number;
 }
@@ -72,6 +75,7 @@ export default function MapsPage() {
             title: m.displayName || m.springName,
             subtitle: barSubtitle(m),
             thumb: m.images?.preview,
+            filename: m.filename,
           })),
         );
       } else {
@@ -84,6 +88,7 @@ export default function MapsPage() {
               ? `${(f.size / 1_048_576).toFixed(1)} MB`
               : undefined,
             thumb: f.mapimages[0],
+            filename: f.filename,
             size: f.size,
           })),
         );
@@ -99,6 +104,26 @@ export default function MapsPage() {
     load(source);
   }, [source, load]);
 
+  // Lowercased map filenames already present in any detected content root.
+  const rootPaths = useContentRootPaths();
+  const [installed, setInstalled] = useState<Set<string>>(new Set());
+  const refreshInstalled = useCallback(async () => {
+    if (rootPaths.length === 0) {
+      setInstalled(new Set());
+      return;
+    }
+    try {
+      const { maps } = await dlInstalledContent({ paths: rootPaths });
+      setInstalled(new Set(maps));
+    } catch {
+      setInstalled(new Set());
+    }
+  }, [rootPaths]);
+
+  useEffect(() => {
+    refreshInstalled();
+  }, [refreshInstalled]);
+
   async function download(springName: string) {
     setDownloading(springName);
     setResult(null);
@@ -109,6 +134,7 @@ export default function MapsPage() {
         writePath,
       });
       setResult({ ok: true, message });
+      await refreshInstalled();
     } catch (e) {
       setResult({ ok: false, message: errMessage(e) });
     } finally {
@@ -238,57 +264,68 @@ export default function MapsPage() {
         )}
         {sorted && sorted.length > 0 && (
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
-            {sorted.map((it) => (
-              <li
-                key={it.springName}
-                className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
-              >
-                <div className="flex aspect-video items-center justify-center bg-muted">
-                  {it.thumb ? (
-                    <img
-                      src={it.thumb}
-                      alt=""
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <MapIcon size={28} className="text-muted-foreground/40" />
-                  )}
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
-                  <div className="min-w-0">
-                    <p
-                      className="truncate text-sm font-medium"
-                      title={it.title}
-                    >
-                      {it.title}
-                    </p>
-                    {it.subtitle && (
-                      <p className="truncate text-xs text-muted-foreground">
-                        {it.subtitle}
-                      </p>
+            {sorted.map((it) => {
+              const isInstalled = installed.has(it.filename.toLowerCase());
+              return (
+                <li
+                  key={it.springName}
+                  className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
+                >
+                  <div className="flex aspect-video items-center justify-center bg-muted">
+                    {it.thumb ? (
+                      <img
+                        src={it.thumb}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <MapIcon size={28} className="text-muted-foreground/40" />
                     )}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-auto w-full"
-                    onClick={() => download(it.springName)}
-                    disabled={downloading !== null}
-                    aria-label={`Download ${it.title}`}
-                  >
-                    {downloading === it.springName ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <Download />
-                    )}
-                    {downloading === it.springName
-                      ? "Downloading…"
-                      : "Download"}
-                  </Button>
-                </div>
-              </li>
-            ))}
+                  <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
+                    <div className="min-w-0">
+                      <p
+                        className="truncate text-sm font-medium"
+                        title={it.title}
+                      >
+                        {it.title}
+                      </p>
+                      {it.subtitle && (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {it.subtitle}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-auto w-full"
+                      onClick={() => download(it.springName)}
+                      disabled={downloading !== null || isInstalled}
+                      aria-label={
+                        isInstalled
+                          ? `${it.title} already downloaded`
+                          : `Download ${it.title}`
+                      }
+                    >
+                      {downloading === it.springName ? (
+                        <Loader2 className="animate-spin" />
+                      ) : isInstalled ? (
+                        <CheckCircle2 className="text-emerald-500" />
+                      ) : (
+                        <Download />
+                      )}
+                      {downloading === it.springName
+                        ? "Downloading…"
+                        : isInstalled
+                          ? "Already downloaded"
+                          : "Download"}
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
