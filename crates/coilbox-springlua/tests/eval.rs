@@ -61,7 +61,9 @@ struct Lighting {
 fn self_contained_mapinfo() {
     let dir = fixture("selfcontained");
     let lua = SpringLua::new(&dir).unwrap();
-    let info: Info = lua.eval_to(&read("selfcontained", "mapinfo.lua"), "mapinfo.lua").unwrap();
+    let info: Info = lua
+        .eval_to(&read("selfcontained", "mapinfo.lua"), "mapinfo.lua")
+        .unwrap();
 
     // Mixed-case source keys come through lowercased.
     assert_eq!(info.name.as_deref(), Some("Self Contained"));
@@ -83,7 +85,9 @@ fn mapinfo_via_vfs_include() {
     // the case the literal scanner fundamentally could not resolve.
     let dir = fixture("withinclude");
     let lua = SpringLua::new(&dir).unwrap();
-    let info: Info = lua.eval_to(&read("withinclude", "mapinfo.lua"), "mapinfo.lua").unwrap();
+    let info: Info = lua
+        .eval_to(&read("withinclude", "mapinfo.lua"), "mapinfo.lua")
+        .unwrap();
 
     assert_eq!(info.name.as_deref(), Some("With Include"));
     assert_eq!(info.voidwater, Some(false));
@@ -101,7 +105,9 @@ fn modinfo_generalises() {
     }
     let dir = fixture("modinfo");
     let lua = SpringLua::new(&dir).unwrap();
-    let m: Mod = lua.eval_to(&read("modinfo", "modinfo.lua"), "modinfo.lua").unwrap();
+    let m: Mod = lua
+        .eval_to(&read("modinfo", "modinfo.lua"), "modinfo.lua")
+        .unwrap();
     assert_eq!(m.name, "Test Game");
     assert_eq!(m.version, "1.0");
     assert_eq!(m.modtype, 1);
@@ -173,5 +179,8 @@ fn non_returning_chunk_errors() {
     let dir = fixture("selfcontained");
     let lua = SpringLua::new(&dir).unwrap();
     let res: coilbox_springlua::Result<Info> = lua.eval_to("local x = 1", "noreturn");
-    assert!(res.is_err(), "a chunk that returns nothing is an error (caller falls back)");
+    assert!(
+        res.is_err(),
+        "a chunk that returns nothing is an error (caller falls back)"
+    );
 }

@@ -17,7 +17,14 @@ const INSTRUCTION_BUDGET: u32 = 50_000_000;
 /// Base-library functions that exist even without `io`/`os`/`package` and can
 /// execute arbitrary strings/files or escape the environment. Removed so the
 /// only way to pull another file is through our root-confined `VFS`.
-const EXEC_HATCHES: &[&str] = &["dofile", "loadfile", "loadstring", "load", "getfenv", "setfenv"];
+const EXEC_HATCHES: &[&str] = &[
+    "dofile",
+    "loadfile",
+    "loadstring",
+    "load",
+    "getfenv",
+    "setfenv",
+];
 
 /// Build a fresh sandboxed VM rooted at `root`.
 pub fn sandbox(root: &Path) -> mlua::Result<Lua> {
