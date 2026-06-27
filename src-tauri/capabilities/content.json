@@ -1,7 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "content",
-  "description": "Grants the content plugin's default commands and the native folder picker to the main window.",
+  "description": "Grants the content plugin's default commands, the native folder picker, and opening any detected/added content folder in the file manager.",
   "windows": ["main"],
-  "permissions": ["coilbox-content:default", "dialog:allow-open"]
+  "permissions": [
+    "coilbox-content:default",
+    "dialog:allow-open",
+    { "identifier": "opener:allow-open-path", "allow": [{ "path": "**" }] }
+  ]
 }
