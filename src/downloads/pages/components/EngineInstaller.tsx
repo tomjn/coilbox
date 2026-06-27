@@ -27,6 +27,8 @@ interface EngineItem {
   key: string;
   title: string;
   subtitle?: string;
+  /** secondary line, e.g. the springfiles filename. */
+  detail?: string;
   prerelease?: boolean;
   /** recoil only: the 7z asset to download. */
   assetUrl?: string;
@@ -75,8 +77,9 @@ export function EngineInstaller() {
         setItems(
           engines.map((e) => ({
             key: e.version,
-            title: e.version,
+            title: `${e.name} ${e.version}`.trim(),
             subtitle: fmtSize(e.size),
+            detail: e.filename,
           })),
         );
       }
@@ -176,6 +179,14 @@ export function EngineInstaller() {
                     </span>
                   )}
                 </p>
+                {item.detail && (
+                  <p
+                    className="truncate font-mono text-xs text-muted-foreground"
+                    title={item.detail}
+                  >
+                    {item.detail}
+                  </p>
+                )}
                 {item.subtitle && (
                   <p className="text-xs text-muted-foreground">
                     {item.subtitle}

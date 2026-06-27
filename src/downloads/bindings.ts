@@ -73,6 +73,7 @@ export const dlSpringfilesList = defineCommand<
 
 /** A platform-matched springfiles engine (one per version). */
 export interface SpringfilesEngine {
+  name: string;
   version: string;
   filename: string;
   size: number;

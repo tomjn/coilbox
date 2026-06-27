@@ -26,6 +26,8 @@ pub struct SpringFile {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpringfilesEngine {
+    /// Engine name (generically `spring` on springfiles).
+    pub name: String,
     pub version: String,
     pub filename: String,
     pub size: u64,
@@ -52,6 +54,7 @@ pub fn engines_for_platform(all: Vec<SpringFile>, token: &str) -> Vec<Springfile
         .filter(|f| f.category.contains(token) && !f.version.is_empty())
         .filter(|f| seen.insert(f.version.clone()))
         .map(|f| SpringfilesEngine {
+            name: f.name,
             version: f.version,
             filename: f.filename,
             size: f.size,
