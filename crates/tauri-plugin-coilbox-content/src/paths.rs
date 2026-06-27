@@ -137,6 +137,30 @@ pub fn candidate_roots(os: Os, b: &BaseDirs) -> Vec<Candidate> {
     };
     push(&mut out, bar, "bar");
 
+    // Beyond All Reason / BAR-Lobby "assets" data dir (newer Electron launcher).
+    // Layout: engine/<version>/, packages/, pool/, maps/, games/, rapid/ — already
+    // recognised by `classify`/`discover_engines`. macOS is best-effort (BAR ships
+    // no official macOS build yet).
+    let bar_assets = match os {
+        Os::Windows => b
+            .local_data
+            .as_ref()
+            .map(|l| l.join("Programs").join("BeyondAllReason").join("assets")),
+        Os::Linux => home.as_ref().map(|h| {
+            h.join(".local")
+                .join("share")
+                .join("BeyondAllReason")
+                .join("assets")
+        }),
+        Os::Mac => home.as_ref().map(|h| {
+            h.join("Library")
+                .join("Application Support")
+                .join("BeyondAllReason")
+                .join("assets")
+        }),
+    };
+    push(&mut out, bar_assets, "bar-assets");
+
     // Zero-K via Steam (opt-in).
     if b.include_zerok {
         match os {
@@ -254,6 +278,36 @@ mod tests {
     fn mac_bar_is_dotspring() {
         let o = origins_for(Os::Mac, &base(), "/home/u/.spring");
         assert!(o.contains(&"bar".to_string()));
+    }
+
+    #[test]
+    fn bar_assets_dir_per_os() {
+        // Linux: ~/.local/share/BeyondAllReason/assets
+        let linux = PathBuf::from("/home/u")
+            .join(".local")
+            .join("share")
+            .join("BeyondAllReason")
+            .join("assets");
+        assert!(candidate_roots(Os::Linux, &base())
+            .iter()
+            .any(|c| c.origin == "bar-assets" && c.path == linux));
+        // Windows: %LOCALAPPDATA%\Programs\BeyondAllReason\assets
+        let win = PathBuf::from("C:\\Users\\u\\AppData\\Local")
+            .join("Programs")
+            .join("BeyondAllReason")
+            .join("assets");
+        assert!(candidate_roots(Os::Windows, &base())
+            .iter()
+            .any(|c| c.origin == "bar-assets" && c.path == win));
+        // macOS: ~/Library/Application Support/BeyondAllReason/assets
+        let mac = PathBuf::from("/home/u")
+            .join("Library")
+            .join("Application Support")
+            .join("BeyondAllReason")
+            .join("assets");
+        assert!(candidate_roots(Os::Mac, &base())
+            .iter()
+            .any(|c| c.origin == "bar-assets" && c.path == mac));
     }
 
     #[test]

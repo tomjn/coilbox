@@ -38,11 +38,28 @@ async fn fetch_gz(url: String) -> Result<String, String> {
 
 /// Run the sidecar with the given args on a blocking thread, returning its output.
 async fn run_sidecar(args: Vec<String>) -> Result<std::process::Output, String> {
+    run_sidecar_env(args, Vec::new()).await
+}
+
+/// Like [`run_sidecar`] but sets extra environment variables on the child — used
+/// to point pr-downloader at a non-default rapid master (`PRD_RAPID_REPO_MASTER`)
+/// or HTTP search URL for repos like Beyond All Reason.
+async fn run_sidecar_env(
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+) -> Result<std::process::Output, String> {
     let path = sidecar::resolve_sidecar().ok_or(SIDECAR_MISSING)?;
-    tauri::async_runtime::spawn_blocking(move || Command::new(&path).args(&args).output())
-        .await
-        .map_err(|e| format!("sidecar task failed: {e}"))?
-        .map_err(|e| format!("failed to run pr-downloader: {e}"))
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut cmd = Command::new(&path);
+        cmd.args(&args);
+        for (k, v) in &envs {
+            cmd.env(k, v);
+        }
+        cmd.output()
+    })
+    .await
+    .map_err(|e| format!("sidecar task failed: {e}"))?
+    .map_err(|e| format!("failed to run pr-downloader: {e}"))
 }
 
 /// `dl_version` — run the sidecar's `--version`, proving the binary is bundled
@@ -88,9 +105,15 @@ async fn dl_versions(repo_url: String) -> CliResult {
 }
 
 /// `dl_download` — download a rapid tag via the sidecar, parsing its log output
-/// into a success/error envelope.
+/// into a success/error envelope. `master_url` (optional) points pr-downloader at
+/// a specific rapid master, e.g. Beyond All Reason; absent, the sidecar's default
+/// (springrts) is used.
 #[tauri::command]
-async fn dl_download(tag: String, write_path: Option<String>) -> CliResult {
+async fn dl_download(
+    tag: String,
+    master_url: Option<String>,
+    write_path: Option<String>,
+) -> CliResult {
     if tag.trim().is_empty() {
         return CliResult::err("tag is required");
     }
@@ -99,7 +122,13 @@ async fn dl_download(tag: String, write_path: Option<String>) -> CliResult {
         args.push("--filesystem-writepath".to_string());
         args.push(wp);
     }
-    match run_sidecar(args).await {
+    let mut envs = Vec::new();
+    if let Some(m) = master_url.filter(|s| !s.trim().is_empty()) {
+        let master = format!("{}/repos.gz", m.trim_end_matches('/'));
+        envs.push(("PRD_RAPID_REPO_MASTER".to_string(), master));
+        envs.push(("PRD_RAPID_USE_STREAMER".to_string(), "false".to_string()));
+    }
+    match run_sidecar_env(args, envs).await {
         Err(e) => CliResult::err(e),
         Ok(out) => {
             let stdout = String::from_utf8_lossy(&out.stdout);

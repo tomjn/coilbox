@@ -9,6 +9,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { contentStateLoad } from "../../content/bindings";
 import {
   dlDownload,
   dlRepos,
@@ -17,6 +18,8 @@ import {
   type Repo,
   type Version,
 } from "../bindings";
+import { useDownloadsConfig } from "../config";
+import { OptionSelect } from "./components/OptionSelect";
 
 const DEFAULT_MASTER = "https://repos.springrts.com";
 
@@ -79,7 +82,12 @@ function EmptyState({
 
 /** Rapid-content explorer: repositories on the left, the selected repo's versions on the right. */
 export default function ExplorerPage() {
-  const [masterUrl, setMasterUrl] = useState(DEFAULT_MASTER);
+  const [cfg] = useDownloadsConfig();
+  const [masterUrl, setMasterUrl] = useState(
+    () => cfg.rapidRepos[0]?.url ?? DEFAULT_MASTER,
+  );
+  // Path of the configured write-root (Downloads settings), passed to downloads.
+  const [writePath, setWritePath] = useState<string | undefined>(undefined);
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [reposLoading, setReposLoading] = useState(false);
   const [reposError, setReposError] = useState<string | null>(null);
@@ -97,7 +105,20 @@ export default function ExplorerPage() {
     message: string;
   } | null>(null);
 
-  async function loadRepos() {
+  // Resolve the configured write-root id to its on-disk path for downloads.
+  useEffect(() => {
+    if (!cfg.writeRootId) {
+      setWritePath(undefined);
+      return;
+    }
+    contentStateLoad(undefined)
+      .then(({ state }) =>
+        setWritePath(state.roots.find((r) => r.id === cfg.writeRootId)?.path),
+      )
+      .catch(() => setWritePath(undefined));
+  }, [cfg.writeRootId]);
+
+  async function loadRepos(url = masterUrl) {
     setReposLoading(true);
     setReposError(null);
     setSelected(null);
@@ -105,7 +126,7 @@ export default function ExplorerPage() {
     setDownloadResult(null);
     try {
       const { repos } = await dlRepos({
-        masterUrl: masterUrl.trim() || DEFAULT_MASTER,
+        masterUrl: url.trim() || DEFAULT_MASTER,
       });
       setRepos(repos);
     } catch (e) {
@@ -137,7 +158,7 @@ export default function ExplorerPage() {
     setDownloading(tag);
     setDownloadResult(null);
     try {
-      const { message } = await dlDownload({ tag });
+      const { message } = await dlDownload({ tag, masterUrl, writePath });
       setDownloadResult({ ok: true, message });
     } catch (e) {
       setDownloadResult({ ok: false, message: errMessage(e) });
@@ -174,26 +195,33 @@ export default function ExplorerPage() {
             bundled sidecar.
           </p>
         </div>
-        <form
-          className="flex items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            loadRepos();
-          }}
-        >
-          <Input
-            type="text"
-            value={masterUrl}
-            onChange={(e) => setMasterUrl(e.target.value)}
-            placeholder={DEFAULT_MASTER}
-            aria-label="Rapid master URL"
-            className="max-w-md font-mono text-xs"
-          />
-          <Button type="submit" disabled={reposLoading}>
-            {reposLoading && <Loader2 className="animate-spin" />}
-            {reposLoading ? "Loading…" : "Load repos"}
-          </Button>
-        </form>
+        <div className="flex items-center gap-2">
+          {cfg.rapidRepos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No rapid repositories configured. Add one in Downloads settings.
+            </p>
+          ) : (
+            <>
+              <OptionSelect
+                value={masterUrl}
+                onValueChange={(url) => {
+                  setMasterUrl(url);
+                  loadRepos(url);
+                }}
+                placeholder="Select a rapid repository…"
+                className="max-w-xs"
+                options={cfg.rapidRepos.map((r) => ({
+                  value: r.url,
+                  label: r.name || r.url,
+                }))}
+              />
+              <Button onClick={() => loadRepos()} disabled={reposLoading}>
+                {reposLoading && <Loader2 className="animate-spin" />}
+                {reposLoading ? "Loading…" : "Load repos"}
+              </Button>
+            </>
+          )}
+        </div>
       </header>
 
       <SidecarWarning />
