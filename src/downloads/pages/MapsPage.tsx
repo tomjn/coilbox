@@ -14,6 +14,7 @@ import {
   dlDownloadMap,
   dlInstalledContent,
   dlSpringfilesList,
+  type SpringFile,
 } from "../bindings";
 import { useContentRootPaths, useWriteRootPath } from "../config";
 import { OptionSelect } from "./components/OptionSelect";
@@ -33,11 +34,33 @@ interface MapItem {
   thumb?: string;
   /** On-disk archive name, lowercased for installed-detection matching. */
   filename: string;
-  /** Bytes, when the source reports it (springfiles); used for size sorting. */
-  size?: number;
+  author?: string;
+  /** Map dimensions; sorted by area (width × height). */
+  width?: number;
+  height?: number;
 }
 
-type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
+type SortKey =
+  | "name-asc"
+  | "name-desc"
+  | "author-asc"
+  | "author-desc"
+  | "area-desc"
+  | "area-asc";
+
+const SORT_OPTIONS = [
+  { value: "name-asc", label: "Name A–Z" },
+  { value: "name-desc", label: "Name Z–A" },
+  { value: "author-asc", label: "Author A–Z" },
+  { value: "author-desc", label: "Author Z–A" },
+  { value: "area-desc", label: "Largest map" },
+  { value: "area-asc", label: "Smallest map" },
+];
+
+const area = (m: MapItem) => (m.width ?? 0) * (m.height ?? 0);
+
+/** How many cards to render per page — the springfiles catalog has thousands. */
+const PAGE = 200;
 
 function barSubtitle(m: BarMap): string {
   const parts: string[] = [];
@@ -45,6 +68,15 @@ function barSubtitle(m: BarMap): string {
   if (m.mapWidth && m.mapHeight) parts.push(`${m.mapWidth}×${m.mapHeight}`);
   if (m.playerCountMax)
     parts.push(`${m.playerCountMin ?? 2}–${m.playerCountMax}p`);
+  return parts.join(" · ");
+}
+
+function springSubtitle(f: SpringFile): string {
+  const parts: string[] = [];
+  if (f.metadata.author) parts.push(`by ${f.metadata.author}`);
+  if (f.metadata.width && f.metadata.height)
+    parts.push(`${f.metadata.width}×${f.metadata.height}`);
+  if (f.size) parts.push(`${(f.size / 1_048_576).toFixed(1)} MB`);
   return parts.join(" · ");
 }
 
@@ -56,6 +88,7 @@ export default function MapsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name-asc");
+  const [limit, setLimit] = useState(PAGE);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
     null,
@@ -76,6 +109,9 @@ export default function MapsPage() {
             subtitle: barSubtitle(m),
             thumb: m.images?.preview,
             filename: m.filename,
+            author: m.author,
+            width: m.mapWidth,
+            height: m.mapHeight,
           })),
         );
       } else {
@@ -84,12 +120,12 @@ export default function MapsPage() {
           results.map((f) => ({
             springName: f.springname,
             title: f.name || f.springname,
-            subtitle: f.size
-              ? `${(f.size / 1_048_576).toFixed(1)} MB`
-              : undefined,
+            subtitle: springSubtitle(f),
             thumb: f.mapimages[0],
             filename: f.filename,
-            size: f.size,
+            author: f.metadata.author,
+            width: f.metadata.width,
+            height: f.metadata.height,
           })),
         );
       }
@@ -161,10 +197,14 @@ export default function MapsPage() {
       switch (sort) {
         case "name-desc":
           return b.title.localeCompare(a.title);
-        case "size-desc":
-          return (b.size ?? 0) - (a.size ?? 0);
-        case "size-asc":
-          return (a.size ?? 0) - (b.size ?? 0);
+        case "author-asc":
+          return (a.author ?? "").localeCompare(b.author ?? "");
+        case "author-desc":
+          return (b.author ?? "").localeCompare(a.author ?? "");
+        case "area-desc":
+          return area(b) - area(a);
+        case "area-asc":
+          return area(a) - area(b);
         default:
           return a.title.localeCompare(b.title);
       }
@@ -172,16 +212,12 @@ export default function MapsPage() {
     return arr;
   }, [filtered, sort]);
 
-  const sortOptions = [
-    { value: "name-asc", label: "Name A–Z" },
-    { value: "name-desc", label: "Name Z–A" },
-    ...(source === "springfiles"
-      ? [
-          { value: "size-desc", label: "Largest" },
-          { value: "size-asc", label: "Smallest" },
-        ]
-      : []),
-  ];
+  // Render incrementally — mounting the whole springfiles catalog is slow.
+  // Paging resets to the first page in the source/filter/sort change handlers.
+  const visible = useMemo(
+    () => (sorted ? sorted.slice(0, limit) : null),
+    [sorted, limit],
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -198,7 +234,7 @@ export default function MapsPage() {
             value={source}
             onValueChange={(v) => {
               setSource(v as Source);
-              setSort("name-asc");
+              setLimit(PAGE);
             }}
             className="w-48"
             options={[
@@ -214,7 +250,10 @@ export default function MapsPage() {
             <Input
               type="text"
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+              onChange={(e) => {
+                setFilter(e.target.value);
+                setLimit(PAGE);
+              }}
               placeholder="Filter maps…"
               aria-label="Filter maps"
               className="h-9 pl-7"
@@ -222,9 +261,12 @@ export default function MapsPage() {
           </div>
           <OptionSelect
             value={sort}
-            onValueChange={(v) => setSort(v as SortKey)}
+            onValueChange={(v) => {
+              setSort(v as SortKey);
+              setLimit(PAGE);
+            }}
             className="w-36"
-            options={sortOptions}
+            options={SORT_OPTIONS}
           />
           {items && (
             <span className="text-sm text-muted-foreground">
@@ -264,12 +306,12 @@ export default function MapsPage() {
         )}
         {sorted && sorted.length > 0 && (
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
-            {sorted.map((it) => {
+            {visible?.map((it) => {
               const isInstalled = installed.has(it.filename.toLowerCase());
               return (
                 <li
                   key={it.springName}
-                  className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
+                  className="flex flex-col overflow-hidden rounded-lg border border-border bg-card [content-visibility:auto] [contain-intrinsic-size:14rem]"
                 >
                   <div className="flex aspect-video items-center justify-center bg-muted">
                     {it.thumb ? (
@@ -327,6 +369,17 @@ export default function MapsPage() {
               );
             })}
           </ul>
+        )}
+        {sorted && visible && sorted.length > visible.length && (
+          <div className="mt-4 flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setLimit((l) => l + PAGE)}
+            >
+              Show more ({sorted.length - visible.length} remaining)
+            </Button>
+          </div>
         )}
       </div>
 
