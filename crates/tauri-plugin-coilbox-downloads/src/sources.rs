@@ -14,10 +14,54 @@ pub struct SpringFile {
     pub name: String,
     pub filename: String,
     pub category: String,
+    /// Version string — populated for engines (e.g. `2025.01.6`), empty for maps.
+    pub version: String,
     pub size: u64,
     pub mirrors: Vec<String>,
     /// Thumbnail/preview image URLs (present when queried with `images=on`).
     pub mapimages: Vec<String>,
+}
+
+/// A platform-matched springfiles engine, deduped to one entry per version.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpringfilesEngine {
+    /// Engine name (generically `spring` on springfiles).
+    pub name: String,
+    pub version: String,
+    pub filename: String,
+    pub size: u64,
+}
+
+/// The springfiles engine `category` token for the current platform, e.g.
+/// `linux64` (matches `engine_linux64`). Engines are listed per-OS so we filter
+/// to the running one.
+pub fn springfiles_engine_token() -> &'static str {
+    match std::env::consts::OS {
+        "windows" => "windows64",
+        "macos" => "macosx",
+        _ => "linux64",
+    }
+}
+
+/// Filter springfiles engine results to `token`'s platform and dedupe to one per
+/// version (newest first). `--download-engine` takes only the version, so the
+/// per-file variants (minimal/full) collapse to a single row.
+pub fn engines_for_platform(all: Vec<SpringFile>, token: &str) -> Vec<SpringfilesEngine> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out: Vec<SpringfilesEngine> = all
+        .into_iter()
+        .filter(|f| f.category.contains(token) && !f.version.is_empty())
+        .filter(|f| seen.insert(f.version.clone()))
+        .map(|f| SpringfilesEngine {
+            name: f.name,
+            version: f.version,
+            filename: f.filename,
+            size: f.size,
+        })
+        .collect();
+    out.sort_by(|a, b| b.version.cmp(&a.version));
+    out
 }
 
 /// Preview images for a BAR map; `preview` is a full HTTPS thumbnail URL.
@@ -66,6 +110,59 @@ pub fn springfiles_list_url(category: &str) -> String {
     )
 }
 
+/// A GitHub release (subset) from the RecoilEngine repo's releases API.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct GithubRelease {
+    pub tag_name: String,
+    pub prerelease: bool,
+    pub assets: Vec<GithubAsset>,
+}
+
+/// A downloadable asset within a GitHub release.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct GithubAsset {
+    pub name: String,
+    pub browser_download_url: String,
+    pub size: u64,
+}
+
+/// A platform-matched Recoil engine release, surfaced to the frontend.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineRelease {
+    pub version: String,
+    pub asset_url: String,
+    pub size: u64,
+    pub prerelease: bool,
+}
+
+pub const RECOIL_RELEASES_URL: &str =
+    "https://api.github.com/repos/beyond-all-reason/RecoilEngine/releases?per_page=40";
+
+/// The Recoil 7z asset suffix for the current platform, e.g. `amd64-linux.7z`.
+/// `None` on platforms with no official build (macOS).
+pub fn recoil_asset_suffix() -> Option<&'static str> {
+    match std::env::consts::OS {
+        "linux" => Some("amd64-linux.7z"),
+        "windows" => Some("amd64-windows.7z"),
+        _ => None,
+    }
+}
+
+/// Pick the platform engine asset from a release. Matching on the exact `<arch>-<os>.7z`
+/// suffix naturally excludes the `-tracy.7z` and `-dbgsym.tar.zst` variants.
+pub fn match_engine_release(rel: &GithubRelease, suffix: &str) -> Option<EngineRelease> {
+    let asset = rel.assets.iter().find(|a| a.name.ends_with(suffix))?;
+    Some(EngineRelease {
+        version: rel.tag_name.clone(),
+        asset_url: asset.browser_download_url.clone(),
+        size: asset.size,
+        prerelease: rel.prerelease,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,6 +183,38 @@ mod tests {
         assert_eq!(v[0].springname, "Comet");
         assert_eq!(v[0].mirrors, vec!["http://m/comet.sd7"]);
         assert_eq!(v[0].mapimages.len(), 1);
+    }
+
+    #[test]
+    fn engines_for_platform_filters_and_dedupes() {
+        let json = r#"[
+            {"name":"spring","filename":"a_linux.7z","category":"engine_linux64","version":"2025.01.6","size":10},
+            {"name":"spring","filename":"a_linux_full.7z","category":"engine_linux64","version":"2025.01.6","size":20},
+            {"name":"spring","filename":"a_win.7z","category":"engine_windows64","version":"2025.01.6","size":15},
+            {"name":"spring","filename":"b_linux.7z","category":"engine_linux64","version":"2024.12.1","size":12}
+        ]"#;
+        let all: Vec<SpringFile> = serde_json::from_str(json).unwrap();
+        let engines = engines_for_platform(all, "linux64");
+        // One per version, windows excluded, newest first.
+        assert_eq!(engines.len(), 2);
+        assert_eq!(engines[0].version, "2025.01.6");
+        assert_eq!(engines[1].version, "2024.12.1");
+    }
+
+    #[test]
+    fn match_engine_release_picks_plain_asset() {
+        let json = r#"{"tag_name":"2025.06.21","prerelease":false,"assets":[
+            {"name":"recoil_2025.06.21_amd64-linux-tracy.7z","browser_download_url":"http://x/tracy","size":1},
+            {"name":"recoil_2025.06.21_amd64-linux-dbgsym.tar.zst","browser_download_url":"http://x/dbg","size":2},
+            {"name":"recoil_2025.06.21_amd64-linux.7z","browser_download_url":"http://x/plain","size":3}
+        ]}"#;
+        let rel: GithubRelease = serde_json::from_str(json).unwrap();
+        let m = match_engine_release(&rel, "amd64-linux.7z").unwrap();
+        assert_eq!(m.version, "2025.06.21");
+        assert_eq!(m.asset_url, "http://x/plain");
+        assert_eq!(m.size, 3);
+        // No windows asset -> no match.
+        assert!(match_engine_release(&rel, "amd64-windows.7z").is_none());
     }
 
     #[test]

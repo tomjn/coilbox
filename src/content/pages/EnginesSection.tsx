@@ -2,6 +2,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
+import { EngineInstaller } from "../../downloads/pages/components/EngineInstaller";
 import {
   type ContentState,
   contentVerifyEngine,
@@ -121,6 +122,8 @@ export default function EnginesSection() {
           ))}
         </div>
       )}
+
+      <EngineInstaller />
     </div>
   );
 }

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-dl-springfiles-engines"
+description = "Enables the dl_springfiles_engines command without any pre-configured scope."
+commands.allow = ["dl_springfiles_engines"]
+
+[[permission]]
+identifier = "deny-dl-springfiles-engines"
+description = "Denies the dl_springfiles_engines command without any pre-configured scope."
+commands.deny = ["dl_springfiles_engines"]

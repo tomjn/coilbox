@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-dl-download-engine-spring"
+description = "Enables the dl_download_engine_spring command without any pre-configured scope."
+commands.allow = ["dl_download_engine_spring"]
+
+[[permission]]
+identifier = "deny-dl-download-engine-spring"
+description = "Denies the dl_download_engine_spring command without any pre-configured scope."
+commands.deny = ["dl_download_engine_spring"]

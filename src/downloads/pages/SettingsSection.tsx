@@ -13,6 +13,9 @@ import { OptionSelect } from "./components/OptionSelect";
  *  - the list of rapid masters offered in the Browse Rapid / Games dropdowns
  *  - the content root every download writes into (`--filesystem-writepath`),
  *    chosen from the content plugin's detected roots.
+ *
+ * Engine downloads live in the content plugin's Engines settings page (below the
+ * engine list) but write into the destination chosen here.
  */
 export default function DownloadsSettings() {
   const [cfg, setCfg] = useDownloadsConfig();

@@ -8,7 +8,11 @@ permissions = [
   "allow-dl-versions",
   "allow-dl-download",
   "allow-dl-springfiles-list",
+  "allow-dl-springfiles-engines",
   "allow-dl-bar-maps",
   "allow-dl-download-map",
   "allow-dl-download-file",
+  "allow-dl-recoil-engines",
+  "allow-dl-download-engine-recoil",
+  "allow-dl-download-engine-spring",
 ]
