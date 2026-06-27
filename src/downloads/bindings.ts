@@ -34,6 +34,6 @@ export const dlVersions = defineCommand<
 >("coilbox-downloads", "dl_versions");
 
 export const dlDownload = defineCommand<
-  { tag: string; writePath?: string },
+  { tag: string; masterUrl?: string; writePath?: string },
   { message: string; tag: string }
 >("coilbox-downloads", "dl_download");
