@@ -6,6 +6,7 @@
 
 mod rapid;
 mod sidecar;
+mod sources;
 
 use picoframe_core::CliResult;
 use serde_json::json;
@@ -143,6 +144,102 @@ async fn dl_download(
     }
 }
 
+/// Fetch a URL as text. springfiles/BAR serve plain (non-gzipped) JSON.
+async fn fetch_text(url: String) -> Result<String, String> {
+    let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+    let resp = resp.error_for_status().map_err(|e| e.to_string())?;
+    resp.text().await.map_err(|e| e.to_string())
+}
+
+/// Stream a URL into `dest_dir/filename` (creating the directory). Used for
+/// non-rapid content (e.g. springfiles game mirrors) the sidecar can't fetch.
+async fn download_to(url: &str, dest_dir: &str, filename: &str) -> Result<String, String> {
+    let resp = reqwest::get(url).await.map_err(|e| e.to_string())?;
+    let resp = resp.error_for_status().map_err(|e| e.to_string())?;
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    let dir = std::path::Path::new(dest_dir);
+    std::fs::create_dir_all(dir).map_err(|e| format!("could not create {dest_dir}: {e}"))?;
+    let path = dir.join(filename);
+    std::fs::write(&path, &bytes)
+        .map_err(|e| format!("could not write {}: {e}", path.display()))?;
+    Ok(path.display().to_string())
+}
+
+/// `dl_springfiles_list` — the full springfiles catalog for a category
+/// (`map` / `game`). Search/filtering happens client-side over the list.
+#[tauri::command]
+async fn dl_springfiles_list(category: String) -> CliResult {
+    let url = sources::springfiles_list_url(&category);
+    match fetch_text(url).await {
+        Ok(body) => match serde_json::from_str::<Vec<sources::SpringFile>>(&body) {
+            Ok(results) => CliResult::ok(json!({ "results": results })),
+            Err(e) => CliResult::err(format!("could not parse springfiles response: {e}")),
+        },
+        Err(e) => CliResult::err(format!("failed to fetch springfiles catalog: {e}")),
+    }
+}
+
+/// `dl_bar_maps` — the Beyond All Reason validated maps list (with thumbnails).
+#[tauri::command]
+async fn dl_bar_maps() -> CliResult {
+    match fetch_text(sources::BAR_MAPS_URL.to_string()).await {
+        Ok(body) => match serde_json::from_str::<Vec<sources::BarMap>>(&body) {
+            Ok(maps) => CliResult::ok(json!({ "maps": maps })),
+            Err(e) => CliResult::err(format!("could not parse BAR maps list: {e}")),
+        },
+        Err(e) => CliResult::err(format!("failed to fetch BAR maps list: {e}")),
+    }
+}
+
+/// `dl_download_map` — download a map by spring name via the sidecar. `search_url`
+/// overrides `PRD_HTTP_SEARCH_URL` (springrts by default; BAR's files-cdn when
+/// downloading a BAR map).
+#[tauri::command]
+async fn dl_download_map(
+    spring_name: String,
+    search_url: Option<String>,
+    write_path: Option<String>,
+) -> CliResult {
+    if spring_name.trim().is_empty() {
+        return CliResult::err("spring_name is required");
+    }
+    let mut args = vec!["--download-map".to_string(), spring_name.clone()];
+    if let Some(wp) = write_path.filter(|s| !s.trim().is_empty()) {
+        args.push("--filesystem-writepath".to_string());
+        args.push(wp);
+    }
+    let mut envs = Vec::new();
+    if let Some(s) = search_url.filter(|s| !s.trim().is_empty()) {
+        envs.push(("PRD_HTTP_SEARCH_URL".to_string(), s));
+    }
+    match run_sidecar_env(args, envs).await {
+        Err(e) => CliResult::err(e),
+        Ok(out) => {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let outcome = sidecar::parse_download(&stdout, &stderr, out.status.code());
+            if outcome.success {
+                CliResult::ok(json!({ "message": outcome.message, "springName": spring_name }))
+            } else {
+                CliResult::err(outcome.message)
+            }
+        }
+    }
+}
+
+/// `dl_download_file` — directly download a file (e.g. a springfiles game mirror)
+/// into `dest_dir/filename`, for non-rapid content the sidecar can't fetch.
+#[tauri::command]
+async fn dl_download_file(url: String, dest_dir: String, filename: String) -> CliResult {
+    if url.trim().is_empty() || filename.trim().is_empty() {
+        return CliResult::err("url and filename are required");
+    }
+    match download_to(&url, &dest_dir, &filename).await {
+        Ok(path) => CliResult::ok(json!({ "message": format!("Saved {path}"), "path": path })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-downloads"` (crate name minus
 /// the `tauri-plugin-` prefix); the frontend invokes
 /// `plugin:coilbox-downloads|<cmd>`.
@@ -152,7 +249,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_version,
             dl_repos,
             dl_versions,
-            dl_download
+            dl_download,
+            dl_springfiles_list,
+            dl_bar_maps,
+            dl_download_map,
+            dl_download_file
         ])
         .build()
 }

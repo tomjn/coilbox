@@ -1,4 +1,6 @@
 import { useSetting } from "@picoframe/frame";
+import { useEffect, useState } from "react";
+import { contentStateLoad } from "../content/bindings";
 
 /** A user-configured rapid master. `url` is the base; `dl_repos` appends `/repos.gz`. */
 export interface RapidRepo {
@@ -32,4 +34,27 @@ export const defaultConfig: DownloadsConfig = {
 
 export function useDownloadsConfig() {
   return useSetting<DownloadsConfig>("downloads.config", defaultConfig);
+}
+
+/**
+ * Resolve the configured write-root id (Downloads settings) to its on-disk path,
+ * via the content plugin's detected roots. Shared by every download screen so
+ * they all write into the same chosen folder. `undefined` when none is set or
+ * the root no longer exists.
+ */
+export function useWriteRootPath(): string | undefined {
+  const [cfg] = useDownloadsConfig();
+  const [path, setPath] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!cfg.writeRootId) {
+      setPath(undefined);
+      return;
+    }
+    contentStateLoad(undefined)
+      .then(({ state }) =>
+        setPath(state.roots.find((r) => r.id === cfg.writeRootId)?.path),
+      )
+      .catch(() => setPath(undefined));
+  }, [cfg.writeRootId]);
+  return path;
 }
