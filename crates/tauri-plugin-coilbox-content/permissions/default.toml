@@ -11,4 +11,5 @@ permissions = [
   "allow-content-remove-root",
   "allow-content-list-engines",
   "allow-content-verify-engine",
+  "allow-content-open-path",
 ]

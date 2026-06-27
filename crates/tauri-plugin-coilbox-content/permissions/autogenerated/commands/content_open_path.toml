@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-open-path"
+description = "Enables the content_open_path command without any pre-configured scope."
+commands.allow = ["content_open_path"]
+
+[[permission]]
+identifier = "deny-content-open-path"
+description = "Denies the content_open_path command without any pre-configured scope."
+commands.deny = ["content_open_path"]
