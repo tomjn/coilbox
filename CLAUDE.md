@@ -1,3 +1,19 @@
+## PR's
+
+Before pushing, run the **full** lint suite locally and confirm it passes. CI
+(`.github/workflows/lint.yml`) checks both Rust and the frontend, so run both
+even when you only touched one surface — and run the **same commands CI runs**,
+not a narrower subset (a single-crate clippy or `biome check` without `ci` will
+miss failures):
+
+- Rust: `cargo fmt --all --check` **and**
+  `cargo clippy --all-targets --all-features -- -D warnings`
+- Frontend: `bunx biome ci .` **and** `bun run typecheck`
+
+Let rustfmt own formatting — run `cargo fmt --all` rather than hand-formatting.
+CI's clippy compiles the Tauri app crate, so externalBin sidecars must exist;
+the unitsync worker is built in CI and locally via `bun run sidecar:unitsync`.
+
 ## UI components
 
 Prefer picoframe's components over native elements or hand-rolled ones. picoframe

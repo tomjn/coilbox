@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-unitsync-game-info"
+description = "Enables the unitsync_game_info command without any pre-configured scope."
+commands.allow = ["unitsync_game_info"]
+
+[[permission]]
+identifier = "deny-unitsync-game-info"
+description = "Denies the unitsync_game_info command without any pre-configured scope."
+commands.deny = ["unitsync_game_info"]

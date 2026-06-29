@@ -1,0 +1,10 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows the unitsync plugin's content-scan, minimap and thumbnail commands."
+permissions = [
+  "allow-unitsync-scan",
+  "allow-unitsync-minimap",
+  "allow-unitsync-thumbnails",
+  "allow-unitsync-game-info",
+]

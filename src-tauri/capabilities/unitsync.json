@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "unitsync",
+  "description": "Grants the unitsync content-scan command to the main window.",
+  "permissions": ["coilbox-unitsync:default"],
+  "windows": ["main"]
+}

@@ -16,5 +16,6 @@ tauri-plugin-coilbox-uberstress = { path = "../crates/tauri-plugin-coilbox-ubers
 tauri-plugin-coilbox-mapconv = { path = "../crates/tauri-plugin-coilbox-mapconv" }
 tauri-plugin-coilbox-anim = { path = "../crates/tauri-plugin-coilbox-anim" }
 tauri-plugin-coilbox-content = { path = "../crates/tauri-plugin-coilbox-content" }
+tauri-plugin-coilbox-unitsync = { path = "../crates/tauri-plugin-coilbox-unitsync" }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"

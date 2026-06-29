@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-unitsync-minimap"
+description = "Enables the unitsync_minimap command without any pre-configured scope."
+commands.allow = ["unitsync_minimap"]
+
+[[permission]]
+identifier = "deny-unitsync-minimap"
+description = "Denies the unitsync_minimap command without any pre-configured scope."
+commands.deny = ["unitsync_minimap"]

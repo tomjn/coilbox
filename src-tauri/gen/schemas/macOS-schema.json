@@ -927,6 +927,60 @@
           "markdownDescription": "Denies the us_settings_save command without any pre-configured scope."
         },
         {
+          "description": "Allows the unitsync plugin's content-scan, minimap and thumbnail commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`",
+          "type": "string",
+          "const": "coilbox-unitsync:default",
+          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap and thumbnail commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`"
+        },
+        {
+          "description": "Enables the unitsync_game_info command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:allow-unitsync-game-info",
+          "markdownDescription": "Enables the unitsync_game_info command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the unitsync_minimap command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:allow-unitsync-minimap",
+          "markdownDescription": "Enables the unitsync_minimap command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the unitsync_scan command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:allow-unitsync-scan",
+          "markdownDescription": "Enables the unitsync_scan command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the unitsync_thumbnails command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:allow-unitsync-thumbnails",
+          "markdownDescription": "Enables the unitsync_thumbnails command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_game_info command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:deny-unitsync-game-info",
+          "markdownDescription": "Denies the unitsync_game_info command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_minimap command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:deny-unitsync-minimap",
+          "markdownDescription": "Denies the unitsync_minimap command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_scan command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:deny-unitsync-scan",
+          "markdownDescription": "Denies the unitsync_scan command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_thumbnails command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:deny-unitsync-thumbnails",
+          "markdownDescription": "Denies the unitsync_thumbnails command without any pre-configured scope."
+        },
+        {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",
           "type": "string",
           "const": "core:default",
