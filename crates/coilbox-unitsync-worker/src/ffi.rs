@@ -31,8 +31,9 @@ type IntByStrFn = unsafe extern "C" fn(*const c_char) -> c_int; // GetMapArchive
 type StrByStrFn = unsafe extern "C" fn(*const c_char) -> *const c_char; // GetArchivePath(name)
 type UintByStrFn = unsafe extern "C" fn(*const c_char) -> c_uint; // GetArchiveChecksum(name)
 type MinimapFn = unsafe extern "C" fn(*const c_char, c_int) -> *const u16; // GetMinimap(name, mip)
-// GetInfoMapSize(mapName, infoType, *width, *height) -> nonzero on success.
-type InfoMapSizeFn = unsafe extern "C" fn(*const c_char, *const c_char, *mut c_int, *mut c_int) -> c_int;
+                                                                           // GetInfoMapSize(mapName, infoType, *width, *height) -> nonzero on success.
+type InfoMapSizeFn =
+    unsafe extern "C" fn(*const c_char, *const c_char, *mut c_int, *mut c_int) -> c_int;
 type StrArgVoidFn = unsafe extern "C" fn(*const c_char); // AddAllArchives(name)
 
 /// Copy a library-owned C string into an owned `String`. Null -> `None`.
@@ -105,8 +106,8 @@ impl Unitsync {
     /// by absolute path lets the dynamic loader resolve the library's own
     /// `@loader_path`/`@rpath`-relative dependencies from the engine dir.
     pub unsafe fn load(libpath: &Path) -> Result<Self, String> {
-        let lib =
-            Library::new(libpath).map_err(|e| format!("failed to load {}: {e}", libpath.display()))?;
+        let lib = Library::new(libpath)
+            .map_err(|e| format!("failed to load {}: {e}", libpath.display()))?;
         let us = Unitsync {
             init_fn: req(&lib, b"Init\0")?,
             uninit_fn: req(&lib, b"UnInit\0")?,

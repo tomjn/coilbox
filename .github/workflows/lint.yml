@@ -44,6 +44,11 @@ jobs:
       # its contents, so an empty placeholder satisfies the check.
       - name: Placeholder mapconv resource dir
         run: mkdir -p src-tauri/mapconv
+      # tauri-build also verifies the externalBin sidecars exist. The unitsync
+      # worker is our own crate (gitignored build artifact), so build it for the
+      # runner's triple before clippy compiles the app crate.
+      - name: Build unitsync worker sidecar
+        run: bash scripts/build-unitsync-worker.sh
       - name: Rustfmt
         run: cargo fmt --all --check
       - name: Clippy

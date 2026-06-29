@@ -70,7 +70,9 @@ fn run_worker_blocking(
     timeout: Duration,
 ) -> Result<String, String> {
     let mut cmd = Command::new(&bin);
-    cmd.args(&args).stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     for (k, v) in &envs {
         cmd.env(k, v);
     }
