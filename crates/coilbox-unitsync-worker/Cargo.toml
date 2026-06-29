@@ -1,0 +1,20 @@
+[package]
+name = "coilbox-unitsync-worker"
+version = "0.0.0"
+description = "Out-of-process worker that dlopens an engine's libunitsync and dumps its map/game/archive data as JSON. Isolated from the app so a unitsync crash can't take it down."
+edition = "2021"
+license = "MIT"
+
+[[bin]]
+name = "coilbox-unitsync-worker"
+path = "src/main.rs"
+
+[dependencies]
+# Runtime dlopen of the engine's libunitsync.* (NOT a link-time dependency — the
+# library lives in the user's engine install, not in our build).
+libloading = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Minimap mode only: encode the RGB565 minimap buffer to PNG (png feature only).
+image = { version = "0.25", default-features = false, features = ["png"] }
+base64 = "0.22"

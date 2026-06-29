@@ -128,3 +128,113 @@ export const contentOpenPath = defineCommand<{ path: string }, unknown>(
   "coilbox-content",
   "content_open_path",
 );
+
+/* -------------------------------------------------------------------------- *
+ * unitsync content scan (plugin `tauri-plugin-coilbox-unitsync`, ACL id
+ * `coilbox-unitsync`). The Content browser pages call this alongside the
+ * content-state bindings above: this plugin's frontend talks to two backends.
+ * -------------------------------------------------------------------------- */
+
+/** An archive (`.sdz`/`.sd7`/`.sdd`) backing a map or game. */
+export interface Archive {
+  name: string;
+  /** On-disk path, when the engine build exposes it. */
+  path?: string;
+  /** Hex CRC, when a checksum accessor is available. */
+  checksum?: string;
+}
+
+export interface MapItem {
+  name: string;
+  fileName?: string;
+  checksum?: string;
+  archives: Archive[];
+  /** mapinfo metadata (description, author, dimensions, ...). */
+  info: Record<string, string>;
+  /** Map proportions; the ratio is the true aspect ratio for undistorted display. */
+  width?: number;
+  height?: number;
+}
+
+export interface GameItem {
+  name: string;
+  checksum?: string;
+  /** The game's own archive. */
+  primaryArchive: Archive;
+  /** Archives the game depends on (its primary archive excluded). */
+  dependencyArchives: Archive[];
+  /** modinfo metadata (name, shortname, version, description, ...). */
+  info: Record<string, string>;
+}
+
+/** A faction/side of a game, with its commander/start unit. */
+export interface Side {
+  name: string;
+  startUnit?: string;
+  /** Friendly start-unit name, when the engine can enumerate units. */
+  startUnitName?: string;
+}
+
+export interface GameInfoResult {
+  sides: Side[];
+  unitCount: number;
+  errors: string[];
+}
+
+/**
+ * Load a game's archives to read its sides (with start units) and unit count —
+ * lazy, since it loads the whole game's archive set. `gameArchive` is the game's
+ * primary archive name.
+ */
+export const unitsyncGameInfo = defineCommand<
+  { enginePath: string; dataDir: string; gameArchive: string },
+  GameInfoResult
+>("coilbox-unitsync", "unitsync_game_info");
+
+export interface ScanResult {
+  maps: MapItem[];
+  games: GameItem[];
+  /** Non-fatal diagnostics drained from unitsync during the scan. */
+  errors: string[];
+  syncVersion?: string;
+}
+
+/**
+ * Scan one content root with one engine's libunitsync, out-of-process. `enginePath`
+ * is the engine dir holding `libunitsync.*` (an `Engine.path`); `dataDir` is the
+ * content root to enumerate (a `ContentRoot.path`).
+ */
+export const unitsyncScan = defineCommand<
+  { enginePath: string; dataDir: string },
+  ScanResult
+>("coilbox-unitsync", "unitsync_scan");
+
+export interface MinimapResult {
+  /** PNG `data:` URL ready for an `<img src>`, when the map has a minimap. */
+  dataUrl?: string;
+  side?: number;
+  errors: string[];
+}
+
+/**
+ * Render one map's minimap as a PNG data URL (lazy — a separate unitsync session
+ * from the scan). `mip` selects resolution: `1024 >> mip` px per side (default 1).
+ */
+export const unitsyncMinimap = defineCommand<
+  { enginePath: string; dataDir: string; mapName: string; mip?: number },
+  MinimapResult
+>("coilbox-unitsync", "unitsync_minimap");
+
+export interface ThumbnailsResult {
+  thumbnails: { name: string; dataUrl: string }[];
+  errors: string[];
+}
+
+/**
+ * Render a small minimap thumbnail for every map in one unitsync session (for the
+ * Maps grid). `mip` selects resolution: `1024 >> mip` px (default 3 = 128px).
+ */
+export const unitsyncThumbnails = defineCommand<
+  { enginePath: string; dataDir: string; mip?: number },
+  ThumbnailsResult
+>("coilbox-unitsync", "unitsync_thumbnails");

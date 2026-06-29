@@ -90,6 +90,14 @@ jobs:
           tar -xzf "smcng_tmp/${ASSET}" -C src-tauri/mapconv
           chmod +x "src-tauri/mapconv/mapcompile${EXE}" "src-tauri/mapconv/mapdecompile${EXE}" || true
 
+      # Unlike pr-downloader/uberstress (committed prebuilts), the unitsync worker
+      # is our own workspace crate, so build it here into src-tauri/binaries/ with
+      # the target-triple suffix Tauri's externalBin bundling expects. It dlopens
+      # libunitsync at runtime (no static link), so the binary is self-contained.
+      - name: Build unitsync worker sidecar
+        shell: bash
+        run: bash scripts/build-unitsync-worker.sh
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

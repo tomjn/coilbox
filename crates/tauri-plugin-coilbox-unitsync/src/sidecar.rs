@@ -1,0 +1,128 @@
+//! Locate the bundled `coilbox-unitsync-worker` sidecar and the engine's
+//! `libunitsync`, and build the worker's argument vector. These helpers are pure
+//! so they can be unit-tested without spawning anything; the spawn/timeout lives
+//! in `lib.rs`.
+//!
+//! The worker is bundled via Tauri `externalBin`, placed next to the app
+//! executable at runtime. We resolve it there (with an env override for dev), so
+//! the ACL grant stays uniform with every other plugin.
+
+use std::path::{Path, PathBuf};
+
+/// Candidate `libunitsync` filenames across platforms.
+const UNITSYNC_NAMES: &[&str] = &["libunitsync.dylib", "unitsync.dll", "libunitsync.so"];
+
+/// Resolve the worker path. `UNITSYNC_WORKER` overrides everything (handy for
+/// `tauri dev` and tests); otherwise look next to the current executable for
+/// `coilbox-unitsync-worker` (`.exe` on Windows), as `externalBin` arranges.
+pub fn resolve_sidecar() -> Option<PathBuf> {
+    if let Ok(p) = std::env::var("UNITSYNC_WORKER") {
+        if !p.is_empty() {
+            return Some(PathBuf::from(p));
+        }
+    }
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let candidate = dir.join(format!(
+        "coilbox-unitsync-worker{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    candidate.exists().then_some(candidate)
+}
+
+/// Find the `libunitsync.*` inside an engine directory (the `Engine.path` from
+/// the content plugin). Returns the first platform-matching file present.
+pub fn find_unitsync(engine_dir: &Path) -> Option<PathBuf> {
+    for name in UNITSYNC_NAMES {
+        let candidate = engine_dir.join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+/// Build the worker argument vector: which library to load and which content root
+/// to scan.
+pub fn build_args(lib: &str, datadir: &str) -> Vec<String> {
+    vec![
+        "--lib".into(),
+        lib.into(),
+        "--datadir".into(),
+        datadir.into(),
+    ]
+}
+
+/// Build args for minimap mode: scan args plus the map name and mip level.
+pub fn build_minimap_args(lib: &str, datadir: &str, map: &str, mip: i32) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--map".into());
+    args.push(map.into());
+    args.push("--mip".into());
+    args.push(mip.to_string());
+    args
+}
+
+/// Build args for batch-thumbnail mode: scan args plus the thumbnail mip level.
+pub fn build_thumbnails_args(lib: &str, datadir: &str, mip: i32) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--thumbnails".into());
+    args.push("--mip".into());
+    args.push(mip.to_string());
+    args
+}
+
+/// Build args for game-detail mode: scan args plus the game's archive name.
+pub fn build_game_args(lib: &str, datadir: &str, game: &str) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--game".into());
+    args.push(game.into());
+    args
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_args_has_lib_and_datadir() {
+        let a = build_args("/eng/libunitsync.dylib", "/home/u/.spring");
+        assert_eq!(
+            a,
+            vec![
+                "--lib".to_string(),
+                "/eng/libunitsync.dylib".to_string(),
+                "--datadir".to_string(),
+                "/home/u/.spring".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn find_unitsync_picks_present_file() {
+        let dir = std::env::temp_dir().join("coilbox_unitsync_find_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // None present yet.
+        assert!(find_unitsync(&dir).is_none());
+        // Create a platform-appropriate name and find it.
+        let name = if cfg!(target_os = "macos") {
+            "libunitsync.dylib"
+        } else if cfg!(windows) {
+            "unitsync.dll"
+        } else {
+            "libunitsync.so"
+        };
+        let f = dir.join(name);
+        std::fs::write(&f, b"x").unwrap();
+        assert_eq!(find_unitsync(&dir), Some(f));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn resolve_sidecar_honors_env_override() {
+        std::env::set_var("UNITSYNC_WORKER", "/custom/worker");
+        assert_eq!(resolve_sidecar(), Some(PathBuf::from("/custom/worker")));
+        std::env::remove_var("UNITSYNC_WORKER");
+    }
+}

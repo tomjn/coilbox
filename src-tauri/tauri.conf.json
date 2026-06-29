@@ -27,7 +27,11 @@
     }
   },
   "bundle": {
-    "externalBin": ["binaries/pr-downloader", "binaries/uberstress"],
+    "externalBin": [
+      "binaries/pr-downloader",
+      "binaries/uberstress",
+      "binaries/coilbox-unitsync-worker"
+    ],
     "resources": ["mapconv"],
     "active": true,
     "targets": "all",

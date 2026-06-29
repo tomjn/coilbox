@@ -1,0 +1,18 @@
+[package]
+name = "tauri-plugin-coilbox-unitsync"
+version = "0.0.0"
+description = "unitsync content-scan plugin for Coilbox (Rust half): spawns the coilbox-unitsync-worker sidecar to read maps/games/archives. ACL identifier: coilbox-unitsync"
+edition = "2021"
+license = "MIT"
+# Tauri requires `links` to equal `package.name`. The ACL identifier is this
+# name with the `tauri-plugin-` prefix stripped -> `coilbox-unitsync`.
+links = "tauri-plugin-coilbox-unitsync"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+picoframe-core = "0.0.2"

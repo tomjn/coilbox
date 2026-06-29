@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "src-tauri",
   "crates/coilbox-springlua",
+  "crates/coilbox-unitsync-worker",
   "crates/tauri-plugin-coilbox-downloads",
   "crates/tauri-plugin-coilbox-uberstress",
   "crates/tauri-plugin-coilbox-mapconv",
