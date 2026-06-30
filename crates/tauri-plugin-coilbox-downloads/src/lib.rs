@@ -435,22 +435,73 @@ async fn dl_recoil_engines() -> CliResult {
     }
 }
 
-/// Download a Recoil `.7z` release and extract it into `<write_path>/engine/<version>/`.
+/// Download a Recoil `.7z` release and extract it into `<write_path>/engine/<version>/`,
+/// emitting download progress then an indeterminate `extracting` phase.
 async fn install_recoil_engine(
     version: &str,
     asset_url: &str,
     write_path: &str,
+    on_progress: &Channel<DownloadProgress>,
 ) -> Result<String, String> {
+    use std::io::Write;
+    use std::time::Instant;
+
     let engine_root = std::path::Path::new(write_path).join("engine");
     let dest = engine_root.join(version);
     std::fs::create_dir_all(&dest)
         .map_err(|e| format!("could not create {}: {e}", dest.display()))?;
 
-    let resp = reqwest::get(asset_url).await.map_err(|e| e.to_string())?;
-    let resp = resp.error_for_status().map_err(|e| e.to_string())?;
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    let mut resp = reqwest::get(asset_url)
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?;
+    let total = resp.content_length();
     let tmp = engine_root.join(format!(".{version}.7z"));
-    std::fs::write(&tmp, &bytes).map_err(|e| format!("could not write engine archive: {e}"))?;
+    let mut file = std::fs::File::create(&tmp)
+        .map_err(|e| format!("could not write engine archive: {e}"))?;
+
+    let start = Instant::now();
+    let mut last_emit = Instant::now();
+    let mut downloaded: u64 = 0;
+    let stream_result: Result<(), String> = loop {
+        match resp.chunk().await {
+            Ok(Some(chunk)) => {
+                if let Err(e) = file.write_all(&chunk) {
+                    break Err(format!("could not write engine archive: {e}"));
+                }
+                downloaded += chunk.len() as u64;
+                if last_emit.elapsed().as_millis() >= 100 {
+                    last_emit = Instant::now();
+                    let _ = on_progress.send(DownloadProgress {
+                        phase: "downloading".into(),
+                        downloaded_bytes: downloaded,
+                        total_bytes: total,
+                        percent: progress::percent(downloaded, total),
+                        bytes_per_sec: progress::bytes_per_sec(
+                            downloaded,
+                            start.elapsed().as_secs_f64(),
+                        ),
+                    });
+                }
+            }
+            Ok(None) => break Ok(()),
+            Err(e) => break Err(e.to_string()),
+        }
+    };
+    if let Err(e) = stream_result {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+
+    // Extraction has no easy byte count — report it as an indeterminate phase.
+    let _ = on_progress.send(DownloadProgress {
+        phase: "extracting".into(),
+        downloaded_bytes: downloaded,
+        total_bytes: None,
+        percent: None,
+        bytes_per_sec: None,
+    });
 
     let tmp_for_extract = tmp.clone();
     let dest_for_extract = dest.clone();
@@ -462,6 +513,8 @@ async fn install_recoil_engine(
     .map_err(|e| format!("extract task failed: {e}"))?;
     let _ = std::fs::remove_file(&tmp);
     extracted?;
+
+    let _ = on_progress.send(DownloadProgress::done(downloaded, total));
     Ok(dest.display().to_string())
 }
 
@@ -472,11 +525,12 @@ async fn dl_download_engine_recoil(
     version: String,
     asset_url: String,
     write_path: String,
+    on_progress: Channel<DownloadProgress>,
 ) -> CliResult {
     if version.trim().is_empty() || asset_url.trim().is_empty() || write_path.trim().is_empty() {
         return CliResult::err("version, asset_url and write_path are required");
     }
-    match install_recoil_engine(&version, &asset_url, &write_path).await {
+    match install_recoil_engine(&version, &asset_url, &write_path, &on_progress).await {
         Ok(dir) => {
             CliResult::ok(json!({ "message": format!("Installed engine {version}"), "path": dir }))
         }
