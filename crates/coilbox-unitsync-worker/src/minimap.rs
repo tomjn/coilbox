@@ -106,7 +106,7 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
 /// Look up a map's checksum by name (for the single-map path, which is given a
 /// name rather than an index). `None` when the engine build lacks the accessor or
 /// the map isn't found — caching is simply skipped in that case.
-fn map_checksum(us: &Unitsync, map_name: &str) -> Option<u32> {
+pub(crate) fn map_checksum(us: &Unitsync, map_name: &str) -> Option<u32> {
     for i in 0..us.map_count() {
         if us.map_name(i).as_deref() == Some(map_name) {
             return us.map_checksum(i);
@@ -158,7 +158,7 @@ fn pixels_to_png(pixels: &[u16], side: u32) -> Result<Vec<u8>, String> {
 }
 
 /// Wrap PNG bytes in a base64 `data:` URL.
-fn png_to_data_url(png: &[u8]) -> String {
+pub(crate) fn png_to_data_url(png: &[u8]) -> String {
     let b64 = base64::engine::general_purpose::STANDARD.encode(png);
     format!("data:image/png;base64,{b64}")
 }

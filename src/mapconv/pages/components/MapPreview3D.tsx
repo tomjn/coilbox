@@ -43,6 +43,8 @@ type Srcs = { height: string; texture: string };
 export function MapPreview3D({
   heightmapPath,
   texturePath,
+  heightSrc,
+  textureSrc,
   minHeight,
   maxHeight,
   worldWidth,
@@ -50,8 +52,14 @@ export function MapPreview3D({
   appearance,
   className,
 }: {
-  heightmapPath: string;
-  texturePath: string;
+  /** File path to the heightmap image (mapconv flow); resolved via `mc_image_info`. */
+  heightmapPath?: string;
+  /** File path to the colour/texture image (mapconv flow). */
+  texturePath?: string;
+  /** Pre-resolved heightmap source (data URL); used instead of `heightmapPath`. */
+  heightSrc?: string;
+  /** Pre-resolved colour source (data URL); used instead of `texturePath`. */
+  textureSrc?: string;
   minHeight: number;
   maxHeight: number;
   worldWidth: number;
@@ -90,11 +98,17 @@ export function MapPreview3D({
     appearance?.sunColor,
   ]);
 
-  // Fetch both maps as downscaled data URLs whenever the inputs change.
+  // Fetch both maps as downscaled data URLs whenever the inputs change. When
+  // pre-resolved sources are supplied (the content flow already has downscaled
+  // data URLs), use them directly and skip the file-path fetch.
   useEffect(() => {
     let cancelled = false;
     setSrcs(null);
     setFailed(false);
+    if (heightSrc && textureSrc) {
+      setSrcs({ height: heightSrc, texture: textureSrc });
+      return;
+    }
     if (!heightmapPath || !texturePath) return;
     Promise.all([
       getImageInfo(heightmapPath, HEIGHT_MAX),
@@ -109,7 +123,7 @@ export function MapPreview3D({
     return () => {
       cancelled = true;
     };
-  }, [heightmapPath, texturePath]);
+  }, [heightmapPath, texturePath, heightSrc, textureSrc]);
 
   // Build the three.js scene from the loaded maps + dimensions. Fully torn down
   // on any dependency change or unmount, so navigating away leaks no GL context.

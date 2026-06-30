@@ -1,11 +1,12 @@
 ## Default Permission
 
-Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.
+Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.
 
 #### This default permission set includes the following:
 
 - `allow-unitsync-scan`
 - `allow-unitsync-minimap`
+- `allow-unitsync-heightmap`
 - `allow-unitsync-thumbnails`
 - `allow-unitsync-game-info`
 - `allow-unitsync-engine-config`
@@ -149,6 +150,32 @@ Enables the unitsync_game_info command without any pre-configured scope.
 <td>
 
 Denies the unitsync_game_info command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-heightmap`
+
+</td>
+<td>
+
+Enables the unitsync_heightmap command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-heightmap`
+
+</td>
+<td>
+
+Denies the unitsync_heightmap command without any pre-configured scope.
 
 </td>
 </tr>

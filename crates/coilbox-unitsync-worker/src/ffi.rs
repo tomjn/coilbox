@@ -34,6 +34,11 @@ type MinimapFn = unsafe extern "C" fn(*const c_char, c_int) -> *const u16; // Ge
                                                                            // GetInfoMapSize(mapName, infoType, *width, *height) -> nonzero on success.
 type InfoMapSizeFn =
     unsafe extern "C" fn(*const c_char, *const c_char, *mut c_int, *mut c_int) -> c_int;
+// GetInfoMap(mapName, infoType, *data, typeHint) -> nonzero on success. `data`
+// is filled with width*height samples; for "height" they are raw 16-bit values.
+type InfoMapFn = unsafe extern "C" fn(*const c_char, *const c_char, *mut u8, c_int) -> c_int;
+// GetMapMinHeight(mapName) / GetMapMaxHeight(mapName) -> world height (float).
+type FloatByStrFn = unsafe extern "C" fn(*const c_char) -> c_float;
 type StrArgVoidFn = unsafe extern "C" fn(*const c_char); // AddAllArchives(name)
 type LpOpenFn = unsafe extern "C" fn(*const c_char, *const c_char, *const c_char) -> c_int; // lpOpenFile
 type IntByStrStrFn = unsafe extern "C" fn(*const c_char, *const c_char) -> c_int; // lpOpenSource(source, accessModes)
@@ -77,6 +82,9 @@ pub struct Unitsync {
     map_info_count_fn: Option<IntByIntFn>,
     minimap_fn: Option<MinimapFn>,
     info_map_size_fn: Option<InfoMapSizeFn>,
+    info_map_fn: Option<InfoMapFn>,
+    map_min_height_fn: Option<FloatByStrFn>,
+    map_max_height_fn: Option<FloatByStrFn>,
     // games (primary mods)
     mod_count_fn: CountFn,
     mod_archive_fn: StrByIntFn,
@@ -151,6 +159,10 @@ unsafe fn opt<T: Copy>(lib: &Library, name: &[u8]) -> Option<T> {
     lib.get::<T>(name).ok().map(|s| *s)
 }
 
+/// unitsync `BitmapType::bm_grayscale_16` — request the native 16-bit height
+/// infomap so `GetInfoMap` copies raw values rather than down-converting to 8-bit.
+const BM_GRAYSCALE_16: c_int = 2;
+
 impl Unitsync {
     /// `dlopen` the library at `libpath` and resolve every entry point. Loading
     /// by absolute path lets the dynamic loader resolve the library's own
@@ -172,6 +184,9 @@ impl Unitsync {
             map_info_count_fn: opt(&lib, b"GetMapInfoCount\0"),
             minimap_fn: opt(&lib, b"GetMinimap\0"),
             info_map_size_fn: opt(&lib, b"GetInfoMapSize\0"),
+            info_map_fn: opt(&lib, b"GetInfoMap\0"),
+            map_min_height_fn: opt(&lib, b"GetMapMinHeight\0"),
+            map_max_height_fn: opt(&lib, b"GetMapMaxHeight\0"),
             mod_count_fn: req(&lib, b"GetPrimaryModCount\0")?,
             mod_archive_fn: req(&lib, b"GetPrimaryModArchive\0")?,
             mod_checksum_fn: opt(&lib, b"GetPrimaryModChecksum\0"),
@@ -365,6 +380,51 @@ impl Unitsync {
         let mut h: c_int = 0;
         let ok = unsafe { f(name.as_ptr(), which.as_ptr(), &mut w, &mut h) };
         (ok != 0 && w > 0 && h > 0).then_some((w as u32, h as u32))
+    }
+
+    /// Dimensions of the map's full-resolution height infomap, `(mapx+1, mapy+1)`.
+    /// Cheap (no pixel read) — call before `heightmap_data` so a cache hit can skip
+    /// the heavy read entirely. `None` if the build lacks `GetInfoMapSize` or the
+    /// map has no height infomap.
+    pub fn heightmap_size(&self, map_name: &str) -> Option<(u32, u32)> {
+        let f = self.info_map_size_fn?;
+        let name = CString::new(map_name).ok()?;
+        let which = CString::new("height").ok()?;
+        let mut w: c_int = 0;
+        let mut h: c_int = 0;
+        let ok = unsafe { f(name.as_ptr(), which.as_ptr(), &mut w, &mut h) };
+        (ok != 0 && w > 0 && h > 0).then_some((w as u32, h as u32))
+    }
+
+    /// The map's full-resolution heightmap as raw 16-bit values (`w*h` long, row
+    /// major). Values are the stored SMF heightmap (0..65535), spanning
+    /// `min_height`..`max_height` in world units. `w`/`h` must come from
+    /// `heightmap_size`. `None` if the build lacks `GetInfoMap` or the read fails.
+    pub fn heightmap_data(&self, map_name: &str, w: u32, h: u32) -> Option<Vec<u16>> {
+        let f = self.info_map_fn?;
+        let name = CString::new(map_name).ok()?;
+        let which = CString::new("height").ok()?;
+        let mut buf = vec![0u16; (w as usize) * (h as usize)];
+        let got = unsafe {
+            f(
+                name.as_ptr(),
+                which.as_ptr(),
+                buf.as_mut_ptr() as *mut u8,
+                BM_GRAYSCALE_16,
+            )
+        };
+        (got != 0).then_some(buf)
+    }
+
+    /// The map's `(min_height, max_height)` in world units (the heights at height
+    /// infomap values 0 and 65535), honouring any `mapinfo.lua` `smf` override.
+    /// `None` if the build lacks the accessors.
+    pub fn height_bounds(&self, map_name: &str) -> Option<(f32, f32)> {
+        let (min_f, max_f) = (self.map_min_height_fn?, self.map_max_height_fn?);
+        let name = CString::new(map_name).ok()?;
+        let lo = unsafe { min_f(name.as_ptr()) };
+        let hi = unsafe { max_f(name.as_ptr()) };
+        Some((lo, hi))
     }
 
     /// The map's minimap as a raw RGB565 buffer (`side x side`, where
