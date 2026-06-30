@@ -1,6 +1,8 @@
 import { Link } from "react-router";
 import { useScanTargetSelection, useUnitsyncScan } from "../config";
+import { isSdd } from "../format";
 import { BrowserToolbar } from "./components/BrowserToolbar";
+import { SddBadge } from "./components/SddBadge";
 import {
   Diagnostics,
   EmptyState,
@@ -58,7 +60,10 @@ export default function GamesPage() {
                 className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-border hover:bg-accent/40"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium">{g.name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate font-medium">{g.name}</p>
+                    {isSdd(g.primaryArchive) && <SddBadge />}
+                  </div>
                   <p className="truncate font-mono text-xs text-muted-foreground">
                     {g.primaryArchive.name}
                   </p>

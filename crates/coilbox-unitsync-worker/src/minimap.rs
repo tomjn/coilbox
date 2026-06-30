@@ -3,7 +3,7 @@
 //! small thumbnails for the whole map list (`render_all`), each in one `Init`.
 
 use crate::ffi::Unitsync;
-use crate::model::{MinimapOutput, Thumbnail, ThumbnailsOutput};
+use crate::model::{MinimapOutput, StartPos, Thumbnail, ThumbnailsOutput};
 use base64::Engine;
 use image::{DynamicImage, ImageFormat, RgbImage};
 use std::io::Cursor;
@@ -23,6 +23,19 @@ pub fn render(lib: &str, map_name: &str, mip: i32) -> MinimapOutput {
     us.init(false, 0);
     let _ = us.drain_errors();
     let result = render_one(&us, map_name, mip);
+
+    // Start positions live in mapinfo.lua, so load the map's archives and parse
+    // them via unitsync's Lua parser.
+    let mut start_positions = Vec::new();
+    if let Some(first_archive) = us.map_archives(map_name).into_iter().next() {
+        us.add_all_archives(&first_archive);
+        start_positions = us
+            .start_positions()
+            .into_iter()
+            .map(|(x, z)| StartPos { x, z })
+            .collect();
+    }
+
     let errors = us.drain_errors();
     us.uninit();
 
@@ -30,9 +43,11 @@ pub fn render(lib: &str, map_name: &str, mip: i32) -> MinimapOutput {
         Ok((data_url, side)) => MinimapOutput {
             data_url: Some(data_url),
             side: Some(side),
+            start_positions,
             errors,
         },
         Err(e) => MinimapOutput {
+            start_positions,
             errors: std::iter::once(e).chain(errors).collect(),
             ..Default::default()
         },

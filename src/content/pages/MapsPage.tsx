@@ -71,7 +71,7 @@ export default function MapsPage() {
             return (
               <li
                 key={m.name}
-                className="overflow-hidden rounded-lg border border-border/50 bg-card transition-colors hover:border-border [contain-intrinsic-size:13rem] [content-visibility:auto]"
+                className="overflow-hidden rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40 hover:shadow-sm [contain-intrinsic-size:13rem] [content-visibility:auto]"
               >
                 <Link to={`/content/maps/${encodeURIComponent(m.name)}`}>
                   <MapThumb

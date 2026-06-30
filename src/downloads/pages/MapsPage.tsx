@@ -311,7 +311,7 @@ export default function MapsPage() {
               return (
                 <li
                   key={it.springName}
-                  className="flex flex-col overflow-hidden rounded-lg border border-border bg-card [content-visibility:auto] [contain-intrinsic-size:14rem]"
+                  className="flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-foreground/20 hover:bg-accent/30 [content-visibility:auto] [contain-intrinsic-size:14rem]"
                 >
                   <div className="flex aspect-video items-center justify-center bg-muted">
                     {it.thumb ? (

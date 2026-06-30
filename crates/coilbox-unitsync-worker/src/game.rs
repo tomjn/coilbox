@@ -67,6 +67,8 @@ pub fn render(lib: &str, game_archive: &str) -> GameInfoOutput {
         });
     }
 
+    let options = crate::read_options(&us, us.mod_option_count());
+
     errors.extend(us.drain_errors());
     us.remove_all_archives();
     us.uninit();
@@ -74,6 +76,7 @@ pub fn render(lib: &str, game_archive: &str) -> GameInfoOutput {
     GameInfoOutput {
         sides,
         unit_count: unit_count as u32,
+        options,
         errors,
     }
 }

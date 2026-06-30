@@ -4,6 +4,24 @@
 use serde::Serialize;
 use std::collections::BTreeMap;
 
+/// A map or game configuration option (its key, label and description).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigOption {
+    pub key: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// A team start position in map world coordinates (elmos).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartPos {
+    pub x: f32,
+    pub z: f32,
+}
+
 /// An archive (`.sdz`/`.sd7`/`.sdd`) backing a map or game.
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +32,10 @@ pub struct Archive {
     /// Hex CRC, when the engine build exposes a checksum accessor.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checksum: Option<String>,
+    /// On-disk size in bytes (file size, or recursive total for a `.sdd` dir),
+    /// when the archive's path resolves.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -32,6 +54,8 @@ pub struct MapItem {
     pub width: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
+    /// Map options (from mapoptions.lua), when present.
+    pub options: Vec<ConfigOption>,
 }
 
 /// One map thumbnail in the batch `thumbnails` output.
@@ -60,6 +84,8 @@ pub struct MinimapOutput {
     /// Side length in pixels.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub side: Option<u32>,
+    /// Team start positions in map world coordinates (for overlaying on the map).
+    pub start_positions: Vec<StartPos>,
     pub errors: Vec<String>,
 }
 
@@ -96,6 +122,8 @@ pub struct Side {
 pub struct GameInfoOutput {
     pub sides: Vec<Side>,
     pub unit_count: u32,
+    /// Game options (from modoptions.lua), when present.
+    pub options: Vec<ConfigOption>,
     pub errors: Vec<String>,
 }
 

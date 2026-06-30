@@ -7,6 +7,7 @@ import {
 } from "../config";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { mapSizeLabel } from "./components/MapThumb";
+import { OptionsList } from "./components/OptionsList";
 import { DetailLoading, NotFound } from "./components/states";
 
 /** Keys shown in the headline; everything else goes in the metadata table. */
@@ -36,6 +37,20 @@ export default function MapDetailPage() {
   );
   const size = mapSizeLabel(map.width, map.height);
 
+  // Start positions are in world coords; the map's world size is its metal-map
+  // dimension * 16, so normalise to 0..1 for overlaying on the (object-fill,
+  // aspect-correct) minimap.
+  const worldW = (map.width ?? 0) * 16;
+  const worldH = (map.height ?? 0) * 16;
+  const markers =
+    worldW > 0 && worldH > 0
+      ? minimap.startPositions.map((p) => ({
+          key: `${p.x},${p.z}`,
+          left: (p.x / worldW) * 100,
+          top: (p.z / worldH) * 100,
+        }))
+      : [];
+
   return (
     <div className="flex flex-col gap-5 p-4">
       <header className="flex flex-col gap-1">
@@ -59,9 +74,14 @@ export default function MapDetailPage() {
       </header>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">Preview</h2>
+        <h2 className="text-sm font-medium">
+          Preview
+          {minimap.startPositions.length > 0
+            ? ` · ${minimap.startPositions.length} start positions`
+            : ""}
+        </h2>
         <div
-          className="flex w-full max-w-sm items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card"
+          className="relative flex w-full max-w-sm items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card"
           style={{
             aspectRatio:
               map.width && map.height
@@ -72,11 +92,21 @@ export default function MapDetailPage() {
           {minimap.loading ? (
             <div className="size-full animate-pulse bg-muted" />
           ) : minimap.dataUrl ? (
-            <img
-              src={minimap.dataUrl}
-              alt={`Minimap of ${map.name}`}
-              className="size-full object-fill"
-            />
+            <>
+              <img
+                src={minimap.dataUrl}
+                alt={`Minimap of ${map.name}`}
+                className="size-full object-fill"
+              />
+              {markers.map((m, i) => (
+                <span
+                  key={m.key}
+                  className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow"
+                  style={{ left: `${m.left}%`, top: `${m.top}%` }}
+                  title={`Start position ${i + 1}`}
+                />
+              ))}
+            </>
           ) : (
             <div className="flex flex-col items-center gap-1 text-muted-foreground">
               <ImageOff className="size-6" />
@@ -85,6 +115,8 @@ export default function MapDetailPage() {
           )}
         </div>
       </section>
+
+      <OptionsList options={map.options} title="Map options" />
 
       {otherInfo.length > 0 && (
         <section className="flex flex-col gap-2">
