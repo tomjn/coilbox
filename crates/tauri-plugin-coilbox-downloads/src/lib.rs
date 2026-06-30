@@ -86,7 +86,9 @@ async fn run_sidecar_streaming(
     let path = sidecar::resolve_sidecar().ok_or(SIDECAR_MISSING)?;
     tauri::async_runtime::spawn_blocking(move || {
         let mut cmd = Command::new(&path);
-        cmd.args(&args).stdout(Stdio::piped()).stderr(Stdio::piped());
+        cmd.args(&args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         for (k, v) in &envs {
             cmd.env(k, v);
         }
@@ -273,8 +275,8 @@ async fn download_to(
     let dir = std::path::Path::new(dest_dir);
     std::fs::create_dir_all(dir).map_err(|e| format!("could not create {dest_dir}: {e}"))?;
     let path = dir.join(filename);
-    let mut file =
-        std::fs::File::create(&path).map_err(|e| format!("could not create {}: {e}", path.display()))?;
+    let mut file = std::fs::File::create(&path)
+        .map_err(|e| format!("could not create {}: {e}", path.display()))?;
 
     let start = Instant::now();
     let mut last_emit = Instant::now();
@@ -483,8 +485,8 @@ async fn install_recoil_engine(
         .map_err(|e| e.to_string())?;
     let total = resp.content_length();
     let tmp = engine_root.join(format!(".{version}.7z"));
-    let mut file = std::fs::File::create(&tmp)
-        .map_err(|e| format!("could not write engine archive: {e}"))?;
+    let mut file =
+        std::fs::File::create(&tmp).map_err(|e| format!("could not write engine archive: {e}"))?;
 
     let start = Instant::now();
     let mut last_emit = Instant::now();
