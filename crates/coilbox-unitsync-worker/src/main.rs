@@ -38,6 +38,10 @@ struct Args {
     file: Option<String>,
     thumbnails: bool,
     config: bool,
+    /// `--lua`: run a Lua snippet through the parser against `--archive`, reading
+    /// the script from `--source-file`.
+    lua: bool,
+    source_file: Option<String>,
     mip: i32,
     /// Directory for the on-disk minimap/thumbnail PNG cache (minimap modes only).
     cache_dir: Option<String>,
@@ -67,6 +71,26 @@ fn run() -> i32 {
     }
 
     let cache_dir = args.cache_dir.as_deref().map(Path::new);
+
+    // Lua console: mount one archive and run a user snippet through the parser.
+    if args.lua {
+        let archive = args.archive.clone().unwrap_or_default();
+        let source = args
+            .source_file
+            .as_deref()
+            .and_then(|p| std::fs::read_to_string(p).ok())
+            .unwrap_or_default();
+        return match std::panic::catch_unwind(|| lua::run(&args.lib, &archive, &source)) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                lua::emit_error("worker panicked while executing Lua".into());
+                1
+            }
+        };
+    }
 
     // Batch thumbnails: a small minimap for every map in one Init.
     if args.thumbnails {
@@ -186,6 +210,8 @@ fn parse_args() -> Result<Args, String> {
     let mut file = None;
     let mut thumbnails = false;
     let mut config = false;
+    let mut lua = false;
+    let mut source_file = None;
     let mut mip = 1; // 512x512 by default
     let mut cache_dir = None;
     let mut it = std::env::args().skip(1);
@@ -200,6 +226,8 @@ fn parse_args() -> Result<Args, String> {
             "--thumbnails" => thumbnails = true,
             "--cache-dir" => cache_dir = it.next(),
             "--config" => config = true,
+            "--lua" => lua = true,
+            "--source-file" => source_file = it.next(),
             "--mip" => {
                 mip = it
                     .next()
@@ -218,6 +246,8 @@ fn parse_args() -> Result<Args, String> {
         file,
         thumbnails,
         config,
+        lua,
+        source_file,
         mip,
         cache_dir,
     })
