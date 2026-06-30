@@ -1,8 +1,10 @@
 import { ArrowLeft, ImageOff } from "lucide-react";
 import { Link, useParams } from "react-router";
+import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import {
   classifyArchive,
   useScanTargetSelection,
+  useUnitsyncHeightmap,
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
@@ -24,6 +26,11 @@ export default function MapDetailPage() {
     selected?.rootPath,
   );
   const minimap = useUnitsyncMinimap(
+    selected?.enginePath,
+    selected?.rootPath,
+    decoded,
+  );
+  const heightmap = useUnitsyncHeightmap(
     selected?.enginePath,
     selected?.rootPath,
     decoded,
@@ -120,6 +127,29 @@ export default function MapDetailPage() {
           )}
         </div>
       </section>
+
+      {heightmap.data?.dataUrl && minimap.dataUrl && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium">3D preview</h2>
+          <MapPreview3D
+            className="max-w-2xl"
+            heightSrc={heightmap.data.dataUrl}
+            textureSrc={minimap.dataUrl}
+            minHeight={heightmap.data.minHeight ?? 0}
+            maxHeight={heightmap.data.maxHeight ?? 0}
+            worldWidth={
+              heightmap.data.width
+                ? (heightmap.data.width - 1) * 8
+                : (map.width ?? 1) * 16
+            }
+            worldHeight={
+              heightmap.data.height
+                ? (heightmap.data.height - 1) * 8
+                : (map.height ?? 1) * 16
+            }
+          />
+        </section>
+      )}
 
       <OptionsList options={map.options} title="Map options" />
 

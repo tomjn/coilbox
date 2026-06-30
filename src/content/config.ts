@@ -8,6 +8,7 @@ import {
   contentStateLoad,
   type EngineConfigResult,
   type GameInfoResult,
+  type HeightmapResult,
   type MinimapResult,
   type ScanResult,
   type StartPos,
@@ -15,6 +16,7 @@ import {
   unitsyncArchiveTree,
   unitsyncEngineConfig,
   unitsyncGameInfo,
+  unitsyncHeightmap,
   unitsyncMinimap,
   unitsyncScan,
   unitsyncThumbnails,
@@ -605,4 +607,55 @@ export function useUnitsyncMinimap(
   }, [enginePath, dataDir, mapName]);
 
   return { dataUrl, startPositions, loading, error };
+}
+
+/** Session cache of heightmap results, keyed by `dataDir::enginePath::mapName`. */
+const heightmapCache = new Map<string, HeightmapResult>();
+
+/** Lazily render and cache a map's heightmap (PNG data URL + world-height bounds). */
+export function useUnitsyncHeightmap(
+  enginePath?: string,
+  dataDir?: string,
+  mapName?: string,
+) {
+  const [data, setData] = useState<HeightmapResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !mapName) {
+      setData(null);
+      return;
+    }
+    const key = `${dataDir}::${enginePath}::${mapName}`;
+    const apply = (res: HeightmapResult) => {
+      setData(res);
+      if (!res.dataUrl && res.errors?.length) setError(res.errors.join("; "));
+    };
+    const cached = heightmapCache.get(key);
+    if (cached) {
+      apply(cached);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    unitsyncHeightmap({ enginePath, dataDir, mapName })
+      .then((res) => {
+        if (cancelled) return;
+        heightmapCache.set(key, res);
+        apply(res);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, mapName]);
+
+  return { data, loading, error };
 }

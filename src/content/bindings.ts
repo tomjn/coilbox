@@ -250,6 +250,30 @@ export const unitsyncMinimap = defineCommand<
   MinimapResult
 >("coilbox-unitsync", "unitsync_minimap");
 
+export interface HeightmapResult {
+  /** Grayscale PNG `data:` URL of the (downscaled) heightmap, for a displacement map. */
+  dataUrl?: string;
+  /** Full heightmap dimensions `(mapx+1, mapy+1)`; the ratio is the map's aspect ratio. */
+  width?: number;
+  height?: number;
+  /** World height at heightmap value 0 (the flat water plane sits here). */
+  minHeight?: number;
+  /** World height at heightmap value 65535. */
+  maxHeight?: number;
+  errors: string[];
+}
+
+/**
+ * Render one map's height infomap as a grayscale PNG data URL plus its world
+ * `minHeight`/`maxHeight` (for physically-correct 3D displacement). Lazy — a
+ * separate unitsync session, cached on disk. `maxSide` caps the PNG's longest side
+ * (default 512).
+ */
+export const unitsyncHeightmap = defineCommand<
+  { enginePath: string; dataDir: string; mapName: string; maxSide?: number },
+  HeightmapResult
+>("coilbox-unitsync", "unitsync_heightmap");
+
 export interface ThumbnailsResult {
   thumbnails: { name: string; dataUrl: string }[];
   errors: string[];
