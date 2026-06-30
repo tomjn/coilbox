@@ -165,6 +165,8 @@ export interface MapItem {
   height?: number;
   /** Map options (from mapoptions.lua). */
   options: ConfigOption[];
+  /** Non-fatal unitsync diagnostics attributed to this map during the scan. */
+  warnings?: string[];
 }
 
 export interface GameItem {
@@ -176,6 +178,8 @@ export interface GameItem {
   dependencyArchives: Archive[];
   /** modinfo metadata (name, shortname, version, description, ...). */
   info: Record<string, string>;
+  /** Non-fatal unitsync diagnostics attributed to this game during the scan. */
+  warnings?: string[];
 }
 
 /** A faction/side of a game, with its commander/start unit. */

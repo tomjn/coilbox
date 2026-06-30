@@ -253,8 +253,8 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
 
     let sync_version = us.spring_version();
 
-    let maps = collect_maps(&us, &mut errors);
-    let games = collect_games(&us, &mut errors);
+    let maps = collect_maps(&us);
+    let games = collect_games(&us);
 
     us.uninit();
 
@@ -266,18 +266,18 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
     })
 }
 
-/// Drain unitsync's error queue and attribute each message to `who` (the map or
-/// game being processed), so a diagnostic names what it failed on. The expected
-/// "no options file" case (maps/games without options, including old TDF maps) is
-/// dropped as benign noise.
-fn drain_attributed(us: &Unitsync, who: &str, errors: &mut Vec<String>) {
-    for e in us.drain_errors() {
-        let lower = e.to_lowercase();
-        if lower.contains("could not open file") && lower.contains("options.lua") {
-            continue;
-        }
-        errors.push(format!("{who}: {e}"));
-    }
+/// Drain unitsync's error queue, returning the diagnostics accumulated while
+/// processing one map or game (so they can be attached to that item). The
+/// expected "no options file" case (maps/games without options, including old
+/// TDF maps) is dropped as benign noise.
+fn drain_attributed(us: &Unitsync) -> Vec<String> {
+    us.drain_errors()
+        .into_iter()
+        .filter(|e| {
+            let lower = e.to_lowercase();
+            !(lower.contains("could not open file") && lower.contains("options.lua"))
+        })
+        .collect()
 }
 
 /// Build an [`Archive`]. `GetArchivePath` returns the *containing directory* and
@@ -343,7 +343,7 @@ pub(crate) fn read_options(us: &Unitsync, count: i32) -> Vec<ConfigOption> {
         .collect()
 }
 
-fn collect_maps(us: &Unitsync, errors: &mut Vec<String>) -> Vec<MapItem> {
+fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
     let count = us.map_count();
     let mut maps = Vec::with_capacity(count.max(0) as usize);
     for i in 0..count {
@@ -359,6 +359,9 @@ fn collect_maps(us: &Unitsync, errors: &mut Vec<String>) -> Vec<MapItem> {
         // Read options last: the GetOption* accessors read a global set by
         // GetMapOptionCount, so populate and consume it back-to-back.
         let options = read_options(us, us.map_option_count(&name));
+        // Drain after the accessors above, so any queued diagnostics attach to
+        // this map.
+        let warnings = drain_attributed(us);
         maps.push(MapItem {
             file_name: us.map_file_name(i),
             checksum: us.map_checksum(i).map(|c| format!("{c:08x}")),
@@ -367,14 +370,14 @@ fn collect_maps(us: &Unitsync, errors: &mut Vec<String>) -> Vec<MapItem> {
             width: dims.map(|(w, _)| w),
             height: dims.map(|(_, h)| h),
             options,
+            warnings,
             name: name.clone(),
         });
-        drain_attributed(us, &name, errors);
     }
     maps
 }
 
-fn collect_games(us: &Unitsync, errors: &mut Vec<String>) -> Vec<GameItem> {
+fn collect_games(us: &Unitsync) -> Vec<GameItem> {
     let count = us.mod_count();
     let mut games = Vec::with_capacity(count.max(0) as usize);
     for i in 0..count {
@@ -398,14 +401,17 @@ fn collect_games(us: &Unitsync, errors: &mut Vec<String>) -> Vec<GameItem> {
             .map(|a| archive(us, a, None))
             .collect();
 
+        // Drain after the accessors above, so any queued diagnostics attach to
+        // this game.
+        let warnings = drain_attributed(us);
         games.push(GameItem {
             name: name.clone(),
             checksum: checksum.map(|c| format!("{c:08x}")),
             primary_archive,
             dependency_archives,
             info,
+            warnings,
         });
-        drain_attributed(us, &name, errors);
     }
     games
 }
