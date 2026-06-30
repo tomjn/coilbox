@@ -225,17 +225,69 @@ async fn fetch_text(url: String) -> Result<String, String> {
     resp.text().await.map_err(|e| e.to_string())
 }
 
-/// Stream a URL into `dest_dir/filename` (creating the directory). Used for
-/// non-rapid content (e.g. springfiles game mirrors) the sidecar can't fetch.
-async fn download_to(url: &str, dest_dir: &str, filename: &str) -> Result<String, String> {
-    let resp = reqwest::get(url).await.map_err(|e| e.to_string())?;
-    let resp = resp.error_for_status().map_err(|e| e.to_string())?;
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+/// Stream a URL into `dest_dir/filename` (creating the directory), emitting
+/// progress over `on_progress` as bytes arrive. Used for non-rapid content (e.g.
+/// springfiles game mirrors) the sidecar can't fetch. Removes the partial file
+/// if the transfer fails partway.
+async fn download_to(
+    url: &str,
+    dest_dir: &str,
+    filename: &str,
+    on_progress: &Channel<DownloadProgress>,
+) -> Result<String, String> {
+    use std::io::Write;
+    use std::time::Instant;
+
+    let mut resp = reqwest::get(url)
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?;
+    let total = resp.content_length();
+
     let dir = std::path::Path::new(dest_dir);
     std::fs::create_dir_all(dir).map_err(|e| format!("could not create {dest_dir}: {e}"))?;
     let path = dir.join(filename);
-    std::fs::write(&path, &bytes)
-        .map_err(|e| format!("could not write {}: {e}", path.display()))?;
+    let mut file =
+        std::fs::File::create(&path).map_err(|e| format!("could not create {}: {e}", path.display()))?;
+
+    let start = Instant::now();
+    let mut last_emit = Instant::now();
+    let mut downloaded: u64 = 0;
+
+    let stream_result: Result<(), String> = loop {
+        match resp.chunk().await {
+            Ok(Some(chunk)) => {
+                if let Err(e) = file.write_all(&chunk) {
+                    break Err(format!("could not write {}: {e}", path.display()));
+                }
+                downloaded += chunk.len() as u64;
+                // Throttle emits to ~10/sec to avoid flooding the channel.
+                if last_emit.elapsed().as_millis() >= 100 {
+                    last_emit = Instant::now();
+                    let _ = on_progress.send(DownloadProgress {
+                        phase: "downloading".into(),
+                        downloaded_bytes: downloaded,
+                        total_bytes: total,
+                        percent: progress::percent(downloaded, total),
+                        bytes_per_sec: progress::bytes_per_sec(
+                            downloaded,
+                            start.elapsed().as_secs_f64(),
+                        ),
+                    });
+                }
+            }
+            Ok(None) => break Ok(()),
+            Err(e) => break Err(e.to_string()),
+        }
+    };
+
+    if let Err(e) = stream_result {
+        let _ = std::fs::remove_file(&path);
+        return Err(e);
+    }
+
+    let _ = on_progress.send(DownloadProgress::done(downloaded, total));
     Ok(path.display().to_string())
 }
 
@@ -334,11 +386,16 @@ async fn dl_download_map(
 /// `dl_download_file` — directly download a file (e.g. a springfiles game mirror)
 /// into `dest_dir/filename`, for non-rapid content the sidecar can't fetch.
 #[tauri::command]
-async fn dl_download_file(url: String, dest_dir: String, filename: String) -> CliResult {
+async fn dl_download_file(
+    url: String,
+    dest_dir: String,
+    filename: String,
+    on_progress: Channel<DownloadProgress>,
+) -> CliResult {
     if url.trim().is_empty() || filename.trim().is_empty() {
         return CliResult::err("url and filename are required");
     }
-    match download_to(&url, &dest_dir, &filename).await {
+    match download_to(&url, &dest_dir, &filename, &on_progress).await {
         Ok(path) => CliResult::ok(json!({ "message": format!("Saved {path}"), "path": path })),
         Err(e) => CliResult::err(e),
     }
