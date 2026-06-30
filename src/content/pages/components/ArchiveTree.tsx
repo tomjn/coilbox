@@ -1,5 +1,5 @@
 import { cn } from "@picoframe/frame";
-import { ChevronDown, ChevronRight, File, Folder } from "lucide-react";
+import { ChevronRight, File, Folder, FolderOpen } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ArchiveFileEntry } from "../../bindings";
 import { formatBytes } from "../../format";
@@ -35,7 +35,24 @@ function buildTree(files: ArchiveFileEntry[]): DirNode {
 }
 
 const ROW =
-  "flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left text-sm hover:bg-accent/50";
+  "flex w-full items-center gap-1.5 rounded py-1 pl-1.5 pr-2 text-left text-sm hover:bg-accent/50";
+
+/** Vertical rails marking each ancestor depth, so nesting reads as aligned
+ * guide lines. One 16px cell per level; the left border is the rail. */
+function IndentGuides({ depth }: { depth: number }) {
+  if (depth === 0) return null;
+  return (
+    <span className="flex shrink-0 self-stretch" aria-hidden>
+      {Array.from({ length: depth }, (_, i) => (
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: fixed-count depth rails
+          key={i}
+          className="w-4 self-stretch border-l border-border/40"
+        />
+      ))}
+    </span>
+  );
+}
 
 /** Render a directory's contents (its sub-dirs then its files), recursively. */
 function DirContents({
@@ -70,9 +87,11 @@ function DirContents({
           type="button"
           key={`f:${f.path}`}
           onClick={() => onSelect(f.path)}
-          style={{ paddingLeft: depth * 14 + 6 }}
           className={cn(ROW, selected === f.path && "bg-accent")}
         >
+          <IndentGuides depth={depth} />
+          {/* Chevron-width spacer so file icons align under folder icons. */}
+          <span className="size-3.5 shrink-0" aria-hidden />
           <File className="size-3.5 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1 truncate font-mono">{f.name}</span>
           <span className="shrink-0 font-mono text-xs text-muted-foreground">
@@ -104,16 +123,21 @@ function DirEntry({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        style={{ paddingLeft: depth * 14 + 6 }}
         className={cn(ROW, "font-medium")}
         aria-expanded={open}
       >
+        <IndentGuides depth={depth} />
+        <ChevronRight
+          className={cn(
+            "size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
+            open && "rotate-90",
+          )}
+        />
         {open ? (
-          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+          <FolderOpen className="size-3.5 shrink-0 text-muted-foreground" />
         ) : (
-          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+          <Folder className="size-3.5 shrink-0 text-muted-foreground" />
         )}
-        <Folder className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate font-mono">{name}</span>
       </button>
       {open && (

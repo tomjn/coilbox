@@ -1,4 +1,5 @@
-import { FileQuestion } from "lucide-react";
+import { Button } from "@picoframe/frame";
+import { Check, Copy, Download, FileQuestion } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ArchiveFileResult } from "../../bindings";
 import { formatBytes } from "../../format";
@@ -78,27 +79,17 @@ function TextPreview({ code, lang }: { code: string; lang: string }) {
   );
 }
 
-/**
- * Preview the selected archive member: highlighted text, an inline image, or a
- * metadata-only notice for binary / too-large files.
- */
-export function FilePreview({
+/** The selected member's contents: highlighted text, an inline image, or a
+ * metadata-only notice for binary / too-large files. */
+function PreviewBody({
   path,
   result,
   loading,
 }: {
-  path: string | null;
+  path: string;
   result: ArchiveFileResult | null;
   loading: boolean;
 }) {
-  if (!path) {
-    return (
-      <Centered>
-        <FileQuestion className="size-6" />
-        Select a file to preview it.
-      </Centered>
-    );
-  }
   if (loading) {
     return (
       <div className="h-full min-h-40 animate-pulse rounded-lg border border-border/50 bg-card" />
@@ -128,5 +119,117 @@ export function FilePreview({
         ? `Too large to preview (${formatBytes(result.size)}).`
         : `No preview for this file type (${formatBytes(result.size)}).`}
     </Centered>
+  );
+}
+
+/** Filename plus the copy/download actions for the selected member. */
+function PreviewToolbar({
+  path,
+  result,
+  onDownload,
+}: {
+  path: string;
+  result: ArchiveFileResult | null;
+  onDownload: () => Promise<boolean>;
+}) {
+  const base = path.split("/").pop() ?? path;
+  const text = result?.kind === "text" ? result.text : undefined;
+  const [copied, setCopied] = useState(false);
+  const [dl, setDl] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  const copy = async () => {
+    if (text == null) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard may be unavailable; the preview text is still selectable.
+    }
+  };
+
+  const download = async () => {
+    setDl("saving");
+    try {
+      const saved = await onDownload();
+      setDl(saved ? "saved" : "idle");
+      if (saved) setTimeout(() => setDl("idle"), 1500);
+    } catch (e) {
+      console.error("archive member download failed", e);
+      setDl("error");
+      setTimeout(() => setDl("idle"), 2500);
+    }
+  };
+
+  const dlLabel =
+    dl === "saving"
+      ? "Saving"
+      : dl === "saved"
+        ? "Saved"
+        : dl === "error"
+          ? "Failed"
+          : "Download";
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <span
+        className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground"
+        title={path}
+      >
+        {base}
+      </span>
+      {text != null && (
+        <Button size="sm" variant="outline" className="gap-1.5" onClick={copy}>
+          {copied ? (
+            <Check className="size-3.5" />
+          ) : (
+            <Copy className="size-3.5" />
+          )}
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      )}
+      <Button
+        size="sm"
+        variant="outline"
+        className="gap-1.5"
+        onClick={download}
+        disabled={dl === "saving"}
+      >
+        <Download className="size-3.5" /> {dlLabel}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Preview the selected archive member with a toolbar to copy (text) or download
+ * (any file) it. Shows a prompt when nothing is selected.
+ */
+export function FilePreview({
+  path,
+  result,
+  loading,
+  onDownload,
+}: {
+  path: string | null;
+  result: ArchiveFileResult | null;
+  loading: boolean;
+  onDownload: () => Promise<boolean>;
+}) {
+  if (!path) {
+    return (
+      <Centered>
+        <FileQuestion className="size-6" />
+        Select a file to preview it.
+      </Centered>
+    );
+  }
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <PreviewToolbar path={path} result={result} onDownload={onDownload} />
+      <div className="min-h-0 flex-1">
+        <PreviewBody path={path} result={result} loading={loading} />
+      </div>
+    </div>
   );
 }

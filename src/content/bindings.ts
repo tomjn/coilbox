@@ -337,3 +337,25 @@ export const unitsyncArchiveFile = defineCommand<
   { enginePath: string; dataDir: string; archive: string; file: string },
   ArchiveFileResult
 >("coilbox-unitsync", "unitsync_archive_file");
+
+export interface ArchiveExtractResult {
+  /** Bytes written to the destination (0 when extraction failed). */
+  size: number;
+  errors: string[];
+}
+
+/**
+ * Write one archive member's full bytes to `dest` (the download action). `file`
+ * is the member's slash-separated path within `archive`; `dest` is an absolute
+ * path the user picked via a save dialog. Unlike preview, this is uncapped.
+ */
+export const unitsyncArchiveExtract = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    archive: string;
+    file: string;
+    dest: string;
+  },
+  ArchiveExtractResult
+>("coilbox-unitsync", "unitsync_archive_extract");

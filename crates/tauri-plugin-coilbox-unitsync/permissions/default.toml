@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands."
+description = "Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info, engine-config and archive browse/extract commands."
 permissions = [
   "allow-unitsync-scan",
   "allow-unitsync-minimap",
@@ -10,4 +10,5 @@ permissions = [
   "allow-unitsync-engine-config",
   "allow-unitsync-archive-tree",
   "allow-unitsync-archive-file",
+  "allow-unitsync-archive-extract",
 ]

@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands.
+Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info, engine-config and archive browse/extract commands.
 
 #### This default permission set includes the following:
 
@@ -11,6 +11,7 @@ Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and eng
 - `allow-unitsync-engine-config`
 - `allow-unitsync-archive-tree`
 - `allow-unitsync-archive-file`
+- `allow-unitsync-archive-extract`
 
 ## Permission Table
 
@@ -20,6 +21,32 @@ Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and eng
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-archive-extract`
+
+</td>
+<td>
+
+Enables the unitsync_archive_extract command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-archive-extract`
+
+</td>
+<td>
+
+Denies the unitsync_archive_extract command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
