@@ -92,64 +92,63 @@ export default function MapDetailPage() {
             ? ` · ${minimap.startPositions.length} start positions`
             : ""}
         </h2>
-        <div
-          className="relative flex w-full max-w-sm items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card"
-          style={{
-            aspectRatio:
-              map.width && map.height
-                ? `${map.width} / ${map.height}`
-                : "1 / 1",
-          }}
-        >
-          {minimap.loading ? (
-            <div className="size-full animate-pulse bg-muted" />
-          ) : minimap.dataUrl ? (
-            <>
-              <img
-                src={minimap.dataUrl}
-                alt={`Minimap of ${map.name}`}
-                className="size-full object-fill"
-              />
-              {markers.map((m, i) => (
-                <span
-                  key={m.key}
-                  className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow"
-                  style={{ left: `${m.left}%`, top: `${m.top}%` }}
-                  title={`Start position ${i + 1}`}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div
+            className="relative flex w-full max-w-sm shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card"
+            style={{
+              aspectRatio:
+                map.width && map.height
+                  ? `${map.width} / ${map.height}`
+                  : "1 / 1",
+            }}
+          >
+            {minimap.loading ? (
+              <div className="size-full animate-pulse bg-muted" />
+            ) : minimap.dataUrl ? (
+              <>
+                <img
+                  src={minimap.dataUrl}
+                  alt={`Minimap of ${map.name}`}
+                  className="size-full object-fill"
                 />
-              ))}
-            </>
-          ) : (
-            <div className="flex flex-col items-center gap-1 text-muted-foreground">
-              <ImageOff className="size-6" />
-              <span className="text-xs">No minimap</span>
-            </div>
+                {markers.map((m, i) => (
+                  <span
+                    key={m.key}
+                    className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow"
+                    style={{ left: `${m.left}%`, top: `${m.top}%` }}
+                    title={`Start position ${i + 1}`}
+                  />
+                ))}
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                <ImageOff className="size-6" />
+                <span className="text-xs">No minimap</span>
+              </div>
+            )}
+          </div>
+
+          {heightmap.data?.dataUrl && minimap.dataUrl && (
+            <MapPreview3D
+              className="w-full min-w-0 lg:flex-1"
+              heightSrc={heightmap.data.dataUrl}
+              textureSrc={minimap.dataUrl}
+              minHeight={heightmap.data.minHeight ?? 0}
+              maxHeight={heightmap.data.maxHeight ?? 0}
+              worldWidth={
+                heightmap.data.width
+                  ? (heightmap.data.width - 1) * 8
+                  : (map.width ?? 1) * 16
+              }
+              worldHeight={
+                heightmap.data.height
+                  ? (heightmap.data.height - 1) * 8
+                  : (map.height ?? 1) * 16
+              }
+            />
           )}
         </div>
       </section>
-
-      {heightmap.data?.dataUrl && minimap.dataUrl && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">3D preview</h2>
-          <MapPreview3D
-            className="max-w-2xl"
-            heightSrc={heightmap.data.dataUrl}
-            textureSrc={minimap.dataUrl}
-            minHeight={heightmap.data.minHeight ?? 0}
-            maxHeight={heightmap.data.maxHeight ?? 0}
-            worldWidth={
-              heightmap.data.width
-                ? (heightmap.data.width - 1) * 8
-                : (map.width ?? 1) * 16
-            }
-            worldHeight={
-              heightmap.data.height
-                ? (heightmap.data.height - 1) * 8
-                : (map.height ?? 1) * 16
-            }
-          />
-        </section>
-      )}
 
       <OptionsList options={map.options} title="Map options" />
 
