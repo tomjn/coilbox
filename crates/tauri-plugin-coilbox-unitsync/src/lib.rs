@@ -12,9 +12,9 @@ mod sidecar;
 
 use picoframe_core::CliResult;
 use sidecar::{
-    build_archive_file_args, build_archive_tree_args, build_args, build_config_args,
-    build_game_args, build_lua_args, build_minimap_args, build_thumbnails_args, find_unitsync,
-    resolve_sidecar,
+    build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
+    build_config_args, build_game_args, build_lua_args, build_minimap_args, build_thumbnails_args,
+    find_unitsync, resolve_sidecar,
 };
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -362,6 +362,32 @@ async fn unitsync_lua_exec(
     Ok(result)
 }
 
+/// `unitsync_archive_extract` — write one member's full bytes to `dest` (the
+/// download action). `file` is the member's slash-separated path within `archive`;
+/// `dest` is an absolute path the user picked via a save dialog.
+#[tauri::command]
+async fn unitsync_archive_extract(
+    engine_path: String,
+    data_dir: String,
+    archive: String,
+    file: String,
+    dest: String,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let args = build_archive_extract_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &archive,
+        &file,
+        &dest,
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive extract").await)
+}
+
 /// Build the plugin. Registered as `"coilbox-unitsync"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-unitsync|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -374,7 +400,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_engine_config,
             unitsync_archive_tree,
             unitsync_archive_file,
-            unitsync_lua_exec
+            unitsync_lua_exec,
+            unitsync_archive_extract
         ])
         .build()
 }

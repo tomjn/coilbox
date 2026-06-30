@@ -36,6 +36,8 @@ struct Args {
     game: Option<String>,
     archive: Option<String>,
     file: Option<String>,
+    /// Destination path for `--extract` (download one member to disk).
+    extract: Option<String>,
     thumbnails: bool,
     config: bool,
     /// `--lua`: run a Lua snippet through the parser against `--archive`, reading
@@ -117,8 +119,25 @@ fn run() -> i32 {
         };
     }
 
-    // Archive browsing: list a member tree, or read one member for preview.
+    // Archive browsing: list a member tree, read one member for preview, or
+    // extract one member to a destination path (download).
     if let Some(archive_name) = args.archive.clone() {
+        if let (Some(inner), Some(dest)) = (args.file.clone(), args.extract.clone()) {
+            return match std::panic::catch_unwind(|| {
+                archive::extract(&args.lib, &archive_name, &inner, &dest)
+            }) {
+                Ok(out) => {
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    0
+                }
+                Err(_) => {
+                    archive::emit_extract_error(
+                        "worker panicked while extracting archive member".into(),
+                    );
+                    1
+                }
+            };
+        }
         if let Some(inner) = args.file.clone() {
             return match std::panic::catch_unwind(|| {
                 archive::file(&args.lib, &archive_name, &inner)
@@ -213,6 +232,7 @@ fn parse_args() -> Result<Args, String> {
     let mut game = None;
     let mut archive = None;
     let mut file = None;
+    let mut extract = None;
     let mut thumbnails = false;
     let mut config = false;
     let mut lua = false;
@@ -228,6 +248,7 @@ fn parse_args() -> Result<Args, String> {
             "--game" => game = it.next(),
             "--archive" => archive = it.next(),
             "--file" => file = it.next(),
+            "--extract" => extract = it.next(),
             "--thumbnails" => thumbnails = true,
             "--cache-dir" => cache_dir = it.next(),
             "--config" => config = true,
@@ -249,6 +270,7 @@ fn parse_args() -> Result<Args, String> {
         game,
         archive,
         file,
+        extract,
         thumbnails,
         config,
         lua,
