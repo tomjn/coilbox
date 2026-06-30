@@ -82,7 +82,7 @@ async fn run_sidecar_streaming(
     envs: Vec<(String, String)>,
     on_progress: Channel<DownloadProgress>,
 ) -> Result<SidecarRun, String> {
-    use std::io::{BufRead, BufReader};
+    use std::io::BufReader;
     let path = sidecar::resolve_sidecar().ok_or(SIDECAR_MISSING)?;
     tauri::async_runtime::spawn_blocking(move || {
         let mut cmd = Command::new(&path);
@@ -106,18 +106,43 @@ async fn run_sidecar_streaming(
             })
         });
 
-        // Read stdout here: collect every line and emit progress as we go.
+        // Read stdout, splitting on BOTH '\n' and '\r': pr-downloader redraws its
+        // progress bar in place with carriage returns, so '\n'-only line splitting
+        // would buffer the entire 0->100% sequence into one chunk and defer every
+        // progress event to the end. Each completed segment is emitted as it arrives.
+        // A mid-stream read error ends the loop as if EOF; the collected output still
+        // feeds parse_download for the verdict, and the exit code is authoritative.
         let mut out = String::new();
         if let Some(s) = stdout {
-            // A mid-stream read error ends the loop as if EOF: the collected output
-            // still feeds parse_download for the verdict, and exit code is authoritative.
-            for line in BufReader::new(s).lines().map_while(Result::ok) {
+            let mut reader = BufReader::new(s);
+            let mut seg: Vec<u8> = Vec::new();
+            let mut byte = [0u8; 1];
+            let flush = |seg: &mut Vec<u8>, out: &mut String| {
+                if seg.is_empty() {
+                    return;
+                }
+                let line = String::from_utf8_lossy(seg).into_owned();
                 if let Some(p) = sidecar::parse_progress_line(&line) {
                     let _ = on_progress.send(p);
                 }
                 out.push_str(&line);
                 out.push('\n');
+                seg.clear();
+            };
+            loop {
+                match reader.read(&mut byte) {
+                    Ok(0) => break,
+                    Ok(_) => {
+                        if byte[0] == b'\n' || byte[0] == b'\r' {
+                            flush(&mut seg, &mut out);
+                        } else {
+                            seg.push(byte[0]);
+                        }
+                    }
+                    Err(_) => break,
+                }
             }
+            flush(&mut seg, &mut out); // trailing segment with no terminator
         }
 
         let err = err_handle.and_then(|h| h.join().ok()).unwrap_or_default();
