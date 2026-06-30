@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-unitsync-archive-extract"
+description = "Enables the unitsync_archive_extract command without any pre-configured scope."
+commands.allow = ["unitsync_archive_extract"]
+
+[[permission]]
+identifier = "deny-unitsync-archive-extract"
+description = "Denies the unitsync_archive_extract command without any pre-configured scope."
+commands.deny = ["unitsync_archive_extract"]

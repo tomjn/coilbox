@@ -6,7 +6,13 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!src-tauri", "!crates", "!**/*.css"]
+    "includes": [
+      "**",
+      "!src-tauri",
+      "!crates",
+      "!**/*.css",
+      "!src/dev/tauri-mcp-bridge.ts"
+    ]
   },
   "formatter": {
     "enabled": true,

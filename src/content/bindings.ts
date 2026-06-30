@@ -361,3 +361,45 @@ export const unitsyncArchiveFile = defineCommand<
   { enginePath: string; dataDir: string; archive: string; file: string },
   ArchiveFileResult
 >("coilbox-unitsync", "unitsync_archive_file");
+
+export interface LuaExecResult {
+  /** The pretty-printed value the script returned (set on success). */
+  result?: string;
+  /** A compile or runtime error from the Lua parser (set on failure). */
+  error?: string;
+  /** Non-fatal unitsync diagnostics (e.g. a missing dependency archive). */
+  errors: string[];
+}
+
+/**
+ * Run a Lua snippet through the engine's Lua parser with `archive` (and its
+ * dependencies) mounted in the VFS, so `VFS.Include(...)` resolves against it.
+ * Restricted, one-shot, no persistent state — a debugging aid, not a REPL. End
+ * the script with `return …` to see a value.
+ */
+export const unitsyncLuaExec = defineCommand<
+  { enginePath: string; dataDir: string; archive: string; source: string },
+  LuaExecResult
+>("coilbox-unitsync", "unitsync_lua_exec");
+
+export interface ArchiveExtractResult {
+  /** Bytes written to the destination (0 when extraction failed). */
+  size: number;
+  errors: string[];
+}
+
+/**
+ * Write one archive member's full bytes to `dest` (the download action). `file`
+ * is the member's slash-separated path within `archive`; `dest` is an absolute
+ * path the user picked via a save dialog. Unlike preview, this is uncapped.
+ */
+export const unitsyncArchiveExtract = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    archive: string;
+    file: string;
+    dest: string;
+  },
+  ArchiveExtractResult
+>("coilbox-unitsync", "unitsync_archive_extract");

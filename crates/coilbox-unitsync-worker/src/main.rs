@@ -18,6 +18,7 @@ mod config;
 mod ffi;
 mod game;
 mod heightmap;
+mod lua;
 mod minimap;
 mod model;
 
@@ -36,9 +37,15 @@ struct Args {
     game: Option<String>,
     archive: Option<String>,
     file: Option<String>,
+    /// Destination path for `--extract` (download one member to disk).
+    extract: Option<String>,
     thumbnails: bool,
     heightmap: bool,
     config: bool,
+    /// `--lua`: run a Lua snippet through the parser against `--archive`, reading
+    /// the script from `--source-file`.
+    lua: bool,
+    source_file: Option<String>,
     mip: i32,
     /// Longest-side pixel cap for the heightmap PNG downscale (heightmap mode).
     max_side: u32,
@@ -71,6 +78,31 @@ fn run() -> i32 {
 
     let cache_dir = args.cache_dir.as_deref().map(Path::new);
 
+    // Lua console: mount one archive and run a user snippet through the parser.
+    if args.lua {
+        let archive = args.archive.clone().unwrap_or_default();
+        let source = match args.source_file.as_deref() {
+            Some(p) => match std::fs::read_to_string(p) {
+                Ok(s) => s,
+                Err(e) => {
+                    lua::emit_error(format!("could not read source file {p}: {e}"));
+                    return 1;
+                }
+            },
+            None => String::new(),
+        };
+        return match std::panic::catch_unwind(|| lua::run(&args.lib, &archive, &source)) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                lua::emit_error("worker panicked while executing Lua".into());
+                1
+            }
+        };
+    }
+
     // Batch thumbnails: a small minimap for every map in one Init.
     if args.thumbnails {
         return match std::panic::catch_unwind(|| {
@@ -91,8 +123,25 @@ fn run() -> i32 {
         };
     }
 
-    // Archive browsing: list a member tree, or read one member for preview.
+    // Archive browsing: list a member tree, read one member for preview, or
+    // extract one member to a destination path (download).
     if let Some(archive_name) = args.archive.clone() {
+        if let (Some(inner), Some(dest)) = (args.file.clone(), args.extract.clone()) {
+            return match std::panic::catch_unwind(|| {
+                archive::extract(&args.lib, &archive_name, &inner, &dest)
+            }) {
+                Ok(out) => {
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    0
+                }
+                Err(_) => {
+                    archive::emit_extract_error(
+                        "worker panicked while extracting archive member".into(),
+                    );
+                    1
+                }
+            };
+        }
         if let Some(inner) = args.file.clone() {
             return match std::panic::catch_unwind(|| {
                 archive::file(&args.lib, &archive_name, &inner)
@@ -207,9 +256,12 @@ fn parse_args() -> Result<Args, String> {
     let mut game = None;
     let mut archive = None;
     let mut file = None;
+    let mut extract = None;
     let mut thumbnails = false;
     let mut heightmap = false;
     let mut config = false;
+    let mut lua = false;
+    let mut source_file = None;
     let mut mip = 1; // 512x512 by default
     let mut max_side = 512u32;
     let mut cache_dir = None;
@@ -222,6 +274,7 @@ fn parse_args() -> Result<Args, String> {
             "--game" => game = it.next(),
             "--archive" => archive = it.next(),
             "--file" => file = it.next(),
+            "--extract" => extract = it.next(),
             "--thumbnails" => thumbnails = true,
             "--heightmap" => heightmap = true,
             "--max-side" => {
@@ -232,6 +285,8 @@ fn parse_args() -> Result<Args, String> {
             }
             "--cache-dir" => cache_dir = it.next(),
             "--config" => config = true,
+            "--lua" => lua = true,
+            "--source-file" => source_file = it.next(),
             "--mip" => {
                 mip = it
                     .next()
@@ -248,9 +303,12 @@ fn parse_args() -> Result<Args, String> {
         game,
         archive,
         file,
+        extract,
         thumbnails,
         heightmap,
         config,
+        lua,
+        source_file,
         mip,
         max_side,
         cache_dir,

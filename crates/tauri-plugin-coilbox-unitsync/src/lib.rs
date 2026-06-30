@@ -12,9 +12,9 @@ mod sidecar;
 
 use picoframe_core::CliResult;
 use sidecar::{
-    build_archive_file_args, build_archive_tree_args, build_args, build_config_args,
-    build_game_args, build_heightmap_args, build_minimap_args, build_thumbnails_args,
-    find_unitsync, resolve_sidecar,
+    build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
+    build_config_args, build_game_args, build_heightmap_args, build_lua_args, build_minimap_args,
+    build_thumbnails_args, find_unitsync, resolve_sidecar,
 };
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -148,6 +148,22 @@ fn read_to_string<R: Read>(reader: Option<R>) -> String {
         let _ = r.read_to_string(&mut buf);
     }
     buf
+}
+
+/// Write a Lua script to a uniquely-named temp file and return its path. Scripts
+/// are passed to the worker by path (not as a CLI arg) because args have length
+/// limits and a console script can be large. The caller removes the file after
+/// the worker exits.
+fn write_temp_script(source: &str) -> Result<PathBuf, String> {
+    let mut path = std::env::temp_dir();
+    let pid = std::process::id();
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    path.push(format!("coilbox-lua-{pid}-{nanos}.lua"));
+    std::fs::write(&path, source).map_err(|e| format!("could not write temp Lua script: {e}"))?;
+    Ok(path)
 }
 
 /// Resolve the worker binary, the engine's `libunitsync.*`, and the engine dir
@@ -342,6 +358,63 @@ async fn unitsync_archive_file(
     Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive file").await)
 }
 
+/// `unitsync_lua_exec` — run a Lua snippet through the engine's Lua parser with
+/// `archive` (and its dependencies) mounted in the VFS. `source` is the script;
+/// it is handed to the worker via a temp file. Returns `{ result?, error?,
+/// errors }`.
+#[tauri::command]
+async fn unitsync_lua_exec(
+    engine_path: String,
+    data_dir: String,
+    archive: String,
+    source: String,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let script = match write_temp_script(&source) {
+        Ok(p) => p,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let args = build_lua_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &archive,
+        &script.to_string_lossy(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    let result = run_worker(bin, args, envs, MINIMAP_TIMEOUT, "lua exec").await;
+    let _ = std::fs::remove_file(&script);
+    Ok(result)
+}
+
+/// `unitsync_archive_extract` — write one member's full bytes to `dest` (the
+/// download action). `file` is the member's slash-separated path within `archive`;
+/// `dest` is an absolute path the user picked via a save dialog.
+#[tauri::command]
+async fn unitsync_archive_extract(
+    engine_path: String,
+    data_dir: String,
+    archive: String,
+    file: String,
+    dest: String,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let args = build_archive_extract_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &archive,
+        &file,
+        &dest,
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive extract").await)
+}
+
 /// Build the plugin. Registered as `"coilbox-unitsync"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-unitsync|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -354,7 +427,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_game_info,
             unitsync_engine_config,
             unitsync_archive_tree,
-            unitsync_archive_file
+            unitsync_archive_file,
+            unitsync_lua_exec,
+            unitsync_archive_extract
         ])
         .build()
 }

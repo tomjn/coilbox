@@ -589,6 +589,7 @@ dependencies = [
  "coilbox-thumb-cache",
  "image 0.25.10",
  "libloading 0.8.9",
+ "mlua",
  "serde",
  "serde_json",
 ]
