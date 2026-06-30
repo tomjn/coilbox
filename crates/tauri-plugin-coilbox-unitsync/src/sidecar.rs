@@ -53,22 +53,45 @@ pub fn build_args(lib: &str, datadir: &str) -> Vec<String> {
     ]
 }
 
-/// Build args for minimap mode: scan args plus the map name and mip level.
-pub fn build_minimap_args(lib: &str, datadir: &str, map: &str, mip: i32) -> Vec<String> {
+/// Append `--cache-dir <dir>` when a PNG cache directory is given.
+fn push_cache_dir(args: &mut Vec<String>, cache_dir: Option<&str>) {
+    if let Some(dir) = cache_dir {
+        args.push("--cache-dir".into());
+        args.push(dir.into());
+    }
+}
+
+/// Build args for minimap mode: scan args plus the map name, mip level, and the
+/// optional on-disk PNG cache directory.
+pub fn build_minimap_args(
+    lib: &str,
+    datadir: &str,
+    map: &str,
+    mip: i32,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.push("--map".into());
     args.push(map.into());
     args.push("--mip".into());
     args.push(mip.to_string());
+    push_cache_dir(&mut args, cache_dir);
     args
 }
 
-/// Build args for batch-thumbnail mode: scan args plus the thumbnail mip level.
-pub fn build_thumbnails_args(lib: &str, datadir: &str, mip: i32) -> Vec<String> {
+/// Build args for batch-thumbnail mode: scan args plus the thumbnail mip level and
+/// the optional on-disk PNG cache directory.
+pub fn build_thumbnails_args(
+    lib: &str,
+    datadir: &str,
+    mip: i32,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.push("--thumbnails".into());
     args.push("--mip".into());
     args.push(mip.to_string());
+    push_cache_dir(&mut args, cache_dir);
     args
 }
 
@@ -96,6 +119,29 @@ mod tests {
                 "/home/u/.spring".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn thumbnails_args_append_cache_dir_when_present() {
+        let with =
+            build_thumbnails_args("/eng/libunitsync.dylib", "/data", 3, Some("/cache/thumbs"));
+        assert_eq!(&with[with.len() - 2..], &["--cache-dir", "/cache/thumbs"]);
+        let without = build_thumbnails_args("/eng/libunitsync.dylib", "/data", 3, None);
+        assert!(!without.iter().any(|a| a == "--cache-dir"));
+    }
+
+    #[test]
+    fn minimap_args_append_cache_dir_when_present() {
+        let with = build_minimap_args(
+            "/eng/libunitsync.dylib",
+            "/data",
+            "Map v1",
+            1,
+            Some("/cache/thumbs"),
+        );
+        assert_eq!(&with[with.len() - 2..], &["--cache-dir", "/cache/thumbs"]);
+        let without = build_minimap_args("/eng/libunitsync.dylib", "/data", "Map v1", 1, None);
+        assert!(!without.iter().any(|a| a == "--cache-dir"));
     }
 
     #[test]

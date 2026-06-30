@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 use tauri::plugin::{Builder, TauriPlugin};
-use tauri::Runtime;
+use tauri::{AppHandle, Manager, Runtime};
 
 const WORKER_MISSING: &str =
     "unitsync worker not found. Bundle it via tauri.conf.json `externalBin` or set UNITSYNC_WORKER.";
@@ -29,6 +29,19 @@ const WORKER_MISSING: &str =
 const SCAN_TIMEOUT: Duration = Duration::from_secs(60);
 /// A single minimap is a fast, bounded operation.
 const MINIMAP_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Subdirectory of the app cache dir holding rendered minimap/thumbnail PNGs.
+const THUMB_CACHE_SUBDIR: &str = "coilbox-unitsync-thumbs";
+
+/// The on-disk PNG cache directory for minimaps/thumbnails, under the app cache
+/// dir. `None` when the platform can't resolve a cache dir — caching is then
+/// simply skipped (same pattern as the mapconv plugin's thumbnail cache).
+fn thumb_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    app.path()
+        .app_cache_dir()
+        .ok()
+        .map(|d| d.join(THUMB_CACHE_SUBDIR))
+}
 
 /// The platform's shared-library search variable.
 fn loader_var() -> &'static str {
@@ -188,7 +201,8 @@ async fn unitsync_scan(engine_path: String, data_dir: String) -> Result<CliResul
 /// `unitsync_minimap` — render one map's minimap as a PNG data URL. `mip` selects
 /// resolution (`1024 >> mip` px per side; defaults to 1 = 512px).
 #[tauri::command]
-async fn unitsync_minimap(
+async fn unitsync_minimap<R: Runtime>(
+    app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
     map_name: String,
@@ -198,11 +212,13 @@ async fn unitsync_minimap(
         Ok(v) => v,
         Err(e) => return Ok(CliResult::err(e)),
     };
+    let cache_dir = thumb_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_minimap_args(
         &libpath.to_string_lossy(),
         &data_dir,
         &map_name,
         mip.unwrap_or(1),
+        cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
     Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "minimap").await)
@@ -211,7 +227,8 @@ async fn unitsync_minimap(
 /// `unitsync_thumbnails` — render a small minimap for every map in one session,
 /// for the Maps grid. `mip` defaults to 3 (128px).
 #[tauri::command]
-async fn unitsync_thumbnails(
+async fn unitsync_thumbnails<R: Runtime>(
+    app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
     mip: Option<i32>,
@@ -220,7 +237,13 @@ async fn unitsync_thumbnails(
         Ok(v) => v,
         Err(e) => return Ok(CliResult::err(e)),
     };
-    let args = build_thumbnails_args(&libpath.to_string_lossy(), &data_dir, mip.unwrap_or(3));
+    let cache_dir = thumb_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_thumbnails_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        mip.unwrap_or(3),
+        cache_dir.as_deref(),
+    );
     let envs = loader_envs(&engine_dir, &data_dir);
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "thumbnails").await)
 }

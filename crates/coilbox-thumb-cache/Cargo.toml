@@ -1,0 +1,8 @@
+[package]
+name = "coilbox-thumb-cache"
+version = "0.0.0"
+description = "Tiny dependency-free on-disk byte cache: read a cache file if present, else run a closure and best-effort write its bytes back. Shared by the mapconv plugin and the unitsync worker for thumbnail caching."
+edition = "2021"
+license = "MIT"
+
+[dependencies]

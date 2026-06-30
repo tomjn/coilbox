@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Boxes, FolderTree, Gamepad2, Map as MapIcon } from "lucide-react";
+import ContentStartupProvider from "./ContentStartupProvider";
 import EnginesSection from "./pages/EnginesSection";
 import FoldersSection from "./pages/FoldersSection";
 
@@ -20,6 +21,9 @@ import FoldersSection from "./pages/FoldersSection";
 const contentPlugin: FramePlugin = {
   id: "content",
   version: "0.0.0",
+  // Runs once at app launch (before any route opens) to warm the unitsync scan
+  // and map thumbnails, so the Maps/Games pages show data instantly.
+  Provider: ContentStartupProvider,
   nav: [
     {
       id: "content",

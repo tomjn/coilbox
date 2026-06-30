@@ -82,9 +82,8 @@ export function targetKey(t: ScanTarget): string {
 }
 
 /** Flatten the content state into every (root, engine) scan target. */
-export function useContentTargets() {
-  const { state, loading, error, refresh } = useContentState();
-  const targets: ScanTarget[] = (state?.roots ?? [])
+export function targetsFromState(state: ContentState | null): ScanTarget[] {
+  return (state?.roots ?? [])
     .filter((r) => r.engines.length > 0)
     .flatMap((r) =>
       r.engines.map((e) => ({
@@ -95,7 +94,12 @@ export function useContentTargets() {
         engineVersion: e.syncVersion ?? e.version,
       })),
     );
-  return { targets, loading, error, refresh };
+}
+
+/** Flatten the content state into every (root, engine) scan target. */
+export function useContentTargets() {
+  const { state, loading, error, refresh } = useContentState();
+  return { targets: targetsFromState(state), loading, error, refresh };
 }
 
 /**
@@ -128,6 +132,24 @@ export function useScanTargetSelection() {
  */
 const scanCache = new Map<string, ScanResult>();
 
+/**
+ * Fetch (or read from cache) a unitsync scan for a target, populating
+ * `scanCache`. Shared by the page hook and the launch warm-up so both read the
+ * same cache. `force` re-runs the scan even on a cache hit.
+ */
+export async function primeScan(
+  enginePath: string,
+  dataDir: string,
+  force = false,
+): Promise<ScanResult> {
+  const key = `${dataDir}::${enginePath}`;
+  const cached = scanCache.get(key);
+  if (!force && cached) return cached;
+  const res = await unitsyncScan({ enginePath, dataDir });
+  scanCache.set(key, res);
+  return res;
+}
+
 /** Run / read a cached unitsync scan for the given target. */
 export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
   const [data, setData] = useState<ScanResult | null>(null);
@@ -145,9 +167,7 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
       setLoading(true);
       setError(null);
       try {
-        const res = await unitsyncScan({ enginePath, dataDir });
-        scanCache.set(key, res);
-        setData(res);
+        setData(await primeScan(enginePath, dataDir, force));
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -173,6 +193,25 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
 /** Session cache of batch thumbnails, keyed by `dataDir::enginePath`. */
 const thumbnailsCache = new Map<string, Map<string, string>>();
 
+/**
+ * Render (or read from cache) every map's thumbnail for a target, populating
+ * `thumbnailsCache` (name -> PNG data URL). Shared by the page hook and the
+ * launch warm-up. The PNGs themselves are cached on disk by the worker, so this
+ * is fast after the first run even across restarts.
+ */
+export async function primeThumbnails(
+  enginePath: string,
+  dataDir: string,
+): Promise<Map<string, string>> {
+  const key = `${dataDir}::${enginePath}`;
+  const cached = thumbnailsCache.get(key);
+  if (cached) return cached;
+  const res = await unitsyncThumbnails({ enginePath, dataDir, mip: 3 });
+  const map = new Map(res.thumbnails.map((t) => [t.name, t.dataUrl]));
+  thumbnailsCache.set(key, map);
+  return map;
+}
+
 /** Lazily render and cache thumbnails for every map (name -> PNG data URL). */
 export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
@@ -183,20 +222,11 @@ export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
       setThumbs(new Map());
       return;
     }
-    const key = `${dataDir}::${enginePath}`;
-    const cached = thumbnailsCache.get(key);
-    if (cached) {
-      setThumbs(cached);
-      return;
-    }
     let cancelled = false;
     setLoading(true);
-    unitsyncThumbnails({ enginePath, dataDir, mip: 3 })
-      .then((res) => {
-        if (cancelled) return;
-        const map = new Map(res.thumbnails.map((t) => [t.name, t.dataUrl]));
-        thumbnailsCache.set(key, map);
-        setThumbs(map);
+    primeThumbnails(enginePath, dataDir)
+      .then((map) => {
+        if (!cancelled) setThumbs(map);
       })
       .catch(() => {
         if (!cancelled) setThumbs(new Map());

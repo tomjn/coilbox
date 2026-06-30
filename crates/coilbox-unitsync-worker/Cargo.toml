@@ -18,3 +18,6 @@ serde_json = "1"
 # Minimap mode only: encode the RGB565 minimap buffer to PNG (png feature only).
 image = { version = "0.25", default-features = false, features = ["png"] }
 base64 = "0.22"
+# Shared dependency-free on-disk byte cache: persist rendered minimap PNGs so they
+# aren't re-rendered every launch.
+coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }

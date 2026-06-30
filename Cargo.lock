@@ -571,10 +571,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-thumb-cache"
+version = "0.0.0"
+
+[[package]]
 name = "coilbox-unitsync-worker"
 version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
+ "coilbox-thumb-cache",
  "image",
  "libloading 0.8.9",
  "serde",
@@ -4097,6 +4102,7 @@ name = "tauri-plugin-coilbox-mapconv"
 version = "0.0.0"
 dependencies = [
  "coilbox-springlua",
+ "coilbox-thumb-cache",
  "image",
  "picoframe-core",
  "serde",
