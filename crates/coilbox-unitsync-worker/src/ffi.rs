@@ -406,7 +406,10 @@ impl Unitsync {
     /// engine's cursor idiom: `FindFilesArchive(archive, cur, buf, &size)` fills
     /// `buf` with the entry at `cur` and returns `cur + 1`, returning `0` once
     /// `cur` is past the end (filling nothing) — so we break on `0` before
-    /// reading. The name buffer follows unitsync's fixed-size contract.
+    /// reading. `size` is in/out: on input it must hold `buf`'s capacity (the
+    /// engine refuses to copy a name that doesn't fit, setting "name-buffer is
+    /// too small" and returning `0`); on output it holds the member's byte size,
+    /// so it must be reset to the buffer length before every call.
     pub fn list_archive_files(&self, archive: i32) -> Vec<(String, u64)> {
         let Some(find) = self.find_files_archive_fn else {
             return Vec::new();
@@ -415,7 +418,7 @@ impl Unitsync {
         let mut buf = vec![0u8; 4096];
         let mut cur: c_int = 0;
         loop {
-            let mut size: c_int = 0;
+            let mut size: c_int = buf.len() as c_int;
             let next = unsafe { find(archive, cur, buf.as_mut_ptr() as *mut c_char, &mut size) };
             if next <= 0 {
                 break;
