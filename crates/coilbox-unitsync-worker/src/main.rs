@@ -17,6 +17,7 @@ mod archive;
 mod config;
 mod ffi;
 mod game;
+mod lua;
 mod minimap;
 mod model;
 
