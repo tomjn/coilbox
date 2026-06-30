@@ -92,6 +92,29 @@ pub struct MinimapOutput {
     pub errors: Vec<String>,
 }
 
+/// A rendered heightmap, returned by the lazy `heightmap` mode: a downscaled
+/// grayscale PNG plus the world-height bounds needed for correct displacement.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HeightmapOutput {
+    /// Grayscale PNG `data:` URL of the (downscaled) heightmap, for a displacement map.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_url: Option<String>,
+    /// Full heightmap dimensions `(mapx+1, mapy+1)` before downscaling (its ratio
+    /// is the map's true aspect ratio).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    /// World height at infomap value 0 (where the flat water plane sits).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_height: Option<f32>,
+    /// World height at infomap value 65535.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_height: Option<f32>,
+    pub errors: Vec<String>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameItem {
