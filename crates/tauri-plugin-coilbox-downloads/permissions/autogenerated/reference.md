@@ -11,6 +11,7 @@ Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR
 - `allow-dl-springfiles-list`
 - `allow-dl-springfiles-engines`
 - `allow-dl-bar-maps`
+- `allow-dl-hakora-maps`
 - `allow-dl-download-map`
 - `allow-dl-download-file`
 - `allow-dl-recoil-engines`
@@ -179,6 +180,32 @@ Enables the dl_download_map command without any pre-configured scope.
 <td>
 
 Denies the dl_download_map command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:allow-dl-hakora-maps`
+
+</td>
+<td>
+
+Enables the dl_hakora_maps command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-hakora-maps`
+
+</td>
+<td>
+
+Denies the dl_hakora_maps command without any pre-configured scope.
 
 </td>
 </tr>

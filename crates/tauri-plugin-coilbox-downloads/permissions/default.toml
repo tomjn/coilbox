@@ -10,6 +10,7 @@ permissions = [
   "allow-dl-springfiles-list",
   "allow-dl-springfiles-engines",
   "allow-dl-bar-maps",
+  "allow-dl-hakora-maps",
   "allow-dl-download-map",
   "allow-dl-download-file",
   "allow-dl-recoil-engines",
