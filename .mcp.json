@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "tauri-mcp": {
+      "command": "node",
+      "args": [
+        "/Users/tomjn/dev/tauri-plugin-mcp/mcp-server-ts/build/index.js"
+      ],
+      "env": {
+        "TAURI_MCP_IPC_PATH": "/tmp/tauri-mcp.sock"
+      }
+    }
+  }
+}
