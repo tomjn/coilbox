@@ -724,7 +724,9 @@ impl Unitsync {
                     .lp_error_log()
                     .unwrap_or_else(|| "could not compile the script".into()));
             }
-            execute();
+            // lpExecute returns nonzero on success; we don't read it here because a
+            // failed run leaves no root table, so root() == 0 below is the signal.
+            let _ = execute();
             if root() == 0 {
                 let log = self.lp_error_log();
                 close();

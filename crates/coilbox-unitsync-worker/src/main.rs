@@ -75,11 +75,16 @@ fn run() -> i32 {
     // Lua console: mount one archive and run a user snippet through the parser.
     if args.lua {
         let archive = args.archive.clone().unwrap_or_default();
-        let source = args
-            .source_file
-            .as_deref()
-            .and_then(|p| std::fs::read_to_string(p).ok())
-            .unwrap_or_default();
+        let source = match args.source_file.as_deref() {
+            Some(p) => match std::fs::read_to_string(p) {
+                Ok(s) => s,
+                Err(e) => {
+                    lua::emit_error(format!("could not read source file {p}: {e}"));
+                    return 1;
+                }
+            },
+            None => String::new(),
+        };
         return match std::panic::catch_unwind(|| lua::run(&args.lib, &archive, &source)) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
