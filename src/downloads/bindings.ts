@@ -53,7 +53,7 @@ export const dlDownload = defineCommand<
     tag: string;
     masterUrl?: string;
     writePath?: string;
-    onProgress?: Channel<DownloadProgress>;
+    onProgress: Channel<DownloadProgress>;
   },
   { message: string; tag: string }
 >("coilbox-downloads", "dl_download");
@@ -139,7 +139,7 @@ export const dlDownloadMap = defineCommand<
     springName: string;
     searchUrl?: string;
     writePath?: string;
-    onProgress?: Channel<DownloadProgress>;
+    onProgress: Channel<DownloadProgress>;
   },
   { message: string; springName: string }
 >("coilbox-downloads", "dl_download_map");
@@ -150,7 +150,7 @@ export const dlDownloadFile = defineCommand<
     url: string;
     destDir: string;
     filename: string;
-    onProgress?: Channel<DownloadProgress>;
+    onProgress: Channel<DownloadProgress>;
   },
   { message: string; path: string }
 >("coilbox-downloads", "dl_download_file");
@@ -185,7 +185,7 @@ export const dlDownloadEngineRecoil = defineCommand<
     version: string;
     assetUrl: string;
     writePath: string;
-    onProgress?: Channel<DownloadProgress>;
+    onProgress: Channel<DownloadProgress>;
   },
   { message: string; path: string }
 >("coilbox-downloads", "dl_download_engine_recoil");
@@ -195,7 +195,7 @@ export const dlDownloadEngineSpring = defineCommand<
   {
     version: string;
     writePath?: string;
-    onProgress?: Channel<DownloadProgress>;
+    onProgress: Channel<DownloadProgress>;
   },
   { message: string; version: string }
 >("coilbox-downloads", "dl_download_engine_spring");
