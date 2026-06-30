@@ -196,6 +196,16 @@ pub struct ArchiveFileOutput {
     pub errors: Vec<String>,
 }
 
+/// Output of the `--archive --file --extract` (download) mode: the number of
+/// bytes written to the destination path, plus any diagnostics.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveExtractOutput {
+    /// Bytes written to the destination (0 when extraction failed).
+    pub size: u64,
+    pub errors: Vec<String>,
+}
+
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanOutput {

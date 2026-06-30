@@ -127,6 +127,21 @@ pub fn build_archive_file_args(lib: &str, datadir: &str, archive: &str, file: &s
     args
 }
 
+/// Build args for archive-extract (download) mode: the file-preview args plus the
+/// destination path the member's full bytes are written to.
+pub fn build_archive_extract_args(
+    lib: &str,
+    datadir: &str,
+    archive: &str,
+    file: &str,
+    dest: &str,
+) -> Vec<String> {
+    let mut args = build_archive_file_args(lib, datadir, archive, file);
+    args.push("--extract".into());
+    args.push(dest.into());
+    args
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,6 +207,19 @@ mod tests {
                 "--file".to_string(),
                 "maps/x.smd".to_string(),
             ]
+        );
+
+        let extract = build_archive_extract_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "Map.sd7",
+            "maps/x.smd",
+            "/out/x.smd",
+        );
+        assert!(extract.contains(&"--file".to_string()));
+        assert_eq!(
+            &extract[extract.len() - 2..],
+            &["--extract".to_string(), "/out/x.smd".to_string()],
         );
     }
 
