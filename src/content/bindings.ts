@@ -337,3 +337,23 @@ export const unitsyncArchiveFile = defineCommand<
   { enginePath: string; dataDir: string; archive: string; file: string },
   ArchiveFileResult
 >("coilbox-unitsync", "unitsync_archive_file");
+
+export interface LuaExecResult {
+  /** The pretty-printed value the script returned (set on success). */
+  result?: string;
+  /** A compile or runtime error from the Lua parser (set on failure). */
+  error?: string;
+  /** Non-fatal unitsync diagnostics (e.g. a missing dependency archive). */
+  errors: string[];
+}
+
+/**
+ * Run a Lua snippet through the engine's Lua parser with `archive` (and its
+ * dependencies) mounted in the VFS, so `VFS.Include(...)` resolves against it.
+ * Restricted, one-shot, no persistent state — a debugging aid, not a REPL. End
+ * the script with `return …` to see a value.
+ */
+export const unitsyncLuaExec = defineCommand<
+  { enginePath: string; dataDir: string; archive: string; source: string },
+  LuaExecResult
+>("coilbox-unitsync", "unitsync_lua_exec");
