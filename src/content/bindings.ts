@@ -251,6 +251,32 @@ export interface ThumbnailsResult {
   errors: string[];
 }
 
+/** One engine configuration value, read from a curated key via `GetSpringConfig*`. */
+export interface EngineConfigSetting {
+  key: string;
+  label: string;
+  category: string;
+  /** The effective value (configured value, or the engine default when unset). */
+  value: string;
+}
+
+export interface EngineConfigResult {
+  settings: EngineConfigSetting[];
+  /** Path of the `springsettings.cfg` unitsync reads, when the build exposes it. */
+  configPath?: string;
+  errors: string[];
+}
+
+/**
+ * Read a curated set of engine settings from the user's `springsettings.cfg`.
+ * unitsync can't enumerate keys, so the worker reads a hand-picked catalog; values
+ * are read-only. `enginePath` selects the libunitsync; `dataDir` the data root.
+ */
+export const unitsyncEngineConfig = defineCommand<
+  { enginePath: string; dataDir: string },
+  EngineConfigResult
+>("coilbox-unitsync", "unitsync_engine_config");
+
 /**
  * Render a small minimap thumbnail for every map in one unitsync session (for the
  * Maps grid). `mip` selects resolution: `1024 >> mip` px (default 3 = 128px).

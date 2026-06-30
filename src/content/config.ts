@@ -3,10 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import {
   type ContentState,
   contentStateLoad,
+  type EngineConfigResult,
   type GameInfoResult,
   type MinimapResult,
   type ScanResult,
   type StartPos,
+  unitsyncEngineConfig,
   unitsyncGameInfo,
   unitsyncMinimap,
   unitsyncScan,
@@ -285,6 +287,54 @@ export function useUnitsyncGameInfo(
   }, [enginePath, dataDir, gameArchive]);
 
   return { info, loading };
+}
+
+/** Session cache of engine config reads, keyed by `dataDir::enginePath`. */
+const engineConfigCache = new Map<string, EngineConfigResult>();
+
+/**
+ * Read / hold the curated engine settings for the selected target. Modeled on
+ * `useUnitsyncScan`: serves the cached read or runs on target change, with an
+ * explicit `run(true)` for the toolbar's Rescan. Cheap (no archive scan), but
+ * cached for the session for consistency with the other browser hooks.
+ */
+export function useUnitsyncEngineConfig(enginePath?: string, dataDir?: string) {
+  const [data, setData] = useState<EngineConfigResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = useCallback(
+    async (force = false) => {
+      if (!enginePath || !dataDir) return;
+      const key = `${dataDir}::${enginePath}`;
+      if (!force && engineConfigCache.has(key)) {
+        setData(engineConfigCache.get(key) ?? null);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await unitsyncEngineConfig({ enginePath, dataDir });
+        engineConfigCache.set(key, res);
+        setData(res);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [enginePath, dataDir],
+  );
+
+  useEffect(() => {
+    if (!enginePath || !dataDir) {
+      setData(null);
+      return;
+    }
+    run(false);
+  }, [enginePath, dataDir, run]);
+
+  return { data, loading, error, run };
 }
 
 /** Session cache of minimap results, keyed by `dataDir::enginePath::mapName`. */

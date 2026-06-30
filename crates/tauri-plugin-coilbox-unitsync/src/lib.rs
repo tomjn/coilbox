@@ -12,8 +12,8 @@ mod sidecar;
 
 use picoframe_core::CliResult;
 use sidecar::{
-    build_args, build_game_args, build_minimap_args, build_thumbnails_args, find_unitsync,
-    resolve_sidecar,
+    build_args, build_config_args, build_game_args, build_minimap_args, build_thumbnails_args,
+    find_unitsync, resolve_sidecar,
 };
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -265,6 +265,20 @@ async fn unitsync_game_info(
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "game info").await)
 }
 
+/// `unitsync_engine_config` — read a curated set of engine settings from the
+/// user's `springsettings.cfg` via `GetSpringConfig*`. A light unitsync session
+/// (no archive scan); `data_dir` selects which data root's config is read.
+#[tauri::command]
+async fn unitsync_engine_config(engine_path: String, data_dir: String) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let args = build_config_args(&libpath.to_string_lossy(), &data_dir);
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config").await)
+}
+
 /// Build the plugin. Registered as `"coilbox-unitsync"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-unitsync|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -273,7 +287,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_scan,
             unitsync_minimap,
             unitsync_thumbnails,
-            unitsync_game_info
+            unitsync_game_info,
+            unitsync_engine_config
         ])
         .build()
 }

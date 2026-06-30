@@ -127,6 +127,28 @@ pub struct GameInfoOutput {
     pub errors: Vec<String>,
 }
 
+/// One engine configuration value, read from a curated key via `GetSpringConfig*`.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineConfigSetting {
+    pub key: String,
+    pub label: String,
+    pub category: String,
+    /// The value as read (stringified); empty string when unset and no default.
+    pub value: String,
+}
+
+/// Output of the `config` mode: the curated engine settings and the config file path.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineConfigOutput {
+    pub settings: Vec<EngineConfigSetting>,
+    /// Path of the `springsettings.cfg` unitsync reads, when the build exposes it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config_path: Option<String>,
+    pub errors: Vec<String>,
+}
+
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanOutput {

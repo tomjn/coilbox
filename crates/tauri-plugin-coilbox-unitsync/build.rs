@@ -7,6 +7,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_minimap",
     "unitsync_thumbnails",
     "unitsync_game_info",
+    "unitsync_engine_config",
 ];
 
 fn main() {
