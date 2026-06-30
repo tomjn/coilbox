@@ -10,10 +10,12 @@ mod sidecar;
 mod sources;
 
 use picoframe_core::CliResult;
+use progress::DownloadProgress;
 use serde_json::json;
 use std::io::Read;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use tauri::{
+    ipc::Channel,
     plugin::{Builder, TauriPlugin},
     Runtime,
 };
@@ -62,6 +64,78 @@ async fn run_sidecar_env(
     .await
     .map_err(|e| format!("sidecar task failed: {e}"))?
     .map_err(|e| format!("failed to run pr-downloader: {e}"))
+}
+
+/// Captured result of a streamed sidecar run, shaped for [`sidecar::parse_download`].
+struct SidecarRun {
+    stdout: String,
+    stderr: String,
+    code: Option<i32>,
+}
+
+/// Like [`run_sidecar_env`] but streams stdout line-by-line, forwarding any
+/// progress lines to `on_progress` as they arrive, while still collecting the
+/// full stdout/stderr for the final outcome verdict. stderr is drained on a
+/// helper thread so a full pipe can't deadlock the child.
+async fn run_sidecar_streaming(
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+    on_progress: Channel<DownloadProgress>,
+) -> Result<SidecarRun, String> {
+    use std::io::{BufRead, BufReader};
+    let path = sidecar::resolve_sidecar().ok_or(SIDECAR_MISSING)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut cmd = Command::new(&path);
+        cmd.args(&args).stdout(Stdio::piped()).stderr(Stdio::piped());
+        for (k, v) in &envs {
+            cmd.env(k, v);
+        }
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("failed to run pr-downloader: {e}"))?;
+
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
+
+        // Drain stderr on a thread, collecting it for the verdict.
+        let err_handle = stderr.map(|s| {
+            std::thread::spawn(move || {
+                let mut buf = String::new();
+                let _ = BufReader::new(s).read_to_string(&mut buf);
+                buf
+            })
+        });
+
+        // Read stdout here: collect every line and emit progress as we go.
+        let mut out = String::new();
+        if let Some(s) = stdout {
+            // A mid-stream read error ends the loop as if EOF: the collected output
+            // still feeds parse_download for the verdict, and exit code is authoritative.
+            for line in BufReader::new(s).lines().map_while(Result::ok) {
+                if let Some(p) = sidecar::parse_progress_line(&line) {
+                    let _ = on_progress.send(p);
+                }
+                out.push_str(&line);
+                out.push('\n');
+            }
+        }
+
+        let err = err_handle.and_then(|h| h.join().ok()).unwrap_or_default();
+        let status = child.wait().map_err(|e| e.to_string())?;
+        let code = status.code();
+        // Only signal completion on a clean exit; on failure the command turns the
+        // collected output into an error verdict and the UI reports that instead.
+        if code == Some(0) {
+            let _ = on_progress.send(DownloadProgress::done(0, None));
+        }
+        Ok(SidecarRun {
+            stdout: out,
+            stderr: err,
+            code,
+        })
+    })
+    .await
+    .map_err(|e| format!("sidecar task failed: {e}"))?
 }
 
 /// `dl_version` — run the sidecar's `--version`, proving the binary is bundled
@@ -115,6 +189,7 @@ async fn dl_download(
     tag: String,
     master_url: Option<String>,
     write_path: Option<String>,
+    on_progress: Channel<DownloadProgress>,
 ) -> CliResult {
     if tag.trim().is_empty() {
         return CliResult::err("tag is required");
@@ -130,12 +205,10 @@ async fn dl_download(
         envs.push(("PRD_RAPID_REPO_MASTER".to_string(), master));
         envs.push(("PRD_RAPID_USE_STREAMER".to_string(), "false".to_string()));
     }
-    match run_sidecar_env(args, envs).await {
+    match run_sidecar_streaming(args, envs, on_progress).await {
         Err(e) => CliResult::err(e),
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            let outcome = sidecar::parse_download(&stdout, &stderr, out.status.code());
+        Ok(run) => {
+            let outcome = sidecar::parse_download(&run.stdout, &run.stderr, run.code);
             if outcome.success {
                 CliResult::ok(json!({ "message": format!("Downloaded {tag}"), "tag": tag }))
             } else {
@@ -229,6 +302,7 @@ async fn dl_download_map(
     spring_name: String,
     search_url: Option<String>,
     write_path: Option<String>,
+    on_progress: Channel<DownloadProgress>,
 ) -> CliResult {
     if spring_name.trim().is_empty() {
         return CliResult::err("spring_name is required");
@@ -242,12 +316,10 @@ async fn dl_download_map(
     if let Some(s) = search_url.filter(|s| !s.trim().is_empty()) {
         envs.push(("PRD_HTTP_SEARCH_URL".to_string(), s));
     }
-    match run_sidecar_env(args, envs).await {
+    match run_sidecar_streaming(args, envs, on_progress).await {
         Err(e) => CliResult::err(e),
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            let outcome = sidecar::parse_download(&stdout, &stderr, out.status.code());
+        Ok(run) => {
+            let outcome = sidecar::parse_download(&run.stdout, &run.stderr, run.code);
             if outcome.success {
                 CliResult::ok(
                     json!({ "message": format!("Downloaded {spring_name}"), "springName": spring_name }),
@@ -358,7 +430,11 @@ async fn dl_download_engine_recoil(
 /// `dl_download_engine_spring` — download a classic Spring engine via the sidecar's
 /// `--download-engine`, which resolves the per-platform build and extracts it.
 #[tauri::command]
-async fn dl_download_engine_spring(version: String, write_path: Option<String>) -> CliResult {
+async fn dl_download_engine_spring(
+    version: String,
+    write_path: Option<String>,
+    on_progress: Channel<DownloadProgress>,
+) -> CliResult {
     if version.trim().is_empty() {
         return CliResult::err("version is required");
     }
@@ -367,12 +443,10 @@ async fn dl_download_engine_spring(version: String, write_path: Option<String>) 
         args.push("--filesystem-writepath".to_string());
         args.push(wp);
     }
-    match run_sidecar(args).await {
+    match run_sidecar_streaming(args, Vec::new(), on_progress).await {
         Err(e) => CliResult::err(e),
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            let outcome = sidecar::parse_download(&stdout, &stderr, out.status.code());
+        Ok(run) => {
+            let outcome = sidecar::parse_download(&run.stdout, &run.stderr, run.code);
             if outcome.success {
                 CliResult::ok(
                     json!({ "message": format!("Installed engine {version}"), "version": version }),
