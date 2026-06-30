@@ -4,6 +4,7 @@
 //! as a [`CliResult`]. Adds rapid-repo browsing (HTTP + gzip) so the frontend can
 //! list downloadable content before downloading a tag.
 
+mod progress;
 mod rapid;
 mod sidecar;
 mod sources;
