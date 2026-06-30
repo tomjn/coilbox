@@ -12,6 +12,14 @@ if (!root) throw new Error("missing #root element");
 // reads return persisted values synchronously on mount.
 const settingsStorage = await createTauriSettingsStorage();
 
+// Dev-only: install the tauri-plugin-mcp webview bridge so the Tauri MCP server's
+// execute_js / query_page / type_text / wait_for / manage_storage tools work.
+// Statically dropped from release builds (import.meta.env.DEV === false).
+if (import.meta.env.DEV) {
+  const { setupTauriMcpBridge } = await import("./dev/setup-tauri-mcp");
+  await setupTauriMcpBridge();
+}
+
 createRoot(root).render(
   <StrictMode>
     <AppFrame
