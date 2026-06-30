@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands.
+Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info, engine-config, archive-browsing and Lua-console commands.
 
 #### This default permission set includes the following:
 
@@ -11,6 +11,7 @@ Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and eng
 - `allow-unitsync-engine-config`
 - `allow-unitsync-archive-tree`
 - `allow-unitsync-archive-file`
+- `allow-unitsync-lua-exec`
 
 ## Permission Table
 
@@ -121,6 +122,32 @@ Enables the unitsync_game_info command without any pre-configured scope.
 <td>
 
 Denies the unitsync_game_info command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-lua-exec`
+
+</td>
+<td>
+
+Enables the unitsync_lua_exec command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-lua-exec`
+
+</td>
+<td>
+
+Denies the unitsync_lua_exec command without any pre-configured scope.
 
 </td>
 </tr>
