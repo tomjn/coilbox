@@ -11,6 +11,7 @@
     "heal:perm-cache": "bun scripts/heal-perm-cache.mjs",
     "sidecar:unitsync": "bash scripts/build-unitsync-worker.sh",
     "sidecar:all": "bun run sidecar:unitsync",
+    "clean": "bash scripts/clean.sh",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit"
