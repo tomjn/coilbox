@@ -37,8 +37,11 @@ struct Args {
     archive: Option<String>,
     file: Option<String>,
     thumbnails: bool,
+    heightmap: bool,
     config: bool,
     mip: i32,
+    /// Longest-side pixel cap for the heightmap PNG downscale (heightmap mode).
+    max_side: u32,
     /// Directory for the on-disk minimap/thumbnail PNG cache (minimap modes only).
     cache_dir: Option<String>,
 }
@@ -145,6 +148,26 @@ fn run() -> i32 {
         };
     }
 
+    // Heightmap: render one map's height infomap to a grayscale PNG data URL.
+    if args.heightmap {
+        if let Some(map) = args.map.clone() {
+            return match std::panic::catch_unwind(|| {
+                heightmap::render(&args.lib, &map, args.max_side, cache_dir)
+            }) {
+                Ok(out) => {
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    0
+                }
+                Err(_) => {
+                    heightmap::emit_error("worker panicked while rendering heightmap".into());
+                    1
+                }
+            };
+        }
+        emit_error("missing --map <name> for --heightmap".into());
+        return 1;
+    }
+
     // Single minimap renders one map; default mode scans everything.
     if let Some(map) = args.map.clone() {
         return match std::panic::catch_unwind(|| {
@@ -185,8 +208,10 @@ fn parse_args() -> Result<Args, String> {
     let mut archive = None;
     let mut file = None;
     let mut thumbnails = false;
+    let mut heightmap = false;
     let mut config = false;
     let mut mip = 1; // 512x512 by default
+    let mut max_side = 512u32;
     let mut cache_dir = None;
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -198,6 +223,13 @@ fn parse_args() -> Result<Args, String> {
             "--archive" => archive = it.next(),
             "--file" => file = it.next(),
             "--thumbnails" => thumbnails = true,
+            "--heightmap" => heightmap = true,
+            "--max-side" => {
+                max_side = it
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--max-side needs an integer")?
+            }
             "--cache-dir" => cache_dir = it.next(),
             "--config" => config = true,
             "--mip" => {
@@ -217,8 +249,10 @@ fn parse_args() -> Result<Args, String> {
         archive,
         file,
         thumbnails,
+        heightmap,
         config,
         mip,
+        max_side,
         cache_dir,
     })
 }
