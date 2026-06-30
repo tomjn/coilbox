@@ -33,6 +33,8 @@ struct Args {
     game: Option<String>,
     thumbnails: bool,
     mip: i32,
+    /// Directory for the on-disk minimap/thumbnail PNG cache (minimap modes only).
+    cache_dir: Option<String>,
 }
 
 fn main() {
@@ -58,9 +60,13 @@ fn run() -> i32 {
         let _ = std::env::set_current_dir(dir);
     }
 
+    let cache_dir = args.cache_dir.as_deref().map(Path::new);
+
     // Batch thumbnails: a small minimap for every map in one Init.
     if args.thumbnails {
-        return match std::panic::catch_unwind(|| minimap::render_all(&args.lib, args.mip)) {
+        return match std::panic::catch_unwind(|| {
+            minimap::render_all(&args.lib, args.mip, cache_dir)
+        }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
                 0
@@ -92,7 +98,9 @@ fn run() -> i32 {
 
     // Single minimap renders one map; default mode scans everything.
     if let Some(map) = args.map.clone() {
-        return match std::panic::catch_unwind(|| minimap::render(&args.lib, &map, args.mip)) {
+        return match std::panic::catch_unwind(|| {
+            minimap::render(&args.lib, &map, args.mip, cache_dir)
+        }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
                 0
@@ -127,6 +135,7 @@ fn parse_args() -> Result<Args, String> {
     let mut game = None;
     let mut thumbnails = false;
     let mut mip = 1; // 512x512 by default
+    let mut cache_dir = None;
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -135,6 +144,7 @@ fn parse_args() -> Result<Args, String> {
             "--map" => map = it.next(),
             "--game" => game = it.next(),
             "--thumbnails" => thumbnails = true,
+            "--cache-dir" => cache_dir = it.next(),
             "--mip" => {
                 mip = it
                     .next()
@@ -151,6 +161,7 @@ fn parse_args() -> Result<Args, String> {
         game,
         thumbnails,
         mip,
+        cache_dir,
     })
 }
 

@@ -308,29 +308,20 @@ fn image_info_cached(
         .zip(thumb_cache_key(path, max))
         .map(|(dir, key)| dir.join(format!("{key}.json")));
 
-    if let Some(file) = &cache_file {
-        if let Ok(bytes) = std::fs::read(file) {
-            if let Ok(e) = serde_json::from_slice::<ThumbEntry>(&bytes) {
-                return Ok((e.width, e.height, e.thumb));
-            }
-        }
-    }
-
-    let (width, height, thumb) = generate_thumb(path, max)?;
-
-    if let Some(file) = &cache_file {
-        if let Some(dir) = file.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
-        if let Ok(bytes) = serde_json::to_vec(&ThumbEntry {
+    // The cache stores the whole `ThumbEntry` as JSON bytes (we need width/height
+    // back, not just the image), so serialize on a miss and deserialize the result.
+    let bytes = coilbox_thumb_cache::cached(cache_file, || {
+        let (width, height, thumb) = generate_thumb(path, max)?;
+        serde_json::to_vec(&ThumbEntry {
             width,
             height,
-            thumb: thumb.clone(),
-        }) {
-            let _ = std::fs::write(file, bytes);
-        }
-    }
-    Ok((width, height, thumb))
+            thumb,
+        })
+        .map_err(|e| format!("could not encode thumbnail cache entry: {e}"))
+    })?;
+    let e: ThumbEntry = serde_json::from_slice(&bytes)
+        .map_err(|e| format!("could not decode thumbnail cache entry: {e}"))?;
+    Ok((e.width, e.height, e.thumb))
 }
 
 /// `mc_image_info` — decode the image at `path` and return its true pixel
