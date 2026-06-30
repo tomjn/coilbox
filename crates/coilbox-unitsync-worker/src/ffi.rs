@@ -36,6 +36,7 @@ type InfoMapSizeFn =
     unsafe extern "C" fn(*const c_char, *const c_char, *mut c_int, *mut c_int) -> c_int;
 type StrArgVoidFn = unsafe extern "C" fn(*const c_char); // AddAllArchives(name)
 type LpOpenFn = unsafe extern "C" fn(*const c_char, *const c_char, *const c_char) -> c_int; // lpOpenFile
+type IntByStrStrFn = unsafe extern "C" fn(*const c_char, *const c_char) -> c_int; // lpOpenSource(source, accessModes)
 type FloatByStrFloatFn = unsafe extern "C" fn(*const c_char, c_float) -> c_float; // lpGetStrKeyFloatVal, GetSpringConfigFloat
 type StrByStrStrFn = unsafe extern "C" fn(*const c_char, *const c_char) -> *const c_char; // GetSpringConfigString
 type IntByStrIntFn = unsafe extern "C" fn(*const c_char, c_int) -> c_int; // GetSpringConfigInt
@@ -127,6 +128,9 @@ pub struct Unitsync {
     lp_int_key_list_count_fn: Option<CountFn>,
     lp_int_key_list_entry_fn: Option<IntByIntFn>,
     lp_str_key_float_val_fn: Option<FloatByStrFloatFn>,
+    lp_open_source_fn: Option<IntByStrStrFn>,
+    lp_error_log_fn: Option<StrFn>,
+    lp_str_key_str_val_fn: Option<StrByStrStrFn>,
     // engine configuration (springsettings.cfg, read by key)
     set_spring_config_file_fn: Option<StrArgVoidFn>,
     spring_config_string_fn: Option<StrByStrStrFn>,
@@ -212,6 +216,9 @@ impl Unitsync {
             lp_int_key_list_count_fn: opt(&lib, b"lpGetIntKeyListCount\0"),
             lp_int_key_list_entry_fn: opt(&lib, b"lpGetIntKeyListEntry\0"),
             lp_str_key_float_val_fn: opt(&lib, b"lpGetStrKeyFloatVal\0"),
+            lp_open_source_fn: opt(&lib, b"lpOpenSource\0"),
+            lp_error_log_fn: opt(&lib, b"lpErrorLog\0"),
+            lp_str_key_str_val_fn: opt(&lib, b"lpGetStrKeyStrVal\0"),
             set_spring_config_file_fn: opt(&lib, b"SetSpringConfigFile\0"),
             spring_config_string_fn: opt(&lib, b"GetSpringConfigString\0"),
             spring_config_int_fn: opt(&lib, b"GetSpringConfigInt\0"),
@@ -680,6 +687,68 @@ impl Unitsync {
             close();
         }
         positions
+    }
+
+    /// Execute a Lua source string through unitsync's `LuaParser` with `modes`
+    /// VFS access. The caller must wrap the user's code so the chunk returns a
+    /// table with a string `result` field (and an optional `__error` field) —
+    /// see [`crate::lua::wrap_source`]. Returns the `result` string on success,
+    /// or `Err(message)` for a compile error (`lpOpenSource` failed), a chunk
+    /// failure (`lpRootTable` empty), a captured runtime error (`__error` set),
+    /// or a build that lacks the Lua-parser symbols.
+    pub fn run_lua_source(&self, source: &str, modes: &str) -> Result<String, String> {
+        let (Some(open), Some(execute), Some(close), Some(root), Some(get_str)) = (
+            self.lp_open_source_fn,
+            self.lp_execute_fn,
+            self.lp_close_fn,
+            self.lp_root_table_fn,
+            self.lp_str_key_str_val_fn,
+        ) else {
+            return Err("this engine's libunitsync does not expose the Lua parser \
+                        (lpOpenSource/lpGetStrKeyStrVal)"
+                .into());
+        };
+        let (Ok(csrc), Ok(cmodes), Ok(result_key), Ok(err_key), Ok(empty)) = (
+            CString::new(source),
+            CString::new(modes),
+            CString::new("result"),
+            CString::new("__error"),
+            CString::new(""),
+        ) else {
+            return Err("Lua source or arguments contained a NUL byte".into());
+        };
+
+        unsafe {
+            if open(csrc.as_ptr(), cmodes.as_ptr()) == 0 {
+                return Err(self
+                    .lp_error_log()
+                    .unwrap_or_else(|| "could not compile the script".into()));
+            }
+            // lpExecute returns nonzero on success; we don't read it here because a
+            // failed run leaves no root table, so root() == 0 below is the signal.
+            let _ = execute();
+            if root() == 0 {
+                let log = self.lp_error_log();
+                close();
+                return Err(log.unwrap_or_else(|| {
+                    "script did not produce a result table (lpRootTable failed)".into()
+                }));
+            }
+            let runtime_err =
+                cstr(get_str(err_key.as_ptr(), empty.as_ptr())).filter(|s| !s.is_empty());
+            let result = cstr(get_str(result_key.as_ptr(), empty.as_ptr())).unwrap_or_default();
+            close();
+            match runtime_err {
+                Some(e) => Err(e),
+                None => Ok(result),
+            }
+        }
+    }
+
+    /// The Lua parser's accumulated error log, when non-empty.
+    fn lp_error_log(&self) -> Option<String> {
+        let f = self.lp_error_log_fn?;
+        unsafe { cstr(f()) }.filter(|s| !s.is_empty())
     }
 
     // ---- engine configuration ---------------------------------------------

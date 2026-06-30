@@ -15,9 +15,16 @@ path = "src/main.rs"
 libloading = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# Minimap mode only: encode the RGB565 minimap buffer to PNG (png feature only).
-image = { version = "0.25", default-features = false, features = ["png"] }
+# Minimap mode encodes the RGB565 buffer to PNG; archive preview also decodes
+# TGA (which browsers can't render) and re-encodes it to PNG.
+image = { version = "0.25", default-features = false, features = ["png", "tga"] }
 base64 = "0.22"
 # Shared dependency-free on-disk byte cache: persist rendered minimap PNGs so they
 # aren't re-rendered every launch.
 coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
+
+[dev-dependencies]
+# Stock Lua 5.1 used ONLY to unit-test the injected serializer + wrapper against a
+# faithful interpreter (the real test target, unitsync's LuaParser, needs a live
+# libunitsync and is exercised manually).
+mlua = { version = "0.11", features = ["lua51", "vendored"] }

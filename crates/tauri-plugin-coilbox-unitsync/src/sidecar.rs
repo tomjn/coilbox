@@ -127,6 +127,33 @@ pub fn build_archive_file_args(lib: &str, datadir: &str, archive: &str, file: &s
     args
 }
 
+/// Build args for `--lua` mode: scan args plus the `--lua` flag, the archive to
+/// mount, and the path of the temp file holding the user's Lua source.
+pub fn build_lua_args(lib: &str, datadir: &str, archive: &str, source_file: &str) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--lua".into());
+    args.push("--archive".into());
+    args.push(archive.into());
+    args.push("--source-file".into());
+    args.push(source_file.into());
+    args
+}
+
+/// Build args for archive-extract (download) mode: the file-preview args plus the
+/// destination path the member's full bytes are written to.
+pub fn build_archive_extract_args(
+    lib: &str,
+    datadir: &str,
+    archive: &str,
+    file: &str,
+    dest: &str,
+) -> Vec<String> {
+    let mut args = build_archive_file_args(lib, datadir, archive, file);
+    args.push("--extract".into());
+    args.push(dest.into());
+    args
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,6 +220,19 @@ mod tests {
                 "maps/x.smd".to_string(),
             ]
         );
+
+        let extract = build_archive_extract_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "Map.sd7",
+            "maps/x.smd",
+            "/out/x.smd",
+        );
+        assert!(extract.contains(&"--file".to_string()));
+        assert_eq!(
+            &extract[extract.len() - 2..],
+            &["--extract".to_string(), "/out/x.smd".to_string()],
+        );
     }
 
     #[test]
@@ -221,5 +261,21 @@ mod tests {
         std::env::set_var("UNITSYNC_WORKER", "/custom/worker");
         assert_eq!(resolve_sidecar(), Some(PathBuf::from("/custom/worker")));
         std::env::remove_var("UNITSYNC_WORKER");
+    }
+
+    #[test]
+    fn build_lua_args_carry_archive_and_source_file() {
+        let a = build_lua_args("/eng/libunitsync.so", "/data", "Map v1", "/tmp/x.lua");
+        assert!(a.contains(&"--lua".to_string()));
+        assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        assert_eq!(
+            &a[a.len() - 4..],
+            &[
+                "--archive".to_string(),
+                "Map v1".to_string(),
+                "--source-file".to_string(),
+                "/tmp/x.lua".to_string(),
+            ]
+        );
     }
 }

@@ -8,6 +8,7 @@ import {
   contentStateLoad,
   type EngineConfigResult,
   type GameInfoResult,
+  type LuaExecResult,
   type MinimapResult,
   type ScanResult,
   type StartPos,
@@ -15,6 +16,7 @@ import {
   unitsyncArchiveTree,
   unitsyncEngineConfig,
   unitsyncGameInfo,
+  unitsyncLuaExec,
   unitsyncMinimap,
   unitsyncScan,
   unitsyncThumbnails,
@@ -605,4 +607,40 @@ export function useUnitsyncMinimap(
   }, [enginePath, dataDir, mapName]);
 
   return { dataUrl, startPositions, loading, error };
+}
+
+/**
+ * Run the Lua console for a target+archive. Unlike the other browser hooks this
+ * is imperative (each Run re-executes; nothing is cached): call `run(source)` and
+ * read `result` / `loading`. Backend/Lua errors surface in `result.error`.
+ */
+export function useUnitsyncLuaExec(
+  enginePath?: string,
+  dataDir?: string,
+  archive?: string,
+) {
+  const [result, setResult] = useState<LuaExecResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const run = useCallback(
+    async (source: string) => {
+      if (!enginePath || !dataDir || !archive) return;
+      setLoading(true);
+      try {
+        setResult(
+          await unitsyncLuaExec({ enginePath, dataDir, archive, source }),
+        );
+      } catch (e) {
+        setResult({
+          error: e instanceof Error ? e.message : String(e),
+          errors: [],
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [enginePath, dataDir, archive],
+  );
+
+  return { run, result, loading };
 }

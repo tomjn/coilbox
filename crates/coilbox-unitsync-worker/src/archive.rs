@@ -4,7 +4,7 @@
 //! `.sdp` packages are read uniformly — each in its own one-shot `Init` session.
 
 use crate::ffi::Unitsync;
-use crate::model::{ArchiveFileEntry, ArchiveFileOutput, ArchiveTreeOutput};
+use crate::model::{ArchiveExtractOutput, ArchiveFileEntry, ArchiveFileOutput, ArchiveTreeOutput};
 use base64::Engine;
 use std::path::Path;
 
@@ -179,12 +179,24 @@ fn read_member(us: &Unitsync, handle: i32, inner: &str) -> ArchiveFileOutput {
             truncated: false,
             ..Default::default()
         },
-        Kind::Image if !oversize => ArchiveFileOutput {
-            kind: "image".into(),
-            data_url: Some(image_data_url(&ext, &bytes)),
-            size,
-            truncated: false,
-            ..Default::default()
+        // An image we can present to the browser: native formats pass through,
+        // `.tga` is transcoded. A decode failure may mean the file isn't really an
+        // image (e.g. a texture that's actually a mis-downloaded HTML page), so
+        // fall back to a text preview when the bytes are UTF-8; else binary.
+        Kind::Image if !oversize => match encode_preview_image(&ext, &bytes) {
+            Some(data_url) => ArchiveFileOutput {
+                kind: "image".into(),
+                data_url: Some(data_url),
+                size,
+                truncated: false,
+                ..Default::default()
+            },
+            None => text_fallback(&bytes, size).unwrap_or(ArchiveFileOutput {
+                kind: "binary".into(),
+                size,
+                truncated: false,
+                ..Default::default()
+            }),
         },
         // Binary members, or previewable types that exceeded their cap.
         _ => ArchiveFileOutput {
@@ -202,14 +214,15 @@ enum Kind {
     Binary,
 }
 
-/// Map an extension to a preview kind and its byte cap. Images browsers can't
-/// render (`.dds`, `.tga`, ...) deliberately fall through to binary.
+/// Map an extension to a preview kind and its byte cap. `.tga` is decoded to PNG
+/// for preview; other formats browsers can't render (`.dds`, ...) fall through to
+/// binary.
 fn classify(ext: &str) -> (Kind, usize) {
     const TEXT: &[&str] = &[
         "lua", "txt", "cfg", "json", "xml", "ini", "md", "glsl", "h", "tdf", "smd", "fbi", "gui",
         "bos", "yml", "yaml", "csv", "html", "css", "js",
     ];
-    const IMAGE: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp"];
+    const IMAGE: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "tga"];
     if TEXT.contains(&ext) {
         (Kind::Text, TEXT_CAP)
     } else if IMAGE.contains(&ext) {
@@ -219,16 +232,90 @@ fn classify(ext: &str) -> (Kind, usize) {
     }
 }
 
-fn image_data_url(ext: &str, bytes: &[u8]) -> String {
-    let mime = match ext {
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "gif" => "image/gif",
-        "bmp" => "image/bmp",
-        _ => "application/octet-stream",
+/// Reinterpret an undecodable "image" as text when its bytes are valid UTF-8 and
+/// within the text cap. Catches assets mislabelled with an image extension (e.g.
+/// an HTML error page saved as `.tga`).
+fn text_fallback(bytes: &[u8], size: u64) -> Option<ArchiveFileOutput> {
+    if size > TEXT_CAP as u64 {
+        return None;
+    }
+    let text = std::str::from_utf8(bytes).ok()?;
+    Some(ArchiveFileOutput {
+        kind: "text".into(),
+        text: Some(text.to_owned()),
+        size,
+        truncated: false,
+        ..Default::default()
+    })
+}
+
+/// Build a `data:` URL for an image member, or `None` if it can't be rendered.
+/// Browser-native formats pass through as-is; `.tga` is decoded and re-encoded to
+/// PNG (browsers don't render TGA). Returns `None` if a TGA fails to decode.
+fn encode_preview_image(ext: &str, bytes: &[u8]) -> Option<String> {
+    let (mime, payload) = match ext {
+        "png" => ("image/png", bytes.to_vec()),
+        "jpg" | "jpeg" => ("image/jpeg", bytes.to_vec()),
+        "gif" => ("image/gif", bytes.to_vec()),
+        "bmp" => ("image/bmp", bytes.to_vec()),
+        "tga" => ("image/png", tga_to_png(bytes)?),
+        _ => return None,
     };
-    let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
-    format!("data:{mime};base64,{b64}")
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&payload);
+    Some(format!("data:{mime};base64,{b64}"))
+}
+
+/// Decode TGA bytes and re-encode them as PNG. The alpha channel is dropped:
+/// Spring's unit/map textures use it as a data channel (team-colour mask,
+/// specular, ...) rather than transparency, so an alpha-aware preview renders
+/// many of them fully transparent. Flattening to opaque RGB keeps the colour
+/// content visible.
+fn tga_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
+    let img = image::load_from_memory_with_format(bytes, image::ImageFormat::Tga).ok()?;
+    let rgb = image::DynamicImage::ImageRgb8(img.to_rgb8());
+    let mut png = std::io::Cursor::new(Vec::new());
+    rgb.write_to(&mut png, image::ImageFormat::Png).ok()?;
+    Some(png.into_inner())
+}
+
+/// Read one member of `archive` in full and write its raw bytes to `dest` (used by
+/// the download action). Unlike preview, this is uncapped and never transcodes.
+pub fn extract(lib: &str, archive_name: &str, inner: &str, dest: &str) -> ArchiveExtractOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(u) => u,
+        Err(e) => {
+            return ArchiveExtractOutput {
+                errors: vec![e],
+                ..Default::default()
+            }
+        }
+    };
+    us.init(false, 0);
+    let mut errors = us.drain_errors();
+
+    let open_path = resolve_open_path(&us, archive_name);
+    // Resolution may probe several candidate archives; discard their diagnostics.
+    let _ = us.drain_errors();
+    let handle = open_path.and_then(|p| us.open_archive(&p));
+    let mut size = 0;
+    match handle {
+        Some(handle) => {
+            match us.read_archive_member(handle, inner, usize::MAX) {
+                Some((real, bytes)) => match std::fs::write(dest, &bytes) {
+                    Ok(()) => size = real,
+                    Err(e) => errors.push(format!("could not write {dest}: {e}")),
+                },
+                None => errors.push(format!("could not read member {inner}")),
+            }
+            us.close_archive(handle);
+        }
+        None => errors.push(format!("could not open archive {archive_name}")),
+    }
+
+    errors.extend(us.drain_errors());
+    us.uninit();
+
+    ArchiveExtractOutput { size, errors }
 }
 
 /// Print a tree error envelope to stdout (used on panic).
@@ -244,6 +331,15 @@ pub fn emit_tree_error(msg: String) {
 pub fn emit_file_error(msg: String) {
     let out = ArchiveFileOutput {
         kind: "binary".into(),
+        errors: vec![msg],
+        ..Default::default()
+    };
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
+/// Print an extract error envelope to stdout (used on panic).
+pub fn emit_extract_error(msg: String) {
+    let out = ArchiveExtractOutput {
         errors: vec![msg],
         ..Default::default()
     };
