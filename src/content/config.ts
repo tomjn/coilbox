@@ -627,7 +627,9 @@ export function useUnitsyncLuaExec(
       if (!enginePath || !dataDir || !archive) return;
       setLoading(true);
       try {
-        setResult(await unitsyncLuaExec({ enginePath, dataDir, archive, source }));
+        setResult(
+          await unitsyncLuaExec({ enginePath, dataDir, archive, source }),
+        );
       } catch (e) {
         setResult({
           error: e instanceof Error ? e.message : String(e),
