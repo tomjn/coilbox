@@ -94,6 +94,23 @@ export const dlBarMaps = defineCommand<undefined, { maps: BarMap[] }>(
 );
 
 /**
+ * A map archive from the hakora.xyz mirror (Apache autoindex). No springname or
+ * metadata — `url` is fetched directly via `dlDownloadFile`. `size` is Apache's
+ * human-readable string (e.g. `6.9M`).
+ */
+export interface HakoraMap {
+  filename: string;
+  url: string;
+  size: string;
+}
+
+/** The hakora.xyz maps mirror, as a flat file list. */
+export const dlHakoraMaps = defineCommand<undefined, { maps: HakoraMap[] }>(
+  "coilbox-downloads",
+  "dl_hakora_maps",
+);
+
+/**
  * Download a map by spring name via the sidecar. `searchUrl` overrides
  * `PRD_HTTP_SEARCH_URL` (springrts default; BAR's files-cdn for BAR maps).
  */

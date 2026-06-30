@@ -155,6 +155,63 @@ pub fn springfiles_list_url(category: &str) -> String {
     )
 }
 
+/// The hakora.xyz maps mirror — an Apache `mod_autoindex` directory listing of
+/// `.sd7`/`.sdz` archives (HTTP only). Trailing slash so `{url}{href}` joins
+/// cleanly to a file URL.
+pub const HAKORA_MAPS_URL: &str = "http://hakora.xyz/files/springrts/maps/";
+
+/// One map archive from the hakora autoindex. Unlike springfiles/BAR there's no
+/// springname or metadata — just the file, fetched directly via `dl_download_file`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HakoraMap {
+    /// On-disk archive name (also the autoindex href; used for installed-detection).
+    pub filename: String,
+    /// Full download URL (`HAKORA_MAPS_URL` + href).
+    pub url: String,
+    /// Apache's human-readable size string (e.g. `6.9M`); empty if not parsed.
+    pub size: String,
+}
+
+/// Slice of `s` between the first `start` and the next `end` after it.
+fn between<'a>(s: &'a str, start: &str, end: &str) -> Option<&'a str> {
+    let i = s.find(start)? + start.len();
+    let j = s[i..].find(end)? + i;
+    Some(&s[i..j])
+}
+
+/// Parse an Apache `mod_autoindex` page into map entries. Each file is one `<tr>`
+/// row: `<a href="name.sd7">name.sd7</a> … <td align="right">SIZE</td>`. We split
+/// on row boundaries and keep only `.sd7`/`.sdz` hrefs — which excludes the
+/// parent-dir link, the `?C=…` sort-header links, and any `.png`/folder rows.
+/// The hakora listing serves full, unencoded ASCII filenames, so the href is the
+/// on-disk name verbatim. Size is the last right-aligned cell (date is the first).
+pub fn parse_hakora_index(html: &str) -> Vec<HakoraMap> {
+    let mut out = Vec::new();
+    for row in html.split("<tr") {
+        let Some(href) = between(row, "href=\"", "\"") else {
+            continue;
+        };
+        let lower = href.to_ascii_lowercase();
+        if !(lower.ends_with(".sd7") || lower.ends_with(".sdz")) {
+            continue;
+        }
+        // The size cell is the last right-aligned column in the row.
+        let size = row
+            .rmatch_indices("align=\"right\">")
+            .next()
+            .and_then(|(i, m)| between(&row[i + m.len()..], "", "</td>"))
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
+        out.push(HakoraMap {
+            url: format!("{HAKORA_MAPS_URL}{href}"),
+            filename: href.to_string(),
+            size,
+        });
+    }
+    out
+}
+
 /// A GitHub release (subset) from the RecoilEngine repo's releases API.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
@@ -282,6 +339,28 @@ mod tests {
         assert_eq!(m.size, 3);
         // No windows asset -> no match.
         assert!(match_engine_release(&rel, "amd64-windows.7z").is_none());
+    }
+
+    #[test]
+    fn parse_hakora_index_keeps_only_map_archives() {
+        // Apache mod_autoindex rows: parent dir, two maps (.sd7/.sdz), an image.
+        let html = r#"<table>
+<tr><th><a href="?C=N;O=D">Name</a></th><th><a href="?C=S;O=A">Size</a></th></tr>
+<tr><td><img></td><td><a href="/files/springrts/">Parent Directory</a></td><td>&nbsp;</td><td align="right">  - </td></tr>
+<tr><td><img></td><td><a href="2lakes.sd7">2lakes.sd7</a></td><td align="right">2024-05-02 03:56  </td><td align="right">6.9M</td><td>&nbsp;</td></tr>
+<tr><td><img></td><td><a href="some_map.sdz">some_map.sdz</a></td><td align="right">2024-01-01 00:00  </td><td align="right"> 12M</td><td>&nbsp;</td></tr>
+<tr><td><img></td><td><a href="chobbybtop.png">chobbybtop.png</a></td><td align="right">2026-01-13 13:25  </td><td align="right">2.8M</td><td>&nbsp;</td></tr>
+</table>"#;
+        let maps = parse_hakora_index(html);
+        assert_eq!(maps.len(), 2); // sd7 + sdz only; parent dir, headers, png excluded
+        assert_eq!(maps[0].filename, "2lakes.sd7");
+        assert_eq!(
+            maps[0].url,
+            "http://hakora.xyz/files/springrts/maps/2lakes.sd7"
+        );
+        assert_eq!(maps[0].size, "6.9M");
+        assert_eq!(maps[1].filename, "some_map.sdz");
+        assert_eq!(maps[1].size, "12M"); // right-aligned cell, trimmed
     }
 
     #[test]

@@ -209,6 +209,17 @@ async fn dl_bar_maps() -> CliResult {
     }
 }
 
+/// `dl_hakora_maps` — the hakora.xyz maps mirror (an Apache autoindex of map
+/// archives, HTTP only). Returns filename + url + size; downloads go through the
+/// direct `dl_download_file` path (no springname, so no sidecar).
+#[tauri::command]
+async fn dl_hakora_maps() -> CliResult {
+    match fetch_text(sources::HAKORA_MAPS_URL.to_string()).await {
+        Ok(body) => CliResult::ok(json!({ "maps": sources::parse_hakora_index(&body) })),
+        Err(e) => CliResult::err(format!("failed to fetch hakora maps: {e}")),
+    }
+}
+
 /// `dl_download_map` — download a map by spring name via the sidecar. `search_url`
 /// overrides `PRD_HTTP_SEARCH_URL` (springrts by default; BAR's files-cdn when
 /// downloading a BAR map).
@@ -417,6 +428,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_springfiles_list,
             dl_springfiles_engines,
             dl_bar_maps,
+            dl_hakora_maps,
             dl_download_map,
             dl_download_file,
             dl_recoil_engines,

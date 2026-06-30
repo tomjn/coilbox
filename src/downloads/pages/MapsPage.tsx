@@ -11,7 +11,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type BarMap,
   dlBarMaps,
+  dlDownloadFile,
   dlDownloadMap,
+  dlHakoraMaps,
   dlInstalledContent,
   dlSpringfilesList,
   type SpringFile,
@@ -23,17 +25,21 @@ import { EmptyState, errMessage } from "./components/states";
 /** pr-downloader HTTP search endpoint for BAR map files. */
 const BAR_SEARCH_URL = "https://files-cdn.beyondallreason.dev/find";
 
-type Source = "bar" | "springfiles";
+type Source = "bar" | "springfiles" | "hakora";
 
 /** Normalised row rendered by the grid, regardless of source. */
 interface MapItem {
-  /** Download identifier passed to `--download-map`. */
+  /** Download identifier passed to `--download-map` (springname); the filename
+   * for hakora, which has no springname. Also the React key, so it must be unique. */
   springName: string;
   title: string;
   subtitle?: string;
   thumb?: string;
   /** On-disk archive name, lowercased for installed-detection matching. */
   filename: string;
+  /** Direct download URL (hakora only). Its presence selects the direct-fetch
+   * path (`dlDownloadFile`) over the pr-downloader sidecar (`dlDownloadMap`). */
+  url?: string;
   author?: string;
   /** Map dimensions; sorted by area (width × height). */
   width?: number;
@@ -114,6 +120,17 @@ export default function MapsPage() {
             height: m.mapHeight,
           })),
         );
+      } else if (src === "hakora") {
+        const { maps } = await dlHakoraMaps(undefined);
+        setItems(
+          maps.map((m) => ({
+            springName: m.filename, // no springname on the mirror; filename is unique
+            title: m.filename.replace(/\.(sd7|sdz)$/i, ""),
+            subtitle: m.size || undefined,
+            filename: m.filename,
+            url: m.url, // marks the direct-fetch path
+          })),
+        );
       } else {
         const { results } = await dlSpringfilesList({ category: "map" });
         setItems(
@@ -160,15 +177,24 @@ export default function MapsPage() {
     refreshInstalled();
   }, [refreshInstalled]);
 
-  async function download(springName: string) {
-    setDownloading(springName);
+  async function download(item: MapItem) {
+    // hakora has no springname, so it's fetched directly into `<root>/maps`,
+    // which (unlike pr-downloader) has no default destination.
+    if (item.url && !writePath) return;
+    setDownloading(item.springName);
     setResult(null);
     try {
-      const { message } = await dlDownloadMap({
-        springName,
-        searchUrl: source === "bar" ? BAR_SEARCH_URL : undefined,
-        writePath,
-      });
+      const { message } = item.url
+        ? await dlDownloadFile({
+            url: item.url,
+            destDir: `${writePath}/maps`,
+            filename: item.filename,
+          })
+        : await dlDownloadMap({
+            springName: item.springName,
+            searchUrl: source === "bar" ? BAR_SEARCH_URL : undefined,
+            writePath,
+          });
       setResult({ ok: true, message });
       await refreshInstalled();
     } catch (e) {
@@ -225,8 +251,8 @@ export default function MapsPage() {
         <div className="space-y-1">
           <h1 className="text-lg font-semibold leading-none">Maps</h1>
           <p className="max-w-prose text-sm text-muted-foreground">
-            Browse and download maps from Beyond All Reason or springfiles into
-            the configured content folder.
+            Browse and download maps from Beyond All Reason, springfiles, or the
+            hakora mirror into the configured content folder.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -240,6 +266,7 @@ export default function MapsPage() {
             options={[
               { value: "bar", label: "Beyond All Reason" },
               { value: "springfiles", label: "springfiles" },
+              { value: "hakora", label: "hakora" },
             ]}
           />
           <div className="relative max-w-xs flex-1">
@@ -343,8 +370,12 @@ export default function MapsPage() {
                       variant="outline"
                       size="sm"
                       className="mt-auto w-full"
-                      onClick={() => download(it.springName)}
-                      disabled={downloading !== null || isInstalled}
+                      onClick={() => download(it)}
+                      disabled={
+                        downloading !== null ||
+                        isInstalled ||
+                        (!!it.url && !writePath)
+                      }
                       aria-label={
                         isInstalled
                           ? `${it.title} already downloaded`
