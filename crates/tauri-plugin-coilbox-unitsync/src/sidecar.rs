@@ -79,6 +79,25 @@ pub fn build_minimap_args(
     args
 }
 
+/// Build args for heightmap mode: scan args plus the map name, the `--heightmap`
+/// flag, the longest-side pixel cap, and the optional on-disk PNG cache directory.
+pub fn build_heightmap_args(
+    lib: &str,
+    datadir: &str,
+    map: &str,
+    max_side: i32,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--map".into());
+    args.push(map.into());
+    args.push("--heightmap".into());
+    args.push("--max-side".into());
+    args.push(max_side.to_string());
+    push_cache_dir(&mut args, cache_dir);
+    args
+}
+
 /// Build args for batch-thumbnail mode: scan args plus the thumbnail mip level and
 /// the optional on-disk PNG cache directory.
 pub fn build_thumbnails_args(
@@ -166,6 +185,26 @@ mod tests {
         assert_eq!(&with[with.len() - 2..], &["--cache-dir", "/cache/thumbs"]);
         let without = build_minimap_args("/eng/libunitsync.dylib", "/data", "Map v1", 1, None);
         assert!(!without.iter().any(|a| a == "--cache-dir"));
+    }
+
+    #[test]
+    fn heightmap_args_carry_map_flag_and_max_side() {
+        let a = build_heightmap_args(
+            "/eng/libunitsync.dylib",
+            "/data",
+            "Map v1",
+            512,
+            Some("/cache/thumbs"),
+        );
+        assert!(a.contains(&"--heightmap".to_string()));
+        assert_eq!(
+            &a[a.len() - 2..],
+            &["--cache-dir".to_string(), "/cache/thumbs".to_string()]
+        );
+        let i = a.iter().position(|x| x == "--map").unwrap();
+        assert_eq!(a[i + 1], "Map v1");
+        let j = a.iter().position(|x| x == "--max-side").unwrap();
+        assert_eq!(a[j + 1], "512");
     }
 
     #[test]
