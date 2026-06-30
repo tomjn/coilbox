@@ -1,6 +1,7 @@
 import { ArrowLeft, ImageOff } from "lucide-react";
 import { Link, useParams } from "react-router";
 import {
+  classifyArchive,
   useScanTargetSelection,
   useUnitsyncMinimap,
   useUnitsyncScan,
@@ -142,8 +143,16 @@ export default function MapDetailPage() {
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {map.archives.map((a) => (
-              <ArchiveRow key={a.name} archive={a} />
+            {map.archives.map((a, i) => (
+              <ArchiveRow
+                key={a.name}
+                archive={a}
+                // Skip the self-classification on the map's own archive (i === 0)
+                // so it doesn't render a redundant "View map" back to this page.
+                classification={
+                  i === 0 ? undefined : classifyArchive(data, a.name)
+                }
+              />
             ))}
           </ul>
         )}

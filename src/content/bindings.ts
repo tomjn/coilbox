@@ -285,3 +285,51 @@ export const unitsyncThumbnails = defineCommand<
   { enginePath: string; dataDir: string; mip?: number },
   ThumbnailsResult
 >("coilbox-unitsync", "unitsync_thumbnails");
+
+/** One member of an archive's file tree. */
+export interface ArchiveFileEntry {
+  /** Slash-separated path within the archive. */
+  path: string;
+  size: number;
+}
+
+export interface ArchiveTreeResult {
+  files: ArchiveFileEntry[];
+  /** The archive's on-disk path (for the `.sdd` "open folder" action). */
+  archivePath?: string;
+  errors: string[];
+}
+
+/**
+ * List one archive's member tree (and resolve its on-disk path). Reads through
+ * unitsync's VFS, so `.sd7`/`.sdz`/`.sdd` and rapid-pool `.sdp` packages all
+ * work. `archive` is the archive name as unitsync knows it.
+ */
+export const unitsyncArchiveTree = defineCommand<
+  { enginePath: string; dataDir: string; archive: string },
+  ArchiveTreeResult
+>("coilbox-unitsync", "unitsync_archive_tree");
+
+export interface ArchiveFileResult {
+  /** `"text"`, `"image"`, or `"binary"`. */
+  kind: "text" | "image" | "binary";
+  /** Decoded contents, when `kind === "text"`. */
+  text?: string;
+  /** `data:` URL, when `kind === "image"`. */
+  dataUrl?: string;
+  /** The member's real size in bytes. */
+  size: number;
+  /** True when the member was a previewable type but exceeded the size cap. */
+  truncated: boolean;
+  errors: string[];
+}
+
+/**
+ * Read one member of an archive for preview. `file` is the member's
+ * slash-separated path within `archive`. Text members are returned up to 512 KB
+ * and images up to 8 MB; anything larger (or non-previewable) returns as binary.
+ */
+export const unitsyncArchiveFile = defineCommand<
+  { enginePath: string; dataDir: string; archive: string; file: string },
+  ArchiveFileResult
+>("coilbox-unitsync", "unitsync_archive_file");

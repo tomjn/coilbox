@@ -8,6 +8,8 @@ const COMMANDS: &[&str] = &[
     "unitsync_thumbnails",
     "unitsync_game_info",
     "unitsync_engine_config",
+    "unitsync_archive_tree",
+    "unitsync_archive_file",
 ];
 
 fn main() {

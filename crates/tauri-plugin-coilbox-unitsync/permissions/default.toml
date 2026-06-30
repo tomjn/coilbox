@@ -8,4 +8,6 @@ permissions = [
   "allow-unitsync-thumbnails",
   "allow-unitsync-game-info",
   "allow-unitsync-engine-config",
+  "allow-unitsync-archive-tree",
+  "allow-unitsync-archive-file",
 ]

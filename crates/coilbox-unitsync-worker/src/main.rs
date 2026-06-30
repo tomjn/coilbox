@@ -13,6 +13,7 @@
 //!
 //! Usage: `coilbox-unitsync-worker --lib <libunitsync.*> --datadir <content-root>`
 
+mod archive;
 mod config;
 mod ffi;
 mod game;
@@ -32,6 +33,8 @@ struct Args {
     datadir: String,
     map: Option<String>,
     game: Option<String>,
+    archive: Option<String>,
+    file: Option<String>,
     thumbnails: bool,
     config: bool,
     mip: i32,
@@ -79,6 +82,34 @@ fn run() -> i32 {
                     ..Default::default()
                 };
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                1
+            }
+        };
+    }
+
+    // Archive browsing: list a member tree, or read one member for preview.
+    if let Some(archive_name) = args.archive.clone() {
+        if let Some(inner) = args.file.clone() {
+            return match std::panic::catch_unwind(|| {
+                archive::file(&args.lib, &archive_name, &inner)
+            }) {
+                Ok(out) => {
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    0
+                }
+                Err(_) => {
+                    archive::emit_file_error("worker panicked while reading archive member".into());
+                    1
+                }
+            };
+        }
+        return match std::panic::catch_unwind(|| archive::tree(&args.lib, &archive_name)) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                archive::emit_tree_error("worker panicked while listing archive".into());
                 1
             }
         };
@@ -150,6 +181,8 @@ fn parse_args() -> Result<Args, String> {
     let mut datadir = None;
     let mut map = None;
     let mut game = None;
+    let mut archive = None;
+    let mut file = None;
     let mut thumbnails = false;
     let mut config = false;
     let mut mip = 1; // 512x512 by default
@@ -161,6 +194,8 @@ fn parse_args() -> Result<Args, String> {
             "--datadir" => datadir = it.next(),
             "--map" => map = it.next(),
             "--game" => game = it.next(),
+            "--archive" => archive = it.next(),
+            "--file" => file = it.next(),
             "--thumbnails" => thumbnails = true,
             "--cache-dir" => cache_dir = it.next(),
             "--config" => config = true,
@@ -178,6 +213,8 @@ fn parse_args() -> Result<Args, String> {
         datadir: datadir.ok_or("missing --datadir <content-root>")?,
         map,
         game,
+        archive,
+        file,
         thumbnails,
         config,
         mip,

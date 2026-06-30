@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-unitsync-archive-file"
+description = "Enables the unitsync_archive_file command without any pre-configured scope."
+commands.allow = ["unitsync_archive_file"]
+
+[[permission]]
+identifier = "deny-unitsync-archive-file"
+description = "Denies the unitsync_archive_file command without any pre-configured scope."
+commands.deny = ["unitsync_archive_file"]

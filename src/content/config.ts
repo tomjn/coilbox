@@ -1,6 +1,9 @@
 import { useSetting } from "@picoframe/frame";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  type Archive,
+  type ArchiveFileResult,
+  type ArchiveTreeResult,
   type ContentState,
   contentStateLoad,
   type EngineConfigResult,
@@ -8,6 +11,8 @@ import {
   type MinimapResult,
   type ScanResult,
   type StartPos,
+  unitsyncArchiveFile,
+  unitsyncArchiveTree,
   unitsyncEngineConfig,
   unitsyncGameInfo,
   unitsyncMinimap,
@@ -361,6 +366,191 @@ export function useUnitsyncEngineConfig(enginePath?: string, dataDir?: string) {
   }, [enginePath, dataDir, run]);
 
   return { data, loading, error, run };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Archives — a unified, classified view derived from the scan, plus lazy
+ * member-tree and member-preview loaders.
+ * -------------------------------------------------------------------------- */
+
+export type ArchiveKind = "map" | "game" | "other";
+
+/** How a single archive is classified within a scan. */
+export interface ArchiveClassification {
+  kind: ArchiveKind;
+  /** True when the archive is a game's *primary* (own) archive. */
+  primary: boolean;
+  /** The map this archive backs (when `kind === "map"`). */
+  mapName?: string;
+  /** The game this archive backs (when `kind === "game"`). */
+  gameName?: string;
+}
+
+/** An archive plus its classification, for the Archives list/detail. */
+export type ClassifiedArchive = Archive & ArchiveClassification;
+
+/**
+ * Classify one archive by name against a scan: a game's own archive is `game`
+ * (primary), a map's own archive (its first listed archive) is `map`, and
+ * everything else is `other`. Used by the Map/Game detail rows.
+ */
+export function classifyArchive(
+  data: ScanResult | null | undefined,
+  name: string,
+): ArchiveClassification {
+  if (!data) return { kind: "other", primary: false };
+  const game = data.games.find((g) => g.primaryArchive.name === name);
+  if (game) return { kind: "game", primary: true, gameName: game.name };
+  const map = data.maps.find((m) => m.archives[0]?.name === name);
+  if (map) return { kind: "map", primary: false, mapName: map.name };
+  return { kind: "other", primary: false };
+}
+
+/**
+ * The deduped union of every archive a scan references — game primaries, map
+ * primaries, and all dependency archives — each classified. Archives can appear
+ * under several maps/games, so we dedup by name, prefer the entry carrying
+ * `path`/`size`, and upgrade an `other` classification when a more specific one
+ * (map/game) is seen.
+ */
+function buildArchiveList(data: ScanResult | null): ClassifiedArchive[] {
+  if (!data) return [];
+  const byName = new Map<string, ClassifiedArchive>();
+
+  const add = (a: Archive, cls: ArchiveClassification) => {
+    const existing = byName.get(a.name);
+    if (!existing) {
+      byName.set(a.name, { ...a, ...cls });
+      return;
+    }
+    existing.path ??= a.path;
+    existing.size ??= a.size;
+    existing.checksum ??= a.checksum;
+    // Upgrade a generic "other" to a specific map/game classification.
+    if (existing.kind === "other" && cls.kind !== "other") {
+      existing.kind = cls.kind;
+      existing.primary = cls.primary;
+      existing.mapName = cls.mapName;
+      existing.gameName = cls.gameName;
+    }
+  };
+
+  for (const g of data.games) {
+    add(g.primaryArchive, { kind: "game", primary: true, gameName: g.name });
+    for (const dep of g.dependencyArchives)
+      add(dep, { kind: "other", primary: false });
+  }
+  for (const m of data.maps) {
+    // The map's own archive is listed first; the rest are shared dependencies.
+    m.archives.forEach((a, i) => {
+      add(
+        a,
+        i === 0
+          ? { kind: "map", primary: false, mapName: m.name }
+          : { kind: "other", primary: false },
+      );
+    });
+  }
+
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Scan a target and expose its archives as one classified, deduped list. */
+export function useArchives(enginePath?: string, dataDir?: string) {
+  const { data, loading, error, run } = useUnitsyncScan(enginePath, dataDir);
+  const archives = useMemo(() => buildArchiveList(data), [data]);
+  return { archives, data, loading, error, run };
+}
+
+/** Session cache of archive member trees, keyed by `dataDir::enginePath::archive`. */
+const archiveTreeCache = new Map<string, ArchiveTreeResult>();
+
+/** Lazily list one archive's member tree (one unitsync session per archive). */
+export function useUnitsyncArchiveTree(
+  enginePath?: string,
+  dataDir?: string,
+  archive?: string,
+) {
+  const [tree, setTree] = useState<ArchiveTreeResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !archive) {
+      setTree(null);
+      return;
+    }
+    const key = `${dataDir}::${enginePath}::${archive}`;
+    const cached = archiveTreeCache.get(key);
+    if (cached) {
+      setTree(cached);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    unitsyncArchiveTree({ enginePath, dataDir, archive })
+      .then((res) => {
+        if (cancelled) return;
+        archiveTreeCache.set(key, res);
+        setTree(res);
+      })
+      .catch(() => {
+        if (!cancelled) setTree(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, archive]);
+
+  return { tree, loading };
+}
+
+/** Session cache of member previews, keyed by `dataDir::enginePath::archive::file`. */
+const archiveFileCache = new Map<string, ArchiveFileResult>();
+
+/** Lazily read one archive member for preview (fetches only when a file is set). */
+export function useUnitsyncArchiveFile(
+  enginePath?: string,
+  dataDir?: string,
+  archive?: string,
+  file?: string,
+) {
+  const [data, setData] = useState<ArchiveFileResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !archive || !file) {
+      setData(null);
+      return;
+    }
+    const key = `${dataDir}::${enginePath}::${archive}::${file}`;
+    const cached = archiveFileCache.get(key);
+    if (cached) {
+      setData(cached);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    unitsyncArchiveFile({ enginePath, dataDir, archive, file })
+      .then((res) => {
+        if (cancelled) return;
+        archiveFileCache.set(key, res);
+        setData(res);
+      })
+      .catch(() => {
+        if (!cancelled) setData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, archive, file]);
+
+  return { data, loading };
 }
 
 /** Session cache of minimap results, keyed by `dataDir::enginePath::mapName`. */

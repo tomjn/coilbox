@@ -9,6 +9,8 @@ Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and eng
 - `allow-unitsync-thumbnails`
 - `allow-unitsync-game-info`
 - `allow-unitsync-engine-config`
+- `allow-unitsync-archive-tree`
+- `allow-unitsync-archive-file`
 
 ## Permission Table
 
@@ -18,6 +20,58 @@ Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and eng
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-archive-file`
+
+</td>
+<td>
+
+Enables the unitsync_archive_file command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-archive-file`
+
+</td>
+<td>
+
+Denies the unitsync_archive_file command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-archive-tree`
+
+</td>
+<td>
+
+Enables the unitsync_archive_tree command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-archive-tree`
+
+</td>
+<td>
+
+Denies the unitsync_archive_tree command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
