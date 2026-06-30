@@ -12,8 +12,8 @@ mod sidecar;
 
 use picoframe_core::CliResult;
 use sidecar::{
-    build_args, build_config_args, build_game_args, build_minimap_args, build_thumbnails_args,
-    find_unitsync, resolve_sidecar,
+    build_archive_file_args, build_archive_tree_args, build_args, build_config_args,
+    build_game_args, build_minimap_args, build_thumbnails_args, find_unitsync, resolve_sidecar,
 };
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -279,6 +279,41 @@ async fn unitsync_engine_config(engine_path: String, data_dir: String) -> Result
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config").await)
 }
 
+/// `unitsync_archive_tree` — list the member tree of one archive (and resolve its
+/// on-disk path). `archive` is the archive name as unitsync knows it.
+#[tauri::command]
+async fn unitsync_archive_tree(
+    engine_path: String,
+    data_dir: String,
+    archive: String,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let args = build_archive_tree_args(&libpath.to_string_lossy(), &data_dir, &archive);
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "archive tree").await)
+}
+
+/// `unitsync_archive_file` — read one member of an archive for preview. `file` is
+/// the member's slash-separated path within `archive`.
+#[tauri::command]
+async fn unitsync_archive_file(
+    engine_path: String,
+    data_dir: String,
+    archive: String,
+    file: String,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let args = build_archive_file_args(&libpath.to_string_lossy(), &data_dir, &archive, &file);
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive file").await)
+}
+
 /// Build the plugin. Registered as `"coilbox-unitsync"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-unitsync|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -288,7 +323,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_minimap,
             unitsync_thumbnails,
             unitsync_game_info,
-            unitsync_engine_config
+            unitsync_engine_config,
+            unitsync_archive_tree,
+            unitsync_archive_file
         ])
         .build()
 }

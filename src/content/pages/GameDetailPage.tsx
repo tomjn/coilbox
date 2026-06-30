@@ -3,6 +3,7 @@ import { ArrowLeft, FolderOpen } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { type Archive, contentOpenPath } from "../bindings";
 import {
+  classifyArchive,
   useScanTargetSelection,
   useUnitsyncGameInfo,
   useUnitsyncScan,
@@ -154,7 +155,11 @@ export default function GameDetailPage() {
         ) : (
           <ul className="flex flex-col gap-2">
             {game.dependencyArchives.map((a) => (
-              <ArchiveRow key={a.name} archive={a} />
+              <ArchiveRow
+                key={a.name}
+                archive={a}
+                classification={classifyArchive(data, a.name)}
+              />
             ))}
           </ul>
         )}

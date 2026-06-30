@@ -489,10 +489,10 @@
           "markdownDescription": "Denies the content_verify_engine command without any pre-configured scope."
         },
         {
-          "description": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`",
+          "description": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-hakora-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`",
           "type": "string",
           "const": "coilbox-downloads:default",
-          "markdownDescription": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`"
+          "markdownDescription": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-hakora-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`"
         },
         {
           "description": "Enables the dl_bar_maps command without any pre-configured scope.",
@@ -529,6 +529,12 @@
           "type": "string",
           "const": "coilbox-downloads:allow-dl-download-map",
           "markdownDescription": "Enables the dl_download_map command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the dl_hakora_maps command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:allow-dl-hakora-maps",
+          "markdownDescription": "Enables the dl_hakora_maps command without any pre-configured scope."
         },
         {
           "description": "Enables the dl_installed_content command without any pre-configured scope.",
@@ -607,6 +613,12 @@
           "type": "string",
           "const": "coilbox-downloads:deny-dl-download-map",
           "markdownDescription": "Denies the dl_download_map command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_hakora_maps command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:deny-dl-hakora-maps",
+          "markdownDescription": "Denies the dl_hakora_maps command without any pre-configured scope."
         },
         {
           "description": "Denies the dl_installed_content command without any pre-configured scope.",
@@ -927,10 +939,22 @@
           "markdownDescription": "Denies the us_settings_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-engine-config`",
+          "description": "Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`",
           "type": "string",
           "const": "coilbox-unitsync:default",
-          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-engine-config`"
+          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`"
+        },
+        {
+          "description": "Enables the unitsync_archive_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:allow-unitsync-archive-file",
+          "markdownDescription": "Enables the unitsync_archive_file command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the unitsync_archive_tree command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:allow-unitsync-archive-tree",
+          "markdownDescription": "Enables the unitsync_archive_tree command without any pre-configured scope."
         },
         {
           "description": "Enables the unitsync_engine_config command without any pre-configured scope.",
@@ -961,6 +985,18 @@
           "type": "string",
           "const": "coilbox-unitsync:allow-unitsync-thumbnails",
           "markdownDescription": "Enables the unitsync_thumbnails command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_archive_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:deny-unitsync-archive-file",
+          "markdownDescription": "Denies the unitsync_archive_file command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_archive_tree command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:deny-unitsync-archive-tree",
+          "markdownDescription": "Denies the unitsync_archive_tree command without any pre-configured scope."
         },
         {
           "description": "Denies the unitsync_engine_config command without any pre-configured scope.",

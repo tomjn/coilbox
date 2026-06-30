@@ -149,6 +149,47 @@ pub struct EngineConfigOutput {
     pub errors: Vec<String>,
 }
 
+/// One member of an archive's file tree.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveFileEntry {
+    /// Slash-separated path within the archive.
+    pub path: String,
+    pub size: u64,
+}
+
+/// Output of the `--archive` (tree) mode: the archive's flat member list plus
+/// its resolved on-disk path (for the `.sdd` "open folder" action).
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveTreeOutput {
+    pub files: Vec<ArchiveFileEntry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archive_path: Option<String>,
+    pub errors: Vec<String>,
+}
+
+/// Output of the `--archive --file` (member preview) mode. `kind` selects which
+/// field carries the content: `text` -> `text`, `image` -> `data_url`,
+/// `binary` -> neither (metadata only).
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveFileOutput {
+    /// `"text"`, `"image"`, or `"binary"`.
+    pub kind: String,
+    /// Decoded (utf8-lossy) contents, when `kind == "text"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    /// `data:` URL, when `kind == "image"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_url: Option<String>,
+    /// The member's real size in bytes (before any cap).
+    pub size: u64,
+    /// True when the member exceeded the preview cap and was not rendered.
+    pub truncated: bool,
+    pub errors: Vec<String>,
+}
+
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanOutput {

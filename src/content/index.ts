@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
+  Archive as ArchiveIcon,
   Boxes,
   FolderTree,
   Gamepad2,
@@ -53,6 +54,13 @@ const contentPlugin: FramePlugin = {
           order: 1,
           icon: Gamepad2,
         },
+        {
+          id: "content.archives",
+          label: "Archives",
+          to: "/content/archives",
+          order: 2,
+          icon: ArchiveIcon,
+        },
       ],
     },
   ],
@@ -76,6 +84,16 @@ const contentPlugin: FramePlugin = {
       path: "content/games/:name",
       lazy: () => import("./pages/GameDetailPage"),
       crumb: (c) => c.params.name ?? "Game",
+    },
+    {
+      path: "content/archives",
+      lazy: () => import("./pages/ArchivesPage"),
+      crumb: "Archives",
+    },
+    {
+      path: "content/archives/:name",
+      lazy: () => import("./pages/ArchiveDetailPage"),
+      crumb: (c) => c.params.name ?? "Archive",
     },
   ],
   settings: [

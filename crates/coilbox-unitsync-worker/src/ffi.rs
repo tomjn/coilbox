@@ -39,6 +39,14 @@ type LpOpenFn = unsafe extern "C" fn(*const c_char, *const c_char, *const c_char
 type FloatByStrFloatFn = unsafe extern "C" fn(*const c_char, c_float) -> c_float; // lpGetStrKeyFloatVal, GetSpringConfigFloat
 type StrByStrStrFn = unsafe extern "C" fn(*const c_char, *const c_char) -> *const c_char; // GetSpringConfigString
 type IntByStrIntFn = unsafe extern "C" fn(*const c_char, c_int) -> c_int; // GetSpringConfigInt
+                                                                          // archive file access (VFS browsing): open/close an archive, iterate its members,
+                                                                          // and read individual member bytes.
+type VoidByIntFn = unsafe extern "C" fn(c_int); // CloseArchive(archive)
+type VoidByIntIntFn = unsafe extern "C" fn(c_int, c_int); // CloseArchiveFile(archive, file)
+type IntByIntIntFn = unsafe extern "C" fn(c_int, c_int) -> c_int; // SizeArchiveFile(archive, file)
+type OpenArchiveFileFn = unsafe extern "C" fn(c_int, *const c_char) -> c_int; // OpenArchiveFile(archive, name)
+type FindFilesFn = unsafe extern "C" fn(c_int, c_int, *mut c_char, *mut c_int) -> c_int; // FindFilesArchive
+type ReadFileFn = unsafe extern "C" fn(c_int, c_int, *mut u8, c_int) -> c_int; // ReadArchiveFile
 
 /// Copy a library-owned C string into an owned `String`. Null -> `None`.
 pub(crate) unsafe fn cstr(p: *const c_char) -> Option<String> {
@@ -81,6 +89,14 @@ pub struct Unitsync {
     // optional archive metadata
     archive_path_fn: Option<StrByStrFn>,
     archive_checksum_fn: Option<UintByStrFn>,
+    // optional archive file access (browse + read members through the VFS)
+    open_archive_fn: Option<IntByStrFn>,
+    close_archive_fn: Option<VoidByIntFn>,
+    find_files_archive_fn: Option<FindFilesFn>,
+    open_archive_file_fn: Option<OpenArchiveFileFn>,
+    read_archive_file_fn: Option<ReadFileFn>,
+    close_archive_file_fn: Option<VoidByIntIntFn>,
+    size_archive_file_fn: Option<IntByIntIntFn>,
     // sides / units (require a game's archives to be added first)
     add_all_archives_fn: Option<StrArgVoidFn>,
     remove_all_archives_fn: Option<VoidFn>,
@@ -160,6 +176,13 @@ impl Unitsync {
             info_value_string_fn: req(&lib, b"GetInfoValueString\0")?,
             archive_path_fn: opt(&lib, b"GetArchivePath\0"),
             archive_checksum_fn: opt(&lib, b"GetArchiveChecksum\0"),
+            open_archive_fn: opt(&lib, b"OpenArchive\0"),
+            close_archive_fn: opt(&lib, b"CloseArchive\0"),
+            find_files_archive_fn: opt(&lib, b"FindFilesArchive\0"),
+            open_archive_file_fn: opt(&lib, b"OpenArchiveFile\0"),
+            read_archive_file_fn: opt(&lib, b"ReadArchiveFile\0"),
+            close_archive_file_fn: opt(&lib, b"CloseArchiveFile\0"),
+            size_archive_file_fn: opt(&lib, b"SizeArchiveFile\0"),
             add_all_archives_fn: opt(&lib, b"AddAllArchives\0"),
             remove_all_archives_fn: opt(&lib, b"RemoveAllArchives\0"),
             side_count_fn: opt(&lib, b"GetSideCount\0"),
@@ -359,6 +382,90 @@ impl Unitsync {
         let f = self.archive_checksum_fn?;
         let c = CString::new(name).ok()?;
         Some(unsafe { f(c.as_ptr()) })
+    }
+
+    // ---- archive file access (browse + read members) ----------------------
+
+    /// Open an archive in the VFS by its name (`*.sd7`/`*.sdz`/`*.sdd`, or a
+    /// rapid `*.sdp`). Returns its handle, or `None` if the build lacks the
+    /// symbol or the open failed (a zero handle means error).
+    pub fn open_archive(&self, name: &str) -> Option<i32> {
+        let f = self.open_archive_fn?;
+        let c = CString::new(name).ok()?;
+        let h = unsafe { f(c.as_ptr()) };
+        (h != 0).then_some(h)
+    }
+
+    pub fn close_archive(&self, archive: i32) {
+        if let Some(f) = self.close_archive_fn {
+            unsafe { f(archive) }
+        }
+    }
+
+    /// List every member of an opened archive as `(path, size)`. Walks the
+    /// engine's cursor idiom: `FindFilesArchive(archive, cur, buf, &size)` fills
+    /// `buf` with the entry at `cur` and returns `cur + 1`, returning `0` once
+    /// `cur` is past the end (filling nothing) — so we break on `0` before
+    /// reading. The name buffer follows unitsync's fixed-size contract.
+    pub fn list_archive_files(&self, archive: i32) -> Vec<(String, u64)> {
+        let Some(find) = self.find_files_archive_fn else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        let mut buf = vec![0u8; 4096];
+        let mut cur: c_int = 0;
+        loop {
+            let mut size: c_int = 0;
+            let next = unsafe { find(archive, cur, buf.as_mut_ptr() as *mut c_char, &mut size) };
+            if next <= 0 {
+                break;
+            }
+            if let Some(name) = unsafe { cstr(buf.as_ptr() as *const c_char) } {
+                if !name.is_empty() {
+                    out.push((name, size.max(0) as u64));
+                }
+            }
+            cur = next;
+            // Safety stop against a misbehaving build that never returns 0.
+            if out.len() >= 200_000 {
+                break;
+            }
+        }
+        out
+    }
+
+    /// Read a member of an opened archive, capped at `cap` bytes. Returns the
+    /// member's real size and the (possibly truncated) bytes, or `None` if the
+    /// build lacks the symbols or the member can't be opened.
+    pub fn read_archive_member(
+        &self,
+        archive: i32,
+        inner: &str,
+        cap: usize,
+    ) -> Option<(u64, Vec<u8>)> {
+        let open = self.open_archive_file_fn?;
+        let size_fn = self.size_archive_file_fn?;
+        let read = self.read_archive_file_fn?;
+        let c = CString::new(inner).ok()?;
+        let fh = unsafe { open(archive, c.as_ptr()) };
+        if fh < 0 {
+            return None;
+        }
+        let real = unsafe { size_fn(archive, fh) }.max(0) as u64;
+        let to_read = (real as usize).min(cap);
+        let mut buf = vec![0u8; to_read];
+        let mut got = 0usize;
+        if to_read > 0 {
+            let n = unsafe { read(archive, fh, buf.as_mut_ptr(), to_read as c_int) };
+            if n > 0 {
+                got = (n as usize).min(to_read);
+            }
+        }
+        buf.truncate(got);
+        if let Some(close) = self.close_archive_file_fn {
+            unsafe { close(archive, fh) }
+        }
+        Some((real, buf))
     }
 
     // ---- sides / units (after a game's archives are added) ----------------

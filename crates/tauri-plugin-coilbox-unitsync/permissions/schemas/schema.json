@@ -295,6 +295,30 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the unitsync_archive_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-unitsync-archive-file",
+          "markdownDescription": "Enables the unitsync_archive_file command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_archive_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-unitsync-archive-file",
+          "markdownDescription": "Denies the unitsync_archive_file command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the unitsync_archive_tree command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-unitsync-archive-tree",
+          "markdownDescription": "Enables the unitsync_archive_tree command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_archive_tree command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-unitsync-archive-tree",
+          "markdownDescription": "Denies the unitsync_archive_tree command without any pre-configured scope."
+        },
+        {
           "description": "Enables the unitsync_engine_config command without any pre-configured scope.",
           "type": "string",
           "const": "allow-unitsync-engine-config",
@@ -355,10 +379,10 @@
           "markdownDescription": "Denies the unitsync_thumbnails command without any pre-configured scope."
         },
         {
-          "description": "Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-engine-config`",
+          "description": "Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-engine-config`"
+          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`"
         }
       ]
     }

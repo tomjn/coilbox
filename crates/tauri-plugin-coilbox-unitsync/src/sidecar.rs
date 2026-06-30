@@ -110,6 +110,23 @@ pub fn build_config_args(lib: &str, datadir: &str) -> Vec<String> {
     args
 }
 
+/// Build args for archive-tree mode: scan args plus the archive name.
+pub fn build_archive_tree_args(lib: &str, datadir: &str, archive: &str) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--archive".into());
+    args.push(archive.into());
+    args
+}
+
+/// Build args for archive-file (member preview) mode: the archive name plus the
+/// member's path within it.
+pub fn build_archive_file_args(lib: &str, datadir: &str, archive: &str, file: &str) -> Vec<String> {
+    let mut args = build_archive_tree_args(lib, datadir, archive);
+    args.push("--file".into());
+    args.push(file.into());
+    args
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,6 +173,26 @@ mod tests {
         let a = build_config_args("/eng/libunitsync.dylib", "/home/u/.spring");
         assert_eq!(a.last(), Some(&"--config".to_string()));
         assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+    }
+
+    #[test]
+    fn build_archive_args_carry_archive_and_member() {
+        let tree = build_archive_tree_args("/eng/libunitsync.so", "/data", "Map.sd7");
+        assert_eq!(tree.last(), Some(&"Map.sd7".to_string()));
+        assert!(tree.contains(&"--archive".to_string()));
+        assert!(!tree.contains(&"--file".to_string()));
+
+        let file = build_archive_file_args("/eng/libunitsync.so", "/data", "Map.sd7", "maps/x.smd");
+        assert!(file.contains(&"--archive".to_string()));
+        assert_eq!(
+            &file[file.len() - 4..],
+            &[
+                "--archive".to_string(),
+                "Map.sd7".to_string(),
+                "--file".to_string(),
+                "maps/x.smd".to_string(),
+            ]
+        );
     }
 
     #[test]
