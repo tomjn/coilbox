@@ -5,12 +5,16 @@ import {
   type ArchiveFileResult,
   type ArchiveTreeResult,
   type ContentState,
+  contentDemoInfo,
+  contentListReplays,
   contentStateLoad,
+  type DemoInfo,
   type EngineConfigResult,
   type GameInfoResult,
   type HeightmapResult,
   type LuaExecResult,
   type MinimapResult,
+  type ReplayFile,
   type ScanResult,
   type StartPos,
   unitsyncArchiveFile,
@@ -614,6 +618,21 @@ export function useUnitsyncMinimap(
 /** Session cache of heightmap results, keyed by `dataDir::enginePath::mapName`. */
 const heightmapCache = new Map<string, HeightmapResult>();
 
+/**
+ * Drop the cached minimap + heightmap for one map, so the next render of the
+ * preview hooks refetches it. Used after a missing map is downloaded (remount the
+ * preview subtree with a new React `key` to trigger the refetch).
+ */
+export function invalidateMapPreview(
+  enginePath: string,
+  dataDir: string,
+  mapName: string,
+) {
+  const key = `${dataDir}::${enginePath}::${mapName}`;
+  minimapCache.delete(key);
+  heightmapCache.delete(key);
+}
+
 /** Lazily render and cache a map's heightmap (PNG data URL + world-height bounds). */
 export function useUnitsyncHeightmap(
   enginePath?: string,
@@ -696,4 +715,85 @@ export function useUnitsyncLuaExec(
   );
 
   return { run, result, loading };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Replays — list a root's demo files, and lazily decode one for its detail view.
+ * -------------------------------------------------------------------------- */
+
+/** List the replays in a content root (re-runs on `rootPath` change / refresh). */
+export function useReplays(rootPath?: string) {
+  const [replays, setReplays] = useState<ReplayFile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!rootPath) {
+      setReplays([]);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await contentListReplays({ root: rootPath });
+      setReplays(res.replays);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [rootPath]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { replays, loading, error, refresh };
+}
+
+/** Session cache of decoded demos, keyed by `enginePath::replayPath`. */
+const demoInfoCache = new Map<string, DemoInfo>();
+
+/**
+ * Lazily decode one replay (native header + start-script, plus demotool's
+ * winner). Cached for the session — decoding re-reads the file and runs demotool.
+ */
+export function useDemoInfo(enginePath?: string, replayPath?: string) {
+  const [info, setInfo] = useState<DemoInfo | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enginePath || !replayPath) {
+      setInfo(null);
+      return;
+    }
+    const key = `${enginePath}::${replayPath}`;
+    const cached = demoInfoCache.get(key);
+    if (cached) {
+      setInfo(cached);
+      setError(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    contentDemoInfo({ enginePath, replayPath })
+      .then((res) => {
+        if (cancelled) return;
+        demoInfoCache.set(key, res.info);
+        setInfo(res.info);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, replayPath]);
+
+  return { info, loading, error };
 }

@@ -12,6 +12,8 @@ const COMMANDS: &[&str] = &[
     "content_list_engines",
     "content_verify_engine",
     "content_open_path",
+    "content_list_replays",
+    "content_demo_info",
 ];
 
 fn main() {

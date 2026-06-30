@@ -2,6 +2,7 @@ import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   Archive as ArchiveIcon,
   Boxes,
+  Clapperboard,
   FolderTree,
   Gamepad2,
   Map as MapIcon,
@@ -61,6 +62,13 @@ const contentPlugin: FramePlugin = {
           order: 2,
           icon: ArchiveIcon,
         },
+        {
+          id: "content.replays",
+          label: "Replays",
+          to: "/content/replays",
+          order: 3,
+          icon: Clapperboard,
+        },
       ],
     },
   ],
@@ -94,6 +102,16 @@ const contentPlugin: FramePlugin = {
       path: "content/archives/:name",
       lazy: () => import("./pages/ArchiveDetailPage"),
       crumb: (c) => c.params.name ?? "Archive",
+    },
+    {
+      path: "content/replays",
+      lazy: () => import("./pages/ReplaysPage"),
+      crumb: "Replays",
+    },
+    {
+      path: "content/replays/:name",
+      lazy: () => import("./pages/ReplayDetailPage"),
+      crumb: (c) => c.params.name ?? "Replay",
     },
   ],
   settings: [

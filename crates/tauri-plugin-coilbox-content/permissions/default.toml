@@ -12,4 +12,6 @@ permissions = [
   "allow-content-list-engines",
   "allow-content-verify-engine",
   "allow-content-open-path",
+  "allow-content-list-replays",
+  "allow-content-demo-info",
 ]

@@ -4319,6 +4319,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-content"
 version = "0.0.0"
 dependencies = [
+ "flate2",
  "picoframe-core",
  "serde",
  "serde_json",

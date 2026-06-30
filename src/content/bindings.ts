@@ -130,6 +130,100 @@ export const contentOpenPath = defineCommand<{ path: string }, unknown>(
 );
 
 /* -------------------------------------------------------------------------- *
+ * Replays — demo files in a root's `demos/`/`replays/` folder. Listing is cheap
+ * fs metadata; decoding reads the demo's native header + start-script and shells
+ * out to `demotool` (in the engine folder) for the winning ally-teams.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A replay file on disk. The summary fields come from a cheap native decode of
+ * the demo header + start-script (no demotool); they're absent if it can't be
+ * decoded. `startTimeMs` (from the header) is a more accurate played date than
+ * `modifiedMs` (the file mtime).
+ */
+export interface ReplayFile {
+  filename: string;
+  path: string;
+  sizeBytes: number;
+  modifiedMs: number;
+  mapName?: string;
+  gameType?: string;
+  durationSec?: number;
+  /** Non-spectator player count. */
+  playerCount?: number;
+  startTimeMs?: number;
+}
+
+/** One player/spectator from a demo, with side + ally-team resolved from their team. */
+export interface ReplayPlayer {
+  name: string;
+  team?: number;
+  allyTeam?: number;
+  /** Faction (the team's `side`, e.g. `Armada`/`Cortex`/`Legion`). */
+  side?: string;
+  /** Normalized team colour `[r, g, b]` in 0..1, when present. */
+  rgbColor?: [number, number, number];
+  spectator: boolean;
+  /** Set only when the winner is known and the player isn't a spectator. */
+  won?: boolean;
+  skill?: string;
+  countryCode?: string;
+}
+
+/** A start box (`startrect`), normalized 0..1 over the map (origin top-left). */
+export interface StartBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/** An ally team: its start box and a representative colour, for the minimap overlay. */
+export interface AllyTeamInfo {
+  id: number;
+  startBox?: StartBox;
+  /** Representative team colour `[r, g, b]` in 0..1. */
+  color?: [number, number, number];
+}
+
+/** Decoded replay metadata (native header + start-script + demotool winner). */
+export interface DemoInfo {
+  engineVersion: string;
+  gameId?: string;
+  /** Battle start, epoch-millis (format with `new Date(ms)`). */
+  startTimeMs: number;
+  /** In-game duration, seconds. */
+  durationSec: number;
+  /** Wall-clock duration, seconds. */
+  wallclockSec: number;
+  mapName: string;
+  /** Game + version, e.g. `Beyond All Reason test-30018-d71d659`. */
+  gameType: string;
+  startPosType?: number;
+  winningAllyTeams: number[];
+  /** False when demotool was absent/failed — show "winner unknown", not a draw. */
+  winnersKnown: boolean;
+  numAllyTeams: number;
+  allyTeams: AllyTeamInfo[];
+  players: ReplayPlayer[];
+}
+
+/** List replays in a content root's `demos/`/`replays/` (cheap; newest first). */
+export const contentListReplays = defineCommand<
+  { root: string },
+  { replays: ReplayFile[] }
+>("coilbox-content", "content_list_replays");
+
+/**
+ * Decode one replay. `enginePath` is an `Engine.path` (the engine folder holding
+ * `demotool`); `replayPath` is a `ReplayFile.path`.
+ */
+export const contentDemoInfo = defineCommand<
+  { enginePath: string; replayPath: string },
+  { info: DemoInfo }
+>("coilbox-content", "content_demo_info");
+
+/* -------------------------------------------------------------------------- *
  * unitsync content scan (plugin `tauri-plugin-coilbox-unitsync`, ACL id
  * `coilbox-unitsync`). The Content browser pages call this alongside the
  * content-state bindings above: this plugin's frontend talks to two backends.
