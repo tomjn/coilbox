@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
   useScanTargetSelection,
@@ -5,6 +6,7 @@ import {
   useUnitsyncThumbnails,
 } from "../config";
 import { BrowserToolbar } from "./components/BrowserToolbar";
+import { FilterBar } from "./components/FilterBar";
 import { MapThumb, mapSizeLabel } from "./components/MapThumb";
 import {
   Diagnostics,
@@ -12,6 +14,18 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "./components/states";
+
+type SortKey = "name-asc" | "name-desc" | "area-desc" | "area-asc";
+
+const SORT_OPTIONS = [
+  { value: "name-asc", label: "Name A–Z" },
+  { value: "name-desc", label: "Name Z–A" },
+  { value: "area-desc", label: "Largest" },
+  { value: "area-asc", label: "Smallest" },
+];
+
+const mapArea = (m: { width?: number; height?: number }) =>
+  (m.width ?? 0) * (m.height ?? 0);
 
 /**
  * A grid of map thumbnails for the selected engine's content. Names + metadata
@@ -30,11 +44,39 @@ export default function MapsPage() {
     selected?.rootPath,
   );
 
+  const [filter, setFilter] = useState("");
+  const [sort, setSort] = useState<SortKey>("name-asc");
+
   // A map can appear in more than one archive; show each name once.
-  const maps = Array.from(
-    new Map((data?.maps ?? []).map((m) => [m.name, m])).values(),
+  const maps = useMemo(
+    () =>
+      Array.from(new Map((data?.maps ?? []).map((m) => [m.name, m])).values()),
+    [data],
   );
   const busy = loading || (!!selected && !data && !error);
+
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return maps;
+    return maps.filter((m) => m.name.toLowerCase().includes(q));
+  }, [maps, filter]);
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      switch (sort) {
+        case "name-desc":
+          return b.name.localeCompare(a.name);
+        case "area-desc":
+          return mapArea(b) - mapArea(a);
+        case "area-asc":
+          return mapArea(a) - mapArea(b);
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+    return arr;
+  }, [filtered, sort]);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -53,6 +95,21 @@ export default function MapsPage() {
         scanning={loading}
       />
 
+      {!busy && maps.length > 0 && (
+        <FilterBar
+          search={filter}
+          onSearch={setFilter}
+          searchPlaceholder="Filter maps…"
+          searchLabel="Filter maps"
+          sort={sort}
+          onSort={(v) => setSort(v as SortKey)}
+          sortOptions={SORT_OPTIONS}
+          total={maps.length}
+          shown={sorted.length}
+          noun="maps"
+        />
+      )}
+
       {error && <ErrorBanner message={error} />}
       {data?.errors?.length ? <Diagnostics errors={data.errors} /> : null}
 
@@ -60,9 +117,11 @@ export default function MapsPage() {
         <SkeletonList />
       ) : maps.length === 0 ? (
         <EmptyState label="No maps found for this engine." />
+      ) : sorted.length === 0 ? (
+        <EmptyState label={`No maps match “${filter.trim()}”.`} />
       ) : (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
-          {maps.map((m) => {
+          {sorted.map((m) => {
             const size = mapSizeLabel(m.width, m.height);
             const thumb = thumbs.get(m.name);
             const archiveLabel = `${m.archives.length} archive${

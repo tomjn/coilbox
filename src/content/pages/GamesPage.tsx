@@ -1,7 +1,9 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useScanTargetSelection, useUnitsyncScan } from "../config";
 import { isSdd } from "../format";
 import { BrowserToolbar } from "./components/BrowserToolbar";
+import { FilterBar } from "./components/FilterBar";
 import { SddBadge } from "./components/SddBadge";
 import {
   Diagnostics,
@@ -9,6 +11,15 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "./components/states";
+
+type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
+
+const SORT_OPTIONS = [
+  { value: "name-asc", label: "Name A–Z" },
+  { value: "name-desc", label: "Name Z–A" },
+  { value: "size-desc", label: "Largest" },
+  { value: "size-asc", label: "Smallest" },
+];
 
 /**
  * Lists the games (primary mods) the selected engine can see. Each row shows the
@@ -23,8 +34,38 @@ export default function GamesPage() {
     selected?.rootPath,
   );
 
+  const [filter, setFilter] = useState("");
+  const [sort, setSort] = useState<SortKey>("name-asc");
+
   const games = data?.games ?? [];
   const busy = loading || (!!selected && !data && !error);
+
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return games;
+    return games.filter(
+      (g) =>
+        g.name.toLowerCase().includes(q) ||
+        g.primaryArchive.name.toLowerCase().includes(q),
+    );
+  }, [games, filter]);
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      switch (sort) {
+        case "name-desc":
+          return b.name.localeCompare(a.name);
+        case "size-desc":
+          return (b.primaryArchive.size ?? 0) - (a.primaryArchive.size ?? 0);
+        case "size-asc":
+          return (a.primaryArchive.size ?? 0) - (b.primaryArchive.size ?? 0);
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+    return arr;
+  }, [filtered, sort]);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -44,6 +85,21 @@ export default function GamesPage() {
         scanning={loading}
       />
 
+      {!busy && games.length > 0 && (
+        <FilterBar
+          search={filter}
+          onSearch={setFilter}
+          searchPlaceholder="Filter games…"
+          searchLabel="Filter games"
+          sort={sort}
+          onSort={(v) => setSort(v as SortKey)}
+          sortOptions={SORT_OPTIONS}
+          total={games.length}
+          shown={sorted.length}
+          noun="games"
+        />
+      )}
+
       {error && <ErrorBanner message={error} />}
       {data?.errors?.length ? <Diagnostics errors={data.errors} /> : null}
 
@@ -51,9 +107,11 @@ export default function GamesPage() {
         <SkeletonList />
       ) : games.length === 0 ? (
         <EmptyState label="No games found for this engine." />
+      ) : sorted.length === 0 ? (
+        <EmptyState label={`No games match “${filter.trim()}”.`} />
       ) : (
         <ul className="flex flex-col gap-2">
-          {games.map((g) => (
+          {sorted.map((g) => (
             <li key={`${g.primaryArchive.name}:${g.name}`}>
               <Link
                 to={`/content/games/${encodeURIComponent(g.name)}`}
