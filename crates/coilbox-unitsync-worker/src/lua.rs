@@ -8,6 +8,57 @@
 //! `{ __error = <string> }` if the user code raised). Rust then reads that one
 //! string back with a single `lpGetStrKeyStrVal`.
 
+use crate::ffi::Unitsync;
+use crate::model::LuaExecOutput;
+use std::path::Path;
+
+/// VFS modes for the parser: unitsync's `SPRING_VFS_ALL` (raw + map + mod + base),
+/// so the script can `VFS.Include` files from the mounted archive — matching the
+/// modes `start_positions` uses to read `mapinfo.lua` from an added archive.
+const VFS_ALL: &str = "rmMbe";
+
+/// Load libunitsync, mount `archive` (and its dependencies) into the VFS, then run
+/// the user's `source` through the Lua parser and collect the result.
+pub fn run(lib: &str, archive: &str, source: &str) -> LuaExecOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(u) => u,
+        Err(e) => {
+            return LuaExecOutput {
+                error: Some(e),
+                ..Default::default()
+            }
+        }
+    };
+    us.init(false, 0);
+    // Mount the archive + deps so VFS.Include resolves against it.
+    us.add_all_archives(archive);
+
+    let wrapped = wrap_source(source);
+    let (result, error) = match us.run_lua_source(&wrapped, VFS_ALL) {
+        Ok(r) => (Some(r), None),
+        Err(e) => (None, Some(e)),
+    };
+    // Surface any unitsync diagnostics (e.g. a missing dependency archive) — useful
+    // when debugging why a VFS.Include didn't resolve.
+    let errors = us.drain_errors();
+    us.uninit();
+
+    LuaExecOutput {
+        result,
+        error,
+        errors,
+    }
+}
+
+/// Print a `--lua` error envelope to stdout (used on the panic path in `main`).
+pub fn emit_error(msg: String) {
+    let out = LuaExecOutput {
+        error: Some(msg),
+        ..Default::default()
+    };
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
 /// A pure-Lua pretty-printer, prepended to every script. Uses only primitives the
 /// unitsync `LuaParser` env keeps (`pairs`/`type`/`tostring`/`string.format`/
 /// `table.concat`/`table.sort`). Handles nil/number/boolean/string/table, sorts
