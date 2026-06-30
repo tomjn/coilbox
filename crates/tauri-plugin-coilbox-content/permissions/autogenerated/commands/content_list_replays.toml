@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-list-replays"
+description = "Enables the content_list_replays command without any pre-configured scope."
+commands.allow = ["content_list_replays"]
+
+[[permission]]
+identifier = "deny-content-list-replays"
+description = "Denies the content_list_replays command without any pre-configured scope."
+commands.deny = ["content_list_replays"]
