@@ -8,7 +8,7 @@ import {
   contentVerifyEngine,
   type Engine,
 } from "../bindings";
-import { useContentState } from "../config";
+import { useContentState, usePreferredEngine } from "../config";
 import { EngineRow } from "./components/EngineRow";
 
 const msg = (e: unknown): string =>
@@ -21,6 +21,8 @@ const msg = (e: unknown): string =>
  */
 export default function EnginesSection() {
   const { state, setState, loading } = useContentState();
+  const allEngines = (state?.roots ?? []).flatMap((r) => r.engines);
+  const { resolvedId, setPrefId } = usePreferredEngine(allEngines);
   const [verifying, setVerifying] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -113,7 +115,9 @@ export default function EnginesSection() {
                     key={engine.id}
                     engine={engine}
                     verifying={verifying.has(engine.id)}
+                    isPreferred={engine.id === resolvedId}
                     onVerify={verify}
+                    onSetPreferred={(e) => setPrefId(e.id)}
                     onOpen={openEngine}
                   />
                 ))}

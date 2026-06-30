@@ -14,6 +14,7 @@ import {
   unitsyncScan,
   unitsyncThumbnails,
 } from "./bindings";
+import { newestEngineId } from "./engineVersion";
 
 /** Lightweight UI prefs (the only thing routed through the frame settings store;
  * the roots/engines themselves live in the plugin's own Rust state.json). */
@@ -105,8 +106,27 @@ export function useContentTargets() {
 }
 
 /**
+ * The user's preferred engine: a global default used wherever an engine must be
+ * picked unambiguously (the scan target today, battle launching later). Stores a
+ * bare `engine.id`; when unset or pointing at a removed engine, it resolves to
+ * the newest available version. An explicit pick always wins over newest.
+ */
+export function usePreferredEngine(
+  engines: { id: string; version: string; syncVersion?: string }[],
+) {
+  const [prefId, setPrefId] = useSetting<string>(
+    "content.preferredEngineId",
+    "",
+  );
+  const resolvedId =
+    engines.find((e) => e.id === prefId)?.id ?? newestEngineId(engines);
+  return { prefId, resolvedId, setPrefId };
+}
+
+/**
  * Target selection shared by the Maps and Games pages: the available targets,
- * the persisted current choice (defaulting to the first available), and a setter.
+ * the persisted current choice, and a setter. With no explicit choice it falls
+ * back to the preferred engine (newest by default), then to the first available.
  */
 export function useScanTargetSelection() {
   const { targets, loading, error, refresh } = useContentTargets();
@@ -114,8 +134,14 @@ export function useScanTargetSelection() {
     "content.scanTarget",
     "",
   );
+  const { resolvedId } = usePreferredEngine(
+    targets.map((t) => ({ id: t.engineId, version: t.engineVersion })),
+  );
   const selected =
-    targets.find((t) => targetKey(t) === selectedKey) ?? targets[0] ?? null;
+    targets.find((t) => targetKey(t) === selectedKey) ??
+    targets.find((t) => t.engineId === resolvedId) ??
+    targets[0] ??
+    null;
   return {
     targets,
     selected,

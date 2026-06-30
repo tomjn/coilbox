@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { CheckCircle2, FolderOpen, Loader2 } from "lucide-react";
+import { CheckCircle2, FolderOpen, Loader2, Star } from "lucide-react";
 import type { Engine } from "../../bindings";
 import { StatusBadge } from "./StatusBadge";
 
@@ -7,12 +7,16 @@ import { StatusBadge } from "./StatusBadge";
 export function EngineRow({
   engine,
   verifying,
+  isPreferred,
   onVerify,
+  onSetPreferred,
   onOpen,
 }: {
   engine: Engine;
   verifying: boolean;
+  isPreferred: boolean;
   onVerify: (engine: Engine) => void;
+  onSetPreferred: (engine: Engine) => void;
   onOpen: (path: string) => void;
 }) {
   return (
@@ -29,6 +33,12 @@ export function EngineRow({
               {engine.syncVersion}
             </StatusBadge>
           )}
+          {isPreferred && (
+            <StatusBadge tone="good">
+              <Star className="mr-1 size-3 fill-current" />
+              Preferred
+            </StatusBadge>
+          )}
         </div>
         <span
           className="break-all font-mono text-xs text-muted-foreground"
@@ -38,6 +48,17 @@ export function EngineRow({
         </span>
       </div>
       <div className="flex items-center gap-2">
+        {!isPreferred && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onSetPreferred(engine)}
+          >
+            <Star className="size-4" />
+            Set preferred
+          </Button>
+        )}
         <Button
           type="button"
           variant="outline"
