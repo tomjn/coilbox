@@ -204,7 +204,7 @@ export default function ArchiveDetailPage() {
               </p>
             )}
           </div>
-          <div className="min-h-0">
+          <div className="min-h-0 min-w-0">
             <FilePreview
               path={selectedFile}
               result={file}
