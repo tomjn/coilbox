@@ -1,4 +1,5 @@
 import { Button, cn, Input } from "@picoframe/frame";
+import { Channel } from "@tauri-apps/api/core";
 import {
   AlertCircle,
   CheckCircle2,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type DownloadProgress,
   dlDownload,
   dlRepos,
   dlVersion,
@@ -19,6 +21,7 @@ import {
 } from "../../bindings";
 import { useDownloadsConfig } from "../../config";
 import { OptionSelect } from "./OptionSelect";
+import { ProgressBar } from "./ProgressBar";
 import { EmptyState, errMessage } from "./states";
 
 const DEFAULT_MASTER = "https://repos.springrts.com";
@@ -84,6 +87,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
   const [versionFilter, setVersionFilter] = useState("");
 
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [downloadResult, setDownloadResult] = useState<{
     ok: boolean;
     message: string;
@@ -135,14 +139,23 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
 
   async function download(tag: string) {
     setDownloading(tag);
+    setProgress(null);
     setDownloadResult(null);
+    const onProgress = new Channel<DownloadProgress>();
+    onProgress.onmessage = (p) => setProgress(p);
     try {
-      const { message } = await dlDownload({ tag, masterUrl, writePath });
+      const { message } = await dlDownload({
+        tag,
+        masterUrl,
+        writePath,
+        onProgress,
+      });
       setDownloadResult({ ok: true, message });
     } catch (e) {
       setDownloadResult({ ok: false, message: errMessage(e) });
     } finally {
       setDownloading(null);
+      setProgress(null);
     }
   }
 
@@ -329,30 +342,34 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                   )}
                 <ul className="divide-y divide-border">
                   {filteredVersions?.map((v) => (
-                    <li
-                      key={v.tag}
-                      className="flex items-center justify-between gap-3 px-6 py-2.5"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{v.name}</p>
-                        <p className="truncate font-mono text-xs text-muted-foreground">
-                          {v.tag}
-                        </p>
+                    <li key={v.tag} className="flex flex-col gap-2 px-6 py-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {v.name}
+                          </p>
+                          <p className="truncate font-mono text-xs text-muted-foreground">
+                            {v.tag}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => download(v.tag)}
+                          disabled={downloading !== null}
+                          aria-label={`Download ${v.tag}`}
+                        >
+                          {downloading === v.tag ? (
+                            <Loader2 className="animate-spin" />
+                          ) : (
+                            <Download />
+                          )}
+                          {downloading === v.tag ? "Downloading…" : "Download"}
+                        </Button>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => download(v.tag)}
-                        disabled={downloading !== null}
-                        aria-label={`Download ${v.tag}`}
-                      >
-                        {downloading === v.tag ? (
-                          <Loader2 className="animate-spin" />
-                        ) : (
-                          <Download />
-                        )}
-                        {downloading === v.tag ? "Downloading…" : "Download"}
-                      </Button>
+                      {downloading === v.tag && progress && (
+                        <ProgressBar progress={progress} />
+                      )}
                     </li>
                   ))}
                 </ul>
