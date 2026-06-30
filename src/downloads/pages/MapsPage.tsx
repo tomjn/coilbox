@@ -1,4 +1,5 @@
 import { Button, cn, Input } from "@picoframe/frame";
+import { Channel } from "@tauri-apps/api/core";
 import {
   AlertCircle,
   CheckCircle2,
@@ -10,6 +11,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type BarMap,
+  type DownloadProgress,
   dlBarMaps,
   dlDownloadFile,
   dlDownloadMap,
@@ -20,6 +22,7 @@ import {
 } from "../bindings";
 import { useContentRootPaths, useWriteRootPath } from "../config";
 import { OptionSelect } from "./components/OptionSelect";
+import { ProgressBar } from "./components/ProgressBar";
 import { EmptyState, errMessage } from "./components/states";
 
 /** pr-downloader HTTP search endpoint for BAR map files. */
@@ -96,6 +99,7 @@ export default function MapsPage() {
   const [sort, setSort] = useState<SortKey>("name-asc");
   const [limit, setLimit] = useState(PAGE);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
     null,
   );
@@ -182,18 +186,23 @@ export default function MapsPage() {
     // which (unlike pr-downloader) has no default destination.
     if (item.url && !writePath) return;
     setDownloading(item.springName);
+    setProgress(null);
     setResult(null);
+    const onProgress = new Channel<DownloadProgress>();
+    onProgress.onmessage = (p) => setProgress(p);
     try {
       const { message } = item.url
         ? await dlDownloadFile({
             url: item.url,
             destDir: `${writePath}/maps`,
             filename: item.filename,
+            onProgress,
           })
         : await dlDownloadMap({
             springName: item.springName,
             searchUrl: source === "bar" ? BAR_SEARCH_URL : undefined,
             writePath,
+            onProgress,
           });
       setResult({ ok: true, message });
       await refreshInstalled();
@@ -201,6 +210,7 @@ export default function MapsPage() {
       setResult({ ok: false, message: errMessage(e) });
     } finally {
       setDownloading(null);
+      setProgress(null);
     }
   }
 
@@ -395,6 +405,9 @@ export default function MapsPage() {
                           ? "Already downloaded"
                           : "Download"}
                     </Button>
+                    {downloading === it.springName && progress && (
+                      <ProgressBar progress={progress} className="mt-2" />
+                    )}
                   </div>
                 </li>
               );

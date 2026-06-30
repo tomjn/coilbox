@@ -4,15 +4,18 @@
 //! as a [`CliResult`]. Adds rapid-repo browsing (HTTP + gzip) so the frontend can
 //! list downloadable content before downloading a tag.
 
+mod progress;
 mod rapid;
 mod sidecar;
 mod sources;
 
 use picoframe_core::CliResult;
+use progress::DownloadProgress;
 use serde_json::json;
 use std::io::Read;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use tauri::{
+    ipc::Channel,
     plugin::{Builder, TauriPlugin},
     Runtime,
 };
@@ -61,6 +64,105 @@ async fn run_sidecar_env(
     .await
     .map_err(|e| format!("sidecar task failed: {e}"))?
     .map_err(|e| format!("failed to run pr-downloader: {e}"))
+}
+
+/// Captured result of a streamed sidecar run, shaped for [`sidecar::parse_download`].
+struct SidecarRun {
+    stdout: String,
+    stderr: String,
+    code: Option<i32>,
+}
+
+/// Like [`run_sidecar_env`] but streams stdout line-by-line, forwarding any
+/// progress lines to `on_progress` as they arrive, while still collecting the
+/// full stdout/stderr for the final outcome verdict. stderr is drained on a
+/// helper thread so a full pipe can't deadlock the child.
+async fn run_sidecar_streaming(
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+    on_progress: Channel<DownloadProgress>,
+) -> Result<SidecarRun, String> {
+    use std::io::BufReader;
+    let path = sidecar::resolve_sidecar().ok_or(SIDECAR_MISSING)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut cmd = Command::new(&path);
+        cmd.args(&args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        for (k, v) in &envs {
+            cmd.env(k, v);
+        }
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("failed to run pr-downloader: {e}"))?;
+
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
+
+        // Drain stderr on a thread, collecting it for the verdict.
+        let err_handle = stderr.map(|s| {
+            std::thread::spawn(move || {
+                let mut buf = String::new();
+                let _ = BufReader::new(s).read_to_string(&mut buf);
+                buf
+            })
+        });
+
+        // Read stdout, splitting on BOTH '\n' and '\r': pr-downloader redraws its
+        // progress bar in place with carriage returns, so '\n'-only line splitting
+        // would buffer the entire 0->100% sequence into one chunk and defer every
+        // progress event to the end. Each completed segment is emitted as it arrives.
+        // A mid-stream read error ends the loop as if EOF; the collected output still
+        // feeds parse_download for the verdict, and the exit code is authoritative.
+        let mut out = String::new();
+        if let Some(s) = stdout {
+            let mut reader = BufReader::new(s);
+            let mut seg: Vec<u8> = Vec::new();
+            let mut byte = [0u8; 1];
+            let flush = |seg: &mut Vec<u8>, out: &mut String| {
+                if seg.is_empty() {
+                    return;
+                }
+                let line = String::from_utf8_lossy(seg).into_owned();
+                if let Some(p) = sidecar::parse_progress_line(&line) {
+                    let _ = on_progress.send(p);
+                }
+                out.push_str(&line);
+                out.push('\n');
+                seg.clear();
+            };
+            loop {
+                match reader.read(&mut byte) {
+                    Ok(0) => break,
+                    Ok(_) => {
+                        if byte[0] == b'\n' || byte[0] == b'\r' {
+                            flush(&mut seg, &mut out);
+                        } else {
+                            seg.push(byte[0]);
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            flush(&mut seg, &mut out); // trailing segment with no terminator
+        }
+
+        let err = err_handle.and_then(|h| h.join().ok()).unwrap_or_default();
+        let status = child.wait().map_err(|e| e.to_string())?;
+        let code = status.code();
+        // Only signal completion on a clean exit; on failure the command turns the
+        // collected output into an error verdict and the UI reports that instead.
+        if code == Some(0) {
+            let _ = on_progress.send(DownloadProgress::done(0, None));
+        }
+        Ok(SidecarRun {
+            stdout: out,
+            stderr: err,
+            code,
+        })
+    })
+    .await
+    .map_err(|e| format!("sidecar task failed: {e}"))?
 }
 
 /// `dl_version` — run the sidecar's `--version`, proving the binary is bundled
@@ -114,6 +216,7 @@ async fn dl_download(
     tag: String,
     master_url: Option<String>,
     write_path: Option<String>,
+    on_progress: Channel<DownloadProgress>,
 ) -> CliResult {
     if tag.trim().is_empty() {
         return CliResult::err("tag is required");
@@ -129,12 +232,10 @@ async fn dl_download(
         envs.push(("PRD_RAPID_REPO_MASTER".to_string(), master));
         envs.push(("PRD_RAPID_USE_STREAMER".to_string(), "false".to_string()));
     }
-    match run_sidecar_env(args, envs).await {
+    match run_sidecar_streaming(args, envs, on_progress).await {
         Err(e) => CliResult::err(e),
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            let outcome = sidecar::parse_download(&stdout, &stderr, out.status.code());
+        Ok(run) => {
+            let outcome = sidecar::parse_download(&run.stdout, &run.stderr, run.code);
             if outcome.success {
                 CliResult::ok(json!({ "message": format!("Downloaded {tag}"), "tag": tag }))
             } else {
@@ -151,17 +252,69 @@ async fn fetch_text(url: String) -> Result<String, String> {
     resp.text().await.map_err(|e| e.to_string())
 }
 
-/// Stream a URL into `dest_dir/filename` (creating the directory). Used for
-/// non-rapid content (e.g. springfiles game mirrors) the sidecar can't fetch.
-async fn download_to(url: &str, dest_dir: &str, filename: &str) -> Result<String, String> {
-    let resp = reqwest::get(url).await.map_err(|e| e.to_string())?;
-    let resp = resp.error_for_status().map_err(|e| e.to_string())?;
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+/// Stream a URL into `dest_dir/filename` (creating the directory), emitting
+/// progress over `on_progress` as bytes arrive. Used for non-rapid content (e.g.
+/// springfiles game mirrors) the sidecar can't fetch. Removes the partial file
+/// if the transfer fails partway.
+async fn download_to(
+    url: &str,
+    dest_dir: &str,
+    filename: &str,
+    on_progress: &Channel<DownloadProgress>,
+) -> Result<String, String> {
+    use std::io::Write;
+    use std::time::Instant;
+
+    let mut resp = reqwest::get(url)
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?;
+    let total = resp.content_length();
+
     let dir = std::path::Path::new(dest_dir);
     std::fs::create_dir_all(dir).map_err(|e| format!("could not create {dest_dir}: {e}"))?;
     let path = dir.join(filename);
-    std::fs::write(&path, &bytes)
-        .map_err(|e| format!("could not write {}: {e}", path.display()))?;
+    let mut file = std::fs::File::create(&path)
+        .map_err(|e| format!("could not create {}: {e}", path.display()))?;
+
+    let start = Instant::now();
+    let mut last_emit = Instant::now();
+    let mut downloaded: u64 = 0;
+
+    let stream_result: Result<(), String> = loop {
+        match resp.chunk().await {
+            Ok(Some(chunk)) => {
+                if let Err(e) = file.write_all(&chunk) {
+                    break Err(format!("could not write {}: {e}", path.display()));
+                }
+                downloaded += chunk.len() as u64;
+                // Throttle emits to ~10/sec to avoid flooding the channel.
+                if last_emit.elapsed().as_millis() >= 100 {
+                    last_emit = Instant::now();
+                    let _ = on_progress.send(DownloadProgress {
+                        phase: "downloading".into(),
+                        downloaded_bytes: downloaded,
+                        total_bytes: total,
+                        percent: progress::percent(downloaded, total),
+                        bytes_per_sec: progress::bytes_per_sec(
+                            downloaded,
+                            start.elapsed().as_secs_f64(),
+                        ),
+                    });
+                }
+            }
+            Ok(None) => break Ok(()),
+            Err(e) => break Err(e.to_string()),
+        }
+    };
+
+    if let Err(e) = stream_result {
+        let _ = std::fs::remove_file(&path);
+        return Err(e);
+    }
+
+    let _ = on_progress.send(DownloadProgress::done(downloaded, total));
     Ok(path.display().to_string())
 }
 
@@ -228,6 +381,7 @@ async fn dl_download_map(
     spring_name: String,
     search_url: Option<String>,
     write_path: Option<String>,
+    on_progress: Channel<DownloadProgress>,
 ) -> CliResult {
     if spring_name.trim().is_empty() {
         return CliResult::err("spring_name is required");
@@ -241,12 +395,10 @@ async fn dl_download_map(
     if let Some(s) = search_url.filter(|s| !s.trim().is_empty()) {
         envs.push(("PRD_HTTP_SEARCH_URL".to_string(), s));
     }
-    match run_sidecar_env(args, envs).await {
+    match run_sidecar_streaming(args, envs, on_progress).await {
         Err(e) => CliResult::err(e),
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            let outcome = sidecar::parse_download(&stdout, &stderr, out.status.code());
+        Ok(run) => {
+            let outcome = sidecar::parse_download(&run.stdout, &run.stderr, run.code);
             if outcome.success {
                 CliResult::ok(
                     json!({ "message": format!("Downloaded {spring_name}"), "springName": spring_name }),
@@ -261,11 +413,16 @@ async fn dl_download_map(
 /// `dl_download_file` — directly download a file (e.g. a springfiles game mirror)
 /// into `dest_dir/filename`, for non-rapid content the sidecar can't fetch.
 #[tauri::command]
-async fn dl_download_file(url: String, dest_dir: String, filename: String) -> CliResult {
+async fn dl_download_file(
+    url: String,
+    dest_dir: String,
+    filename: String,
+    on_progress: Channel<DownloadProgress>,
+) -> CliResult {
     if url.trim().is_empty() || filename.trim().is_empty() {
         return CliResult::err("url and filename are required");
     }
-    match download_to(&url, &dest_dir, &filename).await {
+    match download_to(&url, &dest_dir, &filename, &on_progress).await {
         Ok(path) => CliResult::ok(json!({ "message": format!("Saved {path}"), "path": path })),
         Err(e) => CliResult::err(e),
     }
@@ -305,22 +462,73 @@ async fn dl_recoil_engines() -> CliResult {
     }
 }
 
-/// Download a Recoil `.7z` release and extract it into `<write_path>/engine/<version>/`.
+/// Download a Recoil `.7z` release and extract it into `<write_path>/engine/<version>/`,
+/// emitting download progress then an indeterminate `extracting` phase.
 async fn install_recoil_engine(
     version: &str,
     asset_url: &str,
     write_path: &str,
+    on_progress: &Channel<DownloadProgress>,
 ) -> Result<String, String> {
+    use std::io::Write;
+    use std::time::Instant;
+
     let engine_root = std::path::Path::new(write_path).join("engine");
     let dest = engine_root.join(version);
     std::fs::create_dir_all(&dest)
         .map_err(|e| format!("could not create {}: {e}", dest.display()))?;
 
-    let resp = reqwest::get(asset_url).await.map_err(|e| e.to_string())?;
-    let resp = resp.error_for_status().map_err(|e| e.to_string())?;
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    let mut resp = reqwest::get(asset_url)
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?;
+    let total = resp.content_length();
     let tmp = engine_root.join(format!(".{version}.7z"));
-    std::fs::write(&tmp, &bytes).map_err(|e| format!("could not write engine archive: {e}"))?;
+    let mut file =
+        std::fs::File::create(&tmp).map_err(|e| format!("could not write engine archive: {e}"))?;
+
+    let start = Instant::now();
+    let mut last_emit = Instant::now();
+    let mut downloaded: u64 = 0;
+    let stream_result: Result<(), String> = loop {
+        match resp.chunk().await {
+            Ok(Some(chunk)) => {
+                if let Err(e) = file.write_all(&chunk) {
+                    break Err(format!("could not write engine archive: {e}"));
+                }
+                downloaded += chunk.len() as u64;
+                if last_emit.elapsed().as_millis() >= 100 {
+                    last_emit = Instant::now();
+                    let _ = on_progress.send(DownloadProgress {
+                        phase: "downloading".into(),
+                        downloaded_bytes: downloaded,
+                        total_bytes: total,
+                        percent: progress::percent(downloaded, total),
+                        bytes_per_sec: progress::bytes_per_sec(
+                            downloaded,
+                            start.elapsed().as_secs_f64(),
+                        ),
+                    });
+                }
+            }
+            Ok(None) => break Ok(()),
+            Err(e) => break Err(e.to_string()),
+        }
+    };
+    if let Err(e) = stream_result {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+
+    // Extraction has no easy byte count — report it as an indeterminate phase.
+    let _ = on_progress.send(DownloadProgress {
+        phase: "extracting".into(),
+        downloaded_bytes: downloaded,
+        total_bytes: None,
+        percent: None,
+        bytes_per_sec: None,
+    });
 
     let tmp_for_extract = tmp.clone();
     let dest_for_extract = dest.clone();
@@ -332,6 +540,8 @@ async fn install_recoil_engine(
     .map_err(|e| format!("extract task failed: {e}"))?;
     let _ = std::fs::remove_file(&tmp);
     extracted?;
+
+    let _ = on_progress.send(DownloadProgress::done(downloaded, total));
     Ok(dest.display().to_string())
 }
 
@@ -342,11 +552,12 @@ async fn dl_download_engine_recoil(
     version: String,
     asset_url: String,
     write_path: String,
+    on_progress: Channel<DownloadProgress>,
 ) -> CliResult {
     if version.trim().is_empty() || asset_url.trim().is_empty() || write_path.trim().is_empty() {
         return CliResult::err("version, asset_url and write_path are required");
     }
-    match install_recoil_engine(&version, &asset_url, &write_path).await {
+    match install_recoil_engine(&version, &asset_url, &write_path, &on_progress).await {
         Ok(dir) => {
             CliResult::ok(json!({ "message": format!("Installed engine {version}"), "path": dir }))
         }
@@ -357,7 +568,11 @@ async fn dl_download_engine_recoil(
 /// `dl_download_engine_spring` — download a classic Spring engine via the sidecar's
 /// `--download-engine`, which resolves the per-platform build and extracts it.
 #[tauri::command]
-async fn dl_download_engine_spring(version: String, write_path: Option<String>) -> CliResult {
+async fn dl_download_engine_spring(
+    version: String,
+    write_path: Option<String>,
+    on_progress: Channel<DownloadProgress>,
+) -> CliResult {
     if version.trim().is_empty() {
         return CliResult::err("version is required");
     }
@@ -366,12 +581,10 @@ async fn dl_download_engine_spring(version: String, write_path: Option<String>) 
         args.push("--filesystem-writepath".to_string());
         args.push(wp);
     }
-    match run_sidecar(args).await {
+    match run_sidecar_streaming(args, Vec::new(), on_progress).await {
         Err(e) => CliResult::err(e),
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            let outcome = sidecar::parse_download(&stdout, &stderr, out.status.code());
+        Ok(run) => {
+            let outcome = sidecar::parse_download(&run.stdout, &run.stderr, run.code);
             if outcome.success {
                 CliResult::ok(
                     json!({ "message": format!("Installed engine {version}"), "version": version }),

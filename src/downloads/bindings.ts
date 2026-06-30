@@ -1,4 +1,19 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
+import type { Channel } from "@tauri-apps/api/core";
+
+/**
+ * A live progress sample streamed during a download (mirrors the Rust
+ * `DownloadProgress`). `totalBytes`/`percent` are null for indeterminate
+ * transfers (chunked responses without a length, or archive extraction);
+ * `bytesPerSec` is null when unknown (e.g. the pr-downloader sidecar).
+ */
+export interface DownloadProgress {
+  phase: "downloading" | "extracting" | "done";
+  downloadedBytes: number;
+  totalBytes: number | null;
+  percent: number | null;
+  bytesPerSec: number | null;
+}
 
 /** A rapid repository from the master index. */
 export interface Repo {
@@ -34,7 +49,12 @@ export const dlVersions = defineCommand<
 >("coilbox-downloads", "dl_versions");
 
 export const dlDownload = defineCommand<
-  { tag: string; masterUrl?: string; writePath?: string },
+  {
+    tag: string;
+    masterUrl?: string;
+    writePath?: string;
+    onProgress: Channel<DownloadProgress>;
+  },
   { message: string; tag: string }
 >("coilbox-downloads", "dl_download");
 
@@ -115,13 +135,23 @@ export const dlHakoraMaps = defineCommand<undefined, { maps: HakoraMap[] }>(
  * `PRD_HTTP_SEARCH_URL` (springrts default; BAR's files-cdn for BAR maps).
  */
 export const dlDownloadMap = defineCommand<
-  { springName: string; searchUrl?: string; writePath?: string },
+  {
+    springName: string;
+    searchUrl?: string;
+    writePath?: string;
+    onProgress: Channel<DownloadProgress>;
+  },
   { message: string; springName: string }
 >("coilbox-downloads", "dl_download_map");
 
 /** Direct-download a file (e.g. a springfiles game mirror) into `destDir`. */
 export const dlDownloadFile = defineCommand<
-  { url: string; destDir: string; filename: string },
+  {
+    url: string;
+    destDir: string;
+    filename: string;
+    onProgress: Channel<DownloadProgress>;
+  },
   { message: string; path: string }
 >("coilbox-downloads", "dl_download_file");
 
@@ -151,12 +181,21 @@ export const dlRecoilEngines = defineCommand<
 
 /** Install a Recoil engine release into `<writePath>/engine/<version>/`. */
 export const dlDownloadEngineRecoil = defineCommand<
-  { version: string; assetUrl: string; writePath: string },
+  {
+    version: string;
+    assetUrl: string;
+    writePath: string;
+    onProgress: Channel<DownloadProgress>;
+  },
   { message: string; path: string }
 >("coilbox-downloads", "dl_download_engine_recoil");
 
 /** Download a classic Spring engine via the sidecar's `--download-engine`. */
 export const dlDownloadEngineSpring = defineCommand<
-  { version: string; writePath?: string },
+  {
+    version: string;
+    writePath?: string;
+    onProgress: Channel<DownloadProgress>;
+  },
   { message: string; version: string }
 >("coilbox-downloads", "dl_download_engine_spring");

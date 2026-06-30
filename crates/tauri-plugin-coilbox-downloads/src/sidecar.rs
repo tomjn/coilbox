@@ -88,6 +88,47 @@ pub fn parse_download(stdout: &str, stderr: &str, exit_code: Option<i32>) -> Dow
     }
 }
 
+use crate::progress::{percent, DownloadProgress};
+
+/// Parse one line of pr-downloader stdout into a progress sample, or `None` when
+/// the line carries no progress. Tolerant by design: matches a line containing a
+/// `[Progress]`/`Progress` marker and an `NN%` token, and additionally captures a
+/// `downloaded/total` byte pair when present (e.g.
+/// `[Progress] 42% [===>   ] 123456/294000`).
+pub fn parse_progress_line(line: &str) -> Option<DownloadProgress> {
+    let lower = line.to_lowercase();
+    if !lower.contains("progress") {
+        return None;
+    }
+    // Percent: the token immediately before a '%'.
+    let pct = line.split('%').next().and_then(|head| {
+        head.rsplit(|c: char| !(c.is_ascii_digit() || c == '.'))
+            .find(|t| !t.is_empty())
+            .and_then(|t| t.parse::<f64>().ok())
+    })?;
+
+    // Optional "downloaded/total" pair: first whitespace-delimited token of the
+    // form <digits>/<digits>.
+    let pair = line.split_whitespace().find_map(|tok| {
+        let (a, b) = tok.split_once('/')?;
+        Some((a.parse::<u64>().ok()?, b.parse::<u64>().ok()?))
+    });
+
+    let (downloaded, total) = match pair {
+        Some((d, t)) => (d, Some(t)),
+        None => (0, None),
+    };
+
+    Some(DownloadProgress {
+        phase: "downloading".into(),
+        downloaded_bytes: downloaded,
+        total_bytes: total,
+        // Prefer a byte-derived percent when we have the pair, else the printed %.
+        percent: percent(downloaded, total).or(Some(pct.min(100.0))),
+        bytes_per_sec: None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,5 +182,28 @@ mod tests {
         let o = parse_download("", "", Some(3));
         assert!(!o.success);
         assert_eq!(o.message, "pr-downloader exited with code 3.");
+    }
+
+    #[test]
+    fn progress_percent_only() {
+        let p = parse_progress_line("[Progress] 50% [=====     ]").unwrap();
+        assert_eq!(p.percent, Some(50.0));
+        assert_eq!(p.total_bytes, None);
+        assert_eq!(p.phase, "downloading");
+    }
+
+    #[test]
+    fn progress_with_byte_pair() {
+        let p = parse_progress_line("[Progress] 42% [==>  ] 123456/294000").unwrap();
+        assert_eq!(p.downloaded_bytes, 123456);
+        assert_eq!(p.total_bytes, Some(294000));
+        // byte-derived percent wins over the printed token
+        assert_eq!(p.percent, super::percent(123456, Some(294000)));
+    }
+
+    #[test]
+    fn progress_non_progress_line_is_none() {
+        assert!(parse_progress_line("[Info] connecting to repo").is_none());
+        assert!(parse_progress_line("Download complete!").is_none());
     }
 }

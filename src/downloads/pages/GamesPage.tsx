@@ -1,4 +1,5 @@
 import { Button, cn, Input } from "@picoframe/frame";
+import { Channel } from "@tauri-apps/api/core";
 import {
   AlertCircle,
   CheckCircle2,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  type DownloadProgress,
   dlDownloadFile,
   dlInstalledContent,
   dlSpringfilesList,
@@ -16,6 +18,7 @@ import {
 } from "../bindings";
 import { useContentRootPaths, useWriteRootPath } from "../config";
 import { OptionSelect } from "./components/OptionSelect";
+import { ProgressBar } from "./components/ProgressBar";
 import { EmptyState, errMessage } from "./components/states";
 
 type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
@@ -44,6 +47,7 @@ export default function GamesPage() {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name-asc");
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
     null,
   );
@@ -90,12 +94,16 @@ export default function GamesPage() {
   async function download(game: SpringFile) {
     if (!writePath || !game.mirrors[0]) return;
     setDownloading(game.springname);
+    setProgress(null);
     setResult(null);
+    const onProgress = new Channel<DownloadProgress>();
+    onProgress.onmessage = (p) => setProgress(p);
     try {
       const { message } = await dlDownloadFile({
         url: game.mirrors[0],
         destDir: `${writePath}/games`,
         filename: game.filename,
+        onProgress,
       });
       setResult({ ok: true, message });
       await refreshInstalled();
@@ -103,6 +111,7 @@ export default function GamesPage() {
       setResult({ ok: false, message: errMessage(e) });
     } finally {
       setDownloading(null);
+      setProgress(null);
     }
   }
 
@@ -209,45 +218,50 @@ export default function GamesPage() {
               return (
                 <li
                   key={g.springname}
-                  className="flex items-center justify-between gap-3 px-6 py-2.5"
+                  className="flex flex-col gap-2 px-6 py-2.5"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {g.name || g.springname}
-                    </p>
-                    <p className="truncate font-mono text-xs text-muted-foreground">
-                      {g.filename}
-                    </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {g.name || g.springname}
+                      </p>
+                      <p className="truncate font-mono text-xs text-muted-foreground">
+                        {g.filename}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => download(g)}
+                      disabled={
+                        downloading !== null ||
+                        !writePath ||
+                        !g.mirrors[0] ||
+                        isInstalled
+                      }
+                      aria-label={
+                        isInstalled
+                          ? `${g.name || g.springname} already downloaded`
+                          : `Download ${g.name || g.springname}`
+                      }
+                    >
+                      {downloading === g.springname ? (
+                        <Loader2 className="animate-spin" />
+                      ) : isInstalled ? (
+                        <CheckCircle2 className="text-emerald-500" />
+                      ) : (
+                        <Download />
+                      )}
+                      {downloading === g.springname
+                        ? "Downloading…"
+                        : isInstalled
+                          ? "Already downloaded"
+                          : "Download"}
+                    </Button>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => download(g)}
-                    disabled={
-                      downloading !== null ||
-                      !writePath ||
-                      !g.mirrors[0] ||
-                      isInstalled
-                    }
-                    aria-label={
-                      isInstalled
-                        ? `${g.name || g.springname} already downloaded`
-                        : `Download ${g.name || g.springname}`
-                    }
-                  >
-                    {downloading === g.springname ? (
-                      <Loader2 className="animate-spin" />
-                    ) : isInstalled ? (
-                      <CheckCircle2 className="text-emerald-500" />
-                    ) : (
-                      <Download />
-                    )}
-                    {downloading === g.springname
-                      ? "Downloading…"
-                      : isInstalled
-                        ? "Already downloaded"
-                        : "Download"}
-                  </Button>
+                  {downloading === g.springname && progress && (
+                    <ProgressBar progress={progress} />
+                  )}
                 </li>
               );
             })}
