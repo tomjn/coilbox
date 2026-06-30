@@ -27,14 +27,14 @@ pub fn tree(lib: &str, archive_name: &str) -> ArchiveTreeOutput {
     us.init(false, 0);
     let mut errors = us.drain_errors();
 
-    let archive_path = us.archive_path(archive_name).map(|dir| {
-        Path::new(&dir)
-            .join(archive_name)
-            .to_string_lossy()
-            .into_owned()
-    });
+    let open_path = resolve_open_path(&us, archive_name);
+    // Resolution may probe several candidate archives; discard their diagnostics.
+    let _ = us.drain_errors();
+    let archive_path = open_path
+        .as_deref()
+        .and_then(|p| absolute_archive_path(&us, p));
 
-    let files = match us.open_archive(archive_name) {
+    let files = match open_path.as_deref().and_then(|p| us.open_archive(p)) {
         Some(handle) => {
             let mut files: Vec<ArchiveFileEntry> = us
                 .list_archive_files(handle)
@@ -61,6 +61,57 @@ pub fn tree(lib: &str, archive_name: &str) -> ArchiveTreeOutput {
     }
 }
 
+/// Resolve an archive's scan-reported `name` to a path `OpenArchive` accepts.
+///
+/// `OpenArchive` takes a VFS path/filename, not a name — and `GetArchivePath`
+/// only resolves filename-form names. Games' primary archives are reported by
+/// filename, so they resolve directly. Maps are reported by a *versioned display
+/// name* (`GetMapArchiveName` returns `GetNameVersioned()`, e.g.
+/// "AcidicQuarry 5.17"), which neither call can turn into a path. For those we
+/// match the name to a map, take its `.smf` file as a signature, and find the
+/// backing archive among the raw map archives — the only unitsync-API route from
+/// a versioned name to an openable file. (Display-name *dependencies* that are
+/// neither a map nor a filename, e.g. "Map Helper v1", stay unresolved.)
+fn resolve_open_path(us: &Unitsync, name: &str) -> Option<String> {
+    if let Some(dir) = us.archive_path(name) {
+        return Some(Path::new(&dir).join(name).to_string_lossy().into_owned());
+    }
+    let smf = (0..us.map_count())
+        .find(|&i| us.map_name(i).as_deref() == Some(name))
+        .and_then(|i| us.map_file_name(i))?;
+    us.list_vfs_dir("maps", "*", "r")
+        .into_iter()
+        .filter(|c| is_archive_file(c))
+        .find(|cand| match us.open_archive(cand) {
+            Some(h) => {
+                let hit = us.list_archive_files(h).iter().any(|(p, _)| *p == smf);
+                us.close_archive(h);
+                hit
+            }
+            None => false,
+        })
+}
+
+/// Whether a VFS path looks like a map/game archive we can open (skips stray
+/// files like `.DS_Store` that the raw listing also returns).
+fn is_archive_file(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    [".sd7", ".sdz", ".sdd", ".sdp"]
+        .iter()
+        .any(|ext| lower.ends_with(ext))
+}
+
+/// The absolute on-disk path for an openable archive path (which may be VFS-
+/// relative, like `maps/foo.sd7`, or already absolute).
+fn absolute_archive_path(us: &Unitsync, open_path: &str) -> Option<String> {
+    let fname = Path::new(open_path)
+        .file_name()?
+        .to_string_lossy()
+        .into_owned();
+    let dir = us.archive_path(&fname)?;
+    Some(Path::new(&dir).join(&fname).to_string_lossy().into_owned())
+}
+
 /// Read one member of `archive` for preview, classifying it by extension.
 pub fn file(lib: &str, archive_name: &str, inner: &str) -> ArchiveFileOutput {
     let us = match unsafe { Unitsync::load(Path::new(lib)) } {
@@ -76,7 +127,11 @@ pub fn file(lib: &str, archive_name: &str, inner: &str) -> ArchiveFileOutput {
     us.init(false, 0);
     let mut errors = us.drain_errors();
 
-    let out = match us.open_archive(archive_name) {
+    let open_path = resolve_open_path(&us, archive_name);
+    // Resolution may probe several candidate archives; discard their diagnostics.
+    let _ = us.drain_errors();
+    let handle = open_path.and_then(|p| us.open_archive(&p));
+    let out = match handle {
         Some(handle) => {
             let result = read_member(&us, handle, inner);
             us.close_archive(handle);

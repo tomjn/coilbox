@@ -47,6 +47,7 @@ type IntByIntIntFn = unsafe extern "C" fn(c_int, c_int) -> c_int; // SizeArchive
 type OpenArchiveFileFn = unsafe extern "C" fn(c_int, *const c_char) -> c_int; // OpenArchiveFile(archive, name)
 type FindFilesFn = unsafe extern "C" fn(c_int, c_int, *mut c_char, *mut c_int) -> c_int; // FindFilesArchive
 type ReadFileFn = unsafe extern "C" fn(c_int, c_int, *mut u8, c_int) -> c_int; // ReadArchiveFile
+type FindFilesVfsFn = unsafe extern "C" fn(c_int, *mut c_char, c_int) -> c_int; // FindFilesVFS(idx, buf, size)
 
 /// Copy a library-owned C string into an owned `String`. Null -> `None`.
 pub(crate) unsafe fn cstr(p: *const c_char) -> Option<String> {
@@ -92,6 +93,8 @@ pub struct Unitsync {
     // optional archive file access (browse + read members through the VFS)
     open_archive_fn: Option<IntByStrFn>,
     close_archive_fn: Option<VoidByIntFn>,
+    init_dir_list_vfs_fn: Option<LpOpenFn>,
+    find_files_vfs_fn: Option<FindFilesVfsFn>,
     find_files_archive_fn: Option<FindFilesFn>,
     open_archive_file_fn: Option<OpenArchiveFileFn>,
     read_archive_file_fn: Option<ReadFileFn>,
@@ -178,6 +181,8 @@ impl Unitsync {
             archive_checksum_fn: opt(&lib, b"GetArchiveChecksum\0"),
             open_archive_fn: opt(&lib, b"OpenArchive\0"),
             close_archive_fn: opt(&lib, b"CloseArchive\0"),
+            init_dir_list_vfs_fn: opt(&lib, b"InitDirListVFS\0"),
+            find_files_vfs_fn: opt(&lib, b"FindFilesVFS\0"),
             find_files_archive_fn: opt(&lib, b"FindFilesArchive\0"),
             open_archive_file_fn: opt(&lib, b"OpenArchiveFile\0"),
             read_archive_file_fn: opt(&lib, b"ReadArchiveFile\0"),
@@ -394,6 +399,46 @@ impl Unitsync {
         let c = CString::new(name).ok()?;
         let h = unsafe { f(c.as_ptr()) };
         (h != 0).then_some(h)
+    }
+
+    /// Enumerate VFS file-paths under `path` matching `pattern`, restricted to the
+    /// archive `modes` (VFSModes.h: "r" raw, "M" mod, "m" map, "b" base). Mirrors
+    /// the engine's contract: InitDirListVFS returns 0/-1 (success/error) and fills
+    /// an internal list; FindFilesVFS(idx) copies entry `idx` and returns `idx+1`,
+    /// or 0 once `idx` is past the end. So iterate from index 0.
+    pub fn list_vfs_dir(&self, path: &str, pattern: &str, modes: &str) -> Vec<String> {
+        let (Some(init), Some(find)) = (self.init_dir_list_vfs_fn, self.find_files_vfs_fn) else {
+            return Vec::new();
+        };
+        let (Ok(cp), Ok(cpat), Ok(cm)) = (
+            CString::new(path),
+            CString::new(pattern),
+            CString::new(modes),
+        ) else {
+            return Vec::new();
+        };
+        if unsafe { init(cp.as_ptr(), cpat.as_ptr(), cm.as_ptr()) } < 0 {
+            return Vec::new();
+        }
+        let mut out = Vec::new();
+        let mut buf = vec![0u8; 4096];
+        let mut idx: c_int = 0;
+        loop {
+            let next = unsafe { find(idx, buf.as_mut_ptr() as *mut c_char, buf.len() as c_int) };
+            if next == 0 {
+                break;
+            }
+            if let Some(name) = unsafe { cstr(buf.as_ptr() as *const c_char) } {
+                if !name.is_empty() {
+                    out.push(name);
+                }
+            }
+            idx = next;
+            if out.len() >= 200_000 {
+                break;
+            }
+        }
+        out
     }
 
     pub fn close_archive(&self, archive: i32) {
