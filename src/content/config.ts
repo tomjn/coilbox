@@ -4,7 +4,9 @@ import {
   type ContentState,
   contentStateLoad,
   type GameInfoResult,
+  type MinimapResult,
   type ScanResult,
+  type StartPos,
   unitsyncGameInfo,
   unitsyncMinimap,
   unitsyncScan,
@@ -255,28 +257,35 @@ export function useUnitsyncGameInfo(
   return { info, loading };
 }
 
-/** Session cache of rendered minimaps, keyed by `dataDir::enginePath::mapName`. */
-const minimapCache = new Map<string, string>();
+/** Session cache of minimap results, keyed by `dataDir::enginePath::mapName`. */
+const minimapCache = new Map<string, MinimapResult>();
 
-/** Lazily render and cache a map's minimap (PNG data URL) for the detail page. */
+/** Lazily render and cache a map's minimap + start positions for the detail page. */
 export function useUnitsyncMinimap(
   enginePath?: string,
   dataDir?: string,
   mapName?: string,
 ) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [startPositions, setStartPositions] = useState<StartPos[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enginePath || !dataDir || !mapName) {
       setDataUrl(null);
+      setStartPositions([]);
       return;
     }
     const key = `${dataDir}::${enginePath}::${mapName}`;
+    const apply = (res: MinimapResult) => {
+      setDataUrl(res.dataUrl ?? null);
+      setStartPositions(res.startPositions ?? []);
+      if (!res.dataUrl && res.errors?.length) setError(res.errors.join("; "));
+    };
     const cached = minimapCache.get(key);
-    if (cached !== undefined) {
-      setDataUrl(cached || null);
+    if (cached) {
+      apply(cached);
       return;
     }
     let cancelled = false;
@@ -285,10 +294,8 @@ export function useUnitsyncMinimap(
     unitsyncMinimap({ enginePath, dataDir, mapName })
       .then((res) => {
         if (cancelled) return;
-        const url = res.dataUrl ?? "";
-        minimapCache.set(key, url); // cache "" as "no minimap" to avoid refetch
-        setDataUrl(url || null);
-        if (!url && res.errors?.length) setError(res.errors.join("; "));
+        minimapCache.set(key, res);
+        apply(res);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -301,5 +308,5 @@ export function useUnitsyncMinimap(
     };
   }, [enginePath, dataDir, mapName]);
 
-  return { dataUrl, loading, error };
+  return { dataUrl, startPositions, loading, error };
 }

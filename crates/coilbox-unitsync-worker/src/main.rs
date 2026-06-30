@@ -19,7 +19,7 @@ mod minimap;
 mod model;
 
 use ffi::Unitsync;
-use model::{Archive, GameItem, MapItem, ScanOutput};
+use model::{Archive, ConfigOption, GameItem, MapItem, ScanOutput};
 use std::path::Path;
 
 const LIST_SEP: char = if cfg!(windows) { ';' } else { ':' };
@@ -185,11 +185,8 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
 
     let sync_version = us.spring_version();
 
-    let maps = collect_maps(&us);
-    errors.extend(us.drain_errors());
-
-    let games = collect_games(&us);
-    errors.extend(us.drain_errors());
+    let maps = collect_maps(&us, &mut errors);
+    let games = collect_games(&us, &mut errors);
 
     us.uninit();
 
@@ -201,12 +198,32 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
     })
 }
 
-/// Build an [`Archive`], filling its checksum from a known value or, failing
-/// that, an on-demand lookup, and its path from the optional accessor.
+/// Drain unitsync's error queue and attribute each message to `who` (the map or
+/// game being processed), so a diagnostic names what it failed on. The expected
+/// "no options file" case (maps/games without options, including old TDF maps) is
+/// dropped as benign noise.
+fn drain_attributed(us: &Unitsync, who: &str, errors: &mut Vec<String>) {
+    for e in us.drain_errors() {
+        let lower = e.to_lowercase();
+        if lower.contains("could not open file") && lower.contains("options.lua") {
+            continue;
+        }
+        errors.push(format!("{who}: {e}"));
+    }
+}
+
+/// Build an [`Archive`]. `GetArchivePath` returns the *containing directory* and
+/// only resolves for filename-style archive names (e.g. a game's primary
+/// archive), so we join it with the name for the full path and stat that for the
+/// size. Display-name archives (maps, dependencies) won't resolve — path/size
+/// stay `None`.
 fn archive(us: &Unitsync, name: String, checksum: Option<u32>) -> Archive {
-    let path = us.archive_path(&name);
-    // A zero CRC means "unknown" here (the by-name lookup misses when given an
-    // archive's display name), so omit it rather than show a misleading 00000000.
+    let full = us
+        .archive_path(&name)
+        .map(|dir| Path::new(&dir).join(&name));
+    let size = full.as_deref().and_then(entry_size);
+    let path = full.map(|p| p.to_string_lossy().into_owned());
+    // A zero CRC means "unknown" here, so omit it rather than show a misleading 0.
     let checksum = checksum
         .or_else(|| us.archive_checksum(&name))
         .filter(|&c| c != 0)
@@ -215,10 +232,50 @@ fn archive(us: &Unitsync, name: String, checksum: Option<u32>) -> Archive {
         name,
         path,
         checksum,
+        size,
     }
 }
 
-fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
+/// On-disk size of an archive: file length, or recursive total for a `.sdd` dir.
+fn entry_size(p: &Path) -> Option<u64> {
+    let md = std::fs::metadata(p).ok()?;
+    if md.is_dir() {
+        Some(dir_size(p))
+    } else {
+        Some(md.len())
+    }
+}
+
+fn dir_size(p: &Path) -> u64 {
+    let mut total = 0;
+    if let Ok(entries) = std::fs::read_dir(p) {
+        for e in entries.flatten() {
+            match e.metadata() {
+                Ok(md) if md.is_dir() => total += dir_size(&e.path()),
+                Ok(md) => total += md.len(),
+                Err(_) => {}
+            }
+        }
+    }
+    total
+}
+
+/// Build config options from the global table set by the most recent
+/// `GetMapOptionCount` / `GetModOptionCount` call.
+pub(crate) fn read_options(us: &Unitsync, count: i32) -> Vec<ConfigOption> {
+    (0..count)
+        .filter_map(|i| {
+            let key = us.option_key(i)?;
+            Some(ConfigOption {
+                name: us.option_name(i).unwrap_or_else(|| key.clone()),
+                description: us.option_desc(i),
+                key,
+            })
+        })
+        .collect()
+}
+
+fn collect_maps(us: &Unitsync, errors: &mut Vec<String>) -> Vec<MapItem> {
     let count = us.map_count();
     let mut maps = Vec::with_capacity(count.max(0) as usize);
     for i in 0..count {
@@ -231,6 +288,9 @@ fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
             .map(|a| archive(us, a, None))
             .collect();
         let dims = us.map_dimensions(&name);
+        // Read options last: the GetOption* accessors read a global set by
+        // GetMapOptionCount, so populate and consume it back-to-back.
+        let options = read_options(us, us.map_option_count(&name));
         maps.push(MapItem {
             file_name: us.map_file_name(i),
             checksum: us.map_checksum(i).map(|c| format!("{c:08x}")),
@@ -238,13 +298,15 @@ fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
             info: us.map_info(i),
             width: dims.map(|(w, _)| w),
             height: dims.map(|(_, h)| h),
-            name,
+            options,
+            name: name.clone(),
         });
+        drain_attributed(us, &name, errors);
     }
     maps
 }
 
-fn collect_games(us: &Unitsync) -> Vec<GameItem> {
+fn collect_games(us: &Unitsync, errors: &mut Vec<String>) -> Vec<GameItem> {
     let count = us.mod_count();
     let mut games = Vec::with_capacity(count.max(0) as usize);
     for i in 0..count {
@@ -269,12 +331,13 @@ fn collect_games(us: &Unitsync) -> Vec<GameItem> {
             .collect();
 
         games.push(GameItem {
-            name,
+            name: name.clone(),
             checksum: checksum.map(|c| format!("{c:08x}")),
             primary_archive,
             dependency_archives,
             info,
         });
+        drain_attributed(us, &name, errors);
     }
     games
 }

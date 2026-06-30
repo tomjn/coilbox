@@ -15,7 +15,7 @@
 use libloading::{Library, Symbol};
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_uint};
+use std::os::raw::{c_char, c_float, c_int, c_uint};
 use std::path::Path;
 
 // --- C ABI signatures (reused across same-shaped symbols) -------------------
@@ -35,6 +35,8 @@ type MinimapFn = unsafe extern "C" fn(*const c_char, c_int) -> *const u16; // Ge
 type InfoMapSizeFn =
     unsafe extern "C" fn(*const c_char, *const c_char, *mut c_int, *mut c_int) -> c_int;
 type StrArgVoidFn = unsafe extern "C" fn(*const c_char); // AddAllArchives(name)
+type LpOpenFn = unsafe extern "C" fn(*const c_char, *const c_char, *const c_char) -> c_int; // lpOpenFile
+type FloatByStrFloatFn = unsafe extern "C" fn(*const c_char, c_float) -> c_float; // lpGetStrKeyFloatVal
 
 /// Copy a library-owned C string into an owned `String`. Null -> `None`.
 pub(crate) unsafe fn cstr(p: *const c_char) -> Option<String> {
@@ -87,6 +89,23 @@ pub struct Unitsync {
     unit_count_fn: Option<CountFn>,
     unit_name_fn: Option<StrByIntFn>,
     full_unit_name_fn: Option<StrByIntFn>,
+    // options (map: by name; mod: current loaded game) + shared accessors
+    map_option_count_fn: Option<IntByStrFn>,
+    mod_option_count_fn: Option<CountFn>,
+    option_key_fn: Option<StrByIntFn>,
+    option_name_fn: Option<StrByIntFn>,
+    option_desc_fn: Option<StrByIntFn>,
+    // Lua parser (parse mapinfo.lua from the VFS for start positions)
+    lp_open_file_fn: Option<LpOpenFn>,
+    lp_execute_fn: Option<CountFn>,
+    lp_close_fn: Option<VoidFn>,
+    lp_root_table_fn: Option<CountFn>,
+    lp_sub_table_str_fn: Option<IntByStrFn>,
+    lp_sub_table_int_fn: Option<IntByIntFn>,
+    lp_pop_table_fn: Option<VoidFn>,
+    lp_int_key_list_count_fn: Option<CountFn>,
+    lp_int_key_list_entry_fn: Option<IntByIntFn>,
+    lp_str_key_float_val_fn: Option<FloatByStrFloatFn>,
 }
 
 unsafe fn req<T: Copy>(lib: &Library, name: &[u8]) -> Result<T, String> {
@@ -142,6 +161,21 @@ impl Unitsync {
             unit_count_fn: opt(&lib, b"GetUnitCount\0"),
             unit_name_fn: opt(&lib, b"GetUnitName\0"),
             full_unit_name_fn: opt(&lib, b"GetFullUnitName\0"),
+            map_option_count_fn: opt(&lib, b"GetMapOptionCount\0"),
+            mod_option_count_fn: opt(&lib, b"GetModOptionCount\0"),
+            option_key_fn: opt(&lib, b"GetOptionKey\0"),
+            option_name_fn: opt(&lib, b"GetOptionName\0"),
+            option_desc_fn: opt(&lib, b"GetOptionDesc\0"),
+            lp_open_file_fn: opt(&lib, b"lpOpenFile\0"),
+            lp_execute_fn: opt(&lib, b"lpExecute\0"),
+            lp_close_fn: opt(&lib, b"lpClose\0"),
+            lp_root_table_fn: opt(&lib, b"lpRootTable\0"),
+            lp_sub_table_str_fn: opt(&lib, b"lpSubTableStr\0"),
+            lp_sub_table_int_fn: opt(&lib, b"lpSubTableInt\0"),
+            lp_pop_table_fn: opt(&lib, b"lpPopTable\0"),
+            lp_int_key_list_count_fn: opt(&lib, b"lpGetIntKeyListCount\0"),
+            lp_int_key_list_entry_fn: opt(&lib, b"lpGetIntKeyListEntry\0"),
+            lp_str_key_float_val_fn: opt(&lib, b"lpGetStrKeyFloatVal\0"),
             _lib: lib,
         };
         Ok(us)
@@ -366,5 +400,117 @@ impl Unitsync {
         self.full_unit_name_fn
             .and_then(|f| unsafe { cstr(f(i)) })
             .filter(|s| !s.is_empty())
+    }
+
+    // ---- options ----------------------------------------------------------
+    //
+    // The `GetOption*` accessors read a global table populated by the most recent
+    // `GetMapOptionCount` / `GetModOptionCount` call, so read them right after.
+
+    pub fn map_option_count(&self, map_name: &str) -> i32 {
+        let (Some(f), Ok(c)) = (self.map_option_count_fn, CString::new(map_name)) else {
+            return 0;
+        };
+        unsafe { f(c.as_ptr()) }
+    }
+
+    pub fn mod_option_count(&self) -> i32 {
+        self.mod_option_count_fn
+            .map(|f| unsafe { f() })
+            .unwrap_or(0)
+    }
+
+    pub fn option_key(&self, i: i32) -> Option<String> {
+        self.option_key_fn
+            .and_then(|f| unsafe { cstr(f(i)) })
+            .filter(|s| !s.is_empty())
+    }
+
+    pub fn option_name(&self, i: i32) -> Option<String> {
+        self.option_name_fn
+            .and_then(|f| unsafe { cstr(f(i)) })
+            .filter(|s| !s.is_empty())
+    }
+
+    pub fn option_desc(&self, i: i32) -> Option<String> {
+        self.option_desc_fn
+            .and_then(|f| unsafe { cstr(f(i)) })
+            .filter(|s| !s.is_empty())
+    }
+
+    // ---- start positions --------------------------------------------------
+
+    /// Parse `mapinfo.lua` from the VFS (the calling code must have added the
+    /// map's archives) and extract team start positions as `(x, z)` world coords
+    /// from `teams[i].startPos`. Uses unitsync's own Lua parser so it handles the
+    /// archive VFS and any includes. Empty if unavailable or the map has none.
+    pub fn start_positions(&self) -> Vec<(f32, f32)> {
+        let (
+            Some(open),
+            Some(execute),
+            Some(close),
+            Some(root),
+            Some(sub_str),
+            Some(sub_int),
+            Some(pop),
+            Some(int_count),
+            Some(int_entry),
+            Some(float_val),
+        ) = (
+            self.lp_open_file_fn,
+            self.lp_execute_fn,
+            self.lp_close_fn,
+            self.lp_root_table_fn,
+            self.lp_sub_table_str_fn,
+            self.lp_sub_table_int_fn,
+            self.lp_pop_table_fn,
+            self.lp_int_key_list_count_fn,
+            self.lp_int_key_list_entry_fn,
+            self.lp_str_key_float_val_fn,
+        )
+        else {
+            return Vec::new();
+        };
+
+        // "rmMbe" = unitsync's SPRING_VFS_ALL — search raw + map + mod + base, so
+        // mapinfo.lua resolves inside the added archive (not just the filesystem).
+        let (Ok(file), Ok(modes), Ok(x_key), Ok(z_key)) = (
+            CString::new("mapinfo.lua"),
+            CString::new("rmMbe"),
+            CString::new("x"),
+            CString::new("z"),
+        ) else {
+            return Vec::new();
+        };
+        let teams_key = CString::new("teams").unwrap_or_default();
+        let startpos_key = CString::new("startPos").unwrap_or_default();
+
+        let mut positions = Vec::new();
+        unsafe {
+            if open(file.as_ptr(), modes.as_ptr(), modes.as_ptr()) == 0 {
+                return Vec::new();
+            }
+            execute();
+            if root() != 0 && sub_str(teams_key.as_ptr()) != 0 {
+                let count = int_count();
+                for i in 0..count {
+                    let key = int_entry(i);
+                    if sub_int(key) != 0 {
+                        if sub_str(startpos_key.as_ptr()) != 0 {
+                            let x = float_val(x_key.as_ptr(), f32::MIN);
+                            let z = float_val(z_key.as_ptr(), f32::MIN);
+                            if x > f32::MIN && z > f32::MIN {
+                                positions.push((x, z));
+                            }
+                            pop(); // startPos
+                        }
+                        pop(); // teams[i]
+                    }
+                }
+                pop(); // teams
+            }
+            close();
+        }
+        positions
     }
 }

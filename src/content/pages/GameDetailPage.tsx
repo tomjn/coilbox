@@ -1,11 +1,16 @@
-import { ArrowLeft } from "lucide-react";
+import { Button } from "@picoframe/frame";
+import { ArrowLeft, FolderOpen } from "lucide-react";
 import { Link, useParams } from "react-router";
+import { type Archive, contentOpenPath } from "../bindings";
 import {
   useScanTargetSelection,
   useUnitsyncGameInfo,
   useUnitsyncScan,
 } from "../config";
+import { isSdd } from "../format";
 import { ArchiveRow } from "./components/ArchiveRow";
+import { OptionsList } from "./components/OptionsList";
+import { SddBadge } from "./components/SddBadge";
 import { DetailLoading, NotFound } from "./components/states";
 
 /** Keys surfaced in the headline; everything else goes in the metadata table. */
@@ -37,6 +42,13 @@ export default function GameDetailPage() {
     ([k]) => !HEADLINE_KEYS.has(k),
   );
 
+  const openFolder = (a: Archive) => {
+    if (!a.path) return;
+    // A .sdd path is the folder itself; otherwise open the containing folder.
+    const target = isSdd(a) ? a.path : a.path.replace(/[\\/][^\\/]*$/, "");
+    contentOpenPath({ path: target }).catch(() => {});
+  };
+
   return (
     <div className="flex flex-col gap-5 p-4">
       <header className="flex flex-col gap-1">
@@ -46,7 +58,10 @@ export default function GameDetailPage() {
         >
           <ArrowLeft className="size-3.5" /> Games
         </Link>
-        <h1 className="break-words text-lg font-semibold">{game.name}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="break-words text-lg font-semibold">{game.name}</h1>
+          {isSdd(game.primaryArchive) && <SddBadge />}
+        </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {game.info.version && <span>v{game.info.version}</span>}
           {game.info.shortname && (
@@ -107,8 +122,22 @@ export default function GameDetailPage() {
         </section>
       )}
 
+      <OptionsList options={gameInfo?.options ?? []} title="Game options" />
+
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">Primary archive</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-medium">Primary archive</h2>
+          {game.primaryArchive.path && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => openFolder(game.primaryArchive)}
+            >
+              <FolderOpen className="size-4" /> Open folder
+            </Button>
+          )}
+        </div>
         <ul>
           <ArchiveRow archive={game.primaryArchive} />
         </ul>

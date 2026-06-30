@@ -138,10 +138,19 @@ export const contentOpenPath = defineCommand<{ path: string }, unknown>(
 /** An archive (`.sdz`/`.sd7`/`.sdd`) backing a map or game. */
 export interface Archive {
   name: string;
-  /** On-disk path, when the engine build exposes it. */
+  /** Full on-disk path, when the archive name resolves (game primary archives). */
   path?: string;
   /** Hex CRC, when a checksum accessor is available. */
   checksum?: string;
+  /** On-disk size in bytes, when the path resolves. */
+  size?: number;
+}
+
+/** A map or game configuration option. */
+export interface ConfigOption {
+  key: string;
+  name: string;
+  description?: string;
 }
 
 export interface MapItem {
@@ -154,6 +163,8 @@ export interface MapItem {
   /** Map proportions; the ratio is the true aspect ratio for undistorted display. */
   width?: number;
   height?: number;
+  /** Map options (from mapoptions.lua). */
+  options: ConfigOption[];
 }
 
 export interface GameItem {
@@ -178,6 +189,8 @@ export interface Side {
 export interface GameInfoResult {
   sides: Side[];
   unitCount: number;
+  /** Game options (from modoptions.lua). */
+  options: ConfigOption[];
   errors: string[];
 }
 
@@ -209,10 +222,18 @@ export const unitsyncScan = defineCommand<
   ScanResult
 >("coilbox-unitsync", "unitsync_scan");
 
+/** A team start position in map world coordinates (elmos). */
+export interface StartPos {
+  x: number;
+  z: number;
+}
+
 export interface MinimapResult {
   /** PNG `data:` URL ready for an `<img src>`, when the map has a minimap. */
   dataUrl?: string;
   side?: number;
+  /** Team start positions, for overlaying on the minimap. */
+  startPositions: StartPos[];
   errors: string[];
 }
 
