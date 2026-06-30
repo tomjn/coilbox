@@ -1,3 +1,9 @@
+## Before Creating PRs
+
+ - Make sure to give the user an opportunity to test via `bun tauri dev`
+ - ensure any new GUIs are actually wired into the GUI and can be reached by the user
+ - This is not a website so the chrome MCP will not be useful to you. There is a Tauri MCP
+
 ## PR's
 
 Before pushing, run the **full** lint suite locally and confirm it passes. CI
