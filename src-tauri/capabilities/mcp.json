@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "mcp",
+  "description": "Dev-only: grants the MCP plugin's default commands (console-log forwarding) to the main window. Inert in release builds where the plugin is not registered.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "mcp:default"
+  ]
+}

@@ -19,3 +19,10 @@ tauri-plugin-coilbox-content = { path = "../crates/tauri-plugin-coilbox-content"
 tauri-plugin-coilbox-unitsync = { path = "../crates/tauri-plugin-coilbox-unitsync" }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+# Dev-only AI-agent bridge: runs an MCP socket server so agents can screenshot/
+# drive the app. tomjn fork carries a macOS window-finding fix not yet upstream.
+# Always compiled, but only initialised under `#[cfg(debug_assertions)]` in main.rs.
+# Pinned to the branch carrying the macOS capture-by-window-id fix, which is not
+# yet merged to the fork's default branch. Capture targets Coilbox's own window
+# (by PID/window id) rather than whatever is frontmost.
+tauri-plugin-mcp = { git = "https://github.com/tomjn/tauri-plugin-mcp", branch = "fix/screenshot-by-window-id" }

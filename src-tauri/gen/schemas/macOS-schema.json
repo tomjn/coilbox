@@ -3111,6 +3111,24 @@
           "markdownDescription": "Denies the save command without any pre-configured scope."
         },
         {
+          "description": "Allows the webview to forward console.* logs to the plugin's ring buffer.\n#### This default permission set includes:\n\n- `allow-push-log`",
+          "type": "string",
+          "const": "mcp:default",
+          "markdownDescription": "Allows the webview to forward console.* logs to the plugin's ring buffer.\n#### This default permission set includes:\n\n- `allow-push-log`"
+        },
+        {
+          "description": "Enables the push_log command without any pre-configured scope.",
+          "type": "string",
+          "const": "mcp:allow-push-log",
+          "markdownDescription": "Enables the push_log command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the push_log command without any pre-configured scope.",
+          "type": "string",
+          "const": "mcp:deny-push-log",
+          "markdownDescription": "Denies the push_log command without any pre-configured scope."
+        },
+        {
           "description": "This permission set allows opening `mailto:`, `tel:`, `https://` and `http://` urls using their default application\nas well as reveal file in directories using default file explorer\n#### This default permission set includes:\n\n- `allow-open-url`\n- `allow-reveal-item-in-dir`\n- `allow-default-urls`",
           "type": "string",
           "const": "opener:default",

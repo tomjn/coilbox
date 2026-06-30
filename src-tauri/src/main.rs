@@ -87,6 +87,19 @@ fn main() {
     builder = builder.plugin(tauri_plugin_coilbox_content::init());
     builder = builder.plugin(tauri_plugin_coilbox_unitsync::init());
     // picoframe:plugins-end
+
+    // Dev-only: expose an MCP socket server so AI agents can drive the app
+    // (screenshots, DOM, input). The `tauri-mcp` server in .mcp.json connects
+    // over this socket. Never registered in release builds.
+    #[cfg(debug_assertions)]
+    {
+        builder = builder.plugin(tauri_plugin_mcp::init_with_config(
+            tauri_plugin_mcp::PluginConfig::new("Coilbox".to_string())
+                .start_socket_server(true)
+                .socket_path("/tmp/tauri-mcp.sock".into()),
+        ));
+    }
+
     builder
         .run(tauri::generate_context!())
         .expect("error while running coilbox");
