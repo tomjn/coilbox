@@ -55,13 +55,13 @@ export function LuaConsoleDrawer({
       </Button>
 
       {result?.error != null && (
-        <pre className="overflow-auto whitespace-pre-wrap break-words rounded-md border border-destructive/40 bg-destructive/10 p-3 font-mono text-xs text-destructive">
+        <pre className="max-h-[20rem] overflow-auto whitespace-pre-wrap break-words rounded-md border border-destructive/40 bg-destructive/10 p-3 font-mono text-xs text-destructive">
           {result.error}
         </pre>
       )}
 
       {result?.result != null && (
-        <pre className="overflow-auto whitespace-pre-wrap break-words rounded-md border border-border/50 bg-card p-3 font-mono text-xs">
+        <pre className="max-h-[20rem] overflow-auto whitespace-pre-wrap break-words rounded-md border border-border/50 bg-card p-3 font-mono text-xs">
           {result.result}
         </pre>
       )}
@@ -72,8 +72,9 @@ export function LuaConsoleDrawer({
             Diagnostics ({result.errors.length})
           </summary>
           <ul className="mt-1 flex flex-col gap-1 font-mono">
-            {result.errors.map((e) => (
-              <li key={e}>{e}</li>
+            {result.errors.map((e, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: diagnostics are append-only and never reordered
+              <li key={i}>{e}</li>
             ))}
           </ul>
         </details>
