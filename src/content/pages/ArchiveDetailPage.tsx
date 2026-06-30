@@ -1,5 +1,5 @@
-import { Button } from "@picoframe/frame";
-import { ArrowLeft, FolderOpen } from "lucide-react";
+import { Button, useDrawer } from "@picoframe/frame";
+import { ArrowLeft, FolderOpen, Terminal } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { type Archive, contentOpenPath } from "../bindings";
@@ -14,6 +14,7 @@ import { ArchiveRow } from "./components/ArchiveRow";
 import { ArchiveTree } from "./components/ArchiveTree";
 import { ArchiveTypeBadge, PrimaryBadge } from "./components/ArchiveTypeBadge";
 import { FilePreview } from "./components/FilePreview";
+import { LuaConsoleDrawer } from "./components/LuaConsoleDrawer";
 import { SddBadge } from "./components/SddBadge";
 import { DetailLoading, NotFound } from "./components/states";
 
@@ -25,6 +26,7 @@ export default function ArchiveDetailPage() {
   const { name } = useParams();
   const decoded = name ? decodeURIComponent(name) : "";
   const navigate = useNavigate();
+  const drawer = useDrawer();
   const { selected } = useScanTargetSelection();
   const { archives, data, loading } = useArchives(
     selected?.enginePath,
@@ -97,6 +99,29 @@ export default function ArchiveDetailPage() {
           {archive.primary && <PrimaryBadge />}
           <ArchiveTypeBadge kind={archive.kind} />
           <div className="ml-auto flex shrink-0 gap-2">
+            {selected?.enginePath && selected?.rootPath && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() =>
+                  drawer.open({
+                    title: "Lua Console",
+                    description: `Run Lua through ${archive.name} via unitsync.`,
+                    width: "40rem",
+                    content: (
+                      <LuaConsoleDrawer
+                        enginePath={selected.enginePath}
+                        dataDir={selected.rootPath}
+                        archive={archive.name}
+                      />
+                    ),
+                  })
+                }
+              >
+                <Terminal className="size-4" /> Lua Console
+              </Button>
+            )}
             {linked && (
               <Button
                 size="sm"
