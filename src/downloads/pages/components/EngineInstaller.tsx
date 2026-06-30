@@ -1,8 +1,10 @@
 import { Button, cn } from "@picoframe/frame";
+import { Channel } from "@tauri-apps/api/core";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { contentRescan } from "../../../content/bindings";
 import {
+  type DownloadProgress,
   dlDownloadEngineRecoil,
   dlDownloadEngineSpring,
   dlRecoilEngines,
@@ -10,6 +12,7 @@ import {
 } from "../../bindings";
 import { useWriteRootPath } from "../../config";
 import { OptionSelect } from "./OptionSelect";
+import { ProgressBar } from "./ProgressBar";
 import { errMessage } from "./states";
 
 /** Human-readable byte size for engine archives. */
@@ -50,6 +53,7 @@ export function EngineInstaller() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
     null,
   );
@@ -97,7 +101,10 @@ export function EngineInstaller() {
   async function download(item: EngineItem) {
     if (!writePath) return;
     setDownloading(item.key);
+    setProgress(null);
     setResult(null);
+    const onProgress = new Channel<DownloadProgress>();
+    onProgress.onmessage = (p) => setProgress(p);
     try {
       const { message } =
         source === "recoil"
@@ -105,8 +112,13 @@ export function EngineInstaller() {
               version: item.key,
               assetUrl: item.assetUrl ?? "",
               writePath,
+              onProgress,
             })
-          : await dlDownloadEngineSpring({ version: item.key, writePath });
+          : await dlDownloadEngineSpring({
+              version: item.key,
+              writePath,
+              onProgress,
+            });
       setResult({ ok: true, message });
       // Rescan content so the freshly-installed engine appears in the list above.
       try {
@@ -118,6 +130,7 @@ export function EngineInstaller() {
       setResult({ ok: false, message: errMessage(e) });
     } finally {
       setDownloading(null);
+      setProgress(null);
     }
   }
 
@@ -166,47 +179,49 @@ export function EngineInstaller() {
       {items && items.length > 0 && (
         <ul className="max-h-80 divide-y divide-border overflow-auto rounded-md border border-border">
           {items.map((item) => (
-            <li
-              key={item.key}
-              className="flex items-center justify-between gap-3 px-4 py-2"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {item.title}
-                  {item.prerelease && (
-                    <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-                      pre-release
-                    </span>
+            <li key={item.key} className="flex flex-col gap-2 px-4 py-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {item.title}
+                    {item.prerelease && (
+                      <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
+                        pre-release
+                      </span>
+                    )}
+                  </p>
+                  {item.detail && (
+                    <p
+                      className="truncate font-mono text-xs text-muted-foreground"
+                      title={item.detail}
+                    >
+                      {item.detail}
+                    </p>
                   )}
-                </p>
-                {item.detail && (
-                  <p
-                    className="truncate font-mono text-xs text-muted-foreground"
-                    title={item.detail}
-                  >
-                    {item.detail}
-                  </p>
-                )}
-                {item.subtitle && (
-                  <p className="text-xs text-muted-foreground">
-                    {item.subtitle}
-                  </p>
-                )}
+                  {item.subtitle && (
+                    <p className="text-xs text-muted-foreground">
+                      {item.subtitle}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => download(item)}
+                  disabled={downloading !== null || !writePath}
+                  aria-label={`Download engine ${item.title}`}
+                >
+                  {downloading === item.key ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Download />
+                  )}
+                  {downloading === item.key ? "Installing…" : "Download"}
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => download(item)}
-                disabled={downloading !== null || !writePath}
-                aria-label={`Download engine ${item.title}`}
-              >
-                {downloading === item.key ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <Download />
-                )}
-                {downloading === item.key ? "Installing…" : "Download"}
-              </Button>
+              {downloading === item.key && progress && (
+                <ProgressBar progress={progress} />
+              )}
             </li>
           ))}
         </ul>
