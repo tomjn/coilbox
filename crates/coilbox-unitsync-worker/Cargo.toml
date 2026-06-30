@@ -22,3 +22,9 @@ base64 = "0.22"
 # Shared dependency-free on-disk byte cache: persist rendered minimap PNGs so they
 # aren't re-rendered every launch.
 coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
+
+[dev-dependencies]
+# Stock Lua 5.1 used ONLY to unit-test the injected serializer + wrapper against a
+# faithful interpreter (the real test target, unitsync's LuaParser, needs a live
+# libunitsync and is exercised manually).
+mlua = { version = "0.11", features = ["lua51", "vendored"] }

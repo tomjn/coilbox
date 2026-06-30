@@ -196,6 +196,20 @@ pub struct ArchiveFileOutput {
     pub errors: Vec<String>,
 }
 
+/// `--lua` mode output. `result` is the pretty-printed value the script returned
+/// (set on success); `error` is a compile/runtime error from the Lua parser (set
+/// on failure). Exactly one of the two is normally set. `errors` carries
+/// non-fatal unitsync diagnostics (e.g. archive-mount warnings).
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LuaExecOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub errors: Vec<String>,
+}
+
 /// Output of the `--archive --file --extract` (download) mode: the number of
 /// bytes written to the destination path, plus any diagnostics.
 #[derive(Serialize, Default)]
