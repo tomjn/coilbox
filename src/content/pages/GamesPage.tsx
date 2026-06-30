@@ -10,6 +10,7 @@ import {
   EmptyState,
   ErrorBanner,
   SkeletonList,
+  WarningIcon,
 } from "./components/states";
 
 type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
@@ -121,6 +122,9 @@ export default function GamesPage() {
                   <div className="flex items-center gap-1.5">
                     <p className="truncate font-medium">{g.name}</p>
                     {isSdd(g.primaryArchive) && <SddBadge />}
+                    {g.warnings?.length ? (
+                      <WarningIcon warnings={g.warnings} />
+                    ) : null}
                   </div>
                   <p className="truncate font-mono text-xs text-muted-foreground">
                     {g.primaryArchive.name}

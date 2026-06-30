@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, Inbox } from "lucide-react";
+import { AlertCircle, ArrowLeft, Inbox, TriangleAlert } from "lucide-react";
 import { Link } from "react-router";
 
 /** Inline error banner (matches the content settings pages). */
@@ -27,6 +27,54 @@ export function Diagnostics({ errors }: { errors: string[] }) {
         ))}
       </ul>
     </details>
+  );
+}
+
+/**
+ * Small amber glyph for a list item that has unitsync warnings. The warning
+ * text is surfaced on hover; the detail page shows the full banner.
+ */
+export function WarningIcon({ warnings }: { warnings: string[] }) {
+  return (
+    <span
+      title={warnings.join("\n")}
+      className="inline-flex shrink-0 text-amber-600 dark:text-amber-400"
+    >
+      <TriangleAlert
+        className="size-3.5"
+        aria-label={`${warnings.length} unitsync warning${
+          warnings.length === 1 ? "" : "s"
+        }`}
+      />
+    </span>
+  );
+}
+
+/** Amber banner listing the unitsync warnings for a single map or game. */
+export function WarningBanner({
+  warnings,
+  noun,
+}: {
+  warnings: string[];
+  noun: string;
+}) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+      <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="font-medium text-amber-700 dark:text-amber-400">
+          unitsync reported {warnings.length} warning
+          {warnings.length === 1 ? "" : "s"} for this {noun}
+        </span>
+        <ul className="flex flex-col gap-1 font-mono text-xs text-muted-foreground">
+          {warnings.map((w) => (
+            <li key={w} className="break-words">
+              {w}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 

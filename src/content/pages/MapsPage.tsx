@@ -13,6 +13,7 @@ import {
   EmptyState,
   ErrorBanner,
   SkeletonList,
+  WarningIcon,
 } from "./components/states";
 
 type SortKey = "name-asc" | "name-desc" | "area-desc" | "area-asc";
@@ -141,9 +142,17 @@ export default function MapsPage() {
                     loading={thumbsLoading && !thumb}
                   />
                   <div className="flex flex-col gap-0.5 p-2">
-                    <p className="truncate text-sm font-medium" title={m.name}>
-                      {m.name}
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <p
+                        className="truncate text-sm font-medium"
+                        title={m.name}
+                      >
+                        {m.name}
+                      </p>
+                      {m.warnings?.length ? (
+                        <WarningIcon warnings={m.warnings} />
+                      ) : null}
+                    </div>
                     <p className="truncate text-xs text-muted-foreground">
                       {[size, archiveLabel].filter(Boolean).join(" · ")}
                     </p>

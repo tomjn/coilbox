@@ -12,7 +12,7 @@ import { isSdd } from "../format";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { OptionsList } from "./components/OptionsList";
 import { SddBadge } from "./components/SddBadge";
-import { DetailLoading, NotFound } from "./components/states";
+import { DetailLoading, NotFound, WarningBanner } from "./components/states";
 
 /** Keys surfaced in the headline; everything else goes in the metadata table. */
 const HEADLINE_KEYS = new Set(["name", "shortname", "version", "description"]);
@@ -78,6 +78,10 @@ export default function GameDetailPage() {
           </p>
         )}
       </header>
+
+      {game.warnings?.length ? (
+        <WarningBanner warnings={game.warnings} noun="game" />
+      ) : null}
 
       {otherInfo.length > 0 && (
         <section className="flex flex-col gap-2">

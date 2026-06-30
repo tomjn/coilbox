@@ -56,6 +56,9 @@ pub struct MapItem {
     pub height: Option<u32>,
     /// Map options (from mapoptions.lua), when present.
     pub options: Vec<ConfigOption>,
+    /// Non-fatal unitsync diagnostics attributed to this map during the scan.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }
 
 /// One map thumbnail in the batch `thumbnails` output.
@@ -101,6 +104,9 @@ pub struct GameItem {
     pub dependency_archives: Vec<Archive>,
     /// modinfo metadata (name, shortname, version, description, ...).
     pub info: BTreeMap<String, String>,
+    /// Non-fatal unitsync diagnostics attributed to this game during the scan.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }
 
 /// A faction/side of a game, with its commander/start unit.

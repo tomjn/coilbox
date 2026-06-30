@@ -9,7 +9,7 @@ import {
 import { ArchiveRow } from "./components/ArchiveRow";
 import { mapSizeLabel } from "./components/MapThumb";
 import { OptionsList } from "./components/OptionsList";
-import { DetailLoading, NotFound } from "./components/states";
+import { DetailLoading, NotFound, WarningBanner } from "./components/states";
 
 /** Keys shown in the headline; everything else goes in the metadata table. */
 const HEADLINE_KEYS = new Set(["name", "description"]);
@@ -73,6 +73,10 @@ export default function MapDetailPage() {
           </p>
         )}
       </header>
+
+      {map.warnings?.length ? (
+        <WarningBanner warnings={map.warnings} noun="map" />
+      ) : null}
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium">
