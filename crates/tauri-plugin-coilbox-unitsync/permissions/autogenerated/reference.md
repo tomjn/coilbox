@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows the unitsync plugin's content-scan, minimap and thumbnail commands.
+Allows the unitsync plugin's content-scan, minimap, thumbnail, game-info and engine-config commands.
 
 #### This default permission set includes the following:
 
@@ -8,6 +8,7 @@ Allows the unitsync plugin's content-scan, minimap and thumbnail commands.
 - `allow-unitsync-minimap`
 - `allow-unitsync-thumbnails`
 - `allow-unitsync-game-info`
+- `allow-unitsync-engine-config`
 
 ## Permission Table
 
@@ -17,6 +18,32 @@ Allows the unitsync plugin's content-scan, minimap and thumbnail commands.
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-engine-config`
+
+</td>
+<td>
+
+Enables the unitsync_engine_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-engine-config`
+
+</td>
+<td>
+
+Denies the unitsync_engine_config command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>

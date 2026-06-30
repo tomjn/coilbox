@@ -1,6 +1,13 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Boxes, FolderTree, Gamepad2, Map as MapIcon } from "lucide-react";
+import {
+  Boxes,
+  FolderTree,
+  Gamepad2,
+  Map as MapIcon,
+  SlidersHorizontal,
+} from "lucide-react";
 import ContentStartupProvider from "./ContentStartupProvider";
+import EngineSettingsSection from "./pages/EngineSettingsSection";
 import EnginesSection from "./pages/EnginesSection";
 import FoldersSection from "./pages/FoldersSection";
 
@@ -8,9 +15,11 @@ import FoldersSection from "./pages/FoldersSection";
  * The content plugin's frontend half. It owns the **Content** sidebar section —
  * Maps and Games browsed from the installed engines via libunitsync (the
  * `tauri-plugin-coilbox-unitsync` worker) — and keeps two configuration-shaped
- * settings sections: Content Folders (Spring/Recoil data roots) and Engines
- * (installs found within them), at `/settings/content-folders` and
- * `/settings/engines`. (Replays etc. join the sidebar group later.) Pair with the
+ * settings sections: Content Folders (Spring/Recoil data roots), Engines
+ * (installs found within them), and Engine Settings (a curated, read-only view of
+ * `springsettings.cfg` via unitsync), at `/settings/content-folders`,
+ * `/settings/engines` and `/settings/engine-settings`. (Replays etc. join the
+ * sidebar group later.) Pair with the
  * `tauri-plugin-coilbox-content` crate (ACL id `coilbox-content`), whose persisted
  * state.json is the cross-plugin read API for where game content lives.
  *
@@ -81,6 +90,12 @@ const contentPlugin: FramePlugin = {
       title: "Engines",
       icon: Boxes,
       Component: EnginesSection,
+    },
+    {
+      id: "engine-settings",
+      title: "Engine Settings",
+      icon: SlidersHorizontal,
+      Component: EngineSettingsSection,
     },
   ],
 };

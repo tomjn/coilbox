@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-unitsync-engine-config"
+description = "Enables the unitsync_engine_config command without any pre-configured scope."
+commands.allow = ["unitsync_engine_config"]
+
+[[permission]]
+identifier = "deny-unitsync-engine-config"
+description = "Denies the unitsync_engine_config command without any pre-configured scope."
+commands.deny = ["unitsync_engine_config"]

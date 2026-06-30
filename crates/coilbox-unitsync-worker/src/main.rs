@@ -13,6 +13,7 @@
 //!
 //! Usage: `coilbox-unitsync-worker --lib <libunitsync.*> --datadir <content-root>`
 
+mod config;
 mod ffi;
 mod game;
 mod minimap;
@@ -32,6 +33,7 @@ struct Args {
     map: Option<String>,
     game: Option<String>,
     thumbnails: bool,
+    config: bool,
     mip: i32,
     /// Directory for the on-disk minimap/thumbnail PNG cache (minimap modes only).
     cache_dir: Option<String>,
@@ -96,6 +98,21 @@ fn run() -> i32 {
         };
     }
 
+    // Engine settings: read a curated set of config values (a separate, light
+    // unitsync session — no archive scan).
+    if args.config {
+        return match std::panic::catch_unwind(|| config::render(&args.lib)) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                config::emit_error("worker panicked while reading engine config".into());
+                1
+            }
+        };
+    }
+
     // Single minimap renders one map; default mode scans everything.
     if let Some(map) = args.map.clone() {
         return match std::panic::catch_unwind(|| {
@@ -134,6 +151,7 @@ fn parse_args() -> Result<Args, String> {
     let mut map = None;
     let mut game = None;
     let mut thumbnails = false;
+    let mut config = false;
     let mut mip = 1; // 512x512 by default
     let mut cache_dir = None;
     let mut it = std::env::args().skip(1);
@@ -145,6 +163,7 @@ fn parse_args() -> Result<Args, String> {
             "--game" => game = it.next(),
             "--thumbnails" => thumbnails = true,
             "--cache-dir" => cache_dir = it.next(),
+            "--config" => config = true,
             "--mip" => {
                 mip = it
                     .next()
@@ -160,6 +179,7 @@ fn parse_args() -> Result<Args, String> {
         map,
         game,
         thumbnails,
+        config,
         mip,
         cache_dir,
     })

@@ -103,6 +103,13 @@ pub fn build_game_args(lib: &str, datadir: &str, game: &str) -> Vec<String> {
     args
 }
 
+/// Build args for engine-config mode: scan args plus the `--config` flag.
+pub fn build_config_args(lib: &str, datadir: &str) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--config".into());
+    args
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -142,6 +149,13 @@ mod tests {
         assert_eq!(&with[with.len() - 2..], &["--cache-dir", "/cache/thumbs"]);
         let without = build_minimap_args("/eng/libunitsync.dylib", "/data", "Map v1", 1, None);
         assert!(!without.iter().any(|a| a == "--cache-dir"));
+    }
+
+    #[test]
+    fn build_config_args_appends_flag() {
+        let a = build_config_args("/eng/libunitsync.dylib", "/home/u/.spring");
+        assert_eq!(a.last(), Some(&"--config".to_string()));
+        assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
     }
 
     #[test]
