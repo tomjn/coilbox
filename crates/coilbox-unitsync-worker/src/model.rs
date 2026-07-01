@@ -84,6 +84,11 @@ pub struct MapItem {
 pub struct Thumbnail {
     pub name: String,
     pub data_url: String,
+    /// Map proportions (for undistorted minimap display); ratio = aspect ratio.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
 }
 
 /// Output of the batch `thumbnails` mode: a small minimap per map, one Init.

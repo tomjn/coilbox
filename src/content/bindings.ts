@@ -431,7 +431,12 @@ export const unitsyncHeightmap = defineCommand<
 >("coilbox-unitsync", "unitsync_heightmap");
 
 export interface ThumbnailsResult {
-  thumbnails: { name: string; dataUrl: string }[];
+  thumbnails: {
+    name: string;
+    dataUrl: string;
+    width?: number;
+    height?: number;
+  }[];
   errors: string[];
 }
 
