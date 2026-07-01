@@ -38,4 +38,11 @@ mod tests {
         let b = build_engine_args("/s.txt", Some(""));
         assert_eq!(b, vec!["/s.txt".to_string()]);
     }
+
+    #[test]
+    fn replay_demo_path_is_positional_last() {
+        // A replay reuses build_engine_args with the demo path in the script slot.
+        let a = build_engine_args("/data/demos/2026.sdfz", None);
+        assert_eq!(a, vec!["/data/demos/2026.sdfz".to_string()]);
+    }
 }

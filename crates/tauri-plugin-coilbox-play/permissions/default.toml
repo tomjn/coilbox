@@ -5,5 +5,6 @@ description = "Allows the play plugin's start-script generation, engine launch a
 permissions = [
   "allow-play-generate-script",
   "allow-play-launch",
+  "allow-play-launch-replay",
   "allow-play-cancel",
 ]

@@ -29,6 +29,7 @@ import {
   useUnitsyncMinimap,
 } from "../config";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
+import { WatchButton } from "./components/WatchButton";
 
 /** BAR maps live on the files-cdn search endpoint (replays here are BAR-dominant). */
 const BAR_SEARCH_URL = "https://files-cdn.beyondallreason.dev/find";
@@ -428,28 +429,33 @@ export default function ReplayDetailPage() {
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      <header className="flex flex-col gap-1">
-        <Link
-          to="/content/replays"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
-        >
-          <ArrowLeft className="size-3.5" /> Replays
-        </Link>
-        <h1 className="break-words text-lg font-semibold">
-          {info?.mapName || filename}
-        </h1>
-        <p className="break-all font-mono text-xs text-muted-foreground">
-          {filename}
-        </p>
-        {/* Action seams: Delete + Launch land in a later iteration. */}
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Button disabled title="Coming soon">
-            Launch
-          </Button>
-          <Button disabled title="Coming soon">
-            Delete
-          </Button>
+      <header className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <Link
+            to="/content/replays"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+          >
+            <ArrowLeft className="size-3.5" /> Replays
+          </Link>
+          <h1 className="break-words text-lg font-semibold">
+            {info?.mapName || filename}
+          </h1>
+          <p className="break-all font-mono text-xs text-muted-foreground">
+            {filename}
+          </p>
+          {/* Delete lands in a later iteration. */}
+          <div className="mt-2">
+            <Button disabled title="Coming soon">
+              Delete
+            </Button>
+          </div>
         </div>
+        {replay && info && (
+          <WatchButton
+            replayPath={replay.path}
+            engineVersion={info.engineVersion}
+          />
+        )}
       </header>
 
       {error && <ErrorBanner message={error} />}

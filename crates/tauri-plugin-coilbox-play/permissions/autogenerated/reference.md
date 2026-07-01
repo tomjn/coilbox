@@ -6,6 +6,7 @@ Allows the play plugin's start-script generation, engine launch and cancel comma
 
 - `allow-play-generate-script`
 - `allow-play-launch`
+- `allow-play-launch-replay`
 - `allow-play-cancel`
 
 ## Permission Table
@@ -91,6 +92,32 @@ Enables the play_launch command without any pre-configured scope.
 <td>
 
 Denies the play_launch command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:allow-play-launch-replay`
+
+</td>
+<td>
+
+Enables the play_launch_replay command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:deny-play-launch-replay`
+
+</td>
+<td>
+
+Denies the play_launch_replay command without any pre-configured scope.
 
 </td>
 </tr>

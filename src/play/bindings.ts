@@ -89,6 +89,22 @@ export const playLaunch = defineCommand<
   { exitCode: number | null }
 >("coilbox-play", "play_launch");
 
+/**
+ * Launch the engine to play back a demo (`.sdfz`). No start script is written —
+ * the engine reads map/game/players from the demo. Resolves when the engine
+ * exits. Shares the single-game guard with `playLaunch`.
+ */
+export const playLaunchReplay = defineCommand<
+  {
+    demoPath: string;
+    executable: string;
+    dataDir: string;
+    runId: string;
+    onEvent: Channel<LaunchEvent>;
+  },
+  { exitCode: number | null }
+>("coilbox-play", "play_launch_replay");
+
 /** Kill an in-flight game by run id. */
 export const playCancel = defineCommand<
   { runId: string },
