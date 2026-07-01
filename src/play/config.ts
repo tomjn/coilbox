@@ -1,3 +1,4 @@
+import { useSetting } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 import {
   type SkirmishAi,
@@ -118,6 +119,43 @@ export function useSkirmishAis(
   return { ais, loading };
 }
 
+/** Encode an AI reference to the persisted key (`kind:shortName`). */
+export const aiKey = (a: { kind: string; shortName: string }) =>
+  `${a.kind}:${a.shortName}`;
+
+/**
+ * Remember the last AI the user picked so new opponents default to it. Stored as
+ * an `aiKey` string; empty means "nothing picked yet".
+ */
+export function useLastAi() {
+  return useSetting<string>("play.lastAi", "");
+}
+
+/** Narrow a full `SkirmishAi` to the reference stored on a participant. */
+const toAiRef = (a?: SkirmishAi): Participant["ai"] | undefined =>
+  a ? { kind: a.kind, shortName: a.shortName, name: a.name } : undefined;
+
+/** Resolve a persisted `aiKey` against the current AI list, if still available. */
+export function resolveAi(
+  key: string,
+  ais: SkirmishAi[],
+): Participant["ai"] | undefined {
+  if (!key) return undefined;
+  const [kind, shortName] = key.split(/:(.*)/s);
+  return toAiRef(ais.find((a) => a.kind === kind && a.shortName === shortName));
+}
+
+/**
+ * The AI a new opponent should default to: the last one the user picked, or the
+ * first available AI when nothing's been picked yet (or the last pick is gone).
+ */
+export function defaultAi(
+  lastAi: string,
+  ais: SkirmishAi[],
+): Participant["ai"] | undefined {
+  return resolveAi(lastAi, ais) ?? toAiRef(ais[0]);
+}
+
 /* -------------------------------------------------------------------------- *
  * Participant model + derivation to a BattleConfig.
  * -------------------------------------------------------------------------- */
@@ -186,12 +224,14 @@ export function initialParticipants(): Participant[] {
 export function makeAiParticipant(
   existing: Participant[],
   defaultSide = "",
+  ai?: Participant["ai"],
 ): Participant {
   const aiCount = existing.filter((p) => p.kind === "ai").length;
   return {
     id: nextId(),
     kind: "ai",
     name: `AI ${aiCount + 1}`,
+    ai,
     side: defaultSide,
     color: PALETTE[existing.length % PALETTE.length],
     allyTeam: 1,
