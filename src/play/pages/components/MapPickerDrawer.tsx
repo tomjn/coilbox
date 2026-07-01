@@ -3,6 +3,7 @@ import { ImageOff, Search, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useMemo, useState } from "react";
 import type { MapItem } from "@/content/bindings";
+import type { MapThumbData } from "@/content/config";
 import { mapSizeLabel } from "@/content/pages/components/MapThumb";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,7 @@ export function MapPickerDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   maps: MapItem[];
-  thumbs: Map<string, string>;
+  thumbs: Map<string, MapThumbData>;
   selectedName: string;
   onSelect: (name: string) => void;
 }) {
@@ -100,7 +101,7 @@ export function MapPickerDrawer({
                     <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted/40">
                       {thumb ? (
                         <img
-                          src={thumb}
+                          src={thumb.dataUrl}
                           alt={`Minimap of ${m.name}`}
                           style={{
                             aspectRatio:

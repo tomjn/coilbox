@@ -330,33 +330,45 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
   return { data, loading, error, cancelled, run, cancel };
 }
 
+/** A rendered map thumbnail plus its true proportions (for undistorted display). */
+export interface MapThumbData {
+  dataUrl: string;
+  width?: number;
+  height?: number;
+}
+
 /** Session cache of batch thumbnails, keyed by `dataDir::enginePath`. */
-const thumbnailsCache = new Map<string, Map<string, string>>();
+const thumbnailsCache = new Map<string, Map<string, MapThumbData>>();
 
 /**
  * Render (or read from cache) every map's thumbnail for a target, populating
- * `thumbnailsCache` (name -> PNG data URL). Shared by the page hook and the
- * launch warm-up. The PNGs themselves are cached on disk by the worker, so this
- * is fast after the first run even across restarts.
+ * `thumbnailsCache` (name -> thumbnail + dimensions). Shared by the page hook and
+ * the launch warm-up. The PNGs themselves are cached on disk by the worker, so
+ * this is fast after the first run even across restarts.
  */
 export async function primeThumbnails(
   enginePath: string,
   dataDir: string,
   epoch = 0,
-): Promise<Map<string, string>> {
+): Promise<Map<string, MapThumbData>> {
   const key = `${dataDir}::${enginePath}::${epoch}`;
   const cached = thumbnailsCache.get(key);
   if (cached) return cached;
   const res = await unitsyncThumbnails({ enginePath, dataDir, mip: 3 });
-  const map = new Map(res.thumbnails.map((t) => [t.name, t.dataUrl]));
+  const map = new Map(
+    res.thumbnails.map((t) => [
+      t.name,
+      { dataUrl: t.dataUrl, width: t.width, height: t.height },
+    ]),
+  );
   thumbnailsCache.set(key, map);
   return map;
 }
 
-/** Lazily render and cache thumbnails for every map (name -> PNG data URL). */
+/** Lazily render and cache thumbnails for every map (name -> thumbnail + dims). */
 export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
   const epoch = useScanEpoch(enginePath, dataDir);
-  const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
+  const [thumbs, setThumbs] = useState<Map<string, MapThumbData>>(new Map());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {

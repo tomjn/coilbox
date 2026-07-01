@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { useState } from "react";
 import type { MapItem, StartPos } from "@/content/bindings";
+import type { MapThumbData } from "@/content/config";
 import { mapSizeLabel } from "@/content/pages/components/MapThumb";
 import { MapPickerDrawer } from "./MapPickerDrawer";
 import { MinimapPreview } from "./MinimapPreview";
@@ -28,7 +29,7 @@ export function MapCard({
 }: {
   map: MapItem | null;
   maps: MapItem[];
-  thumbs: Map<string, string>;
+  thumbs: Map<string, MapThumbData>;
   minimapDataUrl?: string | null;
   startPositions: StartPos[];
   minimapLoading?: boolean;

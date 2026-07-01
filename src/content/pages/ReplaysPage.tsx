@@ -161,7 +161,9 @@ export default function ReplaysPage() {
                 >
                   <div className="size-16 shrink-0 overflow-hidden rounded-md">
                     <MapThumb
-                      dataUrl={thumb}
+                      dataUrl={thumb?.dataUrl}
+                      width={thumb?.width}
+                      height={thumb?.height}
                       alt={r.mapName ? `Minimap of ${r.mapName}` : "Replay map"}
                       loading={!!r.mapName && thumbsLoading && !thumb}
                     />

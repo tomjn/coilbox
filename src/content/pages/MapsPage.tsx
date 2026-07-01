@@ -137,7 +137,7 @@ export default function MapsPage() {
               >
                 <Link to={`/content/maps/${encodeURIComponent(m.name)}`}>
                   <MapThumb
-                    dataUrl={thumb}
+                    dataUrl={thumb?.dataUrl}
                     width={m.width}
                     height={m.height}
                     alt={`Minimap of ${m.name}`}

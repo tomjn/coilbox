@@ -134,7 +134,15 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
         };
         let file = cache_file(cache_dir, map_cache_key(&us, &name).as_deref(), mip);
         match render_one(&us, &name, mip, file) {
-            Ok((data_url, _)) => thumbnails.push(Thumbnail { name, data_url }),
+            Ok((data_url, _)) => {
+                let dims = us.map_dimensions(&name);
+                thumbnails.push(Thumbnail {
+                    name,
+                    data_url,
+                    width: dims.map(|(w, _)| w),
+                    height: dims.map(|(_, h)| h),
+                });
+            }
             Err(e) => errors.push(format!("{name}: {e}")),
         }
     }
