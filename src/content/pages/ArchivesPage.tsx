@@ -20,11 +20,9 @@ import {
 export default function ArchivesPage() {
   const { targets, selected, selectedKey, setSelectedKey } =
     useScanTargetSelection();
-  const { archives, data, loading, error, run } = useArchives(
-    selected?.enginePath,
-    selected?.rootPath,
-  );
-  const busy = loading || (!!selected && !data && !error);
+  const { archives, data, loading, error, cancelled, run, cancel } =
+    useArchives(selected?.enginePath, selected?.rootPath);
+  const busy = loading || (!!selected && !data && !error && !cancelled);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -42,6 +40,7 @@ export default function ArchivesPage() {
         onSelect={setSelectedKey}
         onRescan={() => run(true)}
         scanning={loading}
+        onCancel={cancel}
       />
 
       {error && <ErrorBanner message={error} />}
@@ -49,6 +48,8 @@ export default function ArchivesPage() {
 
       {targets.length === 0 ? null : busy ? (
         <SkeletonList />
+      ) : cancelled && archives.length === 0 ? (
+        <EmptyState label="Scan cancelled. Press Rescan to load archives." />
       ) : archives.length === 0 ? (
         <EmptyState label="No archives found for this engine." />
       ) : (

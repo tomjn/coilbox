@@ -1,15 +1,12 @@
-import { Button, useSetting } from "@picoframe/frame";
+import { useSetting } from "@picoframe/frame";
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { contentRescan, contentStateLoad } from "./bindings";
 import {
-  cancelStartupScan,
   primeScan,
   primeThumbnails,
-  setStartupState,
   targetKey,
   targetsFromState,
   useContentPrefs,
-  useContentStartup,
 } from "./config";
 
 /**
@@ -18,9 +15,12 @@ import {
  * time the Maps/Games pages are navigated to — the unitsync scan and the maps
  * grid thumbnails are then already in cache when the user arrives.
  *
- * The scan is surfaced through the shared startup store so a failure/slow scan is
- * visible (with Retry/Cancel) instead of a silent hang. Thumbnails are the slow
- * "everything after"; they run in the background and never gate the lists.
+ * The warm-up is deliberately headless: it renders no chrome of its own. Its
+ * progress and failures surface *in context* on whichever content page the user
+ * opens (the shared scan/error cache the pages read is the same one this fills),
+ * so there's no global banner sitting above the app frame. A slow scan shows as
+ * the page's own loading state, cancellable from its Rescan control; a failed
+ * scan shows as that page's error banner.
  */
 export default function ContentStartupProvider({
   children,
@@ -30,43 +30,31 @@ export default function ContentStartupProvider({
   const [prefs] = useContentPrefs();
   const [selectedKey] = useSetting<string>("content.scanTarget", "");
   const ran = useRef(false);
-  const startup = useContentStartup();
 
-  const warmUp = useCallback(
-    async (force = false) => {
-      const opId = crypto.randomUUID();
-      setStartupState({ status: "scanning", opId });
-      try {
-        let { state } = await contentStateLoad(undefined);
-        // First run with no prior snapshot: detect standard data roots first, so
-        // there's a target to scan (the same step the Folders section does).
-        if (state.lastScanAt == null) {
-          ({ state } = await contentRescan({
-            withCounts: true,
-            includeZerok: prefs.probeZeroK,
-          }));
-        }
-        const targets = targetsFromState(state);
-        const target =
-          targets.find((t) => targetKey(t) === selectedKey) ?? targets[0];
-        if (!target) {
-          setStartupState({ status: "done" });
-          return;
-        }
-        await primeScan(target.enginePath, target.rootPath, force, opId);
-        // Lists are ready now; thumbnails render in the background and must not
-        // gate "done" or block the grid.
-        setStartupState({ status: "done" });
-        primeThumbnails(target.enginePath, target.rootPath).catch(() => {});
-      } catch (e) {
-        setStartupState({
-          status: "error",
-          error: e instanceof Error ? e.message : String(e),
-        });
+  const warmUp = useCallback(async () => {
+    try {
+      let { state } = await contentStateLoad(undefined);
+      // First run with no prior snapshot: detect standard data roots first, so
+      // there's a target to scan (the same step the Folders section does).
+      if (state.lastScanAt == null) {
+        ({ state } = await contentRescan({
+          withCounts: true,
+          includeZerok: prefs.probeZeroK,
+        }));
       }
-    },
-    [prefs.probeZeroK, selectedKey],
-  );
+      const targets = targetsFromState(state);
+      const target =
+        targets.find((t) => targetKey(t) === selectedKey) ?? targets[0];
+      if (!target) return;
+      await primeScan(target.enginePath, target.rootPath);
+      // Lists are ready now; thumbnails render in the background and must not
+      // gate the grid.
+      primeThumbnails(target.enginePath, target.rootPath).catch(() => {});
+    } catch {
+      // The failure is recorded in the shared scan-error cache and surfaced by
+      // the content page the user opens — nothing to show here.
+    }
+  }, [prefs.probeZeroK, selectedKey]);
 
   useEffect(() => {
     if (ran.current) return;
@@ -75,27 +63,5 @@ export default function ContentStartupProvider({
     warmUp();
   }, [prefs.autoScanOnStartup, warmUp]);
 
-  return (
-    <>
-      {startup.status === "scanning" && (
-        <div className="flex items-center justify-between gap-3 border-b border-border/50 bg-muted/40 px-4 py-2 text-sm">
-          <span className="text-muted-foreground">Scanning content…</span>
-          <Button variant="ghost" size="sm" onClick={cancelStartupScan}>
-            Cancel
-          </Button>
-        </div>
-      )}
-      {startup.status === "error" && (
-        <div className="flex items-center justify-between gap-3 border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm">
-          <span className="break-words text-destructive">
-            Content scan failed: {startup.error}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => warmUp(true)}>
-            Retry
-          </Button>
-        </div>
-      )}
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }
