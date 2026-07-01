@@ -1,5 +1,11 @@
 import { useSetting } from "@picoframe/frame";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   type Archive,
   type ArchiveFileResult,
@@ -20,6 +26,7 @@ import {
   type StartPos,
   unitsyncArchiveFile,
   unitsyncArchiveTree,
+  unitsyncCancel,
   unitsyncEngineConfig,
   unitsyncGameInfo,
   unitsyncHeightmap,
@@ -175,22 +182,69 @@ export function useScanTargetSelection() {
  */
 const scanCache = new Map<string, ScanResult>();
 
+/** Session cache of scan *failures*, so a failed target doesn't silently re-run
+ * a multi-minute scan on every navigation. Cleared by a forced retry. */
+const scanErrorCache = new Map<string, string>();
+
 /**
  * Fetch (or read from cache) a unitsync scan for a target, populating
  * `scanCache`. Shared by the page hook and the launch warm-up so both read the
- * same cache. `force` re-runs the scan even on a cache hit.
+ * same cache. `force` re-runs the scan even on a cache hit, and clears any
+ * cached failure for the target.
  */
 export async function primeScan(
   enginePath: string,
   dataDir: string,
   force = false,
+  opId?: string,
 ): Promise<ScanResult> {
   const key = `${dataDir}::${enginePath}`;
+  if (force) scanErrorCache.delete(key);
   const cached = scanCache.get(key);
   if (!force && cached) return cached;
-  const res = await unitsyncScan({ enginePath, dataDir });
-  scanCache.set(key, res);
-  return res;
+  const cachedErr = scanErrorCache.get(key);
+  if (!force && cachedErr) throw new Error(cachedErr);
+  try {
+    const res = await unitsyncScan({ enginePath, dataDir, opId });
+    scanCache.set(key, res);
+    return res;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    scanErrorCache.set(key, msg);
+    throw e;
+  }
+}
+
+type StartupStatus = "idle" | "scanning" | "error" | "done";
+interface StartupState {
+  status: StartupStatus;
+  error?: string;
+  opId?: string;
+}
+
+let startupState: StartupState = { status: "idle" };
+const startupListeners = new Set<() => void>();
+
+/** Update the shared startup state and notify subscribers. */
+export function setStartupState(next: StartupState) {
+  startupState = next;
+  for (const l of startupListeners) l();
+}
+
+/** Subscribe a component to the launch warm-up status. */
+export function useContentStartup() {
+  return useSyncExternalStore(
+    (cb) => {
+      startupListeners.add(cb);
+      return () => startupListeners.delete(cb);
+    },
+    () => startupState,
+  );
+}
+
+/** Cancel the in-flight warm-up scan, if any. */
+export function cancelStartupScan() {
+  if (startupState.opId) unitsyncCancel({ opId: startupState.opId });
 }
 
 /** Run / read a cached unitsync scan for the given target. */

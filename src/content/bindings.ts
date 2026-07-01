@@ -366,9 +366,15 @@ export interface ScanResult {
  * content root to enumerate (a `ContentRoot.path`).
  */
 export const unitsyncScan = defineCommand<
-  { enginePath: string; dataDir: string },
+  { enginePath: string; dataDir: string; opId?: string },
   ScanResult
 >("coilbox-unitsync", "unitsync_scan");
+
+/** Signal the matching in-flight `unitsync_scan`/`unitsync_thumbnails` worker to stop. */
+export const unitsyncCancel = defineCommand<{ opId: string }, unknown>(
+  "coilbox-unitsync",
+  "unitsync_cancel",
+);
 
 /** A team start position in map world coordinates (elmos). */
 export interface StartPos {
@@ -459,7 +465,7 @@ export const unitsyncEngineConfig = defineCommand<
  * Maps grid). `mip` selects resolution: `1024 >> mip` px (default 3 = 128px).
  */
 export const unitsyncThumbnails = defineCommand<
-  { enginePath: string; dataDir: string; mip?: number },
+  { enginePath: string; dataDir: string; mip?: number; opId?: string },
   ThumbnailsResult
 >("coilbox-unitsync", "unitsync_thumbnails");
 
