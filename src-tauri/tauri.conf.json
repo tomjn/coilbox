@@ -51,5 +51,13 @@
         "applicationFolderPosition": { "x": 500, "y": 195 }
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/tomjn/coilbox/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY1QTYzQUU2OTZBN0QyMTcKUldRWDBxZVc1anFtWlVOM0t2NEFxbXhLMmJaYmtZVm9ZM1V6QVVwaDEwTWJvRWFZdTM4NUZDNlUK"
+    }
   }
 }
