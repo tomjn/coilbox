@@ -6,6 +6,7 @@ import {
   unitsyncSkirmishAis,
 } from "../content/bindings";
 import { useContentState, usePreferredEngine } from "../content/config";
+import { compareEngineVersions } from "../content/engineVersion";
 import type { BattleConfig } from "./bindings";
 
 /* -------------------------------------------------------------------------- *
@@ -65,6 +66,76 @@ export function usePreferredTarget(): {
     if (r) target = build(r.path, r.engines[0]);
   }
   return { target, loading, error };
+}
+
+/** A resolved replay launch target plus whether its engine exactly matches the
+ * version the demo was recorded on. */
+export interface ReplayTarget {
+  target: PlayTarget;
+  matched: boolean;
+}
+
+/**
+ * The target to watch a replay with, for a demo's recorded engine version.
+ *
+ * A demo replays cleanly only under its recording engine version, so an engine
+ * whose label (`syncVersion ?? version`) matches `demoVersion` wins
+ * (`compareEngineVersions` keys off the dotted release + commit count and ignores
+ * the trailing branch label like `BAR105`). With no exact match it falls back to
+ * the preferred engine — surfaced as `matched: false` so the UI can warn. Returns
+ * `null` when no engine is installed at all.
+ */
+export function useReplayTarget(demoVersion: string): {
+  resolved: ReplayTarget | null;
+  loading: boolean;
+} {
+  const { state, loading } = useContentState();
+  const roots = state?.roots ?? [];
+  const engines = roots.flatMap((r) =>
+    r.engines.map((e) => ({ id: e.id, version: e.syncVersion ?? e.version })),
+  );
+  const { resolvedId } = usePreferredEngine(engines);
+
+  const build = (
+    rootPath: string,
+    e: (typeof roots)[number]["engines"][number],
+  ): PlayTarget => ({
+    enginePath: e.path,
+    executable: e.executable,
+    dataDir: rootPath,
+    engineVersion: e.syncVersion ?? e.version,
+  });
+
+  // Exact version match wins.
+  for (const r of roots) {
+    for (const e of r.engines) {
+      if (
+        compareEngineVersions(demoVersion, e.syncVersion ?? e.version) === 0
+      ) {
+        return {
+          resolved: { target: build(r.path, e), matched: true },
+          loading,
+        };
+      }
+    }
+  }
+  // Fallback: preferred engine, else the first engine in any root.
+  for (const r of roots) {
+    const e = r.engines.find((en) => en.id === resolvedId);
+    if (e)
+      return {
+        resolved: { target: build(r.path, e), matched: false },
+        loading,
+      };
+  }
+  const first = roots.find((r) => r.engines.length > 0);
+  if (first) {
+    return {
+      resolved: { target: build(first.path, first.engines[0]), matched: false },
+      loading,
+    };
+  }
+  return { resolved: null, loading };
 }
 
 /* -------------------------------------------------------------------------- *
