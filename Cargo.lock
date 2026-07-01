@@ -564,6 +564,7 @@ name = "coilbox"
 version = "0.0.0"
 dependencies = [
  "picoframe-core",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-coilbox-anim",
