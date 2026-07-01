@@ -10,6 +10,7 @@ import {
   contentStateLoad,
   type DemoInfo,
   type EngineConfigResult,
+  type GameHeaderResult,
   type GameInfoResult,
   type HeightmapResult,
   type LuaExecResult,
@@ -20,6 +21,7 @@ import {
   unitsyncArchiveFile,
   unitsyncArchiveTree,
   unitsyncEngineConfig,
+  unitsyncGameHeader,
   unitsyncGameInfo,
   unitsyncHeightmap,
   unitsyncLuaExec,
@@ -557,6 +559,58 @@ export function useUnitsyncArchiveFile(
       cancelled = true;
     };
   }, [enginePath, dataDir, archive, file]);
+
+  return { data, loading };
+}
+
+/** Session cache of resolved header images, keyed by `dataDir::enginePath::checksum`. */
+const gameHeaderCache = new Map<string, GameHeaderResult>();
+
+/**
+ * Lazily resolve a game's header image (loadpicture / bitmaps/loadpictures),
+ * shared across the app via a session cache. No-ops until `archive` and
+ * `checksum` are both set. The Rust command also caches the result on disk, so a
+ * cold cache is still cheap on later launches.
+ */
+export function useGameHeaderImage(
+  enginePath?: string,
+  dataDir?: string,
+  archive?: string,
+  checksum?: string,
+  loadpicture?: string,
+) {
+  const [data, setData] = useState<GameHeaderResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !archive || !checksum) {
+      setData(null);
+      return;
+    }
+    const key = `${dataDir}::${enginePath}::${checksum}`;
+    const cached = gameHeaderCache.get(key);
+    if (cached) {
+      setData(cached);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    unitsyncGameHeader({ enginePath, dataDir, archive, checksum, loadpicture })
+      .then((res) => {
+        if (cancelled) return;
+        gameHeaderCache.set(key, res);
+        setData(res);
+      })
+      .catch(() => {
+        if (!cancelled) setData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, archive, checksum, loadpicture]);
 
   return { data, loading };
 }
