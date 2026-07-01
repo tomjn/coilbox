@@ -20,6 +20,13 @@ const allyLetter = (n: number) => String.fromCharCode(65 + n);
 const aiValue = (a: { kind: string; shortName: string }) =>
   `${a.kind}:${a.shortName}`;
 
+/**
+ * Display label for an AI, dropping a redundant "(game-specific AI)" suffix —
+ * the "Game AIs" group heading already conveys that.
+ */
+const aiLabel = (a: { name?: string; shortName: string }) =>
+  (a.name ?? a.shortName).replace(/\s*\(game-specific AI\)\s*$/i, "");
+
 export function ParticipantsTable({
   participants,
   sides,
@@ -60,7 +67,9 @@ export function ParticipantsTable({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              <th className="px-3 pb-2 pt-3 text-left font-medium">Player</th>
+              <th className="w-full px-3 pb-2 pt-3 text-left font-medium">
+                Player
+              </th>
               <th className="px-3 pb-2 pt-3 text-left font-medium">Faction</th>
               <th className="px-3 pb-2 pt-3 text-left font-medium">Team</th>
               <th className="px-3 pb-2 pt-3 text-left font-medium">Ally</th>
@@ -90,7 +99,7 @@ export function ParticipantsTable({
                         </div>
                       </div>
                     ) : (
-                      <div className="min-w-0 leading-tight">
+                      <div className="min-w-0 flex-1 leading-tight">
                         <Select
                           value={p.ai ? aiValue(p.ai) : ""}
                           disabled={disabled}
@@ -111,7 +120,7 @@ export function ParticipantsTable({
                         >
                           <SelectTrigger
                             size="sm"
-                            className="w-44"
+                            className="w-full"
                             aria-invalid={!p.ai}
                           >
                             <SelectValue placeholder="Pick an AI" />
@@ -125,7 +134,7 @@ export function ParticipantsTable({
                                     key={aiValue(a)}
                                     value={aiValue(a)}
                                   >
-                                    {a.name ?? a.shortName}
+                                    {aiLabel(a)}
                                   </SelectItem>
                                 ))}
                               </SelectGroup>
@@ -138,7 +147,7 @@ export function ParticipantsTable({
                                     key={aiValue(a)}
                                     value={aiValue(a)}
                                   >
-                                    {a.name ?? a.shortName}
+                                    {aiLabel(a)}
                                   </SelectItem>
                                 ))}
                               </SelectGroup>
