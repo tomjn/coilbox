@@ -9,6 +9,11 @@ import { TargetPicker } from "./TargetPicker";
  * (just a muted "via …" label); the picker only appears when there's a real
  * choice. A small Rescan button re-reads the engine on demand. When no engine is
  * available at all it points the user at the settings pages instead.
+ *
+ * While a scan is running the Rescan button turns into a spinning "Cancel scan"
+ * button (when the caller supplies `onCancel`), so a slow scan can be stopped in
+ * place. Callers whose refresh can't be cancelled (e.g. a cheap engine-config
+ * read) simply omit `onCancel` and get the disabled-spinner Rescan as before.
  */
 export function BrowserToolbar({
   targets,
@@ -16,12 +21,14 @@ export function BrowserToolbar({
   onSelect,
   onRescan,
   scanning,
+  onCancel,
 }: {
   targets: ScanTarget[];
   selectedKey: string;
   onSelect: (key: string) => void;
   onRescan: () => void;
   scanning: boolean;
+  onCancel?: () => void;
 }) {
   if (targets.length === 0) {
     return (
@@ -62,18 +69,29 @@ export function BrowserToolbar({
           via {current.engineVersion} · {current.rootLabel ?? current.rootPath}
         </span>
       )}
-      <Button
-        onClick={onRescan}
-        disabled={scanning}
-        className="ml-auto shrink-0 gap-1.5"
-      >
-        {scanning ? (
+      {scanning && onCancel ? (
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          className="ml-auto shrink-0 gap-1.5"
+        >
           <Loader2 className="size-4 animate-spin" />
-        ) : (
-          <RefreshCw className="size-4" />
-        )}
-        Rescan
-      </Button>
+          Cancel scan
+        </Button>
+      ) : (
+        <Button
+          onClick={onRescan}
+          disabled={scanning}
+          className="ml-auto shrink-0 gap-1.5"
+        >
+          {scanning ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <RefreshCw className="size-4" />
+          )}
+          Rescan
+        </Button>
+      )}
     </div>
   );
 }

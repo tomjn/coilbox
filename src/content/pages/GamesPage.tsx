@@ -32,7 +32,7 @@ const SORT_OPTIONS = [
 export default function GamesPage() {
   const { targets, selected, selectedKey, setSelectedKey } =
     useScanTargetSelection();
-  const { data, loading, error, run } = useUnitsyncScan(
+  const { data, loading, error, cancelled, run, cancel } = useUnitsyncScan(
     selected?.enginePath,
     selected?.rootPath,
   );
@@ -46,7 +46,7 @@ export default function GamesPage() {
   const [sort, setSort] = useState<SortKey>("name-asc");
 
   const games = data?.games ?? [];
-  const busy = loading || (!!selected && !data && !error);
+  const busy = loading || (!!selected && !data && !error && !cancelled);
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -91,6 +91,7 @@ export default function GamesPage() {
         onSelect={setSelectedKey}
         onRescan={() => run(true)}
         scanning={loading}
+        onCancel={cancel}
       />
 
       {!busy && games.length > 0 && (
@@ -113,6 +114,8 @@ export default function GamesPage() {
 
       {targets.length === 0 ? null : busy ? (
         <SkeletonList />
+      ) : cancelled && games.length === 0 ? (
+        <EmptyState label="Scan cancelled. Press Rescan to load games." />
       ) : games.length === 0 ? (
         <EmptyState label="No games found for this engine." />
       ) : sorted.length === 0 ? (

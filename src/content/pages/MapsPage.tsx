@@ -35,7 +35,7 @@ const mapArea = (m: { width?: number; height?: number }) =>
 export default function MapsPage() {
   const { targets, selected, selectedKey, setSelectedKey } =
     useScanTargetSelection();
-  const { data, loading, error, run } = useUnitsyncScan(
+  const { data, loading, error, cancelled, run, cancel } = useUnitsyncScan(
     selected?.enginePath,
     selected?.rootPath,
   );
@@ -53,7 +53,7 @@ export default function MapsPage() {
       Array.from(new Map((data?.maps ?? []).map((m) => [m.name, m])).values()),
     [data],
   );
-  const busy = loading || (!!selected && !data && !error);
+  const busy = loading || (!!selected && !data && !error && !cancelled);
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -93,6 +93,7 @@ export default function MapsPage() {
         onSelect={setSelectedKey}
         onRescan={() => run(true)}
         scanning={loading}
+        onCancel={cancel}
       />
 
       {!busy && maps.length > 0 && (
@@ -115,6 +116,8 @@ export default function MapsPage() {
 
       {targets.length === 0 ? null : busy ? (
         <SkeletonList />
+      ) : cancelled && maps.length === 0 ? (
+        <EmptyState label="Scan cancelled. Press Rescan to load maps." />
       ) : maps.length === 0 ? (
         <EmptyState label="No maps found for this engine." />
       ) : sorted.length === 0 ? (

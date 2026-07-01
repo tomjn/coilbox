@@ -188,6 +188,25 @@ const scanCache = new Map<string, ScanResult>();
 const scanErrorCache = new Map<string, string>();
 
 /**
+ * In-flight scans keyed like the scan cache. A page opened while the launch
+ * warm-up (or another page) is mid-scan joins that running op — and its
+ * cancellable `opId` — instead of kicking off a second worker scan of the same
+ * target. This is also what lets a page's Rescan/Cancel control stop the scan
+ * that the launch warm-up started.
+ */
+const inFlightScans = new Map<
+  string,
+  { promise: Promise<ScanResult>; opId: string }
+>();
+
+/** Cancel the in-flight scan for a target, if one is running. */
+export function cancelScan(enginePath?: string, dataDir?: string) {
+  if (!enginePath || !dataDir) return;
+  const inFlight = inFlightScans.get(`${dataDir}::${enginePath}`);
+  if (inFlight) unitsyncCancel({ opId: inFlight.opId });
+}
+
+/**
  * Fetch (or read from cache) a unitsync scan for a target, populating
  * `scanCache`. Shared by the page hook and the launch warm-up so both read the
  * same cache. `force` re-runs the scan even on a cache hit, and clears any
@@ -197,7 +216,6 @@ export async function primeScan(
   enginePath: string,
   dataDir: string,
   force = false,
-  opId?: string,
 ): Promise<ScanResult> {
   const key = `${dataDir}::${enginePath}`;
   if (force) {
@@ -211,15 +229,28 @@ export async function primeScan(
   if (!force && cached) return cached;
   const cachedErr = scanErrorCache.get(key);
   if (!force && cachedErr) throw new Error(cachedErr);
-  try {
-    const res = await unitsyncScan({ enginePath, dataDir, opId });
-    scanCache.set(key, res);
-    return res;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    scanErrorCache.set(key, msg);
-    throw e;
-  }
+  // Join a scan already running for this target rather than starting a second.
+  const inFlight = inFlightScans.get(key);
+  if (inFlight) return inFlight.promise;
+
+  const opId = crypto.randomUUID();
+  const promise = (async () => {
+    try {
+      const res = await unitsyncScan({ enginePath, dataDir, opId });
+      scanCache.set(key, res);
+      return res;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // A user cancellation isn't a target failure — don't poison the error
+      // cache, or the next open would resurface "cancelled" as a scan error.
+      if (!/cancelled/i.test(msg)) scanErrorCache.set(key, msg);
+      throw e;
+    } finally {
+      inFlightScans.delete(key);
+    }
+  })();
+  inFlightScans.set(key, { promise, opId });
+  return promise;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -250,43 +281,12 @@ export function useScanEpoch(enginePath?: string, dataDir?: string): number {
   );
 }
 
-type StartupStatus = "idle" | "scanning" | "error" | "done";
-interface StartupState {
-  status: StartupStatus;
-  error?: string;
-  opId?: string;
-}
-
-let startupState: StartupState = { status: "idle" };
-const startupListeners = new Set<() => void>();
-
-/** Update the shared startup state and notify subscribers. */
-export function setStartupState(next: StartupState) {
-  startupState = next;
-  for (const l of startupListeners) l();
-}
-
-/** Subscribe a component to the launch warm-up status. */
-export function useContentStartup() {
-  return useSyncExternalStore(
-    (cb) => {
-      startupListeners.add(cb);
-      return () => startupListeners.delete(cb);
-    },
-    () => startupState,
-  );
-}
-
-/** Cancel the in-flight warm-up scan, if any. */
-export function cancelStartupScan() {
-  if (startupState.opId) unitsyncCancel({ opId: startupState.opId });
-}
-
 /** Run / read a cached unitsync scan for the given target. */
 export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
   const [data, setData] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cancelled, setCancelled] = useState(false);
 
   const run = useCallback(
     async (force = false) => {
@@ -298,16 +298,24 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
       }
       setLoading(true);
       setError(null);
+      setCancelled(false);
       try {
         setData(await primeScan(enginePath, dataDir, force));
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        const msg = e instanceof Error ? e.message : String(e);
+        // A cancel lands in a stable "cancelled" state rather than an error.
+        if (/cancelled/i.test(msg)) setCancelled(true);
+        else setError(msg);
       } finally {
         setLoading(false);
       }
     },
     [enginePath, dataDir],
   );
+
+  const cancel = useCallback(() => {
+    cancelScan(enginePath, dataDir);
+  }, [enginePath, dataDir]);
 
   // When a target becomes available, show its content immediately: serve the
   // cached result, or auto-scan on first open. `run(false)` does exactly that.
@@ -319,7 +327,7 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
     run(false);
   }, [enginePath, dataDir, run]);
 
-  return { data, loading, error, run };
+  return { data, loading, error, cancelled, run, cancel };
 }
 
 /** Session cache of batch thumbnails, keyed by `dataDir::enginePath`. */
@@ -603,9 +611,12 @@ function buildArchiveList(data: ScanResult | null): ClassifiedArchive[] {
 
 /** Scan a target and expose its archives as one classified, deduped list. */
 export function useArchives(enginePath?: string, dataDir?: string) {
-  const { data, loading, error, run } = useUnitsyncScan(enginePath, dataDir);
+  const { data, loading, error, cancelled, run, cancel } = useUnitsyncScan(
+    enginePath,
+    dataDir,
+  );
   const archives = useMemo(() => buildArchiveList(data), [data]);
-  return { archives, data, loading, error, run };
+  return { archives, data, loading, error, cancelled, run, cancel };
 }
 
 /** Session cache of archive member trees, keyed by `dataDir::enginePath::archive`. */
