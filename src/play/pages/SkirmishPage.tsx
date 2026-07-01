@@ -10,11 +10,14 @@ import {
 } from "@/content/config";
 import { type LaunchEvent, playLaunch } from "../bindings";
 import {
+  aiKey,
+  defaultAi,
   initialParticipants,
   makeAiParticipant,
   type Participant,
   rgbToHex,
   toBattleConfig,
+  useLastAi,
   usePreferredTarget,
   useSkirmishAis,
 } from "../config";
@@ -51,6 +54,7 @@ export default function SkirmishPage() {
 
   const gameInfo = useUnitsyncGameInfo(enginePath, dataDir, gameArchive);
   const { ais } = useSkirmishAis(enginePath, dataDir, gameArchive);
+  const [lastAi, setLastAi] = useLastAi();
   const minimap = useUnitsyncMinimap(enginePath, dataDir, mapName);
   const sides = gameInfo.info?.sides ?? [];
   const modOptions = gameInfo.info?.options ?? [];
@@ -92,6 +96,24 @@ export default function SkirmishPage() {
     });
   }, [sides]);
 
+  // Auto-select the last AI the user picked for any still-empty AI slot (the
+  // default opponent, or one added before the AI list had loaded).
+  useEffect(() => {
+    const preset = defaultAi(lastAi, ais);
+    if (!preset) return;
+    setParticipants((ps) => {
+      let changed = false;
+      const next = ps.map((p) => {
+        if (p.kind === "ai" && !p.ai) {
+          changed = true;
+          return { ...p, ai: preset };
+        }
+        return p;
+      });
+      return changed ? next : ps;
+    });
+  }, [lastAi, ais]);
+
   const activeColors = useMemo(
     () =>
       participants
@@ -114,16 +136,19 @@ export default function SkirmishPage() {
     aiRowsReady &&
     !running;
 
-  const updateParticipant = (id: string, patch: Partial<Participant>) =>
+  const updateParticipant = (id: string, patch: Partial<Participant>) => {
+    // Remember an explicit AI pick so later opponents default to it.
+    if (patch.ai) setLastAi(aiKey(patch.ai));
     setParticipants((ps) =>
       ps.map((p) => (p.id === id ? { ...p, ...patch } : p)),
     );
+  };
   const removeParticipant = (id: string) =>
     setParticipants((ps) => ps.filter((p) => p.id !== id));
   const addAi = () =>
     setParticipants((ps) => [
       ...ps,
-      makeAiParticipant(ps, sides[0]?.name ?? ""),
+      makeAiParticipant(ps, sides[0]?.name ?? "", defaultAi(lastAi, ais)),
     ]);
 
   async function onStart() {
