@@ -25,7 +25,6 @@ type VoidFn = unsafe extern "C" fn();
 type StrFn = unsafe extern "C" fn() -> *const c_char; // GetNextError, GetSpringVersion
 type CountFn = unsafe extern "C" fn() -> c_int; // GetMapCount, GetPrimaryModCount
 type StrByIntFn = unsafe extern "C" fn(c_int) -> *const c_char; // names, archive lists, info accessors
-type UintByIntFn = unsafe extern "C" fn(c_int) -> c_uint; // checksums by index
 type IntByIntFn = unsafe extern "C" fn(c_int) -> c_int; // archive/info counts by index
 type IntByStrFn = unsafe extern "C" fn(*const c_char) -> c_int; // GetMapArchiveCount(name)
 type FloatByIntFn = unsafe extern "C" fn(c_int) -> c_float; // GetOptionNumberDef(i)
@@ -78,7 +77,6 @@ pub struct Unitsync {
     map_count_fn: CountFn,
     map_name_fn: StrByIntFn,
     map_file_name_fn: Option<StrByIntFn>,
-    map_checksum_fn: Option<UintByIntFn>,
     map_archive_count_fn: IntByStrFn,
     map_archive_name_fn: StrByIntFn,
     map_info_count_fn: Option<IntByIntFn>,
@@ -195,7 +193,6 @@ impl Unitsync {
             map_count_fn: req(&lib, b"GetMapCount\0")?,
             map_name_fn: req(&lib, b"GetMapName\0")?,
             map_file_name_fn: opt(&lib, b"GetMapFileName\0"),
-            map_checksum_fn: opt(&lib, b"GetMapChecksum\0"),
             map_archive_count_fn: req(&lib, b"GetMapArchiveCount\0")?,
             map_archive_name_fn: req(&lib, b"GetMapArchiveName\0")?,
             map_info_count_fn: opt(&lib, b"GetMapInfoCount\0"),
@@ -315,10 +312,6 @@ impl Unitsync {
     pub fn map_file_name(&self, i: i32) -> Option<String> {
         let f = self.map_file_name_fn?;
         unsafe { cstr(f(i)) }.filter(|s| !s.is_empty())
-    }
-
-    pub fn map_checksum(&self, i: i32) -> Option<u32> {
-        self.map_checksum_fn.map(|f| unsafe { f(i) })
     }
 
     /// Archives backing a map. `GetMapArchiveCount(name)` populates the internal
