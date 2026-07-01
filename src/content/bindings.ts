@@ -501,6 +501,29 @@ export const unitsyncArchiveFile = defineCommand<
   ArchiveFileResult
 >("coilbox-unitsync", "unitsync_archive_file");
 
+export interface GameHeaderResult {
+  /** Image `data:` URL. Absent when the game has no usable loadpicture/folder art. */
+  dataUrl?: string;
+  errors: string[];
+}
+
+/**
+ * Resolve a game's loading-screen art to a `data:` URL: the modinfo `loadpicture`
+ * first, else a random image from the archive's `bitmaps/loadpictures/` folder.
+ * Resolved images are cached on disk (keyed by `checksum`), so repeat calls are
+ * cheap and stable across launches. `archive` is the game's primary archive name.
+ */
+export const unitsyncGameHeader = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    archive: string;
+    checksum?: string;
+    loadpicture?: string;
+  },
+  GameHeaderResult
+>("coilbox-unitsync", "unitsync_game_header");
+
 export interface LuaExecResult {
   /** The pretty-printed value the script returned (set on success). */
   result?: string;
