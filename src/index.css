@@ -9,3 +9,17 @@ body,
   height: 100%;
   margin: 0;
 }
+
+/* Native colour input: make the colour fill the (square) box with no inset,
+   so the swatch matches the control's shape instead of showing a small rectangle. */
+.color-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+.color-swatch::-moz-color-swatch {
+  border: none;
+  border-radius: 4px;
+}

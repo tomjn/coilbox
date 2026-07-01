@@ -4,6 +4,7 @@ import contentPlugin from "./content";
 // picoframe:imports-start
 import downloadsPlugin from "./downloads";
 import mapconvPlugin from "./mapconv";
+import playPlugin from "./play";
 import uberstressPlugin from "./uberstress";
 // picoframe:imports-end
 
@@ -16,5 +17,6 @@ export const plugins: FramePlugin[] = [
   mapconvPlugin,
   animationPlugin,
   contentPlugin,
+  playPlugin,
   // picoframe:plugins-end
 ];

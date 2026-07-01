@@ -1,0 +1,9 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows the play plugin's start-script generation, engine launch and cancel commands."
+permissions = [
+  "allow-play-generate-script",
+  "allow-play-launch",
+  "allow-play-cancel",
+]

@@ -21,9 +21,10 @@ mod heightmap;
 mod lua;
 mod minimap;
 mod model;
+mod skirmishai;
 
 use ffi::Unitsync;
-use model::{Archive, ConfigOption, GameItem, MapItem, ScanOutput};
+use model::{Archive, ConfigOption, GameItem, MapItem, OptionListItem, ScanOutput};
 use std::path::Path;
 
 const LIST_SEP: char = if cfg!(windows) { ';' } else { ':' };
@@ -42,6 +43,9 @@ struct Args {
     thumbnails: bool,
     heightmap: bool,
     config: bool,
+    /// `--skirmish-ais`: list native skirmish AIs (+ a game's Lua AIs when
+    /// combined with `--game`).
+    skirmish_ais: bool,
     /// `--lua`: run a Lua snippet through the parser against `--archive`, reading
     /// the script from `--source-file`.
     lua: bool,
@@ -168,6 +172,22 @@ fn run() -> i32 {
         };
     }
 
+    // Skirmish AIs: native engine AIs, plus a game's Lua AIs when --game is
+    // given. Checked before game detail because that mode also keys off --game.
+    if args.skirmish_ais {
+        let game = args.game.clone();
+        return match std::panic::catch_unwind(|| skirmishai::render(&args.lib, game.as_deref())) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                skirmishai::emit_error("worker panicked while listing skirmish AIs".into());
+                1
+            }
+        };
+    }
+
     // Game detail: load one game's archives to read its sides + unit count.
     if let Some(game_archive) = args.game.clone() {
         return match std::panic::catch_unwind(|| game::render(&args.lib, &game_archive)) {
@@ -260,6 +280,7 @@ fn parse_args() -> Result<Args, String> {
     let mut thumbnails = false;
     let mut heightmap = false;
     let mut config = false;
+    let mut skirmish_ais = false;
     let mut lua = false;
     let mut source_file = None;
     let mut mip = 1; // 512x512 by default
@@ -285,6 +306,7 @@ fn parse_args() -> Result<Args, String> {
             }
             "--cache-dir" => cache_dir = it.next(),
             "--config" => config = true,
+            "--skirmish-ais" => skirmish_ais = true,
             "--lua" => lua = true,
             "--source-file" => source_file = it.next(),
             "--mip" => {
@@ -307,6 +329,7 @@ fn parse_args() -> Result<Args, String> {
         thumbnails,
         heightmap,
         config,
+        skirmish_ais,
         lua,
         source_file,
         mip,
@@ -422,18 +445,60 @@ fn dir_size(p: &Path) -> u64 {
 }
 
 /// Build config options from the global table set by the most recent
-/// `GetMapOptionCount` / `GetModOptionCount` call.
+/// `GetMapOptionCount` / `GetModOptionCount` call, including each option's type,
+/// default and (for numbers/lists) bounds/items so the UI can render a proper
+/// control. `GetOptionType`: 1 bool, 2 list, 3 number, 4 string.
 pub(crate) fn read_options(us: &Unitsync, count: i32) -> Vec<ConfigOption> {
     (0..count)
         .filter_map(|i| {
             let key = us.option_key(i)?;
-            Some(ConfigOption {
-                name: us.option_name(i).unwrap_or_else(|| key.clone()),
-                description: us.option_desc(i),
+            let name = us.option_name(i).unwrap_or_else(|| key.clone());
+            let description = us.option_desc(i);
+            let mut opt = ConfigOption {
                 key,
-            })
+                name,
+                description,
+                ..Default::default()
+            };
+            match us.option_type(i) {
+                1 => {
+                    opt.kind = Some("bool".into());
+                    opt.default = Some(if us.option_bool_def(i) { "1" } else { "0" }.into());
+                }
+                2 => {
+                    opt.kind = Some("list".into());
+                    opt.default = us.option_list_def(i);
+                    opt.list_items = us
+                        .option_list_items(i)
+                        .into_iter()
+                        .map(|(key, name)| OptionListItem { key, name })
+                        .collect();
+                }
+                3 => {
+                    opt.kind = Some("number".into());
+                    opt.default = us.option_number_def(i).map(fmt_num);
+                    opt.number_min = us.option_number_min(i);
+                    opt.number_max = us.option_number_max(i);
+                    opt.number_step = us.option_number_step(i);
+                }
+                4 => {
+                    opt.kind = Some("string".into());
+                    opt.default = us.option_string_def(i);
+                }
+                _ => {}
+            }
+            Some(opt)
         })
         .collect()
+}
+
+/// Format a unitsync option float without a trailing `.0` (so `1.0` -> `1`).
+fn fmt_num(v: f32) -> String {
+    if v.fract() == 0.0 {
+        format!("{}", v as i64)
+    } else {
+        format!("{v}")
+    }
 }
 
 fn collect_maps(us: &Unitsync) -> Vec<MapItem> {

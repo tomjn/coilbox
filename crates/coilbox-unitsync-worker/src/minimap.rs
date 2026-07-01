@@ -42,9 +42,11 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
         cache_file(cache_dir, map_checksum(&us, map_name), mip),
     );
 
-    // Start positions live in mapinfo.lua, so load the map's archives and parse
-    // them via unitsync's Lua parser.
+    // Start positions and environment (wind/tidal) live in mapinfo.lua, so load
+    // the map's archives and parse them via unitsync's Lua parser.
     let mut start_positions = Vec::new();
+    let mut wind = None;
+    let mut tidal = None;
     if let Some(first_archive) = us.map_archives(map_name).into_iter().next() {
         us.add_all_archives(&first_archive);
         start_positions = us
@@ -52,20 +54,31 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
             .into_iter()
             .map(|(x, z)| StartPos { x, z })
             .collect();
+        (wind, tidal) = us.map_env();
     }
 
     let errors = us.drain_errors();
     us.uninit();
+    let (min_wind, max_wind) = match wind {
+        Some((mn, mx)) => (Some(mn), Some(mx)),
+        None => (None, None),
+    };
 
     match result {
         Ok((data_url, side)) => MinimapOutput {
             data_url: Some(data_url),
             side: Some(side),
             start_positions,
+            min_wind,
+            max_wind,
+            tidal_strength: tidal,
             errors,
         },
         Err(e) => MinimapOutput {
             start_positions,
+            min_wind,
+            max_wind,
+            tidal_strength: tidal,
             errors: std::iter::once(e).chain(errors).collect(),
             ..Default::default()
         },

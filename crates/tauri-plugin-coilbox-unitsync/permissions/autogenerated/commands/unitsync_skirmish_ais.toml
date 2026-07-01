@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-unitsync-skirmish-ais"
+description = "Enables the unitsync_skirmish_ais command without any pre-configured scope."
+commands.allow = ["unitsync_skirmish_ais"]
+
+[[permission]]
+identifier = "deny-unitsync-skirmish-ais"
+description = "Denies the unitsync_skirmish_ais command without any pre-configured scope."
+commands.deny = ["unitsync_skirmish_ais"]

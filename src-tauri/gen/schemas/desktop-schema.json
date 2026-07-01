@@ -801,6 +801,48 @@
           "markdownDescription": "Denies the mc_suggest_sources command without any pre-configured scope."
         },
         {
+          "description": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-launch`\n- `allow-play-cancel`",
+          "type": "string",
+          "const": "coilbox-play:default",
+          "markdownDescription": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-launch`\n- `allow-play-cancel`"
+        },
+        {
+          "description": "Enables the play_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-play:allow-play-cancel",
+          "markdownDescription": "Enables the play_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the play_generate_script command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-play:allow-play-generate-script",
+          "markdownDescription": "Enables the play_generate_script command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the play_launch command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-play:allow-play-launch",
+          "markdownDescription": "Enables the play_launch command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the play_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-play:deny-play-cancel",
+          "markdownDescription": "Denies the play_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the play_generate_script command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-play:deny-play-generate-script",
+          "markdownDescription": "Denies the play_generate_script command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the play_launch command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-play:deny-play-launch",
+          "markdownDescription": "Denies the play_launch command without any pre-configured scope."
+        },
+        {
           "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL, results dir, import/export).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`\n- `allow-us-results-dir`\n- `allow-us-export-report`\n- `allow-us-import-report`",
           "type": "string",
           "const": "coilbox-uberstress:default",
@@ -939,10 +981,10 @@
           "markdownDescription": "Denies the us_settings_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`",
+          "description": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`",
           "type": "string",
           "const": "coilbox-unitsync:default",
-          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`"
+          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`"
         },
         {
           "description": "Enables the unitsync_archive_extract command without any pre-configured scope.",
@@ -997,6 +1039,12 @@
           "type": "string",
           "const": "coilbox-unitsync:allow-unitsync-scan",
           "markdownDescription": "Enables the unitsync_scan command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the unitsync_skirmish_ais command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:allow-unitsync-skirmish-ais",
+          "markdownDescription": "Enables the unitsync_skirmish_ais command without any pre-configured scope."
         },
         {
           "description": "Enables the unitsync_thumbnails command without any pre-configured scope.",
@@ -1057,6 +1105,12 @@
           "type": "string",
           "const": "coilbox-unitsync:deny-unitsync-scan",
           "markdownDescription": "Denies the unitsync_scan command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_skirmish_ais command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:deny-unitsync-skirmish-ais",
+          "markdownDescription": "Denies the unitsync_skirmish_ais command without any pre-configured scope."
         },
         {
           "description": "Denies the unitsync_thumbnails command without any pre-configured scope.",

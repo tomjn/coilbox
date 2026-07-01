@@ -122,6 +122,18 @@ pub fn build_game_args(lib: &str, datadir: &str, game: &str) -> Vec<String> {
     args
 }
 
+/// Build args for skirmish-AI mode: scan args plus the `--skirmish-ais` flag and,
+/// when a game is given, `--game <archive>` so its Lua AIs are enumerated too.
+pub fn build_skirmish_ai_args(lib: &str, datadir: &str, game: Option<&str>) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--skirmish-ais".into());
+    if let Some(game) = game.filter(|g| !g.is_empty()) {
+        args.push("--game".into());
+        args.push(game.into());
+    }
+    args
+}
+
 /// Build args for engine-config mode: scan args plus the `--config` flag.
 pub fn build_config_args(lib: &str, datadir: &str) -> Vec<String> {
     let mut args = build_args(lib, datadir);
@@ -232,6 +244,23 @@ mod tests {
         assert_eq!(a[i + 1], "Map v1");
         let j = a.iter().position(|x| x == "--max-side").unwrap();
         assert_eq!(a[j + 1], "512");
+    }
+
+    #[test]
+    fn build_skirmish_ai_args_flag_and_optional_game() {
+        let no_game = build_skirmish_ai_args("/eng/libunitsync.so", "/data", None);
+        assert!(no_game.contains(&"--skirmish-ais".to_string()));
+        assert!(!no_game.contains(&"--game".to_string()));
+
+        let with_game = build_skirmish_ai_args("/eng/libunitsync.so", "/data", Some("BAR.sdd"));
+        assert!(with_game.contains(&"--skirmish-ais".to_string()));
+        assert_eq!(
+            &with_game[with_game.len() - 2..],
+            &["--game".to_string(), "BAR.sdd".to_string()],
+        );
+
+        let empty_game = build_skirmish_ai_args("/eng/libunitsync.so", "/data", Some(""));
+        assert!(!empty_game.contains(&"--game".to_string()));
     }
 
     #[test]

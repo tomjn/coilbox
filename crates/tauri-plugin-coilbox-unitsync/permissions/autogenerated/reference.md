@@ -9,6 +9,7 @@ Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-i
 - `allow-unitsync-heightmap`
 - `allow-unitsync-thumbnails`
 - `allow-unitsync-game-info`
+- `allow-unitsync-skirmish-ais`
 - `allow-unitsync-engine-config`
 - `allow-unitsync-archive-tree`
 - `allow-unitsync-archive-file`
@@ -254,6 +255,32 @@ Enables the unitsync_scan command without any pre-configured scope.
 <td>
 
 Denies the unitsync_scan command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-skirmish-ais`
+
+</td>
+<td>
+
+Enables the unitsync_skirmish_ais command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-skirmish-ais`
+
+</td>
+<td>
+
+Denies the unitsync_skirmish_ais command without any pre-configured scope.
 
 </td>
 </tr>
