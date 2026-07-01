@@ -70,11 +70,13 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
         cache_file(cache_dir, map_cache_key(&us, map_name).as_deref(), mip),
     );
 
-    // Start positions and environment (wind/tidal) live in mapinfo.lua, so load
-    // the map's archives and parse them via unitsync's Lua parser.
+    // Start positions, environment (wind/tidal) and appearance (water/sky/sun) all
+    // live in mapinfo.lua, so load the map's archives and parse them via unitsync's
+    // Lua parser.
     let mut start_positions = Vec::new();
     let mut wind = None;
     let mut tidal = None;
+    let mut app = crate::ffi::MapAppearance::default();
     if let Some(first_archive) = us.map_archives(map_name).into_iter().next() {
         us.add_all_archives(&first_archive);
         start_positions = us
@@ -83,6 +85,7 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
             .map(|(x, z)| StartPos { x, z })
             .collect();
         (wind, tidal) = us.map_env();
+        app = us.map_appearance();
     }
 
     let errors = us.drain_errors();
@@ -92,23 +95,29 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
         None => (None, None),
     };
 
+    let base = MinimapOutput {
+        start_positions,
+        min_wind,
+        max_wind,
+        tidal_strength: tidal,
+        water_color: app.water_color,
+        water_alpha: app.water_alpha,
+        sky_color: app.sky_color,
+        fog_color: app.fog_color,
+        sun_dir: app.sun_dir,
+        sun_color: app.sun_color,
+        ..Default::default()
+    };
     match result {
         Ok((data_url, side)) => MinimapOutput {
             data_url: Some(data_url),
             side: Some(side),
-            start_positions,
-            min_wind,
-            max_wind,
-            tidal_strength: tidal,
             errors,
+            ..base
         },
         Err(e) => MinimapOutput {
-            start_positions,
-            min_wind,
-            max_wind,
-            tidal_strength: tidal,
             errors: std::iter::once(e).chain(errors).collect(),
-            ..Default::default()
+            ..base
         },
     }
 }

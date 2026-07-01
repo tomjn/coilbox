@@ -163,6 +163,7 @@ export default function MapDetailPage() {
               className="w-full min-w-0 lg:flex-1"
               heightSrc={heightmap.data.dataUrl}
               textureSrc={minimap.dataUrl}
+              appearance={minimap.appearance}
               minHeight={heightmap.data.minHeight ?? 0}
               maxHeight={heightmap.data.maxHeight ?? 0}
               worldWidth={

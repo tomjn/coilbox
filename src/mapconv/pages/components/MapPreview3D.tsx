@@ -273,11 +273,15 @@ export function MapPreview3D({
     };
   }, [srcs, minHeight, maxHeight, worldWidth, worldHeight, appSig]);
 
-  // mapinfo `voidWater` means the engine renders no water — default the toggle
-  // to match when known (resets on map change; the user can still turn it on).
+  // Spring's water plane sits at world height 0, so water is only visible where
+  // terrain drops below it. Default the toggle off for a "dry" map (lowest point
+  // at or above sea level) or one the mapinfo declares `voidWater` — a water plane
+  // under entirely-above-water terrain just looks wrong. The user can still switch
+  // it back on. Resets on map change (minHeight / voidWater are the deps).
+  const hasWater = appearance?.voidWater !== true && minHeight < 0;
   useEffect(() => {
-    if (appearance?.voidWater != null) setWater(!appearance.voidWater);
-  }, [appearance?.voidWater]);
+    setWater(hasWater);
+  }, [hasWater]);
 
   // Live toggles — mutate the existing scene, no rebuild.
   useEffect(() => {

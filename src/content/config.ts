@@ -6,6 +6,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import type { MapAppearance } from "../mapconv/bindings";
 import {
   type Archive,
   type ArchiveFileResult,
@@ -793,6 +794,9 @@ export function useUnitsyncMinimap(
     maxWind?: number;
     tidalStrength?: number;
   }>({});
+  // mapinfo.lua water/sky/sun hints, shaped like the mapconv `MapAppearance` so
+  // the 3D preview lights and colours content maps the way the engine would.
+  const [appearance, setAppearance] = useState<MapAppearance | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -801,6 +805,7 @@ export function useUnitsyncMinimap(
       setDataUrl(null);
       setStartPositions([]);
       setEnv({});
+      setAppearance(null);
       return;
     }
     const key = `${dataDir}::${enginePath}::${mapName}`;
@@ -811,6 +816,14 @@ export function useUnitsyncMinimap(
         minWind: res.minWind,
         maxWind: res.maxWind,
         tidalStrength: res.tidalStrength,
+      });
+      setAppearance({
+        waterColor: res.waterColor,
+        waterAlpha: res.waterAlpha,
+        skyColor: res.skyColor,
+        fogColor: res.fogColor,
+        sunDir: res.sunDir,
+        sunColor: res.sunColor,
       });
       if (!res.dataUrl && res.errors?.length) setError(res.errors.join("; "));
     };
@@ -839,7 +852,7 @@ export function useUnitsyncMinimap(
     };
   }, [enginePath, dataDir, mapName]);
 
-  return { dataUrl, startPositions, env, loading, error };
+  return { dataUrl, startPositions, env, appearance, loading, error };
 }
 
 /** Session cache of heightmap results, keyed by `dataDir::enginePath::mapName`. */
