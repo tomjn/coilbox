@@ -30,9 +30,7 @@ const isChanged = (o: ConfigOption, value?: string) =>
  * summary so the setup stays scannable.
  */
 export function GameOptionsPanel({
-  games,
   selectedGame,
-  onSelectGame,
   startPosType,
   onStartPosType,
   options,
@@ -40,9 +38,7 @@ export function GameOptionsPanel({
   onOptionChange,
   disabled,
 }: {
-  games: GameItem[];
   selectedGame?: GameItem | null;
-  onSelectGame: (name: string) => void;
   startPosType: number;
   onStartPosType: (v: number) => void;
   options: ConfigOption[];
@@ -69,7 +65,7 @@ export function GameOptionsPanel({
         className="flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-left hover:bg-muted/30"
       >
         <span className="flex min-w-0 items-baseline gap-3">
-          <span className="text-sm font-semibold">Game</span>
+          <span className="text-sm font-semibold">Game options</span>
           <span className="truncate text-xs text-muted-foreground">
             {summary}
           </span>
@@ -85,18 +81,6 @@ export function GameOptionsPanel({
       {open && (
         <div className="border-t border-border/40 px-4 pb-4 pt-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <span className="mb-1.5 block text-[11px] uppercase tracking-wide text-muted-foreground">
-                Game
-              </span>
-              <OptionSelect
-                value={selectedGame?.name ?? ""}
-                disabled={disabled || games.length === 0}
-                placeholder="Select a game"
-                options={games.map((g) => ({ value: g.name, label: g.name }))}
-                onValueChange={onSelectGame}
-              />
-            </div>
             <div>
               <span className="mb-1.5 block text-[11px] uppercase tracking-wide text-muted-foreground">
                 Start positions

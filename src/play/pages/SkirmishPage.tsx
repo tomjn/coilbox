@@ -3,6 +3,7 @@ import { Channel } from "@tauri-apps/api/core";
 import { Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
   useUnitsyncMinimap,
   useUnitsyncScan,
@@ -23,6 +24,7 @@ import {
 } from "../config";
 import { useSkirmishDraft } from "../drafts";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
+import { GameSelectCard } from "./components/GameSelectCard";
 import { MapCard } from "./components/MapCard";
 import { ParticipantsTable } from "./components/ParticipantsTable";
 
@@ -35,6 +37,7 @@ export default function SkirmishPage() {
 
   const scan = useUnitsyncScan(enginePath, dataDir);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
+  const { headers: gameHeaders } = useUnitsyncGameHeaders(enginePath, dataDir);
 
   // Seed from the persisted draft so the setup (game, map, opponents, options)
   // survives navigation and restarts. The debounced effect below writes it back.
@@ -60,6 +63,7 @@ export default function SkirmishPage() {
   const gameArchive = selectedGame?.primaryArchive.name;
   // Still scanning and nothing to show yet — the map card shows a spinner.
   const mapsLoading = scan.loading && maps.length === 0;
+  const gamesLoading = scan.loading && games.length === 0;
 
   const gameInfo = useUnitsyncGameInfo(enginePath, dataDir, gameArchive);
   const { ais } = useSkirmishAis(enginePath, dataDir, gameArchive);
@@ -269,9 +273,7 @@ export default function SkirmishPage() {
             onAddAi={addAi}
           />
           <GameOptionsPanel
-            games={games}
             selectedGame={selectedGame}
-            onSelectGame={setGameName}
             startPosType={startPosType}
             onStartPosType={setStartPosType}
             options={modOptions}
@@ -283,19 +285,29 @@ export default function SkirmishPage() {
           />
         </div>
 
-        <MapCard
-          map={selectedMap}
-          maps={maps}
-          thumbs={thumbs}
-          minimapDataUrl={minimap.dataUrl}
-          startPositions={minimap.startPositions}
-          minimapLoading={minimap.loading}
-          markerColors={activeColors}
-          env={minimap.env}
-          mapsLoading={mapsLoading}
-          onSelectMap={setMapName}
-          disabled={running}
-        />
+        <div className="flex flex-col gap-5">
+          <MapCard
+            map={selectedMap}
+            maps={maps}
+            thumbs={thumbs}
+            minimapDataUrl={minimap.dataUrl}
+            startPositions={minimap.startPositions}
+            minimapLoading={minimap.loading}
+            markerColors={activeColors}
+            env={minimap.env}
+            mapsLoading={mapsLoading}
+            onSelectMap={setMapName}
+            disabled={running}
+          />
+          <GameSelectCard
+            game={selectedGame}
+            games={games}
+            headers={gameHeaders}
+            gamesLoading={gamesLoading}
+            onSelectGame={setGameName}
+            disabled={running}
+          />
+        </div>
       </div>
     </div>
   );
