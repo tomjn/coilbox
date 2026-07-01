@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
-import { ArrowLeft, FolderOpen, Play } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router";
+import { FolderOpen } from "lucide-react";
+import { useNavigate, useParams } from "react-router";
 import { useSkirmishDraft } from "@/play/drafts";
 import { type Archive, contentOpenPath } from "../bindings";
 import {
@@ -11,8 +11,8 @@ import {
 } from "../config";
 import { isSdd } from "../format";
 import { ArchiveRow } from "./components/ArchiveRow";
+import { GameHeader } from "./components/GameHeader";
 import { OptionsList } from "./components/OptionsList";
-import { SddBadge } from "./components/SddBadge";
 import { DetailLoading, NotFound, WarningBanner } from "./components/states";
 
 /** Keys surfaced in the headline; everything else goes in the metadata table. */
@@ -69,24 +69,15 @@ export default function GameDetailPage() {
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      <header className="flex flex-col gap-1">
-        <Link
-          to="/content/games"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
-        >
-          <ArrowLeft className="size-3.5" /> Games
-        </Link>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <h1 className="break-words text-lg font-semibold">{game.name}</h1>
-            {isSdd(game.primaryArchive) && <SddBadge />}
-          </div>
-          <Button size="sm" className="shrink-0 gap-1.5" onClick={play}>
-            <Play className="size-4" /> Play
-          </Button>
-        </div>
+      <GameHeader
+        game={game}
+        enginePath={selected?.enginePath}
+        dataDir={selected?.rootPath}
+        onPlay={play}
+      />
+
+      <div className="flex flex-col gap-1">
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {game.info.version && <span>v{game.info.version}</span>}
           {game.info.shortname && (
             <span className="font-mono">{game.info.shortname}</span>
           )}
@@ -95,11 +86,11 @@ export default function GameDetailPage() {
           )}
         </div>
         {game.info.description && (
-          <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+          <p className="max-w-prose text-sm text-muted-foreground">
             {game.info.description}
           </p>
         )}
-      </header>
+      </div>
 
       {game.warnings?.length ? (
         <WarningBanner warnings={game.warnings} noun="game" />
