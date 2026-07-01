@@ -16,6 +16,7 @@ Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-i
 - `allow-unitsync-archive-file`
 - `allow-unitsync-lua-exec`
 - `allow-unitsync-archive-extract`
+- `allow-unitsync-cancel`
 
 ## Permission Table
 
@@ -100,6 +101,32 @@ Enables the unitsync_archive_tree command without any pre-configured scope.
 <td>
 
 Denies the unitsync_archive_tree command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-cancel`
+
+</td>
+<td>
+
+Enables the unitsync_cancel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-cancel`
+
+</td>
+<td>
+
+Denies the unitsync_cancel command without any pre-configured scope.
 
 </td>
 </tr>

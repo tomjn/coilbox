@@ -15,6 +15,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_archive_file",
     "unitsync_lua_exec",
     "unitsync_archive_extract",
+    "unitsync_cancel",
 ];
 
 fn main() {

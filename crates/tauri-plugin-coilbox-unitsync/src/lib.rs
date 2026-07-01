@@ -17,9 +17,12 @@ use sidecar::{
     build_minimap_args, build_skirmish_ai_args, build_thumbnails_args, find_unitsync,
     resolve_sidecar,
 };
+use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{AppHandle, Manager, Runtime};
@@ -27,10 +30,39 @@ use tauri::{AppHandle, Manager, Runtime};
 const WORKER_MISSING: &str =
     "unitsync worker not found. Bundle it via tauri.conf.json `externalBin` or set UNITSYNC_WORKER.";
 
-/// Scans rebuild the whole VFS, which is slow on big content roots; give it room.
-const SCAN_TIMEOUT: Duration = Duration::from_secs(60);
+/// Scans/thumbnails rebuild per-archive state on big content roots; give them
+/// generous room. Cancellation (below) is the primary stop mechanism; this is a
+/// safety net against a wedged worker, not a normal-path limit.
+const SCAN_TIMEOUT: Duration = Duration::from_secs(300);
 /// A single minimap is a fast, bounded operation.
 const MINIMAP_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The timeout error string for an operation, e.g. "unitsync scan timed out after 300s".
+fn fmt_timeout(what: &str, timeout: Duration) -> String {
+    format!("unitsync {what} timed out after {}s", timeout.as_secs())
+}
+
+/// Maps a caller-supplied operation id to its cancel flag, so `unitsync_cancel`
+/// can signal a running scan/thumbnail worker to stop.
+fn cancel_registry() -> &'static Mutex<HashMap<String, Arc<AtomicBool>>> {
+    static REG: OnceLock<Mutex<HashMap<String, Arc<AtomicBool>>>> = OnceLock::new();
+    REG.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Register a cancel flag for `op_id` (replacing any stale one) and return it.
+fn register_cancel(op_id: &str) -> Arc<AtomicBool> {
+    let flag = Arc::new(AtomicBool::new(false));
+    cancel_registry()
+        .lock()
+        .unwrap()
+        .insert(op_id.to_string(), flag.clone());
+    flag
+}
+
+/// Drop the flag for `op_id` once its operation finishes.
+fn unregister_cancel(op_id: &str) {
+    cancel_registry().lock().unwrap().remove(op_id);
+}
 
 /// Subdirectory of the app cache dir holding rendered minimap/thumbnail PNGs.
 const THUMB_CACHE_SUBDIR: &str = "coilbox-unitsync-thumbs";
@@ -83,6 +115,8 @@ fn run_worker_blocking(
     args: Vec<String>,
     envs: Vec<(String, String)>,
     timeout: Duration,
+    what: String,
+    cancel: Option<Arc<AtomicBool>>,
 ) -> Result<String, String> {
     let mut cmd = Command::new(&bin);
     cmd.args(&args)
@@ -111,10 +145,15 @@ fn run_worker_blocking(
         match child.try_wait() {
             Ok(Some(st)) => break st,
             Ok(None) => {
+                if cancel.as_ref().is_some_and(|c| c.load(Ordering::Relaxed)) {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!("unitsync {what} cancelled"));
+                }
                 if start.elapsed() > timeout {
                     let _ = child.kill();
                     let _ = child.wait();
-                    return Err("unitsync scan timed out".into());
+                    return Err(fmt_timeout(&what, timeout));
                 }
                 std::thread::sleep(Duration::from_millis(50));
             }
@@ -193,10 +232,13 @@ async fn run_worker(
     envs: Vec<(String, String)>,
     timeout: Duration,
     what: &str,
+    cancel: Option<Arc<AtomicBool>>,
 ) -> CliResult {
-    let result =
-        tauri::async_runtime::spawn_blocking(move || run_worker_blocking(bin, args, envs, timeout))
-            .await;
+    let what_owned = what.to_string();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        run_worker_blocking(bin, args, envs, timeout, what_owned, cancel)
+    })
+    .await;
     match result {
         Ok(Ok(stdout)) => match serde_json::from_str::<serde_json::Value>(&stdout) {
             Ok(value) => CliResult::ok(value),
@@ -211,14 +253,23 @@ async fn run_worker(
 /// returning its maps, games, archives and metadata. `engine_path` is the engine
 /// dir holding `libunitsync.*`; `data_dir` is the content root to enumerate.
 #[tauri::command]
-async fn unitsync_scan(engine_path: String, data_dir: String) -> Result<CliResult, ()> {
+async fn unitsync_scan(
+    engine_path: String,
+    data_dir: String,
+    op_id: Option<String>,
+) -> Result<CliResult, ()> {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return Ok(CliResult::err(e)),
     };
     let args = build_args(&libpath.to_string_lossy(), &data_dir);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "scan").await)
+    let cancel = op_id.as_deref().map(register_cancel);
+    let res = run_worker(bin, args, envs, SCAN_TIMEOUT, "scan", cancel).await;
+    if let Some(id) = op_id.as_deref() {
+        unregister_cancel(id);
+    }
+    Ok(res)
 }
 
 /// `unitsync_minimap` — render one map's minimap as a PNG data URL. `mip` selects
@@ -244,7 +295,7 @@ async fn unitsync_minimap<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "minimap").await)
+    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "minimap", None).await)
 }
 
 /// `unitsync_heightmap` — render one map's height infomap as a downscaled
@@ -271,7 +322,7 @@ async fn unitsync_heightmap<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "heightmap").await)
+    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "heightmap", None).await)
 }
 
 /// `unitsync_thumbnails` — render a small minimap for every map in one session,
@@ -282,6 +333,7 @@ async fn unitsync_thumbnails<R: Runtime>(
     engine_path: String,
     data_dir: String,
     mip: Option<i32>,
+    op_id: Option<String>,
 ) -> Result<CliResult, ()> {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
@@ -295,7 +347,12 @@ async fn unitsync_thumbnails<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "thumbnails").await)
+    let cancel = op_id.as_deref().map(register_cancel);
+    let res = run_worker(bin, args, envs, SCAN_TIMEOUT, "thumbnails", cancel).await;
+    if let Some(id) = op_id.as_deref() {
+        unregister_cancel(id);
+    }
+    Ok(res)
 }
 
 /// `unitsync_game_info` — load one game's archives to read its sides (with start
@@ -312,7 +369,7 @@ async fn unitsync_game_info(
     };
     let args = build_game_args(&libpath.to_string_lossy(), &data_dir, &game_archive);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "game info").await)
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "game info", None).await)
 }
 
 /// `unitsync_map_info` — load one map's archive set to read its options + any
@@ -329,7 +386,7 @@ async fn unitsync_map_info(
     };
     let args = build_map_info_args(&libpath.to_string_lossy(), &data_dir, &map_name);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map info").await)
+    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map info", None).await)
 }
 
 /// `unitsync_skirmish_ais` — list the skirmish AIs available to play against:
@@ -352,7 +409,7 @@ async fn unitsync_skirmish_ais(
         game_archive.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "skirmish ais").await)
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "skirmish ais", None).await)
 }
 
 /// `unitsync_engine_config` — read a curated set of engine settings from the
@@ -366,7 +423,7 @@ async fn unitsync_engine_config(engine_path: String, data_dir: String) -> Result
     };
     let args = build_config_args(&libpath.to_string_lossy(), &data_dir);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config").await)
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config", None).await)
 }
 
 /// `unitsync_archive_tree` — list the member tree of one archive (and resolve its
@@ -383,7 +440,7 @@ async fn unitsync_archive_tree(
     };
     let args = build_archive_tree_args(&libpath.to_string_lossy(), &data_dir, &archive);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "archive tree").await)
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "archive tree", None).await)
 }
 
 /// `unitsync_archive_file` — read one member of an archive for preview. `file` is
@@ -401,7 +458,7 @@ async fn unitsync_archive_file(
     };
     let args = build_archive_file_args(&libpath.to_string_lossy(), &data_dir, &archive, &file);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive file").await)
+    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive file", None).await)
 }
 
 /// `unitsync_lua_exec` — run a Lua snippet through the engine's Lua parser with
@@ -430,7 +487,7 @@ async fn unitsync_lua_exec(
         &script.to_string_lossy(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    let result = run_worker(bin, args, envs, MINIMAP_TIMEOUT, "lua exec").await;
+    let result = run_worker(bin, args, envs, MINIMAP_TIMEOUT, "lua exec", None).await;
     let _ = std::fs::remove_file(&script);
     Ok(result)
 }
@@ -458,7 +515,17 @@ async fn unitsync_archive_extract(
         &dest,
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive extract").await)
+    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive extract", None).await)
+}
+
+/// `unitsync_cancel` — signal the scan/thumbnail worker registered under `op_id`
+/// to stop. No-op if the id is unknown (already finished).
+#[tauri::command]
+async fn unitsync_cancel(op_id: String) -> Result<CliResult, ()> {
+    if let Some(flag) = cancel_registry().lock().unwrap().get(&op_id) {
+        flag.store(true, Ordering::Relaxed);
+    }
+    Ok(CliResult::ok(serde_json::json!({ "cancelled": true })))
 }
 
 /// Build the plugin. Registered as `"coilbox-unitsync"` (crate name minus the
@@ -477,7 +544,37 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_archive_tree,
             unitsync_archive_file,
             unitsync_lua_exec,
-            unitsync_archive_extract
+            unitsync_archive_extract,
+            unitsync_cancel
         ])
         .build()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timeout_message_names_op_and_seconds() {
+        assert_eq!(
+            fmt_timeout("scan", Duration::from_secs(300)),
+            "unitsync scan timed out after 300s"
+        );
+    }
+
+    #[test]
+    fn cancel_flag_registers_and_signals() {
+        let flag = register_cancel("op-1");
+        assert!(!flag.load(Ordering::Relaxed));
+        // A second lookup sees the same flag and can signal it.
+        cancel_registry()
+            .lock()
+            .unwrap()
+            .get("op-1")
+            .unwrap()
+            .store(true, Ordering::Relaxed);
+        assert!(flag.load(Ordering::Relaxed));
+        unregister_cancel("op-1");
+        assert!(cancel_registry().lock().unwrap().get("op-1").is_none());
+    }
 }
