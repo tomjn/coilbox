@@ -13,6 +13,7 @@ Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-i
 - `allow-unitsync-engine-config`
 - `allow-unitsync-archive-tree`
 - `allow-unitsync-archive-file`
+- `allow-unitsync-game-header`
 - `allow-unitsync-lua-exec`
 - `allow-unitsync-archive-extract`
 
@@ -125,6 +126,32 @@ Enables the unitsync_engine_config command without any pre-configured scope.
 <td>
 
 Denies the unitsync_engine_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-game-header`
+
+</td>
+<td>
+
+Enables the unitsync_game_header command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-game-header`
+
+</td>
+<td>
+
+Denies the unitsync_game_header command without any pre-configured scope.
 
 </td>
 </tr>
