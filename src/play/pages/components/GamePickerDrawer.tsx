@@ -7,7 +7,7 @@ import { isSdd } from "@/content/format";
 import { GameArt } from "@/content/pages/components/GameArt";
 import { SddBadge } from "@/content/pages/components/SddBadge";
 import { WarningIcon } from "@/content/pages/components/states";
-import { cn } from "@/lib/utils";
+import { cn, versionLabel } from "@/lib/utils";
 
 /** Unique id for a game: its name plus its own primary archive (matches GamesPage). */
 const gameId = (g: GameItem) => `${g.primaryArchive.name}:${g.name}`;
@@ -114,7 +114,7 @@ export function GamePickerDrawer({
                     </div>
                     {g.info.version && (
                       <span className="text-[11px] text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-                        v{g.info.version}
+                        {versionLabel(g.info.version)}
                       </span>
                     )}
                   </div>

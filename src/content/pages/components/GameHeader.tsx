@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { ArrowLeft, Play } from "lucide-react";
 import { Link } from "react-router";
+import { versionLabel } from "@/lib/utils";
 import type { GameItem } from "../../bindings";
 import { useUnitsyncGameHeaders } from "../../config";
 import { isSdd } from "../../format";
@@ -62,7 +63,7 @@ export function GameHeader({
           </div>
           {game.info.version && (
             <span className="text-xs text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-              v{game.info.version}
+              {versionLabel(game.info.version)}
             </span>
           )}
         </div>

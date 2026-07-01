@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Play } from "lucide-react";
 import { Link } from "react-router";
+import { versionLabel } from "@/lib/utils";
 import type { GameItem } from "../../bindings";
 import { isSdd } from "../../format";
 import { GameArt } from "./GameArt";
@@ -75,7 +76,7 @@ export function GameCard({
           </div>
           {game.info.version && (
             <span className="text-xs text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-              v{game.info.version}
+              {versionLabel(game.info.version)}
             </span>
           )}
         </div>
