@@ -4,7 +4,9 @@
 //! `.sdp` packages are read uniformly — each in its own one-shot `Init` session.
 
 use crate::ffi::Unitsync;
-use crate::model::{ArchiveExtractOutput, ArchiveFileEntry, ArchiveFileOutput, ArchiveTreeOutput};
+use crate::model::{
+    ArchiveExtractOutput, ArchiveFileEntry, ArchiveFileOutput, ArchiveTreeOutput, GameHeaderOutput,
+};
 use base64::Engine;
 use std::path::Path;
 
@@ -318,6 +320,108 @@ pub fn extract(lib: &str, archive_name: &str, inner: &str, dest: &str) -> Archiv
     ArchiveExtractOutput { size, errors }
 }
 
+/// Resolve one game's header image: the `loadpicture` member first, else a random
+/// image from `bitmaps/loadpictures/`, returned as a `data:` URL. Result is cached
+/// on disk under `cache_dir/<checksum>.dataurl` (or a `.none` marker), so repeat
+/// calls never re-open the archive. Caching is skipped when `checksum` is empty or
+/// `cache_dir` is `None`.
+pub fn game_header(
+    lib: &str,
+    archive_name: &str,
+    loadpicture: &str,
+    checksum: &str,
+    cache_dir: Option<&Path>,
+) -> GameHeaderOutput {
+    // Cache lookup first — a hit avoids loading unitsync entirely.
+    let cache = cache_dir.filter(|_| !checksum.is_empty());
+    if let Some(dir) = cache {
+        match read_header_cache(dir, checksum) {
+            CacheState::Hit(url) => {
+                return GameHeaderOutput {
+                    data_url: Some(url),
+                    errors: Vec::new(),
+                }
+            }
+            CacheState::Negative => {
+                return GameHeaderOutput {
+                    data_url: None,
+                    errors: Vec::new(),
+                }
+            }
+            CacheState::Miss => {}
+        }
+    }
+
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(u) => u,
+        Err(e) => {
+            return GameHeaderOutput {
+                data_url: None,
+                errors: vec![e],
+            }
+        }
+    };
+    us.init(false, 0);
+    let mut errors = us.drain_errors();
+
+    let open_path = resolve_open_path(&us, archive_name);
+    let _ = us.drain_errors();
+    let data_url = match open_path.as_deref().and_then(|p| us.open_archive(p)) {
+        Some(handle) => {
+            let url = resolve_header_member(&us, handle, loadpicture);
+            us.close_archive(handle);
+            url
+        }
+        None => {
+            errors.push(format!("could not open archive {archive_name}"));
+            None
+        }
+    };
+
+    errors.extend(us.drain_errors());
+    us.uninit();
+
+    // Persist the outcome (positive or negative) so later launches skip the open.
+    if let Some(dir) = cache {
+        match &data_url {
+            Some(url) => write_header_hit(dir, checksum, url),
+            None => write_header_negative(dir, checksum),
+        }
+    }
+
+    GameHeaderOutput { data_url, errors }
+}
+
+/// Within an open archive, read the `loadpicture` member if given and decodable,
+/// else a random `bitmaps/loadpictures/` image. Returns the `data:` URL or `None`.
+fn resolve_header_member(us: &Unitsync, handle: i32, loadpicture: &str) -> Option<String> {
+    if !loadpicture.is_empty() {
+        if let Some(url) = read_image_member(us, handle, loadpicture) {
+            return Some(url);
+        }
+    }
+    let mut candidates: Vec<String> = us
+        .list_archive_files(handle)
+        .into_iter()
+        .map(|(path, _)| path)
+        .filter(|p| is_loadpicture_image(p))
+        .collect();
+    candidates.sort();
+    let idx = pick_index(candidates.len())?;
+    read_image_member(us, handle, &candidates[idx])
+}
+
+/// Read one member and encode it as an image `data:` URL, or `None` if it isn't a
+/// decodable image. Capped at `IMAGE_CAP` like the preview path.
+fn read_image_member(us: &Unitsync, handle: i32, inner: &str) -> Option<String> {
+    let ext = inner.rsplit('.').next().unwrap_or("").to_lowercase();
+    let (size, bytes) = us.read_archive_member(handle, inner, IMAGE_CAP)?;
+    if size as usize > IMAGE_CAP {
+        return None;
+    }
+    encode_preview_image(&ext, &bytes)
+}
+
 /// Image extensions we can turn into a `data:` URL for the header (matches the
 /// formats `encode_preview_image` handles).
 const HEADER_IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "gif", "bmp", "tga"];
@@ -405,6 +509,15 @@ pub fn emit_extract_error(msg: String) {
     let out = ArchiveExtractOutput {
         errors: vec![msg],
         ..Default::default()
+    };
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
+/// Print a game-header error envelope to stdout (used on panic).
+pub fn emit_game_header_error(msg: String) {
+    let out = GameHeaderOutput {
+        data_url: None,
+        errors: vec![msg],
     };
     println!("{}", serde_json::to_string(&out).unwrap_or_default());
 }
