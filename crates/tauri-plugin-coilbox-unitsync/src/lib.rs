@@ -124,6 +124,11 @@ fn run_worker_blocking(
     let out = out_handle.join().unwrap_or_default();
     let err = err_handle.join().unwrap_or_default();
 
+    #[cfg(debug_assertions)]
+    if !err.trim().is_empty() {
+        eprintln!("[unitsync-worker stderr] {}", err.trim());
+    }
+
     if out.trim().is_empty() {
         let code = status
             .code()

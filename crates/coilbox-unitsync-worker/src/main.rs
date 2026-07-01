@@ -359,6 +359,8 @@ fn prepend_loader_path(dir: &Path) {
 
 /// Load unitsync, initialise once, and enumerate everything we render.
 fn scan(lib: &str) -> Result<ScanOutput, String> {
+    let timings = std::env::var("COILBOX_UNITSYNC_TIMINGS").is_ok();
+    let t0 = std::time::Instant::now();
     let us = unsafe { Unitsync::load(Path::new(lib))? };
 
     let mut errors = Vec::new();
@@ -366,11 +368,31 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
         errors.push("unitsync Init returned 0 (failure); results may be empty".into());
     }
     errors.extend(us.drain_errors());
+    if timings {
+        eprintln!("[unitsync-timing] init={}ms", t0.elapsed().as_millis());
+    }
 
     let sync_version = us.spring_version();
 
+    let tm = std::time::Instant::now();
     let maps = collect_maps(&us);
+    if timings {
+        eprintln!(
+            "[unitsync-timing] maps={} in {}ms",
+            maps.len(),
+            tm.elapsed().as_millis()
+        );
+    }
+
+    let tg = std::time::Instant::now();
     let games = collect_games(&us);
+    if timings {
+        eprintln!(
+            "[unitsync-timing] games={} in {}ms",
+            games.len(),
+            tg.elapsed().as_millis()
+        );
+    }
 
     us.uninit();
 
@@ -502,6 +524,8 @@ fn fmt_num(v: f32) -> String {
 }
 
 fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
+    let timings = std::env::var("COILBOX_UNITSYNC_TIMINGS").is_ok();
+    let mut opt_nanos: u128 = 0;
     let count = us.map_count();
     let mut maps = Vec::with_capacity(count.max(0) as usize);
     for i in 0..count {
@@ -516,7 +540,9 @@ fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
         let dims = us.map_dimensions(&name);
         // Read options last: the GetOption* accessors read a global set by
         // GetMapOptionCount, so populate and consume it back-to-back.
+        let to = std::time::Instant::now();
         let options = read_options(us, us.map_option_count(&name));
+        opt_nanos += to.elapsed().as_nanos();
         // Drain after the accessors above, so any queued diagnostics attach to
         // this map.
         let warnings = drain_attributed(us);
@@ -531,6 +557,12 @@ fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
             warnings,
             name: name.clone(),
         });
+    }
+    if timings {
+        eprintln!(
+            "[unitsync-timing] map_options total={}ms",
+            opt_nanos / 1_000_000
+        );
     }
     maps
 }
