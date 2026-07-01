@@ -101,6 +101,7 @@ pub struct Unitsync {
     // optional archive metadata
     archive_path_fn: Option<StrByStrFn>,
     archive_checksum_fn: Option<UintByStrFn>,
+    map_checksum_from_name_fn: Option<UintByStrFn>,
     // optional archive file access (browse + read members through the VFS)
     open_archive_fn: Option<IntByStrFn>,
     close_archive_fn: Option<VoidByIntFn>,
@@ -215,6 +216,7 @@ impl Unitsync {
             info_value_string_fn: req(&lib, b"GetInfoValueString\0")?,
             archive_path_fn: opt(&lib, b"GetArchivePath\0"),
             archive_checksum_fn: opt(&lib, b"GetArchiveChecksum\0"),
+            map_checksum_from_name_fn: opt(&lib, b"GetMapChecksumFromName\0"),
             open_archive_fn: opt(&lib, b"OpenArchive\0"),
             close_archive_fn: opt(&lib, b"CloseArchive\0"),
             init_dir_list_vfs_fn: opt(&lib, b"InitDirListVFS\0"),
@@ -482,6 +484,15 @@ impl Unitsync {
 
     pub fn archive_checksum(&self, name: &str) -> Option<u32> {
         let f = self.archive_checksum_fn?;
+        let c = CString::new(name).ok()?;
+        Some(unsafe { f(c.as_ptr()) })
+    }
+
+    /// Sync checksum for a map by name (`GetMapChecksumFromName`). This SHA512-
+    /// hashes the whole archive plus its dependencies, so it's costly — callers
+    /// should only use it lazily (map detail), never during enumeration.
+    pub fn map_checksum_from_name(&self, name: &str) -> Option<u32> {
+        let f = self.map_checksum_from_name_fn?;
         let c = CString::new(name).ok()?;
         Some(unsafe { f(c.as_ptr()) })
     }

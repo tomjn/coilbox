@@ -264,7 +264,6 @@ export interface ConfigOption {
 export interface MapItem {
   name: string;
   fileName?: string;
-  checksum?: string;
   archives: Archive[];
   /** mapinfo metadata (description, author, dimensions, ...). */
   info: Record<string, string>;
@@ -314,6 +313,7 @@ export const unitsyncGameInfo = defineCommand<
 
 export interface MapInfoResult {
   options: ConfigOption[];
+  checksum?: string;
   warnings?: string[];
   errors?: string[];
 }

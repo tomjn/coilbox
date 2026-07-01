@@ -68,8 +68,6 @@ pub struct MapItem {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub checksum: Option<String>,
     pub archives: Vec<Archive>,
     /// mapinfo metadata (description, author, dimensions, ...).
     pub info: BTreeMap<String, String>,
@@ -191,6 +189,10 @@ pub struct GameInfoOutput {
 pub struct MapInfoOutput {
     /// Map options (from mapoptions.lua), when present.
     pub options: Vec<ConfigOption>,
+    /// Sync checksum (from GetMapChecksumFromName) — hashes the whole archive, so
+    /// it's computed lazily here, not during the enumeration scan.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
     /// Non-fatal unitsync diagnostics attributed to this map.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,

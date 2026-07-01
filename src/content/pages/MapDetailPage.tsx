@@ -95,7 +95,9 @@ export default function MapDetailPage() {
         <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">
           {size && <span>{size}</span>}
           {map.fileName && <span className="break-all">{map.fileName}</span>}
-          {map.checksum && <span>checksum {map.checksum}</span>}
+          {mapInfo.info?.checksum && (
+            <span>checksum {mapInfo.info.checksum}</span>
+          )}
         </div>
         {map.info.description && (
           <p className="mt-1 max-w-prose text-sm text-muted-foreground">

@@ -447,10 +447,16 @@ fn map_info(lib: &str, map_name: &str) -> model::MapInfoOutput {
         errors.push("unitsync Init returned 0 (failure)".into());
     }
     let options = read_options(&us, us.map_option_count(map_name));
+    // A zero CRC means "unknown" here, so omit it rather than show a misleading 0.
+    let checksum = us
+        .map_checksum_from_name(map_name)
+        .filter(|&c| c != 0)
+        .map(|c| format!("{c:08x}"));
     let warnings = drain_attributed(&us);
     us.uninit();
     model::MapInfoOutput {
         options,
+        checksum,
         warnings,
         errors,
     }
@@ -590,7 +596,6 @@ fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
         let dims = us.map_dimensions(&name);
         maps.push(MapItem {
             file_name: us.map_file_name(i),
-            checksum: us.map_checksum(i).map(|c| format!("{c:08x}")),
             archives,
             info: us.map_info(i),
             width: dims.map(|(w, _)| w),
