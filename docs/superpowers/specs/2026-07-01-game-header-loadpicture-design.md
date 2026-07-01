@@ -36,49 +36,69 @@ on a detached HEAD one merge behind, so the implementation branch must be based 
 Two layers: a new Rust command that resolves + persistently caches the image, and
 a frontend `GameHeader` component that renders the hero.
 
-### Rust: resolve + disk cache (new command)
+### Rust: resolve + disk cache (worker-owned, new command)
 
-New command `unitsync_game_header` in `tauri-plugin-coilbox-unitsync`, backed by
-resolution logic in `coilbox-unitsync-worker/src/archive.rs`.
+New command `unitsync_game_header` in `tauri-plugin-coilbox-unitsync`, backed by a
+new `game_header` resolver in `coilbox-unitsync-worker/src/archive.rs`. Caching is
+**worker-owned**, exactly like minimaps/thumbnails: the plugin resolves the app
+cache dir and passes it to the worker via `--cache-dir`; the worker does the
+read-before-open / write-after logic. The plugin command mirrors
+`unitsync_minimap` (spawn worker, return the JSON in a `CliResult`); it holds no
+cache logic of its own.
 
 ```
-unitsync_game_header({ enginePath, dataDir, archive, checksum, loadpicture? })
-  -> GameHeaderResult { dataUrl?: string, source: "loadpicture" | "folder" | "none", cached: boolean }
+unitsync_game_header({ enginePath, dataDir, archive, checksum?, loadpicture? })
+  -> GameHeaderResult { dataUrl?: string, errors: string[] }
 ```
 
-Cache directory: `app.path().app_cache_dir()/game-headers/` (sibling of the
-existing thumbnail cache; see `thumb_cache_dir()` in the plugin's `lib.rs`).
+The return is deliberately minimal: `dataUrl` present = show that art; `dataUrl`
+absent = show the gradient placeholder. The frontend needs nothing more, so there
+is no `source`/`cached` field.
 
-Cache key: `game.checksum` (unique per installed game; changes when archive
-content changes, giving free invalidation). If `checksum` is empty, fall back to a
-hash of the archive name.
+Cache directory: `app.path().app_cache_dir()/coilbox-unitsync-headers/` (a
+dedicated sibling of the existing `coilbox-unitsync-thumbs` dir; add a
+`header_cache_dir()` helper mirroring `thumb_cache_dir()`).
 
-Lookup / resolve flow:
+Cache key: `game.checksum` (hex CRC string from the scan; unique per installed
+game, changes when archive content changes -> free invalidation). If `checksum` is
+empty/absent, caching is skipped for that game (same "unknown checksum disables
+caching" behaviour as minimaps) and the archive is resolved live each time.
 
-1. **Positive hit** - `game-headers/<checksum>.png` exists: read it, return its
-   bytes as a PNG `data:` URL with `cached: true`. No archive open. `touch` its
-   mtime for LRU.
-2. **Negative hit** - `game-headers/<checksum>.none` marker exists: return
-   `{ source: "none", cached: true }`. No archive open.
-3. **Miss** - open the archive's VFS once and resolve a candidate:
-   - `loadpicture` first (if the passed path is non-empty and reads as an image).
-   - else list members under `bitmaps/loadpictures/` (case-insensitive prefix)
-     ending in `.jpg/.jpeg/.png/.tga/.bmp` and pick one at random.
-   On success: transcode to PNG (reuse the `encode_preview_image` path in
-   `archive.rs`, factored so it can emit PNG bytes for the disk write as well as
-   the `data:` URL for the response), write `<checksum>.png`, return the `data:`
-   URL with `source` set and `cached: false`. On no candidate: write the
-   `<checksum>.none` marker and return `source: "none"`.
+The cache stores the **resolved `data:` URL as text** in `<checksum>.dataurl`
+(plus a `<checksum>.none` empty negative marker). Storing the response string
+verbatim avoids re-encoding and preserves each image's real MIME type - important
+because the worker's `image` crate only enables `png`+`tga` features and cannot
+decode jpg/gif/bmp, while `encode_preview_image` already passes those formats
+through as-is. The ~33% base64 inflation is negligible for a per-game cache.
 
-Because the chosen file is frozen on disk as `<checksum>.png`, the random folder
-pick is **stable across launches** until the archive (hence checksum) changes.
+Worker `game_header(lib, archive, loadpicture, checksum, cache_dir)` flow:
 
-Eviction: after a write, enumerate `game-headers/`, sum sizes, and if over a cap
-(**default 128 MB**), delete entries oldest-first by mtime until under budget.
-`.none` markers are tiny and exempt. Simple size-based LRU, no index file.
+1. **Positive hit** - `<checksum>.dataurl` exists: read the string, return it as
+   `dataUrl`. No archive open.
+2. **Negative hit** - `<checksum>.none` exists: return `{ dataUrl: None }`. No
+   archive open.
+3. **Miss** - open the archive's VFS once (reusing `resolve_open_path` +
+   `open_archive`) and resolve a candidate:
+   - `loadpicture` first (if the passed path is non-empty and reads as an image
+     via `read_archive_member` + `encode_preview_image`).
+   - else list members (`list_archive_files`), keep those whose lowercased path
+     starts with `bitmaps/loadpictures/` and ends in
+     `.jpg/.jpeg/.png/.gif/.bmp/.tga`, and pick one. The pick index is
+     `SystemTime` nanos mod count (adequate one-time randomness; no `rand` dep).
+   On the first candidate that encodes: write `<checksum>.dataurl`, return the
+   `data:` URL. If no candidate encodes: write `<checksum>.none`, return
+   `{ dataUrl: None }`.
+
+Because the resolved URL is frozen on disk, the random folder pick is **stable
+across launches** until the archive (hence checksum) changes.
+
+Eviction is **deferred** (follow-up): the cache is unbounded, matching the
+existing (also unbounded) thumbnail cache. It is keyed per game, so it holds on
+the order of tens of small entries, not the hundreds a per-map cache would.
 
 ACL: the new command needs its entry in the plugin `build.rs` `COMMANDS` list and
-`permissions/default.toml`, or it is blocked at runtime.
+an `allow-unitsync-game-header` line in `permissions/default.toml`, or it is
+blocked at runtime.
 
 ### Frontend: shared hook + component
 
@@ -107,8 +127,8 @@ Full-bleed Steam-style hero, always present:
   `w-full`, `relative`, `overflow-hidden`.
 - **Base layer (always):** a colored gradient placeholder. Two hues derived from a
   hash of `game.name` produce a diagonal `linear-gradient` (inline style, dark-ish
-  so overlaid white text stays AA-legible). Shown immediately and whenever
-  `source === "none"`.
+  so overlaid white text stays AA-legible). Shown immediately and whenever the
+  resolved `dataUrl` is absent.
 - **Art layer (when `dataUrl` present):** `<img>` absolutely filling the
   container, `object-cover object-center` so the full-screen source art crops to a
   wide, short strip (center-anchored - top/bottom trimmed, matching Steam).
@@ -143,10 +163,9 @@ All spacing on the 8pt/4pt grid. Touch targets >= 24px.
   images, stable across navigation and across relaunches (frozen on disk).
 - A game with neither shows a gradient placeholder hero (never the old plain
   header, never a blank strip), and does not re-open its archive on later launches
-  (negative cache marker).
-- Second launch renders cached heroes without opening the archive VFS
-  (`cached: true`).
-- Cache stays under the size cap via oldest-first eviction.
+  (`.none` negative marker).
+- Second launch renders cached heroes from `<checksum>.dataurl` without opening
+  the archive VFS.
 - The Play button retains its exact merged behaviour (seeds skirmish draft, routes
   to `/play/skirmish`).
 - Lint/type/build green with the same commands CI runs:
