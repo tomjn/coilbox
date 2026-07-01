@@ -170,6 +170,49 @@ async fn play_launch<R: Runtime>(
     })
 }
 
+/// `play_launch_replay` — launch the engine to play back a demo (`.sdfz`). Unlike
+/// `play_launch` this writes no start script: the engine reads map/game/players
+/// from the demo when it's passed as the positional argument. Shares the run
+/// registry, so it refuses to start while any game/replay is already running.
+#[tauri::command]
+async fn play_launch_replay<R: Runtime>(
+    _app: AppHandle<R>,
+    reg: State<'_, RunRegistry>,
+    demo_path: String,
+    executable: String,
+    data_dir: String,
+    run_id: String,
+    on_event: Channel<LaunchEvent>,
+) -> Result<CliResult, ()> {
+    let bin = PathBuf::from(&executable);
+    if !bin.is_file() {
+        return Ok(CliResult::err(format!(
+            "engine executable not found: {executable}"
+        )));
+    }
+    if !PathBuf::from(&demo_path).is_file() {
+        return Ok(CliResult::err(format!("replay not found: {demo_path}")));
+    }
+    // Single game/replay at a time.
+    if !reg.lock().unwrap().is_empty() {
+        return Ok(CliResult::err("a game is already running"));
+    }
+
+    let args = build_engine_args(&demo_path, None);
+    let reg = reg.inner().clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        launch_blocking(bin, args, data_dir, run_id, reg, on_event)
+    })
+    .await;
+
+    Ok(match result {
+        Ok(Ok(Some(code))) => CliResult::ok(json!({ "exitCode": code })),
+        Ok(Ok(None)) => CliResult::ok(json!({ "exitCode": serde_json::Value::Null })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("launch task failed: {e}")),
+    })
+}
+
 /// `play_cancel` — kill an in-flight game by run id (its launch resolves shortly
 /// after, unfreezing the UI).
 #[tauri::command]
@@ -196,6 +239,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             play_generate_script,
             play_launch,
+            play_launch_replay,
             play_cancel
         ])
         .build()
