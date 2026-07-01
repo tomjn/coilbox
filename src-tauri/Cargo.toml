@@ -20,6 +20,8 @@ tauri-plugin-coilbox-unitsync = { path = "../crates/tauri-plugin-coilbox-unitsyn
 tauri-plugin-coilbox-play = { path = "../crates/tauri-plugin-coilbox-play" }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 # Dev-only AI-agent bridge: runs an MCP socket server so agents can screenshot/
 # drive the app. tomjn fork carries a macOS window-finding fix not yet upstream.
 # Always compiled, but only initialised under `#[cfg(debug_assertions)]` in main.rs.
