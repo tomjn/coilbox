@@ -13,7 +13,12 @@ import { isSdd } from "../format";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { OptionsList } from "./components/OptionsList";
 import { SddBadge } from "./components/SddBadge";
-import { DetailLoading, NotFound, WarningBanner } from "./components/states";
+import {
+  DetailError,
+  DetailLoading,
+  NotFound,
+  WarningBanner,
+} from "./components/states";
 
 /** Keys surfaced in the headline; everything else goes in the metadata table. */
 const HEADLINE_KEYS = new Set(["name", "shortname", "version", "description"]);
@@ -28,7 +33,7 @@ export default function GameDetailPage() {
   const navigate = useNavigate();
   const [draft, setDraft] = useSkirmishDraft();
   const { selected } = useScanTargetSelection();
-  const { data, loading } = useUnitsyncScan(
+  const { data, loading, error, run } = useUnitsyncScan(
     selected?.enginePath,
     selected?.rootPath,
   );
@@ -39,6 +44,14 @@ export default function GameDetailPage() {
     game?.primaryArchive.name,
   );
 
+  if (error && !data)
+    return (
+      <DetailError
+        backTo="/content/games"
+        message={error}
+        onRetry={() => run(true)}
+      />
+    );
   if (!data || loading) return <DetailLoading backTo="/content/games" />;
   if (!game) return <NotFound backTo="/content/games" label="game" />;
 

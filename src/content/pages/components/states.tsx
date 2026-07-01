@@ -1,3 +1,4 @@
+import { Button } from "@picoframe/frame";
 import { AlertCircle, ArrowLeft, Inbox, TriangleAlert } from "lucide-react";
 import { Link } from "react-router";
 
@@ -113,6 +114,34 @@ export function DetailLoading({ backTo }: { backTo: string }) {
         <ArrowLeft className="size-3.5" /> Back
       </Link>
       <SkeletonList />
+    </div>
+  );
+}
+
+/** Detail-page error state (the scan for this target failed). */
+export function DetailError({
+  backTo,
+  message,
+  onRetry,
+}: {
+  backTo: string;
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      <Link
+        to={backTo}
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+      >
+        <ArrowLeft className="size-3.5" /> Back
+      </Link>
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
+        <span className="break-words text-destructive">{message}</span>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          Retry
+        </Button>
+      </div>
     </div>
   );
 }

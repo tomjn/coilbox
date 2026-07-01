@@ -12,7 +12,12 @@ import {
 import { ArchiveRow } from "./components/ArchiveRow";
 import { mapSizeLabel } from "./components/MapThumb";
 import { OptionsList } from "./components/OptionsList";
-import { DetailLoading, NotFound, WarningBanner } from "./components/states";
+import {
+  DetailError,
+  DetailLoading,
+  NotFound,
+  WarningBanner,
+} from "./components/states";
 
 /** Keys shown in the headline; everything else goes in the metadata table. */
 const HEADLINE_KEYS = new Set(["name", "description"]);
@@ -22,7 +27,7 @@ export default function MapDetailPage() {
   const { name } = useParams();
   const decoded = name ? decodeURIComponent(name) : "";
   const { selected } = useScanTargetSelection();
-  const { data, loading } = useUnitsyncScan(
+  const { data, loading, error, run } = useUnitsyncScan(
     selected?.enginePath,
     selected?.rootPath,
   );
@@ -42,6 +47,14 @@ export default function MapDetailPage() {
     decoded,
   );
 
+  if (error && !data)
+    return (
+      <DetailError
+        backTo="/content/maps"
+        message={error}
+        onRetry={() => run(true)}
+      />
+    );
   if (!data || loading) return <DetailLoading backTo="/content/maps" />;
   const map = data.maps.find((m) => m.name === decoded);
   if (!map) return <NotFound backTo="/content/maps" label="map" />;
