@@ -9,6 +9,7 @@
 //! explicit `content_verify_engine` (bounded by a timeout), never during listing.
 //! Results use the [`CliResult`] envelope, matching every other picoframe plugin.
 
+mod demo;
 mod engine;
 mod model;
 mod paths;
@@ -554,6 +555,31 @@ async fn content_open_path(path: String) -> Result<CliResult, ()> {
     }
 }
 
+/// `content_list_replays` — list demo files under `<root>/demos` and
+/// `<root>/replays` (fast fs metadata; no decoding). `root` is a `ContentRoot.path`.
+#[tauri::command]
+async fn content_list_replays(root: String) -> Result<CliResult, ()> {
+    let p = PathBuf::from(&root);
+    match tauri::async_runtime::spawn_blocking(move || demo::list_replays(&p)).await {
+        Ok(replays) => Ok(CliResult::ok(json!({ "replays": replays }))),
+        Err(e) => Ok(CliResult::err(format!("list replays task failed: {e}"))),
+    }
+}
+
+/// `content_demo_info` — decode one replay: native header + start-script (map,
+/// game, players, sides, ally-teams) plus demotool's winner. `enginePath` is an
+/// `Engine.path` (where `demotool` lives); `replayPath` an absolute demo path.
+#[tauri::command]
+async fn content_demo_info(engine_path: String, replay_path: String) -> Result<CliResult, ()> {
+    let engine = PathBuf::from(&engine_path);
+    let demo_path = PathBuf::from(&replay_path);
+    match tauri::async_runtime::spawn_blocking(move || demo::demo_info(&engine, &demo_path)).await {
+        Ok(Ok(info)) => Ok(CliResult::ok(json!({ "info": info }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("demo info task failed: {e}"))),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -567,7 +593,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_remove_root,
             content_list_engines,
             content_verify_engine,
-            content_open_path
+            content_open_path,
+            content_list_replays,
+            content_demo_info
         ])
         .build()
 }

@@ -16,3 +16,4 @@ tauri = { version = "2" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 picoframe-core = "0.0.2"
+flate2 = "1"

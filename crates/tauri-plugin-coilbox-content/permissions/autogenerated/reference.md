@@ -13,6 +13,8 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-list-engines`
 - `allow-content-verify-engine`
 - `allow-content-open-path`
+- `allow-content-list-replays`
+- `allow-content-demo-info`
 
 ## Permission Table
 
@@ -78,6 +80,32 @@ Denies the content_candidates command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-content:allow-content-demo-info`
+
+</td>
+<td>
+
+Enables the content_demo_info command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-demo-info`
+
+</td>
+<td>
+
+Denies the content_demo_info command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-content:allow-content-list-engines`
 
 </td>
@@ -97,6 +125,32 @@ Enables the content_list_engines command without any pre-configured scope.
 <td>
 
 Denies the content_list_engines command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-list-replays`
+
+</td>
+<td>
+
+Enables the content_list_replays command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-list-replays`
+
+</td>
+<td>
+
+Denies the content_list_replays command without any pre-configured scope.
 
 </td>
 </tr>

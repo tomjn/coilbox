@@ -375,10 +375,10 @@
           "markdownDescription": "Denies the anim_cob_disasm command without any pre-configured scope."
         },
         {
-          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`",
+          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`",
           "type": "string",
           "const": "coilbox-content:default",
-          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`"
+          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`"
         },
         {
           "description": "Enables the content_add_root command without any pre-configured scope.",
@@ -393,10 +393,22 @@
           "markdownDescription": "Enables the content_candidates command without any pre-configured scope."
         },
         {
+          "description": "Enables the content_demo_info command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-demo-info",
+          "markdownDescription": "Enables the content_demo_info command without any pre-configured scope."
+        },
+        {
           "description": "Enables the content_list_engines command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-content:allow-content-list-engines",
           "markdownDescription": "Enables the content_list_engines command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_list_replays command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-list-replays",
+          "markdownDescription": "Enables the content_list_replays command without any pre-configured scope."
         },
         {
           "description": "Enables the content_open_path command without any pre-configured scope.",
@@ -447,10 +459,22 @@
           "markdownDescription": "Denies the content_candidates command without any pre-configured scope."
         },
         {
+          "description": "Denies the content_demo_info command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-demo-info",
+          "markdownDescription": "Denies the content_demo_info command without any pre-configured scope."
+        },
+        {
           "description": "Denies the content_list_engines command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-content:deny-content-list-engines",
           "markdownDescription": "Denies the content_list_engines command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_list_replays command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-list-replays",
+          "markdownDescription": "Denies the content_list_replays command without any pre-configured scope."
         },
         {
           "description": "Denies the content_open_path command without any pre-configured scope.",
