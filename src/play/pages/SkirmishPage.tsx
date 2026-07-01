@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import { Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
@@ -164,6 +165,7 @@ export default function SkirmishPage() {
     [participants],
   );
 
+  const you = participants.find((p) => p.kind === "you");
   const activeCount = participants.filter(
     (p) => !(p.kind === "you" && p.spectator),
   ).length;
@@ -237,9 +239,28 @@ export default function SkirmishPage() {
     <div className="flex flex-col gap-5 p-4">
       <header className="flex items-center justify-between gap-4">
         <h1 className="text-lg font-semibold">Singleplayer</h1>
-        <Button onClick={onStart} disabled={!canStart}>
-          <Play className="size-4" /> {running ? "Game running…" : "Start Game"}
-        </Button>
+        <div className="flex items-center gap-4">
+          {you && (
+            <label
+              htmlFor="spectate-you"
+              className="inline-flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
+            >
+              <Checkbox
+                id="spectate-you"
+                checked={you.spectator}
+                disabled={running}
+                onCheckedChange={(v) =>
+                  updateParticipant(you.id, { spectator: v === true })
+                }
+              />
+              Spectate
+            </label>
+          )}
+          <Button onClick={onStart} disabled={!canStart}>
+            <Play className="size-4" />{" "}
+            {running ? "Game running…" : "Start Game"}
+          </Button>
+        </div>
       </header>
 
       {!target && !scan.loading && (

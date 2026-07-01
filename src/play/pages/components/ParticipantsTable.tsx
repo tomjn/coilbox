@@ -1,6 +1,5 @@
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -195,22 +194,7 @@ export function ParticipantsTable({
                 </td>
 
                 <td className="px-3 py-2 text-right">
-                  {p.kind === "you" ? (
-                    <label
-                      htmlFor={`spectate-${p.id}`}
-                      className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"
-                    >
-                      <Checkbox
-                        id={`spectate-${p.id}`}
-                        checked={p.spectator}
-                        disabled={disabled}
-                        onCheckedChange={(v) =>
-                          onUpdate(p.id, { spectator: v === true })
-                        }
-                      />
-                      Spectate
-                    </label>
-                  ) : (
+                  {p.kind === "you" ? null : (
                     <Button
                       variant="ghost"
                       size="icon"
