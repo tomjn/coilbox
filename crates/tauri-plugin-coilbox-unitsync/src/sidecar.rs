@@ -79,6 +79,29 @@ pub fn build_minimap_args(
     args
 }
 
+/// Build args for `--game-header` mode: resolve a game's loadpicture art to a
+/// cached data URL. `loadpicture` is the modinfo hint (may be empty); `checksum`
+/// keys the disk cache (empty disables caching).
+pub fn build_game_header_args(
+    lib: &str,
+    datadir: &str,
+    archive: &str,
+    loadpicture: &str,
+    checksum: &str,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--game-header".into());
+    args.push("--archive".into());
+    args.push(archive.into());
+    args.push("--file".into());
+    args.push(loadpicture.into());
+    args.push("--checksum".into());
+    args.push(checksum.into());
+    push_cache_dir(&mut args, cache_dir);
+    args
+}
+
 /// Build args for heightmap mode: scan args plus the map name, the `--heightmap`
 /// flag, the longest-side pixel cap, and the optional on-disk PNG cache directory.
 pub fn build_heightmap_args(
