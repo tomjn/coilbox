@@ -13,7 +13,6 @@ import {
   EmptyState,
   ErrorBanner,
   SkeletonList,
-  WarningIcon,
 } from "./components/states";
 
 type SortKey = "name-asc" | "name-desc" | "area-desc" | "area-asc";
@@ -149,9 +148,6 @@ export default function MapsPage() {
                       >
                         {m.name}
                       </p>
-                      {m.warnings?.length ? (
-                        <WarningIcon warnings={m.warnings} />
-                      ) : null}
                     </div>
                     <p className="truncate text-xs text-muted-foreground">
                       {[size, archiveLabel].filter(Boolean).join(" · ")}

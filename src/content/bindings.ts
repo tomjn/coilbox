@@ -271,10 +271,6 @@ export interface MapItem {
   /** Map proportions; the ratio is the true aspect ratio for undistorted display. */
   width?: number;
   height?: number;
-  /** Map options (from mapoptions.lua). */
-  options: ConfigOption[];
-  /** Non-fatal unitsync diagnostics attributed to this map during the scan. */
-  warnings?: string[];
 }
 
 export interface GameItem {
@@ -315,6 +311,20 @@ export const unitsyncGameInfo = defineCommand<
   { enginePath: string; dataDir: string; gameArchive: string },
   GameInfoResult
 >("coilbox-unitsync", "unitsync_game_info");
+
+export interface MapInfoResult {
+  options: ConfigOption[];
+  warnings?: string[];
+  errors?: string[];
+}
+
+/**
+ * Load a map's options + warnings — lazy, since it mounts the map's archive.
+ */
+export const unitsyncMapInfo = defineCommand<
+  { enginePath: string; dataDir: string; mapName: string },
+  MapInfoResult
+>("coilbox-unitsync", "unitsync_map_info");
 
 /** A skirmish AI available to play against: a native engine AI or a game Lua AI. */
 export interface SkirmishAi {

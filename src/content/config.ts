@@ -13,6 +13,7 @@ import {
   type GameInfoResult,
   type HeightmapResult,
   type LuaExecResult,
+  type MapInfoResult,
   type MinimapResult,
   type ReplayFile,
   type ScanResult,
@@ -23,6 +24,7 @@ import {
   unitsyncGameInfo,
   unitsyncHeightmap,
   unitsyncLuaExec,
+  unitsyncMapInfo,
   unitsyncMinimap,
   unitsyncScan,
   unitsyncThumbnails,
@@ -324,6 +326,51 @@ export function useUnitsyncGameInfo(
       cancelled = true;
     };
   }, [enginePath, dataDir, gameArchive]);
+
+  return { info, loading };
+}
+
+/** Session cache of map info, keyed by `dataDir::enginePath::mapName`. */
+const mapInfoCache = new Map<string, MapInfoResult>();
+
+/** Lazily load one map's options + warnings (mounts the map's archive). */
+export function useUnitsyncMapInfo(
+  enginePath?: string,
+  dataDir?: string,
+  mapName?: string,
+) {
+  const [info, setInfo] = useState<MapInfoResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !mapName) {
+      setInfo(null);
+      return;
+    }
+    const key = `${dataDir}::${enginePath}::${mapName}`;
+    const cached = mapInfoCache.get(key);
+    if (cached) {
+      setInfo(cached);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    unitsyncMapInfo({ enginePath, dataDir, mapName })
+      .then((res) => {
+        if (cancelled) return;
+        mapInfoCache.set(key, res);
+        setInfo(res);
+      })
+      .catch(() => {
+        if (!cancelled) setInfo(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, mapName]);
 
   return { info, loading };
 }

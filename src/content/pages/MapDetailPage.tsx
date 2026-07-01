@@ -5,6 +5,7 @@ import {
   classifyArchive,
   useScanTargetSelection,
   useUnitsyncHeightmap,
+  useUnitsyncMapInfo,
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
@@ -31,6 +32,11 @@ export default function MapDetailPage() {
     decoded,
   );
   const heightmap = useUnitsyncHeightmap(
+    selected?.enginePath,
+    selected?.rootPath,
+    decoded,
+  );
+  const mapInfo = useUnitsyncMapInfo(
     selected?.enginePath,
     selected?.rootPath,
     decoded,
@@ -85,8 +91,8 @@ export default function MapDetailPage() {
         )}
       </header>
 
-      {map.warnings?.length ? (
-        <WarningBanner warnings={map.warnings} noun="map" />
+      {mapInfo.info?.warnings?.length ? (
+        <WarningBanner warnings={mapInfo.info.warnings} noun="map" />
       ) : null}
 
       <section className="flex flex-col gap-2">
@@ -159,7 +165,7 @@ export default function MapDetailPage() {
         </div>
       </section>
 
-      <OptionsList options={map.options} title="Map options" />
+      <OptionsList options={mapInfo.info?.options ?? []} title="Map options" />
 
       {otherInfo.length > 0 && (
         <section className="flex flex-col gap-2">
