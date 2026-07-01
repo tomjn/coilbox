@@ -22,6 +22,7 @@ export function MapCard({
   minimapLoading,
   markerColors,
   env,
+  mapsLoading,
   onSelectMap,
   disabled,
 }: {
@@ -34,6 +35,8 @@ export function MapCard({
   markerColors: string[];
   /** Wind/tidal from the minimap parse of mapinfo.lua. */
   env?: { minWind?: number; maxWind?: number; tidalStrength?: number };
+  /** The map list is still being scanned, so no maps are available yet. */
+  mapsLoading?: boolean;
   onSelectMap: (name: string) => void;
   disabled?: boolean;
 }) {
@@ -60,15 +63,23 @@ export function MapCard({
         height={map?.height}
         startPositions={startPositions}
         markerColors={markerColors}
-        loading={minimapLoading}
-        alt={map ? `Minimap of ${map.name}` : "No map selected"}
-        onClick={disabled ? undefined : () => setPickerOpen(true)}
+        loading={mapsLoading || minimapLoading}
+        alt={
+          mapsLoading
+            ? "Loading maps…"
+            : map
+              ? `Minimap of ${map.name}`
+              : "No map selected"
+        }
+        onClick={
+          disabled || mapsLoading ? undefined : () => setPickerOpen(true)
+        }
       />
 
       <div className="mt-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold">
-            {map?.name ?? "No map selected"}
+            {map?.name ?? (mapsLoading ? "Loading maps…" : "No map selected")}
           </h2>
           <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             {size && <span>{size}</span>}
@@ -99,7 +110,7 @@ export function MapCard({
         <Button
           variant="outline"
           size="sm"
-          disabled={disabled}
+          disabled={disabled || mapsLoading}
           onClick={() => setPickerOpen(true)}
         >
           Choose map

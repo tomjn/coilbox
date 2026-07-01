@@ -49,13 +49,17 @@ export default function SkirmishPage() {
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
   const selectedGame = games.find((g) => g.name === gameName) ?? null;
-  const selectedMap = maps.find((m) => m.name === mapName) ?? null;
+  // Fall back to the first map so a map is shown the instant maps load, without
+  // waiting for the auto-pick effect below to commit `mapName`.
+  const selectedMap = maps.find((m) => m.name === mapName) ?? maps[0] ?? null;
   const gameArchive = selectedGame?.primaryArchive.name;
+  // Still scanning and nothing to show yet — the map card shows a spinner.
+  const mapsLoading = scan.loading && maps.length === 0;
 
   const gameInfo = useUnitsyncGameInfo(enginePath, dataDir, gameArchive);
   const { ais } = useSkirmishAis(enginePath, dataDir, gameArchive);
   const [lastAi, setLastAi] = useLastAi();
-  const minimap = useUnitsyncMinimap(enginePath, dataDir, mapName);
+  const minimap = useUnitsyncMinimap(enginePath, dataDir, selectedMap?.name);
   const sides = gameInfo.info?.sides ?? [];
   const modOptions = gameInfo.info?.options ?? [];
 
@@ -254,6 +258,7 @@ export default function SkirmishPage() {
           minimapLoading={minimap.loading}
           markerColors={activeColors}
           env={minimap.env}
+          mapsLoading={mapsLoading}
           onSelectMap={setMapName}
           disabled={running}
         />
