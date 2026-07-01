@@ -6,6 +6,7 @@ import downloadsPlugin from "./downloads";
 import mapconvPlugin from "./mapconv";
 import playPlugin from "./play";
 import uberstressPlugin from "./uberstress";
+import updaterPlugin from "./updater";
 // picoframe:imports-end
 
 /** The app's plugin list. `picoframe add <plugin>` edits this file. */
@@ -19,4 +20,5 @@ export const plugins: FramePlugin[] = [
   contentPlugin,
   playPlugin,
   // picoframe:plugins-end
+  updaterPlugin,
 ];
