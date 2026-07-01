@@ -566,7 +566,10 @@ mod header_tests {
 
         // Negative hit.
         std::fs::write(dir.join("cccc.none"), "").unwrap();
-        assert!(matches!(read_header_cache(&dir, "cccc"), CacheState::Negative));
+        assert!(matches!(
+            read_header_cache(&dir, "cccc"),
+            CacheState::Negative
+        ));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
