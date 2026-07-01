@@ -5,7 +5,8 @@
 
 use crate::ffi::Unitsync;
 use crate::model::{
-    ArchiveExtractOutput, ArchiveFileEntry, ArchiveFileOutput, ArchiveTreeOutput, GameHeaderOutput,
+    ArchiveExtractOutput, ArchiveFileEntry, ArchiveFileOutput, ArchiveTreeOutput, GameHeaderItem,
+    GameHeadersOutput,
 };
 use base64::Engine;
 use std::path::Path;
@@ -327,43 +328,17 @@ pub fn extract(lib: &str, archive_name: &str, inner: &str, dest: &str) -> Archiv
     ArchiveExtractOutput { size, errors }
 }
 
-/// Resolve one game's header image: the `loadpicture` member first, else a random
-/// image from `bitmaps/loadpictures/`, returned as a `data:` URL. Result is cached
-/// on disk under `cache_dir/<checksum>.dataurl` (or a `.none` marker), so repeat
-/// calls never re-open the archive. Caching is skipped when `checksum` is empty or
-/// `cache_dir` is `None`.
-pub fn game_header(
-    lib: &str,
-    archive_name: &str,
-    loadpicture: &str,
-    checksum: &str,
-    cache_dir: Option<&Path>,
-) -> GameHeaderOutput {
-    // Cache lookup first — a hit avoids loading unitsync entirely.
-    let cache = cache_dir.filter(|_| !checksum.is_empty());
-    if let Some(dir) = cache {
-        match read_header_cache(dir, checksum) {
-            CacheState::Hit(url) => {
-                return GameHeaderOutput {
-                    data_url: Some(url),
-                    errors: Vec::new(),
-                }
-            }
-            CacheState::Negative => {
-                return GameHeaderOutput {
-                    data_url: None,
-                    errors: Vec::new(),
-                }
-            }
-            CacheState::Miss => {}
-        }
-    }
-
+/// Resolve every game's header art in one `Init` session, for the Games grid.
+/// Mirrors `minimap::render_all`: the disk cache is keyed on a cheap file identity
+/// (the primary archive's path + size + mtime) rather than the sync checksum, so
+/// building art for the whole games list needs no per-game checksum work and keeps
+/// the deferred-checksum scan cheap. A cache hit skips opening the archive.
+pub fn game_headers(lib: &str, cache_dir: Option<&Path>) -> GameHeadersOutput {
     let us = match unsafe { Unitsync::load(Path::new(lib)) } {
         Ok(u) => u,
         Err(e) => {
-            return GameHeaderOutput {
-                data_url: None,
+            return GameHeadersOutput {
+                headers: Vec::new(),
                 errors: vec![e],
             }
         }
@@ -371,32 +346,94 @@ pub fn game_header(
     us.init(false, 0);
     let mut errors = us.drain_errors();
 
-    let open_path = resolve_open_path(&us, archive_name);
-    let _ = us.drain_errors();
-    let data_url = match open_path.as_deref().and_then(|p| us.open_archive(p)) {
-        Some(handle) => {
-            let url = resolve_header_member(&us, handle, loadpicture);
-            us.close_archive(handle);
-            url
+    let mut headers = Vec::new();
+    for i in 0..us.mod_count() {
+        let archive_name = us.mod_archive(i).unwrap_or_default();
+        let info = us.mod_info(i);
+        let name = info
+            .get("name")
+            .filter(|s| !s.is_empty())
+            .cloned()
+            .unwrap_or_else(|| archive_name.clone());
+        let loadpicture = info.get("loadpicture").cloned().unwrap_or_default();
+
+        // Cache is keyed on cheap file identity; `None` disables caching for this
+        // game (it simply re-resolves).
+        let key = game_cache_key(&us, &archive_name);
+        let cache = cache_dir.zip(key.as_deref());
+
+        if let Some((dir, key)) = cache {
+            match read_header_cache(dir, key) {
+                CacheState::Hit(url) => {
+                    headers.push(GameHeaderItem {
+                        name,
+                        data_url: Some(url),
+                    });
+                    continue;
+                }
+                CacheState::Negative => {
+                    headers.push(GameHeaderItem {
+                        name,
+                        data_url: None,
+                    });
+                    continue;
+                }
+                CacheState::Miss => {}
+            }
         }
-        None => {
-            errors.push(format!("could not open archive {archive_name}"));
-            None
+
+        let data_url = match resolve_open_path(&us, &archive_name)
+            .as_deref()
+            .and_then(|p| us.open_archive(p))
+        {
+            Some(handle) => {
+                let url = resolve_header_member(&us, handle, &loadpicture);
+                us.close_archive(handle);
+                url
+            }
+            None => {
+                errors.push(format!("could not open archive {archive_name}"));
+                None
+            }
+        };
+        // Archive-open/probe diagnostics are per-game noise, not scan errors.
+        let _ = us.drain_errors();
+
+        if let Some((dir, key)) = cache {
+            match &data_url {
+                Some(url) => write_header_hit(dir, key, url),
+                None => write_header_negative(dir, key),
+            }
         }
-    };
+        headers.push(GameHeaderItem { name, data_url });
+    }
 
     errors.extend(us.drain_errors());
     us.uninit();
 
-    // Persist the outcome (positive or negative) so later launches skip the open.
-    if let Some(dir) = cache {
-        match &data_url {
-            Some(url) => write_header_hit(dir, checksum, url),
-            None => write_header_negative(dir, checksum),
-        }
-    }
+    GameHeadersOutput { headers, errors }
+}
 
-    GameHeaderOutput { data_url, errors }
+/// A cheap, stable cache identity for a game's header art: a hash of its primary
+/// archive's path + size + mtime. Mirrors `minimap::map_cache_key` — no
+/// whole-archive checksum, so keying the whole games list is effectively free.
+/// `None` (archive path doesn't resolve, or stat fails) disables caching.
+fn game_cache_key(us: &Unitsync, archive_name: &str) -> Option<String> {
+    use std::hash::{Hash, Hasher};
+    let dir = us.archive_path(archive_name)?;
+    let path = Path::new(&dir).join(archive_name);
+    let md = std::fs::metadata(&path).ok()?;
+    let mtime = md
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    path.hash(&mut h);
+    md.len().hash(&mut h);
+    mtime.hash(&mut h);
+    Some(format!("{:016x}", h.finish()))
 }
 
 /// Within an open archive, read the `loadpicture` member if given and decodable,
@@ -516,15 +553,6 @@ pub fn emit_extract_error(msg: String) {
     let out = ArchiveExtractOutput {
         errors: vec![msg],
         ..Default::default()
-    };
-    println!("{}", serde_json::to_string(&out).unwrap_or_default());
-}
-
-/// Print a game-header error envelope to stdout (used on panic).
-pub fn emit_game_header_error(msg: String) {
-    let out = GameHeaderOutput {
-        data_url: None,
-        errors: vec![msg],
     };
     println!("{}", serde_json::to_string(&out).unwrap_or_default());
 }

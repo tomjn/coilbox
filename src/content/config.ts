@@ -16,7 +16,6 @@ import {
   contentStateLoad,
   type DemoInfo,
   type EngineConfigResult,
-  type GameHeaderResult,
   type GameInfoResult,
   type HeightmapResult,
   type LuaExecResult,
@@ -29,7 +28,7 @@ import {
   unitsyncArchiveTree,
   unitsyncCancel,
   unitsyncEngineConfig,
-  unitsyncGameHeader,
+  unitsyncGameHeaders,
   unitsyncGameInfo,
   unitsyncHeightmap,
   unitsyncLuaExec,
@@ -201,7 +200,13 @@ export async function primeScan(
   opId?: string,
 ): Promise<ScanResult> {
   const key = `${dataDir}::${enginePath}`;
-  if (force) scanErrorCache.delete(key);
+  if (force) {
+    scanErrorCache.delete(key);
+    // A forced rescan can surface content added since the last scan; bump the
+    // target's epoch so the derived batch loaders (map thumbnails, game headers)
+    // refetch instead of serving their now-stale session cache.
+    bumpScanEpoch(key);
+  }
   const cached = scanCache.get(key);
   if (!force && cached) return cached;
   const cachedErr = scanErrorCache.get(key);
@@ -215,6 +220,34 @@ export async function primeScan(
     scanErrorCache.set(key, msg);
     throw e;
   }
+}
+
+/* -------------------------------------------------------------------------- *
+ * Content epoch — a per-target counter bumped on each forced rescan. The batch
+ * loaders (map thumbnails, game headers) fold it into their cache key + effect
+ * deps so a rescan refetches content added since the last scan instead of serving
+ * a stale session cache.
+ * -------------------------------------------------------------------------- */
+
+const scanEpochs = new Map<string, number>();
+const epochListeners = new Set<() => void>();
+
+/** Bump a target's content epoch (keyed like the scan cache) and notify. */
+function bumpScanEpoch(key: string) {
+  scanEpochs.set(key, (scanEpochs.get(key) ?? 0) + 1);
+  for (const l of epochListeners) l();
+}
+
+/** Subscribe to a target's content epoch; changes on each forced rescan. */
+export function useScanEpoch(enginePath?: string, dataDir?: string): number {
+  const key = enginePath && dataDir ? `${dataDir}::${enginePath}` : "";
+  return useSyncExternalStore(
+    (cb) => {
+      epochListeners.add(cb);
+      return () => epochListeners.delete(cb);
+    },
+    () => (key ? (scanEpochs.get(key) ?? 0) : 0),
+  );
 }
 
 type StartupStatus = "idle" | "scanning" | "error" | "done";
@@ -301,8 +334,9 @@ const thumbnailsCache = new Map<string, Map<string, string>>();
 export async function primeThumbnails(
   enginePath: string,
   dataDir: string,
+  epoch = 0,
 ): Promise<Map<string, string>> {
-  const key = `${dataDir}::${enginePath}`;
+  const key = `${dataDir}::${enginePath}::${epoch}`;
   const cached = thumbnailsCache.get(key);
   if (cached) return cached;
   const res = await unitsyncThumbnails({ enginePath, dataDir, mip: 3 });
@@ -313,6 +347,7 @@ export async function primeThumbnails(
 
 /** Lazily render and cache thumbnails for every map (name -> PNG data URL). */
 export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
+  const epoch = useScanEpoch(enginePath, dataDir);
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
 
@@ -323,7 +358,7 @@ export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
     }
     let cancelled = false;
     setLoading(true);
-    primeThumbnails(enginePath, dataDir)
+    primeThumbnails(enginePath, dataDir, epoch)
       .then((map) => {
         if (!cancelled) setThumbs(map);
       })
@@ -336,7 +371,7 @@ export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir]);
+  }, [enginePath, dataDir, epoch]);
 
   return { thumbs, loading };
 }
@@ -664,46 +699,49 @@ export function useUnitsyncArchiveFile(
   return { data, loading };
 }
 
-/** Session cache of resolved header images, keyed by `dataDir::enginePath::checksum`. */
-const gameHeaderCache = new Map<string, GameHeaderResult>();
+/** Session cache of batch game-header art, keyed by `dataDir::enginePath::epoch`. */
+const gameHeadersCache = new Map<string, Map<string, string>>();
 
 /**
- * Lazily resolve a game's header image (loadpicture / bitmaps/loadpictures),
- * shared across the app via a session cache. No-ops until `archive` and
- * `checksum` are both set. The Rust command also caches the result on disk, so a
- * cold cache is still cheap on later launches.
+ * Render (or read from cache) header art for every game of a target, populating
+ * `gameHeadersCache` (game name -> data URL). Games with no usable art are
+ * omitted. The images are cached on disk by the worker (keyed on cheap file
+ * identity), so this is fast after the first run even across restarts.
  */
-export function useGameHeaderImage(
-  enginePath?: string,
-  dataDir?: string,
-  archive?: string,
-  checksum?: string,
-  loadpicture?: string,
-) {
-  const [data, setData] = useState<GameHeaderResult | null>(null);
+export async function primeGameHeaders(
+  enginePath: string,
+  dataDir: string,
+  epoch = 0,
+): Promise<Map<string, string>> {
+  const key = `${dataDir}::${enginePath}::${epoch}`;
+  const cached = gameHeadersCache.get(key);
+  if (cached) return cached;
+  const res = await unitsyncGameHeaders({ enginePath, dataDir });
+  const map = new Map<string, string>();
+  for (const h of res.headers) if (h.dataUrl) map.set(h.name, h.dataUrl);
+  gameHeadersCache.set(key, map);
+  return map;
+}
+
+/** Lazily render and cache header art for every game (name -> data URL). */
+export function useUnitsyncGameHeaders(enginePath?: string, dataDir?: string) {
+  const epoch = useScanEpoch(enginePath, dataDir);
+  const [headers, setHeaders] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!enginePath || !dataDir || !archive || !checksum) {
-      setData(null);
-      return;
-    }
-    const key = `${dataDir}::${enginePath}::${checksum}`;
-    const cached = gameHeaderCache.get(key);
-    if (cached) {
-      setData(cached);
+    if (!enginePath || !dataDir) {
+      setHeaders(new Map());
       return;
     }
     let cancelled = false;
     setLoading(true);
-    unitsyncGameHeader({ enginePath, dataDir, archive, checksum, loadpicture })
-      .then((res) => {
-        if (cancelled) return;
-        gameHeaderCache.set(key, res);
-        setData(res);
+    primeGameHeaders(enginePath, dataDir, epoch)
+      .then((map) => {
+        if (!cancelled) setHeaders(map);
       })
       .catch(() => {
-        if (!cancelled) setData(null);
+        if (!cancelled) setHeaders(new Map());
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -711,9 +749,9 @@ export function useGameHeaderImage(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, archive, checksum, loadpicture]);
+  }, [enginePath, dataDir, epoch]);
 
-  return { data, loading };
+  return { headers, loading };
 }
 
 /** Session cache of minimap results, keyed by `dataDir::enginePath::mapName`. */

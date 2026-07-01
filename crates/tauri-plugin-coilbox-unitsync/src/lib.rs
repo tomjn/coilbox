@@ -13,7 +13,7 @@ mod sidecar;
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
-    build_config_args, build_game_args, build_game_header_args, build_heightmap_args,
+    build_config_args, build_game_args, build_game_headers_args, build_heightmap_args,
     build_lua_args, build_map_info_args, build_minimap_args, build_skirmish_ai_args,
     build_thumbnails_args, find_unitsync, resolve_sidecar,
 };
@@ -473,35 +473,23 @@ async fn unitsync_archive_file(
     Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive file", None).await)
 }
 
-/// `unitsync_game_header` — resolve a game's loading-screen art (modinfo
-/// `loadpicture` first, else a random `bitmaps/loadpictures/` image) to a `data:`
-/// URL, cached on disk under the app cache dir keyed by `checksum`. `archive` is
-/// the game's primary archive name; `loadpicture` is the modinfo hint (may be
-/// empty); `checksum` is the game's hex CRC (empty disables caching).
+/// `unitsync_game_headers` — batch-resolve loading-screen art for every game in
+/// one session, for the Games grid. Disk-cached under the app cache dir, keyed on
+/// cheap file identity (not sync-checksum), so it needs no per-game checksum.
 #[tauri::command]
-async fn unitsync_game_header<R: Runtime>(
+async fn unitsync_game_headers<R: Runtime>(
     app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
-    archive: String,
-    checksum: Option<String>,
-    loadpicture: Option<String>,
 ) -> Result<CliResult, ()> {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return Ok(CliResult::err(e)),
     };
     let cache_dir = header_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
-    let args = build_game_header_args(
-        &libpath.to_string_lossy(),
-        &data_dir,
-        &archive,
-        loadpicture.as_deref().unwrap_or(""),
-        checksum.as_deref().unwrap_or(""),
-        cache_dir.as_deref(),
-    );
+    let args = build_game_headers_args(&libpath.to_string_lossy(), &data_dir, cache_dir.as_deref());
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "game header", None).await)
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "game headers", None).await)
 }
 
 /// `unitsync_lua_exec` — run a Lua snippet through the engine's Lua parser with
@@ -586,7 +574,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_engine_config,
             unitsync_archive_tree,
             unitsync_archive_file,
-            unitsync_game_header,
+            unitsync_game_headers,
             unitsync_lua_exec,
             unitsync_archive_extract,
             unitsync_cancel

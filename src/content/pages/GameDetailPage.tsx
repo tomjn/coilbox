@@ -1,7 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { FolderOpen } from "lucide-react";
-import { useNavigate, useParams } from "react-router";
-import { useSkirmishDraft } from "@/play/drafts";
+import { useParams } from "react-router";
 import { type Archive, contentOpenPath } from "../bindings";
 import {
   classifyArchive,
@@ -10,6 +9,7 @@ import {
   useUnitsyncScan,
 } from "../config";
 import { isSdd } from "../format";
+import { usePlayGame } from "../usePlayGame";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { GameHeader } from "./components/GameHeader";
 import { OptionsList } from "./components/OptionsList";
@@ -30,8 +30,7 @@ const HEADLINE_KEYS = new Set(["name", "shortname", "version", "description"]);
 export default function GameDetailPage() {
   const { name } = useParams();
   const decoded = name ? decodeURIComponent(name) : "";
-  const navigate = useNavigate();
-  const [draft, setDraft] = useSkirmishDraft();
+  const playGame = usePlayGame();
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
     selected?.enginePath,
@@ -66,28 +65,13 @@ export default function GameDetailPage() {
     contentOpenPath({ path: target }).catch(() => {});
   };
 
-  // Preselect this game in the Singleplayer setup, then jump there. We write the
-  // persisted skirmish draft (the same source the launcher hydrates from) rather
-  // than pass route state. Mod options are per-game, so clear any carried over
-  // from a different previously-set game — the draft-hydration path in the
-  // launcher deliberately skips its own per-switch reset.
-  const play = () => {
-    setDraft({
-      ...draft,
-      gameName: game.name,
-      ...(game.name !== draft.gameName ? { modOptionValues: {} } : {}),
-    });
-    navigate("/play/skirmish");
-  };
-
   return (
     <div className="flex flex-col gap-5 p-4">
       <GameHeader
         game={game}
         enginePath={selected?.enginePath}
         dataDir={selected?.rootPath}
-        checksum={gameInfo?.checksum}
-        onPlay={play}
+        onPlay={() => playGame(game.name)}
       />
 
       <div className="flex flex-col gap-1">

@@ -1,16 +1,18 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
-import { useScanTargetSelection, useUnitsyncScan } from "../config";
-import { isSdd } from "../format";
+import {
+  useScanTargetSelection,
+  useUnitsyncGameHeaders,
+  useUnitsyncScan,
+} from "../config";
+import { usePlayGame } from "../usePlayGame";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
-import { SddBadge } from "./components/SddBadge";
+import { GameCard } from "./components/GameCard";
 import {
   Diagnostics,
   EmptyState,
   ErrorBanner,
   SkeletonList,
-  WarningIcon,
 } from "./components/states";
 
 type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
@@ -34,6 +36,11 @@ export default function GamesPage() {
     selected?.enginePath,
     selected?.rootPath,
   );
+  const { headers, loading: headersLoading } = useUnitsyncGameHeaders(
+    selected?.enginePath,
+    selected?.rootPath,
+  );
+  const playGame = usePlayGame();
 
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name-asc");
@@ -111,37 +118,18 @@ export default function GamesPage() {
       ) : sorted.length === 0 ? (
         <EmptyState label={`No games match “${filter.trim()}”.`} />
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
           {sorted.map((g) => (
-            <li key={`${g.primaryArchive.name}:${g.name}`}>
-              <Link
-                to={`/content/games/${encodeURIComponent(g.name)}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-border hover:bg-accent/40"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="truncate font-medium">{g.name}</p>
-                    {isSdd(g.primaryArchive) && <SddBadge />}
-                    {g.warnings?.length ? (
-                      <WarningIcon warnings={g.warnings} />
-                    ) : null}
-                  </div>
-                  <p className="truncate font-mono text-xs text-muted-foreground">
-                    {g.primaryArchive.name}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  {g.info.version && (
-                    <p className="text-xs text-muted-foreground">
-                      v{g.info.version}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {g.dependencyArchives.length} dep
-                    {g.dependencyArchives.length === 1 ? "" : "s"}
-                  </p>
-                </div>
-              </Link>
+            <li
+              key={`${g.primaryArchive.name}:${g.name}`}
+              className="[contain-intrinsic-size:8rem] [content-visibility:auto]"
+            >
+              <GameCard
+                game={g}
+                artUrl={headers.get(g.name)}
+                loading={headersLoading && !headers.get(g.name)}
+                onPlay={() => playGame(g.name)}
+              />
             </li>
           ))}
         </ul>

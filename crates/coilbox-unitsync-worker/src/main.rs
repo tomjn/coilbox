@@ -48,10 +48,8 @@ struct Args {
     /// `--skirmish-ais`: list native skirmish AIs (+ a game's Lua AIs when
     /// combined with `--game`).
     skirmish_ais: bool,
-    /// `--game-header`: resolve a game's loadpicture/`bitmaps/loadpictures` art.
-    game_header: bool,
-    /// Hex checksum used as the header cache key (game-header mode).
-    checksum: Option<String>,
+    /// `--game-headers`: batch-resolve every game's header art in one Init.
+    game_headers: bool,
     /// `--lua`: run a Lua snippet through the parser against `--archive`, reading
     /// the script from `--source-file`.
     lua: bool,
@@ -133,25 +131,20 @@ fn run() -> i32 {
         };
     }
 
-    // Game header: resolve one game's loadpicture / bitmaps/loadpictures art to a
-    // cached data URL. Uses --archive (primary), --file (loadpicture hint),
-    // --checksum (cache key), --cache-dir. Checked before the archive block, which
-    // also keys off --archive.
-    if args.game_header {
-        let archive_name = args.archive.clone().unwrap_or_default();
-        let loadpicture = args.file.clone().unwrap_or_default();
-        let checksum = args.checksum.clone().unwrap_or_default();
-        return match std::panic::catch_unwind(|| {
-            archive::game_header(&args.lib, &archive_name, &loadpicture, &checksum, cache_dir)
-        }) {
+    // Batch game headers: resolve every game's loadpicture art in one Init, for
+    // the Games grid. Keyed on cheap file identity (not sync-checksum).
+    if args.game_headers {
+        return match std::panic::catch_unwind(|| archive::game_headers(&args.lib, cache_dir)) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
                 0
             }
             Err(_) => {
-                archive::emit_game_header_error(
-                    "worker panicked while resolving game header".into(),
-                );
+                let out = model::GameHeadersOutput {
+                    errors: vec!["worker panicked while resolving game headers".into()],
+                    ..Default::default()
+                };
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
                 1
             }
         };
@@ -334,8 +327,7 @@ fn parse_args() -> Result<Args, String> {
     let mut map_info = false;
     let mut config = false;
     let mut skirmish_ais = false;
-    let mut game_header = false;
-    let mut checksum = None;
+    let mut game_headers = false;
     let mut lua = false;
     let mut source_file = None;
     let mut mip = 1; // 512x512 by default
@@ -363,8 +355,7 @@ fn parse_args() -> Result<Args, String> {
             "--cache-dir" => cache_dir = it.next(),
             "--config" => config = true,
             "--skirmish-ais" => skirmish_ais = true,
-            "--game-header" => game_header = true,
-            "--checksum" => checksum = it.next(),
+            "--game-headers" => game_headers = true,
             "--lua" => lua = true,
             "--source-file" => source_file = it.next(),
             "--mip" => {
@@ -389,8 +380,7 @@ fn parse_args() -> Result<Args, String> {
         map_info,
         config,
         skirmish_ais,
-        game_header,
-        checksum,
+        game_headers,
         lua,
         source_file,
         mip,
