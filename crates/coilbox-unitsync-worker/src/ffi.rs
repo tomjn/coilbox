@@ -25,7 +25,6 @@ type VoidFn = unsafe extern "C" fn();
 type StrFn = unsafe extern "C" fn() -> *const c_char; // GetNextError, GetSpringVersion
 type CountFn = unsafe extern "C" fn() -> c_int; // GetMapCount, GetPrimaryModCount
 type StrByIntFn = unsafe extern "C" fn(c_int) -> *const c_char; // names, archive lists, info accessors
-type UintByIntFn = unsafe extern "C" fn(c_int) -> c_uint; // checksums by index
 type IntByIntFn = unsafe extern "C" fn(c_int) -> c_int; // archive/info counts by index
 type IntByStrFn = unsafe extern "C" fn(*const c_char) -> c_int; // GetMapArchiveCount(name)
 type FloatByIntFn = unsafe extern "C" fn(c_int) -> c_float; // GetOptionNumberDef(i)
@@ -78,7 +77,6 @@ pub struct Unitsync {
     map_count_fn: CountFn,
     map_name_fn: StrByIntFn,
     map_file_name_fn: Option<StrByIntFn>,
-    map_checksum_fn: Option<UintByIntFn>,
     map_archive_count_fn: IntByStrFn,
     map_archive_name_fn: StrByIntFn,
     map_info_count_fn: Option<IntByIntFn>,
@@ -90,7 +88,6 @@ pub struct Unitsync {
     // games (primary mods)
     mod_count_fn: CountFn,
     mod_archive_fn: StrByIntFn,
-    mod_checksum_fn: Option<UintByIntFn>,
     mod_archive_count_fn: IntByIntFn,
     mod_archive_list_fn: StrByIntFn,
     mod_info_count_fn: IntByIntFn,
@@ -101,6 +98,7 @@ pub struct Unitsync {
     // optional archive metadata
     archive_path_fn: Option<StrByStrFn>,
     archive_checksum_fn: Option<UintByStrFn>,
+    map_checksum_from_name_fn: Option<UintByStrFn>,
     // optional archive file access (browse + read members through the VFS)
     open_archive_fn: Option<IntByStrFn>,
     close_archive_fn: Option<VoidByIntFn>,
@@ -195,7 +193,6 @@ impl Unitsync {
             map_count_fn: req(&lib, b"GetMapCount\0")?,
             map_name_fn: req(&lib, b"GetMapName\0")?,
             map_file_name_fn: opt(&lib, b"GetMapFileName\0"),
-            map_checksum_fn: opt(&lib, b"GetMapChecksum\0"),
             map_archive_count_fn: req(&lib, b"GetMapArchiveCount\0")?,
             map_archive_name_fn: req(&lib, b"GetMapArchiveName\0")?,
             map_info_count_fn: opt(&lib, b"GetMapInfoCount\0"),
@@ -206,7 +203,6 @@ impl Unitsync {
             map_max_height_fn: opt(&lib, b"GetMapMaxHeight\0"),
             mod_count_fn: req(&lib, b"GetPrimaryModCount\0")?,
             mod_archive_fn: req(&lib, b"GetPrimaryModArchive\0")?,
-            mod_checksum_fn: opt(&lib, b"GetPrimaryModChecksum\0"),
             mod_archive_count_fn: req(&lib, b"GetPrimaryModArchiveCount\0")?,
             mod_archive_list_fn: req(&lib, b"GetPrimaryModArchiveList\0")?,
             mod_info_count_fn: req(&lib, b"GetPrimaryModInfoCount\0")?,
@@ -215,6 +211,7 @@ impl Unitsync {
             info_value_string_fn: req(&lib, b"GetInfoValueString\0")?,
             archive_path_fn: opt(&lib, b"GetArchivePath\0"),
             archive_checksum_fn: opt(&lib, b"GetArchiveChecksum\0"),
+            map_checksum_from_name_fn: opt(&lib, b"GetMapChecksumFromName\0"),
             open_archive_fn: opt(&lib, b"OpenArchive\0"),
             close_archive_fn: opt(&lib, b"CloseArchive\0"),
             init_dir_list_vfs_fn: opt(&lib, b"InitDirListVFS\0"),
@@ -317,10 +314,6 @@ impl Unitsync {
         unsafe { cstr(f(i)) }.filter(|s| !s.is_empty())
     }
 
-    pub fn map_checksum(&self, i: i32) -> Option<u32> {
-        self.map_checksum_fn.map(|f| unsafe { f(i) })
-    }
-
     /// Archives backing a map. `GetMapArchiveCount(name)` populates the internal
     /// list that `GetMapArchiveName(i)` then reads, so this does both in order.
     pub fn map_archives(&self, map_name: &str) -> Vec<String> {
@@ -342,10 +335,6 @@ impl Unitsync {
     /// The game's own archive filename (the *primary* archive).
     pub fn mod_archive(&self, i: i32) -> Option<String> {
         unsafe { cstr((self.mod_archive_fn)(i)) }
-    }
-
-    pub fn mod_checksum(&self, i: i32) -> Option<u32> {
-        self.mod_checksum_fn.map(|f| unsafe { f(i) })
     }
 
     /// The full archive list for a game (its primary archive plus every
@@ -482,6 +471,15 @@ impl Unitsync {
 
     pub fn archive_checksum(&self, name: &str) -> Option<u32> {
         let f = self.archive_checksum_fn?;
+        let c = CString::new(name).ok()?;
+        Some(unsafe { f(c.as_ptr()) })
+    }
+
+    /// Sync checksum for a map by name (`GetMapChecksumFromName`). This SHA512-
+    /// hashes the whole archive plus its dependencies, so it's costly — callers
+    /// should only use it lazily (map detail), never during enumeration.
+    pub fn map_checksum_from_name(&self, name: &str) -> Option<u32> {
+        let f = self.map_checksum_from_name_fn?;
         let c = CString::new(name).ok()?;
         Some(unsafe { f(c.as_ptr()) })
     }

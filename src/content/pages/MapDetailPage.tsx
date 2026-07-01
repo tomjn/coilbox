@@ -5,13 +5,19 @@ import {
   classifyArchive,
   useScanTargetSelection,
   useUnitsyncHeightmap,
+  useUnitsyncMapInfo,
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { mapSizeLabel } from "./components/MapThumb";
 import { OptionsList } from "./components/OptionsList";
-import { DetailLoading, NotFound, WarningBanner } from "./components/states";
+import {
+  DetailError,
+  DetailLoading,
+  NotFound,
+  WarningBanner,
+} from "./components/states";
 
 /** Keys shown in the headline; everything else goes in the metadata table. */
 const HEADLINE_KEYS = new Set(["name", "description"]);
@@ -21,7 +27,7 @@ export default function MapDetailPage() {
   const { name } = useParams();
   const decoded = name ? decodeURIComponent(name) : "";
   const { selected } = useScanTargetSelection();
-  const { data, loading } = useUnitsyncScan(
+  const { data, loading, error, run } = useUnitsyncScan(
     selected?.enginePath,
     selected?.rootPath,
   );
@@ -35,7 +41,20 @@ export default function MapDetailPage() {
     selected?.rootPath,
     decoded,
   );
+  const mapInfo = useUnitsyncMapInfo(
+    selected?.enginePath,
+    selected?.rootPath,
+    decoded,
+  );
 
+  if (error && !data)
+    return (
+      <DetailError
+        backTo="/content/maps"
+        message={error}
+        onRetry={() => run(true)}
+      />
+    );
   if (!data || loading) return <DetailLoading backTo="/content/maps" />;
   const map = data.maps.find((m) => m.name === decoded);
   if (!map) return <NotFound backTo="/content/maps" label="map" />;
@@ -76,7 +95,9 @@ export default function MapDetailPage() {
         <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">
           {size && <span>{size}</span>}
           {map.fileName && <span className="break-all">{map.fileName}</span>}
-          {map.checksum && <span>checksum {map.checksum}</span>}
+          {mapInfo.info?.checksum && (
+            <span>checksum {mapInfo.info.checksum}</span>
+          )}
         </div>
         {map.info.description && (
           <p className="mt-1 max-w-prose text-sm text-muted-foreground">
@@ -85,8 +106,8 @@ export default function MapDetailPage() {
         )}
       </header>
 
-      {map.warnings?.length ? (
-        <WarningBanner warnings={map.warnings} noun="map" />
+      {mapInfo.info?.warnings?.length ? (
+        <WarningBanner warnings={mapInfo.info.warnings} noun="map" />
       ) : null}
 
       <section className="flex flex-col gap-2">
@@ -159,7 +180,7 @@ export default function MapDetailPage() {
         </div>
       </section>
 
-      <OptionsList options={map.options} title="Map options" />
+      <OptionsList options={mapInfo.info?.options ?? []} title="Map options" />
 
       {otherInfo.length > 0 && (
         <section className="flex flex-col gap-2">

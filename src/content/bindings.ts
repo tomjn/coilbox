@@ -264,22 +264,16 @@ export interface ConfigOption {
 export interface MapItem {
   name: string;
   fileName?: string;
-  checksum?: string;
   archives: Archive[];
   /** mapinfo metadata (description, author, dimensions, ...). */
   info: Record<string, string>;
   /** Map proportions; the ratio is the true aspect ratio for undistorted display. */
   width?: number;
   height?: number;
-  /** Map options (from mapoptions.lua). */
-  options: ConfigOption[];
-  /** Non-fatal unitsync diagnostics attributed to this map during the scan. */
-  warnings?: string[];
 }
 
 export interface GameItem {
   name: string;
-  checksum?: string;
   /** The game's own archive. */
   primaryArchive: Archive;
   /** Archives the game depends on (its primary archive excluded). */
@@ -303,6 +297,8 @@ export interface GameInfoResult {
   unitCount: number;
   /** Game options (from modoptions.lua). */
   options: ConfigOption[];
+  /** Hex CRC (from the primary archive), computed lazily here. */
+  checksum?: string;
   errors: string[];
 }
 
@@ -315,6 +311,21 @@ export const unitsyncGameInfo = defineCommand<
   { enginePath: string; dataDir: string; gameArchive: string },
   GameInfoResult
 >("coilbox-unitsync", "unitsync_game_info");
+
+export interface MapInfoResult {
+  options: ConfigOption[];
+  checksum?: string;
+  warnings?: string[];
+  errors?: string[];
+}
+
+/**
+ * Load a map's options + warnings — lazy, since it mounts the map's archive.
+ */
+export const unitsyncMapInfo = defineCommand<
+  { enginePath: string; dataDir: string; mapName: string },
+  MapInfoResult
+>("coilbox-unitsync", "unitsync_map_info");
 
 /** A skirmish AI available to play against: a native engine AI or a game Lua AI. */
 export interface SkirmishAi {
@@ -356,9 +367,15 @@ export interface ScanResult {
  * content root to enumerate (a `ContentRoot.path`).
  */
 export const unitsyncScan = defineCommand<
-  { enginePath: string; dataDir: string },
+  { enginePath: string; dataDir: string; opId?: string },
   ScanResult
 >("coilbox-unitsync", "unitsync_scan");
+
+/** Signal the matching in-flight `unitsync_scan`/`unitsync_thumbnails` worker to stop. */
+export const unitsyncCancel = defineCommand<{ opId: string }, unknown>(
+  "coilbox-unitsync",
+  "unitsync_cancel",
+);
 
 /** A team start position in map world coordinates (elmos). */
 export interface StartPos {
@@ -449,7 +466,7 @@ export const unitsyncEngineConfig = defineCommand<
  * Maps grid). `mip` selects resolution: `1024 >> mip` px (default 3 = 128px).
  */
 export const unitsyncThumbnails = defineCommand<
-  { enginePath: string; dataDir: string; mip?: number },
+  { enginePath: string; dataDir: string; mip?: number; opId?: string },
   ThumbnailsResult
 >("coilbox-unitsync", "unitsync_thumbnails");
 
@@ -464,6 +481,8 @@ export interface ArchiveTreeResult {
   files: ArchiveFileEntry[];
   /** The archive's on-disk path (for the `.sdd` "open folder" action). */
   archivePath?: string;
+  /** Hex CRC, computed lazily here. */
+  checksum?: string;
   errors: string[];
 }
 

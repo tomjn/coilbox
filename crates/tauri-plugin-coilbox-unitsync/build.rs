@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_heightmap",
     "unitsync_thumbnails",
     "unitsync_game_info",
+    "unitsync_map_info",
     "unitsync_skirmish_ais",
     "unitsync_engine_config",
     "unitsync_archive_tree",
@@ -15,6 +16,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_game_header",
     "unitsync_lua_exec",
     "unitsync_archive_extract",
+    "unitsync_cancel",
 ];
 
 fn main() {

@@ -53,12 +53,19 @@ pub fn tree(lib: &str, archive_name: &str) -> ArchiveTreeOutput {
         }
     };
 
+    // A zero CRC means "unknown" here, so omit it rather than show a misleading 0.
+    let checksum = us
+        .archive_checksum(archive_name)
+        .filter(|&c| c != 0)
+        .map(|c| format!("{c:08x}"));
+
     errors.extend(us.drain_errors());
     us.uninit();
 
     ArchiveTreeOutput {
         files,
         archive_path,
+        checksum,
         errors,
     }
 }

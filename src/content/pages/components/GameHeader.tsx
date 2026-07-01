@@ -16,18 +16,22 @@ export function GameHeader({
   game,
   enginePath,
   dataDir,
+  checksum,
   onPlay,
 }: {
   game: GameItem;
   enginePath?: string;
   dataDir?: string;
+  /** The game's sync checksum, loaded lazily via `useUnitsyncGameInfo` (the scan
+   * no longer carries it); the header-image cache keys on it. */
+  checksum?: string;
   onPlay: () => void;
 }) {
   const { data } = useGameHeaderImage(
     enginePath,
     dataDir,
     game.primaryArchive.name,
-    game.checksum,
+    checksum,
     game.info.loadpicture,
   );
   const artUrl = data?.dataUrl;

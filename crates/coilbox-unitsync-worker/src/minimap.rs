@@ -2,10 +2,10 @@
 //! URLs. Used two ways — a single map's larger preview (`render`) and a batch of
 //! small thumbnails for the whole map list (`render_all`), each in one `Init`.
 //!
-//! Rendered PNGs are cached on disk (under `cache_dir`, keyed by the map's
-//! checksum + mip) via `coilbox-thumb-cache`, so a map's minimap is encoded once
-//! and reused across launches; the expensive `GetMinimap` + RGB565→PNG encode
-//! only runs on a cache miss.
+//! Rendered PNGs are cached on disk (under `cache_dir`, keyed by a cheap file
+//! identity of the map's archive + mip) via `coilbox-thumb-cache`, so a map's
+//! minimap is encoded once and reused across launches; the expensive
+//! `GetMinimap` + RGB565→PNG encode only runs on a cache miss.
 
 use crate::ffi::Unitsync;
 use crate::model::{MinimapOutput, StartPos, Thumbnail, ThumbnailsOutput};
@@ -14,12 +14,40 @@ use image::{DynamicImage, ImageFormat, RgbImage};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-/// Cache file for a map's minimap: `<cache_dir>/<checksum>-<mip>.png`. `None`
-/// (no cache dir, or an unknown checksum) disables caching for that map.
-fn cache_file(cache_dir: Option<&Path>, checksum: Option<u32>, mip: i32) -> Option<PathBuf> {
+/// A cheap, stable cache identity for a map's minimap: a hash of its own
+/// archive's path + size + mtime. Unlike the sync checksum this needs no
+/// whole-archive hashing, so building cache keys for the whole map list is
+/// effectively free. `None` (map has no resolvable archive, or stat fails)
+/// disables caching for that map — it simply re-renders.
+///
+/// Note: for a `.sdd` directory map edited in place the dir mtime may not change,
+/// so a stale minimap can persist until a rescan — an acceptable trade for a
+/// cosmetic minimap that re-renders in ~80ms.
+pub(crate) fn map_cache_key(us: &Unitsync, map_name: &str) -> Option<String> {
+    use std::hash::{Hash, Hasher};
+    let archive = us.map_archives(map_name).into_iter().next()?;
+    let dir = us.archive_path(&archive)?;
+    let path = Path::new(&dir).join(&archive);
+    let md = std::fs::metadata(&path).ok()?;
+    let mtime = md
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    path.hash(&mut h);
+    md.len().hash(&mut h);
+    mtime.hash(&mut h);
+    Some(format!("{:016x}", h.finish()))
+}
+
+/// Cache file for a map's minimap: `<cache_dir>/<key>-<mip>.png`. `None` (no
+/// cache dir, or no cache key) disables caching for that map.
+fn cache_file(cache_dir: Option<&Path>, key: Option<&str>, mip: i32) -> Option<PathBuf> {
     let dir = cache_dir?;
-    let crc = checksum?;
-    Some(dir.join(format!("{crc:08x}-{mip}.png")))
+    let key = key?;
+    Some(dir.join(format!("{key}-{mip}.png")))
 }
 
 /// Render `map_name`'s minimap at `mip` to a PNG data URL (standalone session).
@@ -39,7 +67,7 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
         &us,
         map_name,
         mip,
-        cache_file(cache_dir, map_checksum(&us, map_name), mip),
+        cache_file(cache_dir, map_cache_key(&us, map_name).as_deref(), mip),
     );
 
     // Start positions and environment (wind/tidal) live in mapinfo.lua, so load
@@ -104,7 +132,7 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
         let Some(name) = us.map_name(i) else {
             continue;
         };
-        let file = cache_file(cache_dir, us.map_checksum(i), mip);
+        let file = cache_file(cache_dir, map_cache_key(&us, &name).as_deref(), mip);
         match render_one(&us, &name, mip, file) {
             Ok((data_url, _)) => thumbnails.push(Thumbnail { name, data_url }),
             Err(e) => errors.push(format!("{name}: {e}")),
@@ -114,18 +142,6 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
     us.uninit();
 
     ThumbnailsOutput { thumbnails, errors }
-}
-
-/// Look up a map's checksum by name (for the single-map path, which is given a
-/// name rather than an index). `None` when the engine build lacks the accessor or
-/// the map isn't found — caching is simply skipped in that case.
-pub(crate) fn map_checksum(us: &Unitsync, map_name: &str) -> Option<u32> {
-    for i in 0..us.map_count() {
-        if us.map_name(i).as_deref() == Some(map_name) {
-            return us.map_checksum(i);
-        }
-    }
-    None
 }
 
 /// Render one map's minimap to `(data_url, side)` using an already-initialised

@@ -1,11 +1,12 @@
 //! Heightmap rendering: read a map's full-resolution 16-bit height infomap via
 //! unitsync (`GetInfoMap "height"`, pure static SMF parsing) and turn it into a
 //! downscaled grayscale PNG `data:` URL for the 3D terrain preview. Cached on disk
-//! (under `cache_dir`, keyed by the map's checksum + max-side) like minimaps, so
-//! the heavy read + encode only runs on a cache miss.
+//! (under `cache_dir`, keyed by a cheap file identity of the map's archive +
+//! max-side) like minimaps, so the heavy read + encode only runs on a cache
+//! miss.
 
 use crate::ffi::Unitsync;
-use crate::minimap::{map_checksum, png_to_data_url};
+use crate::minimap::{map_cache_key, png_to_data_url};
 use crate::model::HeightmapOutput;
 use image::{DynamicImage, ImageBuffer, ImageFormat, Luma};
 use std::io::Cursor;
@@ -38,12 +39,12 @@ fn heightmap_png(raw: &[u16], w: u32, h: u32, max_side: u32) -> Result<Vec<u8>, 
     Ok(png.into_inner())
 }
 
-/// Cache file for a heightmap PNG: `<cache_dir>/<checksum>-h<max_side>.png`. The
-/// `h` prefix keeps it from colliding with the minimap cache (`<checksum>-<mip>`).
-fn cache_file(cache_dir: Option<&Path>, checksum: Option<u32>, max_side: u32) -> Option<PathBuf> {
+/// Cache file for a heightmap PNG: `<cache_dir>/<key>-h<max_side>.png`. The `h`
+/// prefix keeps it from colliding with the minimap cache (`<key>-<mip>`).
+fn cache_file(cache_dir: Option<&Path>, key: Option<&str>, max_side: u32) -> Option<PathBuf> {
     let dir = cache_dir?;
-    let crc = checksum?;
-    Some(dir.join(format!("{crc:08x}-h{max_side}.png")))
+    let key = key?;
+    Some(dir.join(format!("{key}-h{max_side}.png")))
 }
 
 /// Render `map_name`'s heightmap to a grayscale PNG data URL plus its world-height
@@ -67,7 +68,7 @@ pub fn render(
     let _ = us.drain_errors();
 
     let bounds = us.height_bounds(map_name);
-    let cache = cache_file(cache_dir, map_checksum(&us, map_name), max_side);
+    let cache = cache_file(cache_dir, map_cache_key(&us, map_name).as_deref(), max_side);
 
     let result = (|| -> Result<(String, u32, u32), String> {
         let (w, h) = us

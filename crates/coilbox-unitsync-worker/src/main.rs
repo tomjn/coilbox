@@ -42,6 +42,8 @@ struct Args {
     extract: Option<String>,
     thumbnails: bool,
     heightmap: bool,
+    /// `--map-info`: lazily read one map's options (combined with `--map`).
+    map_info: bool,
     config: bool,
     /// `--skirmish-ais`: list native skirmish AIs (+ a game's Lua AIs when
     /// combined with `--game`).
@@ -245,6 +247,28 @@ fn run() -> i32 {
         };
     }
 
+    // Lazy map info: one map's options + attributed warnings (mounts the map).
+    if args.map_info {
+        if let Some(map) = args.map.clone() {
+            return match std::panic::catch_unwind(|| map_info(&args.lib, &map)) {
+                Ok(out) => {
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    0
+                }
+                Err(_) => {
+                    let out = model::MapInfoOutput {
+                        errors: vec!["worker panicked while reading map info".into()],
+                        ..Default::default()
+                    };
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    1
+                }
+            };
+        }
+        emit_error("missing --map <name> for --map-info".into());
+        return 1;
+    }
+
     // Heightmap: render one map's height infomap to a grayscale PNG data URL.
     if args.heightmap {
         if let Some(map) = args.map.clone() {
@@ -307,6 +331,7 @@ fn parse_args() -> Result<Args, String> {
     let mut extract = None;
     let mut thumbnails = false;
     let mut heightmap = false;
+    let mut map_info = false;
     let mut config = false;
     let mut skirmish_ais = false;
     let mut game_header = false;
@@ -328,6 +353,7 @@ fn parse_args() -> Result<Args, String> {
             "--extract" => extract = it.next(),
             "--thumbnails" => thumbnails = true,
             "--heightmap" => heightmap = true,
+            "--map-info" => map_info = true,
             "--max-side" => {
                 max_side = it
                     .next()
@@ -360,6 +386,7 @@ fn parse_args() -> Result<Args, String> {
         extract,
         thumbnails,
         heightmap,
+        map_info,
         config,
         skirmish_ais,
         game_header,
@@ -393,6 +420,8 @@ fn prepend_loader_path(dir: &Path) {
 
 /// Load unitsync, initialise once, and enumerate everything we render.
 fn scan(lib: &str) -> Result<ScanOutput, String> {
+    let timings = std::env::var("COILBOX_UNITSYNC_TIMINGS").is_ok();
+    let t0 = std::time::Instant::now();
     let us = unsafe { Unitsync::load(Path::new(lib))? };
 
     let mut errors = Vec::new();
@@ -400,11 +429,31 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
         errors.push("unitsync Init returned 0 (failure); results may be empty".into());
     }
     errors.extend(us.drain_errors());
+    if timings {
+        eprintln!("[unitsync-timing] init={}ms", t0.elapsed().as_millis());
+    }
 
     let sync_version = us.spring_version();
 
+    let tm = std::time::Instant::now();
     let maps = collect_maps(&us);
+    if timings {
+        eprintln!(
+            "[unitsync-timing] maps={} in {}ms",
+            maps.len(),
+            tm.elapsed().as_millis()
+        );
+    }
+
+    let tg = std::time::Instant::now();
     let games = collect_games(&us);
+    if timings {
+        eprintln!(
+            "[unitsync-timing] games={} in {}ms",
+            games.len(),
+            tg.elapsed().as_millis()
+        );
+    }
 
     us.uninit();
 
@@ -414,6 +463,37 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
         errors,
         sync_version,
     })
+}
+
+/// Load one map's archive set and read its options (+ attributed diagnostics).
+fn map_info(lib: &str, map_name: &str) -> model::MapInfoOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(us) => us,
+        Err(e) => {
+            return model::MapInfoOutput {
+                errors: vec![e],
+                ..Default::default()
+            };
+        }
+    };
+    let mut errors = Vec::new();
+    if us.init(false, 0) == 0 {
+        errors.push("unitsync Init returned 0 (failure)".into());
+    }
+    let options = read_options(&us, us.map_option_count(map_name));
+    // A zero CRC means "unknown" here, so omit it rather than show a misleading 0.
+    let checksum = us
+        .map_checksum_from_name(map_name)
+        .filter(|&c| c != 0)
+        .map(|c| format!("{c:08x}"));
+    let warnings = drain_attributed(&us);
+    us.uninit();
+    model::MapInfoOutput {
+        options,
+        checksum,
+        warnings,
+        errors,
+    }
 }
 
 /// Drain unitsync's error queue, returning the diagnostics accumulated while
@@ -434,22 +514,18 @@ fn drain_attributed(us: &Unitsync) -> Vec<String> {
 /// only resolves for filename-style archive names (e.g. a game's primary
 /// archive), so we join it with the name for the full path and stat that for the
 /// size. Display-name archives (maps, dependencies) won't resolve — path/size
-/// stay `None`.
-fn archive(us: &Unitsync, name: String, checksum: Option<u32>) -> Archive {
+/// stay `None`. The checksum is left `None` here — it's SHA512-hashing work,
+/// deferred to the lazy per-item detail loaders (game/archive detail).
+fn archive(us: &Unitsync, name: String) -> Archive {
     let full = us
         .archive_path(&name)
         .map(|dir| Path::new(&dir).join(&name));
     let size = full.as_deref().and_then(entry_size);
     let path = full.map(|p| p.to_string_lossy().into_owned());
-    // A zero CRC means "unknown" here, so omit it rather than show a misleading 0.
-    let checksum = checksum
-        .or_else(|| us.archive_checksum(&name))
-        .filter(|&c| c != 0)
-        .map(|c| format!("{c:08x}"));
     Archive {
         name,
         path,
-        checksum,
+        checksum: None,
         size,
     }
 }
@@ -545,24 +621,15 @@ fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
         let archives = us
             .map_archives(&name)
             .into_iter()
-            .map(|a| archive(us, a, None))
+            .map(|a| archive(us, a))
             .collect();
         let dims = us.map_dimensions(&name);
-        // Read options last: the GetOption* accessors read a global set by
-        // GetMapOptionCount, so populate and consume it back-to-back.
-        let options = read_options(us, us.map_option_count(&name));
-        // Drain after the accessors above, so any queued diagnostics attach to
-        // this map.
-        let warnings = drain_attributed(us);
         maps.push(MapItem {
             file_name: us.map_file_name(i),
-            checksum: us.map_checksum(i).map(|c| format!("{c:08x}")),
             archives,
             info: us.map_info(i),
             width: dims.map(|(w, _)| w),
             height: dims.map(|(_, h)| h),
-            options,
-            warnings,
             name: name.clone(),
         });
     }
@@ -574,7 +641,6 @@ fn collect_games(us: &Unitsync) -> Vec<GameItem> {
     let mut games = Vec::with_capacity(count.max(0) as usize);
     for i in 0..count {
         let primary_name = us.mod_archive(i).unwrap_or_default();
-        let checksum = us.mod_checksum(i);
         let info = us.mod_info(i);
         let name = info
             .get("name")
@@ -582,7 +648,7 @@ fn collect_games(us: &Unitsync) -> Vec<GameItem> {
             .cloned()
             .unwrap_or_else(|| primary_name.clone());
 
-        let primary_archive = archive(us, primary_name.clone(), checksum);
+        let primary_archive = archive(us, primary_name.clone());
         // The archive list includes the game's own archive — but under its
         // display name (the mod name) rather than its filename, so exclude both
         // forms so a game never lists itself as a dependency.
@@ -590,7 +656,7 @@ fn collect_games(us: &Unitsync) -> Vec<GameItem> {
             .mod_archives(i)
             .into_iter()
             .filter(|a| a != &primary_name && a != &name)
-            .map(|a| archive(us, a, None))
+            .map(|a| archive(us, a))
             .collect();
 
         // Drain after the accessors above, so any queued diagnostics attach to
@@ -598,7 +664,6 @@ fn collect_games(us: &Unitsync) -> Vec<GameItem> {
         let warnings = drain_attributed(us);
         games.push(GameItem {
             name: name.clone(),
-            checksum: checksum.map(|c| format!("{c:08x}")),
             primary_archive,
             dependency_archives,
             info,

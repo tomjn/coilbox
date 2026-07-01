@@ -13,7 +13,12 @@ import { isSdd } from "../format";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { GameHeader } from "./components/GameHeader";
 import { OptionsList } from "./components/OptionsList";
-import { DetailLoading, NotFound, WarningBanner } from "./components/states";
+import {
+  DetailError,
+  DetailLoading,
+  NotFound,
+  WarningBanner,
+} from "./components/states";
 
 /** Keys surfaced in the headline; everything else goes in the metadata table. */
 const HEADLINE_KEYS = new Set(["name", "shortname", "version", "description"]);
@@ -28,7 +33,7 @@ export default function GameDetailPage() {
   const navigate = useNavigate();
   const [draft, setDraft] = useSkirmishDraft();
   const { selected } = useScanTargetSelection();
-  const { data, loading } = useUnitsyncScan(
+  const { data, loading, error, run } = useUnitsyncScan(
     selected?.enginePath,
     selected?.rootPath,
   );
@@ -39,6 +44,14 @@ export default function GameDetailPage() {
     game?.primaryArchive.name,
   );
 
+  if (error && !data)
+    return (
+      <DetailError
+        backTo="/content/games"
+        message={error}
+        onRetry={() => run(true)}
+      />
+    );
   if (!data || loading) return <DetailLoading backTo="/content/games" />;
   if (!game) return <NotFound backTo="/content/games" label="game" />;
 
@@ -73,6 +86,7 @@ export default function GameDetailPage() {
         game={game}
         enginePath={selected?.enginePath}
         dataDir={selected?.rootPath}
+        checksum={gameInfo?.checksum}
         onPlay={play}
       />
 
@@ -81,8 +95,8 @@ export default function GameDetailPage() {
           {game.info.shortname && (
             <span className="font-mono">{game.info.shortname}</span>
           )}
-          {game.checksum && (
-            <span className="font-mono">checksum {game.checksum}</span>
+          {gameInfo?.checksum && (
+            <span className="font-mono">checksum {gameInfo.checksum}</span>
           )}
         </div>
         {game.info.description && (

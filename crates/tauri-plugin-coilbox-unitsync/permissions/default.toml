@@ -8,6 +8,7 @@ permissions = [
   "allow-unitsync-heightmap",
   "allow-unitsync-thumbnails",
   "allow-unitsync-game-info",
+  "allow-unitsync-map-info",
   "allow-unitsync-skirmish-ais",
   "allow-unitsync-engine-config",
   "allow-unitsync-archive-tree",
@@ -15,4 +16,5 @@ permissions = [
   "allow-unitsync-game-header",
   "allow-unitsync-lua-exec",
   "allow-unitsync-archive-extract",
+  "allow-unitsync-cancel",
 ]

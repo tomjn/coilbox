@@ -179,8 +179,8 @@ export default function ArchiveDetailPage() {
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {archive.size != null && <span>{formatBytes(archive.size)}</span>}
-          {archive.checksum && (
-            <span className="font-mono">checksum {archive.checksum}</span>
+          {tree?.checksum && (
+            <span className="font-mono">checksum {tree.checksum}</span>
           )}
           {onDiskPath && (
             <span className="break-all font-mono" title={onDiskPath}>
