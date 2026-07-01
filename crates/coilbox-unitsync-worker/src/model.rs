@@ -119,6 +119,20 @@ pub struct MinimapOutput {
     /// Tidal power (`water.tidalStrength` from mapinfo.lua).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tidal_strength: Option<f32>,
+    /// Water/sky/sun appearance from mapinfo.lua, for the 3D preview's lighting and
+    /// water colour. Colours are `[r, g, b]` in 0..1; omitted fields stay `None`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub water_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub water_alpha: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sky_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fog_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sun_dir: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sun_color: Option<[f32; 3]>,
     pub errors: Vec<String>,
 }
 

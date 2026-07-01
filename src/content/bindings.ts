@@ -394,6 +394,14 @@ export interface MinimapResult {
   maxWind?: number;
   /** Tidal power (`water.tidalStrength` from mapinfo.lua). */
   tidalStrength?: number;
+  /** Water/sky/sun appearance from mapinfo.lua, for the 3D preview's lighting and
+   * water colour. Colours are `[r, g, b]` in 0..1. */
+  waterColor?: [number, number, number];
+  waterAlpha?: number;
+  skyColor?: [number, number, number];
+  fogColor?: [number, number, number];
+  sunDir?: [number, number, number];
+  sunColor?: [number, number, number];
   errors: string[];
 }
 

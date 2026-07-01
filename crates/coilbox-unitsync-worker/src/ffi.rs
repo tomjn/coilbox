@@ -44,6 +44,7 @@ type StrArgVoidFn = unsafe extern "C" fn(*const c_char); // AddAllArchives(name)
 type LpOpenFn = unsafe extern "C" fn(*const c_char, *const c_char, *const c_char) -> c_int; // lpOpenFile
 type IntByStrStrFn = unsafe extern "C" fn(*const c_char, *const c_char) -> c_int; // lpOpenSource(source, accessModes)
 type FloatByStrFloatFn = unsafe extern "C" fn(*const c_char, c_float) -> c_float; // lpGetStrKeyFloatVal, GetSpringConfigFloat
+type FloatByIntFloatFn = unsafe extern "C" fn(c_int, c_float) -> c_float; // lpGetIntKeyFloatVal(index, def)
 type StrByStrStrFn = unsafe extern "C" fn(*const c_char, *const c_char) -> *const c_char; // GetSpringConfigString
 type IntByStrIntFn = unsafe extern "C" fn(*const c_char, c_int) -> c_int; // GetSpringConfigInt
                                                                           // archive file access (VFS browsing): open/close an archive, iterate its members,
@@ -55,6 +56,18 @@ type OpenArchiveFileFn = unsafe extern "C" fn(c_int, *const c_char) -> c_int; //
 type FindFilesFn = unsafe extern "C" fn(c_int, c_int, *mut c_char, *mut c_int) -> c_int; // FindFilesArchive
 type ReadFileFn = unsafe extern "C" fn(c_int, c_int, *mut u8, c_int) -> c_int; // ReadArchiveFile
 type FindFilesVfsFn = unsafe extern "C" fn(c_int, *mut c_char, c_int) -> c_int; // FindFilesVFS(idx, buf, size)
+
+/// A map's visual appearance, parsed from `mapinfo.lua` (see [`Unitsync::map_appearance`]).
+/// Colours are `[r, g, b]` in 0..1. Any field the map omits is `None`.
+#[derive(Default)]
+pub struct MapAppearance {
+    pub water_color: Option<[f32; 3]>,
+    pub water_alpha: Option<f32>,
+    pub sky_color: Option<[f32; 3]>,
+    pub fog_color: Option<[f32; 3]>,
+    pub sun_dir: Option<[f32; 3]>,
+    pub sun_color: Option<[f32; 3]>,
+}
 
 /// Copy a library-owned C string into an owned `String`. Null -> `None`.
 pub(crate) unsafe fn cstr(p: *const c_char) -> Option<String> {
@@ -151,6 +164,7 @@ pub struct Unitsync {
     lp_int_key_list_count_fn: Option<CountFn>,
     lp_int_key_list_entry_fn: Option<IntByIntFn>,
     lp_str_key_float_val_fn: Option<FloatByStrFloatFn>,
+    lp_int_key_float_val_fn: Option<FloatByIntFloatFn>,
     lp_open_source_fn: Option<IntByStrStrFn>,
     lp_error_log_fn: Option<StrFn>,
     lp_str_key_str_val_fn: Option<StrByStrStrFn>,
@@ -258,6 +272,7 @@ impl Unitsync {
             lp_int_key_list_count_fn: opt(&lib, b"lpGetIntKeyListCount\0"),
             lp_int_key_list_entry_fn: opt(&lib, b"lpGetIntKeyListEntry\0"),
             lp_str_key_float_val_fn: opt(&lib, b"lpGetStrKeyFloatVal\0"),
+            lp_int_key_float_val_fn: opt(&lib, b"lpGetIntKeyFloatVal\0"),
             lp_open_source_fn: opt(&lib, b"lpOpenSource\0"),
             lp_error_log_fn: opt(&lib, b"lpErrorLog\0"),
             lp_str_key_str_val_fn: opt(&lib, b"lpGetStrKeyStrVal\0"),
@@ -920,6 +935,120 @@ impl Unitsync {
             close();
         }
         (wind, tidal)
+    }
+
+    /// Parse `mapinfo.lua` (the map's archives must be added) for the map's visual
+    /// appearance — the same water/sky/sun fields the mapconv preview reads, so a
+    /// content map's 3D preview lights and colours its water the way the engine
+    /// would. Colours are Lua `{r,g,b}` arrays (int keys 1..3); the sub-table names
+    /// (`water`/`atmosphere`/`lighting`) are already lowercase, but the leaf field
+    /// names are queried case-tolerantly since unitsync's parser lowercases keys
+    /// only when the map calls `lowerkeys(mapinfo)` (not all maps do).
+    ///
+    /// `voidWater` is not read: unitsync's LuaParser exposes no boolean accessor,
+    /// so the frontend instead hides water when no terrain sits below the sea plane
+    /// (`minHeight >= 0`), which covers the common dry-map case.
+    pub fn map_appearance(&self) -> MapAppearance {
+        let (
+            Some(open),
+            Some(execute),
+            Some(close),
+            Some(root),
+            Some(sub_str),
+            Some(pop),
+            Some(str_fval),
+            Some(int_fval),
+        ) = (
+            self.lp_open_file_fn,
+            self.lp_execute_fn,
+            self.lp_close_fn,
+            self.lp_root_table_fn,
+            self.lp_sub_table_str_fn,
+            self.lp_pop_table_fn,
+            self.lp_str_key_float_val_fn,
+            self.lp_int_key_float_val_fn,
+        )
+        else {
+            return MapAppearance::default();
+        };
+        let (Ok(file), Ok(modes)) = (CString::new("mapinfo.lua"), CString::new("rmMbe")) else {
+            return MapAppearance::default();
+        };
+
+        const SENT: f32 = f32::MIN;
+        // Read an `{r,g,b}` array field of the currently-open table (int keys 1..3).
+        let read_vec3 = |names: &[&str]| -> Option<[f32; 3]> {
+            for name in names {
+                let Ok(key) = CString::new(*name) else {
+                    continue;
+                };
+                unsafe {
+                    if sub_str(key.as_ptr()) != 0 {
+                        let v = [int_fval(1, SENT), int_fval(2, SENT), int_fval(3, SENT)];
+                        pop();
+                        if v.iter().all(|&c| c > SENT) {
+                            return Some(v);
+                        }
+                    }
+                }
+            }
+            None
+        };
+        // Read a scalar float field of the currently-open table.
+        let read_f32 = |names: &[&str]| -> Option<f32> {
+            for name in names {
+                let Ok(key) = CString::new(*name) else {
+                    continue;
+                };
+                let v = unsafe { str_fval(key.as_ptr(), SENT) };
+                if v > SENT {
+                    return Some(v);
+                }
+            }
+            None
+        };
+
+        let mut app = MapAppearance::default();
+        unsafe {
+            if open(file.as_ptr(), modes.as_ptr(), modes.as_ptr()) == 0 {
+                return app;
+            }
+            execute();
+            if root() != 0 {
+                let (Ok(water), Ok(atmosphere), Ok(lighting)) = (
+                    CString::new("water"),
+                    CString::new("atmosphere"),
+                    CString::new("lighting"),
+                ) else {
+                    close();
+                    return app;
+                };
+                if sub_str(water.as_ptr()) != 0 {
+                    // surfaceColor wins over planeColor, matching the mapconv reader.
+                    app.water_color =
+                        read_vec3(&["surfaceColor", "surfacecolor", "planeColor", "planecolor"]);
+                    app.water_alpha = read_f32(&["surfaceAlpha", "surfacealpha"]);
+                    pop(); // water
+                }
+                if sub_str(atmosphere.as_ptr()) != 0 {
+                    app.sky_color = read_vec3(&["skyColor", "skycolor"]);
+                    app.fog_color = read_vec3(&["fogColor", "fogcolor"]);
+                    app.sun_color = read_vec3(&["sunColor", "suncolor"]);
+                    pop(); // atmosphere
+                }
+                if sub_str(lighting.as_ptr()) != 0 {
+                    app.sun_dir = read_vec3(&["sunDir", "sundir"]);
+                    // Spring's canonical sun colour lives under `lighting`; prefer it
+                    // over any `atmosphere.sunColor` read above.
+                    if let Some(c) = read_vec3(&["sunColor", "suncolor"]) {
+                        app.sun_color = Some(c);
+                    }
+                    pop(); // lighting
+                }
+            }
+            close();
+        }
+        app
     }
 
     /// Execute a Lua source string through unitsync's `LuaParser` with `modes`
