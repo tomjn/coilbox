@@ -4,6 +4,7 @@ import { isSdd } from "@/content/format";
 import { GameArt } from "@/content/pages/components/GameArt";
 import { SddBadge } from "@/content/pages/components/SddBadge";
 import { WarningIcon } from "@/content/pages/components/states";
+import { versionLabel } from "@/lib/utils";
 import { GamePickerDrawer } from "./GamePickerDrawer";
 
 /**
@@ -85,7 +86,7 @@ export function GameSelectCard({
           </div>
           {game?.info.version && (
             <span className="text-xs text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-              v{game.info.version}
+              {versionLabel(game.info.version)}
             </span>
           )}
         </div>

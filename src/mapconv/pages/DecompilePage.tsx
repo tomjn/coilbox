@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { versionLabel } from "@/lib/utils";
 import {
   type LogLine,
   type MapInfo,
@@ -295,7 +296,7 @@ export default function DecompilePage() {
                     {result.appearance.name}
                     {result.appearance.version && (
                       <span className="ml-1.5 font-normal text-muted-foreground">
-                        v{result.appearance.version}
+                        {versionLabel(result.appearance.version)}
                       </span>
                     )}
                   </h2>
