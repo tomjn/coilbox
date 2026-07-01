@@ -1005,10 +1005,10 @@
           "markdownDescription": "Denies the us_settings_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-map-info`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`\n- `allow-unitsync-cancel`",
+          "description": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-map-info`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-game-header`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`\n- `allow-unitsync-cancel`",
           "type": "string",
           "const": "coilbox-unitsync:default",
-          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-map-info`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`\n- `allow-unitsync-cancel`"
+          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-map-info`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-game-header`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`\n- `allow-unitsync-cancel`"
         },
         {
           "description": "Enables the unitsync_archive_extract command without any pre-configured scope.",
@@ -1039,6 +1039,12 @@
           "type": "string",
           "const": "coilbox-unitsync:allow-unitsync-engine-config",
           "markdownDescription": "Enables the unitsync_engine_config command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the unitsync_game_header command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:allow-unitsync-game-header",
+          "markdownDescription": "Enables the unitsync_game_header command without any pre-configured scope."
         },
         {
           "description": "Enables the unitsync_game_info command without any pre-configured scope.",
@@ -1117,6 +1123,12 @@
           "type": "string",
           "const": "coilbox-unitsync:deny-unitsync-engine-config",
           "markdownDescription": "Denies the unitsync_engine_config command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_game_header command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:deny-unitsync-game-header",
+          "markdownDescription": "Denies the unitsync_game_header command without any pre-configured scope."
         },
         {
           "description": "Denies the unitsync_game_info command without any pre-configured scope.",

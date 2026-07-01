@@ -10,6 +10,16 @@ body,
   margin: 0;
 }
 
+/* Fade-in used by the game header art layer (referenced via animate-[fadein_...]). */
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Native colour input: make the colour fill the (square) box with no inset,
    so the swatch matches the control's shape instead of showing a small rectangle. */
 .color-swatch::-webkit-color-swatch-wrapper {

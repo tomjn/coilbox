@@ -117,6 +117,18 @@ pub struct MinimapOutput {
     pub errors: Vec<String>,
 }
 
+/// A resolved game header image, returned by the `game-header` mode. `data_url`
+/// is absent when the game has no usable loadpicture/folder art (the frontend
+/// then shows a gradient placeholder).
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GameHeaderOutput {
+    /// Image `data:` URL, ready to drop into an `<img src>`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_url: Option<String>,
+    pub errors: Vec<String>,
+}
+
 /// A rendered heightmap, returned by the lazy `heightmap` mode: a downscaled
 /// grayscale PNG plus the world-height bounds needed for correct displacement.
 #[derive(Serialize, Default)]

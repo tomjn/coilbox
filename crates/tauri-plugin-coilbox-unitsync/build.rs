@@ -13,6 +13,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_engine_config",
     "unitsync_archive_tree",
     "unitsync_archive_file",
+    "unitsync_game_header",
     "unitsync_lua_exec",
     "unitsync_archive_extract",
     "unitsync_cancel",
