@@ -1,7 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import { Play } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useUnitsyncGameInfo,
   useUnitsyncMinimap,
@@ -21,6 +21,7 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "../config";
+import { useSkirmishDraft } from "../drafts";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
 import { MapCard } from "./components/MapCard";
 import { ParticipantsTable } from "./components/ParticipantsTable";
@@ -35,14 +36,18 @@ export default function SkirmishPage() {
   const scan = useUnitsyncScan(enginePath, dataDir);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
 
-  const [participants, setParticipants] =
-    useState<Participant[]>(initialParticipants);
-  const [gameName, setGameName] = useState("");
-  const [mapName, setMapName] = useState("");
-  const [startPosType, setStartPosType] = useState(0);
+  // Seed from the persisted draft so the setup (game, map, opponents, options)
+  // survives navigation and restarts. The debounced effect below writes it back.
+  const [draft, setDraft] = useSkirmishDraft();
+  const [participants, setParticipants] = useState<Participant[]>(() =>
+    draft.participants.length > 0 ? draft.participants : initialParticipants(),
+  );
+  const [gameName, setGameName] = useState(() => draft.gameName);
+  const [mapName, setMapName] = useState(() => draft.mapName);
+  const [startPosType, setStartPosType] = useState(() => draft.startPosType);
   const [modOptionValues, setModOptionValues] = useState<
     Record<string, string>
-  >({});
+  >(() => draft.modOptionValues);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,10 +82,16 @@ export default function SkirmishPage() {
       );
   }, [maps]);
 
-  // Mod options are per-game; reset entered values when the game changes.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on game switch only.
+  // Mod options are per-game; reset entered values when the user switches game.
+  // Guard against the initial undefined -> defined transition as the scan lands,
+  // which is hydration (game restored from the draft), not a real switch — that
+  // would otherwise wipe the mod options we just restored.
+  const prevArchive = useRef(gameArchive);
   useEffect(() => {
-    setModOptionValues({});
+    const prev = prevArchive.current;
+    prevArchive.current = gameArchive;
+    if (prev !== undefined && gameArchive !== undefined && prev !== gameArchive)
+      setModOptionValues({});
   }, [gameArchive]);
 
   // Normalise participant factions to a valid side once the game's sides load.
@@ -101,7 +112,8 @@ export default function SkirmishPage() {
   }, [sides]);
 
   // Auto-select the last AI the user picked for any still-empty AI slot (the
-  // default opponent, or one added before the AI list had loaded).
+  // default opponent, or one added before the AI list had loaded). Restored
+  // participants already carry their `ai`, so this only fills genuine blanks.
   useEffect(() => {
     const preset = defaultAi(lastAi, ais);
     if (!preset) return;
@@ -117,6 +129,28 @@ export default function SkirmishPage() {
       return changed ? next : ps;
     });
   }, [lastAi, ais]);
+
+  // Persist the working draft (debounced — one write after edits settle, not per
+  // keystroke). Transient run state (running/error) is intentionally excluded.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setDraft({
+        participants,
+        gameName,
+        mapName,
+        startPosType,
+        modOptionValues,
+      });
+    }, 400);
+    return () => clearTimeout(id);
+  }, [
+    participants,
+    gameName,
+    mapName,
+    startPosType,
+    modOptionValues,
+    setDraft,
+  ]);
 
   const activeColors = useMemo(
     () =>
