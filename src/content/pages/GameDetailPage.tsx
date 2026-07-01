@@ -103,8 +103,8 @@ export default function GameDetailPage() {
           {game.info.shortname && (
             <span className="font-mono">{game.info.shortname}</span>
           )}
-          {game.checksum && (
-            <span className="font-mono">checksum {game.checksum}</span>
+          {gameInfo?.checksum && (
+            <span className="font-mono">checksum {gameInfo.checksum}</span>
           )}
         </div>
         {game.info.description && (

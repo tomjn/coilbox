@@ -144,8 +144,6 @@ pub struct HeightmapOutput {
 #[serde(rename_all = "camelCase")]
 pub struct GameItem {
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub checksum: Option<String>,
     /// The game's own archive.
     pub primary_archive: Archive,
     /// Archives the game depends on (its primary archive excluded).
@@ -178,6 +176,11 @@ pub struct GameInfoOutput {
     pub unit_count: u32,
     /// Game options (from modoptions.lua), when present.
     pub options: Vec<ConfigOption>,
+    /// Sync checksum (from GetPrimaryModChecksum via the primary archive) —
+    /// hashes the archive plus its dependencies, so it's computed lazily here,
+    /// not during the enumeration scan.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
     pub errors: Vec<String>,
 }
 
@@ -262,6 +265,10 @@ pub struct ArchiveTreeOutput {
     pub files: Vec<ArchiveFileEntry>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub archive_path: Option<String>,
+    /// Sync checksum (from GetArchiveChecksum) — hashes the whole archive, so
+    /// it's computed lazily here, not during the enumeration scan.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
     pub errors: Vec<String>,
 }
 

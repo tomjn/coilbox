@@ -69,6 +69,12 @@ pub fn render(lib: &str, game_archive: &str) -> GameInfoOutput {
 
     let options = crate::read_options(&us, us.mod_option_count());
 
+    // A zero CRC means "unknown" here, so omit it rather than show a misleading 0.
+    let checksum = us
+        .archive_checksum(game_archive)
+        .filter(|&c| c != 0)
+        .map(|c| format!("{c:08x}"));
+
     errors.extend(us.drain_errors());
     us.remove_all_archives();
     us.uninit();
@@ -77,6 +83,7 @@ pub fn render(lib: &str, game_archive: &str) -> GameInfoOutput {
         sides,
         unit_count: unit_count as u32,
         options,
+        checksum,
         errors,
     }
 }

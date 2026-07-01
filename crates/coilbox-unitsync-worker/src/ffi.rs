@@ -90,7 +90,6 @@ pub struct Unitsync {
     // games (primary mods)
     mod_count_fn: CountFn,
     mod_archive_fn: StrByIntFn,
-    mod_checksum_fn: Option<UintByIntFn>,
     mod_archive_count_fn: IntByIntFn,
     mod_archive_list_fn: StrByIntFn,
     mod_info_count_fn: IntByIntFn,
@@ -207,7 +206,6 @@ impl Unitsync {
             map_max_height_fn: opt(&lib, b"GetMapMaxHeight\0"),
             mod_count_fn: req(&lib, b"GetPrimaryModCount\0")?,
             mod_archive_fn: req(&lib, b"GetPrimaryModArchive\0")?,
-            mod_checksum_fn: opt(&lib, b"GetPrimaryModChecksum\0"),
             mod_archive_count_fn: req(&lib, b"GetPrimaryModArchiveCount\0")?,
             mod_archive_list_fn: req(&lib, b"GetPrimaryModArchiveList\0")?,
             mod_info_count_fn: req(&lib, b"GetPrimaryModInfoCount\0")?,
@@ -344,10 +342,6 @@ impl Unitsync {
     /// The game's own archive filename (the *primary* archive).
     pub fn mod_archive(&self, i: i32) -> Option<String> {
         unsafe { cstr((self.mod_archive_fn)(i)) }
-    }
-
-    pub fn mod_checksum(&self, i: i32) -> Option<u32> {
-        self.mod_checksum_fn.map(|f| unsafe { f(i) })
     }
 
     /// The full archive list for a game (its primary archive plus every

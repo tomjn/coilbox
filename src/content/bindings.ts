@@ -274,7 +274,6 @@ export interface MapItem {
 
 export interface GameItem {
   name: string;
-  checksum?: string;
   /** The game's own archive. */
   primaryArchive: Archive;
   /** Archives the game depends on (its primary archive excluded). */
@@ -298,6 +297,8 @@ export interface GameInfoResult {
   unitCount: number;
   /** Game options (from modoptions.lua). */
   options: ConfigOption[];
+  /** Hex CRC (from the primary archive), computed lazily here. */
+  checksum?: string;
   errors: string[];
 }
 
@@ -480,6 +481,8 @@ export interface ArchiveTreeResult {
   files: ArchiveFileEntry[];
   /** The archive's on-disk path (for the `.sdd` "open folder" action). */
   archivePath?: string;
+  /** Hex CRC, computed lazily here. */
+  checksum?: string;
   errors: string[];
 }
 
