@@ -79,25 +79,11 @@ pub fn build_minimap_args(
     args
 }
 
-/// Build args for `--game-header` mode: resolve a game's loadpicture art to a
-/// cached data URL. `loadpicture` is the modinfo hint (may be empty); `checksum`
-/// keys the disk cache (empty disables caching).
-pub fn build_game_header_args(
-    lib: &str,
-    datadir: &str,
-    archive: &str,
-    loadpicture: &str,
-    checksum: &str,
-    cache_dir: Option<&str>,
-) -> Vec<String> {
+/// Build args for batch `--game-headers` mode: resolve every game's loadpicture
+/// art in one session, with the optional on-disk cache directory.
+pub fn build_game_headers_args(lib: &str, datadir: &str, cache_dir: Option<&str>) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--game-header".into());
-    args.push("--archive".into());
-    args.push(archive.into());
-    args.push("--file".into());
-    args.push(loadpicture.into());
-    args.push("--checksum".into());
-    args.push(checksum.into());
+    args.push("--game-headers".into());
     push_cache_dir(&mut args, cache_dir);
     args
 }
@@ -242,6 +228,17 @@ mod tests {
             build_thumbnails_args("/eng/libunitsync.dylib", "/data", 3, Some("/cache/thumbs"));
         assert_eq!(&with[with.len() - 2..], &["--cache-dir", "/cache/thumbs"]);
         let without = build_thumbnails_args("/eng/libunitsync.dylib", "/data", 3, None);
+        assert!(!without.iter().any(|a| a == "--cache-dir"));
+    }
+
+    #[test]
+    fn game_headers_args_append_flag_and_cache_dir() {
+        let with =
+            build_game_headers_args("/eng/libunitsync.dylib", "/data", Some("/cache/headers"));
+        assert!(with.contains(&"--game-headers".to_string()));
+        assert_eq!(&with[with.len() - 2..], &["--cache-dir", "/cache/headers"]);
+        let without = build_game_headers_args("/eng/libunitsync.dylib", "/data", None);
+        assert!(without.contains(&"--game-headers".to_string()));
         assert!(!without.iter().any(|a| a == "--cache-dir"));
     }
 

@@ -117,15 +117,23 @@ pub struct MinimapOutput {
     pub errors: Vec<String>,
 }
 
-/// A resolved game header image, returned by the `game-header` mode. `data_url`
-/// is absent when the game has no usable loadpicture/folder art (the frontend
-/// then shows a gradient placeholder).
-#[derive(Serialize, Default)]
+/// One game's resolved header art in the batch `game-headers` output. `data_url`
+/// is absent when the game has no usable loadpicture/folder art.
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GameHeaderOutput {
-    /// Image `data:` URL, ready to drop into an `<img src>`.
+pub struct GameHeaderItem {
+    /// The game's display name (matches `GameItem.name`), for keying in the UI.
+    pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data_url: Option<String>,
+}
+
+/// Output of the batch `game-headers` mode: header art for every game in one
+/// Init, for the Games grid. Keyed on cheap file identity (not sync-checksum).
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GameHeadersOutput {
+    pub headers: Vec<GameHeaderItem>,
     pub errors: Vec<String>,
 }
 

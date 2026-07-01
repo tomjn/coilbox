@@ -2,8 +2,9 @@ import { Button } from "@picoframe/frame";
 import { ArrowLeft, Play } from "lucide-react";
 import { Link } from "react-router";
 import type { GameItem } from "../../bindings";
-import { useGameHeaderImage } from "../../config";
+import { useUnitsyncGameHeaders } from "../../config";
 import { isSdd } from "../../format";
+import { GameArt } from "./GameArt";
 import { SddBadge } from "./SddBadge";
 
 /**
@@ -16,42 +17,28 @@ export function GameHeader({
   game,
   enginePath,
   dataDir,
-  checksum,
   onPlay,
 }: {
   game: GameItem;
   enginePath?: string;
   dataDir?: string;
-  /** The game's sync checksum, loaded lazily via `useUnitsyncGameInfo` (the scan
-   * no longer carries it); the header-image cache keys on it. */
-  checksum?: string;
   onPlay: () => void;
 }) {
-  const { data } = useGameHeaderImage(
-    enginePath,
-    dataDir,
-    game.primaryArchive.name,
-    checksum,
-    game.info.loadpicture,
-  );
-  const artUrl = data?.dataUrl;
+  // Same art source as the Games grid: the batch loader keyed on cheap file
+  // identity. Unlike the old per-game loader it needs no sync checksum (which
+  // some engine builds don't expose), so the banner resolves whenever the grid
+  // does — and shows the identical image.
+  const { headers } = useUnitsyncGameHeaders(enginePath, dataDir);
+  const artUrl = headers.get(game.name);
 
   return (
     <header className="relative -mx-4 -mt-4 h-48 w-full overflow-hidden">
-      {/* Base layer: deterministic gradient so every game has a hero. */}
-      <div
-        className="absolute inset-0"
-        style={{ background: gradientFor(game.name) }}
-        aria-hidden
+      {/* Base + art layers (deterministic gradient, then loading-screen image). */}
+      <GameArt
+        name={game.name}
+        artUrl={artUrl}
+        alt={`${game.name} loading screen`}
       />
-      {/* Art layer: loading-screen image cropped to the wide/short strip. */}
-      {artUrl && (
-        <img
-          src={artUrl}
-          alt={`${game.name} loading screen`}
-          className="absolute inset-0 size-full animate-[fadein_240ms_ease-out] object-cover object-center motion-reduce:animate-none"
-        />
-      )}
       {/* Scrim: fade into the page background along the bottom for text contrast. */}
       <div
         className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent"
@@ -85,15 +72,4 @@ export function GameHeader({
       </div>
     </header>
   );
-}
-
-/** A stable dark diagonal gradient derived from the game name (placeholder art). */
-function gradientFor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  }
-  const h1 = Math.abs(hash) % 360;
-  const h2 = (h1 + 40) % 360;
-  return `linear-gradient(135deg, hsl(${h1} 45% 22%), hsl(${h2} 50% 12%))`;
 }
