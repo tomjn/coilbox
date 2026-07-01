@@ -240,11 +240,25 @@ export interface Archive {
   size?: number;
 }
 
-/** A map or game configuration option. */
+/** One selectable item of a `list`-typed option. */
+export interface OptionListItem {
+  key: string;
+  name: string;
+}
+
+/** A map or game configuration option, with its type/default when known. */
 export interface ConfigOption {
   key: string;
   name: string;
   description?: string;
+  /** `"bool"` | `"number"` | `"list"` | `"string"` (omitted if unknown). */
+  type?: "bool" | "number" | "list" | "string";
+  /** Default value, stringified (`"1"`/`"0"` for bool, the item key for list). */
+  default?: string;
+  numberMin?: number;
+  numberMax?: number;
+  numberStep?: number;
+  listItems?: OptionListItem[];
 }
 
 export interface MapItem {
@@ -302,6 +316,32 @@ export const unitsyncGameInfo = defineCommand<
   GameInfoResult
 >("coilbox-unitsync", "unitsync_game_info");
 
+/** A skirmish AI available to play against: a native engine AI or a game Lua AI. */
+export interface SkirmishAi {
+  /** unitsync `shortName` — written to `[AI].ShortName` (native) or `[TEAM].LuaAI` (lua). */
+  shortName: string;
+  version?: string;
+  name?: string;
+  description?: string;
+  /** `"native"` (engine-bundled) or `"lua"` (declared inside the game archive). */
+  kind: "native" | "lua";
+}
+
+export interface SkirmishAisResult {
+  ais: SkirmishAi[];
+  errors: string[];
+}
+
+/**
+ * List the skirmish AIs available to play against: native engine AIs, plus the
+ * selected game's bundled Lua AIs when `gameArchive` is given. The list changes
+ * per game (Lua AIs live inside each game's archive).
+ */
+export const unitsyncSkirmishAis = defineCommand<
+  { enginePath: string; dataDir: string; gameArchive?: string },
+  SkirmishAisResult
+>("coilbox-unitsync", "unitsync_skirmish_ais");
+
 export interface ScanResult {
   maps: MapItem[];
   games: GameItem[];
@@ -332,6 +372,11 @@ export interface MinimapResult {
   side?: number;
   /** Team start positions, for overlaying on the minimap. */
   startPositions: StartPos[];
+  /** Wind power range (`atmosphere.minWind`/`maxWind` from mapinfo.lua). */
+  minWind?: number;
+  maxWind?: number;
+  /** Tidal power (`water.tidalStrength` from mapinfo.lua). */
+  tidalStrength?: number;
   errors: string[];
 }
 

@@ -4,14 +4,38 @@
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-/// A map or game configuration option (its key, label and description).
+/// One selectable item of a `list`-typed option.
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OptionListItem {
+    pub key: String,
+    pub name: String,
+}
+
+/// A map or game configuration option: its key, label, description, and — when the
+/// engine build exposes them — its type, default, numeric bounds and list items,
+/// so the UI can render a checkbox / number / select instead of a bare text box.
+#[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigOption {
     pub key: String,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// `"bool"`, `"number"`, `"list"`, or `"string"` (omitted if unknown).
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// Default value, stringified (`"1"`/`"0"` for bool, the item key for list).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub number_min: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub number_max: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub number_step: Option<f32>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub list_items: Vec<OptionListItem>,
 }
 
 /// A team start position in map world coordinates (elmos).
@@ -89,6 +113,14 @@ pub struct MinimapOutput {
     pub side: Option<u32>,
     /// Team start positions in map world coordinates (for overlaying on the map).
     pub start_positions: Vec<StartPos>,
+    /// Wind power range (`atmosphere.minWind`/`maxWind` from mapinfo.lua).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_wind: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_wind: Option<f32>,
+    /// Tidal power (`water.tidalStrength` from mapinfo.lua).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tidal_strength: Option<f32>,
     pub errors: Vec<String>,
 }
 
@@ -153,6 +185,30 @@ pub struct GameInfoOutput {
     pub unit_count: u32,
     /// Game options (from modoptions.lua), when present.
     pub options: Vec<ConfigOption>,
+    pub errors: Vec<String>,
+}
+
+/// A skirmish AI available to play against: a native engine AI or a game Lua AI.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SkirmishAi {
+    /// unitsync `shortName` — the value written to `[AI].ShortName` / `[TEAM].LuaAI`.
+    pub short_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// `"native"` (engine-bundled) or `"lua"` (declared inside the game archive).
+    pub kind: String,
+}
+
+/// Output of the `skirmish-ais` mode: the AIs available, optionally for a game.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SkirmishAiOutput {
+    pub ais: Vec<SkirmishAi>,
     pub errors: Vec<String>,
 }
 

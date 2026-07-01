@@ -572,6 +572,11 @@ export function useUnitsyncMinimap(
 ) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [startPositions, setStartPositions] = useState<StartPos[]>([]);
+  const [env, setEnv] = useState<{
+    minWind?: number;
+    maxWind?: number;
+    tidalStrength?: number;
+  }>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -579,12 +584,18 @@ export function useUnitsyncMinimap(
     if (!enginePath || !dataDir || !mapName) {
       setDataUrl(null);
       setStartPositions([]);
+      setEnv({});
       return;
     }
     const key = `${dataDir}::${enginePath}::${mapName}`;
     const apply = (res: MinimapResult) => {
       setDataUrl(res.dataUrl ?? null);
       setStartPositions(res.startPositions ?? []);
+      setEnv({
+        minWind: res.minWind,
+        maxWind: res.maxWind,
+        tidalStrength: res.tidalStrength,
+      });
       if (!res.dataUrl && res.errors?.length) setError(res.errors.join("; "));
     };
     const cached = minimapCache.get(key);
@@ -612,7 +623,7 @@ export function useUnitsyncMinimap(
     };
   }, [enginePath, dataDir, mapName]);
 
-  return { dataUrl, startPositions, loading, error };
+  return { dataUrl, startPositions, env, loading, error };
 }
 
 /** Session cache of heightmap results, keyed by `dataDir::enginePath::mapName`. */

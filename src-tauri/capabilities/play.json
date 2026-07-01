@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "play",
+  "description": "Grants the play plugin's start-script generation, engine launch and cancel commands to the main window.",
+  "windows": ["main"],
+  "permissions": ["coilbox-play:default"]
+}

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-play-generate-script"
+description = "Enables the play_generate_script command without any pre-configured scope."
+commands.allow = ["play_generate_script"]
+
+[[permission]]
+identifier = "deny-play-generate-script"
+description = "Denies the play_generate_script command without any pre-configured scope."
+commands.deny = ["play_generate_script"]

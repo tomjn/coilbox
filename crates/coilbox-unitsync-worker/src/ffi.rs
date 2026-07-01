@@ -28,6 +28,8 @@ type StrByIntFn = unsafe extern "C" fn(c_int) -> *const c_char; // names, archiv
 type UintByIntFn = unsafe extern "C" fn(c_int) -> c_uint; // checksums by index
 type IntByIntFn = unsafe extern "C" fn(c_int) -> c_int; // archive/info counts by index
 type IntByStrFn = unsafe extern "C" fn(*const c_char) -> c_int; // GetMapArchiveCount(name)
+type FloatByIntFn = unsafe extern "C" fn(c_int) -> c_float; // GetOptionNumberDef(i)
+type StrByIntIntFn = unsafe extern "C" fn(c_int, c_int) -> *const c_char; // GetOptionListItemKey(i, j)
 type StrByStrFn = unsafe extern "C" fn(*const c_char) -> *const c_char; // GetArchivePath(name)
 type UintByStrFn = unsafe extern "C" fn(*const c_char) -> c_uint; // GetArchiveChecksum(name)
 type MinimapFn = unsafe extern "C" fn(*const c_char, c_int) -> *const u16; // GetMinimap(name, mip)
@@ -119,12 +121,27 @@ pub struct Unitsync {
     unit_count_fn: Option<CountFn>,
     unit_name_fn: Option<StrByIntFn>,
     full_unit_name_fn: Option<StrByIntFn>,
+    // skirmish AIs: native engine AIs + a mounted mod's Lua AIs (appended after)
+    skirmish_ai_count_fn: Option<CountFn>,
+    skirmish_ai_info_count_fn: Option<IntByIntFn>,
     // options (map: by name; mod: current loaded game) + shared accessors
     map_option_count_fn: Option<IntByStrFn>,
     mod_option_count_fn: Option<CountFn>,
     option_key_fn: Option<StrByIntFn>,
     option_name_fn: Option<StrByIntFn>,
     option_desc_fn: Option<StrByIntFn>,
+    // option typing + defaults (bool/number/list/string)
+    option_type_fn: Option<IntByIntFn>,
+    option_bool_def_fn: Option<IntByIntFn>,
+    option_number_def_fn: Option<FloatByIntFn>,
+    option_number_min_fn: Option<FloatByIntFn>,
+    option_number_max_fn: Option<FloatByIntFn>,
+    option_number_step_fn: Option<FloatByIntFn>,
+    option_string_def_fn: Option<StrByIntFn>,
+    option_list_count_fn: Option<IntByIntFn>,
+    option_list_def_fn: Option<StrByIntFn>,
+    option_list_item_key_fn: Option<StrByIntIntFn>,
+    option_list_item_name_fn: Option<StrByIntIntFn>,
     // Lua parser (parse mapinfo.lua from the VFS for start positions)
     lp_open_file_fn: Option<LpOpenFn>,
     lp_execute_fn: Option<CountFn>,
@@ -216,11 +233,24 @@ impl Unitsync {
             unit_count_fn: opt(&lib, b"GetUnitCount\0"),
             unit_name_fn: opt(&lib, b"GetUnitName\0"),
             full_unit_name_fn: opt(&lib, b"GetFullUnitName\0"),
+            skirmish_ai_count_fn: opt(&lib, b"GetSkirmishAICount\0"),
+            skirmish_ai_info_count_fn: opt(&lib, b"GetSkirmishAIInfoCount\0"),
             map_option_count_fn: opt(&lib, b"GetMapOptionCount\0"),
             mod_option_count_fn: opt(&lib, b"GetModOptionCount\0"),
             option_key_fn: opt(&lib, b"GetOptionKey\0"),
             option_name_fn: opt(&lib, b"GetOptionName\0"),
             option_desc_fn: opt(&lib, b"GetOptionDesc\0"),
+            option_type_fn: opt(&lib, b"GetOptionType\0"),
+            option_bool_def_fn: opt(&lib, b"GetOptionBoolDef\0"),
+            option_number_def_fn: opt(&lib, b"GetOptionNumberDef\0"),
+            option_number_min_fn: opt(&lib, b"GetOptionNumberMin\0"),
+            option_number_max_fn: opt(&lib, b"GetOptionNumberMax\0"),
+            option_number_step_fn: opt(&lib, b"GetOptionNumberStep\0"),
+            option_string_def_fn: opt(&lib, b"GetOptionStringDef\0"),
+            option_list_count_fn: opt(&lib, b"GetOptionListCount\0"),
+            option_list_def_fn: opt(&lib, b"GetOptionListDef\0"),
+            option_list_item_key_fn: opt(&lib, b"GetOptionListItemKey\0"),
+            option_list_item_name_fn: opt(&lib, b"GetOptionListItemName\0"),
             lp_open_file_fn: opt(&lib, b"lpOpenFile\0"),
             lp_execute_fn: opt(&lib, b"lpExecute\0"),
             lp_close_fn: opt(&lib, b"lpClose\0"),
@@ -637,6 +667,27 @@ impl Unitsync {
             .filter(|s| !s.is_empty())
     }
 
+    // ---- skirmish AIs -----------------------------------------------------
+
+    /// Number of skirmish AIs unitsync currently sees: native AIs from the
+    /// engine's AI data dirs, plus any Lua AIs from a mounted mod (appended
+    /// after the natives). 0 if the build lacks `GetSkirmishAICount`.
+    pub fn skirmish_ai_count(&self) -> i32 {
+        self.skirmish_ai_count_fn
+            .map(|f| unsafe { f() })
+            .unwrap_or(0)
+    }
+
+    /// Info block for skirmish AI `i` (`shortName`, `version`, `name`,
+    /// `description`), read via the shared `GetInfo*` accessors that
+    /// `GetSkirmishAIInfoCount(i)` populates. Empty if unsupported.
+    pub fn skirmish_ai_info(&self, i: i32) -> BTreeMap<String, String> {
+        match self.skirmish_ai_info_count_fn {
+            Some(f) => self.read_info(unsafe { f(i) }),
+            None => BTreeMap::new(),
+        }
+    }
+
     // ---- options ----------------------------------------------------------
     //
     // The `GetOption*` accessors read a global table populated by the most recent
@@ -671,6 +722,66 @@ impl Unitsync {
         self.option_desc_fn
             .and_then(|f| unsafe { cstr(f(i)) })
             .filter(|s| !s.is_empty())
+    }
+
+    /// unitsync option type code: 1 bool, 2 list, 3 number, 4 string (0 unknown).
+    pub fn option_type(&self, i: i32) -> i32 {
+        self.option_type_fn.map(|f| unsafe { f(i) }).unwrap_or(0)
+    }
+
+    pub fn option_bool_def(&self, i: i32) -> bool {
+        self.option_bool_def_fn
+            .map(|f| unsafe { f(i) } != 0)
+            .unwrap_or(false)
+    }
+
+    pub fn option_number_def(&self, i: i32) -> Option<f32> {
+        self.option_number_def_fn.map(|f| unsafe { f(i) })
+    }
+
+    pub fn option_number_min(&self, i: i32) -> Option<f32> {
+        self.option_number_min_fn.map(|f| unsafe { f(i) })
+    }
+
+    pub fn option_number_max(&self, i: i32) -> Option<f32> {
+        self.option_number_max_fn.map(|f| unsafe { f(i) })
+    }
+
+    pub fn option_number_step(&self, i: i32) -> Option<f32> {
+        self.option_number_step_fn.map(|f| unsafe { f(i) })
+    }
+
+    pub fn option_string_def(&self, i: i32) -> Option<String> {
+        self.option_string_def_fn
+            .and_then(|f| unsafe { cstr(f(i)) })
+    }
+
+    /// The default item key for a list option.
+    pub fn option_list_def(&self, i: i32) -> Option<String> {
+        self.option_list_def_fn
+            .and_then(|f| unsafe { cstr(f(i)) })
+            .filter(|s| !s.is_empty())
+    }
+
+    /// A list option's selectable items as `(key, name)`.
+    pub fn option_list_items(&self, i: i32) -> Vec<(String, String)> {
+        let count = self
+            .option_list_count_fn
+            .map(|f| unsafe { f(i) })
+            .unwrap_or(0);
+        (0..count)
+            .filter_map(|j| {
+                let key = self
+                    .option_list_item_key_fn
+                    .and_then(|f| unsafe { cstr(f(i, j)) })?;
+                let name = self
+                    .option_list_item_name_fn
+                    .and_then(|f| unsafe { cstr(f(i, j)) })
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| key.clone());
+                Some((key, name))
+            })
+            .collect()
     }
 
     // ---- start positions --------------------------------------------------
@@ -747,6 +858,70 @@ impl Unitsync {
             close();
         }
         positions
+    }
+
+    /// Parse `mapinfo.lua` (the map's archives must be added) for the map's
+    /// environment settings: `atmosphere.{minWind,maxWind}` and
+    /// `water.tidalStrength` — the wind and tidal power available to wind/tidal
+    /// generators. Returns `(wind (min,max), tidal)`; each is `None` when the map
+    /// omits it or the build lacks the Lua parser.
+    pub fn map_env(&self) -> (Option<(f32, f32)>, Option<f32>) {
+        let (
+            Some(open),
+            Some(execute),
+            Some(close),
+            Some(root),
+            Some(sub_str),
+            Some(pop),
+            Some(fval),
+        ) = (
+            self.lp_open_file_fn,
+            self.lp_execute_fn,
+            self.lp_close_fn,
+            self.lp_root_table_fn,
+            self.lp_sub_table_str_fn,
+            self.lp_pop_table_fn,
+            self.lp_str_key_float_val_fn,
+        )
+        else {
+            return (None, None);
+        };
+        let (Ok(file), Ok(modes)) = (CString::new("mapinfo.lua"), CString::new("rmMbe")) else {
+            return (None, None);
+        };
+        let atmosphere = CString::new("atmosphere").unwrap_or_default();
+        let water = CString::new("water").unwrap_or_default();
+        let min_w = CString::new("minWind").unwrap_or_default();
+        let max_w = CString::new("maxWind").unwrap_or_default();
+        let tidal_k = CString::new("tidalStrength").unwrap_or_default();
+
+        let mut wind = None;
+        let mut tidal = None;
+        unsafe {
+            if open(file.as_ptr(), modes.as_ptr(), modes.as_ptr()) == 0 {
+                return (None, None);
+            }
+            execute();
+            if root() != 0 {
+                if sub_str(atmosphere.as_ptr()) != 0 {
+                    let mn = fval(min_w.as_ptr(), f32::MIN);
+                    let mx = fval(max_w.as_ptr(), f32::MIN);
+                    if mn > f32::MIN && mx > f32::MIN {
+                        wind = Some((mn, mx));
+                    }
+                    pop(); // atmosphere
+                }
+                if sub_str(water.as_ptr()) != 0 {
+                    let t = fval(tidal_k.as_ptr(), f32::MIN);
+                    if t > f32::MIN {
+                        tidal = Some(t);
+                    }
+                    pop(); // water
+                }
+            }
+            close();
+        }
+        (wind, tidal)
     }
 
     /// Execute a Lua source string through unitsync's `LuaParser` with `modes`
