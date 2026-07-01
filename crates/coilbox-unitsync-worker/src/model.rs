@@ -78,11 +78,6 @@ pub struct MapItem {
     pub width: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
-    /// Map options (from mapoptions.lua), when present.
-    pub options: Vec<ConfigOption>,
-    /// Non-fatal unitsync diagnostics attributed to this map during the scan.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub warnings: Vec<String>,
 }
 
 /// One map thumbnail in the batch `thumbnails` output.
@@ -185,6 +180,20 @@ pub struct GameInfoOutput {
     pub unit_count: u32,
     /// Game options (from modoptions.lua), when present.
     pub options: Vec<ConfigOption>,
+    pub errors: Vec<String>,
+}
+
+/// Output of the lazy `--map --map-info` mode: one map's options + any
+/// diagnostics attributed while reading them (requires mounting the map
+/// archive, so it's fetched on demand, not during the enumeration scan).
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MapInfoOutput {
+    /// Map options (from mapoptions.lua), when present.
+    pub options: Vec<ConfigOption>,
+    /// Non-fatal unitsync diagnostics attributed to this map.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
     pub errors: Vec<String>,
 }
 

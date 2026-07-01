@@ -42,6 +42,8 @@ struct Args {
     extract: Option<String>,
     thumbnails: bool,
     heightmap: bool,
+    /// `--map-info`: lazily read one map's options (combined with `--map`).
+    map_info: bool,
     config: bool,
     /// `--skirmish-ais`: list native skirmish AIs (+ a game's Lua AIs when
     /// combined with `--game`).
@@ -217,6 +219,28 @@ fn run() -> i32 {
         };
     }
 
+    // Lazy map info: one map's options + attributed warnings (mounts the map).
+    if args.map_info {
+        if let Some(map) = args.map.clone() {
+            return match std::panic::catch_unwind(|| map_info(&args.lib, &map)) {
+                Ok(out) => {
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    0
+                }
+                Err(_) => {
+                    let out = model::MapInfoOutput {
+                        errors: vec!["worker panicked while reading map info".into()],
+                        ..Default::default()
+                    };
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    1
+                }
+            };
+        }
+        emit_error("missing --map <name> for --map-info".into());
+        return 1;
+    }
+
     // Heightmap: render one map's height infomap to a grayscale PNG data URL.
     if args.heightmap {
         if let Some(map) = args.map.clone() {
@@ -279,6 +303,7 @@ fn parse_args() -> Result<Args, String> {
     let mut extract = None;
     let mut thumbnails = false;
     let mut heightmap = false;
+    let mut map_info = false;
     let mut config = false;
     let mut skirmish_ais = false;
     let mut lua = false;
@@ -298,6 +323,7 @@ fn parse_args() -> Result<Args, String> {
             "--extract" => extract = it.next(),
             "--thumbnails" => thumbnails = true,
             "--heightmap" => heightmap = true,
+            "--map-info" => map_info = true,
             "--max-side" => {
                 max_side = it
                     .next()
@@ -328,6 +354,7 @@ fn parse_args() -> Result<Args, String> {
         extract,
         thumbnails,
         heightmap,
+        map_info,
         config,
         skirmish_ais,
         lua,
@@ -402,6 +429,31 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
         errors,
         sync_version,
     })
+}
+
+/// Load one map's archive set and read its options (+ attributed diagnostics).
+fn map_info(lib: &str, map_name: &str) -> model::MapInfoOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(us) => us,
+        Err(e) => {
+            return model::MapInfoOutput {
+                errors: vec![e],
+                ..Default::default()
+            };
+        }
+    };
+    let mut errors = Vec::new();
+    if us.init(false, 0) == 0 {
+        errors.push("unitsync Init returned 0 (failure)".into());
+    }
+    let options = read_options(&us, us.map_option_count(map_name));
+    let warnings = drain_attributed(&us);
+    us.uninit();
+    model::MapInfoOutput {
+        options,
+        warnings,
+        errors,
+    }
 }
 
 /// Drain unitsync's error queue, returning the diagnostics accumulated while
@@ -524,8 +576,6 @@ fn fmt_num(v: f32) -> String {
 }
 
 fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
-    let timings = std::env::var("COILBOX_UNITSYNC_TIMINGS").is_ok();
-    let mut opt_nanos: u128 = 0;
     let count = us.map_count();
     let mut maps = Vec::with_capacity(count.max(0) as usize);
     for i in 0..count {
@@ -538,14 +588,6 @@ fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
             .map(|a| archive(us, a, None))
             .collect();
         let dims = us.map_dimensions(&name);
-        // Read options last: the GetOption* accessors read a global set by
-        // GetMapOptionCount, so populate and consume it back-to-back.
-        let to = std::time::Instant::now();
-        let options = read_options(us, us.map_option_count(&name));
-        opt_nanos += to.elapsed().as_nanos();
-        // Drain after the accessors above, so any queued diagnostics attach to
-        // this map.
-        let warnings = drain_attributed(us);
         maps.push(MapItem {
             file_name: us.map_file_name(i),
             checksum: us.map_checksum(i).map(|c| format!("{c:08x}")),
@@ -553,16 +595,8 @@ fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
             info: us.map_info(i),
             width: dims.map(|(w, _)| w),
             height: dims.map(|(_, h)| h),
-            options,
-            warnings,
             name: name.clone(),
         });
-    }
-    if timings {
-        eprintln!(
-            "[unitsync-timing] map_options total={}ms",
-            opt_nanos / 1_000_000
-        );
     }
     maps
 }
