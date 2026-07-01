@@ -3,7 +3,6 @@
  - Make sure to give the user an opportunity to test via `bun tauri dev`
  - ensure any new GUIs are actually wired into the GUI and can be reached by the user
  - This is not a website so the chrome MCP will not be useful to you. There is a Tauri MCP
- - When the PR touches the GUI, capture screenshots of the affected screens via the Tauri MCP and include them in the PR description
 
 ## PR's
 
