@@ -9,6 +9,7 @@ Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-i
 - `allow-unitsync-heightmap`
 - `allow-unitsync-thumbnails`
 - `allow-unitsync-game-info`
+- `allow-unitsync-map-info`
 - `allow-unitsync-skirmish-ais`
 - `allow-unitsync-engine-config`
 - `allow-unitsync-archive-tree`
@@ -203,6 +204,32 @@ Enables the unitsync_lua_exec command without any pre-configured scope.
 <td>
 
 Denies the unitsync_lua_exec command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-map-info`
+
+</td>
+<td>
+
+Enables the unitsync_map_info command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-map-info`
+
+</td>
+<td>
+
+Denies the unitsync_map_info command without any pre-configured scope.
 
 </td>
 </tr>

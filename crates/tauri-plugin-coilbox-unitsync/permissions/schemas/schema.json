@@ -379,6 +379,18 @@
           "markdownDescription": "Denies the unitsync_lua_exec command without any pre-configured scope."
         },
         {
+          "description": "Enables the unitsync_map_info command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-unitsync-map-info",
+          "markdownDescription": "Enables the unitsync_map_info command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_map_info command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-unitsync-map-info",
+          "markdownDescription": "Denies the unitsync_map_info command without any pre-configured scope."
+        },
+        {
           "description": "Enables the unitsync_minimap command without any pre-configured scope.",
           "type": "string",
           "const": "allow-unitsync-minimap",
@@ -427,10 +439,10 @@
           "markdownDescription": "Denies the unitsync_thumbnails command without any pre-configured scope."
         },
         {
-          "description": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`",
+          "description": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-map-info`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`"
+          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-map-info`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-archive-extract`"
         }
       ]
     }

@@ -122,6 +122,16 @@ pub fn build_game_args(lib: &str, datadir: &str, game: &str) -> Vec<String> {
     args
 }
 
+/// Build args for map-info mode: scan args plus the map name and the
+/// `--map-info` flag.
+pub fn build_map_info_args(lib: &str, datadir: &str, map_name: &str) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--map".into());
+    args.push(map_name.into());
+    args.push("--map-info".into());
+    args
+}
+
 /// Build args for skirmish-AI mode: scan args plus the `--skirmish-ais` flag and,
 /// when a game is given, `--game <archive>` so its Lua AIs are enumerated too.
 pub fn build_skirmish_ai_args(lib: &str, datadir: &str, game: Option<&str>) -> Vec<String> {
@@ -267,6 +277,15 @@ mod tests {
     fn build_config_args_appends_flag() {
         let a = build_config_args("/eng/libunitsync.dylib", "/home/u/.spring");
         assert_eq!(a.last(), Some(&"--config".to_string()));
+        assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+    }
+
+    #[test]
+    fn build_map_info_args_carry_map_and_flag() {
+        let a = build_map_info_args("/eng/libunitsync.dylib", "/home/u/.spring", "Map v1");
+        assert_eq!(a.last(), Some(&"--map-info".to_string()));
+        let i = a.iter().position(|x| x == "--map").unwrap();
+        assert_eq!(a[i + 1], "Map v1");
         assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
     }
 

@@ -13,8 +13,9 @@ mod sidecar;
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
-    build_config_args, build_game_args, build_heightmap_args, build_lua_args, build_minimap_args,
-    build_skirmish_ai_args, build_thumbnails_args, find_unitsync, resolve_sidecar,
+    build_config_args, build_game_args, build_heightmap_args, build_lua_args, build_map_info_args,
+    build_minimap_args, build_skirmish_ai_args, build_thumbnails_args, find_unitsync,
+    resolve_sidecar,
 };
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -314,6 +315,23 @@ async fn unitsync_game_info(
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "game info").await)
 }
 
+/// `unitsync_map_info` — load one map's archive set to read its options + any
+/// attributed diagnostics. Fetched on demand (mounts the map), not during scan.
+#[tauri::command]
+async fn unitsync_map_info(
+    engine_path: String,
+    data_dir: String,
+    map_name: String,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let args = build_map_info_args(&libpath.to_string_lossy(), &data_dir, &map_name);
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map info").await)
+}
+
 /// `unitsync_skirmish_ais` — list the skirmish AIs available to play against:
 /// native engine AIs, plus the selected game's bundled Lua AIs when
 /// `game_archive` is given. Returns `{ ais: [{ shortName, version?, name?,
@@ -453,6 +471,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_heightmap,
             unitsync_thumbnails,
             unitsync_game_info,
+            unitsync_map_info,
             unitsync_skirmish_ais,
             unitsync_engine_config,
             unitsync_archive_tree,
