@@ -15,6 +15,19 @@ use std::path::Path;
 const TEXT_CAP: usize = 512 * 1024;
 /// Image members are previewed up to 8 MiB.
 const IMAGE_CAP: usize = 8 * 1024 * 1024;
+/// Game-header loadpictures are read up to this size before downscaling. 4K PNGs
+/// run ~12 MiB (past the preview cap), so the header cap is larger; anything
+/// beyond it is treated as unusable rather than decoded.
+const HEADER_READ_CAP: usize = 64 * 1024 * 1024;
+/// Downscaled header art fits within this box (1080p), preserving aspect ratio.
+const HEADER_MAX_W: u32 = 1920;
+const HEADER_MAX_H: u32 = 1080;
+/// JPEG quality for downscaled header art.
+const HEADER_JPEG_QUALITY: u8 = 90;
+/// Salts the header cache key. Bump when the header-art encoding changes so stale
+/// `.dataurl`/`.none` entries (e.g. games rejected before downscaling existed) are
+/// invalidated and re-resolved rather than served from an outdated cache.
+const HEADER_CACHE_VERSION: u32 = 2;
 
 /// List every member of `archive` as `(path, size)`, plus its on-disk path.
 pub fn tree(lib: &str, archive_name: &str) -> ArchiveTreeOutput {
@@ -430,6 +443,7 @@ fn game_cache_key(us: &Unitsync, archive_name: &str) -> Option<String> {
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let mut h = std::collections::hash_map::DefaultHasher::new();
+    HEADER_CACHE_VERSION.hash(&mut h);
     path.hash(&mut h);
     md.len().hash(&mut h);
     mtime.hash(&mut h);
@@ -455,15 +469,52 @@ fn resolve_header_member(us: &Unitsync, handle: i32, loadpicture: &str) -> Optio
     read_image_member(us, handle, &candidates[idx])
 }
 
-/// Read one member and encode it as an image `data:` URL, or `None` if it isn't a
-/// decodable image. Capped at `IMAGE_CAP` like the preview path.
+/// Read one loadpicture member and return it as a downscaled JPEG `data:` URL, or
+/// `None` if it isn't a decodable image. Unlike the raw preview path, header art
+/// is read up to `HEADER_READ_CAP` and always re-encoded (see
+/// `encode_header_image`) so 4K art still renders and every header stays small.
 fn read_image_member(us: &Unitsync, handle: i32, inner: &str) -> Option<String> {
     let ext = inner.rsplit('.').next().unwrap_or("").to_lowercase();
-    let (size, bytes) = us.read_archive_member(handle, inner, IMAGE_CAP)?;
-    if size as usize > IMAGE_CAP {
+    let (size, bytes) = us.read_archive_member(handle, inner, HEADER_READ_CAP)?;
+    if size as usize > HEADER_READ_CAP {
         return None;
     }
-    encode_preview_image(&ext, &bytes)
+    encode_header_image(&ext, &bytes)
+}
+
+/// Decode a loadpicture (by extension, since TGA has no magic bytes) and encode it
+/// as a JPEG `data:` URL downscaled to fit within `HEADER_MAX_W`x`HEADER_MAX_H`.
+/// Aspect ratio is preserved and smaller images keep their size (never upscaled).
+/// Alpha is dropped — loadpictures are opaque backgrounds — matching `tga_to_png`.
+/// Re-encoding every header keeps oversized art (which overflows the raw preview
+/// cap) renderable and bounds the data URL cached in memory and on disk.
+fn encode_header_image(ext: &str, bytes: &[u8]) -> Option<String> {
+    let format = match ext {
+        "png" => image::ImageFormat::Png,
+        "jpg" | "jpeg" => image::ImageFormat::Jpeg,
+        "gif" => image::ImageFormat::Gif,
+        "bmp" => image::ImageFormat::Bmp,
+        "tga" => image::ImageFormat::Tga,
+        _ => return None,
+    };
+    let img = image::load_from_memory_with_format(bytes, format).ok()?;
+    let img = if img.width() > HEADER_MAX_W || img.height() > HEADER_MAX_H {
+        img.thumbnail(HEADER_MAX_W, HEADER_MAX_H)
+    } else {
+        img
+    };
+    let rgb = img.to_rgb8();
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, HEADER_JPEG_QUALITY)
+        .encode(
+            rgb.as_raw(),
+            rgb.width(),
+            rgb.height(),
+            image::ExtendedColorType::Rgb8,
+        )
+        .ok()?;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&jpeg);
+    Some(format!("data:image/jpeg;base64,{b64}"))
 }
 
 /// Image extensions we can turn into a `data:` URL for the header (matches the
@@ -572,6 +623,47 @@ mod header_tests {
         assert!(!is_loadpicture_image("bitmaps/loadpictures/readme.txt"));
         // the folder entry itself
         assert!(!is_loadpicture_image("bitmaps/loadpictures/"));
+    }
+
+    /// Encode a solid-colour RGB image of `w`x`h` as PNG bytes for the tests.
+    fn png_bytes(w: u32, h: u32) -> Vec<u8> {
+        let img = image::RgbImage::from_pixel(w, h, image::Rgb([10, 120, 220]));
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(img)
+            .write_to(&mut out, image::ImageFormat::Png)
+            .unwrap();
+        out.into_inner()
+    }
+
+    #[test]
+    fn oversized_header_is_downscaled_to_jpeg() {
+        // A 4K image (larger than the 1080p box) comes back as a JPEG that fits.
+        let url = encode_header_image("png", &png_bytes(3840, 2160)).unwrap();
+        assert!(url.starts_with("data:image/jpeg;base64,"), "got {url:.32}");
+
+        let raw = base64::engine::general_purpose::STANDARD
+            .decode(url.trim_start_matches("data:image/jpeg;base64,"))
+            .unwrap();
+        let out = image::load_from_memory_with_format(&raw, image::ImageFormat::Jpeg).unwrap();
+        assert!(out.width() <= HEADER_MAX_W && out.height() <= HEADER_MAX_H);
+        // Aspect ratio (16:9) is preserved: downscaled to the box width.
+        assert_eq!(out.width(), HEADER_MAX_W);
+    }
+
+    #[test]
+    fn small_header_keeps_its_size() {
+        let url = encode_header_image("png", &png_bytes(320, 200)).unwrap();
+        let raw = base64::engine::general_purpose::STANDARD
+            .decode(url.trim_start_matches("data:image/jpeg;base64,"))
+            .unwrap();
+        let out = image::load_from_memory_with_format(&raw, image::ImageFormat::Jpeg).unwrap();
+        assert_eq!((out.width(), out.height()), (320, 200));
+    }
+
+    #[test]
+    fn undecodable_header_bytes_return_none() {
+        assert!(encode_header_image("png", b"not a png").is_none());
+        assert!(encode_header_image("webp", &png_bytes(8, 8)).is_none());
     }
 
     #[test]
