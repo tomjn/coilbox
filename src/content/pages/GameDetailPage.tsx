@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
-import { ArrowLeft, FolderOpen } from "lucide-react";
-import { Link, useParams } from "react-router";
+import { ArrowLeft, FolderOpen, Play } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router";
+import { useSkirmishDraft } from "@/play/drafts";
 import { type Archive, contentOpenPath } from "../bindings";
 import {
   classifyArchive,
@@ -24,6 +25,8 @@ const HEADLINE_KEYS = new Set(["name", "shortname", "version", "description"]);
 export default function GameDetailPage() {
   const { name } = useParams();
   const decoded = name ? decodeURIComponent(name) : "";
+  const navigate = useNavigate();
+  const [draft, setDraft] = useSkirmishDraft();
   const { selected } = useScanTargetSelection();
   const { data, loading } = useUnitsyncScan(
     selected?.enginePath,
@@ -50,6 +53,20 @@ export default function GameDetailPage() {
     contentOpenPath({ path: target }).catch(() => {});
   };
 
+  // Preselect this game in the Singleplayer setup, then jump there. We write the
+  // persisted skirmish draft (the same source the launcher hydrates from) rather
+  // than pass route state. Mod options are per-game, so clear any carried over
+  // from a different previously-set game — the draft-hydration path in the
+  // launcher deliberately skips its own per-switch reset.
+  const play = () => {
+    setDraft({
+      ...draft,
+      gameName: game.name,
+      ...(game.name !== draft.gameName ? { modOptionValues: {} } : {}),
+    });
+    navigate("/play/skirmish");
+  };
+
   return (
     <div className="flex flex-col gap-5 p-4">
       <header className="flex flex-col gap-1">
@@ -59,9 +76,14 @@ export default function GameDetailPage() {
         >
           <ArrowLeft className="size-3.5" /> Games
         </Link>
-        <div className="flex items-center gap-2">
-          <h1 className="break-words text-lg font-semibold">{game.name}</h1>
-          {isSdd(game.primaryArchive) && <SddBadge />}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h1 className="break-words text-lg font-semibold">{game.name}</h1>
+            {isSdd(game.primaryArchive) && <SddBadge />}
+          </div>
+          <Button size="sm" className="shrink-0 gap-1.5" onClick={play}>
+            <Play className="size-4" /> Play
+          </Button>
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {game.info.version && <span>v{game.info.version}</span>}
