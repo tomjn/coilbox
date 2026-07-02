@@ -25,7 +25,7 @@ mod status;
 pub use hash::password_hash;
 pub use login::{LoginConfig, LoginMachine, LoginPhase};
 pub use message::{parse_line, ServerMessage};
-pub use reduce::{reduce, Delta};
+pub use reduce::{reduce, reduce_at, Delta};
 pub use state::{
     Battle, Bot, ChannelState, ChatKind, ChatMsg, LobbyState, MemberStatus, StartRect, User,
 };

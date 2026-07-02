@@ -6,7 +6,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::status::{BattleStatus, ClientStatus};
 
@@ -22,7 +22,7 @@ pub struct User {
 }
 
 /// The kind of a chat message, so the frontend can render it appropriately.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ChatKind {
     Said,
@@ -35,14 +35,16 @@ pub enum ChatKind {
 }
 
 /// A single chat line. `channel` is `None` for battle chat with no known channel
-/// and for private messages.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+/// and for private messages. `at` is a unix-millis receive timestamp (0 when the
+/// reducer is driven without a clock, e.g. in tests via `reduce`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatMsg {
     pub channel: Option<String>,
     pub from: String,
     pub text: String,
     pub kind: ChatKind,
+    pub at: u64,
 }
 
 /// The state of a joined channel.

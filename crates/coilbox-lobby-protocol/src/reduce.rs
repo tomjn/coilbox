@@ -98,7 +98,8 @@ pub enum Delta {
 }
 
 /// Apply a server message to the lobby state, returning the deltas produced.
-pub fn reduce(state: &mut LobbyState, msg: ServerMessage) -> Vec<Delta> {
+/// `now_ms` stamps any chat message created (unix millis; pass 0 when no clock).
+pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec<Delta> {
     match msg {
         ServerMessage::Accepted { username } => {
             state.my_username = Some(username.clone());
@@ -176,6 +177,7 @@ pub fn reduce(state: &mut LobbyState, msg: ServerMessage) -> Vec<Delta> {
                     from: username,
                     text: String::new(),
                     kind: ChatKind::Join,
+                    at: now_ms,
                 },
             )
         }
@@ -195,6 +197,7 @@ pub fn reduce(state: &mut LobbyState, msg: ServerMessage) -> Vec<Delta> {
                     from: username,
                     text: reason.unwrap_or_default(),
                     kind: ChatKind::Leave,
+                    at: now_ms,
                 },
             )
         }
@@ -222,6 +225,7 @@ pub fn reduce(state: &mut LobbyState, msg: ServerMessage) -> Vec<Delta> {
                 from: String::new(),
                 text,
                 kind: ChatKind::System,
+                at: now_ms,
             },
         ),
         ServerMessage::Said {
@@ -236,6 +240,7 @@ pub fn reduce(state: &mut LobbyState, msg: ServerMessage) -> Vec<Delta> {
                 from: username,
                 text: message,
                 kind: ChatKind::Said,
+                at: now_ms,
             },
         ),
         ServerMessage::SaidEx {
@@ -250,6 +255,7 @@ pub fn reduce(state: &mut LobbyState, msg: ServerMessage) -> Vec<Delta> {
                 from: username,
                 text: message,
                 kind: ChatKind::SaidEx,
+                at: now_ms,
             },
         ),
         ServerMessage::SaidPrivate { username, message } => {
@@ -258,10 +264,10 @@ pub fn reduce(state: &mut LobbyState, msg: ServerMessage) -> Vec<Delta> {
             vec![Delta::PrivateMessage { from: username }]
         }
         ServerMessage::SaidBattle { username, message } => {
-            reduce_battle_chat(state, username, message, ChatKind::SaidBattle)
+            reduce_battle_chat(state, username, message, ChatKind::SaidBattle, now_ms)
         }
         ServerMessage::SaidBattleEx { username, message } => {
-            reduce_battle_chat(state, username, message, ChatKind::SaidBattle)
+            reduce_battle_chat(state, username, message, ChatKind::SaidBattle, now_ms)
         }
         ServerMessage::BattleOpened {
             id,
@@ -523,6 +529,11 @@ pub fn reduce(state: &mut LobbyState, msg: ServerMessage) -> Vec<Delta> {
     }
 }
 
+/// Clock-free convenience wrapper (timestamps stamped as 0). Used by tests.
+pub fn reduce(state: &mut LobbyState, msg: ServerMessage) -> Vec<Delta> {
+    reduce_at(state, msg, 0)
+}
+
 /// Append a chat message to a channel (creating it if needed) and emit a delta
 /// pointing at its index.
 fn push_chat(state: &mut LobbyState, channel: &str, msg: ChatMsg) -> Vec<Delta> {
@@ -548,6 +559,7 @@ fn reduce_battle_chat(
     username: String,
     message: String,
     kind: ChatKind,
+    now_ms: u64,
 ) -> Vec<Delta> {
     let channel = state
         .current_battle
@@ -562,6 +574,7 @@ fn reduce_battle_chat(
                 from: username,
                 text: message,
                 kind,
+                at: now_ms,
             },
         ),
         None => vec![Delta::ChatMessage {
@@ -703,5 +716,13 @@ mod tests {
             }]
         );
         assert_eq!(s.channels["main"].messages[0].text, "hello there");
+    }
+
+    #[test]
+    fn reduce_at_stamps_chat_timestamp() {
+        let mut s = LobbyState::new();
+        reduce_at(&mut s, parse_line("JOIN main"), 111);
+        reduce_at(&mut s, parse_line("SAID main bob hello there"), 12345);
+        assert_eq!(s.channels["main"].messages[0].at, 12345);
     }
 }
