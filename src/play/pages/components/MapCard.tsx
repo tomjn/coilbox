@@ -77,45 +77,46 @@ export function MapCard({
         }
       />
 
-      <div className="mt-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold">
+      <div className="mt-3">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="min-w-0 truncate text-sm font-semibold">
             {map?.name ?? (mapsLoading ? "Loading maps…" : "No map selected")}
           </h2>
-          <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-            {size && <span>{size}</span>}
-            {startPositions.length > 0 && (
-              <span>· {startPositions.length} start positions</span>
-            )}
-            {wind && <span>· {wind}</span>}
-            {tidal && <span>· {tidal}</span>}
-          </div>
-          {description && (
-            <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">
-              {description}
-            </p>
-          )}
-          {tags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {tags.slice(0, 3).map(([k, v]) => (
-                <span
-                  key={k}
-                  className="rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground"
-                >
-                  {v}
-                </span>
-              ))}
-            </div>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            disabled={disabled || mapsLoading}
+            onClick={() => setPickerOpen(true)}
+          >
+            Choose map
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={disabled || mapsLoading}
-          onClick={() => setPickerOpen(true)}
-        >
-          Choose map
-        </Button>
+        <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+          {size && <span>{size}</span>}
+          {startPositions.length > 0 && (
+            <span>· {startPositions.length} start positions</span>
+          )}
+          {wind && <span>· {wind}</span>}
+          {tidal && <span>· {tidal}</span>}
+        </div>
+        {description && (
+          <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">
+            {description}
+          </p>
+        )}
+        {tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {tags.slice(0, 3).map(([k, v]) => (
+              <span
+                key={k}
+                className="rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+              >
+                {v}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <MapPickerDrawer
