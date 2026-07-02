@@ -35,7 +35,6 @@ export function GameCard({
 }) {
   const brand = useBrandingEntry(game);
   const brandBanner = useBrandingImage(brand?.banner);
-  const brandLogo = useBrandingImage(brand?.logo);
   const art = brandBanner ?? artUrl;
   return (
     <div className="group relative aspect-video overflow-hidden rounded-lg border border-border/50 bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-0.5 hover:border-border hover:shadow-lg hover:shadow-black/30 focus-within:ring-2 focus-within:ring-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0">
@@ -44,14 +43,6 @@ export function GameCard({
         artUrl={art}
         alt={`${game.name} loading screen`}
       />
-      {brandLogo && (
-        <img
-          src={brandLogo}
-          alt=""
-          aria-hidden
-          className="absolute left-2 top-2 h-6 w-auto drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
-        />
-      )}
       {loading && !art && (
         <div className="absolute inset-0 animate-pulse bg-muted-foreground/10" />
       )}
