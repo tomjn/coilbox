@@ -109,7 +109,6 @@ export function ChatPane({
                       : m.text; // system message text
                 return (
                   <div
-                    // biome-ignore lint/suspicious/noArrayIndexKey: append-only log, index is stable identity.
                     key={key}
                     className="py-0.5 text-center text-xs text-muted-foreground"
                   >
@@ -120,7 +119,6 @@ export function ChatPane({
               const own = currentUser != null && m.from === currentUser;
               return (
                 <div
-                  // biome-ignore lint/suspicious/noArrayIndexKey: append-only log, index is stable identity.
                   key={key}
                   className={
                     own
