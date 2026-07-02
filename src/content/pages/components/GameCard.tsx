@@ -3,6 +3,7 @@ import { Play } from "lucide-react";
 import { Link } from "react-router";
 import { versionLabel } from "@/lib/utils";
 import type { GameItem } from "../../bindings";
+import { useBrandingEntry, useBrandingImage } from "../../branding";
 import { isSdd } from "../../format";
 import { GameArt } from "./GameArt";
 import { SddBadge } from "./SddBadge";
@@ -32,14 +33,26 @@ export function GameCard({
   loading?: boolean;
   onPlay: () => void;
 }) {
+  const brand = useBrandingEntry(game);
+  const brandBanner = useBrandingImage(brand?.banner);
+  const brandLogo = useBrandingImage(brand?.logo);
+  const art = brandBanner ?? artUrl;
   return (
     <div className="group relative aspect-video overflow-hidden rounded-lg border border-border/50 bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-0.5 hover:border-border hover:shadow-lg hover:shadow-black/30 focus-within:ring-2 focus-within:ring-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       <GameArt
         name={game.name}
-        artUrl={artUrl}
+        artUrl={art}
         alt={`${game.name} loading screen`}
       />
-      {loading && !artUrl && (
+      {brandLogo && (
+        <img
+          src={brandLogo}
+          alt=""
+          aria-hidden
+          className="absolute left-2 top-2 h-6 w-auto drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+        />
+      )}
+      {loading && !art && (
         <div className="absolute inset-0 animate-pulse bg-muted-foreground/10" />
       )}
       {/* Scrim: darken the bottom so the overlaid title/version stay legible. */}
@@ -67,7 +80,7 @@ export function GameCard({
               className="truncate text-sm font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
               title={game.name}
             >
-              {game.name}
+              {brand?.title ?? game.name}
             </p>
             {isSdd(game.primaryArchive) && <SddBadge />}
             {game.warnings?.length ? (
