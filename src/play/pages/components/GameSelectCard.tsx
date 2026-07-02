@@ -36,7 +36,7 @@ export function GameSelectCard({
   const blocked = disabled || gamesLoading;
   // Catalog branding art wins over the game's own loading-screen art.
   const brand = useBrandingEntry(game ?? undefined);
-  const brandBanner = useBrandingImage(brand?.banner);
+  const brandBanner = useBrandingImage(brand?.banner, true);
 
   return (
     <div className="group relative aspect-video overflow-hidden rounded-lg border border-border/50 bg-card shadow-sm">

@@ -4537,6 +4537,7 @@ name = "tauri-plugin-coilbox-content"
 version = "0.0.0"
 dependencies = [
  "flate2",
+ "image 0.25.10",
  "picoframe-core",
  "reqwest 0.12.28",
  "serde",

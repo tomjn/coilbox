@@ -32,7 +32,7 @@ export function GameHeader({
   // does — and shows the identical image.
   const { headers } = useUnitsyncGameHeaders(enginePath, dataDir);
   const brand = useBrandingEntry(game);
-  const brandBanner = useBrandingImage(brand?.banner);
+  const brandBanner = useBrandingImage(brand?.banner, true);
   // Catalog art wins; the game's own loading-screen art is the fallback.
   const artUrl = brandBanner ?? headers.get(game.name);
 

@@ -59,10 +59,10 @@ const brandingCatalogCmd = defineCommand<{ url: string }, CatalogResult>(
   "coilbox-content",
   "branding_catalog",
 );
-const brandingImageCmd = defineCommand<{ urls: string[] }, ImageResult>(
-  "coilbox-content",
-  "branding_image",
-);
+const brandingImageCmd = defineCommand<
+  { urls: string[]; reencode: boolean },
+  ImageResult
+>("coilbox-content", "branding_image");
 
 /** An entry with its regex precompiled (invalid regex -> undefined, entry kept). */
 interface CompiledEntry extends BrandingEntry {
@@ -170,9 +170,16 @@ const imageCache = new Map<string, Promise<ImageResult>>();
 /**
  * Resolve the first working URL to a cached `data:` URL via the Rust proxy (fetch
  * once, CSP-safe). No-ops for empty input; session-cached by the joined URL list.
+ *
+ * Set `reencode` for opaque photographic art (banners, screenshots): the Rust side
+ * downsamples and JPEG-encodes it to bound the data URL. Leave it off for logos,
+ * which are usually transparent and small and must keep their original bytes.
  */
-export function useBrandingImage(urls?: string[]): string | undefined {
-  const key = urls?.length ? urls.join("\n") : "";
+export function useBrandingImage(
+  urls?: string[],
+  reencode = false,
+): string | undefined {
+  const key = urls?.length ? `${reencode ? "j" : "r"}\n${urls.join("\n")}` : "";
   const [dataUrl, setDataUrl] = useState<string | undefined>(undefined);
   useEffect(() => {
     if (!key) {
@@ -182,7 +189,10 @@ export function useBrandingImage(urls?: string[]): string | undefined {
     let cancelled = false;
     let promise = imageCache.get(key);
     if (!promise) {
-      promise = brandingImageCmd({ urls: key.split("\n") });
+      // key = "<variant>\n<url>\n<url>..." — self-contained so the effect need
+      // only depend on `key` (variant "j" = re-encode as JPEG, "r" = raw).
+      const [variant, ...urlList] = key.split("\n");
+      promise = brandingImageCmd({ urls: urlList, reencode: variant === "j" });
       imageCache.set(key, promise);
     }
     promise

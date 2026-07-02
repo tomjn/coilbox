@@ -602,15 +602,21 @@ async fn branding_catalog<R: Runtime>(app: AppHandle<R>, url: String) -> Result<
 
 /// `branding_image` — fetch the first working image URL (https only), cache it
 /// once as a `data:` URL keyed by URL hash, and return it. Empty `dataUrl` = the
-/// UI falls back to the game's own art / gradient.
+/// UI falls back to the game's own art / gradient. When `reencode` is set (opaque
+/// photographic art — banners, screenshots), decodable rasters are downsampled and
+/// JPEG-encoded to bound the cached data URL; logos pass through untouched.
 #[tauri::command]
-async fn branding_image<R: Runtime>(app: AppHandle<R>, urls: Vec<String>) -> Result<CliResult, ()> {
+async fn branding_image<R: Runtime>(
+    app: AppHandle<R>,
+    urls: Vec<String>,
+    reencode: bool,
+) -> Result<CliResult, ()> {
     let cache_dir = app
         .path()
         .app_cache_dir()
         .ok()
         .map(|d| d.join("coilbox-branding-images"));
-    let data_url = branding::resolve_image(&urls, cache_dir).await;
+    let data_url = branding::resolve_image(&urls, cache_dir, reencode).await;
     Ok(CliResult::ok(json!({ "dataUrl": data_url })))
 }
 

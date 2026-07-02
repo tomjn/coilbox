@@ -47,6 +47,37 @@ pub(crate) fn data_url(content_type: &str, bytes: &[u8]) -> String {
     format!("data:{};base64,{}", content_type, base64_encode(bytes))
 }
 
+/// Downsample bound + JPEG quality for re-encoded photographic art (banners,
+/// screenshots), mirroring the loadpicture header pipeline in the unitsync worker.
+const PHOTO_MAX_W: u32 = 1920;
+const PHOTO_MAX_H: u32 = 1080;
+const PHOTO_JPEG_QUALITY: u8 = 85;
+
+/// Decode arbitrary raster bytes, downscale to fit `PHOTO_MAX_W`x`PHOTO_MAX_H`
+/// (aspect-preserving, never upscaled), drop alpha, and re-encode as a JPEG
+/// `data:` URL. Returns `None` if the bytes aren't a decodable raster (e.g. SVG or
+/// WebP) so the caller can fall back to passing the original bytes through. Used
+/// only for opaque photographic art — logos keep their original bytes/transparency.
+pub(crate) fn reencode_jpeg(bytes: &[u8]) -> Option<String> {
+    let img = image::load_from_memory(bytes).ok()?;
+    let img = if img.width() > PHOTO_MAX_W || img.height() > PHOTO_MAX_H {
+        img.thumbnail(PHOTO_MAX_W, PHOTO_MAX_H)
+    } else {
+        img
+    };
+    let rgb = img.to_rgb8();
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, PHOTO_JPEG_QUALITY)
+        .encode(
+            rgb.as_raw(),
+            rgb.width(),
+            rgb.height(),
+            image::ExtendedColorType::Rgb8,
+        )
+        .ok()?;
+    Some(format!("data:image/jpeg;base64,{}", base64_encode(&jpeg)))
+}
+
 /// Pick a usable image content type: trust an `image/*` response header, else
 /// guess from the URL extension, else default to `image/png`. Anything not
 /// `image/*` returns `None` so non-image responses are rejected.
@@ -78,12 +109,23 @@ pub(crate) fn image_content_type(header: Option<&str>, url: &str) -> Option<Stri
     }
 }
 
-/// A cache-dir subpath helper, mirroring the header/thumb cache layout.
-pub(crate) fn image_cache_files(cache_dir: &std::path::Path, url: &str) -> (PathBuf, PathBuf) {
+/// Bumped when the cached encoding changes so stale entries miss and refetch.
+const IMAGE_CACHE_VERSION: u32 = 2;
+
+/// A cache-dir subpath helper, mirroring the header/thumb cache layout. The
+/// filename carries a version salt and a `photo`/`raw` variant so re-encoded and
+/// pass-through results for the same URL never collide (and old entries invalidate).
+pub(crate) fn image_cache_files(
+    cache_dir: &std::path::Path,
+    url: &str,
+    reencode: bool,
+) -> (PathBuf, PathBuf) {
     let key = url_key(url);
+    let variant = if reencode { "photo" } else { "raw" };
+    let stem = format!("{key}.v{IMAGE_CACHE_VERSION}.{variant}");
     (
-        cache_dir.join(format!("{key}.dataurl")),
-        cache_dir.join(format!("{key}.none")),
+        cache_dir.join(format!("{stem}.dataurl")),
+        cache_dir.join(format!("{stem}.none")),
     )
 }
 
@@ -155,12 +197,18 @@ pub(crate) async fn resolve_catalog(
 /// Fetch the first URL that yields an image, cache it once as a `data:` URL, and
 /// return it. `.dataurl` positive hits and `.none` negative markers avoid refetch.
 /// Only `https` URLs are attempted (privacy/security).
-pub(crate) async fn resolve_image(urls: &[String], cache_dir: Option<PathBuf>) -> Option<String> {
+pub(crate) async fn resolve_image(
+    urls: &[String],
+    cache_dir: Option<PathBuf>,
+    reencode: bool,
+) -> Option<String> {
     for url in urls {
         if !url.starts_with("https://") {
             continue;
         }
-        let files = cache_dir.as_ref().map(|d| image_cache_files(d, url));
+        let files = cache_dir
+            .as_ref()
+            .map(|d| image_cache_files(d, url, reencode));
         if let Some((pos, neg)) = &files {
             if let Ok(text) = std::fs::read_to_string(pos) {
                 return Some(text);
@@ -169,7 +217,7 @@ pub(crate) async fn resolve_image(urls: &[String], cache_dir: Option<PathBuf>) -
                 continue;
             }
         }
-        match fetch_image(url).await {
+        match fetch_image(url, reencode).await {
             Some(data_url) => {
                 if let Some((pos, _)) = &files {
                     if let Some(dir) = pos.parent() {
@@ -192,8 +240,10 @@ pub(crate) async fn resolve_image(urls: &[String], cache_dir: Option<PathBuf>) -
     None
 }
 
-/// Fetch one image URL → `data:` URL, or `None` on any failure / non-image.
-async fn fetch_image(url: &str) -> Option<String> {
+/// Fetch one image URL → `data:` URL, or `None` on any failure / non-image. When
+/// `reencode` is set the bytes are downsampled and JPEG-encoded (for opaque
+/// photographic art); if they can't be decoded (SVG/WebP) we pass them through raw.
+async fn fetch_image(url: &str, reencode: bool) -> Option<String> {
     let resp = reqwest::get(url).await.ok()?.error_for_status().ok()?;
     let header = resp
         .headers()
@@ -202,6 +252,11 @@ async fn fetch_image(url: &str) -> Option<String> {
         .map(str::to_owned);
     let content_type = image_content_type(header.as_deref(), url)?;
     let bytes = resp.bytes().await.ok()?;
+    if reencode {
+        if let Some(jpeg) = reencode_jpeg(&bytes) {
+            return Some(jpeg);
+        }
+    }
     Some(data_url(&content_type, &bytes))
 }
 
@@ -228,6 +283,75 @@ mod tests {
     fn url_key_is_stable_and_differs() {
         assert_eq!(url_key("https://a/x.png"), url_key("https://a/x.png"));
         assert_ne!(url_key("https://a/x.png"), url_key("https://a/y.png"));
+    }
+
+    /// Encode a solid-colour RGBA image to in-memory PNG bytes for the tests.
+    fn png_bytes(w: u32, h: u32) -> Vec<u8> {
+        let img = image::RgbaImage::from_pixel(w, h, image::Rgba([10, 20, 30, 255]));
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut out, image::ImageFormat::Png)
+            .unwrap();
+        out.into_inner()
+    }
+
+    #[test]
+    fn reencode_downsamples_oversized_and_emits_jpeg() {
+        let url = reencode_jpeg(&png_bytes(3840, 2160)).unwrap();
+        assert!(url.starts_with("data:image/jpeg;base64,"));
+        let b64 = url.trim_start_matches("data:image/jpeg;base64,");
+        let bytes = base64_decode(b64);
+        let out = image::load_from_memory(&bytes).unwrap();
+        assert!(out.width() <= PHOTO_MAX_W && out.height() <= PHOTO_MAX_H);
+        assert_eq!(out.width(), PHOTO_MAX_W); // 16:9 source hits the width bound
+    }
+
+    #[test]
+    fn reencode_keeps_small_images_unscaled() {
+        let url = reencode_jpeg(&png_bytes(320, 200)).unwrap();
+        let b64 = url.trim_start_matches("data:image/jpeg;base64,");
+        let out = image::load_from_memory(&base64_decode(b64)).unwrap();
+        assert_eq!((out.width(), out.height()), (320, 200));
+    }
+
+    #[test]
+    fn reencode_rejects_undecodable_bytes() {
+        assert!(reencode_jpeg(b"not an image").is_none());
+    }
+
+    #[test]
+    fn cache_files_separate_variant_and_version() {
+        let dir = std::path::Path::new("/tmp");
+        let (photo, _) = image_cache_files(dir, "https://a/x.png", true);
+        let (raw, _) = image_cache_files(dir, "https://a/x.png", false);
+        assert_ne!(photo, raw);
+        assert!(photo.to_string_lossy().contains(".photo."));
+        assert!(raw.to_string_lossy().contains(".raw."));
+        assert!(photo
+            .to_string_lossy()
+            .contains(&format!(".v{IMAGE_CACHE_VERSION}.")));
+    }
+
+    /// Minimal standard-base64 decoder, test-only, to round-trip `base64_encode`.
+    fn base64_decode(s: &str) -> Vec<u8> {
+        const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let val = |c: u8| T.iter().position(|&t| t == c).unwrap() as u32;
+        let clean: Vec<u8> = s.bytes().filter(|&c| c != b'=').collect();
+        let mut out = Vec::with_capacity(clean.len() / 4 * 3);
+        for chunk in clean.chunks(4) {
+            let mut n = 0u32;
+            for (i, &c) in chunk.iter().enumerate() {
+                n |= val(c) << (18 - 6 * i);
+            }
+            out.push((n >> 16) as u8);
+            if chunk.len() > 2 {
+                out.push((n >> 8) as u8);
+            }
+            if chunk.len() > 3 {
+                out.push(n as u8);
+            }
+        }
+        out
     }
 
     #[test]
