@@ -9,11 +9,11 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use coilbox_lobby_protocol::{
-    command, parse_line, reduce, Delta, LobbyState, LoginConfig, LoginMachine, LoginPhase,
-    ServerMessage,
+    command, parse_line, record_outgoing_private, reduce_at, Delta, LobbyState, LoginConfig,
+    LoginMachine, LoginPhase, ServerMessage,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
@@ -21,7 +21,16 @@ use tauri::ipc::Channel;
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::codec::{Framed, LinesCodec};
 
+use crate::dmlog::DmLog;
 use crate::tls::AsyncReadWrite;
+
+/// Unix-millis now, saturating to 0 on the (impossible) pre-epoch case.
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
 
 /// How often we send an unsolicited `PING`. The server drops idle clients, so this
 /// is a keepalive, not latency measurement; a coarse interval is plenty.
@@ -76,9 +85,12 @@ pub fn spawn_connection(
     stream: Box<dyn AsyncReadWrite>,
     login_cfg: LoginConfig,
     on_event: Channel<LobbyEvent>,
+    dm_log: DmLog,
 ) {
     let (tx, rx) = mpsc::unbounded_channel::<Outbound>();
-    let state = Arc::new(Mutex::new(LobbyState::new()));
+    let mut initial = LobbyState::new();
+    initial.dms = dm_log.load();
+    let state = Arc::new(Mutex::new(initial));
 
     let handle = tokio::spawn(run_loop(
         registry.clone(),
@@ -88,6 +100,7 @@ pub fn spawn_connection(
         on_event,
         rx,
         state.clone(),
+        dm_log,
     ));
 
     // Register after spawning so we have the abort handle. The task's first action
@@ -106,6 +119,7 @@ pub fn spawn_connection(
 /// The connection event loop. Interleaves inbound lines, queued outbound lines
 /// (from commands), and the keepalive timer over one socket; on exit it reports the
 /// reason and evicts itself from the registry.
+#[allow(clippy::too_many_arguments)]
 async fn run_loop(
     registry: Registry,
     server_key: String,
@@ -114,6 +128,7 @@ async fn run_loop(
     on_event: Channel<LobbyEvent>,
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
+    dm_log: DmLog,
 ) {
     let _ = on_event.send(LobbyEvent::Connected);
 
@@ -160,8 +175,21 @@ async fn run_loop(
                         outbound.push(command::pong(token.as_deref()));
                     }
 
-                    let deltas = reduce(&mut state.lock().unwrap(), msg);
+                    let now = now_ms();
+                    let deltas = reduce_at(&mut state.lock().unwrap(), msg, now);
                     for delta in deltas {
+                        if let Delta::PrivateMessage { from } = &delta {
+                            let last = state
+                                .lock()
+                                .unwrap()
+                                .dms
+                                .get(from)
+                                .and_then(|t| t.last())
+                                .cloned();
+                            if let Some(m) = last {
+                                dm_log.append(from, &m);
+                            }
+                        }
                         let _ = on_event.send(LobbyEvent::Delta { delta });
                     }
                 }
@@ -171,6 +199,22 @@ async fn run_loop(
             Some(out) = rx.recv() => match out {
                 Outbound::Line(line) => outbound.push(line),
                 Outbound::SayPrivate { peer, text } => {
+                    let now = now_ms();
+                    let deltas =
+                        record_outgoing_private(&mut state.lock().unwrap(), &peer, &text, now);
+                    let last = state
+                        .lock()
+                        .unwrap()
+                        .dms
+                        .get(&peer)
+                        .and_then(|t| t.last())
+                        .cloned();
+                    if let Some(m) = last {
+                        dm_log.append(&peer, &m);
+                    }
+                    for delta in deltas {
+                        let _ = on_event.send(LobbyEvent::Delta { delta });
+                    }
                     outbound.push(command::say_private(&peer, &text));
                 }
             },

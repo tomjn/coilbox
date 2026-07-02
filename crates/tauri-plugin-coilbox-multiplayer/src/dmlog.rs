@@ -12,8 +12,6 @@ use coilbox_lobby_protocol::ChatMsg;
 use serde::{Deserialize, Serialize};
 
 /// One persisted DM line: the thread key (`peer`) plus the message.
-// wired up in the next task
-#[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 struct StoredDm {
     peer: String,
@@ -21,15 +19,11 @@ struct StoredDm {
 }
 
 /// Append-only DM history at a fixed path.
-// wired up in the next task
-#[allow(dead_code)]
 pub struct DmLog {
     path: PathBuf,
 }
 
 /// Turn a `serverKey` (`user@host:port`) into a filesystem-safe stem.
-// wired up in the next task
-#[allow(dead_code)]
 pub fn sanitize_key(server_key: &str) -> String {
     server_key
         .chars()
@@ -43,8 +37,6 @@ pub fn sanitize_key(server_key: &str) -> String {
         .collect()
 }
 
-// wired up in the next task
-#[allow(dead_code)]
 impl DmLog {
     /// A log at `<dir>/<sanitized key>.jsonl`. Does not touch disk yet.
     pub fn new(dir: &Path, server_key: &str) -> Self {

@@ -49,7 +49,8 @@ fn enqueue(registry: &Registry, server_key: &str, line: String) -> CliResult {
 /// only the hash).
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-async fn mp_connect(
+async fn mp_connect<R: Runtime>(
+    app: tauri::AppHandle<R>,
     registry: State<'_, Registry>,
     server_key: String,
     host: String,
@@ -64,6 +65,12 @@ async fn mp_connect(
     if registry.lock().unwrap().contains_key(&server_key) {
         return Ok(CliResult::err(format!("already connected: {server_key}")));
     }
+
+    let dm_dir = match app.path().app_data_dir() {
+        Ok(d) => d.join("coilbox").join("lobby-dms"),
+        Err(e) => return Ok(CliResult::err(format!("no app data dir: {e}"))),
+    };
+    let dm_log = dmlog::DmLog::new(&dm_dir, &server_key);
 
     let stream = match tls::connect_stream(&host, port, tls, allow_self_signed).await {
         Ok(s) => s,
@@ -90,6 +97,7 @@ async fn mp_connect(
         stream,
         login_cfg,
         on_event,
+        dm_log,
     );
     Ok(CliResult::ok(json!({ "connected": true })))
 }
