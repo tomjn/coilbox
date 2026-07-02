@@ -57,6 +57,7 @@ export interface ChatMsg {
   from: string;
   text: string;
   kind: ChatKind;
+  at: number;
 }
 
 export interface ChannelState {
@@ -64,6 +65,12 @@ export interface ChannelState {
   topic: string | null;
   users: string[];
   messages: ChatMsg[];
+}
+
+export interface DirChannel {
+  name: string;
+  userCount: number;
+  topic: string | null;
 }
 
 export interface MemberStatus {
@@ -114,9 +121,11 @@ export interface LobbyState {
   compflags: string[];
   users: Record<string, User>;
   channels: Record<string, ChannelState>;
+  dms: Record<string, ChatMsg[]>;
   battles: Record<string, Battle>;
   currentBattle: number | null;
   lastBattle: number | null;
+  channelDirectory: DirChannel[];
 }
 
 /** The phases of the login handshake (mirrors `LoginPhase`). */
@@ -159,7 +168,8 @@ export type Delta =
   | { kind: "serverMessage"; text: string }
   | { kind: "ring"; from: string }
   | { kind: "joinBattleFailed"; reason: string }
-  | { kind: "openBattleFailed"; reason: string };
+  | { kind: "openBattleFailed"; reason: string }
+  | { kind: "channelListReceived" };
 
 /** An event streamed over the connect `Channel` (mirrors `LobbyEvent`). */
 export type LobbyEvent =
@@ -229,6 +239,11 @@ export const mpLeaveChannel = defineCommand<
   { serverKey: string; channel: string },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_leave_channel");
+
+export const mpListChannels = defineCommand<
+  { serverKey: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_list_channels");
 
 export const mpJoinBattle = defineCommand<
   {
