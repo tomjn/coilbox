@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { GameItem } from "@/content/bindings";
+import { useBrandingEntry, useBrandingImage } from "@/content/branding";
 import { isSdd } from "@/content/format";
 import { GameArt } from "@/content/pages/components/GameArt";
 import { SddBadge } from "@/content/pages/components/SddBadge";
@@ -33,13 +34,16 @@ export function GameSelectCard({
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const blocked = disabled || gamesLoading;
+  // Catalog branding art wins over the game's own loading-screen art.
+  const brand = useBrandingEntry(game ?? undefined);
+  const brandBanner = useBrandingImage(brand?.banner);
 
   return (
     <div className="group relative aspect-video overflow-hidden rounded-lg border border-border/50 bg-card shadow-sm">
       {game ? (
         <GameArt
           name={game.name}
-          artUrl={headers.get(game.name)}
+          artUrl={brandBanner ?? headers.get(game.name)}
           alt={`${game.name} loading screen`}
         />
       ) : (
