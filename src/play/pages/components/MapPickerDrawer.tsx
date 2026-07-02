@@ -1,11 +1,10 @@
 import { Button, Input } from "@picoframe/frame";
-import { ImageOff, Search, X } from "lucide-react";
+import { Check, ImageOff, Search, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useMemo, useState } from "react";
 import type { MapItem } from "@/content/bindings";
 import type { MapThumbData } from "@/content/config";
 import { mapSizeLabel } from "@/content/pages/components/MapThumb";
-import { cn } from "@/lib/utils";
 
 /** Unique id for a map: its name plus its own archive (distinguishes variants). */
 const mapId = (m: MapItem) => `${m.name}::${m.archives[0]?.name ?? ""}`;
@@ -91,14 +90,18 @@ export function MapPickerDrawer({
                       onSelect(m.name);
                       onOpenChange(false);
                     }}
-                    className={cn(
-                      "flex flex-col overflow-hidden rounded-lg border bg-card text-left transition-colors hover:border-primary focus-visible:border-primary focus-visible:outline-none",
-                      m.name === selectedName
-                        ? "border-primary ring-2 ring-primary/25"
-                        : "border-border/60",
-                    )}
+                    aria-pressed={m.name === selectedName}
+                    className="flex flex-col overflow-hidden rounded-lg border border-border/50 bg-card text-left transition-colors hover:border-border hover:bg-accent/50 hover:shadow-md focus-visible:border-primary focus-visible:outline-none"
                   >
-                    <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted/40">
+                    <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted/40">
+                      {m.name === selectedName && (
+                        <div
+                          className="absolute right-2 top-2 z-10 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background"
+                          aria-hidden
+                        >
+                          <Check className="size-4" />
+                        </div>
+                      )}
                       {thumb ? (
                         <img
                           src={thumb.dataUrl}

@@ -1,18 +1,15 @@
 import { Button } from "@picoframe/frame";
 import { Play } from "lucide-react";
 import { Link } from "react-router";
-import { versionLabel } from "@/lib/utils";
 import type { GameItem } from "../../bindings";
 import { useBrandingEntry, useBrandingImage } from "../../branding";
 import { isSdd } from "../../format";
-import { GameArt } from "./GameArt";
-import { SddBadge } from "./SddBadge";
-import { WarningIcon } from "./states";
+import { GameCardShell } from "./GameCardShell";
 
 /**
- * A game as a 16:9 hero card for the Games grid: the game's loading-screen art
- * (or a gradient placeholder) with its name, version and a Play button overlaid on
- * a bottom scrim — a compact echo of the game detail banner.
+ * A game card for the Games grid: 16:9 loading-screen art (or a gradient
+ * placeholder) over a solid caption band with the name, version and a Play
+ * button — rendered through the shared {@link GameCardShell}.
  *
  * The whole card links to the game detail; the Play button seeds the Singleplayer
  * setup instead. To keep those two interactive targets from nesting (a `<button>`
@@ -37,53 +34,16 @@ export function GameCard({
   const brandBanner = useBrandingImage(brand?.banner, true);
   const art = brandBanner ?? artUrl;
   return (
-    <div className="group relative aspect-video overflow-hidden rounded-lg border border-border/50 bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-0.5 hover:border-border hover:shadow-lg hover:shadow-black/30 focus-within:ring-2 focus-within:ring-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-      <GameArt
-        name={game.name}
-        artUrl={art}
-        alt={`${game.name} loading screen`}
-      />
-      {loading && !art && (
-        <div className="absolute inset-0 animate-pulse bg-muted-foreground/10" />
-      )}
-      {/* Scrim: darken the bottom so the overlaid title/version stay legible. */}
-      <div
-        className="absolute inset-0 bg-gradient-to-t from-white/80 via-white/20 to-transparent dark:from-black/80 dark:via-black/20"
-        aria-hidden
-      />
-      {/* Hover wash: a subtle brighten so the card responds to the pointer. */}
-      <div
-        className="pointer-events-none absolute inset-0 bg-white/0 transition-colors duration-150 group-hover:bg-white/10"
-        aria-hidden
-      />
-
-      {/* Stretched link: anywhere but the Play button opens the game detail. */}
-      <Link
-        to={`/content/games/${encodeURIComponent(game.name)}`}
-        aria-label={game.name}
-        className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-      />
-
-      <div className="pointer-events-none absolute inset-x-3 bottom-2 flex items-end justify-between gap-2">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <div className="flex items-center gap-1.5">
-            <p
-              className="truncate text-sm font-semibold text-foreground drop-shadow-[0_1px_3px_rgba(255,255,255,0.9)] dark:text-white dark:drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
-              title={game.name}
-            >
-              {brand?.title ?? game.name}
-            </p>
-            {isSdd(game.primaryArchive) && <SddBadge />}
-            {game.warnings?.length ? (
-              <WarningIcon warnings={game.warnings} />
-            ) : null}
-          </div>
-          {game.info.version && (
-            <span className="text-xs text-foreground/90 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] dark:text-white/90 dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-              {versionLabel(game.info.version)}
-            </span>
-          )}
-        </div>
+    <GameCardShell
+      name={game.name}
+      title={brand?.title ?? game.name}
+      artUrl={art}
+      alt={`${game.name} loading screen`}
+      version={game.info.version}
+      sdd={isSdd(game.primaryArchive)}
+      warnings={game.warnings}
+      loading={loading}
+      action={
         <Button
           size="sm"
           aria-label="Play"
@@ -92,7 +52,14 @@ export function GameCard({
         >
           <Play className="size-4" />
         </Button>
-      </div>
-    </div>
+      }
+    >
+      {/* Stretched link: anywhere but the Play button opens the game detail. */}
+      <Link
+        to={`/content/games/${encodeURIComponent(game.name)}`}
+        aria-label={game.name}
+        className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+      />
+    </GameCardShell>
   );
 }

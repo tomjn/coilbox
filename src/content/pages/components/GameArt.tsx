@@ -17,7 +17,7 @@ export function GameArt({
   return (
     <>
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 rounded-[inherit]"
         style={{ background: gradientFor(name) }}
         aria-hidden
       />
@@ -25,7 +25,7 @@ export function GameArt({
         <img
           src={artUrl}
           alt={alt}
-          className="absolute inset-0 size-full animate-[fadein_240ms_ease-out] object-cover object-center motion-reduce:animate-none"
+          className="absolute inset-0 size-full animate-[fadein_240ms_ease-out] rounded-[inherit] object-cover object-center motion-reduce:animate-none"
         />
       )}
     </>
