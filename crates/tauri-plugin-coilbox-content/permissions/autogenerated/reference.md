@@ -15,6 +15,8 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-open-path`
 - `allow-content-list-replays`
 - `allow-content-demo-info`
+- `allow-branding-catalog`
+- `allow-branding-image`
 
 ## Permission Table
 
@@ -24,6 +26,58 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`coilbox-content:allow-branding-catalog`
+
+</td>
+<td>
+
+Enables the branding_catalog command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-branding-catalog`
+
+</td>
+<td>
+
+Denies the branding_catalog command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-branding-image`
+
+</td>
+<td>
+
+Enables the branding_image command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-branding-image`
+
+</td>
+<td>
+
+Denies the branding_image command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
