@@ -12,8 +12,10 @@ use crate::model::{UnitBuildpicsOutput, UnitDisplay};
 use std::path::Path;
 
 /// Salts the buildpic cache key, independent of the header cache so this cache can
-/// be invalidated on its own. Bump when the icon encoding or cache format changes.
-const BUILDPIC_CACHE_VERSION: u32 = 2;
+/// be invalidated on its own. Bump when the icon encoding, cache format, or the
+/// name/buildpic *resolution logic* changes so pre-change records are re-resolved.
+/// v3: nested/scripted Lua defs + legacy `.fbi` name resolution.
+const BUILDPIC_CACHE_VERSION: u32 = 3;
 
 /// Read up to this many bytes of a candidate texture before decoding (build pics
 /// are tiny; this is a generous safety bound).
