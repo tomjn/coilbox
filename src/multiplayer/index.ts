@@ -14,7 +14,8 @@ const multiplayerPlugin: FramePlugin = {
     {
       id: "multiplayer",
       label: "Multiplayer",
-      order: 25,
+      // Directly under Singleplayer (play = 5), above Content (15).
+      order: 10,
       items: [
         {
           id: "multiplayer.lobby",

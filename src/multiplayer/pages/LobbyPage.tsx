@@ -1,6 +1,6 @@
 import { Button, Input } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -44,6 +44,14 @@ export default function LobbyPage() {
     () => servers.find((s) => s.id === selectedId),
     [servers, selectedId],
   );
+
+  // Auto-select the first server once the directory loads (or when the current
+  // selection is gone), so Connect is usable without a manual pick.
+  useEffect(() => {
+    if (servers.length > 0 && !servers.some((s) => s.id === selectedId)) {
+      setSelectedId(servers[0].id);
+    }
+  }, [servers, selectedId]);
 
   const state = mirror.state;
   const users = state ? Object.values(state.users) : [];
