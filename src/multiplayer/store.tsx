@@ -4,7 +4,9 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useReducer,
+  useRef,
   useState,
 } from "react";
 import { lsGetCredential } from "../lobby-servers/bindings";
@@ -17,6 +19,7 @@ import {
   mpDisconnect,
   mpSnapshot,
 } from "./bindings";
+import { conversationCounts } from "./chat/conversation";
 
 /**
  * A per-connection mirror of the Rust-side lobby state. The Rust plugin owns the
@@ -100,6 +103,10 @@ interface MultiplayerContextValue {
   /** Open a connection to `server` (throws on missing username/password). */
   connect: (server: LobbyServer) => Promise<void>;
   disconnect: () => Promise<void>;
+  /** Unread count for a conversation id given its current message count. */
+  unreadFor: (id: string, count: number) => number;
+  /** Mark a conversation read up to its current message count. */
+  markSeen: (id: string, count: number) => void;
 }
 
 const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
@@ -114,6 +121,37 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const [mirror, dispatch] = useReducer(mirrorReducer, initialMirror);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Per-conversation "seen up to N messages" marks. Seeded to the connect-time
+  // snapshot so persisted DM history and already-present channel logs don't show
+  // as unread; conversations appearing AFTER connect start unseen (fully unread).
+  const seenRef = useRef<Record<string, number>>({});
+  const [, forceSeenTick] = useReducer((n: number) => n + 1, 0);
+  const baselineDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (activeKey == null) {
+      seenRef.current = {};
+      baselineDoneRef.current = false;
+      return;
+    }
+    if (!baselineDoneRef.current && mirror.state) {
+      seenRef.current = conversationCounts(mirror.state);
+      baselineDoneRef.current = true;
+      forceSeenTick();
+    }
+  }, [activeKey, mirror.state]);
+
+  const unreadFor = useCallback((id: string, count: number) => {
+    const seen = seenRef.current[id] ?? 0;
+    return Math.max(0, count - seen);
+  }, []);
+
+  const markSeen = useCallback((id: string, count: number) => {
+    if (seenRef.current[id] === count) return;
+    seenRef.current[id] = count;
+    forceSeenTick();
+  }, []);
 
   const connect = useCallback(async (server: LobbyServer) => {
     if (!server.username) {
@@ -184,7 +222,15 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
 
   return (
     <MultiplayerContext.Provider
-      value={{ mirror, activeKey, busy, connect, disconnect }}
+      value={{
+        mirror,
+        activeKey,
+        busy,
+        connect,
+        disconnect,
+        unreadFor,
+        markSeen,
+      }}
     >
       {children}
     </MultiplayerContext.Provider>
