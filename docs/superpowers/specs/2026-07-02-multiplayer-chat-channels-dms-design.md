@@ -26,7 +26,11 @@ and stay visually consistent.
   (Approach A). The visual component is store-agnostic and unit-testable; the
   battle GUI reuses it later.
 - **Channel joining**: **full channel browser** (server-wide directory) - net-new
-  backend work (no `CHANNELS` support exists today).
+  backend work (no `CHANNELS` support exists today). Presented as a **side
+  drawer** that opens within the Chat hub.
+- **DM persistence**: DM history is **durable across app restarts**, stored
+  **backend-side** in the app data dir, keyed per (server + account), **keeping
+  everything** (no retention cap). Channel history stays ephemeral.
 - **Battle chat**: **not** surfaced in the hub for v1; it stays battle-only (the
   future battle GUI embeds `ChatPane` itself).
 - **Notifications**: **unread badges** only for v1 (no mention highlight, no OS
@@ -102,8 +106,29 @@ and stay visually consistent.
   `CHANNELS`. New command -> `build.rs` COMMANDS entry + `permissions/default.toml`
   (ACL, per the plugin-command-ACL convention) or it is runtime-blocked.
 - **`mp_say_private`**: after a successful send, call `record_outgoing_private`
-  on the connection's state and emit a delta so the frontend re-snapshots.
+  on the connection's state, **append the message to the DM store on disk**, and
+  emit a delta so the frontend re-snapshots.
 - The reduce call site passes `SystemTime::now()` millis as `now_ms`.
+
+### DM persistence (backend)
+
+The plugin owns durable DM history; the pure protocol crate stays clock- and
+disk-free.
+
+- **Location**: `<app_data_dir>/coilbox/lobby-dms/<accountFile>.jsonl`, where
+  `accountFile` is a filesystem-safe derivation of the connection's `serverKey`
+  (`username@host:port`, which already encodes account + server). Sanitize/hash
+  it for the filename.
+- **Format**: append-only JSONL. Each line is one stored DM: `{ peer, from,
+  text, kind, at }`. Append-only means no full-file rewrites and matches the
+  keep-everything decision.
+- **Load**: on connect, once `my_username` is known (post-login), read the
+  account's JSONL, group lines by `peer`, and seed `LobbyState.dms`. The mirror
+  snapshot then carries history with no frontend change.
+- **Append**: on every incoming (post echo-guard) and outgoing DM, append one
+  line. A disk failure is logged and does not break live chat (history is
+  best-effort durable; the session copy in `dms` is authoritative in-memory).
+- **Retention**: keep everything (no cap).
 
 ### Frontend - `src/multiplayer`
 
@@ -123,8 +148,10 @@ New `src/multiplayer/chat/`:
 - **`ConversationSidebar.tsx`** - hub-only. Lists joined channels + DM threads,
   each with an unread badge and active highlight; a "Browse channels" button and
   a "New DM" affordance (start a DM by username, or via clicking a user).
-- **`ChannelBrowser.tsx`** - picoframe `dialog`. Lists `channelDirectory` with
-  Join buttons + a refresh; loading and empty states.
+- **`ChannelBrowser.tsx`** - a **side drawer** (slide-in `<aside>` within the
+  hub, CSS transition gated by `prefers-reduced-motion`; no listed picoframe
+  "sheet" component, so this is a styled panel, not a modal dialog). Lists
+  `channelDirectory` with Join buttons + a refresh; loading and empty states.
 - **`pages/ChatPage.tsx`** - the hub. Composes
   `<ConversationSidebar/> + <ChatPane variant="full"/> + optional <MemberList/>`;
   owns the active-conversation selection. Not-connected -> empty state linking to
@@ -146,12 +173,14 @@ New `src/multiplayer/chat/`:
 
 ## Data flow
 
+- **Connect**: after login, plugin loads the account's DM JSONL into
+  `LobbyState.dms` before/with the first snapshot -> threads open with history.
 - **Incoming DM**: server -> plugin parse (`now_ms`) -> reducer stores in `dms`
-  -> `delta` -> provider re-snapshots -> sidebar thread + unread badge ->
-  `ChatPane` renders when active.
+  + plugin appends to JSONL -> `delta` -> provider re-snapshots -> sidebar thread
+  + unread badge -> `ChatPane` renders when active.
 - **Send DM**: `ChatPane.onSend` -> `useConversation.send` -> `mpSayPrivate` ->
-  plugin sends + `record_outgoing_private` -> `delta` -> snapshot -> message
-  appears immediately (no server echo needed).
+  plugin sends + `record_outgoing_private` + appends to JSONL -> `delta` ->
+  snapshot -> message appears immediately (no server echo needed).
 - **Browse/join**: Browse -> `mpListChannels` -> `begin_channel_list` +
   `CHANNELS` -> `CHANNEL...ENDOFCHANNELS` fills the directory -> `delta` ->
   dialog lists -> Join -> `mpJoinChannel` -> channel appears in the sidebar.
@@ -175,6 +204,9 @@ New `src/multiplayer/chat/`:
     clears it.
   - `Command::ListChannels` serializes to `CHANNELS`.
   - Timestamp threading: reducer stamps `ChatMsg.at` from the passed `now_ms`.
+- **Persistence** (plugin-level): a DM-store round-trip - append a few DMs,
+  reload from the JSONL, assert `dms` is rehydrated grouped by peer and in order;
+  a missing/corrupt file degrades to empty history without erroring.
 - **Frontend**: `ChatPane` and `useConversation` are isolated and testable with
   mock props/mirror. Primary verification is the CI-equivalent suite plus a live
   smoke:
@@ -187,7 +219,7 @@ New `src/multiplayer/chat/`:
 
 - Mention/keyword highlight and OS notifications.
 - Battle chat in the hub (battle GUI reuses `ChatPane` separately).
-- Persisting chat history across disconnects (in-memory, matches current model).
+- Persisting **channel** history (channels stay in-memory; only **DMs** persist).
 - Moderation actions, message editing/deletion, emoji/rich text.
 
 ## Reuse contract (for the future battle GUI)
