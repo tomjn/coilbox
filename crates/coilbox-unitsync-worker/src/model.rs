@@ -223,6 +223,16 @@ pub struct GameInfoOutput {
     pub errors: Vec<String>,
 }
 
+/// Output of `--unit-buildpics`: a map of unit internal name -> build-icon `data:`
+/// URL, for the units that resolved. Units with no usable build pic are simply
+/// absent (and negative-cached on disk so re-runs skip them).
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitBuildpicsOutput {
+    pub buildpics: std::collections::BTreeMap<String, String>,
+    pub errors: Vec<String>,
+}
+
 /// Output of the lazy `--map --map-info` mode: one map's options + any
 /// diagnostics attributed while reading them (requires mounting the map
 /// archive, so it's fetched on demand, not during the enumeration scan).
