@@ -45,6 +45,7 @@ export function ChatPane({
   disabled = false,
 }: ChatPaneProps) {
   const [draft, setDraft] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   // Keep the newest message in view as the log grows.
@@ -57,7 +58,13 @@ export function ChatPane({
     const text = draft.trim();
     if (!text || disabled) return;
     setDraft("");
-    await onSend(text);
+    setSendError(null);
+    try {
+      await onSend(text);
+    } catch (e) {
+      setDraft(text); // restore so the user doesn't lose their message
+      setSendError(String(e));
+    }
   }
 
   return (
@@ -88,11 +95,33 @@ export function ChatPane({
               <p className="text-sm text-muted-foreground">No messages yet.</p>
             ))
           : messages.map((m, i) => {
+              const key = `${m.from}-${m.at}-${i}`;
+              if (
+                m.kind === "join" ||
+                m.kind === "leave" ||
+                m.kind === "system"
+              ) {
+                const label =
+                  m.kind === "join"
+                    ? `${m.from} joined`
+                    : m.kind === "leave"
+                      ? `${m.from} left${m.text ? `: ${m.text}` : ""}`
+                      : m.text; // system message text
+                return (
+                  <div
+                    // biome-ignore lint/suspicious/noArrayIndexKey: append-only log, index is stable identity.
+                    key={key}
+                    className="py-0.5 text-center text-xs text-muted-foreground"
+                  >
+                    {label}
+                  </div>
+                );
+              }
               const own = currentUser != null && m.from === currentUser;
               return (
                 <div
                   // biome-ignore lint/suspicious/noArrayIndexKey: append-only log, index is stable identity.
-                  key={`${m.from}-${m.at}-${i}`}
+                  key={key}
                   className={
                     own
                       ? "flex flex-col items-end"
@@ -123,6 +152,12 @@ export function ChatPane({
             })}
         <div ref={endRef} />
       </div>
+
+      {sendError && (
+        <p className="px-4 pb-1 text-xs text-destructive">
+          Failed to send: {sendError}
+        </p>
+      )}
 
       <div className="flex gap-2 border-t border-border px-4 py-3">
         <Input
