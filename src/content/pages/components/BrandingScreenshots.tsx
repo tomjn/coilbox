@@ -11,7 +11,7 @@ function Thumb({
   shot: BrandingScreenshot;
   onOpen: (dataUrl: string, caption?: string) => void;
 }) {
-  const dataUrl = useBrandingImage(shot.urls);
+  const dataUrl = useBrandingImage(shot.urls, true);
   if (!dataUrl) return null;
   return (
     <button

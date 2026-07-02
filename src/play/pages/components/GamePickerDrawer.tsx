@@ -26,7 +26,7 @@ function GameTileArt({
   headers: Map<string, string>;
 }) {
   const brand = useBrandingEntry(game);
-  const brandBanner = useBrandingImage(brand?.banner);
+  const brandBanner = useBrandingImage(brand?.banner, true);
   return (
     <GameArt
       name={game.name}

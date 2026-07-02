@@ -34,7 +34,7 @@ export function GameCard({
   onPlay: () => void;
 }) {
   const brand = useBrandingEntry(game);
-  const brandBanner = useBrandingImage(brand?.banner);
+  const brandBanner = useBrandingImage(brand?.banner, true);
   const art = brandBanner ?? artUrl;
   return (
     <div className="group relative aspect-video overflow-hidden rounded-lg border border-border/50 bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-0.5 hover:border-border hover:shadow-lg hover:shadow-black/30 focus-within:ring-2 focus-within:ring-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0">
