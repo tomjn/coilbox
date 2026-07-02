@@ -162,7 +162,12 @@ pub fn generate_script(cfg: &BattleConfig) -> String {
     // A networked host advertises where the engine listens; pure singleplayer omits
     // this and the engine picks a local port itself.
     if let Some(port) = cfg.host_port {
-        kv(&mut s, 1, "HostIP", cfg.host_ip.as_deref().unwrap_or("0.0.0.0"));
+        kv(
+            &mut s,
+            1,
+            "HostIP",
+            cfg.host_ip.as_deref().unwrap_or("0.0.0.0"),
+        );
         kv(&mut s, 1, "HostPort", &port.to_string());
     }
     kv(&mut s, 1, "NumPlayers", &cfg.players.len().to_string());
