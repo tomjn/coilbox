@@ -60,13 +60,13 @@ export function GameHeader({
       <div className="absolute inset-x-4 bottom-3 flex items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex items-center gap-2">
-            <h1 className="break-words text-lg font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+            <h1 className="break-words text-lg font-semibold text-foreground drop-shadow-[0_1px_3px_rgba(255,255,255,0.9)] dark:text-white dark:drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
               {brand?.title ?? game.name}
             </h1>
             {isSdd(game.primaryArchive) && <SddBadge />}
           </div>
           {game.info.version && (
-            <span className="text-xs text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+            <span className="text-xs text-foreground/90 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] dark:text-white/90 dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
               {versionLabel(game.info.version)}
             </span>
           )}
