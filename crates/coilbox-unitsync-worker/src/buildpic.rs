@@ -22,6 +22,9 @@ const BUILDPIC_READ_CAP: usize = 8 * 1024 * 1024;
 /// Extensions tried under `unitpics/`, in the engine's resolution order.
 const BUILDPIC_EXTS: &[&str] = &["dds", "png", "tga", "bmp"];
 
+/// Legacy `.fbi` unit files are small TDF text; cap the read generously.
+const FBI_READ_CAP: usize = 256 * 1024;
+
 /// A unit's fields read from its unitdef: the `buildpic` filename (may be empty)
 /// and the human-friendly `name` (may be empty).
 #[derive(Default, Clone)]
@@ -171,6 +174,46 @@ fn push_unique(v: &mut Vec<String>, s: String) {
     }
 }
 
+/// Find an archive member whose path equals or ends with `/<target_lc>`
+/// (case-insensitive: `list` holds `(lowercased, actual)` pairs, `target_lc` is
+/// already lowercase). Returns the actual stored path.
+fn find_member(list: &[(String, String)], target_lc: &str) -> Option<String> {
+    let suffix = format!("/{target_lc}");
+    list.iter()
+        .find(|(lower, _)| lower == target_lc || lower.ends_with(&suffix))
+        .map(|(_, real)| real.clone())
+}
+
+/// Pull the friendly `name` and `buildpic` out of a legacy TDF unit file (`.fbi`).
+/// TDF is `key=value;` with case-insensitive keys and `//` line comments; each unit
+/// file describes one unit, so we take the first top-level `name=`/`buildpic=`.
+fn parse_fbi_fields(text: &str) -> (Option<String>, Option<String>) {
+    let mut name = None;
+    let mut buildpic = None;
+    for line in text.lines() {
+        let line = line
+            .split("//")
+            .next()
+            .unwrap_or("")
+            .trim()
+            .trim_end_matches(';')
+            .trim();
+        let Some((k, v)) = line.split_once('=') else {
+            continue;
+        };
+        let val = v.trim();
+        if val.is_empty() {
+            continue;
+        }
+        match k.trim().to_ascii_lowercase().as_str() {
+            "name" if name.is_none() => name = Some(val.to_string()),
+            "buildpic" if buildpic.is_none() => buildpic = Some(val.to_string()),
+            _ => {}
+        }
+    }
+    (name, buildpic)
+}
+
 /// Resolve build icons for `units` in `game_archive`. Cache hits/negatives skip the
 /// unitsync session entirely; otherwise mount the archive once and resolve the
 /// misses. `cache_dir` `None` disables caching (always re-resolves).
@@ -256,7 +299,33 @@ pub fn render(
                     .get(&unit.to_lowercase())
                     .cloned()
                     .unwrap_or_default();
-                let icon = candidate_members(unit, &uf.buildpic)
+                let mut name = uf.name;
+                let mut buildpic = uf.buildpic;
+                // Legacy TDF games (e.g. XTA) store units as `.fbi` text, which is
+                // not Lua — unitsync can't process them and the Lua pass finds
+                // nothing. Read name/buildpic straight from the unit's `.fbi`.
+                if name.is_empty() || buildpic.is_empty() {
+                    if let Some(actual) =
+                        find_member(&list, &format!("{}.fbi", unit.to_lowercase()))
+                    {
+                        if let Some((_, bytes)) =
+                            us.read_archive_member(handle, &actual, FBI_READ_CAP)
+                        {
+                            let (fnm, fbp) = parse_fbi_fields(&String::from_utf8_lossy(&bytes));
+                            if name.is_empty() {
+                                if let Some(x) = fnm {
+                                    name = x;
+                                }
+                            }
+                            if buildpic.is_empty() {
+                                if let Some(x) = fbp {
+                                    buildpic = x;
+                                }
+                            }
+                        }
+                    }
+                }
+                let icon = candidate_members(unit, &buildpic)
                     .into_iter()
                     .find_map(|cand| {
                         let actual = list
@@ -266,7 +335,7 @@ pub fn render(
                         read_and_encode(&us, handle, &actual)
                     });
                 let display = UnitDisplay {
-                    name: Some(uf.name).filter(|s| !s.is_empty()),
+                    name: Some(name).filter(|s| !s.is_empty()),
                     icon,
                 };
                 if let Some((dir, base)) = cache {
@@ -404,6 +473,42 @@ mod tests {
         let c = candidate_members("armcom", "");
         assert_eq!(c[0], "unitpics/armcom.dds");
         assert!(c.contains(&"unitpics/armcom.png".to_string()));
+    }
+
+    #[test]
+    fn parses_fbi_name_and_buildpic() {
+        let fbi = "[UNITINFO]\n{\n\tside=Arm;\n\tname=Commander;\n\t\
+                   description=Commander;\n\tunitname=arm_commander;\n\t\
+                   buildpic=arm_commander.DDS;\n\tmaxdamage=3000;\n}\n";
+        let (name, buildpic) = parse_fbi_fields(fbi);
+        assert_eq!(name.as_deref(), Some("Commander"));
+        assert_eq!(buildpic.as_deref(), Some("arm_commander.DDS"));
+    }
+
+    #[test]
+    fn fbi_ignores_comments_and_missing_fields() {
+        let (name, buildpic) = parse_fbi_fields("// name=Nope;\nunitname=x;\n");
+        assert_eq!(name, None);
+        assert_eq!(buildpic, None);
+    }
+
+    #[test]
+    fn find_member_matches_nested_case_insensitively() {
+        let list = vec![
+            (
+                "units/tarm_commander.fbi".into(),
+                "Units/Tarm_commander.fbi".into(),
+            ),
+            (
+                "units/arm_commander.fbi".into(),
+                "Units/arm_commander.fbi".into(),
+            ),
+        ];
+        // Exact basename match wins; the `T`-prefixed sibling must not match.
+        assert_eq!(
+            find_member(&list, "arm_commander.fbi").as_deref(),
+            Some("Units/arm_commander.fbi")
+        );
     }
 
     #[test]
