@@ -22,6 +22,7 @@ mod lua;
 mod minimap;
 mod model;
 mod skirmishai;
+mod texture;
 
 use ffi::Unitsync;
 use model::{Archive, ConfigOption, GameItem, MapItem, OptionListItem, ScanOutput};
