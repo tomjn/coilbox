@@ -131,6 +131,17 @@ async fn run_loop(
                         let _ = on_event.send(LobbyEvent::Phase { phase: login.phase() });
                     }
 
+                    // A rejected login (e.g. wrong password) leaves the socket open
+                    // but useless — tear it down so the frontend returns to the
+                    // connect screen and the registry slot frees for a retry. Capture
+                    // the server's reason before `msg` is moved into `reduce`.
+                    if login.phase() == LoginPhase::Denied {
+                        break 'conn match &msg {
+                            ServerMessage::Denied { reason } => Some(reason.clone()),
+                            _ => Some("login denied".into()),
+                        };
+                    }
+
                     // The server's PING must be answered promptly or it drops us.
                     if let ServerMessage::Ping { token } = &msg {
                         outbound.push(command::pong(token.as_deref()));

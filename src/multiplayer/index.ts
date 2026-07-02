@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Swords } from "lucide-react";
+import { MultiplayerProvider } from "./store";
 
 /**
  * The multiplayer plugin's frontend half: a "Lobby" nav group and its routes,
@@ -35,6 +36,9 @@ const multiplayerPlugin: FramePlugin = {
       crumb: "Lobby",
     },
   ],
+  // App-level: the live connection + its state mirror must outlive the Lobby route
+  // so navigating away doesn't drop the UI's view of a still-open connection.
+  Provider: MultiplayerProvider,
 };
 
 export default multiplayerPlugin;

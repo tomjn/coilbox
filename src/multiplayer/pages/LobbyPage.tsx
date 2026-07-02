@@ -1,5 +1,4 @@
 import { Button, Input } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useState } from "react";
 import {
   Select,
@@ -8,18 +7,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { lsGetCredential } from "../../lobby-servers/bindings";
 import { useLobbyServers } from "../../lobby-servers/config";
-import {
-  type LobbyEvent,
-  mpConnect,
-  mpDisconnect,
-  mpJoinBattle,
-  mpLeaveBattle,
-  mpSay,
-  mpSnapshot,
-} from "../bindings";
-import { useLobbyMirror } from "../store";
+import { mpJoinBattle, mpLeaveBattle, mpSay } from "../bindings";
+import { useMultiplayer } from "../store";
 
 /**
  * The lobby client screen. Deliberately plain (UI/UX polish is a follow-up): a
@@ -32,11 +22,10 @@ import { useLobbyMirror } from "../store";
 export default function LobbyPage() {
   const [cfg] = useLobbyServers();
   const servers = cfg.servers;
-  const { mirror, dispatch } = useLobbyMirror();
+  // Connection + mirror live in the app-level provider so they survive navigation.
+  const { mirror, activeKey, busy, connect, disconnect } = useMultiplayer();
 
   const [selectedId, setSelectedId] = useState<string>("");
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState("");
 
@@ -65,73 +54,25 @@ export default function LobbyPage() {
       ? state?.channels[currentBattle.channel]
       : undefined;
 
-  async function connect() {
+  async function onConnect() {
     if (!selected) {
       setError("Pick a server first.");
       return;
     }
-    if (!selected.username) {
-      setError("This server has no configured username (set one in Settings).");
-      return;
-    }
     setError(null);
-    setBusy(true);
-    const serverKey = `${selected.username}@${selected.host}:${selected.port}`;
     try {
-      const cred = await lsGetCredential({
-        serverId: selected.id,
-        username: selected.username,
-      });
-      if (!cred.secret) {
-        setError("No stored password for this server (set one in Settings).");
-        return;
-      }
-
-      const onEvent = new Channel<LobbyEvent>();
-      onEvent.onmessage = (ev) => {
-        dispatch({ type: "event", ev });
-        // The mirror is refreshed wholesale on any state-changing delta so it
-        // never drifts from the authoritative Rust state.
-        if (ev.kind === "delta") {
-          mpSnapshot({ serverKey })
-            .then((r) => dispatch({ type: "snapshot", state: r.state }))
-            .catch(() => {});
-        }
-      };
-
-      dispatch({ type: "connecting" });
-      await mpConnect({
-        serverKey,
-        host: selected.host,
-        port: selected.port,
-        tls: selected.tls,
-        allowSelfSigned: selected.allowSelfSigned,
-        username: selected.username,
-        password: cred.secret,
-        compatFlags: ["u", "sp"],
-        onEvent,
-      });
-      const snap = await mpSnapshot({ serverKey });
-      dispatch({ type: "snapshot", state: snap.state });
-      setActiveKey(serverKey);
+      await connect(selected);
     } catch (e) {
       setError(String(e));
-    } finally {
-      setBusy(false);
     }
   }
 
-  async function disconnect() {
-    if (!activeKey) return;
-    setBusy(true);
+  async function onDisconnect() {
+    setError(null);
     try {
-      await mpDisconnect({ serverKey: activeKey });
+      await disconnect();
     } catch (e) {
       setError(String(e));
-    } finally {
-      dispatch({ type: "reset" });
-      setActiveKey(null);
-      setBusy(false);
     }
   }
 
@@ -193,11 +134,11 @@ export default function LobbyPage() {
         </Select>
 
         {activeKey ? (
-          <Button onClick={disconnect} disabled={busy}>
+          <Button onClick={onDisconnect} disabled={busy}>
             Disconnect
           </Button>
         ) : (
-          <Button onClick={connect} disabled={busy || servers.length === 0}>
+          <Button onClick={onConnect} disabled={busy || servers.length === 0}>
             Connect
           </Button>
         )}
