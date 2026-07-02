@@ -6,7 +6,29 @@
 //! which drives this crate. Keeping it pure is what lets the bitfields, the parser
 //! and the state reducer be golden-tested in isolation (mirrors the `anim` crate).
 //!
-//! Modules are filled in incrementally; see the crate's implementation plan.
+//! # Surface
+//! - [`parse_line`] turns a raw server line into a typed [`ServerMessage`].
+//! - The [`command`] module builds outgoing wire lines (no trailing newline).
+//! - [`ClientStatus`] / [`BattleStatus`] pack and unpack the status bitfields.
+//! - [`password_hash`] computes the login password hash.
+//! - [`reduce`] applies a [`ServerMessage`] to [`LobbyState`], emitting [`Delta`]s.
+//! - [`LoginMachine`] drives the reply-driven login handshake.
 
-// Scaffold: module surface is added by the implementation. Kept empty so the
-// workspace compiles before the protocol engine lands.
+pub mod command;
+mod hash;
+mod login;
+mod message;
+mod reduce;
+mod state;
+mod status;
+
+pub use hash::password_hash;
+pub use login::{LoginConfig, LoginMachine, LoginPhase};
+pub use message::{parse_line, ServerMessage};
+pub use reduce::{reduce, Delta};
+pub use state::{
+    Battle, Bot, ChannelState, ChatKind, ChatMsg, LobbyState, MemberStatus, StartRect, User,
+};
+pub use status::{
+    default_battle_status, team_color_from_rgb, team_color_rgb, BattleStatus, ClientStatus,
+};
