@@ -259,9 +259,22 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             },
         ),
         ServerMessage::SaidPrivate { username, message } => {
-            // Private messages are not stored in a channel; surface as a delta.
-            let _ = message;
-            vec![Delta::PrivateMessage { from: username }]
+            // Some servers echo our own SAYPRIVATE back to us; we already recorded that
+            // copy locally when sending, so drop the echo.
+            if state.my_username.as_deref() == Some(username.as_str()) {
+                return vec![];
+            }
+            push_dm(
+                state,
+                &username,
+                ChatMsg {
+                    channel: None,
+                    from: username.clone(),
+                    text: message,
+                    kind: ChatKind::Private,
+                    at: now_ms,
+                },
+            )
         }
         ServerMessage::SaidBattle { username, message } => {
             reduce_battle_chat(state, username, message, ChatKind::SaidBattle, now_ms)
@@ -552,6 +565,38 @@ fn push_chat(state: &mut LobbyState, channel: &str, msg: ChatMsg) -> Vec<Delta> 
     }]
 }
 
+/// Append a message to a DM thread keyed by `peer` (the other party), emitting a
+/// `PrivateMessage` delta naming that thread.
+fn push_dm(state: &mut LobbyState, peer: &str, msg: ChatMsg) -> Vec<Delta> {
+    state.dms.entry(peer.to_string()).or_default().push(msg);
+    vec![Delta::PrivateMessage {
+        from: peer.to_string(),
+    }]
+}
+
+/// Record a private message WE sent to `peer`. The server does not echo
+/// `SAYPRIVATE`, so the plugin calls this so the sent line appears in the thread.
+/// `from` is our own username (falls back to empty if not yet logged in).
+pub fn record_outgoing_private(
+    state: &mut LobbyState,
+    peer: &str,
+    text: &str,
+    now_ms: u64,
+) -> Vec<Delta> {
+    let me = state.my_username.clone().unwrap_or_default();
+    push_dm(
+        state,
+        peer,
+        ChatMsg {
+            channel: None,
+            from: me,
+            text: text.to_string(),
+            kind: ChatKind::Private,
+            at: now_ms,
+        },
+    )
+}
+
 /// Route battle chat into the current battle's channel if one is known,
 /// otherwise emit a delta with no channel.
 fn reduce_battle_chat(
@@ -724,5 +769,42 @@ mod tests {
         reduce_at(&mut s, parse_line("JOIN main"), 111);
         reduce_at(&mut s, parse_line("SAID main bob hello there"), 12345);
         assert_eq!(s.channels["main"].messages[0].at, 12345);
+    }
+
+    #[test]
+    fn incoming_private_stored_in_dm_thread() {
+        let mut s = LobbyState::new();
+        s.my_username = Some("me".into());
+        let d = reduce_at(&mut s, parse_line("SAIDPRIVATE bob hi there me"), 500);
+        assert_eq!(d, vec![Delta::PrivateMessage { from: "bob".into() }]);
+        let thread = &s.dms["bob"];
+        assert_eq!(thread.len(), 1);
+        assert_eq!(thread[0].from, "bob");
+        assert_eq!(thread[0].text, "hi there me");
+        assert_eq!(thread[0].kind, ChatKind::Private);
+        assert_eq!(thread[0].at, 500);
+    }
+
+    #[test]
+    fn own_private_echo_is_ignored() {
+        let mut s = LobbyState::new();
+        s.my_username = Some("me".into());
+        // A server that echoes our own SAYPRIVATE back as SAIDPRIVATE me ...
+        let d = reduce_at(&mut s, parse_line("SAIDPRIVATE me hello"), 1);
+        assert!(d.is_empty());
+        assert!(!s.dms.contains_key("me"));
+    }
+
+    #[test]
+    fn outgoing_private_recorded_under_peer_from_me() {
+        let mut s = LobbyState::new();
+        s.my_username = Some("me".into());
+        let d = record_outgoing_private(&mut s, "bob", "yo bob", 777);
+        assert_eq!(d, vec![Delta::PrivateMessage { from: "bob".into() }]);
+        let thread = &s.dms["bob"];
+        assert_eq!(thread.len(), 1);
+        assert_eq!(thread[0].from, "me");
+        assert_eq!(thread[0].text, "yo bob");
+        assert_eq!(thread[0].at, 777);
     }
 }

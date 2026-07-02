@@ -120,6 +120,8 @@ pub struct LobbyState {
     pub compflags: HashSet<String>,
     pub users: HashMap<String, User>,
     pub channels: HashMap<String, ChannelState>,
+    /// Direct-message threads keyed by the other party's username.
+    pub dms: HashMap<String, Vec<ChatMsg>>,
     pub battles: HashMap<u32, Battle>,
     pub current_battle: Option<u32>,
     pub last_battle: Option<u32>,
