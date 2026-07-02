@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { FolderOpen } from "lucide-react";
 import { useParams } from "react-router";
 import { type Archive, contentOpenPath } from "../bindings";
+import { useBrandingEntry } from "../branding";
 import {
   classifyArchive,
   useScanTargetSelection,
@@ -11,6 +12,8 @@ import {
 import { isSdd } from "../format";
 import { usePlayGame } from "../usePlayGame";
 import { ArchiveRow } from "./components/ArchiveRow";
+import { BrandingLinks } from "./components/BrandingLinks";
+import { BrandingScreenshots } from "./components/BrandingScreenshots";
 import { GameHeader } from "./components/GameHeader";
 import { OptionsList } from "./components/OptionsList";
 import {
@@ -42,6 +45,7 @@ export default function GameDetailPage() {
     selected?.rootPath,
     game?.primaryArchive.name,
   );
+  const brand = useBrandingEntry(game);
 
   if (error && !data)
     return (
@@ -89,6 +93,11 @@ export default function GameDetailPage() {
           </p>
         )}
       </div>
+
+      {brand && <BrandingLinks entry={brand} />}
+      {brand?.screenshots?.length ? (
+        <BrandingScreenshots shots={brand.screenshots} />
+      ) : null}
 
       {game.warnings?.length ? (
         <WarningBanner warnings={game.warnings} noun="game" />

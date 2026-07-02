@@ -32,7 +32,7 @@
       "binaries/uberstress",
       "binaries/coilbox-unitsync-worker"
     ],
-    "resources": ["mapconv"],
+    "resources": ["mapconv", "branding/catalog.json"],
     "active": true,
     "createUpdaterArtifacts": true,
     "targets": "all",

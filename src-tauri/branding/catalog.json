@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "updated": "2026-07-02",
+  "entries": [
+    {
+      "id": "splinter-faction",
+      "match": { "regex": "^Splinter *Faction" },
+      "title": "Splinter Faction",
+      "banner": ["https://img.itch.zone/aW1nLzIxNjg5NTc3LnBuZw==/original/W1YpP9.png"],
+      "logo": ["https://splinterfaction.info/images/logo.webp"],
+      "screenshots": [],
+      "videos": [],
+      "links": [
+        { "label": "Website", "url": "https://splinterfaction.info/" },
+        { "label": "itch.io", "url": "https://frozenyak.itch.io/splinterfaction" }
+      ]
+    }
+  ]
+}

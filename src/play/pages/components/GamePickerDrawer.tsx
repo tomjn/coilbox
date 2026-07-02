@@ -3,6 +3,7 @@ import { Search, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useMemo, useState } from "react";
 import type { GameItem } from "@/content/bindings";
+import { useBrandingEntry, useBrandingImage } from "@/content/branding";
 import { isSdd } from "@/content/format";
 import { GameArt } from "@/content/pages/components/GameArt";
 import { SddBadge } from "@/content/pages/components/SddBadge";
@@ -11,6 +12,29 @@ import { cn, versionLabel } from "@/lib/utils";
 
 /** Unique id for a game: its name plus its own primary archive (matches GamesPage). */
 const gameId = (g: GameItem) => `${g.primaryArchive.name}:${g.name}`;
+
+/**
+ * One tile's art layer: catalog branding banner (when the game matches an entry)
+ * over the batched loading-screen art. A component (not an inline call) so the
+ * branding hooks run per game without breaking the rules of hooks in the map.
+ */
+function GameTileArt({
+  game,
+  headers,
+}: {
+  game: GameItem;
+  headers: Map<string, string>;
+}) {
+  const brand = useBrandingEntry(game);
+  const brandBanner = useBrandingImage(brand?.banner);
+  return (
+    <GameArt
+      name={game.name}
+      artUrl={brandBanner ?? headers.get(game.name)}
+      alt={`${game.name} loading screen`}
+    />
+  );
+}
 
 /**
  * A right-hand slide-in sheet for picking a game from a searchable grid of hero
@@ -90,11 +114,7 @@ export function GamePickerDrawer({
                       : "border-border/60",
                   )}
                 >
-                  <GameArt
-                    name={g.name}
-                    artUrl={headers.get(g.name)}
-                    alt={`${g.name} loading screen`}
-                  />
+                  <GameTileArt game={g} headers={headers} />
                   <div
                     className="absolute inset-0 bg-gradient-to-t from-white/80 via-white/20 to-transparent dark:from-black/80 dark:via-black/20"
                     aria-hidden
