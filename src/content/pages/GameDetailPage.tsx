@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { FolderOpen } from "lucide-react";
+import { useMemo } from "react";
 import { useParams } from "react-router";
 import { type Archive, contentOpenPath } from "../bindings";
 import { useBrandingEntry } from "../branding";
@@ -8,6 +9,7 @@ import {
   useScanTargetSelection,
   useUnitsyncGameInfo,
   useUnitsyncScan,
+  useUnitsyncUnitBuildpics,
 } from "../config";
 import { isSdd } from "../format";
 import { usePlayGame } from "../usePlayGame";
@@ -44,6 +46,25 @@ export default function GameDetailPage() {
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
+  );
+  const startUnits = useMemo(
+    () =>
+      gameInfo
+        ? Array.from(
+            new Set(
+              gameInfo.sides
+                .map((s) => s.startUnit)
+                .filter((u): u is string => !!u),
+            ),
+          )
+        : [],
+    [gameInfo],
+  );
+  const buildpics = useUnitsyncUnitBuildpics(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+    startUnits,
   );
   const brand = useBrandingEntry(game);
 
@@ -134,7 +155,16 @@ export default function GameDetailPage() {
                   key={s.name}
                   className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-card p-3"
                 >
-                  <span className="font-medium">{s.name}</span>
+                  <div className="flex items-center gap-2">
+                    {s.startUnit && buildpics?.buildpics[s.startUnit] && (
+                      <img
+                        src={buildpics.buildpics[s.startUnit]}
+                        alt=""
+                        className="h-8 w-8 shrink-0 rounded object-contain"
+                      />
+                    )}
+                    <span className="font-medium">{s.name}</span>
+                  </div>
                   {(s.startUnitName || s.startUnit) && (
                     <span className="font-mono text-xs text-muted-foreground">
                       {s.startUnitName ?? s.startUnit}
