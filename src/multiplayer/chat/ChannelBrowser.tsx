@@ -19,7 +19,7 @@ export function ChannelBrowser({
   onClose: () => void;
   onJoined: (name: string) => void;
 }) {
-  const { mirror, activeKey } = useMultiplayer();
+  const { mirror, activeKey, rememberChannel } = useMultiplayer();
   const [loading, setLoading] = useState(false);
   const directory = mirror.state?.channelDirectory ?? [];
 
@@ -48,6 +48,7 @@ export function ChannelBrowser({
     if (!activeKey) return;
     try {
       await mpJoinChannel({ serverKey: activeKey, channel: name });
+      rememberChannel(name);
       onJoined(name);
       onClose();
     } catch {

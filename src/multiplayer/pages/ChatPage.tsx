@@ -1,7 +1,8 @@
 import { Button } from "@picoframe/frame";
-import { Users } from "lucide-react";
+import { LogOut, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { mpLeaveChannel } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
 import { ChatPane } from "../chat/ChatPane";
 import { ConversationSidebar } from "../chat/ConversationSidebar";
@@ -16,7 +17,7 @@ import { useMultiplayer } from "../store";
  * Connection lives on the Lobby page; when disconnected this shows a prompt.
  */
 export default function ChatPage() {
-  const { mirror, activeKey, markSeen } = useMultiplayer();
+  const { mirror, activeKey, markSeen, forgetChannel } = useMultiplayer();
   const [active, setActive] = useState<ConversationDescriptor | null>(null);
   const [showMembers, setShowMembers] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
@@ -28,6 +29,21 @@ export default function ChatPage() {
   useEffect(() => {
     if (active) markSeen(convId(active), conv.messages.length);
   }, [active, conv.messages.length, markSeen]);
+
+  // Leave a channel: stop the server membership, forget it (no auto-rejoin), and
+  // deselect it if it was the open conversation.
+  async function leaveChannel(name: string) {
+    if (!activeKey) return;
+    try {
+      await mpLeaveChannel({ serverKey: activeKey, channel: name });
+    } catch {
+      // Forget it regardless; leaving is best-effort.
+    }
+    forgetChannel(name);
+    setActive((cur) =>
+      cur?.kind === "channel" && cur.name === name ? null : cur,
+    );
+  }
 
   if (!activeKey) {
     return (
@@ -66,14 +82,23 @@ export default function ChatPage() {
           placeholder={`Message ${conv.title}`}
           headerActions={
             active.kind === "channel" ? (
-              <Button
-                className="h-7 px-2"
-                onClick={() => setShowMembers((v) => !v)}
-                aria-label="Toggle members"
-                aria-pressed={showMembers}
-              >
-                <Users className="size-4" />
-              </Button>
+              <>
+                <Button
+                  className="h-7 px-2"
+                  onClick={() => setShowMembers((v) => !v)}
+                  aria-label="Toggle members"
+                  aria-pressed={showMembers}
+                >
+                  <Users className="size-4" />
+                </Button>
+                <Button
+                  className="h-7 px-2"
+                  onClick={() => leaveChannel(active.name)}
+                  aria-label="Leave channel"
+                >
+                  <LogOut className="size-4" />
+                </Button>
+              </>
             ) : undefined
           }
         />

@@ -1,3 +1,4 @@
+import { useSetting } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
   createContext,
@@ -17,6 +18,7 @@ import {
   type LoginPhase,
   mpConnect,
   mpDisconnect,
+  mpJoinChannel,
   mpSnapshot,
 } from "./bindings";
 import { conversationCounts } from "./chat/conversation";
@@ -107,6 +109,10 @@ interface MultiplayerContextValue {
   unreadFor: (id: string, count: number) => number;
   /** Mark a conversation read up to its current message count. */
   markSeen: (id: string, count: number) => void;
+  /** Remember a joined channel so it's auto-rejoined on the next connect. */
+  rememberChannel: (name: string) => void;
+  /** Forget a channel so it's no longer auto-rejoined. */
+  forgetChannel: (name: string) => void;
 }
 
 const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
@@ -152,6 +158,53 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     seenRef.current[id] = count;
     forceSeenTick();
   }, []);
+
+  // Channels the user has chosen to be in, persisted per `serverKey` so they can be
+  // auto-rejoined on the next connect. This is a preference list (re-derivable by
+  // rejoining), so it lives in the frame settings store rather than backend state.
+  const [joinedChannels, setJoinedChannels] = useSetting<
+    Record<string, string[]>
+  >("multiplayer.joinedChannels", {});
+  const rejoinedForRef = useRef<string | null>(null);
+
+  const rememberChannel = useCallback(
+    (name: string) => {
+      if (!activeKey) return;
+      const cur = joinedChannels[activeKey] ?? [];
+      if (cur.includes(name)) return;
+      setJoinedChannels({ ...joinedChannels, [activeKey]: [...cur, name] });
+    },
+    [activeKey, joinedChannels, setJoinedChannels],
+  );
+
+  const forgetChannel = useCallback(
+    (name: string) => {
+      if (!activeKey) return;
+      const cur = joinedChannels[activeKey] ?? [];
+      if (!cur.includes(name)) return;
+      setJoinedChannels({
+        ...joinedChannels,
+        [activeKey]: cur.filter((c) => c !== name),
+      });
+    },
+    [activeKey, joinedChannels, setJoinedChannels],
+  );
+
+  // Auto-rejoin remembered channels once per connection, after login reaches the
+  // `ready` phase (JOIN before ACCEPTED would be rejected). The ref guards against
+  // re-firing when `joinedChannels` changes mid-session (e.g. the user joins one).
+  useEffect(() => {
+    if (activeKey == null) {
+      rejoinedForRef.current = null;
+      return;
+    }
+    if (mirror.phase === "ready" && rejoinedForRef.current !== activeKey) {
+      rejoinedForRef.current = activeKey;
+      for (const name of joinedChannels[activeKey] ?? []) {
+        mpJoinChannel({ serverKey: activeKey, channel: name }).catch(() => {});
+      }
+    }
+  }, [activeKey, mirror.phase, joinedChannels]);
 
   const connect = useCallback(async (server: LobbyServer) => {
     if (!server.username) {
@@ -230,6 +283,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         disconnect,
         unreadFor,
         markSeen,
+        rememberChannel,
+        forgetChannel,
       }}
     >
       {children}
