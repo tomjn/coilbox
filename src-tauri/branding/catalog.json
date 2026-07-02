@@ -4,7 +4,7 @@
   "entries": [
     {
       "id": "splinter-faction",
-      "match": { "regex": "^Splinter Faction" },
+      "match": { "regex": "^Splinter *Faction" },
       "title": "Splinter Faction",
       "banner": ["https://img.itch.zone/aW1nLzIxNjg5NTc3LnBuZw==/original/W1YpP9.png"],
       "logo": ["https://splinterfaction.info/images/logo.webp"],
