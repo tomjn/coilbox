@@ -153,7 +153,9 @@ fn mp_say(
     )
 }
 
-/// `mp_say_private` — direct message to a user.
+/// `mp_say_private` - direct message to a user. Posts a typed `SayPrivate` so the
+/// connection task records it into DM state, persists it, and emits a delta before
+/// sending the wire line (the server does not echo SAYPRIVATE).
 #[tauri::command]
 fn mp_say_private(
     registry: State<'_, Registry>,
@@ -161,11 +163,17 @@ fn mp_say_private(
     username: String,
     message: String,
 ) -> CliResult {
-    enqueue(
-        registry.inner(),
-        &server_key,
-        command::say_private(&username, &message),
-    )
+    let map = registry.lock().unwrap();
+    match map.get(&server_key) {
+        Some(conn) => match conn.tx.send(Outbound::SayPrivate {
+            peer: username,
+            text: message,
+        }) {
+            Ok(()) => CliResult::ok(json!({ "sent": true })),
+            Err(_) => CliResult::err("connection is closed"),
+        },
+        None => CliResult::err(format!("not connected: {server_key}")),
+    }
 }
 
 /// `mp_join_channel` — join a chat channel (optional key).
@@ -195,6 +203,16 @@ fn mp_leave_channel(
         &server_key,
         command::leave_channel(&channel),
     )
+}
+
+/// `mp_list_channels` - clear the cached directory and request the server's public
+/// channel list (`CHANNELS`); the reply streams as `CHANNEL...ENDOFCHANNELS`.
+#[tauri::command]
+fn mp_list_channels(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    if let Some(conn) = registry.lock().unwrap().get(&server_key) {
+        coilbox_lobby_protocol::begin_channel_list(&mut conn.state.lock().unwrap());
+    }
+    enqueue(registry.inner(), &server_key, command::list_channels())
 }
 
 /// `mp_join_battle` — join an open battle (optional battle key and script password).
@@ -575,6 +593,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_say_private,
             mp_join_channel,
             mp_leave_channel,
+            mp_list_channels,
             mp_join_battle,
             mp_leave_battle,
             mp_set_status,

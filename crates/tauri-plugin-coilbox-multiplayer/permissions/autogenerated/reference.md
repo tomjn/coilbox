@@ -12,6 +12,7 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-say-private`
 - `allow-mp-join-channel`
 - `allow-mp-leave-channel`
+- `allow-mp-list-channels`
 - `allow-mp-join-battle`
 - `allow-mp-leave-battle`
 - `allow-mp-set-status`
@@ -372,6 +373,32 @@ Enables the mp_leave_channel command without any pre-configured scope.
 <td>
 
 Denies the mp_leave_channel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-list-channels`
+
+</td>
+<td>
+
+Enables the mp_list_channels command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-list-channels`
+
+</td>
+<td>
+
+Denies the mp_list_channels command without any pre-configured scope.
 
 </td>
 </tr>

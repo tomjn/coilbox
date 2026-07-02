@@ -11,6 +11,7 @@ permissions = [
   "allow-mp-say-private",
   "allow-mp-join-channel",
   "allow-mp-leave-channel",
+  "allow-mp-list-channels",
   "allow-mp-join-battle",
   "allow-mp-leave-battle",
   "allow-mp-set-status",

@@ -41,12 +41,7 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 /// task before the wire line is sent, keeping the task the single state writer.
 pub enum Outbound {
     Line(String),
-    // Constructed once `mp_say_private` is rerouted through it in a later task.
-    #[allow(dead_code)]
-    SayPrivate {
-        peer: String,
-        text: String,
-    },
+    SayPrivate { peer: String, text: String },
 }
 
 /// One live connection, held in the plugin registry so commands can push lines and
