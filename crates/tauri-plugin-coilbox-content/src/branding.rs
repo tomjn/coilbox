@@ -4,9 +4,6 @@
 //! fetching remote branding images and caching them once as `data:` URLs (which
 //! sidestep CSP host-allowlisting — the catalog can reference any host).
 
-// removed in Task 2 (helpers consumed by fetch/cache + Tauri commands there).
-#![allow(dead_code)]
-
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
@@ -88,6 +85,124 @@ pub(crate) fn image_cache_files(cache_dir: &std::path::Path, url: &str) -> (Path
         cache_dir.join(format!("{key}.dataurl")),
         cache_dir.join(format!("{key}.none")),
     )
+}
+
+/// Fetch the catalog JSON text over HTTP. Errors carry the reqwest message.
+pub(crate) async fn fetch_catalog_text(url: &str) -> Result<String, String> {
+    let resp = reqwest::get(url).await.map_err(|e| e.to_string())?;
+    let resp = resp.error_for_status().map_err(|e| e.to_string())?;
+    resp.text().await.map_err(|e| e.to_string())
+}
+
+/// Result of resolving the catalog: the raw JSON text plus where it came from.
+/// The frontend parses/validates the JSON, so Rust stays schema-agnostic.
+#[derive(serde::Serialize)]
+pub(crate) struct CatalogResult {
+    pub json: String,
+    pub source: String, // "network" | "cache" | "seed" | "error"
+    pub errors: Vec<String>,
+}
+
+/// Fetch → cache → seed. Never hard-fails: on network error, returns the disk
+/// cache, then the bundled seed, then an empty catalog with the errors attached.
+pub(crate) async fn resolve_catalog(
+    url: &str,
+    cache_file: Option<PathBuf>,
+    seed_file: Option<PathBuf>,
+) -> CatalogResult {
+    match fetch_catalog_text(url).await {
+        Ok(text) => {
+            if let Some(f) = &cache_file {
+                if let Some(dir) = f.parent() {
+                    let _ = std::fs::create_dir_all(dir);
+                }
+                let _ = std::fs::write(f, &text);
+            }
+            CatalogResult {
+                json: text,
+                source: "network".into(),
+                errors: vec![],
+            }
+        }
+        Err(e) => {
+            if let Some(f) = &cache_file {
+                if let Ok(text) = std::fs::read_to_string(f) {
+                    return CatalogResult {
+                        json: text,
+                        source: "cache".into(),
+                        errors: vec![e],
+                    };
+                }
+            }
+            if let Some(f) = &seed_file {
+                if let Ok(text) = std::fs::read_to_string(f) {
+                    return CatalogResult {
+                        json: text,
+                        source: "seed".into(),
+                        errors: vec![e],
+                    };
+                }
+            }
+            CatalogResult {
+                json: r#"{"version":1,"entries":[]}"#.into(),
+                source: "error".into(),
+                errors: vec![e],
+            }
+        }
+    }
+}
+
+/// Fetch the first URL that yields an image, cache it once as a `data:` URL, and
+/// return it. `.dataurl` positive hits and `.none` negative markers avoid refetch.
+/// Only `https` URLs are attempted (privacy/security).
+pub(crate) async fn resolve_image(urls: &[String], cache_dir: Option<PathBuf>) -> Option<String> {
+    for url in urls {
+        if !url.starts_with("https://") {
+            continue;
+        }
+        let files = cache_dir.as_ref().map(|d| image_cache_files(d, url));
+        if let Some((pos, neg)) = &files {
+            if let Ok(text) = std::fs::read_to_string(pos) {
+                return Some(text);
+            }
+            if neg.exists() {
+                continue;
+            }
+        }
+        match fetch_image(url).await {
+            Some(data_url) => {
+                if let Some((pos, _)) = &files {
+                    if let Some(dir) = pos.parent() {
+                        let _ = std::fs::create_dir_all(dir);
+                    }
+                    let _ = std::fs::write(pos, &data_url);
+                }
+                return Some(data_url);
+            }
+            None => {
+                if let Some((_, neg)) = &files {
+                    if let Some(dir) = neg.parent() {
+                        let _ = std::fs::create_dir_all(dir);
+                    }
+                    let _ = std::fs::write(neg, b"");
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Fetch one image URL → `data:` URL, or `None` on any failure / non-image.
+async fn fetch_image(url: &str) -> Option<String> {
+    let resp = reqwest::get(url).await.ok()?.error_for_status().ok()?;
+    let header = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
+    let content_type = image_content_type(header.as_deref(), url)?;
+    let bytes = resp.bytes().await.ok()?;
+    Some(data_url(&content_type, &bytes))
 }
 
 #[cfg(test)]

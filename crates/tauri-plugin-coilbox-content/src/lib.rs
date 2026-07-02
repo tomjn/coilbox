@@ -581,6 +581,39 @@ async fn content_demo_info(engine_path: String, replay_path: String) -> Result<C
     }
 }
 
+/// `branding_catalog` — fetch the remote branding catalog JSON, disk-cache it, and
+/// fall back to the cache then the bundled seed on network failure. Returns the
+/// raw JSON text; the frontend parses/matches it (Rust stays schema-agnostic).
+#[tauri::command]
+async fn branding_catalog<R: Runtime>(app: AppHandle<R>, url: String) -> Result<CliResult, ()> {
+    let cache_file = app
+        .path()
+        .app_cache_dir()
+        .ok()
+        .map(|d| d.join("coilbox-branding").join("catalog.json"));
+    let seed_file = app
+        .path()
+        .resource_dir()
+        .ok()
+        .map(|d| d.join("branding").join("catalog.json"));
+    let res = branding::resolve_catalog(&url, cache_file, seed_file).await;
+    Ok(CliResult::ok(json!(res)))
+}
+
+/// `branding_image` — fetch the first working image URL (https only), cache it
+/// once as a `data:` URL keyed by URL hash, and return it. Empty `dataUrl` = the
+/// UI falls back to the game's own art / gradient.
+#[tauri::command]
+async fn branding_image<R: Runtime>(app: AppHandle<R>, urls: Vec<String>) -> Result<CliResult, ()> {
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .ok()
+        .map(|d| d.join("coilbox-branding-images"));
+    let data_url = branding::resolve_image(&urls, cache_dir).await;
+    Ok(CliResult::ok(json!({ "dataUrl": data_url })))
+}
+
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -596,7 +629,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_verify_engine,
             content_open_path,
             content_list_replays,
-            content_demo_info
+            content_demo_info,
+            branding_catalog,
+            branding_image
         ])
         .build()
 }
