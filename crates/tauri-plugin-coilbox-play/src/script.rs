@@ -12,7 +12,7 @@ use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct BattleConfig {
     /// `[GAME].MapName` — map name without extension.
@@ -36,6 +36,53 @@ pub struct BattleConfig {
     pub mod_options: BTreeMap<String, String>,
     #[serde(default)]
     pub map_options: BTreeMap<String, String>,
+    /// Whether this machine hosts the game. Singleplayer/skirmish and lobby-host
+    /// are hosts (`true`, the default — the engine runs a local host); a client
+    /// joining a remote lobby battle sets this `false` and gets a minimal script
+    /// that just points at the host (`[GAME]` below).
+    #[serde(default = "default_true")]
+    pub is_host: bool,
+    /// Host address for a networked game. When hosting, `[GAME].HostIP` (defaults
+    /// to `0.0.0.0`); when joining, the host we connect to.
+    #[serde(default)]
+    pub host_ip: Option<String>,
+    /// Host port. Present for a networked host (the port the engine listens on) or
+    /// a client (the port to connect to). Absent for pure singleplayer.
+    #[serde(default)]
+    pub host_port: Option<u16>,
+    /// Script password the client presents to the host (client scripts only).
+    #[serde(default)]
+    pub my_passwd: Option<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+// Hand-written so `is_host` defaults to `true` (a bool's `Default` is `false`),
+// matching the serde `default_true` used for deserialization. Everything else is
+// its type's own default.
+impl Default for BattleConfig {
+    fn default() -> Self {
+        Self {
+            map_name: String::new(),
+            game_type: String::new(),
+            my_player_name: String::new(),
+            start_pos_type: 0,
+            game_start_delay: None,
+            fixed_rng_seed: None,
+            players: Vec::new(),
+            ais: Vec::new(),
+            teams: Vec::new(),
+            ally_teams: Vec::new(),
+            mod_options: BTreeMap::new(),
+            map_options: BTreeMap::new(),
+            is_host: true,
+            host_ip: None,
+            host_port: None,
+            my_passwd: None,
+        }
+    }
 }
 
 #[derive(Deserialize, Clone, Debug, Default)]
@@ -97,6 +144,13 @@ pub struct AllyTeam {
 
 /// Render a `BattleConfig` into the engine's `[GAME]{ ... }` start-script text.
 pub fn generate_script(cfg: &BattleConfig) -> String {
+    // A client joining a remote lobby battle needs only a minimal script pointing
+    // at the host; the host relays the full game/team/player state. (See skylobby
+    // `script-data-client`.)
+    if !cfg.is_host {
+        return generate_client_script(cfg);
+    }
+
     let mut s = String::new();
     s.push_str("[GAME]\n{\n");
 
@@ -105,6 +159,12 @@ pub fn generate_script(cfg: &BattleConfig) -> String {
     kv(&mut s, 1, "StartPosType", &cfg.start_pos_type.to_string());
     kv(&mut s, 1, "MyPlayerName", &cfg.my_player_name);
     kv(&mut s, 1, "IsHost", "1");
+    // A networked host advertises where the engine listens; pure singleplayer omits
+    // this and the engine picks a local port itself.
+    if let Some(port) = cfg.host_port {
+        kv(&mut s, 1, "HostIP", cfg.host_ip.as_deref().unwrap_or("0.0.0.0"));
+        kv(&mut s, 1, "HostPort", &port.to_string());
+    }
     kv(&mut s, 1, "NumPlayers", &cfg.players.len().to_string());
     kv(&mut s, 1, "NumTeams", &cfg.teams.len().to_string());
     kv(&mut s, 1, "NumAllyTeams", &cfg.ally_teams.len().to_string());
@@ -198,6 +258,26 @@ pub fn generate_script(cfg: &BattleConfig) -> String {
         });
     }
 
+    s.push_str("}\n");
+    s
+}
+
+/// Minimal `[GAME]` block for a client joining a remote host: it identifies the
+/// player and where to connect; the host supplies teams/players/AIs over the wire.
+fn generate_client_script(cfg: &BattleConfig) -> String {
+    let mut s = String::new();
+    s.push_str("[GAME]\n{\n");
+    kv(&mut s, 1, "IsHost", "0");
+    kv(&mut s, 1, "MyPlayerName", &cfg.my_player_name);
+    if let Some(ip) = &cfg.host_ip {
+        kv(&mut s, 1, "HostIP", ip);
+    }
+    if let Some(port) = cfg.host_port {
+        kv(&mut s, 1, "HostPort", &port.to_string());
+    }
+    if let Some(pw) = &cfg.my_passwd {
+        kv(&mut s, 1, "MyPasswd", pw);
+    }
     s.push_str("}\n");
     s
 }
@@ -358,6 +438,45 @@ mod tests {
         let s = generate_script(&cfg);
         assert!(s.contains("[OPTIONS]"));
         assert!(s.contains("difficultyLevel=1;"));
+    }
+
+    #[test]
+    fn client_script_is_minimal_and_points_at_host() {
+        let mut cfg = sample();
+        cfg.is_host = false;
+        cfg.host_ip = Some("192.0.2.10".into());
+        cfg.host_port = Some(8452);
+        cfg.my_passwd = Some("s3cret".into());
+        let s = generate_script(&cfg);
+        assert!(s.contains("IsHost=0;"));
+        assert!(s.contains("MyPlayerName=You;"));
+        assert!(s.contains("HostIP=192.0.2.10;"));
+        assert!(s.contains("HostPort=8452;"));
+        assert!(s.contains("MyPasswd=s3cret;"));
+        // No full-host structure leaks into a client script.
+        assert!(!s.contains("[TEAM0]"));
+        assert!(!s.contains("NumPlayers="));
+    }
+
+    #[test]
+    fn networked_host_emits_hostport() {
+        let mut cfg = sample();
+        cfg.host_port = Some(8452);
+        let s = generate_script(&cfg);
+        assert!(s.contains("IsHost=1;"));
+        assert!(s.contains("HostIP=0.0.0.0;"));
+        assert!(s.contains("HostPort=8452;"));
+        // Full host structure still present.
+        assert!(s.contains("[TEAM0]"));
+    }
+
+    #[test]
+    fn singleplayer_host_unchanged_without_port() {
+        // Default is_host=true, no host_port -> identical to the legacy skirmish path.
+        let s = generate_script(&sample());
+        assert!(s.contains("IsHost=1;"));
+        assert!(!s.contains("HostPort="));
+        assert!(!s.contains("HostIP="));
     }
 
     #[test]
