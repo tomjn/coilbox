@@ -30,43 +30,99 @@ struct UnitFields {
     name: String,
 }
 
-/// Build the Lua script run through the parser. For each requested unit it reads
-/// its unitdef from `units/<name>.lua` (keyed by unit name inside the file) and
-/// pulls out the `buildpic` filename and the human-friendly `name`, returning a
-/// flat `unit\tbuildpic\tname` string (one line per unit) in the `result` field
-/// that `run_lua_source` reads back. Empty buildpic => fall back to the name
-/// convention; empty name => fall back to the engine's start-unit name.
+/// Lua run through the parser to read each requested unit's `buildpic` filename
+/// and human-friendly `name` from its unitdef, returning a flat `unit\tbuildpic\tname`
+/// string (one line per unit) in the `result` field that `run_lua_source` reads.
+///
+/// Games vary in how they ship unit defs, so this handles both shapes:
+///  - a flat `units/<name>.lua` (self-contained tables, e.g. Balanced Annihilation),
+///    tried first as a fast path; and
+///  - defs nested under `units/<subfolder>/` that call gamedata helper globals
+///    (`lowerkeys`, `Shared`) the game normally injects — we predefine those so the
+///    files evaluate, then recurse to find each wanted unit.
+///
+/// `__WANT__` is replaced with the `['name']=true,` set to look for.
+const BUILDPIC_SCRIPT: &str = r#"
+-- Helpers some games' unit files expect; without them VFS.Include on those defs
+-- raises and yields nothing. A benign auto-stub stands in for `Shared` etc.
+function lowerkeys(t)
+  if type(t) ~= 'table' then return t end
+  local o = {}
+  for k, v in pairs(t) do
+    if type(k) == 'string' then k = string.lower(k) end
+    o[k] = lowerkeys(v)
+  end
+  return o
+end
+local function stub()
+  return setmetatable({}, { __index = function() return stub() end,
+                            __call = function() return stub() end })
+end
+if Shared == nil then Shared = stub() end
+
+local want = { __WANT__ }
+local found = {}
+local remaining = 0
+for _ in pairs(want) do remaining = remaining + 1 end
+local budget = 4000
+
+-- Record any wanted unit defined in `def` (its internal name is a table key).
+local function take(def)
+  if type(def) ~= 'table' then return end
+  for k, v in pairs(def) do
+    if type(v) == 'table' then
+      local key = string.lower(tostring(k))
+      if want[key] and not found[key] then
+        local bp = type(v.buildpic) == 'string' and v.buildpic or ''
+        local nm = type(v.name) == 'string' and v.name or ''
+        found[key] = bp .. '\t' .. nm
+        remaining = remaining - 1
+      end
+    end
+  end
+end
+
+-- Fast path: flat units/<name>.lua.
+for name in pairs(want) do
+  local ok, def = pcall(VFS.Include, 'units/' .. name .. '.lua')
+  if ok then take(def) end
+end
+
+-- Recursive fallback: defs nested under units/<subfolder>/.
+local function scan(dir, depth)
+  if remaining <= 0 or budget <= 0 or depth > 6 then return end
+  if VFS.DirList then
+    for _, f in ipairs(VFS.DirList(dir, '*.lua')) do
+      if remaining <= 0 or budget <= 0 then break end
+      budget = budget - 1
+      local ok, def = pcall(VFS.Include, f)
+      if ok then take(def) end
+    end
+  end
+  if remaining <= 0 or budget <= 0 then return end
+  if VFS.SubDirs then
+    for _, sd in ipairs(VFS.SubDirs(dir, '*')) do
+      if remaining <= 0 or budget <= 0 then break end
+      scan(sd, depth + 1)
+    end
+  end
+end
+if remaining > 0 then scan('units/', 0) end
+
+local parts = {}
+for name in pairs(want) do
+  parts[#parts + 1] = name .. '\t' .. (found[name] or '\t')
+end
+return { result = table.concat(parts, '\n') }
+"#;
+
 fn build_buildpic_script(units: &[String]) -> String {
     // Unit internal names are alnum/underscore, so a single-quoted key is safe.
     let want: String = units
         .iter()
-        .map(|u| format!("['{}']=1,", u.to_lowercase()))
+        .map(|u| format!("['{}']=true,", u.to_lowercase()))
         .collect();
-    format!(
-        r#"
-local want = {{ {want} }}
-local parts = {{}}
-for name in pairs(want) do
-  local bp = ''
-  local nm = ''
-  local ok, def = pcall(VFS.Include, 'units/'..name..'.lua')
-  if ok and type(def) == 'table' then
-    local ud = def[name]
-    if type(ud) ~= 'table' then
-      for k, v in pairs(def) do
-        if type(v) == 'table' and string.lower(k) == name then ud = v break end
-      end
-    end
-    if type(ud) == 'table' then
-      if type(ud.buildpic) == 'string' then bp = ud.buildpic end
-      if type(ud.name) == 'string' then nm = ud.name end
-    end
-  end
-  parts[#parts + 1] = name .. '\t' .. bp .. '\t' .. nm
-end
-return {{ result = table.concat(parts, '\n') }}
-"#
-    )
+    BUILDPIC_SCRIPT.replace("__WANT__", &want)
 }
 
 /// Parse the `unit\tbuildpic\tname` lines the Lua script returns into a map keyed
@@ -336,13 +392,6 @@ mod tests {
     }
 
     #[test]
-    fn build_script_reads_buildpic_and_name_fields() {
-        let s = build_buildpic_script(&["armcom".into()]);
-        assert!(s.contains("ud.buildpic"));
-        assert!(s.contains("ud.name"));
-    }
-
-    #[test]
     fn candidates_prefer_explicit_buildpic_then_unit_name() {
         let c = candidate_members("armcom", "unitpics/ArmCom_alt.png");
         assert_eq!(c[0], "unitpics/ArmCom_alt.png");
@@ -358,10 +407,13 @@ mod tests {
     }
 
     #[test]
-    fn lua_script_lists_requested_units() {
+    fn build_script_covers_flat_and_nested_layouts() {
         let s = build_buildpic_script(&["armcom".into(), "corcom".into()]);
-        assert!(s.contains("['armcom']") && s.contains("['corcom']"));
-        assert!(s.contains("VFS.Include"));
+        assert!(s.contains("['armcom']=true") && s.contains("['corcom']=true"));
+        assert!(s.contains("VFS.Include")); // flat fast path
+        assert!(s.contains("VFS.SubDirs")); // recursive fallback
+        assert!(s.contains("lowerkeys")); // gamedata helper shim
+        assert!(s.contains(".buildpic") && s.contains(".name"));
         assert!(s.contains("result ="));
     }
 }
