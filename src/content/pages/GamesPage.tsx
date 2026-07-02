@@ -125,7 +125,7 @@ export default function GamesPage() {
           {sorted.map((g) => (
             <li
               key={`${g.primaryArchive.name}:${g.name}`}
-              className="[contain-intrinsic-size:8rem] [content-visibility:auto]"
+              className="[contain-intrinsic-size:11rem] [content-visibility:auto]"
             >
               <GameCard
                 game={g}

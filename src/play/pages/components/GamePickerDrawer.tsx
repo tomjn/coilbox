@@ -5,42 +5,56 @@ import { useMemo, useState } from "react";
 import type { GameItem } from "@/content/bindings";
 import { useBrandingEntry, useBrandingImage } from "@/content/branding";
 import { isSdd } from "@/content/format";
-import { GameArt } from "@/content/pages/components/GameArt";
-import { SddBadge } from "@/content/pages/components/SddBadge";
-import { WarningIcon } from "@/content/pages/components/states";
-import { cn, versionLabel } from "@/lib/utils";
+import { GameCardShell } from "@/content/pages/components/GameCardShell";
 
 /** Unique id for a game: its name plus its own primary archive (matches GamesPage). */
 const gameId = (g: GameItem) => `${g.primaryArchive.name}:${g.name}`;
 
 /**
- * One tile's art layer: catalog branding banner (when the game matches an entry)
- * over the batched loading-screen art. A component (not an inline call) so the
- * branding hooks run per game without breaking the rules of hooks in the map.
+ * One picker tile: the shared {@link GameCardShell} wrapped in a stretched select
+ * button. A component (not an inline call) so the branding hooks run per game
+ * without breaking the rules of hooks in the map.
  */
-function GameTileArt({
+function GameTile({
   game,
   headers,
+  selected,
+  onSelect,
 }: {
   game: GameItem;
   headers: Map<string, string>;
+  selected: boolean;
+  onSelect: () => void;
 }) {
   const brand = useBrandingEntry(game);
   const brandBanner = useBrandingImage(brand?.banner, true);
   return (
-    <GameArt
+    <GameCardShell
       name={game.name}
+      title={brand?.title ?? game.name}
       artUrl={brandBanner ?? headers.get(game.name)}
       alt={`${game.name} loading screen`}
-    />
+      version={game.info.version}
+      sdd={isSdd(game.primaryArchive)}
+      warnings={game.warnings}
+      selected={selected}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-label={game.name}
+        aria-pressed={selected}
+        className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+      />
+    </GameCardShell>
   );
 }
 
 /**
- * A right-hand slide-in sheet for picking a game from a searchable grid of hero
+ * A right-hand slide-in sheet for picking a game from a searchable grid of
  * tiles. The game counterpart of `MapPickerDrawer`: same radix `Dialog` sheet,
- * but each tile is a 16:9 loading-screen card (via `GameArt`) rather than a square
- * minimap. Selecting a tile sets the game and closes.
+ * but each tile is a 16:9 loading-screen image (via `GameArt`) over a caption
+ * band rather than a square minimap. Selecting a tile sets the game and closes.
  */
 export function GamePickerDrawer({
   open,
@@ -100,45 +114,16 @@ export function GamePickerDrawer({
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             <div className="grid grid-cols-2 content-start gap-3">
               {filtered.map((g) => (
-                <button
+                <GameTile
                   key={gameId(g)}
-                  type="button"
-                  onClick={() => {
+                  game={g}
+                  headers={headers}
+                  selected={g.name === selectedName}
+                  onSelect={() => {
                     onSelect(g.name);
                     onOpenChange(false);
                   }}
-                  className={cn(
-                    "group relative aspect-video overflow-hidden rounded-lg border bg-card text-left transition-colors hover:border-primary focus-visible:border-primary focus-visible:outline-none",
-                    g.name === selectedName
-                      ? "border-primary ring-2 ring-primary/25"
-                      : "border-border/60",
-                  )}
-                >
-                  <GameTileArt game={g} headers={headers} />
-                  <div
-                    className="absolute inset-0 bg-gradient-to-t from-white/80 via-white/20 to-transparent dark:from-black/80 dark:via-black/20"
-                    aria-hidden
-                  />
-                  <div className="absolute inset-x-2.5 bottom-2 flex flex-col gap-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="truncate text-xs font-semibold text-foreground drop-shadow-[0_1px_3px_rgba(255,255,255,0.9)] dark:text-white dark:drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
-                        title={g.name}
-                      >
-                        {g.name}
-                      </span>
-                      {isSdd(g.primaryArchive) && <SddBadge />}
-                      {g.warnings?.length ? (
-                        <WarningIcon warnings={g.warnings} />
-                      ) : null}
-                    </div>
-                    {g.info.version && (
-                      <span className="text-[11px] text-foreground/90 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] dark:text-white/90 dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-                        {versionLabel(g.info.version)}
-                      </span>
-                    )}
-                  </div>
-                </button>
+                />
               ))}
               {filtered.length === 0 && (
                 <p className="col-span-2 py-8 text-center text-sm text-muted-foreground">
