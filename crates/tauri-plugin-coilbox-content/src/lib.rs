@@ -9,6 +9,7 @@
 //! explicit `content_verify_engine` (bounded by a timeout), never during listing.
 //! Results use the [`CliResult`] envelope, matching every other picoframe plugin.
 
+mod branding;
 mod demo;
 mod engine;
 mod model;
