@@ -52,6 +52,10 @@ struct Args {
     skirmish_ais: bool,
     /// `--game-headers`: batch-resolve every game's header art in one Init.
     game_headers: bool,
+    /// `--unit-buildpics`: resolve start-unit build icons for `--game`, for the
+    /// units listed in `--units` (comma-separated).
+    unit_buildpics: bool,
+    units: Vec<String>,
     /// `--lua`: run a Lua snippet through the parser against `--archive`, reading
     /// the script from `--source-file`.
     lua: bool,
@@ -147,6 +151,26 @@ fn run() -> i32 {
                     ..Default::default()
                 };
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                1
+            }
+        };
+    }
+
+    // Unit build icons: resolve start-unit build pics for one game in one Init,
+    // disk-cached like game headers. Checked before the --game modes because it
+    // also keys off --game.
+    if args.unit_buildpics {
+        let game_archive = args.game.clone().unwrap_or_default();
+        let units = args.units.clone();
+        return match std::panic::catch_unwind(|| {
+            buildpic::render(&args.lib, &game_archive, &units, cache_dir)
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                buildpic::emit_error("worker panicked while resolving unit build pics".into());
                 1
             }
         };
@@ -330,6 +354,8 @@ fn parse_args() -> Result<Args, String> {
     let mut config = false;
     let mut skirmish_ais = false;
     let mut game_headers = false;
+    let mut unit_buildpics = false;
+    let mut units: Vec<String> = Vec::new();
     let mut lua = false;
     let mut source_file = None;
     let mut mip = 1; // 512x512 by default
@@ -358,6 +384,19 @@ fn parse_args() -> Result<Args, String> {
             "--config" => config = true,
             "--skirmish-ais" => skirmish_ais = true,
             "--game-headers" => game_headers = true,
+            "--unit-buildpics" => unit_buildpics = true,
+            "--units" => {
+                units = it
+                    .next()
+                    .map(|s| {
+                        s.split(',')
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty())
+                            .map(str::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            }
             "--lua" => lua = true,
             "--source-file" => source_file = it.next(),
             "--mip" => {
@@ -383,6 +422,8 @@ fn parse_args() -> Result<Args, String> {
         config,
         skirmish_ais,
         game_headers,
+        unit_buildpics,
+        units,
         lua,
         source_file,
         mip,

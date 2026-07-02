@@ -13,8 +13,6 @@ const ICON_MAX: u32 = 128;
 /// isn't supported or the bytes don't decode. `.dds` is DXT/BCn-decompressed;
 /// everything else goes through the `image` crate (extension-driven because TGA has
 /// no magic bytes).
-// consumed by buildpic mode (next task)
-#[allow(dead_code)]
 pub fn decode_texture(ext: &str, bytes: &[u8]) -> Option<image::RgbaImage> {
     match ext.to_lowercase().as_str() {
         "dds" => decode_dds(bytes),
@@ -27,8 +25,6 @@ pub fn decode_texture(ext: &str, bytes: &[u8]) -> Option<image::RgbaImage> {
     }
 }
 
-// consumed by buildpic mode (next task)
-#[allow(dead_code)]
 fn load_rgba(bytes: &[u8], format: image::ImageFormat) -> Option<image::RgbaImage> {
     Some(
         image::load_from_memory_with_format(bytes, format)
@@ -40,8 +36,6 @@ fn load_rgba(bytes: &[u8], format: image::ImageFormat) -> Option<image::RgbaImag
 /// Decode a DXT/BCn `.dds` (the common Spring/Recoil build-pic case) into RGBA8.
 /// Only block-compressed BC1/2/3 are handled; uncompressed or BC4/5/6/7 DDS return
 /// `None` (treated as unresolved by the caller).
-// consumed by buildpic mode (next task)
-#[allow(dead_code)]
 fn decode_dds(bytes: &[u8]) -> Option<image::RgbaImage> {
     let dds = ddsfile::Dds::read(bytes).ok()?;
     let (w, h) = (dds.get_width(), dds.get_height());
@@ -54,8 +48,6 @@ fn decode_dds(bytes: &[u8]) -> Option<image::RgbaImage> {
 
 /// Map a DDS fourcc (`D3DFormat`) or modern `DxgiFormat` to the texpresso block
 /// format. Prefers the legacy fourcc (what most Spring build pics carry).
-// consumed by buildpic mode (next task)
-#[allow(dead_code)]
 fn bc_format(
     d3d: Option<ddsfile::D3DFormat>,
     dxgi: Option<ddsfile::DxgiFormat>,
@@ -81,8 +73,6 @@ fn bc_format(
 /// Downscale to fit `ICON_MAX` (preserving aspect, never upscaling) and encode a
 /// PNG `data:` URL. PNG (not JPEG) preserves the transparent backgrounds build pics
 /// usually have.
-// consumed by buildpic mode (next task)
-#[allow(dead_code)]
 pub fn encode_icon_png(img: image::RgbaImage) -> Option<String> {
     let dynimg = image::DynamicImage::ImageRgba8(img);
     let scaled = if dynimg.width() > ICON_MAX || dynimg.height() > ICON_MAX {
