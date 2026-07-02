@@ -1,9 +1,30 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the multiplayer lobby client's connect, disconnect and state-snapshot commands."
+description = "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands."
 permissions = [
   "allow-mp-connect",
   "allow-mp-disconnect",
   "allow-mp-snapshot",
+  "allow-mp-send",
+  "allow-mp-say",
+  "allow-mp-say-private",
+  "allow-mp-join-channel",
+  "allow-mp-leave-channel",
+  "allow-mp-join-battle",
+  "allow-mp-leave-battle",
+  "allow-mp-set-status",
+  "allow-mp-set-battle-status",
+  "allow-mp-open-battle",
+  "allow-mp-add-bot",
+  "allow-mp-remove-bot",
+  "allow-mp-update-bot",
+  "allow-mp-force-team",
+  "allow-mp-force-ally",
+  "allow-mp-force-color",
+  "allow-mp-force-spectator",
+  "allow-mp-kick",
+  "allow-mp-set-start-rect",
+  "allow-mp-set-script-tags",
+  "allow-mp-build-battle-config",
 ]

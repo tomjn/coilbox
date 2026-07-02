@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-join-battle"
+description = "Enables the mp_join_battle command without any pre-configured scope."
+commands.allow = ["mp_join_battle"]
+
+[[permission]]
+identifier = "deny-mp-join-battle"
+description = "Denies the mp_join_battle command without any pre-configured scope."
+commands.deny = ["mp_join_battle"]

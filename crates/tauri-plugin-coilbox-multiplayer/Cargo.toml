@@ -17,3 +17,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 picoframe-core = "0.0.2"
 coilbox-lobby-protocol = { path = "../coilbox-lobby-protocol" }
+tokio = { version = "1", features = ["net", "io-util", "sync", "rt", "macros", "time"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }

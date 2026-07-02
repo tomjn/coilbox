@@ -295,6 +295,30 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the mp_add_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-add-bot",
+          "markdownDescription": "Enables the mp_add_bot command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_add_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-add-bot",
+          "markdownDescription": "Denies the mp_add_bot command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_build_battle_config command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-build-battle-config",
+          "markdownDescription": "Enables the mp_build_battle_config command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_build_battle_config command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-build-battle-config",
+          "markdownDescription": "Denies the mp_build_battle_config command without any pre-configured scope."
+        },
+        {
           "description": "Enables the mp_connect command without any pre-configured scope.",
           "type": "string",
           "const": "allow-mp-connect",
@@ -319,6 +343,222 @@
           "markdownDescription": "Denies the mp_disconnect command without any pre-configured scope."
         },
         {
+          "description": "Enables the mp_force_ally command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-force-ally",
+          "markdownDescription": "Enables the mp_force_ally command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_force_ally command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-force-ally",
+          "markdownDescription": "Denies the mp_force_ally command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_force_color command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-force-color",
+          "markdownDescription": "Enables the mp_force_color command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_force_color command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-force-color",
+          "markdownDescription": "Denies the mp_force_color command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_force_spectator command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-force-spectator",
+          "markdownDescription": "Enables the mp_force_spectator command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_force_spectator command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-force-spectator",
+          "markdownDescription": "Denies the mp_force_spectator command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_force_team command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-force-team",
+          "markdownDescription": "Enables the mp_force_team command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_force_team command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-force-team",
+          "markdownDescription": "Denies the mp_force_team command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_join_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-join-battle",
+          "markdownDescription": "Enables the mp_join_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_join_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-join-battle",
+          "markdownDescription": "Denies the mp_join_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_join_channel command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-join-channel",
+          "markdownDescription": "Enables the mp_join_channel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_join_channel command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-join-channel",
+          "markdownDescription": "Denies the mp_join_channel command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_kick command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-kick",
+          "markdownDescription": "Enables the mp_kick command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_kick command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-kick",
+          "markdownDescription": "Denies the mp_kick command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_leave_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-leave-battle",
+          "markdownDescription": "Enables the mp_leave_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_leave_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-leave-battle",
+          "markdownDescription": "Denies the mp_leave_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_leave_channel command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-leave-channel",
+          "markdownDescription": "Enables the mp_leave_channel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_leave_channel command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-leave-channel",
+          "markdownDescription": "Denies the mp_leave_channel command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_open_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-open-battle",
+          "markdownDescription": "Enables the mp_open_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_open_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-open-battle",
+          "markdownDescription": "Denies the mp_open_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_remove_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-remove-bot",
+          "markdownDescription": "Enables the mp_remove_bot command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_remove_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-remove-bot",
+          "markdownDescription": "Denies the mp_remove_bot command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_say command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-say",
+          "markdownDescription": "Enables the mp_say command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_say command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-say",
+          "markdownDescription": "Denies the mp_say command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_say_private command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-say-private",
+          "markdownDescription": "Enables the mp_say_private command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_say_private command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-say-private",
+          "markdownDescription": "Denies the mp_say_private command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_send command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-send",
+          "markdownDescription": "Enables the mp_send command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_send command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-send",
+          "markdownDescription": "Denies the mp_send command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_set_battle_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-set-battle-status",
+          "markdownDescription": "Enables the mp_set_battle_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_set_battle_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-set-battle-status",
+          "markdownDescription": "Denies the mp_set_battle_status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_set_script_tags command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-set-script-tags",
+          "markdownDescription": "Enables the mp_set_script_tags command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_set_script_tags command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-set-script-tags",
+          "markdownDescription": "Denies the mp_set_script_tags command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_set_start_rect command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-set-start-rect",
+          "markdownDescription": "Enables the mp_set_start_rect command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_set_start_rect command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-set-start-rect",
+          "markdownDescription": "Denies the mp_set_start_rect command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_set_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-set-status",
+          "markdownDescription": "Enables the mp_set_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_set_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-set-status",
+          "markdownDescription": "Denies the mp_set_status command without any pre-configured scope."
+        },
+        {
           "description": "Enables the mp_snapshot command without any pre-configured scope.",
           "type": "string",
           "const": "allow-mp-snapshot",
@@ -331,10 +571,22 @@
           "markdownDescription": "Denies the mp_snapshot command without any pre-configured scope."
         },
         {
-          "description": "Allows the multiplayer lobby client's connect, disconnect and state-snapshot commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-disconnect`\n- `allow-mp-snapshot`",
+          "description": "Enables the mp_update_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-update-bot",
+          "markdownDescription": "Enables the mp_update_bot command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_update_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-update-bot",
+          "markdownDescription": "Denies the mp_update_bot command without any pre-configured scope."
+        },
+        {
+          "description": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-disconnect`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-join-battle`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-set-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-build-battle-config`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the multiplayer lobby client's connect, disconnect and state-snapshot commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-disconnect`\n- `allow-mp-snapshot`"
+          "markdownDescription": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-disconnect`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-join-battle`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-set-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-build-battle-config`"
         }
       ]
     }

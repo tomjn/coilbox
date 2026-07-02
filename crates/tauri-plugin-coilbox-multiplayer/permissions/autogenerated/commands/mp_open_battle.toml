@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-open-battle"
+description = "Enables the mp_open_battle command without any pre-configured scope."
+commands.allow = ["mp_open_battle"]
+
+[[permission]]
+identifier = "deny-mp-open-battle"
+description = "Denies the mp_open_battle command without any pre-configured scope."
+commands.deny = ["mp_open_battle"]
