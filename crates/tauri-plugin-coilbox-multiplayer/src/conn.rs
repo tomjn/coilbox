@@ -27,11 +27,24 @@ use crate::tls::AsyncReadWrite;
 /// is a keepalive, not latency measurement; a coarse interval is plenty.
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 
+/// A queued outbound action for the connection task. `Line` is a raw wire line;
+/// `SayPrivate` is recorded into DM state + persisted + emitted as a delta by the
+/// task before the wire line is sent, keeping the task the single state writer.
+pub enum Outbound {
+    Line(String),
+    // Constructed once `mp_say_private` is rerouted through it in a later task.
+    #[allow(dead_code)]
+    SayPrivate {
+        peer: String,
+        text: String,
+    },
+}
+
 /// One live connection, held in the plugin registry so commands can push lines and
 /// disconnect. `state` is the shared authoritative mirror the read task mutates and
 /// `mp_snapshot` clones.
 pub struct ServerConn {
-    pub tx: UnboundedSender<String>,
+    pub tx: UnboundedSender<Outbound>,
     pub state: Arc<Mutex<LobbyState>>,
     pub abort: tokio::task::AbortHandle,
 }
@@ -64,7 +77,7 @@ pub fn spawn_connection(
     login_cfg: LoginConfig,
     on_event: Channel<LobbyEvent>,
 ) {
-    let (tx, rx) = mpsc::unbounded_channel::<String>();
+    let (tx, rx) = mpsc::unbounded_channel::<Outbound>();
     let state = Arc::new(Mutex::new(LobbyState::new()));
 
     let handle = tokio::spawn(run_loop(
@@ -99,7 +112,7 @@ async fn run_loop(
     stream: Box<dyn AsyncReadWrite>,
     login_cfg: LoginConfig,
     on_event: Channel<LobbyEvent>,
-    mut rx: mpsc::UnboundedReceiver<String>,
+    mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
 ) {
     let _ = on_event.send(LobbyEvent::Connected);
@@ -155,7 +168,12 @@ async fn run_loop(
                 Some(Err(e)) => break 'conn Some(e.to_string()),
                 None => break 'conn None,
             },
-            Some(line) = rx.recv() => outbound.push(line),
+            Some(out) = rx.recv() => match out {
+                Outbound::Line(line) => outbound.push(line),
+                Outbound::SayPrivate { peer, text } => {
+                    outbound.push(command::say_private(&peer, &text));
+                }
+            },
             _ = ping.tick() => outbound.push(command::ping(None)),
         }
 

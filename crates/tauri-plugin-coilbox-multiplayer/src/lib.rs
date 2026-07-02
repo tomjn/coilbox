@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use coilbox_lobby_protocol::{
     command, password_hash, team_color_rgb, BattleStatus, ClientStatus, LobbyState, LoginConfig,
 };
-use conn::{spawn_connection, LobbyEvent, Registry, ServerConn};
+use conn::{spawn_connection, LobbyEvent, Outbound, Registry, ServerConn};
 use picoframe_core::CliResult;
 use serde_json::{json, Value};
 use tauri::{
@@ -33,7 +33,7 @@ use tauri::{
 fn enqueue(registry: &Registry, server_key: &str, line: String) -> CliResult {
     let map = registry.lock().unwrap();
     match map.get(server_key) {
-        Some(conn) => match conn.tx.send(line) {
+        Some(conn) => match conn.tx.send(Outbound::Line(line)) {
             Ok(()) => CliResult::ok(json!({ "sent": true })),
             Err(_) => CliResult::err("connection is closed"),
         },
@@ -101,7 +101,7 @@ fn mp_disconnect(registry: State<'_, Registry>, server_key: String) -> CliResult
     let conn = registry.lock().unwrap().remove(&server_key);
     match conn {
         Some(ServerConn { tx, abort, .. }) => {
-            let _ = tx.send(command::exit(None));
+            let _ = tx.send(Outbound::Line(command::exit(None)));
             abort.abort();
             CliResult::ok(json!({ "disconnected": true }))
         }
