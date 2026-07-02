@@ -47,7 +47,7 @@ export function GameSelectCard({
       )}
       {/* Scrim: darken the bottom so the overlaid title/version stay legible. */}
       <div
-        className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"
+        className="absolute inset-0 bg-gradient-to-t from-white/80 via-white/20 to-transparent dark:from-black/80 dark:via-black/20"
         aria-hidden
       />
       {/* Hover wash: a subtle brighten so the card responds to the pointer. */}
@@ -73,7 +73,7 @@ export function GameSelectCard({
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex items-center gap-1.5">
             <p
-              className="truncate text-sm font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+              className="truncate text-sm font-semibold text-foreground drop-shadow-[0_1px_3px_rgba(255,255,255,0.9)] dark:text-white dark:drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
               title={game?.name}
             >
               {game?.name ??
@@ -85,12 +85,12 @@ export function GameSelectCard({
             ) : null}
           </div>
           {game?.info.version && (
-            <span className="text-xs text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+            <span className="text-xs text-foreground/90 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] dark:text-white/90 dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
               {versionLabel(game.info.version)}
             </span>
           )}
         </div>
-        <span className="shrink-0 rounded-md border border-white/30 bg-black/30 px-2 py-1 text-xs font-medium text-white backdrop-blur-sm group-hover:bg-black/40">
+        <span className="shrink-0 rounded-md border border-black/20 bg-white/40 px-2 py-1 text-xs font-medium text-foreground backdrop-blur-sm group-hover:bg-white/60 dark:border-white/30 dark:bg-black/30 dark:text-white dark:group-hover:bg-black/40">
           Choose game
         </span>
       </div>
