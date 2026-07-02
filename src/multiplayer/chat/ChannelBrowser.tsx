@@ -23,10 +23,20 @@ export function ChannelBrowser({
   const [loading, setLoading] = useState(false);
   const directory = mirror.state?.channelDirectory ?? [];
 
+  function refresh() {
+    if (!activeKey) return;
+    setLoading(true);
+    mpListChannels({ serverKey: activeKey }).catch(() => setLoading(false));
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: request-on-open keyed intentionally on [open, activeKey]
   useEffect(() => {
     if (!open || !activeKey) return;
-    setLoading(true);
-    mpListChannels({ serverKey: activeKey }).catch(() => {});
+    refresh();
+    // Fallback so an empty or failed directory resolves to the empty state
+    // instead of spinning forever (the length>0 effect clears it sooner on success).
+    const t = setTimeout(() => setLoading(false), 4000);
+    return () => clearTimeout(t);
   }, [open, activeKey]);
 
   // The directory arriving (channelListReceived -> snapshot) clears loading.
@@ -36,9 +46,13 @@ export function ChannelBrowser({
 
   async function join(name: string) {
     if (!activeKey) return;
-    await mpJoinChannel({ serverKey: activeKey, channel: name });
-    onJoined(name);
-    onClose();
+    try {
+      await mpJoinChannel({ serverKey: activeKey, channel: name });
+      onJoined(name);
+      onClose();
+    } catch {
+      // Channel-join failures are surfaced via the protocol layer, not here.
+    }
   }
 
   return (
@@ -55,17 +69,12 @@ export function ChannelBrowser({
         className={`absolute inset-y-0 right-0 z-20 flex w-80 flex-col border-l border-border bg-background shadow-lg transition-transform motion-reduce:transition-none ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
-        aria-hidden={!open}
+        inert={!open}
       >
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold">Browse channels</h2>
           <div className="flex items-center gap-1">
-            <Button
-              className="h-7 px-2"
-              onClick={() =>
-                activeKey && mpListChannels({ serverKey: activeKey })
-              }
-            >
+            <Button className="h-7 px-2" onClick={refresh}>
               Refresh
             </Button>
             <Button className="h-7 px-2" onClick={onClose} aria-label="Close">
