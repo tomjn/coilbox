@@ -158,6 +158,7 @@ export type Delta =
   | { kind: "chatMessage"; channel: string | null; index: number }
   | { kind: "privateMessage"; from: string }
   | { kind: "channelJoined"; channel: string }
+  | { kind: "channelLeft"; channel: string }
   | { kind: "channelTopicChanged"; channel: string }
   | { kind: "startRectChanged"; ally: number }
   | { kind: "scriptTagsChanged" }

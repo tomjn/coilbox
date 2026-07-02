@@ -65,6 +65,9 @@ pub enum Delta {
     ChannelJoined {
         channel: String,
     },
+    ChannelLeft {
+        channel: String,
+    },
     ChannelTopicChanged {
         channel: String,
     },
@@ -188,6 +191,13 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             username,
             reason,
         } => {
+            // Our own LEFT (the server's echo of our LEAVE) means we're no longer in
+            // the channel, so drop it from state entirely rather than just trimming
+            // the member list — otherwise it would linger in the channel list.
+            if state.my_username.as_deref() == Some(username.as_str()) {
+                state.channels.remove(&channel);
+                return vec![Delta::ChannelLeft { channel }];
+            }
             if let Some(ch) = state.channels.get_mut(&channel) {
                 ch.users.remove(&username);
             }
@@ -856,5 +866,33 @@ mod tests {
         assert_eq!(thread[0].from, "me");
         assert_eq!(thread[0].text, "yo bob");
         assert_eq!(thread[0].at, 777);
+    }
+
+    #[test]
+    fn own_leave_removes_channel() {
+        let mut s = LobbyState::new();
+        s.my_username = Some("me".into());
+        reduce(&mut s, parse_line("JOIN main"));
+        assert!(s.channels.contains_key("main"));
+        let d = reduce(&mut s, parse_line("LEFT main me"));
+        assert_eq!(
+            d,
+            vec![Delta::ChannelLeft {
+                channel: "main".into()
+            }]
+        );
+        assert!(!s.channels.contains_key("main"));
+    }
+
+    #[test]
+    fn other_user_leave_keeps_channel() {
+        let mut s = LobbyState::new();
+        s.my_username = Some("me".into());
+        reduce(&mut s, parse_line("JOIN main"));
+        reduce(&mut s, parse_line("JOINED main bob"));
+        let d = reduce(&mut s, parse_line("LEFT main bob"));
+        assert!(s.channels.contains_key("main"));
+        assert!(!s.channels["main"].users.contains("bob"));
+        assert!(matches!(d.as_slice(), [Delta::ChatMessage { .. }]));
     }
 }
