@@ -112,6 +112,15 @@ pub struct Battle {
     pub start_rects: HashMap<u8, StartRect>,
 }
 
+/// A public channel as advertised by the server's `CHANNELS` directory.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirChannel {
+    pub name: String,
+    pub user_count: u32,
+    pub topic: Option<String>,
+}
+
 /// The authoritative lobby state for one connection.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -125,6 +134,8 @@ pub struct LobbyState {
     pub battles: HashMap<u32, Battle>,
     pub current_battle: Option<u32>,
     pub last_battle: Option<u32>,
+    /// The last-fetched public channel directory (from `CHANNELS`).
+    pub channel_directory: Vec<DirChannel>,
 }
 
 impl LobbyState {

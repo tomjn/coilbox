@@ -40,6 +40,11 @@ pub fn list_comp_flags() -> String {
     "LISTCOMPFLAGS".to_string()
 }
 
+/// `CHANNELS` - request the public channel directory.
+pub fn list_channels() -> String {
+    "CHANNELS".to_string()
+}
+
 /// `PING [token]`.
 pub fn ping(token: Option<&str>) -> String {
     match token {
@@ -323,6 +328,11 @@ mod tests {
             update_battle_info(2, true, -1, "SomeMap"),
             "UPDATEBATTLEINFO 2 1 -1 SomeMap"
         );
+    }
+
+    #[test]
+    fn list_channels_line() {
+        assert_eq!(list_channels(), "CHANNELS");
     }
 
     #[test]

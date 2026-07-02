@@ -7,7 +7,8 @@
 
 use crate::message::ServerMessage;
 use crate::state::{
-    Battle, Bot, ChannelState, ChatKind, ChatMsg, LobbyState, MemberStatus, StartRect, User,
+    Battle, Bot, ChannelState, ChatKind, ChatMsg, DirChannel, LobbyState, MemberStatus, StartRect,
+    User,
 };
 use crate::status::{BattleStatus, ClientStatus};
 use serde::Serialize;
@@ -95,6 +96,7 @@ pub enum Delta {
     OpenBattleFailed {
         reason: String,
     },
+    ChannelListReceived,
 }
 
 /// Apply a server message to the lobby state, returning the deltas produced.
@@ -523,6 +525,19 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         ServerMessage::ServerMsg { text } | ServerMessage::ServerMsgBox { text } => {
             vec![Delta::ServerMessage { text }]
         }
+        ServerMessage::ChannelInfo {
+            name,
+            user_count,
+            topic,
+        } => {
+            state.channel_directory.push(DirChannel {
+                name,
+                user_count,
+                topic,
+            });
+            vec![]
+        }
+        ServerMessage::EndOfChannels => vec![Delta::ChannelListReceived],
         // Messages carrying no state change / handled by the login machine.
         ServerMessage::TasServer { .. }
         | ServerMessage::Motd { .. }
@@ -545,6 +560,12 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
 /// Clock-free convenience wrapper (timestamps stamped as 0). Used by tests.
 pub fn reduce(state: &mut LobbyState, msg: ServerMessage) -> Vec<Delta> {
     reduce_at(state, msg, 0)
+}
+
+/// Clear the channel directory ahead of a fresh `CHANNELS` request so stale
+/// entries don't linger while the new list streams in.
+pub fn begin_channel_list(state: &mut LobbyState) {
+    state.channel_directory.clear();
 }
 
 /// Append a chat message to a channel (creating it if needed) and emit a delta
@@ -793,6 +814,35 @@ mod tests {
         let d = reduce_at(&mut s, parse_line("SAIDPRIVATE me hello"), 1);
         assert!(d.is_empty());
         assert!(!s.dms.contains_key("me"));
+    }
+
+    #[test]
+    fn channel_directory_accumulates_then_completes() {
+        let mut s = LobbyState::new();
+        begin_channel_list(&mut s);
+        reduce(&mut s, parse_line("CHANNEL main 42 Welcome to main"));
+        reduce(&mut s, parse_line("CHANNEL newbies 7"));
+        let d = reduce(&mut s, parse_line("ENDOFCHANNELS"));
+        assert_eq!(d, vec![Delta::ChannelListReceived]);
+        assert_eq!(s.channel_directory.len(), 2);
+        assert_eq!(s.channel_directory[0].name, "main");
+        assert_eq!(s.channel_directory[0].user_count, 42);
+        assert_eq!(
+            s.channel_directory[0].topic.as_deref(),
+            Some("Welcome to main")
+        );
+        assert_eq!(s.channel_directory[1].name, "newbies");
+        assert_eq!(s.channel_directory[1].user_count, 7);
+        assert_eq!(s.channel_directory[1].topic, None);
+    }
+
+    #[test]
+    fn begin_channel_list_clears_previous() {
+        let mut s = LobbyState::new();
+        begin_channel_list(&mut s);
+        reduce(&mut s, parse_line("CHANNEL a 1"));
+        begin_channel_list(&mut s);
+        assert!(s.channel_directory.is_empty());
     }
 
     #[test]

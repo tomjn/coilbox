@@ -75,6 +75,14 @@ pub enum ServerMessage {
     },
     /// `CHANNELMESSAGE <channel> <text>`
     ChannelMessage { channel: String, text: String },
+    /// `CHANNEL <name> <usercount> [topic]`
+    ChannelInfo {
+        name: String,
+        user_count: u32,
+        topic: Option<String>,
+    },
+    /// `ENDOFCHANNELS`
+    EndOfChannels,
     /// `JOINFAILED <reason>`
     JoinFailed { reason: String },
     /// `SAID <channel> <username> <msg>`
@@ -354,6 +362,22 @@ pub fn parse_line(line: &str) -> ServerMessage {
             },
             None => ServerMessage::Unknown { raw: raw() },
         },
+        "CHANNEL" => match fields::<3>(rest) {
+            Some([name, count, topic]) => ServerMessage::ChannelInfo {
+                name: name.to_string(),
+                user_count: count.trim().parse().unwrap_or(0),
+                topic: (!topic.is_empty()).then(|| topic.to_string()),
+            },
+            None => match fields::<2>(rest) {
+                Some([name, count]) => ServerMessage::ChannelInfo {
+                    name: name.to_string(),
+                    user_count: count.trim().parse().unwrap_or(0),
+                    topic: None,
+                },
+                None => ServerMessage::Unknown { raw: raw() },
+            },
+        },
+        "ENDOFCHANNELS" => ServerMessage::EndOfChannels,
         "JOINFAILED" => ServerMessage::JoinFailed {
             reason: rest.to_string(),
         },
