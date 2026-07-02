@@ -711,6 +711,48 @@
           "markdownDescription": "Denies the dl_versions command without any pre-configured scope."
         },
         {
+          "description": "Allows storing, reading and deleting lobby login secrets in the OS keychain.\n#### This default permission set includes:\n\n- `allow-ls-store-credential`\n- `allow-ls-get-credential`\n- `allow-ls-delete-credential`",
+          "type": "string",
+          "const": "coilbox-lobby-servers:default",
+          "markdownDescription": "Allows storing, reading and deleting lobby login secrets in the OS keychain.\n#### This default permission set includes:\n\n- `allow-ls-store-credential`\n- `allow-ls-get-credential`\n- `allow-ls-delete-credential`"
+        },
+        {
+          "description": "Enables the ls_delete_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:allow-ls-delete-credential",
+          "markdownDescription": "Enables the ls_delete_credential command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the ls_get_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:allow-ls-get-credential",
+          "markdownDescription": "Enables the ls_get_credential command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the ls_store_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:allow-ls-store-credential",
+          "markdownDescription": "Enables the ls_store_credential command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the ls_delete_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:deny-ls-delete-credential",
+          "markdownDescription": "Denies the ls_delete_credential command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the ls_get_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:deny-ls-get-credential",
+          "markdownDescription": "Denies the ls_get_credential command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the ls_store_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:deny-ls-store-credential",
+          "markdownDescription": "Denies the ls_store_credential command without any pre-configured scope."
+        },
+        {
           "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
           "type": "string",
           "const": "coilbox-mapconv:default",
@@ -847,6 +889,48 @@
           "type": "string",
           "const": "coilbox-mapconv:deny-mc-suggest-sources",
           "markdownDescription": "Denies the mc_suggest_sources command without any pre-configured scope."
+        },
+        {
+          "description": "Allows the multiplayer lobby client's connect, disconnect and state-snapshot commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-disconnect`\n- `allow-mp-snapshot`",
+          "type": "string",
+          "const": "coilbox-multiplayer:default",
+          "markdownDescription": "Allows the multiplayer lobby client's connect, disconnect and state-snapshot commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-disconnect`\n- `allow-mp-snapshot`"
+        },
+        {
+          "description": "Enables the mp_connect command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-connect",
+          "markdownDescription": "Enables the mp_connect command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_disconnect command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-disconnect",
+          "markdownDescription": "Enables the mp_disconnect command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_snapshot command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-snapshot",
+          "markdownDescription": "Enables the mp_snapshot command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_connect command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-connect",
+          "markdownDescription": "Denies the mp_connect command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_disconnect command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-disconnect",
+          "markdownDescription": "Denies the mp_disconnect command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_snapshot command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-snapshot",
+          "markdownDescription": "Denies the mp_snapshot command without any pre-configured scope."
         },
         {
           "description": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-launch`\n- `allow-play-launch-replay`\n- `allow-play-cancel`",

@@ -1,0 +1,9 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows storing, reading and deleting lobby login secrets in the OS keychain."
+permissions = [
+  "allow-ls-store-credential",
+  "allow-ls-get-credential",
+  "allow-ls-delete-credential",
+]

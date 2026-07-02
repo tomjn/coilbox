@@ -1,0 +1,9 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows the multiplayer lobby client's connect, disconnect and state-snapshot commands."
+permissions = [
+  "allow-mp-connect",
+  "allow-mp-disconnect",
+  "allow-mp-snapshot",
+]

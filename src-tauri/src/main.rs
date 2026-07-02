@@ -89,6 +89,8 @@ fn main() {
     builder = builder.plugin(tauri_plugin_coilbox_content::init());
     builder = builder.plugin(tauri_plugin_coilbox_unitsync::init());
     builder = builder.plugin(tauri_plugin_coilbox_play::init());
+    builder = builder.plugin(tauri_plugin_coilbox_lobby_servers::init());
+    builder = builder.plugin(tauri_plugin_coilbox_multiplayer::init());
     // picoframe:plugins-end
 
     // Dev-only: expose an MCP socket server so AI agents can drive the app
