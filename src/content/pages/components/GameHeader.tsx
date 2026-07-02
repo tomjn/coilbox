@@ -37,7 +37,7 @@ export function GameHeader({
   const artUrl = brandBanner ?? headers.get(game.name);
 
   return (
-    <header className="relative -mx-4 -mt-4 h-48 w-full overflow-hidden">
+    <header className="relative -mx-4 -mt-4 h-48 overflow-hidden">
       {/* Base + art layers (deterministic gradient, then loading-screen image). */}
       <GameArt
         name={game.name}
