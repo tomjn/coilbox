@@ -1,7 +1,7 @@
 //! JSON output shapes. Serialized camelCase so the Tauri plugin can pass them
 //! straight through to the frontend (matching the rest of coilbox).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// One selectable item of a `list`-typed option.
@@ -220,6 +220,35 @@ pub struct GameInfoOutput {
     /// not during the enumeration scan.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checksum: Option<String>,
+    pub errors: Vec<String>,
+}
+
+/// One resolved start unit: its human-friendly name (from the unitdef `name`
+/// field) and its build-icon `data:` URL. Either may be absent. Also the on-disk
+/// cache record (round-tripped as JSON), so it derives Deserialize too.
+#[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitDisplay {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub icon: Option<String>,
+}
+
+impl UnitDisplay {
+    /// Nothing resolved — no name and no icon.
+    pub fn is_empty(&self) -> bool {
+        self.name.is_none() && self.icon.is_none()
+    }
+}
+
+/// Output of `--unit-buildpics`: a map of unit internal name -> its display info
+/// (friendly name + build icon), for the units that resolved. Units with nothing
+/// usable are absent (and still cached on disk so re-runs skip them).
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitBuildpicsOutput {
+    pub units: std::collections::BTreeMap<String, UnitDisplay>,
     pub errors: Vec<String>,
 }
 

@@ -25,6 +25,7 @@ import {
   type ReplayFile,
   type ScanResult,
   type StartPos,
+  type UnitBuildpicsResult,
   unitsyncArchiveFile,
   unitsyncArchiveTree,
   unitsyncCancel,
@@ -37,6 +38,7 @@ import {
   unitsyncMinimap,
   unitsyncScan,
   unitsyncThumbnails,
+  unitsyncUnitBuildpics,
 } from "./bindings";
 import { newestEngineId } from "./engineVersion";
 
@@ -440,6 +442,55 @@ export function useUnitsyncGameInfo(
   }, [enginePath, dataDir, gameArchive]);
 
   return { info, loading };
+}
+
+/** Session cache of unit build icons, keyed by dataDir::engine::game::units. */
+const buildpicsCache = new Map<string, UnitBuildpicsResult>();
+
+/** Lazily resolve build icons for a game's start units. */
+export function useUnitsyncUnitBuildpics(
+  enginePath?: string,
+  dataDir?: string,
+  gameArchive?: string,
+  units?: string[],
+) {
+  const [data, setData] = useState<UnitBuildpicsResult | null>(null);
+  // Stable, order-independent key for the requested unit set. The effect derives
+  // the unit list back from this string so it depends only on stable values
+  // (arrays are unstable references that would refetch every render).
+  const unitsKey = (units ?? []).slice().sort().join(",");
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !gameArchive || unitsKey === "") {
+      setData(null);
+      return;
+    }
+    const unitList = unitsKey.split(",");
+    const key = `${dataDir}::${enginePath}::${gameArchive}::${unitsKey}`;
+    const cached = buildpicsCache.get(key);
+    if (cached) {
+      setData(cached);
+      return;
+    }
+    let cancelled = false;
+    unitsyncUnitBuildpics({
+      enginePath,
+      dataDir,
+      gameArchive,
+      units: unitList,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        buildpicsCache.set(key, res);
+        setData(res);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, gameArchive, unitsKey]);
+
+  return data;
 }
 
 /** Session cache of map info, keyed by `dataDir::enginePath::mapName`. */

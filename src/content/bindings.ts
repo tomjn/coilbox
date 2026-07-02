@@ -312,6 +312,34 @@ export const unitsyncGameInfo = defineCommand<
   GameInfoResult
 >("coilbox-unitsync", "unitsync_game_info");
 
+/** One resolved start unit: its friendly name and/or build-icon `data:` URL. */
+export interface UnitDisplay {
+  /** Human-friendly name from the unitdef `name` field, when present. */
+  name?: string;
+  /** Build-icon `data:` URL, when a texture resolved. */
+  icon?: string;
+}
+
+export interface UnitBuildpicsResult {
+  /** Unit internal name -> its display info, for units that resolved. */
+  units: Record<string, UnitDisplay>;
+  errors: string[];
+}
+
+/**
+ * Resolve build icons for a game's start units — lazy, since it mounts the game's
+ * archive set. `gameArchive` is the primary archive; `units` are internal names.
+ */
+export const unitsyncUnitBuildpics = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    gameArchive: string;
+    units: string[];
+  },
+  UnitBuildpicsResult
+>("coilbox-unitsync", "unitsync_unit_buildpics");
+
 export interface MapInfoResult {
   options: ConfigOption[];
   checksum?: string;

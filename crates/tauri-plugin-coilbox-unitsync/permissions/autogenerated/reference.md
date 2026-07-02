@@ -9,6 +9,7 @@ Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-i
 - `allow-unitsync-heightmap`
 - `allow-unitsync-thumbnails`
 - `allow-unitsync-game-info`
+- `allow-unitsync-unit-buildpics`
 - `allow-unitsync-map-info`
 - `allow-unitsync-skirmish-ais`
 - `allow-unitsync-engine-config`
@@ -388,6 +389,32 @@ Enables the unitsync_thumbnails command without any pre-configured scope.
 <td>
 
 Denies the unitsync_thumbnails command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-unit-buildpics`
+
+</td>
+<td>
+
+Enables the unitsync_unit_buildpics command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-unit-buildpics`
+
+</td>
+<td>
+
+Denies the unitsync_unit_buildpics command without any pre-configured scope.
 
 </td>
 </tr>

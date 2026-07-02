@@ -15,7 +15,7 @@ use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
     build_config_args, build_game_args, build_game_headers_args, build_heightmap_args,
     build_lua_args, build_map_info_args, build_minimap_args, build_skirmish_ai_args,
-    build_thumbnails_args, find_unitsync, resolve_sidecar,
+    build_thumbnails_args, build_unit_buildpics_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -70,6 +70,9 @@ const THUMB_CACHE_SUBDIR: &str = "coilbox-unitsync-thumbs";
 /// Subdirectory of the app cache dir holding resolved game-header `data:` URLs.
 const HEADER_CACHE_SUBDIR: &str = "coilbox-unitsync-headers";
 
+/// Subdirectory of the app cache dir holding resolved unit build-icon `data:` URLs.
+const BUILDPIC_CACHE_SUBDIR: &str = "coilbox-unitsync-buildpics";
+
 /// The on-disk PNG cache directory for minimaps/thumbnails, under the app cache
 /// dir. `None` when the platform can't resolve a cache dir — caching is then
 /// simply skipped (same pattern as the mapconv plugin's thumbnail cache).
@@ -87,6 +90,15 @@ fn header_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
         .app_cache_dir()
         .ok()
         .map(|d| d.join(HEADER_CACHE_SUBDIR))
+}
+
+/// The on-disk unit build-icon cache directory, under the app cache dir. `None`
+/// when the platform can't resolve a cache dir (caching is then skipped).
+fn buildpic_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    app.path()
+        .app_cache_dir()
+        .ok()
+        .map(|d| d.join(BUILDPIC_CACHE_SUBDIR))
 }
 
 /// The platform's shared-library search variable.
@@ -384,6 +396,34 @@ async fn unitsync_game_info(
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "game info", None).await)
 }
 
+/// `unitsync_unit_buildpics` — resolve build icons for a game's start units in one
+/// session. `game_archive` is the game's primary archive; `units` are the units'
+/// internal names (e.g. `armcom`). Disk-cached under the app cache dir, keyed on
+/// cheap file identity. Returns `{ buildpics: { name: dataUrl }, errors }`.
+#[tauri::command]
+async fn unitsync_unit_buildpics<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    game_archive: String,
+    units: Vec<String>,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let cache_dir = buildpic_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_unit_buildpics_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &game_archive,
+        &units,
+        cache_dir.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit buildpics", None).await)
+}
+
 /// `unitsync_map_info` — load one map's archive set to read its options + any
 /// attributed diagnostics. Fetched on demand (mounts the map), not during scan.
 #[tauri::command]
@@ -569,6 +609,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_heightmap,
             unitsync_thumbnails,
             unitsync_game_info,
+            unitsync_unit_buildpics,
             unitsync_map_info,
             unitsync_skirmish_ais,
             unitsync_engine_config,
