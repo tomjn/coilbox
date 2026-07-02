@@ -95,7 +95,7 @@ pub fn tree(lib: &str, archive_name: &str) -> ArchiveTreeOutput {
 /// backing archive among the raw map archives — the only unitsync-API route from
 /// a versioned name to an openable file. (Display-name *dependencies* that are
 /// neither a map nor a filename, e.g. "Map Helper v1", stay unresolved.)
-fn resolve_open_path(us: &Unitsync, name: &str) -> Option<String> {
+pub(crate) fn resolve_open_path(us: &Unitsync, name: &str) -> Option<String> {
     if let Some(dir) = us.archive_path(name) {
         return Some(Path::new(&dir).join(name).to_string_lossy().into_owned());
     }

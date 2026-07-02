@@ -14,6 +14,7 @@
 //! Usage: `coilbox-unitsync-worker --lib <libunitsync.*> --datadir <content-root>`
 
 mod archive;
+mod buildpic;
 mod config;
 mod ffi;
 mod game;
