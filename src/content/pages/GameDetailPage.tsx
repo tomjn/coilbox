@@ -13,6 +13,7 @@ import { isSdd } from "../format";
 import { usePlayGame } from "../usePlayGame";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { BrandingLinks } from "./components/BrandingLinks";
+import { BrandingScreenshots } from "./components/BrandingScreenshots";
 import { GameHeader } from "./components/GameHeader";
 import { OptionsList } from "./components/OptionsList";
 import {
@@ -94,6 +95,9 @@ export default function GameDetailPage() {
       </div>
 
       {brand && <BrandingLinks entry={brand} />}
+      {brand?.screenshots?.length ? (
+        <BrandingScreenshots shots={brand.screenshots} />
+      ) : null}
 
       {game.warnings?.length ? (
         <WarningBanner warnings={game.warnings} noun="game" />
