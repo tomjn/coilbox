@@ -26,6 +26,11 @@ image = { version = "0.25", default-features = false, features = [
     "bmp",
     "gif",
 ] }
+# DDS (DirectDraw Surface) decode for unit build pics, which are frequently
+# DXT/BCn-compressed. ddsfile parses the container + format; texpresso does the
+# pure-Rust BC1/2/3 block decompress. Decode-only — no C toolchain.
+ddsfile = "0.6"
+texpresso = "2"
 base64 = "0.22"
 # Shared dependency-free on-disk byte cache: persist rendered minimap PNGs so they
 # aren't re-rendered every launch.
