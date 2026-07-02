@@ -312,9 +312,17 @@ export const unitsyncGameInfo = defineCommand<
   GameInfoResult
 >("coilbox-unitsync", "unitsync_game_info");
 
+/** One resolved start unit: its friendly name and/or build-icon `data:` URL. */
+export interface UnitDisplay {
+  /** Human-friendly name from the unitdef `name` field, when present. */
+  name?: string;
+  /** Build-icon `data:` URL, when a texture resolved. */
+  icon?: string;
+}
+
 export interface UnitBuildpicsResult {
-  /** Unit internal name -> build-icon `data:` URL, for units that resolved. */
-  buildpics: Record<string, string>;
+  /** Unit internal name -> its display info, for units that resolved. */
+  units: Record<string, UnitDisplay>;
   errors: string[];
 }
 

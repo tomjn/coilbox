@@ -8,12 +8,12 @@
 //! header cache.
 
 use crate::ffi::Unitsync;
-use crate::model::UnitBuildpicsOutput;
+use crate::model::{UnitBuildpicsOutput, UnitDisplay};
 use std::path::Path;
 
 /// Salts the buildpic cache key, independent of the header cache so this cache can
-/// be invalidated on its own. Bump when the icon encoding changes.
-const BUILDPIC_CACHE_VERSION: u32 = 1;
+/// be invalidated on its own. Bump when the icon encoding or cache format changes.
+const BUILDPIC_CACHE_VERSION: u32 = 2;
 
 /// Read up to this many bytes of a candidate texture before decoding (build pics
 /// are tiny; this is a generous safety bound).
@@ -22,10 +22,20 @@ const BUILDPIC_READ_CAP: usize = 8 * 1024 * 1024;
 /// Extensions tried under `unitpics/`, in the engine's resolution order.
 const BUILDPIC_EXTS: &[&str] = &["dds", "png", "tga", "bmp"];
 
-/// Build the Lua script run through the parser. It reads each requested unit's
-/// `buildpic` field from `units/<name>.lua` (keyed by unit name inside the file),
-/// and returns a flat `name\tbuildpic` string in the `result` field that
-/// `run_lua_source` reads back. Empty buildpic => fall back to the name convention.
+/// A unit's fields read from its unitdef: the `buildpic` filename (may be empty)
+/// and the human-friendly `name` (may be empty).
+#[derive(Default, Clone)]
+struct UnitFields {
+    buildpic: String,
+    name: String,
+}
+
+/// Build the Lua script run through the parser. For each requested unit it reads
+/// its unitdef from `units/<name>.lua` (keyed by unit name inside the file) and
+/// pulls out the `buildpic` filename and the human-friendly `name`, returning a
+/// flat `unit\tbuildpic\tname` string (one line per unit) in the `result` field
+/// that `run_lua_source` reads back. Empty buildpic => fall back to the name
+/// convention; empty name => fall back to the engine's start-unit name.
 fn build_buildpic_script(units: &[String]) -> String {
     // Unit internal names are alnum/underscore, so a single-quoted key is safe.
     let want: String = units
@@ -38,6 +48,7 @@ local want = {{ {want} }}
 local parts = {{}}
 for name in pairs(want) do
   local bp = ''
+  local nm = ''
   local ok, def = pcall(VFS.Include, 'units/'..name..'.lua')
   if ok and type(def) == 'table' then
     local ud = def[name]
@@ -46,21 +57,28 @@ for name in pairs(want) do
         if type(v) == 'table' and string.lower(k) == name then ud = v break end
       end
     end
-    if type(ud) == 'table' and type(ud.buildpic) == 'string' then bp = ud.buildpic end
+    if type(ud) == 'table' then
+      if type(ud.buildpic) == 'string' then bp = ud.buildpic end
+      if type(ud.name) == 'string' then nm = ud.name end
+    end
   end
-  parts[#parts + 1] = name .. '\t' .. bp
+  parts[#parts + 1] = name .. '\t' .. bp .. '\t' .. nm
 end
 return {{ result = table.concat(parts, '\n') }}
 "#
     )
 }
 
-/// Parse the `name\tbuildpic` lines the Lua script returns into a map.
-fn parse_buildpic_result(raw: &str) -> std::collections::HashMap<String, String> {
+/// Parse the `unit\tbuildpic\tname` lines the Lua script returns into a map keyed
+/// by unit name. A missing third field (older-style lines) parses as an empty name.
+fn parse_buildpic_result(raw: &str) -> std::collections::HashMap<String, UnitFields> {
     raw.lines()
         .filter_map(|line| {
-            let (name, bp) = line.split_once('\t')?;
-            Some((name.to_string(), bp.to_string()))
+            let mut it = line.split('\t');
+            let unit = it.next()?;
+            let buildpic = it.next().unwrap_or("").to_string();
+            let name = it.next().unwrap_or("").to_string();
+            Some((unit.to_string(), UnitFields { buildpic, name }))
         })
         .collect()
 }
@@ -106,7 +124,7 @@ pub fn render(
     units: &[String],
     cache_dir: Option<&Path>,
 ) -> UnitBuildpicsOutput {
-    let mut buildpics = std::collections::BTreeMap::new();
+    let mut resolved = std::collections::BTreeMap::new();
     let mut errors = Vec::new();
 
     let us = match unsafe { Unitsync::load(Path::new(lib)) } {
@@ -128,13 +146,9 @@ pub fn render(
     let mut misses: Vec<String> = Vec::new();
     for unit in units {
         if let Some((dir, base)) = cache {
-            match read_cache(dir, base, unit) {
-                Some(Some(url)) => {
-                    buildpics.insert(unit.clone(), url);
-                    continue;
-                }
-                Some(None) => continue, // negative cache: no icon
-                None => {}
+            if let Some(display) = read_cache(dir, base, unit) {
+                collect_display(&mut resolved, unit, display);
+                continue;
             }
         }
         misses.push(unit.clone());
@@ -142,17 +156,23 @@ pub fn render(
 
     if misses.is_empty() {
         us.uninit();
-        return UnitBuildpicsOutput { buildpics, errors };
+        return UnitBuildpicsOutput {
+            units: resolved,
+            errors,
+        };
     }
 
     if !us.add_all_archives(game_archive) {
         errors.push("this engine's libunitsync can't load game archives".into());
         us.uninit();
-        return UnitBuildpicsOutput { buildpics, errors };
+        return UnitBuildpicsOutput {
+            units: resolved,
+            errors,
+        };
     }
     errors.extend(us.drain_errors());
 
-    // One Lua pass reads the explicit `buildpic` fields for the miss units.
+    // One Lua pass reads each miss unit's `buildpic` filename + human name.
     let script = build_buildpic_script(&misses);
     let fields = match us.run_lua_source(&script, "rmMbe") {
         Ok(raw) => parse_buildpic_result(&raw),
@@ -176,23 +196,27 @@ pub fn render(
                 .map(|(path, _)| (path.to_lowercase(), path))
                 .collect();
             for unit in &misses {
-                let bp = fields
+                let uf = fields
                     .get(&unit.to_lowercase())
                     .cloned()
                     .unwrap_or_default();
-                let url = candidate_members(unit, &bp).into_iter().find_map(|cand| {
-                    let actual = list
-                        .iter()
-                        .find(|(lower, _)| *lower == cand.to_lowercase())
-                        .map(|(_, real)| real.clone())?;
-                    read_and_encode(&us, handle, &actual)
-                });
+                let icon = candidate_members(unit, &uf.buildpic)
+                    .into_iter()
+                    .find_map(|cand| {
+                        let actual = list
+                            .iter()
+                            .find(|(lower, _)| *lower == cand.to_lowercase())
+                            .map(|(_, real)| real.clone())?;
+                        read_and_encode(&us, handle, &actual)
+                    });
+                let display = UnitDisplay {
+                    name: Some(uf.name).filter(|s| !s.is_empty()),
+                    icon,
+                };
                 if let Some((dir, base)) = cache {
-                    write_cache(dir, base, unit, url.as_deref());
+                    write_cache(dir, base, unit, &display);
                 }
-                if let Some(url) = url {
-                    buildpics.insert(unit.clone(), url);
-                }
+                collect_display(&mut resolved, unit, display);
             }
             us.close_archive(handle);
             true
@@ -207,7 +231,10 @@ pub fn render(
     us.remove_all_archives();
     us.uninit();
 
-    UnitBuildpicsOutput { buildpics, errors }
+    UnitBuildpicsOutput {
+        units: resolved,
+        errors,
+    }
 }
 
 /// Read one member (capped) and decode+encode it as a build-icon PNG data URL.
@@ -242,6 +269,18 @@ fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String> {
     Some(format!("{:016x}", h.finish()))
 }
 
+/// Insert a resolved record into the output map, skipping fully-empty ones (the UI
+/// falls back to the engine start-unit name for those).
+fn collect_display(
+    map: &mut std::collections::BTreeMap<String, UnitDisplay>,
+    unit: &str,
+    display: UnitDisplay,
+) {
+    if !display.is_empty() {
+        map.insert(unit.to_string(), display);
+    }
+}
+
 /// Per-unit cache file stem: `<gamekey>_<sanitized-unit>`.
 fn unit_stem(base: &str, unit: &str) -> String {
     let safe: String = unit
@@ -251,29 +290,23 @@ fn unit_stem(base: &str, unit: &str) -> String {
     format!("{base}_{safe}")
 }
 
-/// `Some(Some(url))` = cached icon; `Some(None)` = negative cache; `None` = miss.
-fn read_cache(dir: &Path, base: &str, unit: &str) -> Option<Option<String>> {
-    let stem = unit_stem(base, unit);
-    if let Ok(url) = std::fs::read_to_string(dir.join(format!("{stem}.dataurl"))) {
-        return Some(Some(url));
-    }
-    if dir.join(format!("{stem}.none")).exists() {
-        return Some(None);
-    }
-    None
+/// Read a unit's cached record. `Some(display)` = resolved (the display may be
+/// empty, i.e. "resolved to nothing" — still a hit that skips the mount); `None` =
+/// cache miss. Present-but-unparseable files are treated as misses.
+fn read_cache(dir: &Path, base: &str, unit: &str) -> Option<UnitDisplay> {
+    let path = dir.join(format!("{}.json", unit_stem(base, unit)));
+    let raw = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&raw).ok()
 }
 
-/// Best-effort cache write: `.dataurl` for a hit, `.none` marker for no icon.
-fn write_cache(dir: &Path, base: &str, unit: &str, url: Option<&str>) {
+/// Best-effort cache write of the resolved record as JSON. An empty record is
+/// still written so a re-run doesn't re-mount the archive for a unit we already
+/// know has nothing.
+fn write_cache(dir: &Path, base: &str, unit: &str, display: &UnitDisplay) {
     let _ = std::fs::create_dir_all(dir);
-    let stem = unit_stem(base, unit);
-    match url {
-        Some(u) => {
-            let _ = std::fs::write(dir.join(format!("{stem}.dataurl")), u);
-        }
-        None => {
-            let _ = std::fs::write(dir.join(format!("{stem}.none")), b"");
-        }
+    let path = dir.join(format!("{}.json", unit_stem(base, unit)));
+    if let Ok(json) = serde_json::to_string(display) {
+        let _ = std::fs::write(path, json);
     }
 }
 
@@ -292,12 +325,21 @@ mod tests {
 
     #[test]
     fn parses_tab_separated_buildpic_result() {
-        let got = parse_buildpic_result("armcom\tunitpics/armcom.dds\ncorcom\t\n");
-        assert_eq!(
-            got.get("armcom").map(String::as_str),
-            Some("unitpics/armcom.dds")
-        );
-        assert_eq!(got.get("corcom").map(String::as_str), Some(""));
+        let got =
+            parse_buildpic_result("armcom\tunitpics/armcom.dds\tArmada Commander\ncorcom\t\t\n");
+        let arm = got.get("armcom").expect("armcom present");
+        assert_eq!(arm.buildpic, "unitpics/armcom.dds");
+        assert_eq!(arm.name, "Armada Commander");
+        let cor = got.get("corcom").expect("corcom present");
+        assert_eq!(cor.buildpic, "");
+        assert_eq!(cor.name, "");
+    }
+
+    #[test]
+    fn build_script_reads_buildpic_and_name_fields() {
+        let s = build_buildpic_script(&["armcom".into()]);
+        assert!(s.contains("ud.buildpic"));
+        assert!(s.contains("ud.name"));
     }
 
     #[test]

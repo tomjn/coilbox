@@ -150,28 +150,39 @@ export default function GameDetailPage() {
             <div className="h-12 animate-pulse rounded-lg border border-border/50 bg-card" />
           ) : (
             <ul className="flex flex-col gap-2">
-              {gameInfo?.sides.map((s) => (
-                <li
-                  key={s.name}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-card p-3"
-                >
-                  <div className="flex items-center gap-2">
-                    {s.startUnit && buildpics?.buildpics[s.startUnit] && (
-                      <img
-                        src={buildpics.buildpics[s.startUnit]}
-                        alt=""
-                        className="h-8 w-8 shrink-0 rounded object-contain"
-                      />
+              {gameInfo?.sides.map((s) => {
+                const icon = s.startUnit
+                  ? buildpics?.units[s.startUnit]?.icon
+                  : undefined;
+                // Prefer the unitdef's human name; fall back to the engine's
+                // start-unit name, then the internal id.
+                const unitLabel =
+                  (s.startUnit && buildpics?.units[s.startUnit]?.name) ||
+                  s.startUnitName ||
+                  s.startUnit;
+                return (
+                  <li
+                    key={s.name}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-card p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      {icon && (
+                        <img
+                          src={icon}
+                          alt=""
+                          className="h-16 w-16 shrink-0 rounded object-contain"
+                        />
+                      )}
+                      <span className="font-medium">{s.name}</span>
+                    </div>
+                    {unitLabel && (
+                      <span className="text-xs text-muted-foreground">
+                        {unitLabel}
+                      </span>
                     )}
-                    <span className="font-medium">{s.name}</span>
-                  </div>
-                  {(s.startUnitName || s.startUnit) && (
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {s.startUnitName ?? s.startUnit}
-                    </span>
-                  )}
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
