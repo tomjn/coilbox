@@ -3,6 +3,7 @@ import { ArrowLeft, Play } from "lucide-react";
 import { Link } from "react-router";
 import { versionLabel } from "@/lib/utils";
 import type { GameItem } from "../../bindings";
+import { useBrandingEntry, useBrandingImage } from "../../branding";
 import { useUnitsyncGameHeaders } from "../../config";
 import { isSdd } from "../../format";
 import { GameArt } from "./GameArt";
@@ -30,7 +31,11 @@ export function GameHeader({
   // some engine builds don't expose), so the banner resolves whenever the grid
   // does — and shows the identical image.
   const { headers } = useUnitsyncGameHeaders(enginePath, dataDir);
-  const artUrl = headers.get(game.name);
+  const brand = useBrandingEntry(game);
+  const brandBanner = useBrandingImage(brand?.banner);
+  const brandLogo = useBrandingImage(brand?.logo);
+  // Catalog art wins; the game's own loading-screen art is the fallback.
+  const artUrl = brandBanner ?? headers.get(game.name);
 
   return (
     <header className="relative -mx-4 -mt-4 h-48 w-full overflow-hidden">
@@ -56,8 +61,16 @@ export function GameHeader({
       <div className="absolute inset-x-4 bottom-3 flex items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex items-center gap-2">
+            {brandLogo && (
+              <img
+                src={brandLogo}
+                alt=""
+                aria-hidden
+                className="h-7 w-auto shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+              />
+            )}
             <h1 className="break-words text-lg font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
-              {game.name}
+              {brand?.title ?? game.name}
             </h1>
             {isSdd(game.primaryArchive) && <SddBadge />}
           </div>
