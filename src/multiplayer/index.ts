@@ -1,5 +1,5 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Swords } from "lucide-react";
+import { MessagesSquare, Swords } from "lucide-react";
 import { MultiplayerProvider } from "./store";
 
 /**
@@ -26,6 +26,14 @@ const multiplayerPlugin: FramePlugin = {
           order: 0,
           icon: Swords,
         },
+        {
+          id: "multiplayer.chat",
+          label: "Chat",
+          to: "/chat",
+          end: true,
+          order: 1,
+          icon: MessagesSquare,
+        },
       ],
     },
   ],
@@ -34,6 +42,11 @@ const multiplayerPlugin: FramePlugin = {
       path: "lobby",
       lazy: () => import("./pages/LobbyPage"),
       crumb: "Lobby",
+    },
+    {
+      path: "chat",
+      lazy: () => import("./pages/ChatPage"),
+      crumb: "Chat",
     },
   ],
   // App-level: the live connection + its state mirror must outlive the Lobby route
