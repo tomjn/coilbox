@@ -10,6 +10,7 @@
 //! file exposes the Tauri commands over that registry.
 
 mod conn;
+mod dmlog;
 mod tls;
 
 use std::collections::{BTreeMap, BTreeSet};
