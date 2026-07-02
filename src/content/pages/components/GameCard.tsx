@@ -44,7 +44,7 @@ export function GameCard({
       )}
       {/* Scrim: darken the bottom so the overlaid title/version stay legible. */}
       <div
-        className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"
+        className="absolute inset-0 bg-gradient-to-t from-white/80 via-white/20 to-transparent dark:from-black/80 dark:via-black/20"
         aria-hidden
       />
       {/* Hover wash: a subtle brighten so the card responds to the pointer. */}
@@ -64,7 +64,7 @@ export function GameCard({
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex items-center gap-1.5">
             <p
-              className="truncate text-sm font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+              className="truncate text-sm font-semibold text-foreground drop-shadow-[0_1px_3px_rgba(255,255,255,0.9)] dark:text-white dark:drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
               title={game.name}
             >
               {game.name}
@@ -75,17 +75,18 @@ export function GameCard({
             ) : null}
           </div>
           {game.info.version && (
-            <span className="text-xs text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+            <span className="text-xs text-foreground/90 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] dark:text-white/90 dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
               {versionLabel(game.info.version)}
             </span>
           )}
         </div>
         <Button
           size="sm"
-          className="pointer-events-auto relative z-10 shrink-0 gap-1.5"
+          aria-label="Play"
+          className="pointer-events-auto relative z-10 shrink-0"
           onClick={onPlay}
         >
-          <Play className="size-4" /> Play
+          <Play className="size-4" />
         </Button>
       </div>
     </div>

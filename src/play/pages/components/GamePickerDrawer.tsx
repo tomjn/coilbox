@@ -96,13 +96,13 @@ export function GamePickerDrawer({
                     alt={`${g.name} loading screen`}
                   />
                   <div
-                    className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"
+                    className="absolute inset-0 bg-gradient-to-t from-white/80 via-white/20 to-transparent dark:from-black/80 dark:via-black/20"
                     aria-hidden
                   />
                   <div className="absolute inset-x-2.5 bottom-2 flex flex-col gap-0.5">
                     <div className="flex items-center gap-1.5">
                       <span
-                        className="truncate text-xs font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                        className="truncate text-xs font-semibold text-foreground drop-shadow-[0_1px_3px_rgba(255,255,255,0.9)] dark:text-white dark:drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
                         title={g.name}
                       >
                         {g.name}
@@ -113,7 +113,7 @@ export function GamePickerDrawer({
                       ) : null}
                     </div>
                     {g.info.version && (
-                      <span className="text-[11px] text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+                      <span className="text-[11px] text-foreground/90 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] dark:text-white/90 dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                         {versionLabel(g.info.version)}
                       </span>
                     )}
