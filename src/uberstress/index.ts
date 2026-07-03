@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { History, Server, Zap } from "lucide-react";
+import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import UberstressSettings from "./pages/SettingsSection";
 
 /**
@@ -29,6 +30,7 @@ const uberstressPlugin: FramePlugin = {
           end: true,
           order: 0,
           icon: Zap,
+          useVisible: useAdvancedMode,
         },
         {
           id: "uberstress.history",
@@ -36,6 +38,7 @@ const uberstressPlugin: FramePlugin = {
           to: "/uberstress/history",
           order: 1,
           icon: History,
+          useVisible: useAdvancedMode,
         },
       ],
     },
@@ -43,12 +46,12 @@ const uberstressPlugin: FramePlugin = {
   routes: [
     {
       path: "uberstress",
-      lazy: () => import("./pages/RunPage"),
+      lazy: gateAdvanced(() => import("./pages/RunPage")),
       crumb: "uberstress",
     },
     {
       path: "uberstress/history",
-      lazy: () => import("./pages/HistoryPage"),
+      lazy: gateAdvanced(() => import("./pages/HistoryPage")),
       crumb: "History",
     },
   ],

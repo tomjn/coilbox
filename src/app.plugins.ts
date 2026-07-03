@@ -3,6 +3,7 @@ import animationPlugin from "./animation";
 import contentPlugin from "./content";
 // picoframe:imports-start
 import downloadsPlugin from "./downloads";
+import generalPlugin from "./general";
 import lobbyServersPlugin from "./lobby-servers";
 import mapconvPlugin from "./mapconv";
 import multiplayerPlugin from "./multiplayer";
@@ -24,5 +25,6 @@ export const plugins: FramePlugin[] = [
   lobbyServersPlugin,
   multiplayerPlugin,
   // picoframe:plugins-end
+  generalPlugin,
   updaterPlugin,
 ];

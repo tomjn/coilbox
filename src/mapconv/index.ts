@@ -7,6 +7,7 @@ import {
   Map as MapIcon,
   PackageOpen,
 } from "lucide-react";
+import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import MapconvSettings from "./pages/SettingsSection";
 
 /**
@@ -35,6 +36,7 @@ const mapconvPlugin: FramePlugin = {
           to: "/mapconv/projects",
           order: 0,
           icon: LayoutGrid,
+          useVisible: useAdvancedMode,
         },
         {
           id: "mapconv.compile",
@@ -43,6 +45,7 @@ const mapconvPlugin: FramePlugin = {
           end: true,
           order: 1,
           icon: Hammer,
+          useVisible: useAdvancedMode,
         },
         {
           id: "mapconv.decompile",
@@ -50,6 +53,7 @@ const mapconvPlugin: FramePlugin = {
           to: "/mapconv/decompile",
           order: 2,
           icon: PackageOpen,
+          useVisible: useAdvancedMode,
         },
         // External reference — home launcher only (sidebar: false), opened in
         // the system browser via the Tauri opener.
@@ -60,6 +64,7 @@ const mapconvPlugin: FramePlugin = {
           icon: BookOpen,
           sidebar: false,
           order: 3,
+          useVisible: useAdvancedMode,
         },
         {
           id: "mapconv.s3o-blender-tools",
@@ -68,6 +73,7 @@ const mapconvPlugin: FramePlugin = {
           icon: Code2,
           sidebar: false,
           order: 4,
+          useVisible: useAdvancedMode,
         },
       ],
     },
@@ -75,17 +81,17 @@ const mapconvPlugin: FramePlugin = {
   routes: [
     {
       path: "mapconv/projects",
-      lazy: () => import("./pages/ProjectsPage"),
+      lazy: gateAdvanced(() => import("./pages/ProjectsPage")),
       crumb: "Projects",
     },
     {
       path: "mapconv",
-      lazy: () => import("./pages/CompilePage"),
+      lazy: gateAdvanced(() => import("./pages/CompilePage")),
       crumb: "mapconv",
     },
     {
       path: "mapconv/decompile",
-      lazy: () => import("./pages/DecompilePage"),
+      lazy: gateAdvanced(() => import("./pages/DecompilePage")),
       crumb: "Decompile",
     },
   ],
