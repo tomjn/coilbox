@@ -1,12 +1,20 @@
 import { Button } from "@picoframe/frame";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Channel } from "@tauri-apps/api/core";
+import { AlertTriangle, Download, RefreshCw } from "lucide-react";
 import { useState } from "react";
+import type { DownloadProgress } from "@/downloads/bindings";
+import { useWriteRootPath } from "@/downloads/config";
+import { ProgressBar } from "@/downloads/pages/components/ProgressBar";
+import { errMessage } from "@/downloads/pages/components/states";
+import { downloadGameAnySource } from "./downloadGame";
 
 /**
- * Shown when the battle's game isn't installed locally. Game archives are hard to
- * resolve by name, so this points at the Downloads → Games page rather than
- * offering a direct download, plus a rescan for the already-on-disk case. (The
- * missing-map case is handled inline in the minimap box, see `MissingMapBox`.)
+ * Shown when the battle's game isn't installed locally. Downloads the game
+ * (rapid via pr-downloader, falling back to the springfiles catalog — see
+ * `downloadGameAnySource`) or rescans if it's already on disk. On success it
+ * calls `onRescan`, which re-scans and remounts the cards so the real game
+ * appears. (The missing-map case is handled inline in the minimap box, see
+ * `MissingMapBox`.)
  */
 export function MissingContentCard({
   gameName,
@@ -15,10 +23,32 @@ export function MissingContentCard({
   gameName: string;
   onRescan: () => Promise<void>;
 }) {
+  const writePath = useWriteRootPath();
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [rescanning, setRescanning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function downloadGame() {
+    setDownloading(true);
+    setProgress(null);
+    setError(null);
+    const onProgress = new Channel<DownloadProgress>();
+    onProgress.onmessage = (p) => setProgress(p);
+    try {
+      await downloadGameAnySource({ gameName, writePath, onProgress });
+      await onRescan();
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setDownloading(false);
+      setProgress(null);
+    }
+  }
 
   async function rescan() {
     setRescanning(true);
+    setError(null);
     try {
       await onRescan();
     } finally {
@@ -34,22 +64,30 @@ export function MissingContentCard({
       </div>
       <p className="text-sm">
         <span className="font-medium">{gameName}</span> isn't installed —
-        install it from <span className="font-medium">Downloads → Games</span>,
-        then rescan.
+        download it to join, or rescan if it's already on disk.
       </p>
-      <div>
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={rescanning}
-          onClick={rescan}
-        >
-          <RefreshCw
-            className={rescanning ? "size-4 animate-spin" : "size-4"}
-          />
-          {rescanning ? "Rescanning…" : "Rescan content"}
-        </Button>
-      </div>
+      {downloading && progress ? (
+        <ProgressBar progress={progress} />
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" disabled={downloading} onClick={downloadGame}>
+            <Download className="size-4" />
+            {downloading ? "Downloading…" : "Download"}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={rescanning || downloading}
+            onClick={rescan}
+          >
+            <RefreshCw
+              className={rescanning ? "size-4 animate-spin" : "size-4"}
+            />
+            {rescanning ? "Rescanning…" : "Rescan"}
+          </Button>
+        </div>
+      )}
+      {error && <span className="text-sm text-destructive">{error}</span>}
     </div>
   );
 }
