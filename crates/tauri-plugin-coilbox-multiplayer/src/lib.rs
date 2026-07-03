@@ -18,7 +18,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use coilbox_lobby_protocol::{
     command, password_hash, team_color_rgb, BattleStatus, ClientStatus, LobbyState, LoginConfig,
 };
-use conn::{spawn_connection, LobbyEvent, Outbound, Registry, ServerConn};
+use conn::{spawn_connection, LobbyEvent, Outbound, Registry};
 use picoframe_core::CliResult;
 use serde_json::{json, Value};
 use tauri::{
@@ -102,20 +102,50 @@ async fn mp_connect<R: Runtime>(
     Ok(CliResult::ok(json!({ "connected": true })))
 }
 
-/// `mp_disconnect` — best-effort `EXIT`, then abort the connection task and evict
-/// it. Aborting the task drops the socket, so this is idempotent for an
-/// already-dead connection.
+/// `mp_disconnect` — request a graceful logout: the connection task writes `EXIT`,
+/// flushes it, and exits (self-evicting). Evicting from the registry here as well
+/// makes it idempotent; the queued `Shutdown` still reaches the task's receiver.
 #[tauri::command]
 fn mp_disconnect(registry: State<'_, Registry>, server_key: String) -> CliResult {
     let conn = registry.lock().unwrap().remove(&server_key);
     match conn {
-        Some(ServerConn { tx, abort, .. }) => {
-            let _ = tx.send(Outbound::Line(command::exit(None)));
-            abort.abort();
+        Some(conn) => {
+            let _ = conn.tx.send(Outbound::Shutdown);
             CliResult::ok(json!({ "disconnected": true }))
         }
         None => CliResult::ok(json!({ "disconnected": false })),
     }
+}
+
+/// `mp_reattach` — after a webview reload the connect `Channel` is dead but the
+/// connection task keeps running. Swap in the fresh `Channel` and replay
+/// `Connected` + the current login phase so the frontend can re-adopt the live
+/// connection (it then pulls a snapshot to refill its mirror).
+#[tauri::command]
+fn mp_reattach(
+    registry: State<'_, Registry>,
+    server_key: String,
+    on_event: Channel<LobbyEvent>,
+) -> CliResult {
+    let map = registry.lock().unwrap();
+    match map.get(&server_key) {
+        Some(conn) => {
+            *conn.sink.lock().unwrap() = on_event.clone();
+            let _ = on_event.send(LobbyEvent::Connected);
+            let phase = *conn.phase.lock().unwrap();
+            let _ = on_event.send(LobbyEvent::Phase { phase });
+            CliResult::ok(json!({ "reattached": true }))
+        }
+        None => CliResult::err(format!("not connected: {server_key}")),
+    }
+}
+
+/// `mp_active_keys` — the server keys of all live connections, so the frontend can
+/// discover and re-adopt one after a reload.
+#[tauri::command]
+fn mp_active_keys(registry: State<'_, Registry>) -> CliResult {
+    let keys: Vec<String> = registry.lock().unwrap().keys().cloned().collect();
+    CliResult::ok(json!({ "keys": keys }))
 }
 
 /// `mp_snapshot` — clone and return the authoritative state for one connection so
@@ -587,6 +617,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             mp_connect,
             mp_disconnect,
+            mp_reattach,
+            mp_active_keys,
             mp_snapshot,
             mp_send,
             mp_say,

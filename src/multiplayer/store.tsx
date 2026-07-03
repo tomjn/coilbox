@@ -16,9 +16,11 @@ import {
   type LobbyEvent,
   type LobbyState,
   type LoginPhase,
+  mpActiveKeys,
   mpConnect,
   mpDisconnect,
   mpJoinChannel,
+  mpReattach,
   mpSnapshot,
 } from "./bindings";
 import { conversationCounts } from "./chat/conversation";
@@ -232,61 +234,71 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     }
   }, [activeKey, mirror.phase, joinedChannels]);
 
-  const connect = useCallback(async (server: LobbyServer) => {
-    if (!server.username) {
-      throw new Error(
-        "This server has no configured username (set one in Settings).",
-      );
-    }
-    setBusy(true);
-    const serverKey = `${server.username}@${server.host}:${server.port}`;
-    try {
-      const cred = await lsGetCredential({
-        serverId: server.id,
-        username: server.username,
-      });
-      if (!cred.secret) {
+  // Build the event Channel for a connection and wire it to the mirror. Shared by
+  // `connect` and the reload-rehydrate path so both handle events identically. The
+  // Rust side evicts the connection on any teardown (socket close, or a rejected
+  // login), so a `disconnected` event clears the active key to return the UI to the
+  // connect screen while keeping the reason.
+  const openChannel = useCallback((serverKey: string) => {
+    const onEvent = new Channel<LobbyEvent>();
+    onEvent.onmessage = (ev) => {
+      dispatch({ type: "event", ev });
+      if (ev.kind === "delta") {
+        mpSnapshot({ serverKey })
+          .then((r) => dispatch({ type: "snapshot", state: r.state }))
+          .catch(() => {});
+      }
+      if (ev.kind === "disconnected") {
+        setActiveKey(null);
+      }
+    };
+    return onEvent;
+  }, []);
+
+  const connect = useCallback(
+    async (server: LobbyServer) => {
+      if (!server.username) {
         throw new Error(
-          "No stored password for this server (set one in Settings).",
+          "This server has no configured username (set one in Settings).",
         );
       }
-
-      const onEvent = new Channel<LobbyEvent>();
-      onEvent.onmessage = (ev) => {
-        dispatch({ type: "event", ev });
-        if (ev.kind === "delta") {
-          mpSnapshot({ serverKey })
-            .then((r) => dispatch({ type: "snapshot", state: r.state }))
-            .catch(() => {});
+      setBusy(true);
+      const serverKey = `${server.username}@${server.host}:${server.port}`;
+      try {
+        const cred = await lsGetCredential({
+          serverId: server.id,
+          username: server.username,
+        });
+        if (!cred.secret) {
+          throw new Error(
+            "No stored password for this server (set one in Settings).",
+          );
         }
-        // The Rust side evicts the connection on any teardown (socket close, or a
-        // rejected login like a wrong password), so clear the active key to return
-        // the UI to the connect screen while keeping the disconnect reason.
-        if (ev.kind === "disconnected") {
-          setActiveKey(null);
-        }
-      };
 
-      dispatch({ type: "connecting" });
-      await mpConnect({
-        serverKey,
-        host: server.host,
-        port: server.port,
-        tls: server.tls,
-        allowSelfSigned: server.allowSelfSigned,
-        username: server.username,
-        password: cred.secret,
-        compatFlags: ["u", "sp"],
-        onEvent,
-      });
-      const snap = await mpSnapshot({ serverKey });
-      dispatch({ type: "snapshot", state: snap.state });
-      setActiveKey(serverKey);
-      setLoginPopoverOpen(false);
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+        const onEvent = openChannel(serverKey);
+
+        dispatch({ type: "connecting" });
+        await mpConnect({
+          serverKey,
+          host: server.host,
+          port: server.port,
+          tls: server.tls,
+          allowSelfSigned: server.allowSelfSigned,
+          username: server.username,
+          password: cred.secret,
+          compatFlags: ["u", "sp"],
+          onEvent,
+        });
+        const snap = await mpSnapshot({ serverKey });
+        dispatch({ type: "snapshot", state: snap.state });
+        setActiveKey(serverKey);
+        setLoginPopoverOpen(false);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [openChannel],
+  );
 
   const disconnect = useCallback(async () => {
     if (!activeKey) return;
@@ -303,6 +315,31 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const clearJoinError = useCallback(() => {
     dispatch({ type: "clearJoinError" });
   }, []);
+
+  // After a webview reload the React state resets but the Rust connection task keeps
+  // running, so re-adopt any live connection on mount (via `mp_reattach`). Without
+  // this a Vite hot-reload / refresh strands the UI as "disconnected" while the
+  // backend is still logged in — and a fresh connect would be rejected as a
+  // duplicate login. Runs once.
+  const rehydratedRef = useRef(false);
+  useEffect(() => {
+    if (rehydratedRef.current) return;
+    rehydratedRef.current = true;
+    (async () => {
+      try {
+        const { keys } = await mpActiveKeys({});
+        const serverKey = keys[0];
+        if (!serverKey) return;
+        const onEvent = openChannel(serverKey);
+        await mpReattach({ serverKey, onEvent });
+        const snap = await mpSnapshot({ serverKey });
+        dispatch({ type: "snapshot", state: snap.state });
+        setActiveKey(serverKey);
+      } catch {
+        // No live connection to re-adopt; stay disconnected.
+      }
+    })();
+  }, [openChannel]);
 
   return (
     <MultiplayerContext.Provider

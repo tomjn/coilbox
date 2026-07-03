@@ -209,6 +209,22 @@ export const mpDisconnect = defineCommand<
   { disconnected: boolean }
 >("coilbox-multiplayer", "mp_disconnect");
 
+/**
+ * Re-adopt a still-live connection after a webview reload: swap in a fresh event
+ * `Channel`. The backend replays `Connected` + the current phase over it, then the
+ * caller pulls `mpSnapshot` to refill its mirror.
+ */
+export const mpReattach = defineCommand<
+  { serverKey: string; onEvent: Channel<LobbyEvent> },
+  { reattached: boolean }
+>("coilbox-multiplayer", "mp_reattach");
+
+/** The server keys of all live connections (to re-adopt one after a reload). */
+export const mpActiveKeys = defineCommand<
+  Record<string, never>,
+  { keys: string[] }
+>("coilbox-multiplayer", "mp_active_keys");
+
 /** Clone the authoritative state for one connection (to seed/resync the mirror). */
 export const mpSnapshot = defineCommand<
   { serverKey: string },

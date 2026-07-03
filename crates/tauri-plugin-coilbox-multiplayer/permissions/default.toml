@@ -5,6 +5,8 @@ description = "Allows the multiplayer lobby client's connection, state, chat, ba
 permissions = [
   "allow-mp-connect",
   "allow-mp-disconnect",
+  "allow-mp-reattach",
+  "allow-mp-active-keys",
   "allow-mp-snapshot",
   "allow-mp-send",
   "allow-mp-say",

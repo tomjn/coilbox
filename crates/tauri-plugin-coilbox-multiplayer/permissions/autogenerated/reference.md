@@ -6,6 +6,8 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 
 - `allow-mp-connect`
 - `allow-mp-disconnect`
+- `allow-mp-reattach`
+- `allow-mp-active-keys`
 - `allow-mp-snapshot`
 - `allow-mp-send`
 - `allow-mp-say`
@@ -38,6 +40,32 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-active-keys`
+
+</td>
+<td>
+
+Enables the mp_active_keys command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-active-keys`
+
+</td>
+<td>
+
+Denies the mp_active_keys command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
@@ -425,6 +453,32 @@ Enables the mp_open_battle command without any pre-configured scope.
 <td>
 
 Denies the mp_open_battle command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-reattach`
+
+</td>
+<td>
+
+Enables the mp_reattach command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-reattach`
+
+</td>
+<td>
+
+Denies the mp_reattach command without any pre-configured scope.
 
 </td>
 </tr>

@@ -3,9 +3,9 @@
 //!
 //! One `tokio` task owns the whole duplex: it reads server lines, drives the
 //! `LoginMachine`, feeds each parsed message through the pure `reduce`r, and writes
-//! outbound lines. Keeping IO in a single task means aborting that task (on
-//! disconnect) tears down the socket and every timer at once, with no cross-task
-//! shutdown handshake to get wrong.
+//! outbound lines. Keeping IO in a single task means a graceful `Shutdown` (on
+//! disconnect) writes `EXIT`, then drops the socket and every timer at once, with no
+//! cross-task shutdown handshake to get wrong.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -38,19 +38,32 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 
 /// A queued outbound action for the connection task. `Line` is a raw wire line;
 /// `SayPrivate` is recorded into DM state + persisted + emitted as a delta by the
-/// task before the wire line is sent, keeping the task the single state writer.
+/// task before the wire line is sent, keeping the task the single state writer;
+/// `Shutdown` requests a graceful logout (write `EXIT`, flush, then exit).
 pub enum Outbound {
     Line(String),
     SayPrivate { peer: String, text: String },
+    Shutdown,
+}
+
+/// The frontend event channel, wrapped so a webview reload can swap in a fresh
+/// `Channel` (via `mp_reattach`) without disturbing the running connection task.
+pub type EventSink = Arc<Mutex<Channel<LobbyEvent>>>;
+
+/// Send one event to the current frontend channel, ignoring a detached/dead one.
+fn emit(sink: &EventSink, ev: LobbyEvent) {
+    let _ = sink.lock().unwrap().send(ev);
 }
 
 /// One live connection, held in the plugin registry so commands can push lines and
 /// disconnect. `state` is the shared authoritative mirror the read task mutates and
-/// `mp_snapshot` clones.
+/// `mp_snapshot` clones; `sink` is the swappable event channel and `phase` the last
+/// login phase, both so a reload can re-adopt the connection via `mp_reattach`.
 pub struct ServerConn {
     pub tx: UnboundedSender<Outbound>,
     pub state: Arc<Mutex<LobbyState>>,
-    pub abort: tokio::task::AbortHandle,
+    pub sink: EventSink,
+    pub phase: Arc<Mutex<LoginPhase>>,
 }
 
 /// The registry of live connections, keyed by a frontend-supplied `serverKey`
@@ -73,7 +86,7 @@ pub enum LobbyEvent {
 /// Spawn the connection task for an already-connected (and, if requested, already
 /// TLS-upgraded) `stream`, registering its [`ServerConn`] so other commands can act
 /// on it. Returns once the task is spawned and registered; the task itself runs
-/// until the socket closes or it is aborted by `mp_disconnect`.
+/// until the socket closes or a `Shutdown` from `mp_disconnect` ends it.
 pub fn spawn_connection(
     registry: Registry,
     server_key: String,
@@ -86,27 +99,31 @@ pub fn spawn_connection(
     let mut initial = LobbyState::new();
     initial.dms = dm_log.load();
     let state = Arc::new(Mutex::new(initial));
+    let sink: EventSink = Arc::new(Mutex::new(on_event));
+    let phase = Arc::new(Mutex::new(LoginPhase::AwaitGreeting));
 
-    let handle = tokio::spawn(run_loop(
+    tokio::spawn(run_loop(
         registry.clone(),
         server_key.clone(),
         stream,
         login_cfg,
-        on_event,
+        sink.clone(),
+        phase.clone(),
         rx,
         state.clone(),
         dm_log,
     ));
 
-    // Register after spawning so we have the abort handle. The task's first action
-    // is a network read (the greeting), so it will not have removed itself before
-    // this insert completes for any real connection.
+    // Register after spawning. The task's first action is a network read (the
+    // greeting), so it will not have removed itself before this insert completes
+    // for any real connection.
     registry.lock().unwrap().insert(
         server_key,
         ServerConn {
             tx,
             state,
-            abort: handle.abort_handle(),
+            sink,
+            phase,
         },
     );
 }
@@ -120,12 +137,13 @@ async fn run_loop(
     server_key: String,
     stream: Box<dyn AsyncReadWrite>,
     login_cfg: LoginConfig,
-    on_event: Channel<LobbyEvent>,
+    sink: EventSink,
+    phase_slot: Arc<Mutex<LoginPhase>>,
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
     dm_log: DmLog,
 ) {
-    let _ = on_event.send(LobbyEvent::Connected);
+    emit(&sink, LobbyEvent::Connected);
 
     let mut framed = Framed::new(stream, LinesCodec::new());
     let mut login = LoginMachine::new(login_cfg);
@@ -138,11 +156,12 @@ async fn run_loop(
         // Each iteration collects the lines to write, then flushes them at the end,
         // so the single owned sink is only ever borrowed in one place.
         let mut outbound: Vec<String> = Vec::new();
+        let mut shutdown = false;
 
         tokio::select! {
             item = framed.next() => match item {
                 Some(Ok(line)) => {
-                    let _ = on_event.send(LobbyEvent::Console {
+                    emit(&sink, LobbyEvent::Console {
                         direction: "in".into(),
                         line: line.clone(),
                     });
@@ -151,7 +170,8 @@ async fn run_loop(
                     let before = login.phase();
                     outbound.extend(login.on_message(&msg));
                     if login.phase() != before {
-                        let _ = on_event.send(LobbyEvent::Phase { phase: login.phase() });
+                        *phase_slot.lock().unwrap() = login.phase();
+                        emit(&sink, LobbyEvent::Phase { phase: login.phase() });
                     }
 
                     // A rejected login (e.g. wrong password) leaves the socket open
@@ -185,7 +205,7 @@ async fn run_loop(
                                 dm_log.append(from, &m);
                             }
                         }
-                        let _ = on_event.send(LobbyEvent::Delta { delta });
+                        emit(&sink, LobbyEvent::Delta { delta });
                     }
                 }
                 Some(Err(e)) => break 'conn Some(e.to_string()),
@@ -193,6 +213,10 @@ async fn run_loop(
             },
             Some(out) = rx.recv() => match out {
                 Outbound::Line(line) => outbound.push(line),
+                Outbound::Shutdown => {
+                    outbound.push(command::exit(None));
+                    shutdown = true;
+                }
                 Outbound::SayPrivate { peer, text } => {
                     let now = now_ms();
                     let deltas =
@@ -208,7 +232,7 @@ async fn run_loop(
                         dm_log.append(&peer, &m);
                     }
                     for delta in deltas {
-                        let _ = on_event.send(LobbyEvent::Delta { delta });
+                        emit(&sink, LobbyEvent::Delta { delta });
                     }
                     outbound.push(command::say_private(&peer, &text));
                 }
@@ -217,17 +241,25 @@ async fn run_loop(
         }
 
         for line in outbound {
-            let _ = on_event.send(LobbyEvent::Console {
-                direction: "out".into(),
-                line: line.clone(),
-            });
+            emit(
+                &sink,
+                LobbyEvent::Console {
+                    direction: "out".into(),
+                    line: line.clone(),
+                },
+            );
             // A write failure means the socket is gone; report it and stop.
             if let Err(e) = framed.send(line).await {
                 break 'conn Some(e.to_string());
             }
         }
+
+        // A `Shutdown` request wrote its `EXIT` above; now exit cleanly.
+        if shutdown {
+            break 'conn None;
+        }
     };
 
-    let _ = on_event.send(LobbyEvent::Disconnected { reason });
+    emit(&sink, LobbyEvent::Disconnected { reason });
     registry.lock().unwrap().remove(&server_key);
 }

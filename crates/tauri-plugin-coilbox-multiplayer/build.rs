@@ -5,6 +5,8 @@
 const COMMANDS: &[&str] = &[
     "mp_connect",
     "mp_disconnect",
+    "mp_reattach",
+    "mp_active_keys",
     "mp_snapshot",
     "mp_send",
     "mp_say",

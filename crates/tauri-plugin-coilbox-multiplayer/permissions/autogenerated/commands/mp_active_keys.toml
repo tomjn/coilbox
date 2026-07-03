@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-active-keys"
+description = "Enables the mp_active_keys command without any pre-configured scope."
+commands.allow = ["mp_active_keys"]
+
+[[permission]]
+identifier = "deny-mp-active-keys"
+description = "Denies the mp_active_keys command without any pre-configured scope."
+commands.deny = ["mp_active_keys"]
