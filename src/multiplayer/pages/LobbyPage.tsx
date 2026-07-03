@@ -1,13 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
-import { useEffect, useMemo, useState } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useLobbyServers } from "../../lobby-servers/config";
+import { useState } from "react";
 import { mpJoinBattle, mpLeaveBattle, mpSay } from "../bindings";
 import { useMultiplayer } from "../store";
 
@@ -20,27 +12,11 @@ import { useMultiplayer } from "../store";
  * Default-exported for the frame's lazy route convention.
  */
 export default function LobbyPage() {
-  const [cfg] = useLobbyServers();
-  const servers = cfg.servers;
   // Connection + mirror live in the app-level provider so they survive navigation.
-  const { mirror, activeKey, busy, connect, disconnect } = useMultiplayer();
+  const { mirror, activeKey, openLoginPopover } = useMultiplayer();
 
-  const [selectedId, setSelectedId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState("");
-
-  const selected = useMemo(
-    () => servers.find((s) => s.id === selectedId),
-    [servers, selectedId],
-  );
-
-  // Auto-select the first server once the directory loads (or when the current
-  // selection is gone), so Connect is usable without a manual pick.
-  useEffect(() => {
-    if (servers.length > 0 && !servers.some((s) => s.id === selectedId)) {
-      setSelectedId(servers[0].id);
-    }
-  }, [servers, selectedId]);
 
   const state = mirror.state;
   const users = state ? Object.values(state.users) : [];
@@ -53,28 +29,6 @@ export default function LobbyPage() {
     currentBattle?.channel != null
       ? state?.channels[currentBattle.channel]
       : undefined;
-
-  async function onConnect() {
-    if (!selected) {
-      setError("Pick a server first.");
-      return;
-    }
-    setError(null);
-    try {
-      await connect(selected);
-    } catch (e) {
-      setError(String(e));
-    }
-  }
-
-  async function onDisconnect() {
-    setError(null);
-    try {
-      await disconnect();
-    } catch (e) {
-      setError(String(e));
-    }
-  }
 
   async function join(id: number) {
     if (!activeKey) return;
@@ -114,48 +68,13 @@ export default function LobbyPage() {
         </p>
       </header>
 
-      {/* Connection controls */}
-      <section className="flex flex-wrap items-center gap-3">
-        <Select
-          value={selectedId}
-          onValueChange={setSelectedId}
-          disabled={activeKey != null || busy}
-        >
-          <SelectTrigger className="w-64" aria-label="Lobby server">
-            <SelectValue placeholder="Select a server" />
-          </SelectTrigger>
-          <SelectContent>
-            {servers.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.name} ({s.host}:{s.port})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {activeKey ? (
-          <Button onClick={onDisconnect} disabled={busy}>
-            Disconnect
-          </Button>
-        ) : (
-          <Button onClick={onConnect} disabled={busy || servers.length === 0}>
-            Connect
-          </Button>
-        )}
-
-        <span className="text-sm text-muted-foreground">
-          {mirror.connected
-            ? `Phase: ${mirror.phase ?? "…"}`
-            : activeKey
-              ? "Connecting…"
-              : "Not connected"}
-        </span>
-      </section>
-
-      {servers.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          No servers configured. Add one under Settings first.
-        </p>
+      {!activeKey && (
+        <section className="flex flex-col items-start gap-3">
+          <p className="text-sm text-muted-foreground">
+            You are not connected to a lobby server.
+          </p>
+          <Button onClick={openLoginPopover}>Connect…</Button>
+        </section>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
       {mirror.error && (
