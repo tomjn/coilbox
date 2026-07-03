@@ -1,0 +1,19 @@
+[package]
+name = "tauri-plugin-coilbox-lobby-servers"
+version = "0.0.0"
+description = "Lobby server directory + OS-keychain credential vault (Rust half). ACL identifier: coilbox-lobby-servers"
+edition = "2021"
+license = "MIT"
+# Tauri requires `links` to equal `package.name`. The ACL identifier is this name
+# with the `tauri-plugin-` prefix stripped -> `coilbox-lobby-servers`.
+links = "tauri-plugin-coilbox-lobby-servers"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+picoframe-core = "0.0.2"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }

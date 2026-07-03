@@ -1,0 +1,11 @@
+[package]
+name = "coilbox-lobby-protocol"
+version = "0.0.0"
+description = "Pure, IO-free TASServer/Recoil lobby protocol engine: line parser, command builders, status bitfields, login state machine and authoritative state reducer. No Tauri, no tokio."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+md-5 = "0.10"
+base64 = "0.22"

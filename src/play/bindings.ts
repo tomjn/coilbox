@@ -59,6 +59,18 @@ export interface BattleConfig {
   allyTeams: AllyTeam[];
   modOptions?: Record<string, string>;
   mapOptions?: Record<string, string>;
+  /**
+   * Whether this machine hosts the game. Defaults to true (singleplayer/skirmish
+   * and lobby-host); a client joining a remote lobby battle sets false and gets a
+   * minimal script pointing at the host.
+   */
+  isHost?: boolean;
+  /** Host address: `0.0.0.0` when hosting a networked game, or the host to join. */
+  hostIp?: string;
+  /** Host port (networked host or client). Omitted for pure singleplayer. */
+  hostPort?: number;
+  /** Script password presented to the host (client scripts only). */
+  myPasswd?: string;
 }
 
 /** Engine lifecycle event streamed while a game runs. */

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-leave-channel"
+description = "Enables the mp_leave_channel command without any pre-configured scope."
+commands.allow = ["mp_leave_channel"]
+
+[[permission]]
+identifier = "deny-mp-leave-channel"
+description = "Denies the mp_leave_channel command without any pre-configured scope."
+commands.deny = ["mp_leave_channel"]

@@ -30,6 +30,7 @@ export function GameCardShell({
   art,
   action,
   className,
+  artClassName,
   children,
 }: {
   /** Game name; seeds the deterministic gradient placeholder. */
@@ -49,6 +50,8 @@ export function GameCardShell({
   /** Trailing caption control (Play button, Choose-game chip). */
   action?: ReactNode;
   className?: string;
+  /** Overrides the art region's aspect/height (default `aspect-video`). */
+  artClassName?: string;
   /** Stretched interactive overlay (a `Link` or `button`). */
   children?: ReactNode;
 }) {
@@ -59,7 +62,12 @@ export function GameCardShell({
         className,
       )}
     >
-      <div className="relative aspect-video shrink-0 overflow-hidden rounded-t-lg">
+      <div
+        className={cn(
+          "relative shrink-0 overflow-hidden rounded-t-lg",
+          artClassName ?? "aspect-video",
+        )}
+      >
         {art ?? <GameArt name={name} artUrl={artUrl} alt={alt} />}
         {loading && (
           <div className="absolute inset-0 animate-pulse bg-muted-foreground/10" />

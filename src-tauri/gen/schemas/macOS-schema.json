@@ -711,6 +711,48 @@
           "markdownDescription": "Denies the dl_versions command without any pre-configured scope."
         },
         {
+          "description": "Allows storing, reading and deleting lobby login secrets in the OS keychain.\n#### This default permission set includes:\n\n- `allow-ls-store-credential`\n- `allow-ls-get-credential`\n- `allow-ls-delete-credential`",
+          "type": "string",
+          "const": "coilbox-lobby-servers:default",
+          "markdownDescription": "Allows storing, reading and deleting lobby login secrets in the OS keychain.\n#### This default permission set includes:\n\n- `allow-ls-store-credential`\n- `allow-ls-get-credential`\n- `allow-ls-delete-credential`"
+        },
+        {
+          "description": "Enables the ls_delete_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:allow-ls-delete-credential",
+          "markdownDescription": "Enables the ls_delete_credential command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the ls_get_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:allow-ls-get-credential",
+          "markdownDescription": "Enables the ls_get_credential command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the ls_store_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:allow-ls-store-credential",
+          "markdownDescription": "Enables the ls_store_credential command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the ls_delete_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:deny-ls-delete-credential",
+          "markdownDescription": "Denies the ls_delete_credential command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the ls_get_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:deny-ls-get-credential",
+          "markdownDescription": "Denies the ls_get_credential command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the ls_store_credential command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lobby-servers:deny-ls-store-credential",
+          "markdownDescription": "Denies the ls_store_credential command without any pre-configured scope."
+        },
+        {
           "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
           "type": "string",
           "const": "coilbox-mapconv:default",
@@ -847,6 +889,348 @@
           "type": "string",
           "const": "coilbox-mapconv:deny-mc-suggest-sources",
           "markdownDescription": "Denies the mc_suggest_sources command without any pre-configured scope."
+        },
+        {
+          "description": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-disconnect`\n- `allow-mp-reattach`\n- `allow-mp-active-keys`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-say-battle`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-list-channels`\n- `allow-mp-join-battle`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-set-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-build-battle-config`",
+          "type": "string",
+          "const": "coilbox-multiplayer:default",
+          "markdownDescription": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-disconnect`\n- `allow-mp-reattach`\n- `allow-mp-active-keys`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-say-battle`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-list-channels`\n- `allow-mp-join-battle`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-set-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-build-battle-config`"
+        },
+        {
+          "description": "Enables the mp_active_keys command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-active-keys",
+          "markdownDescription": "Enables the mp_active_keys command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_add_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-add-bot",
+          "markdownDescription": "Enables the mp_add_bot command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_build_battle_config command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-build-battle-config",
+          "markdownDescription": "Enables the mp_build_battle_config command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_connect command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-connect",
+          "markdownDescription": "Enables the mp_connect command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_disconnect command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-disconnect",
+          "markdownDescription": "Enables the mp_disconnect command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_force_ally command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-force-ally",
+          "markdownDescription": "Enables the mp_force_ally command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_force_color command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-force-color",
+          "markdownDescription": "Enables the mp_force_color command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_force_spectator command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-force-spectator",
+          "markdownDescription": "Enables the mp_force_spectator command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_force_team command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-force-team",
+          "markdownDescription": "Enables the mp_force_team command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_join_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-join-battle",
+          "markdownDescription": "Enables the mp_join_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_join_channel command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-join-channel",
+          "markdownDescription": "Enables the mp_join_channel command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_kick command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-kick",
+          "markdownDescription": "Enables the mp_kick command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_leave_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-leave-battle",
+          "markdownDescription": "Enables the mp_leave_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_leave_channel command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-leave-channel",
+          "markdownDescription": "Enables the mp_leave_channel command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_list_channels command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-list-channels",
+          "markdownDescription": "Enables the mp_list_channels command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_open_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-open-battle",
+          "markdownDescription": "Enables the mp_open_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_reattach command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-reattach",
+          "markdownDescription": "Enables the mp_reattach command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_remove_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-remove-bot",
+          "markdownDescription": "Enables the mp_remove_bot command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_say command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-say",
+          "markdownDescription": "Enables the mp_say command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_say_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-say-battle",
+          "markdownDescription": "Enables the mp_say_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_say_private command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-say-private",
+          "markdownDescription": "Enables the mp_say_private command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_send command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-send",
+          "markdownDescription": "Enables the mp_send command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_set_battle_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-set-battle-status",
+          "markdownDescription": "Enables the mp_set_battle_status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_set_script_tags command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-set-script-tags",
+          "markdownDescription": "Enables the mp_set_script_tags command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_set_start_rect command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-set-start-rect",
+          "markdownDescription": "Enables the mp_set_start_rect command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_set_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-set-status",
+          "markdownDescription": "Enables the mp_set_status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_snapshot command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-snapshot",
+          "markdownDescription": "Enables the mp_snapshot command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_update_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:allow-mp-update-bot",
+          "markdownDescription": "Enables the mp_update_bot command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_active_keys command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-active-keys",
+          "markdownDescription": "Denies the mp_active_keys command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_add_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-add-bot",
+          "markdownDescription": "Denies the mp_add_bot command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_build_battle_config command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-build-battle-config",
+          "markdownDescription": "Denies the mp_build_battle_config command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_connect command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-connect",
+          "markdownDescription": "Denies the mp_connect command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_disconnect command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-disconnect",
+          "markdownDescription": "Denies the mp_disconnect command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_force_ally command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-force-ally",
+          "markdownDescription": "Denies the mp_force_ally command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_force_color command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-force-color",
+          "markdownDescription": "Denies the mp_force_color command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_force_spectator command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-force-spectator",
+          "markdownDescription": "Denies the mp_force_spectator command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_force_team command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-force-team",
+          "markdownDescription": "Denies the mp_force_team command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_join_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-join-battle",
+          "markdownDescription": "Denies the mp_join_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_join_channel command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-join-channel",
+          "markdownDescription": "Denies the mp_join_channel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_kick command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-kick",
+          "markdownDescription": "Denies the mp_kick command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_leave_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-leave-battle",
+          "markdownDescription": "Denies the mp_leave_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_leave_channel command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-leave-channel",
+          "markdownDescription": "Denies the mp_leave_channel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_list_channels command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-list-channels",
+          "markdownDescription": "Denies the mp_list_channels command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_open_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-open-battle",
+          "markdownDescription": "Denies the mp_open_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_reattach command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-reattach",
+          "markdownDescription": "Denies the mp_reattach command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_remove_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-remove-bot",
+          "markdownDescription": "Denies the mp_remove_bot command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_say command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-say",
+          "markdownDescription": "Denies the mp_say command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_say_battle command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-say-battle",
+          "markdownDescription": "Denies the mp_say_battle command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_say_private command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-say-private",
+          "markdownDescription": "Denies the mp_say_private command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_send command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-send",
+          "markdownDescription": "Denies the mp_send command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_set_battle_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-set-battle-status",
+          "markdownDescription": "Denies the mp_set_battle_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_set_script_tags command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-set-script-tags",
+          "markdownDescription": "Denies the mp_set_script_tags command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_set_start_rect command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-set-start-rect",
+          "markdownDescription": "Denies the mp_set_start_rect command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_set_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-set-status",
+          "markdownDescription": "Denies the mp_set_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_snapshot command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-snapshot",
+          "markdownDescription": "Denies the mp_snapshot command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_update_bot command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-multiplayer:deny-mp-update-bot",
+          "markdownDescription": "Denies the mp_update_bot command without any pre-configured scope."
         },
         {
           "description": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-launch`\n- `allow-play-launch-replay`\n- `allow-play-cancel`",

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-set-script-tags"
+description = "Enables the mp_set_script_tags command without any pre-configured scope."
+commands.allow = ["mp_set_script_tags"]
+
+[[permission]]
+identifier = "deny-mp-set-script-tags"
+description = "Denies the mp_set_script_tags command without any pre-configured scope."
+commands.deny = ["mp_set_script_tags"]

@@ -13,12 +13,13 @@
     "sidecar:all": "bun run sidecar:unitsync",
     "clean": "bash scripts/clean.sh",
     "lint": "biome check .",
+    "test": "vitest run",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@picoframe/frame": "^0.0.9",
-    "@picoframe/plugin-sdk": "^0.0.4",
+    "@picoframe/frame": "^0.0.13",
+    "@picoframe/plugin-sdk": "^0.0.6",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2.5.0",
@@ -46,6 +47,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
-    "vite": "^8.0.14"
+    "vite": "^8.0.14",
+    "vitest": "^4.1.9"
   }
 }

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-kick"
+description = "Enables the mp_kick command without any pre-configured scope."
+commands.allow = ["mp_kick"]
+
+[[permission]]
+identifier = "deny-mp-kick"
+description = "Denies the mp_kick command without any pre-configured scope."
+commands.deny = ["mp_kick"]

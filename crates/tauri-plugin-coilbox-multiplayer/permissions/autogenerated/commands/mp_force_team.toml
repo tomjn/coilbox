@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-force-team"
+description = "Enables the mp_force_team command without any pre-configured scope."
+commands.allow = ["mp_force_team"]
+
+[[permission]]
+identifier = "deny-mp-force-team"
+description = "Denies the mp_force_team command without any pre-configured scope."
+commands.deny = ["mp_force_team"]

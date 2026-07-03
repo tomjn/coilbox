@@ -1,0 +1,25 @@
+[package]
+name = "tauri-plugin-coilbox-multiplayer"
+version = "0.0.0"
+description = "Live lobby client (Rust half): tokio socket, TLS/STLS, login state machine, and Channel event streaming driving the coilbox-lobby-protocol engine. ACL identifier: coilbox-multiplayer"
+edition = "2021"
+license = "MIT"
+# Tauri requires `links` to equal `package.name`. The ACL identifier is this name
+# with the `tauri-plugin-` prefix stripped -> `coilbox-multiplayer`.
+links = "tauri-plugin-coilbox-multiplayer"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+picoframe-core = "0.0.2"
+coilbox-lobby-protocol = { path = "../coilbox-lobby-protocol" }
+tokio = { version = "1", features = ["net", "io-util", "sync", "rt", "macros", "time"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }

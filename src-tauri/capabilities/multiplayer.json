@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "multiplayer",
+  "description": "Grants the multiplayer lobby client's connection and state commands to the main window.",
+  "windows": ["main"],
+  "permissions": ["coilbox-multiplayer:default"]
+}

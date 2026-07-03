@@ -1,0 +1,190 @@
+import { Button, NavGate } from "@picoframe/frame";
+import { LogOut, Users } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { mpLeaveBattle, mpLeaveChannel } from "../bindings";
+import { ChannelBrowser } from "../chat/ChannelBrowser";
+import { ChatPane } from "../chat/ChatPane";
+import { ConversationSidebar } from "../chat/ConversationSidebar";
+import { type ConversationDescriptor, convId } from "../chat/conversation";
+import { MemberList } from "../chat/MemberList";
+import { useConversation } from "../chat/useConversation";
+import { useMpRevealed, useMultiplayer } from "../store";
+
+/**
+ * The chat hub: sidebar of channels + DMs, a reusable ChatPane for the active
+ * conversation, a toggleable member panel, and the channel-browser drawer.
+ * Connection lives on the Login page; when disconnected this shows a prompt.
+ * Reachable only once the user has connected this session (see the `NavGate`
+ * wrapper below); before that, the route redirects to Login.
+ */
+function ChatPage() {
+  const { mirror, activeKey, markSeen, forgetChannel, openLoginPopover } =
+    useMultiplayer();
+  const [active, setActive] = useState<ConversationDescriptor | null>(null);
+  const [showMembers, setShowMembers] = useState(false);
+  const [browserOpen, setBrowserOpen] = useState(false);
+
+  const conv = useConversation(active);
+  const me = mirror.state?.myUsername ?? null;
+
+  // In a battle, tint messages by each player's team colour. The `teamColor` int
+  // is `0xBBGGRR` (red is the low byte), matching the protocol's team_color_rgb.
+  const battle =
+    active?.kind === "battle"
+      ? mirror.state?.battles[String(active.id)]
+      : undefined;
+  const senderColor = useCallback(
+    (from: string): string | undefined => {
+      const c = battle?.members[from]?.teamColor;
+      if (c == null) return undefined;
+      const r = c & 0xff;
+      const g = (c >> 8) & 0xff;
+      const b = (c >> 16) & 0xff;
+      return `#${[r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("")}`;
+    },
+    [battle],
+  );
+  const users = mirror.state?.users;
+  const isBot = useCallback(
+    (from: string): boolean => users?.[from]?.status.bot ?? false,
+    [users],
+  );
+
+  // For a DM header, mark the peer as a bot and show their online presence
+  // (a user is present in the global roster only while connected).
+  const dmPeer = active?.kind === "dm" ? active.peer : null;
+  const titleIsBot = dmPeer != null && isBot(dmPeer);
+  const titlePresence =
+    dmPeer == null
+      ? undefined
+      : users?.[dmPeer]
+        ? ("online" as const)
+        : ("offline" as const);
+
+  // Mark the open conversation read as its message count changes.
+  useEffect(() => {
+    if (active) markSeen(convId(active), conv.messages.length);
+  }, [active, conv.messages.length, markSeen]);
+
+  // Leave a channel: stop the server membership, forget it (no auto-rejoin), and
+  // deselect it if it was the open conversation.
+  async function leaveChannel(name: string) {
+    if (!activeKey) return;
+    try {
+      await mpLeaveChannel({ serverKey: activeKey, channel: name });
+    } catch {
+      // Forget it regardless; leaving is best-effort.
+    }
+    forgetChannel(name);
+    setActive((cur) =>
+      cur?.kind === "channel" && cur.name === name ? null : cur,
+    );
+  }
+
+  // Leave the current battle. Battle chat isn't a leavable channel of its own, so
+  // the header's leave action drops the whole battle (SAYBATTLE ends with it).
+  async function leaveBattle() {
+    if (!activeKey) return;
+    try {
+      await mpLeaveBattle({ serverKey: activeKey });
+    } catch {
+      // Best-effort; deselect regardless.
+    }
+    setActive((cur) => (cur?.kind === "battle" ? null : cur));
+  }
+
+  if (!activeKey) {
+    return (
+      <main className="flex flex-col items-center justify-center gap-4 p-10 text-center">
+        <h1 className="text-lg font-semibold">Chat</h1>
+        <p className="text-sm text-muted-foreground">
+          You are not connected to a lobby server.
+        </p>
+        <Button onClick={openLoginPopover}>Connect…</Button>
+      </main>
+    );
+  }
+
+  return (
+    <main className="relative flex h-full min-h-0 overflow-hidden">
+      <ConversationSidebar
+        active={active}
+        onSelect={setActive}
+        onBrowse={() => setBrowserOpen(true)}
+      />
+
+      {active ? (
+        <ChatPane
+          key={convId(active)}
+          variant="full"
+          title={conv.title}
+          subtitle={conv.subtitle}
+          titleIsBot={titleIsBot}
+          titlePresence={titlePresence}
+          messages={conv.messages}
+          currentUser={me}
+          senderColor={senderColor}
+          isBot={isBot}
+          onSend={conv.send}
+          headerActions={
+            active.kind === "channel" || active.kind === "battle" ? (
+              <>
+                <Button
+                  variant="secondary"
+                  className="h-7 px-2"
+                  onClick={() => setShowMembers((v) => !v)}
+                  aria-label="Toggle members"
+                  aria-pressed={showMembers}
+                >
+                  <Users className="size-4" />
+                </Button>
+                {active.kind === "channel" ? (
+                  <Button
+                    className="h-7 px-2"
+                    onClick={() => leaveChannel(active.name)}
+                    aria-label="Leave channel"
+                  >
+                    <LogOut className="size-4" />
+                  </Button>
+                ) : (
+                  <Button className="h-7 gap-1.5 px-2" onClick={leaveBattle}>
+                    <LogOut className="size-4" />
+                    Leave
+                  </Button>
+                )}
+              </>
+            ) : undefined
+          }
+        />
+      ) : (
+        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+          Select a conversation, or browse channels to join one.
+        </div>
+      )}
+
+      {(active?.kind === "channel" || active?.kind === "battle") &&
+        showMembers && (
+          <MemberList
+            members={conv.members}
+            onSelect={(username) => setActive({ kind: "dm", peer: username })}
+            colorFor={senderColor}
+          />
+        )}
+
+      <ChannelBrowser
+        open={browserOpen}
+        onClose={() => setBrowserOpen(false)}
+        onJoined={(name) => setActive({ kind: "channel", name })}
+      />
+    </main>
+  );
+}
+
+/** Route entry: gated behind having connected at least once this session. */
+export default function ChatRoute() {
+  return (
+    <NavGate use={useMpRevealed} redirectTo="/lobby">
+      <ChatPage />
+    </NavGate>
+  );
+}

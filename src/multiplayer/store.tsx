@@ -1,0 +1,440 @@
+import { useSetting } from "@picoframe/frame";
+import { Channel } from "@tauri-apps/api/core";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import { lsGetCredential } from "../lobby-servers/bindings";
+import type { LobbyServer } from "../lobby-servers/config";
+import {
+  type LobbyEvent,
+  type LobbyState,
+  type LoginPhase,
+  mpActiveKeys,
+  mpConnect,
+  mpDisconnect,
+  mpJoinChannel,
+  mpReattach,
+  mpSnapshot,
+} from "./bindings";
+import { conversationCounts } from "./chat/conversation";
+
+/**
+ * The connection key for a server: `username@host:port`. Shared by the store and
+ * any UI that needs to match a configured server against the live connection
+ * (e.g. the settings "Connected" badge), so the derivation can't drift.
+ */
+export function serverKeyFor(server: LobbyServer): string {
+  return `${server.username}@${server.host}:${server.port}`;
+}
+
+/**
+ * A per-connection mirror of the Rust-side lobby state. The Rust plugin owns the
+ * authoritative parse; this mirror is refreshed wholesale from `mpSnapshot` on each
+ * `delta` event (correctness over incremental cleverness) while `phase` and
+ * `console` are driven directly off the event stream.
+ */
+export interface LobbyMirror {
+  connected: boolean;
+  phase: LoginPhase | null;
+  state: LobbyState | null;
+  consoleLines: string[];
+  error: string | null;
+  /** Reason from the last failed JOINBATTLE/OPENBATTLE, cleared on next attempt. */
+  lastJoinError: string | null;
+}
+
+const CONSOLE_CAP = 500;
+
+export const initialMirror: LobbyMirror = {
+  connected: false,
+  phase: null,
+  state: null,
+  consoleLines: [],
+  error: null,
+  lastJoinError: null,
+};
+
+export type MirrorAction =
+  | { type: "connecting" }
+  | { type: "event"; ev: LobbyEvent }
+  | { type: "snapshot"; state: LobbyState }
+  | { type: "reset" }
+  | { type: "clearJoinError" };
+
+/**
+ * Fold one action into the mirror. `delta` events are intentionally not applied
+ * here — the provider re-fetches a snapshot and dispatches `snapshot` instead, so
+ * the mirror never drifts from the authoritative state.
+ */
+export function mirrorReducer(
+  m: LobbyMirror,
+  action: MirrorAction,
+): LobbyMirror {
+  switch (action.type) {
+    case "connecting":
+      return { ...initialMirror, connected: false };
+    case "snapshot":
+      return { ...m, state: action.state };
+    case "reset":
+      return initialMirror;
+    case "clearJoinError":
+      return { ...m, lastJoinError: null };
+    case "event": {
+      const ev = action.ev;
+      switch (ev.kind) {
+        case "connected":
+          return { ...m, connected: true, error: null };
+        case "phase":
+          return { ...m, phase: ev.phase };
+        case "console": {
+          const line = `${ev.direction === "out" ? ">>" : "<<"} ${ev.line}`;
+          const next = [...m.consoleLines, line];
+          return {
+            ...m,
+            consoleLines:
+              next.length > CONSOLE_CAP ? next.slice(-CONSOLE_CAP) : next,
+          };
+        }
+        case "disconnected":
+          return { ...m, connected: false, error: ev.reason ?? null };
+        case "delta": {
+          const d = ev.delta;
+          if (d.kind === "joinBattleFailed" || d.kind === "openBattleFailed") {
+            return { ...m, lastJoinError: d.reason };
+          }
+          return m;
+        }
+        // `delta` is otherwise handled by the provider via a snapshot refresh.
+        default:
+          return m;
+      }
+    }
+    default:
+      return m;
+  }
+}
+
+interface MultiplayerContextValue {
+  mirror: LobbyMirror;
+  /** The connected `serverKey`, or null when not connected. */
+  activeKey: string | null;
+  /** Whether a connection is currently live (`activeKey != null`). */
+  connected: boolean;
+  /**
+   * Session-sticky: `true` once the user has connected at least once this app run,
+   * and never cleared by a later disconnect/logout. Gates the Chat/Battles sidebar
+   * items so they appear on first connect and stay until the app is closed.
+   */
+  revealed: boolean;
+  busy: boolean;
+  /** Open a connection to `server` (throws on missing username/password). */
+  connect: (server: LobbyServer) => Promise<void>;
+  disconnect: () => Promise<void>;
+  /** Unread count for a conversation id given its current message count. */
+  unreadFor: (id: string, count: number) => number;
+  /** Mark a conversation read up to its current message count. */
+  markSeen: (id: string, count: number) => void;
+  /** Remember a joined channel so it's auto-rejoined on the next connect. */
+  rememberChannel: (name: string) => void;
+  /** Forget a channel so it's no longer auto-rejoined. */
+  forgetChannel: (name: string) => void;
+  /** Reason from the last failed battle join, or null. */
+  lastJoinError: string | null;
+  /** Clear the last join-failure reason (call at the start of a join attempt). */
+  clearJoinError: () => void;
+  /** Whether the topbar login/status popover is open. */
+  loginPopoverOpen: boolean;
+  /** Open the topbar login/status popover (used by not-connected CTAs app-wide). */
+  openLoginPopover: () => void;
+  /** Close the topbar login/status popover. */
+  closeLoginPopover: () => void;
+}
+
+const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
+
+/**
+ * App-level provider owning the (single) live lobby connection. It lives above the
+ * router so the connection and its mirror survive navigating away from the Lobby
+ * page — the page just reads this context rather than holding connection state
+ * locally (which would desync from the persistent Rust-side socket on remount).
+ */
+export function MultiplayerProvider({ children }: { children: ReactNode }) {
+  const [mirror, dispatch] = useReducer(mirrorReducer, initialMirror);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // One-way "has ever connected this session" latch driving Chat/Battles sidebar
+  // visibility. Set on any transition to connected (fresh connect or reload
+  // reattach) and never reset, so those views stick across a logout until quit.
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    if (activeKey != null) setRevealed(true);
+  }, [activeKey]);
+  const [loginPopoverOpen, setLoginPopoverOpen] = useState(false);
+  const openLoginPopover = useCallback(() => setLoginPopoverOpen(true), []);
+  const closeLoginPopover = useCallback(() => setLoginPopoverOpen(false), []);
+
+  // Per-conversation "seen up to N messages" marks. Seeded to the connect-time
+  // snapshot so persisted DM history and already-present channel logs don't show
+  // as unread; conversations appearing AFTER connect start unseen (fully unread).
+  const seenRef = useRef<Record<string, number>>({});
+  const [, forceSeenTick] = useReducer((n: number) => n + 1, 0);
+  const baselineDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (activeKey == null) {
+      seenRef.current = {};
+      baselineDoneRef.current = false;
+      return;
+    }
+    if (!baselineDoneRef.current && mirror.state) {
+      seenRef.current = conversationCounts(mirror.state);
+      baselineDoneRef.current = true;
+      forceSeenTick();
+    }
+  }, [activeKey, mirror.state]);
+
+  const unreadFor = useCallback((id: string, count: number) => {
+    const seen = seenRef.current[id] ?? 0;
+    return Math.max(0, count - seen);
+  }, []);
+
+  const markSeen = useCallback((id: string, count: number) => {
+    if (seenRef.current[id] === count) return;
+    seenRef.current[id] = count;
+    forceSeenTick();
+  }, []);
+
+  // Channels the user has chosen to be in, persisted per `serverKey` so they can be
+  // auto-rejoined on the next connect. This is a preference list (re-derivable by
+  // rejoining), so it lives in the frame settings store rather than backend state.
+  const [joinedChannels, setJoinedChannels] = useSetting<
+    Record<string, string[]>
+  >("multiplayer.joinedChannels", {});
+  const rejoinedForRef = useRef<string | null>(null);
+
+  const rememberChannel = useCallback(
+    (name: string) => {
+      if (!activeKey) return;
+      const cur = joinedChannels[activeKey] ?? [];
+      if (cur.includes(name)) return;
+      setJoinedChannels({ ...joinedChannels, [activeKey]: [...cur, name] });
+    },
+    [activeKey, joinedChannels, setJoinedChannels],
+  );
+
+  const forgetChannel = useCallback(
+    (name: string) => {
+      if (!activeKey) return;
+      const cur = joinedChannels[activeKey] ?? [];
+      if (!cur.includes(name)) return;
+      setJoinedChannels({
+        ...joinedChannels,
+        [activeKey]: cur.filter((c) => c !== name),
+      });
+    },
+    [activeKey, joinedChannels, setJoinedChannels],
+  );
+
+  // Auto-rejoin remembered channels once per connection, after login reaches the
+  // `ready` phase (JOIN before ACCEPTED would be rejected). The ref guards against
+  // re-firing when `joinedChannels` changes mid-session (e.g. the user joins one).
+  useEffect(() => {
+    if (activeKey == null) {
+      rejoinedForRef.current = null;
+      return;
+    }
+    if (mirror.phase === "ready" && rejoinedForRef.current !== activeKey) {
+      rejoinedForRef.current = activeKey;
+      for (const name of joinedChannels[activeKey] ?? []) {
+        mpJoinChannel({ serverKey: activeKey, channel: name }).catch(() => {});
+      }
+    }
+  }, [activeKey, mirror.phase, joinedChannels]);
+
+  // Build the event Channel for a connection and wire it to the mirror. Shared by
+  // `connect` and the reload-rehydrate path so both handle events identically. The
+  // Rust side evicts the connection on any teardown (socket close, or a rejected
+  // login), so a `disconnected` event clears the active key to return the UI to the
+  // connect screen while keeping the reason.
+  const openChannel = useCallback((serverKey: string) => {
+    const onEvent = new Channel<LobbyEvent>();
+    onEvent.onmessage = (ev) => {
+      dispatch({ type: "event", ev });
+      if (ev.kind === "delta") {
+        mpSnapshot({ serverKey })
+          .then((r) => dispatch({ type: "snapshot", state: r.state }))
+          .catch(() => {});
+      }
+      if (ev.kind === "disconnected") {
+        setActiveKey(null);
+      }
+    };
+    return onEvent;
+  }, []);
+
+  const connect = useCallback(
+    async (server: LobbyServer) => {
+      if (!server.username) {
+        throw new Error(
+          "This server has no configured username (set one in Settings).",
+        );
+      }
+      setBusy(true);
+      const serverKey = serverKeyFor(server);
+      try {
+        const cred = await lsGetCredential({
+          serverId: server.id,
+          username: server.username,
+        });
+        if (!cred.secret) {
+          throw new Error(
+            "No stored password for this server (set one in Settings).",
+          );
+        }
+
+        const onEvent = openChannel(serverKey);
+
+        dispatch({ type: "connecting" });
+        await mpConnect({
+          serverKey,
+          host: server.host,
+          port: server.port,
+          tls: server.tls,
+          allowSelfSigned: server.allowSelfSigned,
+          username: server.username,
+          password: cred.secret,
+          compatFlags: ["u", "sp"],
+          onEvent,
+        });
+        const snap = await mpSnapshot({ serverKey });
+        dispatch({ type: "snapshot", state: snap.state });
+        setActiveKey(serverKey);
+        setLoginPopoverOpen(false);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [openChannel],
+  );
+
+  const disconnect = useCallback(async () => {
+    if (!activeKey) return;
+    setBusy(true);
+    try {
+      await mpDisconnect({ serverKey: activeKey });
+    } finally {
+      dispatch({ type: "reset" });
+      setActiveKey(null);
+      setBusy(false);
+    }
+  }, [activeKey]);
+
+  const clearJoinError = useCallback(() => {
+    dispatch({ type: "clearJoinError" });
+  }, []);
+
+  // After a webview reload the React state resets but the Rust connection task keeps
+  // running, so re-adopt any live connection on mount (via `mp_reattach`). Without
+  // this a Vite hot-reload / refresh strands the UI as "disconnected" while the
+  // backend is still logged in — and a fresh connect would be rejected as a
+  // duplicate login. Runs once.
+  const rehydratedRef = useRef(false);
+  useEffect(() => {
+    if (rehydratedRef.current) return;
+    rehydratedRef.current = true;
+    (async () => {
+      try {
+        const { keys } = await mpActiveKeys({});
+        const serverKey = keys[0];
+        if (!serverKey) return;
+        const onEvent = openChannel(serverKey);
+        await mpReattach({ serverKey, onEvent });
+        const snap = await mpSnapshot({ serverKey });
+        dispatch({ type: "snapshot", state: snap.state });
+        setActiveKey(serverKey);
+      } catch {
+        // No live connection to re-adopt; stay disconnected.
+      }
+    })();
+  }, [openChannel]);
+
+  return (
+    <MultiplayerContext.Provider
+      value={{
+        mirror,
+        activeKey,
+        connected: activeKey != null,
+        revealed,
+        busy,
+        connect,
+        disconnect,
+        unreadFor,
+        markSeen,
+        rememberChannel,
+        forgetChannel,
+        lastJoinError: mirror.lastJoinError,
+        clearJoinError,
+        loginPopoverOpen,
+        openLoginPopover,
+        closeLoginPopover,
+      }}
+    >
+      {children}
+    </MultiplayerContext.Provider>
+  );
+}
+
+/** Access the app-level lobby connection. Must be used within the provider. */
+export function useMultiplayer(): MultiplayerContextValue {
+  const ctx = useContext(MultiplayerContext);
+  if (!ctx) {
+    throw new Error("useMultiplayer must be used within MultiplayerProvider");
+  }
+  return ctx;
+}
+
+/**
+ * Nav/route predicate: has the user connected at least once this session? Gates
+ * the Chat/Battles sidebar items and routes (via `useVisible` / `NavGate`).
+ */
+export function useMpRevealed(): boolean {
+  return useMultiplayer().revealed;
+}
+
+/**
+ * Nav/route predicate: is multiplayer currently disconnected? Gates the Login
+ * sidebar item + route so it shows only while logged out.
+ */
+export function useMpDisconnected(): boolean {
+  return !useMultiplayer().connected;
+}
+
+/**
+ * Nav/route predicate: is the user currently in a battle? Gates the Battle Room
+ * sidebar item + route so it appears on join and vanishes on leave.
+ */
+export function useMpInBattle(): boolean {
+  return useMultiplayer().mirror.state?.currentBattle != null;
+}
+
+/**
+ * The dynamic label for the Battle Room nav item: the joined battle's title, or
+ * a generic fallback. Read reactively so picoframe re-renders it as the battle
+ * changes (`NavItem.useLabel`).
+ */
+export function useBattleRoomLabel(): string {
+  const state = useMultiplayer().mirror.state;
+  const battle =
+    state?.currentBattle != null
+      ? state.battles[String(state.currentBattle)]
+      : undefined;
+  return battle?.title?.trim() || "Battle Room";
+}
