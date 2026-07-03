@@ -20,4 +20,16 @@ describe("parseMessage", () => {
       { type: "text", value: "no way !nope" },
     ]);
   });
+
+  it("parses inline code and ignores markers inside it", () => {
+    expect(parseMessage("run `!foo *bar*` please")).toEqual([
+      { type: "text", value: "run " },
+      { type: "code", value: "!foo *bar*" },
+      { type: "text", value: " please" },
+    ]);
+  });
+
+  it("leaves an unclosed backtick as literal text", () => {
+    expect(parseMessage("a ` b")).toEqual([{ type: "text", value: "a ` b" }]);
+  });
 });

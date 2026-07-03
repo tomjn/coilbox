@@ -24,8 +24,17 @@ export function parseMessage(text: string): Inline[] {
 
 /** Code spans first (literal), remaining runs handed to URL/emphasis parsing. */
 function parseInline(text: string): Inline[] {
-  if (text === "") return [];
-  return parseUrls(text);
+  const out: Inline[] = [];
+  const codeRe = /`([^`]+)`/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = codeRe.exec(text)) !== null) {
+    if (m.index > last) out.push(...parseUrls(text.slice(last, m.index)));
+    out.push({ type: "code", value: m[1] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(...parseUrls(text.slice(last)));
+  return out;
 }
 
 function parseUrls(text: string): Inline[] {
