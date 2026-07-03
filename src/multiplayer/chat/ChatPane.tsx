@@ -197,7 +197,15 @@ export function ChatPane({
                         : undefined
                     }
                   >
-                    <span className="whitespace-pre-wrap break-words font-mono">
+                    <span
+                      className={cn(
+                        "whitespace-pre-wrap break-words",
+                        // Bot output (SPADS command lists / stats tables) relies
+                        // on monospace alignment; human chat reads better
+                        // proportional.
+                        bot && "font-mono",
+                      )}
+                    >
                       <FormattedText text={m.text} />
                     </span>
                   </div>

@@ -24,7 +24,7 @@ function renderNode(n: Inline, key: string): ReactNode {
       return <span key={key}>{n.value}</span>;
     case "code":
       return (
-        <code key={key} className="rounded bg-foreground/10 px-1">
+        <code key={key} className="rounded bg-foreground/10 px-1 font-mono">
           {n.value}
         </code>
       );
