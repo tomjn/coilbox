@@ -399,6 +399,19 @@ export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
   return { thumbs, loading };
 }
 
+/**
+ * Resolution state of a lazy unitsync info fetch. Distinguishes the two silent
+ * failures the callers care about — a resolved-but-unhashable result
+ * (`unsyncable`, checksum came back 0) and a worker/IPC failure (`error`) — from
+ * genuine in-flight work (`loading`), so the UI needn't conflate them.
+ */
+export type UnitsyncInfoStatus =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "unsyncable"
+  | "error";
+
 /** Session cache of game info, keyed by `dataDir::enginePath::gameArchive`. */
 const gameInfoCache = new Map<string, GameInfoResult>();
 
@@ -409,39 +422,51 @@ export function useUnitsyncGameInfo(
   gameArchive?: string,
 ) {
   const [info, setInfo] = useState<GameInfoResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<UnitsyncInfoStatus>("idle");
+  const [nonce, setNonce] = useState(0);
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: nonce is a manual retry trigger that re-runs the fetch, not read in the body
   useEffect(() => {
     if (!enginePath || !dataDir || !gameArchive) {
       setInfo(null);
+      setStatus("idle");
       return;
     }
     const key = `${dataDir}::${enginePath}::${gameArchive}`;
     const cached = gameInfoCache.get(key);
     if (cached) {
       setInfo(cached);
+      setStatus("ready");
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    setStatus("loading");
     unitsyncGameInfo({ enginePath, dataDir, gameArchive })
       .then((res) => {
         if (cancelled) return;
-        gameInfoCache.set(key, res);
         setInfo(res);
+        // Only a syncable result is cached (mirrors the worker's disk cache), so
+        // a zero-checksum result stays retryable rather than sticking forever.
+        if (res.checksum) {
+          gameInfoCache.set(key, res);
+          setStatus("ready");
+        } else {
+          setStatus("unsyncable");
+        }
       })
       .catch(() => {
-        if (!cancelled) setInfo(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setInfo(null);
+          setStatus("error");
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, gameArchive]);
+  }, [enginePath, dataDir, gameArchive, nonce]);
 
-  return { info, loading };
+  return { info, status, reload, loading: status === "loading" };
 }
 
 /** Session cache of unit build icons, keyed by dataDir::engine::game::units. */
@@ -503,39 +528,51 @@ export function useUnitsyncMapInfo(
   mapName?: string,
 ) {
   const [info, setInfo] = useState<MapInfoResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<UnitsyncInfoStatus>("idle");
+  const [nonce, setNonce] = useState(0);
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: nonce is a manual retry trigger that re-runs the fetch, not read in the body
   useEffect(() => {
     if (!enginePath || !dataDir || !mapName) {
       setInfo(null);
+      setStatus("idle");
       return;
     }
     const key = `${dataDir}::${enginePath}::${mapName}`;
     const cached = mapInfoCache.get(key);
     if (cached) {
       setInfo(cached);
+      setStatus("ready");
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    setStatus("loading");
     unitsyncMapInfo({ enginePath, dataDir, mapName })
       .then((res) => {
         if (cancelled) return;
-        mapInfoCache.set(key, res);
         setInfo(res);
+        // Only a syncable result is cached (mirrors the worker's disk cache), so
+        // a zero-checksum result stays retryable rather than sticking forever.
+        if (res.checksum) {
+          mapInfoCache.set(key, res);
+          setStatus("ready");
+        } else {
+          setStatus("unsyncable");
+        }
       })
       .catch(() => {
-        if (!cancelled) setInfo(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setInfo(null);
+          setStatus("error");
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, mapName]);
+  }, [enginePath, dataDir, mapName, nonce]);
 
-  return { info, loading };
+  return { info, status, reload, loading: status === "loading" };
 }
 
 /** Session cache of engine config reads, keyed by `dataDir::enginePath`. */

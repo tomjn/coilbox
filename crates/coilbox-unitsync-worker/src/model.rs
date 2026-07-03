@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// One selectable item of a `list`-typed option.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct OptionListItem {
     pub key: String,
@@ -15,8 +15,8 @@ pub struct OptionListItem {
 /// A map or game configuration option: its key, label, description, and — when the
 /// engine build exposes them — its type, default, numeric bounds and list items,
 /// so the UI can render a checkbox / number / select instead of a bare text box.
-#[derive(Serialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct ConfigOption {
     pub key: String,
     pub name: String,
@@ -195,8 +195,8 @@ pub struct GameItem {
 }
 
 /// A faction/side of a game, with its commander/start unit.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct Side {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -208,8 +208,8 @@ pub struct Side {
 
 /// Output of the lazy `game` mode: a game's sides and unit count (requires
 /// loading the game's archive set, so it's fetched on demand, not during scan).
-#[derive(Serialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct GameInfoOutput {
     pub sides: Vec<Side>,
     pub unit_count: u32,
@@ -255,8 +255,8 @@ pub struct UnitBuildpicsOutput {
 /// Output of the lazy `--map --map-info` mode: one map's options + any
 /// diagnostics attributed while reading them (requires mounting the map
 /// archive, so it's fetched on demand, not during the enumeration scan).
-#[derive(Serialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct MapInfoOutput {
     /// Map options (from mapoptions.lua), when present.
     pub options: Vec<ConfigOption>,

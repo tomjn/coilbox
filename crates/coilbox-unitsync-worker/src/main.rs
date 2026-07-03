@@ -19,6 +19,7 @@ mod config;
 mod ffi;
 mod game;
 mod heightmap;
+mod infocache;
 mod lua;
 mod minimap;
 mod model;
@@ -239,7 +240,8 @@ fn run() -> i32 {
 
     // Game detail: load one game's archives to read its sides + unit count.
     if let Some(game_archive) = args.game.clone() {
-        return match std::panic::catch_unwind(|| game::render(&args.lib, &game_archive)) {
+        return match std::panic::catch_unwind(|| game::render(&args.lib, &game_archive, cache_dir))
+        {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
                 0
@@ -269,7 +271,7 @@ fn run() -> i32 {
     // Lazy map info: one map's options + attributed warnings (mounts the map).
     if args.map_info {
         if let Some(map) = args.map.clone() {
-            return match std::panic::catch_unwind(|| map_info(&args.lib, &map)) {
+            return match std::panic::catch_unwind(|| map_info(&args.lib, &map, cache_dir)) {
                 Ok(out) => {
                     println!("{}", serde_json::to_string(&out).unwrap_or_default());
                     0
@@ -499,7 +501,9 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
 }
 
 /// Load one map's archive set and read its options (+ attributed diagnostics).
-fn map_info(lib: &str, map_name: &str) -> model::MapInfoOutput {
+/// Disk-cached under `cache_dir` (keyed on the map archive's file identity) — a
+/// hit skips the costly `GetMapChecksumFromName` whole-archive hash.
+fn map_info(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> model::MapInfoOutput {
     let us = match unsafe { Unitsync::load(Path::new(lib)) } {
         Ok(us) => us,
         Err(e) => {
@@ -513,6 +517,17 @@ fn map_info(lib: &str, map_name: &str) -> model::MapInfoOutput {
     if us.init(false, 0) == 0 {
         errors.push("unitsync Init returned 0 (failure)".into());
     }
+
+    // Cheap file-identity cache: a hit returns before the expensive checksum hash.
+    let key = infocache::map_key(&us, map_name);
+    let cache = cache_dir.zip(key.as_deref());
+    if let Some((dir, key)) = cache {
+        if let Some(hit) = infocache::read::<model::MapInfoOutput>(dir, key) {
+            us.uninit();
+            return hit;
+        }
+    }
+
     let options = read_options(&us, us.map_option_count(map_name));
     // A zero CRC means "unknown" here, so omit it rather than show a misleading 0.
     let checksum = us
@@ -521,12 +536,19 @@ fn map_info(lib: &str, map_name: &str) -> model::MapInfoOutput {
         .map(|c| format!("{c:08x}"));
     let warnings = drain_attributed(&us);
     us.uninit();
-    model::MapInfoOutput {
+    let out = model::MapInfoOutput {
         options,
         checksum,
         warnings,
         errors,
+    };
+    // Only cache a syncable result; leave a failed hash uncached so a retry re-runs.
+    if let Some((dir, key)) = cache {
+        if out.checksum.is_some() {
+            infocache::write(dir, key, &out);
+        }
     }
+    out
 }
 
 /// Drain unitsync's error queue, returning the diagnostics accumulated while

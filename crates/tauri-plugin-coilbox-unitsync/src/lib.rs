@@ -72,6 +72,7 @@ const HEADER_CACHE_SUBDIR: &str = "coilbox-unitsync-headers";
 
 /// Subdirectory of the app cache dir holding resolved unit build-icon `data:` URLs.
 const BUILDPIC_CACHE_SUBDIR: &str = "coilbox-unitsync-buildpics";
+const INFO_CACHE_SUBDIR: &str = "coilbox-unitsync-info";
 
 /// The on-disk PNG cache directory for minimaps/thumbnails, under the app cache
 /// dir. `None` when the platform can't resolve a cache dir — caching is then
@@ -99,6 +100,15 @@ fn buildpic_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
         .app_cache_dir()
         .ok()
         .map(|d| d.join(BUILDPIC_CACHE_SUBDIR))
+}
+
+/// The on-disk game/map info-blob cache directory, under the app cache dir.
+/// `None` when the platform can't resolve a cache dir (caching is then skipped).
+fn info_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    app.path()
+        .app_cache_dir()
+        .ok()
+        .map(|d| d.join(INFO_CACHE_SUBDIR))
 }
 
 /// The platform's shared-library search variable.
@@ -382,7 +392,8 @@ async fn unitsync_thumbnails<R: Runtime>(
 /// `unitsync_game_info` — load one game's archives to read its sides (with start
 /// units) and unit count. `game_archive` is the game's primary archive name.
 #[tauri::command]
-async fn unitsync_game_info(
+async fn unitsync_game_info<R: Runtime>(
+    app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
     game_archive: String,
@@ -391,7 +402,13 @@ async fn unitsync_game_info(
         Ok(v) => v,
         Err(e) => return Ok(CliResult::err(e)),
     };
-    let args = build_game_args(&libpath.to_string_lossy(), &data_dir, &game_archive);
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_game_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &game_archive,
+        cache_dir.as_deref(),
+    );
     let envs = loader_envs(&engine_dir, &data_dir);
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "game info", None).await)
 }
@@ -427,7 +444,8 @@ async fn unitsync_unit_buildpics<R: Runtime>(
 /// `unitsync_map_info` — load one map's archive set to read its options + any
 /// attributed diagnostics. Fetched on demand (mounts the map), not during scan.
 #[tauri::command]
-async fn unitsync_map_info(
+async fn unitsync_map_info<R: Runtime>(
+    app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
     map_name: String,
@@ -436,7 +454,13 @@ async fn unitsync_map_info(
         Ok(v) => v,
         Err(e) => return Ok(CliResult::err(e)),
     };
-    let args = build_map_info_args(&libpath.to_string_lossy(), &data_dir, &map_name);
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_map_info_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &map_name,
+        cache_dir.as_deref(),
+    );
     let envs = loader_envs(&engine_dir, &data_dir);
     Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map info", None).await)
 }
