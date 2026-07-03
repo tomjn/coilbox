@@ -72,7 +72,7 @@ export default function LobbyStatusButton() {
         <button
           type="button"
           aria-label={LABEL[status]}
-          className="relative flex size-8 items-center justify-center rounded-md hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+          className="relative flex size-8 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
         >
           <Users className="size-4" />
           <span
@@ -142,7 +142,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         <Link
           to="/chat"
           onClick={onNavigate}
-          className="inline-flex h-8 items-center justify-center rounded-md border border-border text-sm font-medium hover:bg-muted"
+          className="inline-flex h-8 items-center justify-center rounded-md border border-border text-sm font-medium hover:bg-accent"
         >
           Chat
         </Link>
@@ -196,7 +196,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
             type="button"
             onClick={() => connectTo(a)}
             disabled={busy}
-            className="flex flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+            className="flex flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
           >
             <span className="text-base font-semibold leading-tight">
               {a.username || "(no username)"}
@@ -210,7 +210,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
       <Link
         to="/settings/lobby-servers"
         onClick={onNavigate}
-        className="mt-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="mt-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
       >
         <Plus className="size-4" />
         Add a login
@@ -218,7 +218,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
       <button
         type="button"
         onClick={() => setRegistering(true)}
-        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
       >
         <UserPlus className="size-4" />
         Register a new account
