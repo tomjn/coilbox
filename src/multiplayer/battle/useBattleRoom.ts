@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { GameItem, MapItem, Side } from "@/content/bindings";
+import type { ConfigOption, GameItem, MapItem, Side } from "@/content/bindings";
 import {
   invalidateMapPreview,
   useUnitsyncGameInfo,
+  useUnitsyncMapInfo,
   useUnitsyncScan,
 } from "@/content/config";
 import { type PlayTarget, usePreferredTarget } from "@/play/config";
 import type { Battle, MemberStatus } from "../bindings";
-import { mpLeaveBattle, mpSayBattle, mpSetBattleStatus } from "../bindings";
+import {
+  mpLeaveBattle,
+  mpSayBattle,
+  mpSetBattleStatus,
+  mpSetScriptTags,
+} from "../bindings";
 import { useMultiplayer } from "../store";
+import { canEditBattleOptions } from "./battleOptions";
 import {
   deriveSync,
   hexToColorInt,
@@ -44,6 +51,14 @@ export interface BattleRoomView {
   localGame: GameItem | undefined;
   rows: MemberRow[];
   sides: Side[];
+  /** Mod-option schema from the game archive (empty if the game isn't installed). */
+  modOptionsSchema: ConfigOption[];
+  /** Map-option schema from the map archive (empty if the map isn't installed). */
+  mapOptionsSchema: ConfigOption[];
+  /** Whether the local user may edit options (founder, or the host is an autohost). */
+  canEditOptions: boolean;
+  /** Dispatch one option edit: founder → SETSCRIPTTAGS, autohost → `!bSet`. */
+  sendOption: (tagKey: string, spadsName: string, value: string) => void;
   startPosType: number;
   mapMissing: boolean;
   gameMissing: boolean;
@@ -99,6 +114,11 @@ export function useBattleRoom(): BattleRoomView {
   const gameArchive = localGame?.primaryArchive.name;
   const gameInfo = useUnitsyncGameInfo(enginePath, dataDir, gameArchive);
   const sides = gameInfo.info?.sides ?? [];
+  const mapInfo = useUnitsyncMapInfo(enginePath, dataDir, battle?.map);
+  const modOptionsSchema = gameInfo.info?.options ?? [];
+  const mapOptionsSchema = mapInfo.info?.options ?? [];
+  const hostIsBot = !!battle && !!state?.users[battle.host]?.status.bot;
+  const canEditOptions = canEditBattleOptions(isFounder, hostIsBot);
 
   const [contentNonce, setContentNonce] = useState(0);
 
@@ -182,6 +202,23 @@ export function useBattleRoom(): BattleRoomView {
     [activeKey],
   );
 
+  // Route one option edit. Founder: set the script tag directly. Autohost battle:
+  // send `!bSet <name> <value>`; the autohost validates + echoes SETSCRIPTTAGS.
+  const sendOption = useCallback(
+    (tagKey: string, spadsName: string, value: string) => {
+      if (!activeKey) return;
+      if (isFounder) {
+        mpSetScriptTags({
+          serverKey: activeKey,
+          tags: { [tagKey]: value },
+        }).catch(() => {});
+      } else {
+        autohostSend(`!bSet ${spadsName} ${value}`);
+      }
+    },
+    [activeKey, isFounder, autohostSend],
+  );
+
   const rescan = useCallback(async () => {
     if (enginePath && dataDir && battle?.map) {
       invalidateMapPreview(enginePath, dataDir, battle.map);
@@ -204,6 +241,10 @@ export function useBattleRoom(): BattleRoomView {
     localGame,
     rows,
     sides,
+    modOptionsSchema,
+    mapOptionsSchema,
+    canEditOptions,
+    sendOption,
     startPosType,
     mapMissing,
     gameMissing,

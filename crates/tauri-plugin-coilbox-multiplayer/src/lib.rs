@@ -517,6 +517,31 @@ fn mp_set_script_tags(
 /// are only a best-effort approximation and are not consumed on the join path. A
 /// hosting-side mapping would need to renumber teams into a contiguous 0..N index
 /// space.
+/// Split a battle's opaque `script_tags` into the engine option maps the `play`
+/// `BattleConfig` consumes. Keys are matched case-insensitively (SPADS lowercases
+/// tag paths, but the engine is case-insensitive): `game/startpostype`,
+/// `game/modoptions/<k>`, `game/mapoptions/<k>`. Anything else is ignored.
+fn split_script_tags(
+    tags: &BTreeMap<String, String>,
+) -> (u8, BTreeMap<String, String>, BTreeMap<String, String>) {
+    const MOD: &str = "game/modoptions/";
+    const MAP: &str = "game/mapoptions/";
+    let mut start_pos_type = 0u8;
+    let mut mod_opts = BTreeMap::new();
+    let mut map_opts = BTreeMap::new();
+    for (k, v) in tags {
+        let lk = k.to_ascii_lowercase();
+        if lk == "game/startpostype" {
+            start_pos_type = v.trim().parse().unwrap_or(0);
+        } else if let Some(name) = lk.strip_prefix(MOD) {
+            mod_opts.insert(name.to_string(), v.clone());
+        } else if let Some(name) = lk.strip_prefix(MAP) {
+            map_opts.insert(name.to_string(), v.clone());
+        }
+    }
+    (start_pos_type, mod_opts, map_opts)
+}
+
 fn battle_to_config(state: &LobbyState) -> Result<Value, String> {
     let bid = state.current_battle.ok_or("not currently in a battle")?;
     let battle = state
@@ -567,6 +592,8 @@ fn battle_to_config(state: &LobbyState) -> Result<Value, String> {
         allies.insert(bs.ally);
     }
 
+    let (start_pos_type, mod_options, map_options) = split_script_tags(&battle.script_tags);
+
     let ally_teams: Vec<Value> = allies.iter().map(|_| json!({ "numAllies": 0 })).collect();
     let my_passwd = battle
         .members
@@ -577,7 +604,9 @@ fn battle_to_config(state: &LobbyState) -> Result<Value, String> {
         "mapName": battle.map,
         "gameType": battle.modname,
         "myPlayerName": me,
-        "startPosType": 0,
+        "startPosType": start_pos_type,
+        "modOptions": mod_options,
+        "mapOptions": map_options,
         "players": players,
         "ais": ais,
         "teams": teams.into_values().collect::<Vec<_>>(),
@@ -704,6 +733,16 @@ mod tests {
             },
         );
 
+        battle
+            .script_tags
+            .insert("game/startpostype".into(), "2".into());
+        battle
+            .script_tags
+            .insert("game/modoptions/maxunits".into(), "2000".into());
+        battle
+            .script_tags
+            .insert("game/mapoptions/waterlevel".into(), "-50".into());
+
         state.battles.insert(7, battle);
         state.current_battle = Some(7);
         state
@@ -742,6 +781,14 @@ mod tests {
         assert_eq!(red[0], 1.0);
         assert_eq!(red[1], 0.0);
         assert_eq!(red[2], 0.0);
+    }
+
+    #[test]
+    fn build_config_maps_script_tags_to_options() {
+        let cfg = battle_to_config(&joined_state()).unwrap();
+        assert_eq!(cfg["startPosType"], 2);
+        assert_eq!(cfg["modOptions"]["maxunits"], "2000");
+        assert_eq!(cfg["mapOptions"]["waterlevel"], "-50");
     }
 
     #[test]
