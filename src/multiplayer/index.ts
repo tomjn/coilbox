@@ -34,6 +34,14 @@ const multiplayerPlugin: FramePlugin = {
           order: 1,
           icon: MessagesSquare,
         },
+        {
+          id: "multiplayer.battles",
+          label: "Battles",
+          to: "/battles",
+          end: true,
+          order: 2,
+          icon: Swords,
+        },
       ],
     },
   ],
@@ -47,6 +55,11 @@ const multiplayerPlugin: FramePlugin = {
       path: "chat",
       lazy: () => import("./pages/ChatPage"),
       crumb: "Chat",
+    },
+    {
+      path: "battles",
+      lazy: () => import("./pages/BattlesPage"),
+      crumb: "Battles",
     },
   ],
   // App-level: the live connection + its state mirror must outlive the Lobby route
