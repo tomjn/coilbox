@@ -1,7 +1,13 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { MessagesSquare, Swords } from "lucide-react";
+import { Gamepad2, LogIn, MessagesSquare, Swords } from "lucide-react";
 import LobbyStatusButton from "./LobbyStatusButton";
-import { MultiplayerProvider } from "./store";
+import {
+  MultiplayerProvider,
+  useBattleRoomLabel,
+  useMpDisconnected,
+  useMpInBattle,
+  useMpRevealed,
+} from "./store";
 
 /**
  * The multiplayer plugin's frontend half: a "Lobby" nav group and its routes,
@@ -21,11 +27,13 @@ const multiplayerPlugin: FramePlugin = {
       items: [
         {
           id: "multiplayer.lobby",
-          label: "Lobby",
+          label: "Login",
           to: "/lobby",
           end: true,
           order: 0,
-          icon: Swords,
+          icon: LogIn,
+          // Only while logged out; disappears once connected.
+          useVisible: useMpDisconnected,
         },
         {
           id: "multiplayer.chat",
@@ -34,6 +42,8 @@ const multiplayerPlugin: FramePlugin = {
           end: true,
           order: 1,
           icon: MessagesSquare,
+          // Revealed on first connect, then sticky for the session.
+          useVisible: useMpRevealed,
         },
         {
           id: "multiplayer.battles",
@@ -42,6 +52,19 @@ const multiplayerPlugin: FramePlugin = {
           end: true,
           order: 2,
           icon: Swords,
+          useVisible: useMpRevealed,
+        },
+        {
+          id: "multiplayer.battle",
+          // Static fallback; the live battle title comes from `useLabel`.
+          label: "Battle Room",
+          to: "/battle",
+          end: true,
+          order: 3,
+          icon: Gamepad2,
+          // Only while in a battle; label tracks the joined battle's title.
+          useVisible: useMpInBattle,
+          useLabel: useBattleRoomLabel,
         },
       ],
     },
@@ -50,7 +73,7 @@ const multiplayerPlugin: FramePlugin = {
     {
       path: "lobby",
       lazy: () => import("./pages/LobbyPage"),
-      crumb: "Lobby",
+      crumb: "Login",
     },
     {
       path: "chat",
@@ -61,6 +84,11 @@ const multiplayerPlugin: FramePlugin = {
       path: "battles",
       lazy: () => import("./pages/BattlesPage"),
       crumb: "Battles",
+    },
+    {
+      path: "battle",
+      lazy: () => import("./pages/BattleRoomPage"),
+      crumb: "Battle Room",
     },
   ],
   slots: [{ slot: "topbar.right", order: 100, Component: LobbyStatusButton }],

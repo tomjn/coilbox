@@ -1,4 +1,5 @@
 import { ImageOff } from "lucide-react";
+import type { ReactNode } from "react";
 import type { StartPos } from "@/content/bindings";
 
 /**
@@ -24,6 +25,8 @@ export function MinimapPreview({
   loading,
   alt,
   onClick,
+  children,
+  placeholder,
 }: {
   dataUrl?: string | null;
   width?: number;
@@ -35,6 +38,11 @@ export function MinimapPreview({
   alt: string;
   /** When set, the preview is clickable (used to open the map picker). */
   onClick?: () => void;
+  /** Extra overlay content in the aspect-correct image box (e.g. start boxes). */
+  children?: ReactNode;
+  /** Replaces the "No minimap" empty state (e.g. an inline download panel). When
+   * shown, the box is not clickable so its own controls stay interactive. */
+  placeholder?: ReactNode;
 }) {
   const worldW = (width ?? 0) * 16;
   const worldH = (height ?? 0) * 16;
@@ -88,6 +96,11 @@ export function MinimapPreview({
           {i + 1}
         </span>
       ))}
+      {children}
+    </div>
+  ) : placeholder ? (
+    <div className="flex aspect-square w-full items-center justify-center p-3">
+      {placeholder}
     </div>
   ) : (
     <div className="flex aspect-square w-full flex-col items-center justify-center gap-1 text-muted-foreground">
@@ -96,7 +109,10 @@ export function MinimapPreview({
     </div>
   );
 
-  return onClick ? (
+  // A shown placeholder owns its own controls, so the box mustn't also be a button.
+  const showingPlaceholder = !loading && !dataUrl && !!placeholder;
+
+  return onClick && !showingPlaceholder ? (
     <button
       type="button"
       onClick={onClick}

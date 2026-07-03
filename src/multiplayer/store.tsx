@@ -125,6 +125,14 @@ interface MultiplayerContextValue {
   mirror: LobbyMirror;
   /** The connected `serverKey`, or null when not connected. */
   activeKey: string | null;
+  /** Whether a connection is currently live (`activeKey != null`). */
+  connected: boolean;
+  /**
+   * Session-sticky: `true` once the user has connected at least once this app run,
+   * and never cleared by a later disconnect/logout. Gates the Chat/Battles sidebar
+   * items so they appear on first connect and stay until the app is closed.
+   */
+  revealed: boolean;
   busy: boolean;
   /** Open a connection to `server` (throws on missing username/password). */
   connect: (server: LobbyServer) => Promise<void>;
@@ -161,6 +169,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const [mirror, dispatch] = useReducer(mirrorReducer, initialMirror);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // One-way "has ever connected this session" latch driving Chat/Battles sidebar
+  // visibility. Set on any transition to connected (fresh connect or reload
+  // reattach) and never reset, so those views stick across a logout until quit.
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    if (activeKey != null) setRevealed(true);
+  }, [activeKey]);
   const [loginPopoverOpen, setLoginPopoverOpen] = useState(false);
   const openLoginPopover = useCallback(() => setLoginPopoverOpen(true), []);
   const closeLoginPopover = useCallback(() => setLoginPopoverOpen(false), []);
@@ -355,6 +371,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       value={{
         mirror,
         activeKey,
+        connected: activeKey != null,
+        revealed,
         busy,
         connect,
         disconnect,
@@ -381,4 +399,42 @@ export function useMultiplayer(): MultiplayerContextValue {
     throw new Error("useMultiplayer must be used within MultiplayerProvider");
   }
   return ctx;
+}
+
+/**
+ * Nav/route predicate: has the user connected at least once this session? Gates
+ * the Chat/Battles sidebar items and routes (via `useVisible` / `NavGate`).
+ */
+export function useMpRevealed(): boolean {
+  return useMultiplayer().revealed;
+}
+
+/**
+ * Nav/route predicate: is multiplayer currently disconnected? Gates the Login
+ * sidebar item + route so it shows only while logged out.
+ */
+export function useMpDisconnected(): boolean {
+  return !useMultiplayer().connected;
+}
+
+/**
+ * Nav/route predicate: is the user currently in a battle? Gates the Battle Room
+ * sidebar item + route so it appears on join and vanishes on leave.
+ */
+export function useMpInBattle(): boolean {
+  return useMultiplayer().mirror.state?.currentBattle != null;
+}
+
+/**
+ * The dynamic label for the Battle Room nav item: the joined battle's title, or
+ * a generic fallback. Read reactively so picoframe re-renders it as the battle
+ * changes (`NavItem.useLabel`).
+ */
+export function useBattleRoomLabel(): string {
+  const state = useMultiplayer().mirror.state;
+  const battle =
+    state?.currentBattle != null
+      ? state.battles[String(state.currentBattle)]
+      : undefined;
+  return battle?.title?.trim() || "Battle Room";
 }

@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { MapItem, StartPos } from "@/content/bindings";
 import type { MapThumbData } from "@/content/config";
 import { mapSizeLabel } from "@/content/pages/components/MapThumb";
@@ -26,6 +26,9 @@ export function MapCard({
   mapsLoading,
   onSelectMap,
   disabled,
+  selectLabel = "Choose map",
+  overlay,
+  placeholder,
 }: {
   map: MapItem | null;
   maps: MapItem[];
@@ -40,6 +43,12 @@ export function MapCard({
   mapsLoading?: boolean;
   onSelectMap: (name: string) => void;
   disabled?: boolean;
+  /** Label for the picker button (e.g. "Suggest map" in a joined battle). */
+  selectLabel?: string;
+  /** Extra overlay in the minimap box (e.g. ally start boxes). */
+  overlay?: ReactNode;
+  /** Replaces the empty-state inside the minimap box (e.g. a download panel). */
+  placeholder?: ReactNode;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const size = map ? mapSizeLabel(map.width, map.height) : null;
@@ -75,7 +84,10 @@ export function MapCard({
         onClick={
           disabled || mapsLoading ? undefined : () => setPickerOpen(true)
         }
-      />
+        placeholder={placeholder}
+      >
+        {overlay}
+      </MinimapPreview>
 
       <div className="mt-3">
         <div className="flex items-start justify-between gap-3">
@@ -89,7 +101,7 @@ export function MapCard({
             disabled={disabled || mapsLoading}
             onClick={() => setPickerOpen(true)}
           >
-            Choose map
+            {selectLabel}
           </Button>
         </div>
         <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">

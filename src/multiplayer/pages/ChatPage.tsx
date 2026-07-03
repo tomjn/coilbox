@@ -1,4 +1,4 @@
-import { Button } from "@picoframe/frame";
+import { Button, NavGate } from "@picoframe/frame";
 import { LogOut, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { mpLeaveBattle, mpLeaveChannel } from "../bindings";
@@ -8,14 +8,16 @@ import { ConversationSidebar } from "../chat/ConversationSidebar";
 import { type ConversationDescriptor, convId } from "../chat/conversation";
 import { MemberList } from "../chat/MemberList";
 import { useConversation } from "../chat/useConversation";
-import { useMultiplayer } from "../store";
+import { useMpRevealed, useMultiplayer } from "../store";
 
 /**
  * The chat hub: sidebar of channels + DMs, a reusable ChatPane for the active
  * conversation, a toggleable member panel, and the channel-browser drawer.
- * Connection lives on the Lobby page; when disconnected this shows a prompt.
+ * Connection lives on the Login page; when disconnected this shows a prompt.
+ * Reachable only once the user has connected this session (see the `NavGate`
+ * wrapper below); before that, the route redirects to Login.
  */
-export default function ChatPage() {
+function ChatPage() {
   const { mirror, activeKey, markSeen, forgetChannel, openLoginPopover } =
     useMultiplayer();
   const [active, setActive] = useState<ConversationDescriptor | null>(null);
@@ -157,5 +159,14 @@ export default function ChatPage() {
         onJoined={(name) => setActive({ kind: "channel", name })}
       />
     </main>
+  );
+}
+
+/** Route entry: gated behind having connected at least once this session. */
+export default function ChatRoute() {
+  return (
+    <NavGate use={useMpRevealed} redirectTo="/lobby">
+      <ChatPage />
+    </NavGate>
   );
 }

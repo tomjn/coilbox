@@ -87,6 +87,7 @@ export interface Bot {
   teamColor: number;
 }
 
+/** Ally start rectangle; bounds are integers on a 0..200 grid (200 = full map). */
 export interface StartRect {
   left: number;
   top: number;

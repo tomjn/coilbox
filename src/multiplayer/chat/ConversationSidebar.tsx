@@ -8,6 +8,7 @@ import {
   Swords,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import type { ChatMsg } from "../bindings";
 import { useMultiplayer } from "../store";
 import {
   type ConversationDescriptor,
@@ -78,6 +79,22 @@ export function ConversationSidebar({
 }) {
   const { mirror, unreadFor } = useMultiplayer();
   const state = mirror.state;
+  const me = state?.myUsername ?? null;
+
+  // Unread count worth badging: messages arrived since last seen, minus the
+  // user's own lines. That excludes both messages they sent and the server's
+  // echo of their own JOIN (a Join msg with `from === me`), neither of which is
+  // a "new message" to them. Seen index is recovered from `unreadFor` so this
+  // reuses the store's read bookkeeping rather than duplicating it.
+  function unreadBadge(id: string, msgs: ChatMsg[]): number {
+    const total = msgs.length;
+    const seen = total - unreadFor(id, total);
+    let n = 0;
+    for (let i = seen; i < total; i++) {
+      if (msgs[i].from !== me) n++;
+    }
+    return n;
+  }
   // Battle chat lives in a synthetic `__battle__<id>` channel; surface it in its
   // own section rather than among joined channels.
   const channels = state
@@ -98,7 +115,7 @@ export function ConversationSidebar({
   const activeId = active ? convId(active) : null;
 
   function rowClass(id: string): string {
-    return `flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
+    return `flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
       id === activeId ? "bg-muted font-medium" : "hover:bg-muted"
     }`;
   }
@@ -119,8 +136,7 @@ export function ConversationSidebar({
                 channel: battleChannel,
               };
               const id = convId(desc);
-              const count =
-                state?.channels[battleChannel]?.messages.length ?? 0;
+              const msgs = state?.channels[battleChannel]?.messages ?? [];
               return (
                 <li key={id}>
                   <button
@@ -132,7 +148,7 @@ export function ConversationSidebar({
                     <span className="truncate">
                       {currentBattle.title || `Battle ${currentBattle.id}`}
                     </span>
-                    <Badge n={unreadFor(id, count)} />
+                    <Badge n={unreadBadge(id, msgs)} />
                   </button>
                 </li>
               );
@@ -159,7 +175,7 @@ export function ConversationSidebar({
         <ul className="flex flex-col gap-0.5 px-2">
           {channels.map((name) => {
             const id = `channel:${name}`;
-            const count = state?.channels[name].messages.length ?? 0;
+            const msgs = state?.channels[name].messages ?? [];
             return (
               <li key={id}>
                 <button
@@ -169,7 +185,7 @@ export function ConversationSidebar({
                 >
                   <Hash className="size-4 shrink-0 text-muted-foreground" />
                   <span className="truncate">{name}</span>
-                  <Badge n={unreadFor(id, count)} />
+                  <Badge n={unreadBadge(id, msgs)} />
                 </button>
               </li>
             );
@@ -191,7 +207,7 @@ export function ConversationSidebar({
         <ul className="flex flex-col gap-0.5 px-2">
           {peers.map((peer) => {
             const id = `dm:${peer}`;
-            const count = state?.dms[peer].length ?? 0;
+            const msgs = state?.dms[peer] ?? [];
             return (
               <li key={id}>
                 <button
@@ -201,7 +217,7 @@ export function ConversationSidebar({
                 >
                   <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
                   <span className="truncate">{peer}</span>
-                  <Badge n={unreadFor(id, count)} />
+                  <Badge n={unreadBadge(id, msgs)} />
                 </button>
               </li>
             );

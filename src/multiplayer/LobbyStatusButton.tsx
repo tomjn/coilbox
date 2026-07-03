@@ -83,10 +83,11 @@ export default function LobbyStatusButton() {
   );
 }
 
-function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
+export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   const [cfg] = useLobbyServers();
   const servers = cfg.servers;
-  const { mirror, activeKey, busy, connect, disconnect } = useMultiplayer();
+  const { mirror, activeKey, revealed, busy, connect, disconnect } =
+    useMultiplayer();
 
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<LobbyServer | null>(null);
@@ -153,7 +154,9 @@ function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
 
   return (
     <div className="flex flex-col gap-1">
-      <p className="px-2 pb-1 text-sm font-medium">Connect to multiplayer</p>
+      <p className="px-2 pb-1 text-sm font-medium">
+        {revealed ? "Reconnect to multiplayer" : "Connect to multiplayer"}
+      </p>
       {servers.map((s) => (
         <button
           key={s.id}

@@ -5,8 +5,8 @@
     "": {
       "name": "coilbox",
       "dependencies": {
-        "@picoframe/frame": "^0.0.9",
-        "@picoframe/plugin-sdk": "^0.0.4",
+        "@picoframe/frame": "^0.0.13",
+        "@picoframe/plugin-sdk": "^0.0.6",
         "@tauri-apps/api": "^2.11.0",
         "@tauri-apps/plugin-dialog": "^2.7.1",
         "@tauri-apps/plugin-opener": "^2.5.0",
@@ -88,9 +88,9 @@
 
     "@oxc-project/types": ["@oxc-project/types@0.137.0", "", {}, "sha512-WT+Gb24i8hmvo85AIv2oEYouEXkRlKAlT9WaCa3TfLgNCN+GhrJOGZuIlMouAh38Qe4QOx26eUOVsq70qXrywA=="],
 
-    "@picoframe/frame": ["@picoframe/frame@0.0.9", "", { "dependencies": { "@tauri-apps/plugin-opener": "^2.5.0", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.16.0", "radix-ui": "^1.6.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@picoframe/plugin-sdk": "*", "@tauri-apps/api": "^2.11.0", "react": "^19.0.0", "react-dom": "^19.0.0", "react-router": "^7.6.0" } }, "sha512-sGFi7wsYceO7rXXqc/3Wx7b8u7PTXc+R5VKp7kT6U7BFbtT/vaV2KA59xAOwAqGGtSEM8pbJPDv28BIvwWsENA=="],
+    "@picoframe/frame": ["@picoframe/frame@0.0.13", "", { "dependencies": { "@tauri-apps/plugin-opener": "^2.5.0", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.16.0", "radix-ui": "^1.6.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@picoframe/plugin-sdk": "*", "@tauri-apps/api": "^2.11.0", "react": "^19.0.0", "react-dom": "^19.0.0", "react-router": "^7.6.0" } }, "sha512-ET4EeEzgtME9ajx48OHNDEnPKjkBL/7QSqRx6DTP+tXY7tYr5XKBjo7K5i118Z8klunRx5cCZ5HRKSpZhZawvg=="],
 
-    "@picoframe/plugin-sdk": ["@picoframe/plugin-sdk@0.0.4", "", { "peerDependencies": { "@tauri-apps/api": "^2.11.0", "react": "^19.0.0" } }, "sha512-1x00q4Hul5seYygqYxEfd7uLAjxM92WSHmd8gdRJu1loZeR+tGziXyXlAbCLb+ptE6qj6kFSCJ8uHZI03Cu6aQ=="],
+    "@picoframe/plugin-sdk": ["@picoframe/plugin-sdk@0.0.6", "", { "peerDependencies": { "@tauri-apps/api": "^2.11.0", "react": "^19.0.0" } }, "sha512-PZqLH9at907l/U8LsuH0+07lBHkmsWjebur9CJUgWG61MnEeGxnc9m00Ik2CSMmzuVfZapTn1lEHmNSoYSG/aw=="],
 
     "@radix-ui/number": ["@radix-ui/number@1.1.2", "", {}, "sha512-ceTwaxc4I5IOi97DgCotl3pqiyRGvffcc0oOsE2dQYaJOFIDsDt4VWG6xEbg1QePv9QWausCEIppud/tJ1wNig=="],
 

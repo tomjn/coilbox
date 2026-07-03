@@ -1,5 +1,6 @@
-import { Button } from "@picoframe/frame";
-import { useMemo, useState } from "react";
+import { Button, NavGate } from "@picoframe/frame";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { useScanTargetSelection } from "../../content/config";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
 import { BattleList } from "../battles/BattleList";
@@ -8,15 +9,17 @@ import {
   filterSortBattles,
 } from "../battles/battleFilters";
 import { type Battle, mpJoinBattle, mpLeaveBattle } from "../bindings";
-import { useMultiplayer } from "../store";
+import { useMpRevealed, useMultiplayer } from "../store";
 
 /**
  * The Battles hub: search + filter/sort controls over the live battle list, with
  * in-place join. Battles come from the mirror snapshot (kept fresh by the store's
  * delta→snapshot rule); joining is reflected by the joined banner rather than
- * navigating away. Connection lives on the Lobby page; disconnected shows a prompt.
+ * navigating away. Connection lives on the Login page; disconnected shows a prompt.
+ * Reachable only once the user has connected this session (see the `NavGate`
+ * wrapper below); before that, the route redirects to Login.
  */
-export default function BattlesPage() {
+function BattlesPage() {
   const {
     mirror,
     activeKey,
@@ -43,9 +46,21 @@ export default function BattlesPage() {
   // Selected engine + content root for rendering local minimaps in the rows.
   const { selected } = useScanTargetSelection();
 
+  const navigate = useNavigate();
   const ready = mirror.phase === "ready";
   const joinedId = mirror.state?.currentBattle ?? null;
   const canJoin = ready && !busy && joinedId == null;
+
+  // After a user-initiated join lands (the ack sets `currentBattle`), go straight
+  // to the battle room. Gated on `joiningRef` so merely revisiting this page while
+  // already in a battle doesn't redirect.
+  const joiningRef = useRef(false);
+  useEffect(() => {
+    if (joinedId != null && joiningRef.current) {
+      joiningRef.current = false;
+      navigate("/battle");
+    }
+  }, [joinedId, navigate]);
   const joinedBattle =
     joinedId != null ? mirror.state?.battles[String(joinedId)] : undefined;
 
@@ -67,10 +82,12 @@ export default function BattlesPage() {
   async function onJoin(b: Battle, key?: string) {
     if (!activeKey) return;
     clearJoinError();
+    joiningRef.current = true;
     try {
       await mpJoinBattle({ serverKey: activeKey, id: b.id, key });
     } catch {
       // Wire-level failures surface via lastJoinError or a disconnect.
+      joiningRef.current = false;
     }
   }
 
@@ -127,5 +144,14 @@ export default function BattlesPage() {
         dataDir={selected?.rootPath}
       />
     </main>
+  );
+}
+
+/** Route entry: gated behind having connected at least once this session. */
+export default function BattlesRoute() {
+  return (
+    <NavGate use={useMpRevealed} redirectTo="/lobby">
+      <BattlesPage />
+    </NavGate>
   );
 }

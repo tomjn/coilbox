@@ -1,4 +1,4 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, cn, Input } from "@picoframe/frame";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ChatMsg } from "../bindings";
 
@@ -9,6 +9,24 @@ function formatTime(at: number): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** Messages within this window from one sender are visually grouped. */
+const GROUP_WINDOW_MS = 5 * 60_000;
+
+/** join/leave/system render as centered notices and never group. */
+const isNotice = (k: ChatMsg["kind"]) =>
+  k === "join" || k === "leave" || k === "system";
+
+/**
+ * Whether `b` should be grouped under `a`: same sender, close in time, neither a
+ * notice. SPADS dumps command lists / stats tables as a burst of separate
+ * messages, so grouping collapses the per-message name + timestamp into one.
+ */
+function grouped(a: ChatMsg, b: ChatMsg): boolean {
+  if (isNotice(a.kind) || isNotice(b.kind)) return false;
+  if (a.from !== b.from) return false;
+  return Math.abs(b.at - a.at) <= GROUP_WINDOW_MS;
 }
 
 export interface ChatPaneProps {
@@ -93,23 +111,19 @@ export function ChatPane({
         )}
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-auto px-4 py-3">
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto px-4 py-3">
         {messages.length === 0
           ? (emptyState ?? (
               <p className="text-sm text-muted-foreground">No messages yet.</p>
             ))
           : messages.map((m, i) => {
               const key = `${m.from}-${m.at}-${i}`;
-              if (
-                m.kind === "join" ||
-                m.kind === "leave" ||
-                m.kind === "system"
-              ) {
+              if (isNotice(m.kind)) {
                 const color = senderColor?.(m.from);
                 return (
                   <div
                     key={key}
-                    className="py-0.5 text-center text-xs text-muted-foreground"
+                    className="mt-2 py-0.5 text-center text-xs text-muted-foreground first:mt-0"
                   >
                     {m.kind === "system" ? (
                       m.text
@@ -131,20 +145,26 @@ export function ChatPane({
               }
               const own = currentUser != null && m.from === currentUser;
               const color = senderColor?.(m.from);
+              // Group a run of messages from one sender: name on the first only,
+              // timestamp on the last only, tight spacing between.
+              const prev = messages[i - 1];
+              const next = messages[i + 1];
+              const prevSame = prev != null && grouped(prev, m);
+              const nextSame = next != null && grouped(m, next);
               return (
                 <div
                   key={key}
-                  className={
-                    own
-                      ? "flex flex-col items-end"
-                      : "flex flex-col items-start"
-                  }
+                  className={cn(
+                    "flex flex-col first:mt-0",
+                    own ? "items-end" : "items-start",
+                    prevSame ? "mt-0.5" : "mt-2",
+                  )}
                 >
                   <div
                     className={
                       own
-                        ? "max-w-[75%] rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-                        : "max-w-[75%] rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm"
+                        ? "max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+                        : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm"
                     }
                     // Wash the non-own bubble with the sender's team colour (low
                     // alpha keeps the foreground text readable in both themes).
@@ -154,7 +174,7 @@ export function ChatPane({
                         : undefined
                     }
                   >
-                    {!own && (
+                    {!own && !prevSame && (
                       <span
                         className="mr-2 text-xs font-medium text-muted-foreground"
                         style={color ? { color } : undefined}
@@ -162,13 +182,15 @@ export function ChatPane({
                         {m.from}
                       </span>
                     )}
-                    <span className="whitespace-pre-wrap break-words">
+                    <span className="whitespace-pre-wrap break-words font-mono">
                       {m.text}
                     </span>
                   </div>
-                  <span className="px-1 pt-0.5 text-[10px] text-muted-foreground">
-                    {formatTime(m.at)}
-                  </span>
+                  {!nextSame && (
+                    <span className="px-1 pt-0.5 text-[10px] text-muted-foreground">
+                      {formatTime(m.at)}
+                    </span>
+                  )}
                 </div>
               );
             })}
