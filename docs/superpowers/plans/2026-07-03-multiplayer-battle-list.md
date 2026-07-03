@@ -515,16 +515,16 @@ git commit -m "feat(multiplayer): battles nav item + route"
 
 ---
 
-### Task 5: Vendor the popover component + JoinBattlePopover
+### Task 5: JoinBattlePopover (popover primitive already vendored)
 
 **Files:**
-- Create: `src/components/ui/popover.tsx` (via shadcn)
 - Create: `src/multiplayer/battles/JoinBattlePopover.tsx`
 
-- [ ] **Step 1: Add the picoframe popover component**
+> Note: `src/components/ui/popover.tsx` **already exists** (added by concurrent work, commit `68bc4a3`) and exports `Popover`, `PopoverTrigger`, `PopoverContent`, `PopoverAnchor` from `@/components/ui/popover` (radix-ui wrapper; default content width `w-72`). Do NOT run shadcn or modify that file — just import from it.
 
-Run: `npx shadcn@latest add @picoframe/popover`
-Expected: creates `src/components/ui/popover.tsx` exporting `Popover`, `PopoverTrigger`, `PopoverContent`. (Requires network; `components.json` is already wired to the registry.)
+- [ ] **Step 1: Confirm the popover primitive exports**
+
+Read `src/components/ui/popover.tsx` and confirm it exports `Popover`, `PopoverTrigger`, `PopoverContent`. (It does as of commit `68bc4a3`.) No install needed.
 
 - [ ] **Step 2: Create the password-prompt popover**
 
@@ -609,7 +609,7 @@ Expected: FAIL only on the still-missing `./pages/BattlesPage` (from Task 4). `J
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/components/ui/popover.tsx src/multiplayer/battles/JoinBattlePopover.tsx components.json
+git add src/multiplayer/battles/JoinBattlePopover.tsx
 git commit -m "feat(multiplayer): join-battle password popover"
 ```
 
