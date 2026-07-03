@@ -51,6 +51,7 @@ export function BattleFilterPopover({
     <Popover>
       <PopoverTrigger asChild>
         <Button
+          variant={badgeCount > 0 ? "default" : "secondary"}
           className="h-9 shrink-0 gap-2 px-3"
           aria-label="Filters and sorting"
         >
