@@ -32,4 +32,20 @@ describe("parseMessage", () => {
   it("leaves an unclosed backtick as literal text", () => {
     expect(parseMessage("a ` b")).toEqual([{ type: "text", value: "a ` b" }]);
   });
+
+  it("auto-links a bare URL", () => {
+    expect(parseMessage("see https://example.com yo")).toEqual([
+      { type: "text", value: "see " },
+      { type: "url", value: "https://example.com" },
+      { type: "text", value: " yo" },
+    ]);
+  });
+
+  it("trims trailing sentence punctuation off a URL", () => {
+    expect(parseMessage("go https://example.com.")).toEqual([
+      { type: "text", value: "go " },
+      { type: "url", value: "https://example.com" },
+      { type: "text", value: "." },
+    ]);
+  });
 });

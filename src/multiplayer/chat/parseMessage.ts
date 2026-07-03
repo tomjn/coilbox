@@ -37,6 +37,28 @@ function parseInline(text: string): Inline[] {
   return out;
 }
 
+/** Extract bare http(s) URLs; remaining runs handed to bold/italic parsing. */
 function parseUrls(text: string): Inline[] {
+  const out: Inline[] = [];
+  const urlRe = /https?:\/\/\S+/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = urlRe.exec(text)) !== null) {
+    if (m.index > last) out.push(...parseEmphasis(text.slice(last, m.index)));
+    const url = m[0];
+    const trail = /[.,!?)\]}:;]+$/.exec(url);
+    out.push({
+      type: "url",
+      value: trail ? url.slice(0, -trail[0].length) : url,
+    });
+    if (trail) out.push({ type: "text", value: trail[0] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(...parseEmphasis(text.slice(last)));
+  return out;
+}
+
+/** Bold/italic pass (implemented in the next task). */
+function parseEmphasis(text: string): Inline[] {
   return text === "" ? [] : [{ type: "text", value: text }];
 }
