@@ -56,7 +56,7 @@ src/multiplayer/
     useBattles.ts             // derive filtered+sorted Battle[]         (new)
     BattleList.tsx            // maps rows, empty state                  (new)
     BattleRow.tsx             // one battle row + Join                   (new)
-    JoinBattleDialog.tsx      // password prompt (picoframe dialog)      (new)
+    JoinBattlePopover.tsx     // password prompt anchored on Join (picoframe popover)  (new)
 ```
 
 ### Data flow (read-only off the mirror)
@@ -93,14 +93,15 @@ function occupancy(b: Battle): number {
   `occupancy/maxPlayers`, spectatorCount, lock + password icons (picoframe/lucide).
   Join button: disabled when `!ready`, `busy`, or already `joined`. Highlighted
   when this row is the joined battle.
-- **`JoinBattleDialog`** — picoframe `dialog`; shown when joining a passworded
-  battle. Collects the key, then calls the join. Cancel closes without joining.
+- **`JoinBattlePopover`** — picoframe `popover` whose trigger is the row's Join
+  button (drawers/popovers preferred over modal dialogs). Collects the key, then
+  calls the join. Closing resets the field.
 
 ### Join flow (join in place)
 
 ```
 Join(b) →
-  b.passworded ? open JoinBattleDialog(b) : joinNow(b)
+  b.passworded ? open JoinBattlePopover(on Join button) : joinNow(b)
   onSubmit(key) → joinNow(b, key)
   joinNow(b, key?) →
     clearJoinError()                                   // reset lastJoinError
@@ -141,7 +142,7 @@ This is the only change to existing state plumbing. Everything else is additive.
   a subsequent successful snapshot leaves it cleared.
 - **Manual smoke** (`bun tauri dev`, live TASServer): battle appears/updates/closes
   live; join a public battle → banner + Leave works; join a passworded battle →
-  dialog → wrong key shows reason; occupancy matches the server.
+  popover → wrong key shows reason; occupancy matches the server.
 - Full lint suite before PR: `cargo fmt --all --check`,
   `cargo clippy --all-targets --all-features -- -D warnings`, `bunx biome ci .`,
   `bun run typecheck`. (Rust only changes if any; this pass is frontend + store.)
@@ -153,5 +154,5 @@ This is the only change to existing state plumbing. Everything else is additive.
   a live server during smoke.
 - **spectatorCount** from `UPDATEBATTLEINFO` is a count of spectating members, a
   subset — shown separately, not subtracted from occupancy in this pass.
-- Reusing picoframe `dialog` requires it be present in `src/components/ui/`; add via
-  `npx shadcn@latest add @picoframe/dialog` if missing.
+- Reusing picoframe `popover` requires it be present in `src/components/ui/`; add via
+  `npx shadcn@latest add @picoframe/popover` if missing.
