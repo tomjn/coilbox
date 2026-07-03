@@ -113,7 +113,6 @@ function ChatPage() {
           senderColor={senderColor}
           isBot={isBot}
           onSend={conv.send}
-          placeholder={`Message ${conv.title}`}
           headerActions={
             active.kind === "channel" || active.kind === "battle" ? (
               <>

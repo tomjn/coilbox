@@ -49,7 +49,6 @@ export interface ChatPaneProps {
   /** `full` fills the viewport column; `embedded` fits a smaller host box. */
   variant?: "full" | "embedded";
   emptyState?: ReactNode;
-  placeholder?: string;
   disabled?: boolean;
 }
 
@@ -69,7 +68,6 @@ export function ChatPane({
   isBot,
   variant = "full",
   emptyState,
-  placeholder = "Message…",
   disabled = false,
 }: ChatPaneProps) {
   const [draft, setDraft] = useState("");
@@ -236,9 +234,10 @@ export function ChatPane({
               submit();
             }
           }}
-          placeholder={placeholder}
+          placeholder="Type your message..."
           disabled={disabled}
           aria-label="Message"
+          className="placeholder:italic"
         />
         <Button
           onClick={submit}

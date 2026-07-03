@@ -55,7 +55,6 @@ export function BattleChatCard({ battle }: { battle: Battle }) {
         senderColor={senderColor}
         isBot={isBot}
         onSend={conv.send}
-        placeholder="Message the battle"
       />
     </div>
   );
