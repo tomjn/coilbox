@@ -10,24 +10,28 @@ import {
  * Join affordance for a passworded battle: the Join button is the popover trigger,
  * and the content is a small password form. Submitting hands the key up and closes;
  * closing resets the field. Used in place of a modal dialog (drawers/popovers
- * preferred over dialogs).
+ * preferred over dialogs). Open state is controlled by the parent so the row's
+ * minimap/title can open it too, not just this button.
  */
 export function JoinBattlePopover({
   title,
   disabled,
   onSubmit,
+  open,
+  onOpenChange,
 }: {
   title: string;
   disabled: boolean;
   onSubmit: (key: string) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
   return (
     <Popover
       open={open}
       onOpenChange={(o) => {
-        setOpen(o);
+        onOpenChange(o);
         if (!o) setKey("");
       }}
     >
@@ -42,7 +46,7 @@ export function JoinBattlePopover({
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit(key);
-            setOpen(false);
+            onOpenChange(false);
           }}
         >
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Input> control (implicit label association) */}
