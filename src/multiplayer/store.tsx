@@ -113,6 +113,12 @@ interface MultiplayerContextValue {
   rememberChannel: (name: string) => void;
   /** Forget a channel so it's no longer auto-rejoined. */
   forgetChannel: (name: string) => void;
+  /** Whether the topbar login/status popover is open. */
+  loginPopoverOpen: boolean;
+  /** Open the topbar login/status popover (used by not-connected CTAs app-wide). */
+  openLoginPopover: () => void;
+  /** Close the topbar login/status popover. */
+  closeLoginPopover: () => void;
 }
 
 const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
@@ -127,6 +133,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const [mirror, dispatch] = useReducer(mirrorReducer, initialMirror);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loginPopoverOpen, setLoginPopoverOpen] = useState(false);
+  const openLoginPopover = useCallback(() => setLoginPopoverOpen(true), []);
+  const closeLoginPopover = useCallback(() => setLoginPopoverOpen(false), []);
 
   // Per-conversation "seen up to N messages" marks. Seeded to the connect-time
   // snapshot so persisted DM history and already-present channel logs don't show
@@ -256,6 +265,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       const snap = await mpSnapshot({ serverKey });
       dispatch({ type: "snapshot", state: snap.state });
       setActiveKey(serverKey);
+      setLoginPopoverOpen(false);
     } finally {
       setBusy(false);
     }
@@ -285,6 +295,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         markSeen,
         rememberChannel,
         forgetChannel,
+        loginPopoverOpen,
+        openLoginPopover,
+        closeLoginPopover,
       }}
     >
       {children}
