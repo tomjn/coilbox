@@ -1,3 +1,5 @@
+import { Input } from "@picoframe/frame";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { EngineConfigSetting } from "../bindings";
 import { useScanTargetSelection, useUnitsyncEngineConfig } from "../config";
 import { BrowserToolbar } from "./components/BrowserToolbar";
@@ -79,16 +81,11 @@ export default function EngineSettingsSection() {
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 {category}
               </h2>
-              <dl className="grid grid-cols-[minmax(10rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
+              <div className="grid grid-cols-[minmax(10rem,auto)_1fr] items-center gap-x-4 gap-y-2.5 rounded-lg border border-border/50 bg-card p-3 text-sm">
                 {items.map((s) => (
-                  <div key={s.key} className="contents">
-                    <dt className="text-muted-foreground" title={s.key}>
-                      {s.label}
-                    </dt>
-                    <dd className="break-words font-mono">{s.value || "—"}</dd>
-                  </div>
+                  <EngineSettingField key={s.key} setting={s} />
                 ))}
-              </dl>
+              </div>
             </section>
           ))}
         </div>
@@ -102,6 +99,42 @@ export default function EngineSettingsSection() {
           Config file: {data.configPath}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * One engine setting rendered as the (disabled) control its type calls for — a
+ * checkbox for `bool`, a number/text field otherwise — so the read-only view
+ * mirrors the singleplayer mod-options panel. Label and control share the
+ * parent grid via `contents`.
+ */
+function EngineSettingField({ setting: s }: { setting: EngineConfigSetting }) {
+  const id = `engineopt-${s.key}`;
+
+  if (s.type === "bool") {
+    return (
+      <div className="contents">
+        <label htmlFor={id} className="text-muted-foreground" title={s.key}>
+          {s.label}
+        </label>
+        <Checkbox id={id} checked={s.value === "1"} disabled />
+      </div>
+    );
+  }
+
+  return (
+    <div className="contents">
+      <label htmlFor={id} className="text-muted-foreground" title={s.key}>
+        {s.label}
+      </label>
+      <Input
+        id={id}
+        type={s.type === "number" ? "number" : "text"}
+        value={s.value}
+        disabled
+        readOnly
+      />
     </div>
   );
 }

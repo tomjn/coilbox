@@ -17,6 +17,8 @@ use std::path::Path;
 /// A curated key's type plus the engine default returned when it isn't set.
 enum Kind {
     Str(&'static str),
+    /// A genuine on/off toggle stored as an engine int (`0`/`1`).
+    Bool(bool),
     Int(i32),
     Float(f32),
 }
@@ -32,12 +34,12 @@ struct ConfigVar {
 /// and defaults verified against Recoil `spring --list-config-vars`.
 const CATALOG: &[ConfigVar] = &[
     // Display
-    cv("Fullscreen", "Fullscreen", "Display", Kind::Int(1)),
+    cv("Fullscreen", "Fullscreen", "Display", Kind::Bool(true)),
     cv(
         "WindowBorderless",
         "Borderless window",
         "Display",
-        Kind::Int(0),
+        Kind::Bool(false),
     ),
     cv("XResolution", "Resolution width", "Display", Kind::Int(0)),
     cv("YResolution", "Resolution height", "Display", Kind::Int(0)),
@@ -81,7 +83,7 @@ const CATALOG: &[ConfigVar] = &[
         "AdvMapShading",
         "Advanced map shading",
         "Graphics",
-        Kind::Int(1),
+        Kind::Bool(true),
     ),
     // Sound
     cv("snd_volmaster", "Master volume", "Sound", Kind::Int(60)),
@@ -107,7 +109,7 @@ const CATALOG: &[ConfigVar] = &[
         "HardwareCursor",
         "Hardware cursor",
         "Input & Camera",
-        Kind::Int(0),
+        Kind::Bool(false),
     ),
     cv(
         "ScrollWheelSpeed",
@@ -125,7 +127,7 @@ const CATALOG: &[ConfigVar] = &[
         "EdgeMoveDynamic",
         "Dynamic edge scroll",
         "Input & Camera",
-        Kind::Int(1),
+        Kind::Bool(true),
     ),
     cv(
         "FPSFOV",
@@ -201,13 +203,20 @@ pub fn render(lib: &str) -> EngineConfigOutput {
         .filter_map(|v| {
             let value = match v.kind {
                 Kind::Str(d) => us.spring_config_string(v.key, d),
+                Kind::Bool(d) => us.spring_config_int(v.key, d as i32).map(|n| n.to_string()),
                 Kind::Int(d) => us.spring_config_int(v.key, d).map(|n| n.to_string()),
                 Kind::Float(d) => us.spring_config_float(v.key, d).map(fmt_float),
             }?;
+            let value_type = match v.kind {
+                Kind::Str(_) => "string",
+                Kind::Bool(_) => "bool",
+                Kind::Int(_) | Kind::Float(_) => "number",
+            };
             Some(EngineConfigSetting {
                 key: v.key.to_string(),
                 label: v.label.to_string(),
                 category: v.category.to_string(),
+                value_type,
                 value,
             })
         })

@@ -481,6 +481,8 @@ export interface EngineConfigSetting {
   key: string;
   label: string;
   category: string;
+  /** How to render the value. */
+  type: "bool" | "number" | "string";
   /** The effective value (configured value, or the engine default when unset). */
   value: string;
 }
