@@ -140,6 +140,13 @@ pub struct LobbyState {
     pub host_port: Option<u16>,
     /// The last-fetched public channel directory (from `CHANNELS`).
     pub channel_directory: Vec<DirChannel>,
+    /// Our intended per-battle status + team colour, authoritative for answering
+    /// `REQUESTBATTLESTATUS`. Set when we open a battle (host defaults to player)
+    /// and updated on every status push (spectate/ready/sync/colour), so a server
+    /// re-prompt never reverts us to the spectator default. Cleared on leave.
+    /// Internal-only: the frontend reads confirmed status from `members`.
+    #[serde(skip)]
+    pub my_intended_battle_status: Option<(BattleStatus, u32)>,
 }
 
 impl LobbyState {
@@ -152,6 +159,11 @@ impl LobbyState {
     /// Falls back to the protocol default when we are not yet a member (e.g. the
     /// prompt races our own join), so the server always gets a well-formed reply.
     pub fn my_battle_status_or_default(&self) -> (BattleStatus, u32) {
+        // Our own intent wins: it's set the moment we open a battle (host → player)
+        // and on every status push, so a re-prompt can't revert a spectate toggle.
+        if let Some(intended) = self.my_intended_battle_status {
+            return intended;
+        }
         if let (Some(bid), Some(me)) = (self.current_battle, self.my_username.as_ref()) {
             if let Some(m) = self.battles.get(&bid).and_then(|b| b.members.get(me)) {
                 return (m.battle_status, m.team_color);

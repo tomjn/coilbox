@@ -354,6 +354,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             state.battles.remove(&id);
             if state.current_battle == Some(id) {
                 state.current_battle = None;
+                state.my_intended_battle_status = None;
             }
             vec![Delta::BattleClosed { id }]
         }
@@ -382,6 +383,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                 && state.current_battle == Some(id)
             {
                 state.current_battle = None;
+                state.my_intended_battle_status = None;
             }
             vec![Delta::MemberLeft {
                 battle_id: id,

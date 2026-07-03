@@ -16,8 +16,8 @@ mod tls;
 use std::collections::{BTreeMap, BTreeSet};
 
 use coilbox_lobby_protocol::{
-    command, password_hash, team_color_rgb, BattleStatus, ClientStatus, LobbyState, LoginConfig,
-    LoginMode,
+    command, default_battle_status, password_hash, team_color_rgb, BattleStatus, ClientStatus,
+    LobbyState, LoginConfig, LoginMode,
 };
 use conn::{spawn_connection, LobbyEvent, Outbound, Registry};
 use picoframe_core::CliResult;
@@ -40,6 +40,21 @@ fn enqueue(registry: &Registry, server_key: &str, line: String) -> CliResult {
             Err(_) => CliResult::err("connection is closed"),
         },
         None => CliResult::err(format!("not connected: {server_key}")),
+    }
+}
+
+/// Record our intended battle status on the connection's state so the
+/// `REQUESTBATTLESTATUS` auto-reply (in `conn.rs`) reflects it. Kept in sync with
+/// every status push and seeded to player when we open a battle, so the server's
+/// re-prompts can't revert us to the spectator default.
+fn set_intended_battle_status(
+    registry: &Registry,
+    server_key: &str,
+    status: BattleStatus,
+    color: u32,
+) {
+    if let Some(conn) = registry.lock().unwrap().get(server_key) {
+        conn.state.lock().unwrap().my_intended_battle_status = Some((status, color));
     }
 }
 
@@ -411,6 +426,7 @@ fn mp_set_battle_status(
         sync,
         side,
     };
+    set_intended_battle_status(registry.inner(), &server_key, status, color);
     enqueue(
         registry.inner(),
         &server_key,
@@ -453,6 +469,13 @@ fn mp_open_battle(
         &title,
         &modname,
     );
+    // Seat the host as a player by default (protocol default is spectator). The
+    // frontend's colour/sync/spectate pushes then refine this via mp_set_battle_status.
+    let seat = BattleStatus {
+        mode: true,
+        ..default_battle_status()
+    };
+    set_intended_battle_status(registry.inner(), &server_key, seat, 0);
     enqueue(registry.inner(), &server_key, line)
 }
 
