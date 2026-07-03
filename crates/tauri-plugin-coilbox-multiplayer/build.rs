@@ -11,6 +11,7 @@ const COMMANDS: &[&str] = &[
     "mp_send",
     "mp_say",
     "mp_say_private",
+    "mp_say_battle",
     "mp_join_channel",
     "mp_leave_channel",
     "mp_list_channels",

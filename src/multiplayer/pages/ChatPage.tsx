@@ -1,7 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { LogOut, Users } from "lucide-react";
-import { useEffect, useState } from "react";
-import { mpLeaveChannel } from "../bindings";
+import { useCallback, useEffect, useState } from "react";
+import { mpLeaveBattle, mpLeaveChannel } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
 import { ChatPane } from "../chat/ChatPane";
 import { ConversationSidebar } from "../chat/ConversationSidebar";
@@ -25,6 +25,24 @@ export default function ChatPage() {
   const conv = useConversation(active);
   const me = mirror.state?.myUsername ?? null;
 
+  // In a battle, tint messages by each player's team colour. The `teamColor` int
+  // is `0xBBGGRR` (red is the low byte), matching the protocol's team_color_rgb.
+  const battle =
+    active?.kind === "battle"
+      ? mirror.state?.battles[String(active.id)]
+      : undefined;
+  const senderColor = useCallback(
+    (from: string): string | undefined => {
+      const c = battle?.members[from]?.teamColor;
+      if (c == null) return undefined;
+      const r = c & 0xff;
+      const g = (c >> 8) & 0xff;
+      const b = (c >> 16) & 0xff;
+      return `#${[r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("")}`;
+    },
+    [battle],
+  );
+
   // Mark the open conversation read as its message count changes.
   useEffect(() => {
     if (active) markSeen(convId(active), conv.messages.length);
@@ -43,6 +61,18 @@ export default function ChatPage() {
     setActive((cur) =>
       cur?.kind === "channel" && cur.name === name ? null : cur,
     );
+  }
+
+  // Leave the current battle. Battle chat isn't a leavable channel of its own, so
+  // the header's leave action drops the whole battle (SAYBATTLE ends with it).
+  async function leaveBattle() {
+    if (!activeKey) return;
+    try {
+      await mpLeaveBattle({ serverKey: activeKey });
+    } catch {
+      // Best-effort; deselect regardless.
+    }
+    setActive((cur) => (cur?.kind === "battle" ? null : cur));
   }
 
   if (!activeKey) {
@@ -73,10 +103,11 @@ export default function ChatPage() {
           subtitle={conv.subtitle}
           messages={conv.messages}
           currentUser={me}
+          senderColor={senderColor}
           onSend={conv.send}
           placeholder={`Message ${conv.title}`}
           headerActions={
-            active.kind === "channel" ? (
+            active.kind === "channel" || active.kind === "battle" ? (
               <>
                 <Button
                   className="h-7 px-2"
@@ -86,13 +117,20 @@ export default function ChatPage() {
                 >
                   <Users className="size-4" />
                 </Button>
-                <Button
-                  className="h-7 px-2"
-                  onClick={() => leaveChannel(active.name)}
-                  aria-label="Leave channel"
-                >
-                  <LogOut className="size-4" />
-                </Button>
+                {active.kind === "channel" ? (
+                  <Button
+                    className="h-7 px-2"
+                    onClick={() => leaveChannel(active.name)}
+                    aria-label="Leave channel"
+                  >
+                    <LogOut className="size-4" />
+                  </Button>
+                ) : (
+                  <Button className="h-7 gap-1.5 px-2" onClick={leaveBattle}>
+                    <LogOut className="size-4" />
+                    Leave
+                  </Button>
+                )}
               </>
             ) : undefined
           }
@@ -103,12 +141,14 @@ export default function ChatPage() {
         </div>
       )}
 
-      {active?.kind === "channel" && showMembers && (
-        <MemberList
-          members={conv.members}
-          onSelect={(username) => setActive({ kind: "dm", peer: username })}
-        />
-      )}
+      {(active?.kind === "channel" || active?.kind === "battle") &&
+        showMembers && (
+          <MemberList
+            members={conv.members}
+            onSelect={(username) => setActive({ kind: "dm", peer: username })}
+            colorFor={senderColor}
+          />
+        )}
 
       <ChannelBrowser
         open={browserOpen}

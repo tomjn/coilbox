@@ -5,10 +5,15 @@ import {
   Hash,
   MessageSquare,
   Plus,
+  Swords,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useMultiplayer } from "../store";
-import { type ConversationDescriptor, convId } from "./conversation";
+import {
+  type ConversationDescriptor,
+  convId,
+  isBattleChannel,
+} from "./conversation";
 
 function Badge({ n }: { n: number }) {
   if (n <= 0) return null;
@@ -72,10 +77,22 @@ export function ConversationSidebar({
 }) {
   const { mirror, unreadFor } = useMultiplayer();
   const state = mirror.state;
-  const channels = state ? Object.keys(state.channels).sort() : [];
+  // Battle chat lives in a synthetic `__battle__<id>` channel; surface it in its
+  // own section rather than among joined channels.
+  const channels = state
+    ? Object.keys(state.channels)
+        .filter((n) => !isBattleChannel(n))
+        .sort()
+    : [];
   const peers = state ? Object.keys(state.dms ?? {}).sort() : [];
+  const currentBattle =
+    state?.currentBattle != null
+      ? state.battles[String(state.currentBattle)]
+      : undefined;
+  const battleChannel = currentBattle?.channel ?? null;
   const [channelsOpen, setChannelsOpen] = useState(true);
   const [dmsOpen, setDmsOpen] = useState(true);
+  const [battleOpen, setBattleOpen] = useState(true);
 
   const activeId = active ? convId(active) : null;
 
@@ -87,6 +104,42 @@ export function ConversationSidebar({
 
   return (
     <nav className="flex w-60 shrink-0 flex-col overflow-auto border-r border-border">
+      {currentBattle && battleChannel && (
+        <Section
+          title="Battle"
+          open={battleOpen}
+          onToggle={() => setBattleOpen((v) => !v)}
+        >
+          <ul className="flex flex-col gap-0.5 px-2">
+            {(() => {
+              const desc: ConversationDescriptor = {
+                kind: "battle",
+                id: currentBattle.id,
+                channel: battleChannel,
+              };
+              const id = convId(desc);
+              const count =
+                state?.channels[battleChannel]?.messages.length ?? 0;
+              return (
+                <li key={id}>
+                  <button
+                    type="button"
+                    className={rowClass(id)}
+                    onClick={() => onSelect(desc)}
+                  >
+                    <Swords className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">
+                      {currentBattle.title || `Battle ${currentBattle.id}`}
+                    </span>
+                    <Badge n={unreadFor(id, count)} />
+                  </button>
+                </li>
+              );
+            })()}
+          </ul>
+        </Section>
+      )}
+
       <Section
         title="Channels"
         open={channelsOpen}

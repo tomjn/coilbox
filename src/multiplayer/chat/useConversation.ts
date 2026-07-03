@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import type { ChatMsg, User } from "../bindings";
-import { mpSay, mpSayPrivate } from "../bindings";
+import { mpSay, mpSayBattle, mpSayPrivate } from "../bindings";
 import { useMultiplayer } from "../store";
 import {
   type ConversationDescriptor,
@@ -48,6 +48,8 @@ export function useConversation(
           channel: desc.name,
           message: trimmed,
         });
+      } else if (desc.kind === "battle") {
+        await mpSayBattle({ serverKey: activeKey, message: trimmed });
       } else {
         await mpSayPrivate({
           serverKey: activeKey,
@@ -59,15 +61,21 @@ export function useConversation(
     [activeKey, desc],
   );
 
+  const battle =
+    desc?.kind === "battle" ? state?.battles[String(desc.id)] : undefined;
   const title = !desc
     ? ""
     : desc.kind === "channel"
       ? `#${desc.name}`
-      : desc.peer;
+      : desc.kind === "battle"
+        ? battle?.title || `Battle ${desc.id}`
+        : desc.peer;
   const subtitle =
     desc?.kind === "channel"
       ? (state?.channels[desc.name]?.topic ?? undefined)
-      : undefined;
+      : desc?.kind === "battle"
+        ? (battle?.map ?? undefined)
+        : undefined;
 
   return { title, subtitle, messages, members, send };
 }

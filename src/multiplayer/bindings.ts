@@ -247,6 +247,11 @@ export const mpSayPrivate = defineCommand<
   { sent: boolean }
 >("coilbox-multiplayer", "mp_say_private");
 
+export const mpSayBattle = defineCommand<
+  { serverKey: string; message: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_say_battle");
+
 export const mpJoinChannel = defineCommand<
   { serverKey: string; channel: string; key?: string | null },
   { sent: boolean }

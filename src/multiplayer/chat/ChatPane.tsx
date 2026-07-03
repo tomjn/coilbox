@@ -20,6 +20,9 @@ export interface ChatPaneProps {
   onSend: (text: string) => void | Promise<void>;
   /** Top-bar action buttons (e.g. a members toggle). */
   headerActions?: ReactNode;
+  /** Optional per-sender accent colour (`#rrggbb`), e.g. a battle player's team
+   * colour. Returns undefined when the sender has no colour (channels/DMs). */
+  senderColor?: (from: string) => string | undefined;
   /** `full` fills the viewport column; `embedded` fits a smaller host box. */
   variant?: "full" | "embedded";
   emptyState?: ReactNode;
@@ -39,6 +42,7 @@ export function ChatPane({
   currentUser,
   onSend,
   headerActions,
+  senderColor,
   variant = "full",
   emptyState,
   placeholder = "Message…",
@@ -101,22 +105,32 @@ export function ChatPane({
                 m.kind === "leave" ||
                 m.kind === "system"
               ) {
-                const label =
-                  m.kind === "join"
-                    ? `${m.from} joined`
-                    : m.kind === "leave"
-                      ? `${m.from} left${m.text ? `: ${m.text}` : ""}`
-                      : m.text; // system message text
+                const color = senderColor?.(m.from);
                 return (
                   <div
                     key={key}
                     className="py-0.5 text-center text-xs text-muted-foreground"
                   >
-                    {label}
+                    {m.kind === "system" ? (
+                      m.text
+                    ) : (
+                      <>
+                        <span
+                          className="font-medium"
+                          style={color ? { color } : undefined}
+                        >
+                          {m.from}
+                        </span>
+                        {m.kind === "join"
+                          ? " joined"
+                          : ` left${m.text ? `: ${m.text}` : ""}`}
+                      </>
+                    )}
                   </div>
                 );
               }
               const own = currentUser != null && m.from === currentUser;
+              const color = senderColor?.(m.from);
               return (
                 <div
                   key={key}
@@ -132,9 +146,19 @@ export function ChatPane({
                         ? "max-w-[75%] rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-sm text-primary-foreground"
                         : "max-w-[75%] rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm"
                     }
+                    // Wash the non-own bubble with the sender's team colour (low
+                    // alpha keeps the foreground text readable in both themes).
+                    style={
+                      !own && color
+                        ? { backgroundColor: `${color}26` }
+                        : undefined
+                    }
                   >
                     {!own && (
-                      <span className="mr-2 text-xs font-medium text-muted-foreground">
+                      <span
+                        className="mr-2 text-xs font-medium text-muted-foreground"
+                        style={color ? { color } : undefined}
+                      >
                         {m.from}
                       </span>
                     )}

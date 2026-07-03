@@ -12,6 +12,7 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-send`
 - `allow-mp-say`
 - `allow-mp-say-private`
+- `allow-mp-say-battle`
 - `allow-mp-join-channel`
 - `allow-mp-leave-channel`
 - `allow-mp-list-channels`
@@ -531,6 +532,32 @@ Enables the mp_say command without any pre-configured scope.
 <td>
 
 Denies the mp_say command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-say-battle`
+
+</td>
+<td>
+
+Enables the mp_say_battle command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-say-battle`
+
+</td>
+<td>
+
+Denies the mp_say_battle command without any pre-configured scope.
 
 </td>
 </tr>

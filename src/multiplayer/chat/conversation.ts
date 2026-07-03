@@ -1,14 +1,29 @@
 import type { ChatMsg, LobbyState, User } from "../bindings";
 
-/** Which conversation a chat surface is bound to. `battle` is reserved for the
- * future battle GUI and not used by the hub. */
+/** Which conversation a chat surface is bound to. A `battle` is backed by its
+ * server-side `__battle__<id>` channel but carries the battle `id` so the UI can
+ * show the battle title and offer "leave battle" instead of "leave channel". */
 export type ConversationDescriptor =
   | { kind: "channel"; name: string }
-  | { kind: "dm"; peer: string };
+  | { kind: "dm"; peer: string }
+  | { kind: "battle"; id: number; channel: string };
+
+/** The TASServer auto-joins a per-battle channel named `__battle__<id>`; these
+ * are surfaced as battle conversations, not listed among real channels. */
+export function isBattleChannel(name: string): boolean {
+  return name.startsWith("__battle__");
+}
 
 /** Stable string id for unread bookkeeping and selection. */
 export function convId(d: ConversationDescriptor): string {
-  return d.kind === "channel" ? `channel:${d.name}` : `dm:${d.peer}`;
+  switch (d.kind) {
+    case "channel":
+      return `channel:${d.name}`;
+    case "dm":
+      return `dm:${d.peer}`;
+    case "battle":
+      return `battle:${d.id}`;
+  }
 }
 
 /** All conversation ids present in a snapshot, with their current message counts. */
@@ -28,19 +43,23 @@ export function conversationMembers(
   state: LobbyState,
   d: ConversationDescriptor,
 ): User[] {
-  if (d.kind !== "channel") return [];
-  const ch = state.channels[d.name];
+  const channel =
+    d.kind === "channel" ? d.name : d.kind === "battle" ? d.channel : null;
+  if (channel == null) return [];
+  const ch = state.channels[channel];
   if (!ch) return [];
   return ch.users
     .map((u) => state.users[u])
     .filter((u): u is User => Boolean(u));
 }
 
-/** Messages of a conversation from the snapshot. */
+/** Messages of a conversation from the snapshot. Battle chat lives in the
+ * synthetic `__battle__<id>` channel bucket, keyed by the descriptor's channel. */
 export function conversationMessages(
   state: LobbyState,
   d: ConversationDescriptor,
 ): ChatMsg[] {
-  if (d.kind === "channel") return state.channels[d.name]?.messages ?? [];
-  return state.dms?.[d.peer] ?? [];
+  if (d.kind === "dm") return state.dms?.[d.peer] ?? [];
+  const channel = d.kind === "channel" ? d.name : d.channel;
+  return state.channels[channel]?.messages ?? [];
 }

@@ -206,6 +206,14 @@ fn mp_say_private(
     }
 }
 
+/// `mp_say_battle` — chat to the current battle via `SAYBATTLE`. Battle chat is
+/// not a channel (no channel argument); the server echoes it back as `SAIDBATTLE`,
+/// which the reducer parks in the battle's synthetic `__battle__<id>` bucket.
+#[tauri::command]
+fn mp_say_battle(registry: State<'_, Registry>, server_key: String, message: String) -> CliResult {
+    enqueue(registry.inner(), &server_key, command::say_battle(&message))
+}
+
 /// `mp_join_channel` — join a chat channel (optional key).
 #[tauri::command]
 fn mp_join_channel(
@@ -623,6 +631,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_send,
             mp_say,
             mp_say_private,
+            mp_say_battle,
             mp_join_channel,
             mp_leave_channel,
             mp_list_channels,
