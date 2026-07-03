@@ -11,12 +11,16 @@ export function BattleList({
   joinedId,
   canJoin,
   onJoin,
+  enginePath,
+  dataDir,
 }: {
   battles: Battle[];
   totalCount: number;
   joinedId: number | null;
   canJoin: boolean;
   onJoin: (b: Battle, key?: string) => void;
+  enginePath?: string;
+  dataDir?: string;
 }) {
   if (totalCount === 0) {
     return (
@@ -41,6 +45,8 @@ export function BattleList({
           joined={b.id === joinedId}
           canJoin={canJoin}
           onJoin={onJoin}
+          enginePath={enginePath}
+          dataDir={dataDir}
         />
       ))}
     </ul>

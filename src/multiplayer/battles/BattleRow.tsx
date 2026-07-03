@@ -1,37 +1,61 @@
 import { Button } from "@picoframe/frame";
 import { Lock, Users } from "lucide-react";
+import { useUnitsyncMinimap } from "../../content/config";
+import { MapThumb } from "../../content/pages/components/MapThumb";
 import type { Battle } from "../bindings";
 import { occupancy } from "./battleFilters";
 import { JoinBattlePopover } from "./JoinBattlePopover";
 
 /**
- * One battle in the list: title (with a lock glyph when passworded/locked), map ·
- * game · host, occupancy and spectators, and a join affordance. `joined` highlights
- * the battle the user is in; `canJoin` gates joining (ready, not busy, not already
- * in a battle). Passworded battles join via a password popover; others via a plain
- * button. `onJoin`'s optional `key` carries the popover password.
+ * One battle in the list: a minimap thumbnail, title (with a lock glyph when
+ * passworded/locked), map · game · host, occupancy and spectators, and a join
+ * affordance. `joined` highlights the battle the user is in; `canJoin` gates
+ * joining (ready, not busy, not already in a battle). Passworded battles join via
+ * a password popover; others via a plain button. `onJoin`'s optional `key` carries
+ * the popover password.
+ *
+ * The minimap renders from the LOCAL unitsync copy only (`enginePath`/`dataDir`
+ * come from the selected scan target). Maps the user hasn't installed fall through
+ * to MapThumb's placeholder icon — we deliberately don't substitute a remote or
+ * browse-cached thumbnail here.
  */
 export function BattleRow({
   battle,
   joined,
   canJoin,
   onJoin,
+  enginePath,
+  dataDir,
 }: {
   battle: Battle;
   joined: boolean;
   canJoin: boolean;
   onJoin: (b: Battle, key?: string) => void;
+  enginePath?: string;
+  dataDir?: string;
 }) {
   const players = occupancy(battle);
   const full = players >= battle.maxPlayers;
   const restricted = battle.passworded || battle.locked;
   const disabled = joined || !canJoin || full;
+  const { dataUrl, loading } = useUnitsyncMinimap(
+    enginePath,
+    dataDir,
+    battle.map,
+  );
   return (
     <li
       className={`flex items-center gap-4 rounded-md border p-3 ${
         joined ? "border-primary bg-primary/5" : "border-border"
       }`}
     >
+      <div className="w-14 shrink-0 overflow-hidden rounded-md border border-border">
+        <MapThumb
+          dataUrl={dataUrl ?? undefined}
+          loading={loading}
+          alt={`Minimap of ${battle.map}`}
+        />
+      </div>
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2 truncate text-sm font-medium">
           {restricted && (

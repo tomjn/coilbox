@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { LogOut } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useScanTargetSelection } from "../../content/config";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
 import { BattleList } from "../battles/BattleList";
 import {
@@ -39,6 +40,9 @@ export default function BattlesPage() {
     [mirror.state?.battles],
   );
   const shown = useMemo(() => filterSortBattles(all, filters), [all, filters]);
+
+  // Selected engine + content root for rendering local minimaps in the rows.
+  const { selected } = useScanTargetSelection();
 
   const ready = mirror.phase === "ready";
   const joinedId = mirror.state?.currentBattle ?? null;
@@ -129,6 +133,8 @@ export default function BattlesPage() {
         joinedId={joinedId}
         canJoin={canJoin}
         onJoin={onJoin}
+        enginePath={selected?.enginePath}
+        dataDir={selected?.rootPath}
       />
     </main>
   );
