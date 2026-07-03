@@ -1063,6 +1063,82 @@ impl Unitsync {
         app
     }
 
+    /// Read a game's `validais.lua` (the game's archives must be added) — a
+    /// whitelist of skirmish-AI name *patterns* the game declares compatible, so a
+    /// lobby can hide AIs that won't work. The file `return`s an array of
+    /// `{ name = <pattern>, desc = ... }` tables; this collects the non-empty
+    /// `name` patterns.
+    ///
+    /// `None` means "no whitelist" — the file is absent, unparseable, or this
+    /// build lacks the Lua parser — and the caller then shows every AI. `Some`
+    /// (even empty) means the game shipped a whitelist and only matching AIs
+    /// should be shown.
+    pub fn valid_ais(&self) -> Option<Vec<String>> {
+        let (
+            Some(open),
+            Some(execute),
+            Some(close),
+            Some(root),
+            Some(sub_int),
+            Some(pop),
+            Some(int_count),
+            Some(int_entry),
+            Some(str_val),
+        ) = (
+            self.lp_open_file_fn,
+            self.lp_execute_fn,
+            self.lp_close_fn,
+            self.lp_root_table_fn,
+            self.lp_sub_table_int_fn,
+            self.lp_pop_table_fn,
+            self.lp_int_key_list_count_fn,
+            self.lp_int_key_list_entry_fn,
+            self.lp_str_key_str_val_fn,
+        )
+        else {
+            return None;
+        };
+        // "rmMbe" = SPRING_VFS_ALL, so validais.lua resolves inside the mounted
+        // game archive (see `start_positions`).
+        let (Ok(file), Ok(modes), Ok(name_key), Ok(empty)) = (
+            CString::new("validais.lua"),
+            CString::new("rmMbe"),
+            CString::new("name"),
+            CString::new(""),
+        ) else {
+            return None;
+        };
+
+        let mut patterns = Vec::new();
+        unsafe {
+            // File not present in the VFS — no whitelist, show all AIs.
+            if open(file.as_ptr(), modes.as_ptr(), modes.as_ptr()) == 0 {
+                return None;
+            }
+            execute();
+            // Chunk failed / didn't return a table — treat as no whitelist rather
+            // than hiding everything, matching how a lobby degrades on a bad file.
+            if root() == 0 {
+                close();
+                return None;
+            }
+            let count = int_count();
+            for i in 0..count {
+                let key = int_entry(i);
+                if sub_int(key) != 0 {
+                    if let Some(name) =
+                        cstr(str_val(name_key.as_ptr(), empty.as_ptr())).filter(|s| !s.is_empty())
+                    {
+                        patterns.push(name);
+                    }
+                    pop(); // entry table
+                }
+            }
+            close();
+        }
+        Some(patterns)
+    }
+
     /// Execute a Lua source string through unitsync's `LuaParser` with `modes`
     /// VFS access. The caller must wrap the user's code so the chunk returns a
     /// table with a string `result` field (and an optional `__error` field) —

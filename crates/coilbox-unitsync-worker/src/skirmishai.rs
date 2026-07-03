@@ -9,6 +9,7 @@
 
 use crate::ffi::Unitsync;
 use crate::model::{SkirmishAi, SkirmishAiOutput};
+use regex::Regex;
 use std::path::Path;
 
 /// Load unitsync, list native skirmish AIs, and (when `game_archive` is given)
@@ -40,6 +41,12 @@ pub fn render(lib: &str, game_archive: Option<&str>) -> SkirmishAiOutput {
             for i in native_count..total {
                 ais.push(read_ai(&us, i, "lua"));
             }
+            // Honour the game's validais.lua whitelist while its archive is still
+            // mounted (the Lua parser reads from the VFS). Absent file -> `None` ->
+            // every AI stays.
+            if let Some(patterns) = us.valid_ais() {
+                ais = retain_valid(ais, &patterns);
+            }
             us.remove_all_archives();
         } else {
             errors.push("this engine's libunitsync can't load game archives".into());
@@ -64,6 +71,19 @@ fn read_ai(us: &Unitsync, i: i32, kind: &str) -> SkirmishAi {
     }
 }
 
+/// Keep only the AIs whose `short_name` matches one of the `validais.lua` name
+/// patterns. Each pattern is compiled as a regex and matched with `is_match`
+/// (unanchored — a substring hit counts), mirroring skylobby's `re-find`; a
+/// pattern that fails to compile is skipped. With no usable patterns nothing
+/// matches, so the list empties — a game that ships an empty/garbled whitelist
+/// gets no AIs, exactly as it declared.
+fn retain_valid(ais: Vec<SkirmishAi>, patterns: &[String]) -> Vec<SkirmishAi> {
+    let regexes: Vec<Regex> = patterns.iter().filter_map(|p| Regex::new(p).ok()).collect();
+    ais.into_iter()
+        .filter(|ai| regexes.iter().any(|re| re.is_match(&ai.short_name)))
+        .collect()
+}
+
 /// Print a skirmish-AI error envelope to stdout (used on panic).
 pub fn emit_error(msg: String) {
     let out = SkirmishAiOutput {
@@ -71,4 +91,65 @@ pub fn emit_error(msg: String) {
         ..Default::default()
     };
     println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ai(short: &str) -> SkirmishAi {
+        SkirmishAi {
+            short_name: short.to_string(),
+            version: None,
+            name: None,
+            description: None,
+            kind: "native".to_string(),
+        }
+    }
+
+    fn kept(ais: Vec<SkirmishAi>, patterns: &[&str]) -> Vec<String> {
+        let pats: Vec<String> = patterns.iter().map(|s| s.to_string()).collect();
+        retain_valid(ais, &pats)
+            .into_iter()
+            .map(|a| a.short_name)
+            .collect()
+    }
+
+    // Uses SplinterFaction's real validais.lua patterns. Note the *regex*
+    // semantics we chose: `Simple*AI` is `Simpl` + `e*` + `AI`, so it matches
+    // "SimpleAI" but NOT "SimpleConstructorAI" (the `AI` must follow the e's).
+    #[test]
+    fn keeps_pattern_matches_drops_the_rest() {
+        let ais = vec![
+            ai("SimpleAI"),
+            ai("SimpleConstructorAI"),
+            ai("ChickensAI"),
+            ai("Sandbox"),
+            ai("BARb"),
+        ];
+        assert_eq!(
+            kept(ais, &["Simple*AI", "ChickensAI", "Sandbox"]),
+            vec!["SimpleAI", "ChickensAI", "Sandbox"],
+        );
+    }
+
+    // `is_match` is unanchored, so a bare name matches any AI containing it.
+    #[test]
+    fn matches_as_substring() {
+        let ais = vec![ai("ChickensAI"), ai("SuperChickensAIv2"), ai("KAIK")];
+        assert_eq!(
+            kept(ais, &["Chickens"]),
+            vec!["ChickensAI", "SuperChickensAIv2"],
+        );
+    }
+
+    // A garbled pattern is skipped; if nothing compiles, everything is filtered out.
+    #[test]
+    fn invalid_pattern_is_skipped() {
+        assert_eq!(
+            kept(vec![ai("ChickensAI"), ai("Sandbox")], &["Chickens", "("]),
+            vec!["ChickensAI"],
+        );
+        assert!(kept(vec![ai("ChickensAI"), ai("Sandbox")], &["("]).is_empty());
+    }
 }

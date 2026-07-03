@@ -32,6 +32,9 @@ image = { version = "0.25", default-features = false, features = [
 ddsfile = "0.6"
 texpresso = "2"
 base64 = "0.22"
+# Skirmish-AI whitelist: a game's `validais.lua` lists AI name *patterns*, matched
+# as regexes against AI short names (skylobby-compatible `re-find` semantics).
+regex = "1"
 # Shared dependency-free on-disk byte cache: persist rendered minimap PNGs so they
 # aren't re-rendered every launch.
 coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
