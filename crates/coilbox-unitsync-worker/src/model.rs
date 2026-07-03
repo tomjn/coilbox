@@ -301,6 +301,9 @@ pub struct EngineConfigSetting {
     pub key: String,
     pub label: String,
     pub category: String,
+    /// How to render the value: `"bool"` | `"number"` | `"string"`.
+    #[serde(rename = "type")]
+    pub value_type: &'static str,
     /// The value as read (stringified); empty string when unset and no default.
     pub value: String,
 }
