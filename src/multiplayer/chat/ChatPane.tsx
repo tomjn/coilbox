@@ -161,6 +161,14 @@ export function ChatPane({
                     prevSame ? "mt-0.5" : "mt-2",
                   )}
                 >
+                  {!own && !prevSame && (
+                    <span
+                      className="mb-0.5 px-1 text-xs font-medium text-muted-foreground"
+                      style={color ? { color } : undefined}
+                    >
+                      {m.from}
+                    </span>
+                  )}
                   <div
                     className={
                       own
@@ -175,14 +183,6 @@ export function ChatPane({
                         : undefined
                     }
                   >
-                    {!own && !prevSame && (
-                      <span
-                        className="mr-2 text-xs font-medium text-muted-foreground"
-                        style={color ? { color } : undefined}
-                      >
-                        {m.from}
-                      </span>
-                    )}
                     <span className="whitespace-pre-wrap break-words font-mono">
                       <FormattedText text={m.text} />
                     </span>
