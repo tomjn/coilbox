@@ -35,6 +35,8 @@ export interface LobbyMirror {
   state: LobbyState | null;
   consoleLines: string[];
   error: string | null;
+  /** Reason from the last failed JOINBATTLE/OPENBATTLE, cleared on next attempt. */
+  lastJoinError: string | null;
 }
 
 const CONSOLE_CAP = 500;
@@ -45,13 +47,15 @@ export const initialMirror: LobbyMirror = {
   state: null,
   consoleLines: [],
   error: null,
+  lastJoinError: null,
 };
 
 export type MirrorAction =
   | { type: "connecting" }
   | { type: "event"; ev: LobbyEvent }
   | { type: "snapshot"; state: LobbyState }
-  | { type: "reset" };
+  | { type: "reset" }
+  | { type: "clearJoinError" };
 
 /**
  * Fold one action into the mirror. `delta` events are intentionally not applied
@@ -69,6 +73,8 @@ export function mirrorReducer(
       return { ...m, state: action.state };
     case "reset":
       return initialMirror;
+    case "clearJoinError":
+      return { ...m, lastJoinError: null };
     case "event": {
       const ev = action.ev;
       switch (ev.kind) {
@@ -87,7 +93,14 @@ export function mirrorReducer(
         }
         case "disconnected":
           return { ...m, connected: false, error: ev.reason ?? null };
-        // `delta` is handled by the provider via a snapshot refresh.
+        case "delta": {
+          const d = ev.delta;
+          if (d.kind === "joinBattleFailed" || d.kind === "openBattleFailed") {
+            return { ...m, lastJoinError: d.reason };
+          }
+          return m;
+        }
+        // `delta` is otherwise handled by the provider via a snapshot refresh.
         default:
           return m;
       }
@@ -113,6 +126,10 @@ interface MultiplayerContextValue {
   rememberChannel: (name: string) => void;
   /** Forget a channel so it's no longer auto-rejoined. */
   forgetChannel: (name: string) => void;
+  /** Reason from the last failed battle join, or null. */
+  lastJoinError: string | null;
+  /** Clear the last join-failure reason (call at the start of a join attempt). */
+  clearJoinError: () => void;
   /** Whether the topbar login/status popover is open. */
   loginPopoverOpen: boolean;
   /** Open the topbar login/status popover (used by not-connected CTAs app-wide). */
@@ -283,6 +300,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     }
   }, [activeKey]);
 
+  const clearJoinError = useCallback(() => {
+    dispatch({ type: "clearJoinError" });
+  }, []);
+
   return (
     <MultiplayerContext.Provider
       value={{
@@ -295,6 +316,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         markSeen,
         rememberChannel,
         forgetChannel,
+        lastJoinError: mirror.lastJoinError,
+        clearJoinError,
         loginPopoverOpen,
         openLoginPopover,
         closeLoginPopover,
