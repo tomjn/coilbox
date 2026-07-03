@@ -219,7 +219,7 @@ export function ChatPane({
                   >
                     <span
                       className={cn(
-                        "whitespace-pre-wrap break-words",
+                        "whitespace-pre-wrap [overflow-wrap:anywhere]",
                         // Bot output (SPADS command lists / stats tables) relies
                         // on monospace alignment; human chat reads better
                         // proportional.
