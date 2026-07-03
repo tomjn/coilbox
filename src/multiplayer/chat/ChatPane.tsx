@@ -151,6 +151,7 @@ export function ChatPane({
               }
               const own = currentUser != null && m.from === currentUser;
               const color = senderColor?.(m.from);
+              const bot = isBot?.(m.from) ?? false;
               // Group a run of messages from one sender: name on the first only,
               // timestamp on the last only, tight spacing between.
               const prev = messages[i - 1];
@@ -168,11 +169,16 @@ export function ChatPane({
                 >
                   {!own && !prevSame && (
                     <span
-                      className="mb-0.5 flex items-center gap-1 px-1 text-xs font-medium text-muted-foreground"
+                      className={cn(
+                        "mb-0.5 flex items-center gap-1 px-1 text-xs",
+                        bot
+                          ? "font-semibold text-foreground"
+                          : "font-medium text-muted-foreground",
+                      )}
                       style={color ? { color } : undefined}
                     >
-                      {isBot?.(m.from) && (
-                        <Bot className="size-3 shrink-0" aria-label="Bot" />
+                      {bot && (
+                        <Bot className="size-4 shrink-0" aria-label="Bot" />
                       )}
                       {m.from}
                     </span>
