@@ -1,21 +1,14 @@
 import { Button } from "@picoframe/frame";
-import { Users } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Plus, Users } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { useLobbyServers } from "../lobby-servers/config";
+import { type LobbyServer, useLobbyServers } from "../lobby-servers/config";
 import { useMultiplayer } from "./store";
 
 type DotStatus = "off" | "connecting" | "on" | "error";
@@ -95,30 +88,12 @@ function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   const servers = cfg.servers;
   const { mirror, activeKey, busy, connect, disconnect } = useMultiplayer();
 
-  const [selectedId, setSelectedId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const selected = useMemo(
-    () => servers.find((s) => s.id === selectedId),
-    [servers, selectedId],
-  );
-
-  // Auto-select the first server once the directory loads (or when the current
-  // selection is gone), so Connect is usable without a manual pick.
-  useEffect(() => {
-    if (servers.length > 0 && !servers.some((s) => s.id === selectedId)) {
-      setSelectedId(servers[0].id);
-    }
-  }, [servers, selectedId]);
-
-  async function onConnect() {
-    if (!selected) {
-      setError("Pick a server first.");
-      return;
-    }
+  async function connectTo(server: LobbyServer) {
     setError(null);
     try {
-      await connect(selected);
+      await connect(server);
     } catch (e) {
       setError(String(e));
     }
@@ -134,8 +109,7 @@ function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   }
 
   if (activeKey != null) {
-    const username =
-      mirror.state?.myUsername ?? selected?.username ?? "Connected";
+    const username = mirror.state?.myUsername ?? "Connected";
     const ready = mirror.phase === "ready";
     return (
       <div className="flex flex-col gap-3">
@@ -170,38 +144,39 @@ function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm font-medium">Connect to multiplayer</p>
-      <Select value={selectedId} onValueChange={setSelectedId} disabled={busy}>
-        <SelectTrigger className="w-full" aria-label="Lobby server">
-          <SelectValue placeholder="Select a server" />
-        </SelectTrigger>
-        <SelectContent>
-          {servers.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
-              {s.name} ({s.host}:{s.port})
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button
-        onClick={onConnect}
-        disabled={busy || servers.length === 0}
-        className="h-8"
-      >
-        {busy ? "Connecting…" : "Connect"}
-      </Button>
-      {error && <p className="text-xs text-destructive">{error}</p>}
-      {mirror.error && (
-        <p className="text-xs text-destructive">Disconnected: {mirror.error}</p>
-      )}
+    <div className="flex flex-col gap-1">
+      <p className="px-2 pb-1 text-sm font-medium">Connect to multiplayer</p>
+      {servers.map((s) => (
+        <button
+          key={s.id}
+          type="button"
+          onClick={() => connectTo(s)}
+          disabled={busy}
+          className="flex flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+        >
+          <span className="text-base font-semibold leading-tight">
+            {s.username ?? s.name}
+          </span>
+          <span className="text-xs text-muted-foreground">{s.name}</span>
+        </button>
+      ))}
       <Link
         to="/settings/lobby-servers"
         onClick={onNavigate}
-        className="text-xs text-muted-foreground hover:text-foreground"
+        className="mt-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
       >
-        Manage servers
+        <Plus className="size-4" />
+        Add a server
       </Link>
+      {busy && (
+        <p className="px-2 pt-1 text-xs text-muted-foreground">Connecting…</p>
+      )}
+      {error && <p className="px-2 pt-1 text-xs text-destructive">{error}</p>}
+      {mirror.error && (
+        <p className="px-2 pt-1 text-xs text-destructive">
+          Disconnected: {mirror.error}
+        </p>
+      )}
     </div>
   );
 }
