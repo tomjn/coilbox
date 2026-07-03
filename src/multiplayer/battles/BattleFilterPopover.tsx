@@ -1,4 +1,4 @@
-import { Button } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import { SlidersHorizontal } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import {
@@ -23,10 +23,11 @@ const DEFAULTS = {
 } satisfies Omit<BattleFilters, "search">;
 
 /**
- * Consolidates sort + hide filters behind a single "Filters" popover so the toolbar
- * stays search-first (players rarely filter). The trigger badges the number of
- * active hide filters; inside are two segmented groups (sort is single-select and
- * toggles direction on re-click; hide is multi-select) plus a reset.
+ * Consolidates search + sort + hide filters behind a single "Filters" popover so the
+ * toolbar stays a single line (players rarely filter, and a battle list can get long).
+ * The trigger badges the number of active filters (search + hides); inside are the
+ * search box, two segmented groups (sort is single-select and toggles direction on
+ * re-click; hide is multi-select), and a reset.
  */
 export function BattleFilterPopover({
   filters,
@@ -35,12 +36,14 @@ export function BattleFilterPopover({
   filters: BattleFilters;
   setFilters: Dispatch<SetStateAction<BattleFilters>>;
 }) {
-  const activeHides =
+  const hasSearch = filters.search.trim().length > 0;
+  const badgeCount =
+    Number(hasSearch) +
     Number(filters.hideEmpty) +
     Number(filters.hideLockedPassworded) +
     Number(filters.hideFull);
   const nonDefault =
-    activeHides > 0 ||
+    badgeCount > 0 ||
     filters.sortKey !== DEFAULTS.sortKey ||
     filters.sortDir !== DEFAULTS.sortDir;
 
@@ -53,14 +56,24 @@ export function BattleFilterPopover({
         >
           <SlidersHorizontal className="size-4" />
           Filters
-          {activeHides > 0 && (
+          {badgeCount > 0 && (
             <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
-              {activeHides}
+              {badgeCount}
             </span>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 space-y-4">
+      <PopoverContent align="end" className="w-72 space-y-4">
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground">Search</p>
+          <Input
+            value={filters.search}
+            onChange={(e) =>
+              setFilters((f) => ({ ...f, search: e.target.value }))
+            }
+            placeholder="Title, map, host, or game"
+          />
+        </div>
         <fieldset className="space-y-2">
           <legend className="mb-1 text-xs font-medium text-muted-foreground">
             Sort by
@@ -130,7 +143,9 @@ export function BattleFilterPopover({
           <button
             type="button"
             className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-            onClick={() => setFilters((f) => ({ ...f, ...DEFAULTS }))}
+            onClick={() =>
+              setFilters((f) => ({ ...f, ...DEFAULTS, search: "" }))
+            }
           >
             Reset filters
           </button>

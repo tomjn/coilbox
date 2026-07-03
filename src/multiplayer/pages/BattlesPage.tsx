@@ -1,5 +1,4 @@
-import { Button, Input } from "@picoframe/frame";
-import { LogOut } from "lucide-react";
+import { Button } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import { useScanTargetSelection } from "../../content/config";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
@@ -50,6 +49,13 @@ export default function BattlesPage() {
   const joinedBattle =
     joinedId != null ? mirror.state?.battles[String(joinedId)] : undefined;
 
+  // Pin the battle you're in to the top, regardless of filters/sort, so it (and
+  // its Leave button) is always reachable — even if a filter would hide it.
+  const ordered = useMemo(() => {
+    if (!joinedBattle) return shown;
+    return [joinedBattle, ...shown.filter((b) => b.id !== joinedId)];
+  }, [shown, joinedBattle, joinedId]);
+
   // `key` is supplied by the row's password popover for passworded battles.
   async function onJoin(b: Battle, key?: string) {
     if (!activeKey) return;
@@ -80,7 +86,7 @@ export default function BattlesPage() {
 
   return (
     <main className="flex h-full min-h-0 flex-col">
-      <header className="flex flex-col gap-3 border-b border-border p-4">
+      <header className="flex items-center justify-between gap-2 border-b border-border p-4">
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold">Battles</h1>
           <span className="text-sm text-muted-foreground">
@@ -89,34 +95,8 @@ export default function BattlesPage() {
               : `(${shown.length} of ${all.length})`}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <Input
-            className="flex-1"
-            value={filters.search}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, search: e.target.value }))
-            }
-            placeholder="Search battles by title, map, host, or game"
-          />
-          <BattleFilterPopover filters={filters} setFilters={setFilters} />
-        </div>
+        <BattleFilterPopover filters={filters} setFilters={setFilters} />
       </header>
-
-      {joinedBattle && (
-        <div className="flex items-center justify-between gap-3 border-b border-border bg-primary/5 px-4 py-2 text-sm">
-          <span>
-            You are in <strong>{joinedBattle.title}</strong>.
-          </span>
-          <Button
-            className="h-8 px-3"
-            onClick={leave}
-            aria-label="Leave battle"
-          >
-            <LogOut className="mr-1 size-4" />
-            Leave
-          </Button>
-        </div>
-      )}
 
       {lastJoinError && (
         <div
@@ -128,11 +108,12 @@ export default function BattlesPage() {
       )}
 
       <BattleList
-        battles={shown}
+        battles={ordered}
         totalCount={all.length}
         joinedId={joinedId}
         canJoin={canJoin}
         onJoin={onJoin}
+        onLeave={leave}
         enginePath={selected?.enginePath}
         dataDir={selected?.rootPath}
       />

@@ -11,6 +11,7 @@ export function BattleList({
   joinedId,
   canJoin,
   onJoin,
+  onLeave,
   enginePath,
   dataDir,
 }: {
@@ -19,6 +20,7 @@ export function BattleList({
   joinedId: number | null;
   canJoin: boolean;
   onJoin: (b: Battle, key?: string) => void;
+  onLeave: () => void;
   enginePath?: string;
   dataDir?: string;
 }) {
@@ -45,6 +47,7 @@ export function BattleList({
           joined={b.id === joinedId}
           canJoin={canJoin}
           onJoin={onJoin}
+          onLeave={onLeave}
           enginePath={enginePath}
           dataDir={dataDir}
         />

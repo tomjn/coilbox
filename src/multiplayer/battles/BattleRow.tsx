@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { Lock, Users } from "lucide-react";
+import { Lock, LogOut, Users } from "lucide-react";
 import { useUnitsyncMinimap } from "../../content/config";
 import { MapThumb } from "../../content/pages/components/MapThumb";
 import type { Battle } from "../bindings";
@@ -24,6 +24,7 @@ export function BattleRow({
   joined,
   canJoin,
   onJoin,
+  onLeave,
   enginePath,
   dataDir,
 }: {
@@ -31,6 +32,7 @@ export function BattleRow({
   joined: boolean;
   canJoin: boolean;
   onJoin: (b: Battle, key?: string) => void;
+  onLeave: () => void;
   enginePath?: string;
   dataDir?: string;
 }) {
@@ -80,8 +82,13 @@ export function BattleRow({
         )}
       </div>
       {joined ? (
-        <Button className="h-8 shrink-0 px-3" disabled>
-          Joined
+        <Button
+          className="h-8 shrink-0 gap-1 px-3"
+          onClick={onLeave}
+          aria-label="Leave battle"
+        >
+          <LogOut className="size-4" />
+          Leave
         </Button>
       ) : battle.passworded ? (
         <JoinBattlePopover
