@@ -8,6 +8,7 @@ import {
   Map as MapIcon,
   SlidersHorizontal,
 } from "lucide-react";
+import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import ContentStartupProvider from "./ContentStartupProvider";
 import EngineSettingsSection from "./pages/EngineSettingsSection";
 import EnginesSection from "./pages/EnginesSection";
@@ -56,11 +57,14 @@ const contentPlugin: FramePlugin = {
           icon: Gamepad2,
         },
         {
+          // Archive explorer is a modding tool — gated behind advanced mode,
+          // unlike the player-facing Maps/Games/Replays in this same group.
           id: "content.archives",
           label: "Archives",
           to: "/content/archives",
           order: 2,
           icon: ArchiveIcon,
+          useVisible: useAdvancedMode,
         },
         {
           id: "content.replays",
@@ -95,12 +99,12 @@ const contentPlugin: FramePlugin = {
     },
     {
       path: "content/archives",
-      lazy: () => import("./pages/ArchivesPage"),
+      lazy: gateAdvanced(() => import("./pages/ArchivesPage")),
       crumb: "Archives",
     },
     {
       path: "content/archives/:name",
-      lazy: () => import("./pages/ArchiveDetailPage"),
+      lazy: gateAdvanced(() => import("./pages/ArchiveDetailPage")),
       crumb: (c) => c.params.name ?? "Archive",
     },
     {
