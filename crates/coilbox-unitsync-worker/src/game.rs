@@ -5,6 +5,7 @@
 //! (`RemoveAllArchives`). It's fetched on demand when a game detail page opens.
 
 use crate::ffi::Unitsync;
+use crate::infocache;
 use crate::model::{GameInfoOutput, Side};
 use std::collections::HashMap;
 use std::path::Path;
@@ -13,7 +14,9 @@ use std::path::Path;
 const PROCESS_UNITS_MAX_ITERS: i32 = 100_000;
 
 /// Load `game_archive` (a game's primary archive) and read its sides + unit count.
-pub fn render(lib: &str, game_archive: &str) -> GameInfoOutput {
+/// Disk-cached under `cache_dir` (keyed on the archive's file identity) — a hit
+/// skips the costly `AddAllArchives` + `GetArchiveChecksum` whole-archive hash.
+pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameInfoOutput {
     let us = match unsafe { Unitsync::load(Path::new(lib)) } {
         Ok(u) => u,
         Err(e) => {
@@ -25,6 +28,16 @@ pub fn render(lib: &str, game_archive: &str) -> GameInfoOutput {
     };
     us.init(false, 0);
     let mut errors = us.drain_errors();
+
+    // Cheap file-identity cache: a hit returns before mounting the archive set.
+    let key = infocache::game_key(&us, game_archive);
+    let cache = cache_dir.zip(key.as_deref());
+    if let Some((dir, key)) = cache {
+        if let Some(hit) = infocache::read::<GameInfoOutput>(dir, key) {
+            us.uninit();
+            return hit;
+        }
+    }
 
     if !us.add_all_archives(game_archive) {
         errors.push("this engine's libunitsync can't load game archives".into());
@@ -79,13 +92,20 @@ pub fn render(lib: &str, game_archive: &str) -> GameInfoOutput {
     us.remove_all_archives();
     us.uninit();
 
-    GameInfoOutput {
+    let out = GameInfoOutput {
         sides,
         unit_count: unit_count as u32,
         options,
         checksum,
         errors,
+    };
+    // Only cache a syncable result; leave a failed hash uncached so a retry re-runs.
+    if let Some((dir, key)) = cache {
+        if out.checksum.is_some() {
+            infocache::write(dir, key, &out);
+        }
     }
+    out
 }
 
 /// Print a game-info error envelope to stdout (used on panic).

@@ -142,21 +142,34 @@ pub fn build_thumbnails_args(
     args
 }
 
-/// Build args for game-detail mode: scan args plus the game's archive name.
-pub fn build_game_args(lib: &str, datadir: &str, game: &str) -> Vec<String> {
+/// Build args for game-detail mode: scan args plus the game's archive name and
+/// the optional on-disk info-blob cache directory.
+pub fn build_game_args(
+    lib: &str,
+    datadir: &str,
+    game: &str,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.push("--game".into());
     args.push(game.into());
+    push_cache_dir(&mut args, cache_dir);
     args
 }
 
-/// Build args for map-info mode: scan args plus the map name and the
-/// `--map-info` flag.
-pub fn build_map_info_args(lib: &str, datadir: &str, map_name: &str) -> Vec<String> {
+/// Build args for map-info mode: scan args plus the map name, the `--map-info`
+/// flag, and the optional on-disk info-blob cache directory.
+pub fn build_map_info_args(
+    lib: &str,
+    datadir: &str,
+    map_name: &str,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.push("--map".into());
     args.push(map_name.into());
     args.push("--map-info".into());
+    push_cache_dir(&mut args, cache_dir);
     args
 }
 
@@ -321,11 +334,29 @@ mod tests {
 
     #[test]
     fn build_map_info_args_carry_map_and_flag() {
-        let a = build_map_info_args("/eng/libunitsync.dylib", "/home/u/.spring", "Map v1");
+        let a = build_map_info_args("/eng/libunitsync.dylib", "/home/u/.spring", "Map v1", None);
         assert_eq!(a.last(), Some(&"--map-info".to_string()));
         let i = a.iter().position(|x| x == "--map").unwrap();
         assert_eq!(a[i + 1], "Map v1");
         assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+    }
+
+    #[test]
+    fn build_game_and_map_info_args_append_cache_dir() {
+        let g = build_game_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "game.sdd",
+            Some("/cache/info"),
+        );
+        assert_eq!(&g[g.len() - 2..], &["--cache-dir", "/cache/info"]);
+        let m = build_map_info_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "Map v1",
+            Some("/cache/info"),
+        );
+        assert_eq!(&m[m.len() - 2..], &["--cache-dir", "/cache/info"]);
     }
 
     #[test]

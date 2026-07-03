@@ -103,7 +103,34 @@ export function HostBattlePopover({
   const maphash = hexToI32(mapInfo.info?.checksum);
   // The hashes let joiners verify they have the same content; without them the
   // battle would open unsyncable, so gate hosting on both resolving.
-  const checksumsReady = !!gameInfo.info?.checksum && !!mapInfo.info?.checksum;
+  const checksumsReady =
+    gameInfo.status === "ready" && mapInfo.status === "ready";
+  // A resolved-but-unhashable checksum or a worker error is a dead end, not
+  // progress — surface it (with a retry) instead of hanging on "Reading content".
+  const gameFailed =
+    gameInfo.status === "error" || gameInfo.status === "unsyncable";
+  const mapFailed =
+    mapInfo.status === "error" || mapInfo.status === "unsyncable";
+
+  function hostButtonLabel(): string {
+    if (!gameName || !mapName || checksumsReady) return "Host battle";
+    if (gameInfo.status === "loading") return "Hashing game…";
+    if (mapInfo.status === "loading") return "Hashing map…";
+    // Both failed/idle: the button is disabled and the error row explains why.
+    return "Host battle";
+  }
+
+  function failMessage(
+    kind: "game" | "map",
+    status: typeof gameInfo.status,
+    firstError?: string,
+  ): string {
+    if (status === "unsyncable")
+      return `Couldn't hash the ${kind} — it may be missing a dependency or be unreadable.`;
+    return firstError
+      ? `Failed to read the ${kind}: ${firstError}`
+      : `Failed to read the ${kind}.`;
+  }
 
   const noEngine = !target && !scan.loading;
   const canHost = !!target && !!gameName && !!mapName && checksumsReady;
@@ -242,10 +269,51 @@ export function HostBattlePopover({
                 </span>
               </label>
 
+              {(gameFailed || mapFailed) && (
+                <div className="flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive">
+                  {gameFailed && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span>
+                        {failMessage(
+                          "game",
+                          gameInfo.status,
+                          gameInfo.info?.errors?.[0],
+                        )}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-6 shrink-0 px-2"
+                        onClick={gameInfo.reload}
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  )}
+                  {mapFailed && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span>
+                        {failMessage(
+                          "map",
+                          mapInfo.status,
+                          mapInfo.info?.errors?.[0],
+                        )}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-6 shrink-0 px-2"
+                        onClick={mapInfo.reload}
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <Button type="submit" className="h-8" disabled={!canHost}>
-                {checksumsReady || !gameName || !mapName
-                  ? "Host battle"
-                  : "Reading content…"}
+                {hostButtonLabel()}
               </Button>
             </>
           )}
