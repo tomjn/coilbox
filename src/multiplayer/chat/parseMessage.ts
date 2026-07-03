@@ -58,7 +58,27 @@ function parseUrls(text: string): Inline[] {
   return out;
 }
 
-/** Bold/italic pass (implemented in the next task). */
+/**
+ * Bold (`**x**`) then italic (`*x*` / `_x_`). Content cannot span the same
+ * marker, so an unmatched or lone marker simply falls through as literal text.
+ * Matched content is parsed recursively to allow one level of nesting.
+ */
 function parseEmphasis(text: string): Inline[] {
-  return text === "" ? [] : [{ type: "text", value: text }];
+  const out: Inline[] = [];
+  const re = /\*\*([^*]+)\*\*|\*([^*]+)\*|_([^_]+)_/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) {
+      out.push({ type: "text", value: text.slice(last, m.index) });
+    }
+    if (m[1] !== undefined) {
+      out.push({ type: "bold", children: parseEmphasis(m[1]) });
+    } else {
+      out.push({ type: "italic", children: parseEmphasis(m[2] ?? m[3]) });
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push({ type: "text", value: text.slice(last) });
+  return out;
 }

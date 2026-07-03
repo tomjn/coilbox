@@ -48,4 +48,28 @@ describe("parseMessage", () => {
       { type: "text", value: "." },
     ]);
   });
+
+  it("parses bold and both italic markers, stripping the markers", () => {
+    expect(parseMessage("a **b** c *d* e _f_")).toEqual([
+      { type: "text", value: "a " },
+      { type: "bold", children: [{ type: "text", value: "b" }] },
+      { type: "text", value: " c " },
+      { type: "italic", children: [{ type: "text", value: "d" }] },
+      { type: "text", value: " e " },
+      { type: "italic", children: [{ type: "text", value: "f" }] },
+    ]);
+  });
+
+  it("nests italic inside bold", () => {
+    expect(parseMessage("**_x_**")).toEqual([
+      {
+        type: "bold",
+        children: [{ type: "italic", children: [{ type: "text", value: "x" }] }],
+      },
+    ]);
+  });
+
+  it("leaves a lone asterisk as literal text", () => {
+    expect(parseMessage("2 * 3")).toEqual([{ type: "text", value: "2 * 3" }]);
+  });
 });
