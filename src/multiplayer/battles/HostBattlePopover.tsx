@@ -1,5 +1,6 @@
 import { Button, Input } from "@picoframe/frame";
 import { useEffect, useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
@@ -34,8 +35,10 @@ const DEFAULT_HOST_PORT = 8452;
  * "Host a battle" affordance for the Battles hub: a compact popover collecting the
  * game, map, title, size and (optional) password, then firing OPENBATTLE via the
  * parent's `onHost`. The engine is the preferred one (no picker), and the mod/map
- * hashes come from unitsync so joining clients can sync. Phase 1 opens a plain
- * (natType 0) battle reachable on `port`; NAT traversal is a later phase.
+ * hashes come from unitsync so joining clients can sync. With "hole punching" on
+ * the battle opens as natType 1 (the server relays each joiner's IP so NATed
+ * players can connect); off, it's a plain natType 0 battle that needs `port`
+ * reachable (public IP, LAN, or a manual port-forward).
  */
 export function HostBattlePopover({
   disabled,
@@ -59,6 +62,9 @@ export function HostBattlePopover({
   const [maxPlayers, setMaxPlayers] = useState(16);
   const [port, setPort] = useState(DEFAULT_HOST_PORT);
   const [password, setPassword] = useState("");
+  // Default on: most home hosts are behind NAT, and the server-side hole punching
+  // lets those players connect. Uncheck for a public IP / forwarded port.
+  const [holePunch, setHolePunch] = useState(true);
 
   // Default the game/map to the first scanned entry once a scan lands.
   useEffect(() => {
@@ -91,7 +97,7 @@ export function HostBattlePopover({
     if (!canHost || !target) return;
     onHost({
       battleType: 0,
-      natType: 0,
+      natType: holePunch ? 1 : 0,
       key: password.trim() || "*",
       port,
       maxPlayers,
@@ -200,10 +206,25 @@ export function HostBattlePopover({
                 />
               </label>
 
-              <p className="text-xs text-muted-foreground">
-                Players connect directly to you on port {port}. If you are
-                behind a router, forward this port or others may fail to join.
-              </p>
+              {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association) */}
+              <label className="flex items-start gap-2 text-sm">
+                <Checkbox
+                  checked={holePunch}
+                  onCheckedChange={(v) => setHolePunch(v === true)}
+                  className="mt-0.5"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="font-medium">
+                    Hole punching for NAT players
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {holePunch
+                      ? "The server relays each joiner's IP so players behind a router can connect. Some may still fail — forwarding port " +
+                        `${port} is the reliable fallback.`
+                      : `Players connect directly to port ${port}; forward it on your router or others can't join.`}
+                  </span>
+                </span>
+              </label>
 
               <Button type="submit" className="h-8" disabled={!canHost}>
                 {checksumsReady || !gameName || !mapName

@@ -202,6 +202,14 @@ async fn run_loop(
                         outbound.push(command::my_battle_status(bs, color));
                     }
 
+                    // As a host, the server relays every client's join through us as
+                    // JOINBATTLEREQUEST (carrying their IP for NAT hole punching); auto-
+                    // accept so joins complete. Only hosts receive this, so it's safe to
+                    // answer unconditionally.
+                    if let ServerMessage::JoinBattleRequest { username, .. } = &msg {
+                        outbound.push(command::join_battle_accept(username));
+                    }
+
                     let now = now_ms();
                     let deltas = reduce_at(&mut state.lock().unwrap(), msg, now);
                     for delta in deltas {
