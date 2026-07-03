@@ -50,6 +50,17 @@ function ChatPage() {
     [users],
   );
 
+  // For a DM header, mark the peer as a bot and show their online presence
+  // (a user is present in the global roster only while connected).
+  const dmPeer = active?.kind === "dm" ? active.peer : null;
+  const titleIsBot = dmPeer != null && isBot(dmPeer);
+  const titlePresence =
+    dmPeer == null
+      ? undefined
+      : users?.[dmPeer]
+        ? ("online" as const)
+        : ("offline" as const);
+
   // Mark the open conversation read as its message count changes.
   useEffect(() => {
     if (active) markSeen(convId(active), conv.messages.length);
@@ -108,6 +119,8 @@ function ChatPage() {
           variant="full"
           title={conv.title}
           subtitle={conv.subtitle}
+          titleIsBot={titleIsBot}
+          titlePresence={titlePresence}
           messages={conv.messages}
           currentUser={me}
           senderColor={senderColor}

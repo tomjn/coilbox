@@ -34,6 +34,10 @@ function grouped(a: ChatMsg, b: ChatMsg): boolean {
 export interface ChatPaneProps {
   title: string;
   subtitle?: string;
+  /** Show a bot glyph before the title (e.g. a DM with an autohost). */
+  titleIsBot?: boolean;
+  /** Presence dot for a single-subject conversation (DMs); omit otherwise. */
+  titlePresence?: "online" | "offline";
   messages: ChatMsg[];
   /** The logged-in username, used to right-align our own messages. */
   currentUser?: string | null;
@@ -60,6 +64,8 @@ export interface ChatPaneProps {
 export function ChatPane({
   title,
   subtitle,
+  titleIsBot = false,
+  titlePresence,
   messages,
   currentUser,
   onSend,
@@ -103,7 +109,23 @@ export function ChatPane({
     >
       <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold">{title}</h2>
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+            {titlePresence && (
+              <span
+                role="img"
+                className={cn(
+                  "size-2 shrink-0 rounded-full",
+                  titlePresence === "online"
+                    ? "bg-green-500"
+                    : "bg-muted-foreground/50",
+                )}
+                aria-label={titlePresence === "online" ? "Online" : "Offline"}
+                title={titlePresence === "online" ? "Online" : "Offline"}
+              />
+            )}
+            {titleIsBot && <Bot className="size-4 shrink-0" aria-label="Bot" />}
+            <span className="truncate">{title}</span>
+          </h2>
           {subtitle && (
             <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
           )}
