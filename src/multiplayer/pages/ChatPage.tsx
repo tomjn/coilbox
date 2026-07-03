@@ -1,6 +1,7 @@
 import { Button, NavGate } from "@picoframe/frame";
-import { LogOut, Users } from "lucide-react";
+import { Gamepad2, LogOut, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { mpLeaveBattle, mpLeaveChannel } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
 import { ChatPane } from "../chat/ChatPane";
@@ -20,6 +21,7 @@ import { useMpRevealed, useMultiplayer } from "../store";
 function ChatPage() {
   const { mirror, activeKey, markSeen, forgetChannel, openLoginPopover } =
     useMultiplayer();
+  const navigate = useNavigate();
   const [active, setActive] = useState<ConversationDescriptor | null>(null);
   const [showMembers, setShowMembers] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
@@ -147,10 +149,20 @@ function ChatPage() {
                     <LogOut className="size-4" />
                   </Button>
                 ) : (
-                  <Button className="h-7 gap-1.5 px-2" onClick={leaveBattle}>
-                    <LogOut className="size-4" />
-                    Leave
-                  </Button>
+                  <>
+                    <Button
+                      variant="secondary"
+                      className="h-7 gap-1.5 px-2"
+                      onClick={() => navigate("/battle")}
+                    >
+                      <Gamepad2 className="size-4" />
+                      Go to battle
+                    </Button>
+                    <Button className="h-7 gap-1.5 px-2" onClick={leaveBattle}>
+                      <LogOut className="size-4" />
+                      Leave
+                    </Button>
+                  </>
                 )}
               </>
             ) : undefined
