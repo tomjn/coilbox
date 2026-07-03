@@ -39,10 +39,13 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 /// A queued outbound action for the connection task. `Line` is a raw wire line;
 /// `SayPrivate` is recorded into DM state + persisted + emitted as a delta by the
 /// task before the wire line is sent, keeping the task the single state writer;
-/// `Shutdown` requests a graceful logout (write `EXIT`, flush, then exit).
+/// `Shutdown` requests a graceful logout (write `EXIT`, flush, then exit);
+/// `ConfirmAgreement` resumes a login parked awaiting the emailed verification
+/// code by driving the login machine (`CONFIRMAGREEMENT` + re-`LOGIN`).
 pub enum Outbound {
     Line(String),
     SayPrivate { peer: String, text: String },
+    ConfirmAgreement { code: Option<String> },
     Shutdown,
 }
 
@@ -181,6 +184,7 @@ async fn run_loop(
                     if login.phase() == LoginPhase::Denied {
                         break 'conn match &msg {
                             ServerMessage::Denied { reason } => Some(reason.clone()),
+                            ServerMessage::RegistrationDenied { reason } => Some(reason.clone()),
                             _ => Some("login denied".into()),
                         };
                     }
@@ -213,6 +217,14 @@ async fn run_loop(
             },
             Some(out) = rx.recv() => match out {
                 Outbound::Line(line) => outbound.push(line),
+                Outbound::ConfirmAgreement { code } => {
+                    let before = login.phase();
+                    outbound.extend(login.submit_agreement_code(code.as_deref()));
+                    if login.phase() != before {
+                        *phase_slot.lock().unwrap() = login.phase();
+                        emit(&sink, LobbyEvent::Phase { phase: login.phase() });
+                    }
+                }
                 Outbound::Shutdown => {
                     outbound.push(command::exit(None));
                     shutdown = true;

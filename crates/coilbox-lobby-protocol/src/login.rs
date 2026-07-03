@@ -5,30 +5,55 @@
 //! trailing newlines) in reaction to inbound [`ServerMessage`]s; the driving
 //! plugin does the actual IO and the TLS upgrade.
 //!
-//! Flow:
+//! Flow (login):
 //! greeting -> (if `use_stls`, emit `STLS`, enter [`LoginPhase::TlsUpgrade`];
 //! the plugin performs the upgrade then re-feeds the fresh greeting) -> emit
 //! `LISTCOMPFLAGS`, enter [`LoginPhase::AwaitCompFlags`] -> on `COMPFLAGS` emit
 //! `LOGIN`, enter [`LoginPhase::AwaitAccepted`] -> on `ACCEPTED` enter
 //! [`LoginPhase::StreamingState`] -> on `LOGININFOEND` become
 //! [`LoginPhase::Ready`]. `DENIED` -> [`LoginPhase::Denied`].
+//!
+//! Registration ([`LoginMode::Register`]) shares the greeting/compflags prelude,
+//! then on `COMPFLAGS` emits `REGISTER` (instead of `LOGIN`) and terminates on
+//! `REGISTRATIONACCEPTED` -> [`LoginPhase::Registered`] / `REGISTRATIONDENIED`
+//! -> [`LoginPhase::Denied`].
+//!
+//! Verification codes: a new account's first `LOGIN` can trigger the agreement
+//! handshake (`AGREEMENT...` / `AGREEMENTEND`). Rather than auto-confirm, the
+//! machine parks in [`LoginPhase::AwaitAgreement`] so the UI can collect the
+//! emailed code; [`LoginMachine::submit_agreement_code`] then emits
+//! `CONFIRMAGREEMENT [code]` and re-sends `LOGIN` (the server does not log us in
+//! on `CONFIRMAGREEMENT` alone).
 
 use serde::Serialize;
 
 use crate::command;
 use crate::message::ServerMessage;
 
-/// Configuration for a login attempt.
+/// Whether the handshake is a login or a new-account registration. They share the
+/// greeting/compflags prelude and differ only in the command sent on `COMPFLAGS`.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum LoginMode {
+    #[default]
+    Login,
+    Register {
+        email: Option<String>,
+    },
+}
+
+/// Configuration for a login (or registration) attempt.
 #[derive(Clone, Debug)]
 pub struct LoginConfig {
     pub username: String,
-    /// Already `BASE64(MD5(password))`.
+    /// Already `BASE64(MD5(password))`. Sent for both `LOGIN` and `REGISTER`.
     pub password_hash: String,
     pub local_ip: String,
     pub agent: String,
     pub client_id: String,
     pub compat_flags: Vec<String>,
     pub use_stls: bool,
+    /// Login vs. register. Defaults to [`LoginMode::Login`] via [`Default`].
+    pub mode: LoginMode,
 }
 
 /// The phases of the login handshake.
@@ -39,8 +64,15 @@ pub enum LoginPhase {
     TlsUpgrade,
     AwaitCompFlags,
     AwaitAccepted,
+    /// Register mode: `REGISTER` sent, awaiting `REGISTRATIONACCEPTED`/`...DENIED`.
+    AwaitRegistration,
+    /// Agreement handshake ended; parked until the UI supplies the verification
+    /// code (see [`LoginMachine::submit_agreement_code`]).
+    AwaitAgreement,
     StreamingState,
     Ready,
+    /// Register mode: `REGISTRATIONACCEPTED` received (terminal success).
+    Registered,
     Denied,
 }
 
@@ -49,6 +81,8 @@ pub enum LoginPhase {
 pub struct LoginMachine {
     config: LoginConfig,
     phase: LoginPhase,
+    /// `AGREEMENT` lines collected between the first one and `AGREEMENTEND`.
+    agreement: Vec<String>,
 }
 
 impl LoginMachine {
@@ -57,6 +91,7 @@ impl LoginMachine {
         LoginMachine {
             config,
             phase: LoginPhase::AwaitGreeting,
+            agreement: Vec::new(),
         }
     }
 
@@ -87,21 +122,20 @@ impl LoginMachine {
                 // a token-auth flag, negotiate a token instead of sending the
                 // MD5 password LOGIN below.
                 let _ = flags;
-                self.phase = LoginPhase::AwaitAccepted;
-                let flag_refs: Vec<&str> = self
-                    .config
-                    .compat_flags
-                    .iter()
-                    .map(String::as_str)
-                    .collect();
-                vec![command::login(
-                    &self.config.username,
-                    &self.config.password_hash,
-                    &self.config.local_ip,
-                    &self.config.agent,
-                    &self.config.client_id,
-                    &flag_refs,
-                )]
+                match &self.config.mode {
+                    LoginMode::Login => {
+                        self.phase = LoginPhase::AwaitAccepted;
+                        vec![self.login_line()]
+                    }
+                    LoginMode::Register { email } => {
+                        self.phase = LoginPhase::AwaitRegistration;
+                        vec![command::register(
+                            &self.config.username,
+                            &self.config.password_hash,
+                            email.as_deref(),
+                        )]
+                    }
+                }
             }
             (LoginPhase::AwaitAccepted, ServerMessage::Accepted { .. }) => {
                 self.phase = LoginPhase::StreamingState;
@@ -111,10 +145,24 @@ impl LoginMachine {
                 self.phase = LoginPhase::Ready;
                 vec![]
             }
-            // Agreement path: confirm so the server proceeds to the compflags/login.
-            (_, ServerMessage::Agreement { .. }) => vec![],
+            (LoginPhase::AwaitRegistration, ServerMessage::RegistrationAccepted) => {
+                self.phase = LoginPhase::Registered;
+                vec![]
+            }
+            (LoginPhase::AwaitRegistration, ServerMessage::RegistrationDenied { .. }) => {
+                self.phase = LoginPhase::Denied;
+                vec![]
+            }
+            // Agreement / verification: park until the UI supplies the code rather
+            // than auto-confirming — servers with email verification reject an
+            // empty `CONFIRMAGREEMENT`. Accumulate the text for the UI to show.
+            (_, ServerMessage::Agreement { line }) => {
+                self.agreement.push(line.clone());
+                vec![]
+            }
             (_, ServerMessage::AgreementEnd) => {
-                vec![command::confirm_agreement(None)]
+                self.phase = LoginPhase::AwaitAgreement;
+                vec![]
             }
             (_, ServerMessage::Denied { reason }) => {
                 self.phase = LoginPhase::Denied;
@@ -123,6 +171,41 @@ impl LoginMachine {
             }
             _ => vec![],
         }
+    }
+
+    /// The `LOGIN` wire line for this config.
+    fn login_line(&self) -> String {
+        let flag_refs: Vec<&str> = self
+            .config
+            .compat_flags
+            .iter()
+            .map(String::as_str)
+            .collect();
+        command::login(
+            &self.config.username,
+            &self.config.password_hash,
+            &self.config.local_ip,
+            &self.config.agent,
+            &self.config.client_id,
+            &flag_refs,
+        )
+    }
+
+    /// The agreement text accumulated from `AGREEMENT` lines, joined by newlines.
+    pub fn agreement_text(&self) -> String {
+        self.agreement.join("\n")
+    }
+
+    /// Supply the verification/agreement code from the UI and resume the login.
+    /// Emits `CONFIRMAGREEMENT [code]` then re-sends `LOGIN` (the server does not
+    /// log us in on the confirmation alone). A no-op unless parked in
+    /// [`LoginPhase::AwaitAgreement`].
+    pub fn submit_agreement_code(&mut self, code: Option<&str>) -> Vec<String> {
+        if self.phase != LoginPhase::AwaitAgreement {
+            return vec![];
+        }
+        self.phase = LoginPhase::AwaitAccepted;
+        vec![command::confirm_agreement(code), self.login_line()]
     }
 }
 
@@ -140,6 +223,7 @@ mod tests {
             client_id: "0".into(),
             compat_flags: vec!["u".into(), "sp".into()],
             use_stls,
+            mode: LoginMode::Login,
         }
     }
 
@@ -192,10 +276,73 @@ mod tests {
     }
 
     #[test]
-    fn agreement_end_confirms() {
+    fn agreement_parks_for_code_then_confirms_and_relogins() {
         let mut m = LoginMachine::new(cfg(false));
         m.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
+        m.on_message(&parse_line("COMPFLAGS u sp"));
+
+        // The server streams the agreement then ends it — the machine parks
+        // instead of auto-confirming, so a verification code can be collected.
+        assert!(m
+            .on_message(&parse_line("AGREEMENT Please enter the code"))
+            .is_empty());
         let out = m.on_message(&parse_line("AGREEMENTEND"));
-        assert_eq!(out, vec!["CONFIRMAGREEMENT"]);
+        assert!(out.is_empty());
+        assert_eq!(m.phase(), LoginPhase::AwaitAgreement);
+        assert_eq!(m.agreement_text(), "Please enter the code");
+
+        // Supplying the code confirms and re-sends LOGIN.
+        let out = m.submit_agreement_code(Some("1234"));
+        assert_eq!(
+            out,
+            vec![
+                "CONFIRMAGREEMENT 1234".to_string(),
+                "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t0\tu sp".to_string(),
+            ]
+        );
+        assert_eq!(m.phase(), LoginPhase::AwaitAccepted);
+    }
+
+    #[test]
+    fn submit_agreement_code_is_noop_when_not_parked() {
+        let mut m = LoginMachine::new(cfg(false));
+        assert!(m.submit_agreement_code(Some("1234")).is_empty());
+    }
+
+    fn register_cfg(email: Option<&str>) -> LoginConfig {
+        LoginConfig {
+            mode: LoginMode::Register {
+                email: email.map(str::to_string),
+            },
+            ..cfg(false)
+        }
+    }
+
+    #[test]
+    fn register_flow_sends_register_then_accepts() {
+        let mut m = LoginMachine::new(register_cfg(Some("bob@example.com")));
+
+        let out = m.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
+        assert_eq!(out, vec!["LISTCOMPFLAGS"]);
+
+        let out = m.on_message(&parse_line("COMPFLAGS u sp"));
+        assert_eq!(out, vec!["REGISTER alice aGFzaA== bob@example.com"]);
+        assert_eq!(m.phase(), LoginPhase::AwaitRegistration);
+
+        let out = m.on_message(&parse_line("REGISTRATIONACCEPTED"));
+        assert!(out.is_empty());
+        assert_eq!(m.phase(), LoginPhase::Registered);
+    }
+
+    #[test]
+    fn register_denied_transitions_to_denied() {
+        let mut m = LoginMachine::new(register_cfg(None));
+        m.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
+        let out = m.on_message(&parse_line("COMPFLAGS u sp"));
+        assert_eq!(out, vec!["REGISTER alice aGFzaA=="]);
+
+        let out = m.on_message(&parse_line("REGISTRATIONDENIED username taken"));
+        assert!(out.is_empty());
+        assert_eq!(m.phase(), LoginPhase::Denied);
     }
 }

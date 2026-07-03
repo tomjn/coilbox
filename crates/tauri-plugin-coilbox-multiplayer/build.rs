@@ -4,6 +4,8 @@
 // `coilbox-multiplayer:default`.
 const COMMANDS: &[&str] = &[
     "mp_connect",
+    "mp_register",
+    "mp_confirm_agreement",
     "mp_disconnect",
     "mp_reattach",
     "mp_active_keys",

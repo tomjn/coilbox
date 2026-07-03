@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { Loader2, Plus, Users } from "lucide-react";
+import { Loader2, Plus, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import {
@@ -9,11 +9,13 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
+  allServers,
   type LobbyAccount,
   resolveServer,
   useCustomServers,
   useLobbyAccounts,
 } from "../lobby-servers/config";
+import { RegisterForm } from "../lobby-servers/RegisterForm";
 import { useMultiplayer } from "./store";
 
 type DotStatus = "off" | "connecting" | "on" | "error";
@@ -97,6 +99,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
 
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<LobbyAccount | null>(null);
+  const [registering, setRegistering] = useState(false);
 
   async function connectTo(account: LobbyAccount) {
     setError(null);
@@ -151,6 +154,22 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     );
   }
 
+  // Registering owns the panel while its form is open — checked before `busy` so
+  // the form stays mounted during the in-flight request (which also sets `busy`),
+  // keeping its fields and any error visible rather than flashing the spinner.
+  if (registering) {
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="px-1 text-sm font-medium">Create an account</p>
+        <RegisterForm
+          servers={allServers(customCfg.servers)}
+          onSuccess={() => setRegistering(false)}
+          onCancel={() => setRegistering(false)}
+        />
+      </div>
+    );
+  }
+
   if (busy) {
     const label = pending?.username ?? "server";
     return (
@@ -196,6 +215,14 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         <Plus className="size-4" />
         Add a login
       </Link>
+      <button
+        type="button"
+        onClick={() => setRegistering(true)}
+        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <UserPlus className="size-4" />
+        Register a new account
+      </button>
       {error && <p className="px-2 pt-1 text-xs text-destructive">{error}</p>}
       {mirror.error && (
         <p className="px-2 pt-1 text-xs text-destructive">

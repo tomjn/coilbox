@@ -5,6 +5,8 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 #### This default permission set includes the following:
 
 - `allow-mp-connect`
+- `allow-mp-register`
+- `allow-mp-confirm-agreement`
 - `allow-mp-disconnect`
 - `allow-mp-reattach`
 - `allow-mp-active-keys`
@@ -116,6 +118,32 @@ Enables the mp_build_battle_config command without any pre-configured scope.
 <td>
 
 Denies the mp_build_battle_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-confirm-agreement`
+
+</td>
+<td>
+
+Enables the mp_confirm_agreement command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-confirm-agreement`
+
+</td>
+<td>
+
+Denies the mp_confirm_agreement command without any pre-configured scope.
 
 </td>
 </tr>
@@ -480,6 +508,32 @@ Enables the mp_reattach command without any pre-configured scope.
 <td>
 
 Denies the mp_reattach command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-register`
+
+</td>
+<td>
+
+Enables the mp_register command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-register`
+
+</td>
+<td>
+
+Denies the mp_register command without any pre-configured scope.
 
 </td>
 </tr>

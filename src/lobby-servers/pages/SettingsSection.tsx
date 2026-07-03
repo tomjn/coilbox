@@ -1,5 +1,5 @@
 import { Button, cn, Input } from "@picoframe/frame";
-import { Plus, Server, Terminal, Trash2, Users } from "lucide-react";
+import { Plus, Server, Terminal, Trash2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ConsoleDrawer } from "../../multiplayer/ConsoleDrawer";
 import { serverKeyFor, useMultiplayer } from "../../multiplayer/store";
@@ -15,6 +15,7 @@ import {
   useCustomServers,
   useLobbyAccounts,
 } from "../config";
+import { RegisterForm } from "../RegisterForm";
 import { CheckField, Field } from "./components/Field";
 import { OptionSelect } from "./components/OptionSelect";
 
@@ -33,6 +34,7 @@ export default function LobbyServersSettings() {
   const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
   const [customCfg, setCustomCfg] = useCustomServers();
   const [consoleOpen, setConsoleOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
 
   const servers = allServers(customCfg.servers);
 
@@ -108,15 +110,35 @@ export default function LobbyServersSettings() {
           <h2 className={H2_CLASS}>
             <Users size={15} /> Accounts
           </h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={addAccount}
-            disabled={servers.length === 0}
-          >
-            <Plus /> Add login
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRegisterOpen((o) => !o)}
+              disabled={servers.length === 0}
+            >
+              <UserPlus /> Register
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addAccount}
+              disabled={servers.length === 0}
+            >
+              <Plus /> Add login
+            </Button>
+          </div>
         </div>
+        {registerOpen && (
+          <div className="space-y-3 rounded-md border border-border p-3">
+            <p className="text-sm font-medium">Create a new account</p>
+            <RegisterForm
+              servers={servers}
+              onSuccess={() => setRegisterOpen(false)}
+              onCancel={() => setRegisterOpen(false)}
+            />
+          </div>
+        )}
         {accountsCfg.accounts.length === 0 ? (
           <p className={EMPTY_CLASS}>
             No logins yet. Add one to connect to a lobby.

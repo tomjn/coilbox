@@ -4,6 +4,8 @@
 description = "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands."
 permissions = [
   "allow-mp-connect",
+  "allow-mp-register",
+  "allow-mp-confirm-agreement",
   "allow-mp-disconnect",
   "allow-mp-reattach",
   "allow-mp-active-keys",

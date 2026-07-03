@@ -1,7 +1,7 @@
 //! Golden test: the LoginMachine emits the right lines, in order, across the
 //! handshake.
 
-use coilbox_lobby_protocol::{parse_line, LoginConfig, LoginMachine, LoginPhase};
+use coilbox_lobby_protocol::{parse_line, LoginConfig, LoginMachine, LoginMode, LoginPhase};
 
 fn config(use_stls: bool) -> LoginConfig {
     LoginConfig {
@@ -12,6 +12,7 @@ fn config(use_stls: bool) -> LoginConfig {
         client_id: "0".into(),
         compat_flags: vec!["u".into(), "sp".into()],
         use_stls,
+        mode: LoginMode::Login,
     }
 }
 

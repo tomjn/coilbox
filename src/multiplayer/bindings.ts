@@ -135,8 +135,11 @@ export type LoginPhase =
   | "tlsUpgrade"
   | "awaitCompFlags"
   | "awaitAccepted"
+  | "awaitRegistration"
+  | "awaitAgreement"
   | "streamingState"
   | "ready"
+  | "registered"
   | "denied";
 
 // ---------------------------------------------------------------------------
@@ -203,6 +206,37 @@ export const mpConnect = defineCommand<
   },
   { connected: boolean }
 >("coilbox-multiplayer", "mp_connect");
+
+/**
+ * Register a new account on a server, then disconnect. Streams `LobbyEvent`s over
+ * `onEvent`; success is the `registered` phase, denial arrives as `disconnected`
+ * with the server's reason. Does NOT log in — connect normally afterwards.
+ */
+export const mpRegister = defineCommand<
+  {
+    serverKey: string;
+    host: string;
+    port: number;
+    tls: boolean;
+    allowSelfSigned: boolean;
+    username: string;
+    password: string;
+    email: string | null;
+    compatFlags: string[];
+    onEvent: Channel<LobbyEvent>;
+  },
+  { connected: boolean }
+>("coilbox-multiplayer", "mp_register");
+
+/**
+ * Resume a login parked awaiting the emailed verification code: sends
+ * `CONFIRMAGREEMENT [code]` and re-logs-in on the live connection. Omit `code` for
+ * agreements that need none.
+ */
+export const mpConfirmAgreement = defineCommand<
+  { serverKey: string; code?: string | null },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_confirm_agreement");
 
 /** Disconnect and tear down the connection task. */
 export const mpDisconnect = defineCommand<
