@@ -49,12 +49,19 @@ export default function BattlesPage() {
   const joinedBattle =
     joinedId != null ? mirror.state?.battles[String(joinedId)] : undefined;
 
-  // Pin the battle you're in to the top, regardless of filters/sort, so it (and
-  // its Leave button) is always reachable — even if a filter would hide it.
-  const ordered = useMemo(() => {
-    if (!joinedBattle) return shown;
-    return [joinedBattle, ...shown.filter((b) => b.id !== joinedId)];
-  }, [shown, joinedBattle, joinedId]);
+  // A battle is "in progress" when its host is in-game; BattleList groups on this
+  // (open first, in-progress last). The joined battle is pinned separately so its
+  // Leave button is always reachable even inside a collapsed group.
+  const users = mirror.state?.users;
+  const inProgressIds = useMemo(() => {
+    const ids = new Set<number>();
+    if (users) {
+      for (const b of all) {
+        if (users[b.host]?.status.ingame) ids.add(b.id);
+      }
+    }
+    return ids;
+  }, [all, users]);
 
   // `key` is supplied by the row's password popover for passworded battles.
   async function onJoin(b: Battle, key?: string) {
@@ -108,9 +115,11 @@ export default function BattlesPage() {
       )}
 
       <BattleList
-        battles={ordered}
+        battles={shown}
         totalCount={all.length}
+        joinedBattle={joinedBattle}
         joinedId={joinedId}
+        inProgressIds={inProgressIds}
         canJoin={canJoin}
         onJoin={onJoin}
         onLeave={leave}
