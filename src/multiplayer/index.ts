@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { MessagesSquare, Swords } from "lucide-react";
+import LobbyStatusButton from "./LobbyStatusButton";
 import { MultiplayerProvider } from "./store";
 
 /**
@@ -62,6 +63,7 @@ const multiplayerPlugin: FramePlugin = {
       crumb: "Battles",
     },
   ],
+  slots: [{ slot: "topbar.right", order: 100, Component: LobbyStatusButton }],
   // App-level: the live connection + its state mirror must outlive the Lobby route
   // so navigating away doesn't drop the UI's view of a still-open connection.
   Provider: MultiplayerProvider,
