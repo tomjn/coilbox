@@ -13,6 +13,7 @@
     "sidecar:all": "bun run sidecar:unitsync",
     "clean": "bash scripts/clean.sh",
     "lint": "biome check .",
+    "test": "vitest run",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit"
   },
@@ -46,6 +47,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
-    "vite": "^8.0.14"
+    "vite": "^8.0.14",
+    "vitest": "^4.1.9"
   }
 }
