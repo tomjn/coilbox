@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSetting } from "@picoframe/frame";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConfigOption, GameItem, MapItem, Side } from "@/content/bindings";
 import {
   invalidateMapPreview,
@@ -21,6 +22,7 @@ import {
   hexToColorInt,
   type MemberRow,
   membersToRows,
+  randomTeamColorHex,
   type SyncState,
   startPosTypeOf,
 } from "./config";
@@ -91,6 +93,13 @@ export interface BattleRoomView {
 export function useBattleRoom(): BattleRoomView {
   const { mirror, activeKey } = useMultiplayer();
   const state = mirror.state;
+
+  // The team colour we remember across battles and app restarts. Empty means
+  // "never picked" — we assign a random colour the first time we need one.
+  const [savedColor, setSavedColor] = useSetting<string>(
+    "multiplayer.teamColor",
+    "",
+  );
 
   const battle =
     state?.currentBattle != null
@@ -188,6 +197,26 @@ export function useBattleRoom(): BattleRoomView {
     if (myStatus.battleStatus.sync !== desired) pushStatus({ sync: desired });
   }, [activeKey, myStatus, contentKnown, mapMissing, gameMissing, pushStatus]);
 
+  // We join a battle showing as black (teamColor 0 is the protocol's "unset").
+  // Announce our remembered colour instead — or, the first time, a fresh random
+  // one we then persist — so we never sit in the lobby as black. Gated to run once
+  // per join: teamColor 0 is indistinguishable from a deliberate black, so we
+  // can't rely on the server echo flipping it to know we're done, or we'd re-push
+  // forever if the user actually chose black.
+  const coloredBattle = useRef<number | null>(null);
+  useEffect(() => {
+    if (!activeKey || !battle || !myStatus) return;
+    if (coloredBattle.current === battle.id) return;
+    coloredBattle.current = battle.id;
+    if (myStatus.teamColor !== 0) return; // already coloured (rejoin/echo)
+    let hex = savedColor;
+    if (!hex) {
+      hex = randomTeamColorHex();
+      setSavedColor(hex);
+    }
+    pushStatus({ color: hexToColorInt(hex) });
+  }, [activeKey, battle, myStatus, savedColor, setSavedColor, pushStatus]);
+
   const leave = useCallback(async () => {
     if (!activeKey) return;
     await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
@@ -259,7 +288,10 @@ export function useBattleRoom(): BattleRoomView {
     setSide: (side) => pushStatus({ side }),
     setTeam: (teamId) => pushStatus({ teamId }),
     setAlly: (ally) => pushStatus({ ally }),
-    setColor: (hex) => pushStatus({ color: hexToColorInt(hex) }),
+    setColor: (hex) => {
+      setSavedColor(hex);
+      pushStatus({ color: hexToColorInt(hex) });
+    },
     leave,
     autohostSend,
     startGame: () => autohostSend("!start"),
