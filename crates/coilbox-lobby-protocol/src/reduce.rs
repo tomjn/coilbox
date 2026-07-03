@@ -312,27 +312,36 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             modname,
             channel,
         } => {
-            state.battles.insert(
+            // The founder is implicitly a member of their own battle, but the
+            // server sends no JOINEDBATTLE for them, so seed the member here.
+            // Without this we never appear in our own roster and our own
+            // CLIENTBATTLESTATUS echo is dropped (find_member_battle can't place
+            // a member that isn't in any battle yet).
+            let own = state.my_username.as_deref() == Some(host.as_str());
+            let mut battle = Battle {
                 id,
-                Battle {
-                    id,
-                    host,
-                    ip,
-                    port,
-                    map,
-                    maphash,
-                    modname,
-                    engine,
-                    version,
-                    max_players,
-                    passworded,
-                    locked: false,
-                    spectator_count: 0,
-                    title,
-                    channel,
-                    ..Default::default()
-                },
-            );
+                host,
+                ip,
+                port,
+                map,
+                maphash,
+                modname,
+                engine,
+                version,
+                max_players,
+                passworded,
+                locked: false,
+                spectator_count: 0,
+                title,
+                channel,
+                ..Default::default()
+            };
+            if own {
+                battle
+                    .members
+                    .insert(battle.host.clone(), MemberStatus::default());
+            }
+            state.battles.insert(id, battle);
             vec![Delta::BattleOpened { id }]
         }
         ServerMessage::UpdateBattleInfo {
@@ -795,6 +804,42 @@ mod tests {
         let m = &s.battles[&4].members["bob"];
         assert_eq!(m.battle_status, bs);
         assert_eq!(m.team_color, 255);
+    }
+
+    #[test]
+    fn own_open_seats_founder_and_accepts_own_status_echo() {
+        let mut s = LobbyState::new();
+        reduce(&mut s, parse_line("ACCEPTED alice"));
+        reduce(
+            &mut s,
+            parse_line(
+                "BATTLEOPENED 7 0 0 alice 1.2.3.4 8452 12 0 0 -1 spring\t105\tMap\tTitle\tBAR",
+            ),
+        );
+        reduce(&mut s, parse_line("JOINBATTLE 7 hash"));
+        // The server sends no JOINEDBATTLE for the founder, yet we must appear.
+        assert!(s.battles[&7].members.contains_key("alice"));
+        // Our own status echo must land (find_member_battle can now place us).
+        let bs = BattleStatus {
+            mode: true,
+            ..Default::default()
+        };
+        let line = format!("CLIENTBATTLESTATUS alice {} 255", bs.to_int());
+        reduce(&mut s, parse_line(&line));
+        assert_eq!(s.battles[&7].members["alice"].battle_status, bs);
+    }
+
+    #[test]
+    fn other_battle_open_does_not_seat_us() {
+        let mut s = LobbyState::new();
+        reduce(&mut s, parse_line("ACCEPTED alice"));
+        reduce(
+            &mut s,
+            parse_line(
+                "BATTLEOPENED 8 0 0 bob 1.2.3.4 8452 12 0 0 -1 spring\t105\tMap\tTitle\tBAR",
+            ),
+        );
+        assert!(s.battles[&8].members.is_empty());
     }
 
     #[test]
