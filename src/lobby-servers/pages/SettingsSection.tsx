@@ -106,39 +106,9 @@ export default function LobbyServersSettings() {
   return (
     <div className="space-y-8">
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className={H2_CLASS}>
-            <Users size={15} /> Accounts
-          </h2>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRegisterOpen((o) => !o)}
-              disabled={servers.length === 0}
-            >
-              <UserPlus /> Register
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addAccount}
-              disabled={servers.length === 0}
-            >
-              <Plus /> Add login
-            </Button>
-          </div>
-        </div>
-        {registerOpen && (
-          <div className="space-y-3 rounded-md border border-border p-3">
-            <p className="text-sm font-medium">Create a new account</p>
-            <RegisterForm
-              servers={servers}
-              onSuccess={() => setRegisterOpen(false)}
-              onCancel={() => setRegisterOpen(false)}
-            />
-          </div>
-        )}
+        <h2 className={H2_CLASS}>
+          <Users size={15} /> Accounts
+        </h2>
         {accountsCfg.accounts.length === 0 ? (
           <p className={EMPTY_CLASS}>
             No logins yet. Add one to connect to a lobby.
@@ -156,6 +126,34 @@ export default function LobbyServersSettings() {
               />
             ))}
           </ul>
+        )}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRegisterOpen((o) => !o)}
+            disabled={servers.length === 0}
+          >
+            <UserPlus /> Register
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addAccount}
+            disabled={servers.length === 0}
+          >
+            <Plus /> Add login
+          </Button>
+        </div>
+        {registerOpen && (
+          <div className="space-y-3 rounded-md border border-border p-3">
+            <p className="text-sm font-medium">Create a new account</p>
+            <RegisterForm
+              servers={servers}
+              onSuccess={() => setRegisterOpen(false)}
+              onCancel={() => setRegisterOpen(false)}
+            />
+          </div>
         )}
       </section>
 
