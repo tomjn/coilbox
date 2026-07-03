@@ -1,6 +1,7 @@
 import { Button, cn, Input } from "@picoframe/frame";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ChatMsg } from "../bindings";
+import { FormattedText } from "./FormattedText";
 
 /** Format a unix-millis timestamp as a short local time (blank when absent). */
 function formatTime(at: number): string {
@@ -183,7 +184,7 @@ export function ChatPane({
                       </span>
                     )}
                     <span className="whitespace-pre-wrap break-words font-mono">
-                      {m.text}
+                      <FormattedText text={m.text} />
                     </span>
                   </div>
                   {!nextSame && (
