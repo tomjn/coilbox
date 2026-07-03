@@ -257,17 +257,6 @@ export function useBattleRoom(): BattleRoomView {
     pushStatus({ color: hexToColorInt(hex) });
   }, [activeKey, battle, myStatus, savedColor, setSavedColor, pushStatus]);
 
-  // A host joins their own battle as a spectator by default (protocol default
-  // status); flip us to a player once, so the founder appears in the game. Gated
-  // per battle so the user can still choose to spectate afterwards.
-  const hostSeatedBattle = useRef<number | null>(null);
-  useEffect(() => {
-    if (!activeKey || !battle || !myStatus || !selfHost) return;
-    if (hostSeatedBattle.current === battle.id) return;
-    hostSeatedBattle.current = battle.id;
-    if (!myStatus.battleStatus.mode) pushStatus({ mode: true });
-  }, [activeKey, battle, myStatus, selfHost, pushStatus]);
-
   const leave = useCallback(async () => {
     if (!activeKey) return;
     await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
