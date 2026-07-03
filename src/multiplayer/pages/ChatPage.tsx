@@ -1,7 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { LogOut, Users } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
 import { mpLeaveChannel } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
 import { ChatPane } from "../chat/ChatPane";
@@ -17,7 +16,8 @@ import { useMultiplayer } from "../store";
  * Connection lives on the Lobby page; when disconnected this shows a prompt.
  */
 export default function ChatPage() {
-  const { mirror, activeKey, markSeen, forgetChannel } = useMultiplayer();
+  const { mirror, activeKey, markSeen, forgetChannel, openLoginPopover } =
+    useMultiplayer();
   const [active, setActive] = useState<ConversationDescriptor | null>(null);
   const [showMembers, setShowMembers] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
@@ -52,12 +52,7 @@ export default function ChatPage() {
         <p className="text-sm text-muted-foreground">
           You are not connected to a lobby server.
         </p>
-        <Link
-          to="/lobby"
-          className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
-        >
-          Go to the Lobby to connect
-        </Link>
+        <Button onClick={openLoginPopover}>Connect…</Button>
       </main>
     );
   }
