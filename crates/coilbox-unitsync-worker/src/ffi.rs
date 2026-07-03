@@ -31,6 +31,7 @@ type FloatByIntFn = unsafe extern "C" fn(c_int) -> c_float; // GetOptionNumberDe
 type StrByIntIntFn = unsafe extern "C" fn(c_int, c_int) -> *const c_char; // GetOptionListItemKey(i, j)
 type StrByStrFn = unsafe extern "C" fn(*const c_char) -> *const c_char; // GetArchivePath(name)
 type UintByStrFn = unsafe extern "C" fn(*const c_char) -> c_uint; // GetArchiveChecksum(name)
+type UintByIntFn = unsafe extern "C" fn(c_int) -> c_uint; // GetPrimaryModChecksum(index)
 type MinimapFn = unsafe extern "C" fn(*const c_char, c_int) -> *const u16; // GetMinimap(name, mip)
                                                                            // GetInfoMapSize(mapName, infoType, *width, *height) -> nonzero on success.
 type InfoMapSizeFn =
@@ -111,6 +112,7 @@ pub struct Unitsync {
     // optional archive metadata
     archive_path_fn: Option<StrByStrFn>,
     archive_checksum_fn: Option<UintByStrFn>,
+    mod_checksum_fn: Option<UintByIntFn>,
     map_checksum_from_name_fn: Option<UintByStrFn>,
     // optional archive file access (browse + read members through the VFS)
     open_archive_fn: Option<IntByStrFn>,
@@ -225,6 +227,7 @@ impl Unitsync {
             info_value_string_fn: req(&lib, b"GetInfoValueString\0")?,
             archive_path_fn: opt(&lib, b"GetArchivePath\0"),
             archive_checksum_fn: opt(&lib, b"GetArchiveChecksum\0"),
+            mod_checksum_fn: opt(&lib, b"GetPrimaryModChecksum\0"),
             map_checksum_from_name_fn: opt(&lib, b"GetMapChecksumFromName\0"),
             open_archive_fn: opt(&lib, b"OpenArchive\0"),
             close_archive_fn: opt(&lib, b"CloseArchive\0"),
@@ -488,6 +491,15 @@ impl Unitsync {
         let f = self.archive_checksum_fn?;
         let c = CString::new(name).ok()?;
         Some(unsafe { f(c.as_ptr()) })
+    }
+
+    /// Sync checksum for a game (primary mod) by its index (`GetPrimaryModChecksum`).
+    /// Unlike `archive_checksum` (a single archive) this hashes the mod archive
+    /// plus all its dependencies — the value joiners verify against — and is the
+    /// checksum lobbies expect in OPENBATTLE. `None` if the build lacks the symbol.
+    pub fn mod_checksum(&self, index: i32) -> Option<u32> {
+        let f = self.mod_checksum_fn?;
+        Some(unsafe { f(index) })
     }
 
     /// Sync checksum for a map by name (`GetMapChecksumFromName`). This SHA512-

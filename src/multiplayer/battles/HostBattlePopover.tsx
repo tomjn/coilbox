@@ -126,7 +126,9 @@ export function HostBattlePopover({
     firstError?: string,
   ): string {
     if (status === "unsyncable")
-      return `Couldn't hash the ${kind} — it may be missing a dependency or be unreadable.`;
+      return firstError
+        ? `Couldn't hash the ${kind}: ${firstError}`
+        : `Couldn't hash the ${kind} — it may be missing a dependency or be unreadable.`;
     return firstError
       ? `Failed to read the ${kind}: ${firstError}`
       : `Failed to read the ${kind}.`;

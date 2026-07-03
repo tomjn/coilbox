@@ -82,11 +82,24 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameIn
 
     let options = crate::read_options(&us, us.mod_option_count());
 
-    // A zero CRC means "unknown" here, so omit it rather than show a misleading 0.
-    let checksum = us
-        .archive_checksum(game_archive)
+    // Prefer the full primary-mod sync checksum (archive + all dependencies) — the
+    // value joiners verify against — over the single-archive `GetArchiveChecksum`,
+    // which many engine builds leave 0 for a game's primary archive. Look the mod
+    // up by index (games are "primary mods" in unitsync), falling back to the
+    // single-archive checksum on builds that lack `GetPrimaryModChecksum`.
+    let mod_index =
+        (0..us.mod_count()).find(|&i| us.mod_archive(i).as_deref() == Some(game_archive));
+    let checksum = mod_index
+        .and_then(|i| us.mod_checksum(i))
+        .or_else(|| us.archive_checksum(game_archive))
+        // A zero CRC means "unknown", so omit it rather than show a misleading 0.
         .filter(|&c| c != 0)
         .map(|c| format!("{c:08x}"));
+    if checksum.is_none() {
+        errors.push(format!(
+            "no sync checksum for {game_archive} (primary-mod index {mod_index:?}): GetPrimaryModChecksum / GetArchiveChecksum returned 0 or are unavailable in this engine build"
+        ));
+    }
 
     errors.extend(us.drain_errors());
     us.remove_all_archives();
