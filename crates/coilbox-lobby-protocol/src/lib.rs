@@ -23,7 +23,7 @@ mod state;
 mod status;
 
 pub use hash::password_hash;
-pub use login::{LoginConfig, LoginMachine, LoginPhase};
+pub use login::{LoginConfig, LoginMachine, LoginMode, LoginPhase};
 pub use message::{parse_line, ServerMessage};
 pub use reduce::{begin_channel_list, record_outgoing_private, reduce, reduce_at, Delta};
 pub use state::{

@@ -331,6 +331,18 @@
           "markdownDescription": "Denies the mp_build_battle_config command without any pre-configured scope."
         },
         {
+          "description": "Enables the mp_confirm_agreement command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-confirm-agreement",
+          "markdownDescription": "Enables the mp_confirm_agreement command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_confirm_agreement command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-confirm-agreement",
+          "markdownDescription": "Denies the mp_confirm_agreement command without any pre-configured scope."
+        },
+        {
           "description": "Enables the mp_connect command without any pre-configured scope.",
           "type": "string",
           "const": "allow-mp-connect",
@@ -499,6 +511,18 @@
           "markdownDescription": "Denies the mp_reattach command without any pre-configured scope."
         },
         {
+          "description": "Enables the mp_register command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-register",
+          "markdownDescription": "Enables the mp_register command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_register command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-register",
+          "markdownDescription": "Denies the mp_register command without any pre-configured scope."
+        },
+        {
           "description": "Enables the mp_remove_bot command without any pre-configured scope.",
           "type": "string",
           "const": "allow-mp-remove-bot",
@@ -631,10 +655,10 @@
           "markdownDescription": "Denies the mp_update_bot command without any pre-configured scope."
         },
         {
-          "description": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-disconnect`\n- `allow-mp-reattach`\n- `allow-mp-active-keys`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-say-battle`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-list-channels`\n- `allow-mp-join-battle`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-set-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-build-battle-config`",
+          "description": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-register`\n- `allow-mp-confirm-agreement`\n- `allow-mp-disconnect`\n- `allow-mp-reattach`\n- `allow-mp-active-keys`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-say-battle`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-list-channels`\n- `allow-mp-join-battle`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-set-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-build-battle-config`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-disconnect`\n- `allow-mp-reattach`\n- `allow-mp-active-keys`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-say-battle`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-list-channels`\n- `allow-mp-join-battle`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-set-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-build-battle-config`"
+          "markdownDescription": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-register`\n- `allow-mp-confirm-agreement`\n- `allow-mp-disconnect`\n- `allow-mp-reattach`\n- `allow-mp-active-keys`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-say-battle`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-list-channels`\n- `allow-mp-join-battle`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-set-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-build-battle-config`"
         }
       ]
     }

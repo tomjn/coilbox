@@ -17,6 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use coilbox_lobby_protocol::{
     command, password_hash, team_color_rgb, BattleStatus, ClientStatus, LobbyState, LoginConfig,
+    LoginMode,
 };
 use conn::{spawn_connection, LobbyEvent, Outbound, Registry};
 use picoframe_core::CliResult;
@@ -42,11 +43,69 @@ fn enqueue(registry: &Registry, server_key: &str, line: String) -> CliResult {
     }
 }
 
-/// `mp_connect` — open (and, for TLS servers, STLS-upgrade) the socket, then hand
-/// it to the connection task which runs the login handshake and streams events.
+/// Open (and, for TLS servers, STLS-upgrade) the socket, then hand it to the
+/// connection task which runs the login/registration handshake and streams events.
+/// Shared by [`mp_connect`] and [`mp_register`], which differ only in `mode`.
 /// Refuses a second connection under the same `server_key`. The password is hashed
-/// here and never logged in plaintext (the outbound `LOGIN` console line carries
-/// only the hash).
+/// here and never logged in plaintext (the outbound `LOGIN`/`REGISTER` console line
+/// carries only the hash).
+#[allow(clippy::too_many_arguments)]
+async fn open_and_spawn<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    registry: &Registry,
+    server_key: String,
+    host: String,
+    port: u16,
+    tls: bool,
+    allow_self_signed: bool,
+    username: String,
+    password: String,
+    compat_flags: Vec<String>,
+    mode: LoginMode,
+    on_event: Channel<LobbyEvent>,
+) -> CliResult {
+    if registry.lock().unwrap().contains_key(&server_key) {
+        return CliResult::err(format!("already connected: {server_key}"));
+    }
+
+    let dm_dir = match app.path().app_data_dir() {
+        Ok(d) => d.join("coilbox").join("lobby-dms"),
+        Err(e) => return CliResult::err(format!("no app data dir: {e}")),
+    };
+    let dm_log = dmlog::DmLog::new(&dm_dir, &server_key);
+
+    let stream = match tls::connect_stream(&host, port, tls, allow_self_signed).await {
+        Ok(s) => s,
+        Err(e) => return CliResult::err(e),
+    };
+
+    let login_cfg = LoginConfig {
+        username,
+        password_hash: password_hash(&password),
+        // The server records this as the client's advertised local address; a
+        // wildcard is accepted and avoids leaking a real LAN IP.
+        local_ip: "*".into(),
+        agent: format!("Coilbox {}", env!("CARGO_PKG_VERSION")),
+        client_id: "0".into(),
+        compat_flags,
+        // TLS was already upgraded up-front in `connect_stream`, so the login
+        // machine drives a plain greeting on the already-secured stream.
+        use_stls: false,
+        mode,
+    };
+
+    spawn_connection(
+        registry.clone(),
+        server_key,
+        stream,
+        login_cfg,
+        on_event,
+        dm_log,
+    );
+    CliResult::ok(json!({ "connected": true }))
+}
+
+/// `mp_connect` — open a lobby connection and run the login handshake.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 async fn mp_connect<R: Runtime>(
@@ -62,44 +121,78 @@ async fn mp_connect<R: Runtime>(
     compat_flags: Vec<String>,
     on_event: Channel<LobbyEvent>,
 ) -> Result<CliResult, ()> {
-    if registry.lock().unwrap().contains_key(&server_key) {
-        return Ok(CliResult::err(format!("already connected: {server_key}")));
-    }
-
-    let dm_dir = match app.path().app_data_dir() {
-        Ok(d) => d.join("coilbox").join("lobby-dms"),
-        Err(e) => return Ok(CliResult::err(format!("no app data dir: {e}"))),
-    };
-    let dm_log = dmlog::DmLog::new(&dm_dir, &server_key);
-
-    let stream = match tls::connect_stream(&host, port, tls, allow_self_signed).await {
-        Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(e)),
-    };
-
-    let login_cfg = LoginConfig {
-        username,
-        password_hash: password_hash(&password),
-        // The server records this as the client's advertised local address; a
-        // wildcard is accepted and avoids leaking a real LAN IP.
-        local_ip: "*".into(),
-        agent: format!("Coilbox {}", env!("CARGO_PKG_VERSION")),
-        client_id: "0".into(),
-        compat_flags,
-        // TLS was already upgraded up-front in `connect_stream`, so the login
-        // machine drives a plain greeting on the already-secured stream.
-        use_stls: false,
-    };
-
-    spawn_connection(
-        registry.inner().clone(),
+    Ok(open_and_spawn(
+        &app,
+        registry.inner(),
         server_key,
-        stream,
-        login_cfg,
+        host,
+        port,
+        tls,
+        allow_self_signed,
+        username,
+        password,
+        compat_flags,
+        LoginMode::Login,
         on_event,
-        dm_log,
-    );
-    Ok(CliResult::ok(json!({ "connected": true })))
+    )
+    .await)
+}
+
+/// `mp_register` — open a connection and register a new account (`REGISTER` instead
+/// of `LOGIN`). Streams the same events; the frontend watches for the `registered`
+/// phase (success) then disconnects, or a `disconnected` reason (denial). It does
+/// NOT log in — the caller connects normally afterwards, which is when a
+/// verification server issues its agreement/code challenge.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn mp_register<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    registry: State<'_, Registry>,
+    server_key: String,
+    host: String,
+    port: u16,
+    tls: bool,
+    allow_self_signed: bool,
+    username: String,
+    password: String,
+    email: Option<String>,
+    compat_flags: Vec<String>,
+    on_event: Channel<LobbyEvent>,
+) -> Result<CliResult, ()> {
+    Ok(open_and_spawn(
+        &app,
+        registry.inner(),
+        server_key,
+        host,
+        port,
+        tls,
+        allow_self_signed,
+        username,
+        password,
+        compat_flags,
+        LoginMode::Register { email },
+        on_event,
+    )
+    .await)
+}
+
+/// `mp_confirm_agreement` — resume a login parked awaiting the emailed verification
+/// code. Drives the connection's login machine to send `CONFIRMAGREEMENT [code]`
+/// and re-`LOGIN`. `code` is omitted for agreements that need no code.
+#[tauri::command]
+fn mp_confirm_agreement(
+    registry: State<'_, Registry>,
+    server_key: String,
+    code: Option<String>,
+) -> CliResult {
+    let map = registry.lock().unwrap();
+    match map.get(&server_key) {
+        Some(conn) => match conn.tx.send(Outbound::ConfirmAgreement { code }) {
+            Ok(()) => CliResult::ok(json!({ "sent": true })),
+            Err(_) => CliResult::err("connection is closed"),
+        },
+        None => CliResult::err(format!("not connected: {server_key}")),
+    }
 }
 
 /// `mp_disconnect` — request a graceful logout: the connection task writes `EXIT`,
@@ -653,6 +746,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         })
         .invoke_handler(tauri::generate_handler![
             mp_connect,
+            mp_register,
+            mp_confirm_agreement,
             mp_disconnect,
             mp_reattach,
             mp_active_keys,

@@ -17,13 +17,16 @@ import {
   type LobbyState,
   type LoginPhase,
   mpActiveKeys,
+  mpConfirmAgreement,
   mpConnect,
   mpDisconnect,
   mpJoinChannel,
   mpReattach,
+  mpRegister,
   mpSnapshot,
 } from "./bindings";
 import { conversationCounts } from "./chat/conversation";
+import { VerificationCodeDialog } from "./VerificationCodeDialog";
 
 /**
  * The connection key for a server: `username@host:port`. Shared by the store and
@@ -136,7 +139,27 @@ interface MultiplayerContextValue {
   busy: boolean;
   /** Open a connection as `username` to `server` (throws if no stored password). */
   connect: (server: LobbyServer, username: string) => Promise<void>;
+  /**
+   * Register a new account on `server`. Resolves once the server accepts it (the
+   * connection is then closed); rejects with the server's reason on denial. Does
+   * not log in or persist anything — the caller stores the credential/account.
+   */
+  register: (
+    server: LobbyServer,
+    username: string,
+    password: string,
+    email?: string,
+  ) => Promise<void>;
   disconnect: () => Promise<void>;
+  /**
+   * The connection currently parked awaiting an emailed verification code (its
+   * `serverKey`), or null. Drives the verification-code dialog.
+   */
+  pendingAgreement: { serverKey: string } | null;
+  /** Submit the verification code for the parked connection and resume login. */
+  submitAgreementCode: (code: string) => Promise<void>;
+  /** Abandon the verification prompt by disconnecting the parked connection. */
+  cancelAgreement: () => Promise<void>;
   /** Unread count for a conversation id given its current message count. */
   unreadFor: (id: string, count: number) => number;
   /** Mark a conversation read up to its current message count. */
@@ -169,6 +192,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const [mirror, dispatch] = useReducer(mirrorReducer, initialMirror);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingAgreement, setPendingAgreement] = useState<{
+    serverKey: string;
+  } | null>(null);
 
   // One-way "has ever connected this session" latch driving Chat/Battles sidebar
   // visibility. Set on any transition to connected (fresh connect or reload
@@ -273,8 +299,21 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           .then((r) => dispatch({ type: "snapshot", state: r.state }))
           .catch(() => {});
       }
+      // The server can pause a new account's first login on the agreement/
+      // verification-code handshake; surface that so the dialog can prompt. Any
+      // other phase (e.g. the resume after submitting the code) clears it.
+      if (ev.kind === "phase") {
+        setPendingAgreement((p) =>
+          ev.phase === "awaitAgreement"
+            ? { serverKey }
+            : p?.serverKey === serverKey
+              ? null
+              : p,
+        );
+      }
       if (ev.kind === "disconnected") {
         setActiveKey(null);
+        setPendingAgreement((p) => (p?.serverKey === serverKey ? null : p));
       }
     };
     return onEvent;
@@ -316,6 +355,83 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     },
     [openChannel],
   );
+
+  // Register a new account: open a throwaway connection that sends REGISTER, then
+  // resolve on the `registered` phase / reject on `disconnected` (denial). The
+  // connection is torn down before returning so a subsequent login can reuse the
+  // key. Registration never logs us in — the emailed-code step happens on the
+  // login that follows. `register` doesn't persist anything; the caller stores the
+  // credential + account on success.
+  const register = useCallback(
+    async (
+      server: LobbyServer,
+      username: string,
+      password: string,
+      email?: string,
+    ) => {
+      setBusy(true);
+      const serverKey = serverKeyFor(server, username);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          let settled = false;
+          const onEvent = new Channel<LobbyEvent>();
+          onEvent.onmessage = (ev) => {
+            if (settled) return;
+            if (ev.kind === "phase" && ev.phase === "registered") {
+              settled = true;
+              resolve();
+            } else if (ev.kind === "phase" && ev.phase === "awaitAgreement") {
+              // Not expected during REGISTER (uberserver verifies on LOGIN). Fail
+              // loud rather than hang: the account may exist — tell the user to
+              // log in to enter their code.
+              settled = true;
+              reject(
+                new Error(
+                  "Server asked for verification during registration. Try logging in to enter your code.",
+                ),
+              );
+            } else if (ev.kind === "disconnected") {
+              settled = true;
+              reject(new Error(ev.reason ?? "Registration failed"));
+            }
+          };
+          mpRegister({
+            serverKey,
+            host: server.host,
+            port: server.port,
+            tls: server.tls,
+            allowSelfSigned: server.allowSelfSigned,
+            username,
+            password,
+            email: email ?? null,
+            compatFlags: ["u", "sp"],
+            onEvent,
+          }).catch(reject);
+        });
+      } finally {
+        // Free the registry slot (the register connection stays open on success).
+        await mpDisconnect({ serverKey }).catch(() => {});
+        setBusy(false);
+      }
+    },
+    [],
+  );
+
+  const submitAgreementCode = useCallback(
+    async (code: string) => {
+      if (!pendingAgreement) return;
+      await mpConfirmAgreement({ serverKey: pendingAgreement.serverKey, code });
+      setPendingAgreement(null);
+    },
+    [pendingAgreement],
+  );
+
+  const cancelAgreement = useCallback(async () => {
+    if (!pendingAgreement) return;
+    const serverKey = pendingAgreement.serverKey;
+    setPendingAgreement(null);
+    await mpDisconnect({ serverKey }).catch(() => {});
+  }, [pendingAgreement]);
 
   const disconnect = useCallback(async () => {
     if (!activeKey) return;
@@ -367,7 +483,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         revealed,
         busy,
         connect,
+        register,
         disconnect,
+        pendingAgreement,
+        submitAgreementCode,
+        cancelAgreement,
         unreadFor,
         markSeen,
         rememberChannel,
@@ -380,6 +500,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <VerificationCodeDialog />
     </MultiplayerContext.Provider>
   );
 }
