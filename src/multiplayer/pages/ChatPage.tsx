@@ -110,6 +110,7 @@ export default function ChatPage() {
             active.kind === "channel" || active.kind === "battle" ? (
               <>
                 <Button
+                  variant="secondary"
                   className="h-7 px-2"
                   onClick={() => setShowMembers((v) => !v)}
                   aria-label="Toggle members"

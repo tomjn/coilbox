@@ -146,6 +146,7 @@ export function ConversationSidebar({
         onToggle={() => setChannelsOpen((v) => !v)}
         action={
           <Button
+            variant="secondary"
             onClick={onBrowse}
             aria-label="Browse channels"
             className="h-7 px-2"
