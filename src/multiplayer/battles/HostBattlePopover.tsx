@@ -1,5 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
@@ -53,8 +53,24 @@ export function HostBattlePopover({
   const dataDir = target?.dataDir;
 
   const scan = useUnitsyncScan(enginePath, dataDir);
-  const games = scan.data?.games ?? [];
-  const maps = scan.data?.maps ?? [];
+  // A game or map can appear in more than one archive (e.g. a packaged `.sdz`
+  // and its decompiled `.sdd`); collapse by name so each Select has one option
+  // per name. The option value/key is the name, so duplicates would both violate
+  // the unique-key rule and give the Select two indistinguishable entries.
+  const games = useMemo(
+    () =>
+      Array.from(
+        new Map((scan.data?.games ?? []).map((g) => [g.name, g])).values(),
+      ),
+    [scan.data],
+  );
+  const maps = useMemo(
+    () =>
+      Array.from(
+        new Map((scan.data?.maps ?? []).map((m) => [m.name, m])).values(),
+      ),
+    [scan.data],
+  );
 
   const [title, setTitle] = useState("");
   const [gameName, setGameName] = useState("");
