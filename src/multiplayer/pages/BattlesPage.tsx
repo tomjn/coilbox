@@ -6,7 +6,7 @@ import {
   type BattleFilters,
   type BattleSortKey,
   filterSortBattles,
-} from "../battles/battleList";
+} from "../battles/battleFilters";
 import { type Battle, mpJoinBattle, mpLeaveBattle } from "../bindings";
 import { useMultiplayer } from "../store";
 

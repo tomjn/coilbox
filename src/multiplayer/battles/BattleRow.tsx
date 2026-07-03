@@ -1,7 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Lock, Users } from "lucide-react";
 import type { Battle } from "../bindings";
-import { occupancy } from "./battleList";
+import { occupancy } from "./battleFilters";
 import { JoinBattlePopover } from "./JoinBattlePopover";
 
 /**

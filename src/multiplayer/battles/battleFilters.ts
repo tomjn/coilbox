@@ -35,7 +35,10 @@ function compareBy(key: BattleSortKey, a: Battle, b: Battle): number {
 }
 
 /** Filter and sort a battle list for display. Pure — no snapshot access. */
-export function filterSortBattles(battles: Battle[], f: BattleFilters): Battle[] {
+export function filterSortBattles(
+  battles: Battle[],
+  f: BattleFilters,
+): Battle[] {
   const q = f.search.trim().toLowerCase();
   const filtered = battles.filter((b) => {
     if (q) {

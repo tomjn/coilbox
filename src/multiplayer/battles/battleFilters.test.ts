@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Battle, MemberStatus } from "../bindings";
-import { type BattleFilters, filterSortBattles, occupancy } from "./battleList";
+import {
+  type BattleFilters,
+  filterSortBattles,
+  occupancy,
+} from "./battleFilters";
 
 function mk(p: Partial<Battle>): Battle {
   return {
@@ -45,9 +49,9 @@ describe("occupancy", () => {
   });
 
   it("does not double-count a host present in members", () => {
-    expect(occupancy(mk({ host: "host", members: { host: M, alice: M } }))).toBe(
-      2,
-    );
+    expect(
+      occupancy(mk({ host: "host", members: { host: M, alice: M } })),
+    ).toBe(2);
   });
 });
 
@@ -60,7 +64,9 @@ describe("filterSortBattles", () => {
       mk({ id: 4, title: "Delta", modname: "BAR" }),
     ];
     const ids = (q: string) =>
-      filterSortBattles(list, { ...base, search: q }).map((b) => b.id).sort();
+      filterSortBattles(list, { ...base, search: q })
+        .map((b) => b.id)
+        .sort();
     expect(ids("delta")).toEqual([2, 4]);
     expect(ids("ZED")).toEqual([3]);
     expect(ids("bar")).toEqual([4]);

@@ -21,7 +21,10 @@ describe("mirrorReducer join-failure handling", () => {
   it("sets lastJoinError from a joinBattleFailed delta", () => {
     const m = mirrorReducer(initialMirror, {
       type: "event",
-      ev: { kind: "delta", delta: { kind: "joinBattleFailed", reason: "Wrong password" } },
+      ev: {
+        kind: "delta",
+        delta: { kind: "joinBattleFailed", reason: "Wrong password" },
+      },
     });
     expect(m.lastJoinError).toBe("Wrong password");
   });
@@ -29,7 +32,10 @@ describe("mirrorReducer join-failure handling", () => {
   it("sets lastJoinError from an openBattleFailed delta", () => {
     const m = mirrorReducer(initialMirror, {
       type: "event",
-      ev: { kind: "delta", delta: { kind: "openBattleFailed", reason: "Nope" } },
+      ev: {
+        kind: "delta",
+        delta: { kind: "openBattleFailed", reason: "Nope" },
+      },
     });
     expect(m.lastJoinError).toBe("Nope");
   });
@@ -44,13 +50,16 @@ describe("mirrorReducer join-failure handling", () => {
 
   it("clearJoinError resets it", () => {
     const withErr = { ...initialMirror, lastJoinError: "x" };
-    expect(mirrorReducer(withErr, { type: "clearJoinError" }).lastJoinError).toBeNull();
+    expect(
+      mirrorReducer(withErr, { type: "clearJoinError" }).lastJoinError,
+    ).toBeNull();
   });
 
   it("snapshot preserves lastJoinError", () => {
     const withErr = { ...initialMirror, lastJoinError: "x" };
     expect(
-      mirrorReducer(withErr, { type: "snapshot", state: emptyState }).lastJoinError,
+      mirrorReducer(withErr, { type: "snapshot", state: emptyState })
+        .lastJoinError,
     ).toBe("x");
   });
 });
