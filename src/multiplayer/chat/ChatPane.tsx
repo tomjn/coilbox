@@ -1,5 +1,5 @@
 import { Button, cn, Input } from "@picoframe/frame";
-import { Bot } from "lucide-react";
+import { ArrowUp, Bot } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ChatMsg } from "../bindings";
 import { FormattedText } from "./FormattedText";
@@ -240,8 +240,14 @@ export function ChatPane({
           disabled={disabled}
           aria-label="Message"
         />
-        <Button onClick={submit} disabled={disabled || draft.trim() === ""}>
-          Send
+        <Button
+          onClick={submit}
+          disabled={disabled || draft.trim() === ""}
+          size="icon"
+          aria-label="Send"
+          title="Send"
+        >
+          <ArrowUp className="size-4" />
         </Button>
       </div>
     </section>
