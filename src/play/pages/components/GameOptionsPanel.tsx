@@ -119,7 +119,7 @@ export function GameOptionsPanel({
 }
 
 /** Render one mod option as the control its type calls for. */
-function ModOptionField({
+export function ModOptionField({
   option: o,
   value,
   disabled,
