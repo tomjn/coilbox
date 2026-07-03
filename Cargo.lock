@@ -593,6 +593,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-portable"
+version = "0.0.0"
+dependencies = [
+ "tauri",
+]
+
+[[package]]
 name = "coilbox-springlua"
 version = "0.0.0"
 dependencies = [
@@ -4626,6 +4633,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-content"
 version = "0.0.0"
 dependencies = [
+ "coilbox-portable",
  "flate2",
  "image 0.25.10",
  "picoframe-core",
@@ -4666,6 +4674,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-mapconv"
 version = "0.0.0"
 dependencies = [
+ "coilbox-portable",
  "coilbox-springlua",
  "coilbox-thumb-cache",
  "image 0.25.10",
@@ -4683,6 +4692,7 @@ name = "tauri-plugin-coilbox-multiplayer"
 version = "0.0.0"
 dependencies = [
  "coilbox-lobby-protocol",
+ "coilbox-portable",
  "futures-util",
  "picoframe-core",
  "rustls",
@@ -4700,6 +4710,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-play"
 version = "0.0.0"
 dependencies = [
+ "coilbox-portable",
  "picoframe-core",
  "serde",
  "serde_json",
@@ -4711,6 +4722,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-uberstress"
 version = "0.0.0"
 dependencies = [
+ "coilbox-portable",
  "picoframe-core",
  "serde",
  "serde_json",
@@ -4722,6 +4734,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-unitsync"
 version = "0.0.0"
 dependencies = [
+ "coilbox-portable",
  "picoframe-core",
  "serde",
  "serde_json",

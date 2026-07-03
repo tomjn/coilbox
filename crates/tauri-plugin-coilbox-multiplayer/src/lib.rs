@@ -68,7 +68,7 @@ async fn open_and_spawn<R: Runtime>(
         return CliResult::err(format!("already connected: {server_key}"));
     }
 
-    let dm_dir = match app.path().app_data_dir() {
+    let dm_dir = match coilbox_portable::data_dir(app) {
         Ok(d) => d.join("coilbox").join("lobby-dms"),
         Err(e) => return CliResult::err(format!("no app data dir: {e}")),
     };

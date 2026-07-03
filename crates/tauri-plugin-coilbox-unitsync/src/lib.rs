@@ -25,7 +25,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::plugin::{Builder, TauriPlugin};
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Runtime};
 
 const WORKER_MISSING: &str =
     "unitsync worker not found. Bundle it via tauri.conf.json `externalBin` or set UNITSYNC_WORKER.";
@@ -78,8 +78,7 @@ const INFO_CACHE_SUBDIR: &str = "coilbox-unitsync-info";
 /// dir. `None` when the platform can't resolve a cache dir — caching is then
 /// simply skipped (same pattern as the mapconv plugin's thumbnail cache).
 fn thumb_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
-    app.path()
-        .app_cache_dir()
+    coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(THUMB_CACHE_SUBDIR))
 }
@@ -87,8 +86,7 @@ fn thumb_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
 /// The on-disk header cache directory, under the app cache dir. `None` when the
 /// platform can't resolve a cache dir (caching is then skipped).
 fn header_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
-    app.path()
-        .app_cache_dir()
+    coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(HEADER_CACHE_SUBDIR))
 }
@@ -96,8 +94,7 @@ fn header_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
 /// The on-disk unit build-icon cache directory, under the app cache dir. `None`
 /// when the platform can't resolve a cache dir (caching is then skipped).
 fn buildpic_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
-    app.path()
-        .app_cache_dir()
+    coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(BUILDPIC_CACHE_SUBDIR))
 }
@@ -105,8 +102,7 @@ fn buildpic_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
 /// The on-disk game/map info-blob cache directory, under the app cache dir.
 /// `None` when the platform can't resolve a cache dir (caching is then skipped).
 fn info_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
-    app.path()
-        .app_cache_dir()
+    coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(INFO_CACHE_SUBDIR))
 }

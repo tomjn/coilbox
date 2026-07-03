@@ -33,11 +33,7 @@ type SharedRegistry = Arc<Mutex<HashMap<String, Child>>>;
 
 /// Resolve the plugin's settings-file path and results directory under app-data.
 fn data_dirs<R: Runtime>(app: &AppHandle<R>) -> Result<(PathBuf, PathBuf), String> {
-    let base = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("could not resolve app data dir: {e}"))?
-        .join("uberstress");
+    let base = coilbox_portable::data_dir(app)?.join("uberstress");
     Ok((base.join("settings.json"), base.join("results")))
 }
 

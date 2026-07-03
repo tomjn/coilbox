@@ -33,6 +33,8 @@ export default function FoldersSection() {
     path: string;
     message: string;
   } | null>(null);
+  // Store the next added folder as a path relative to the app dir (portable).
+  const [addPortable, setAddPortable] = useState(false);
 
   const doRescan = useCallback(async () => {
     setRescanning(true);
@@ -69,7 +71,10 @@ export default function FoldersSection() {
     if (typeof picked !== "string") return;
     setActionError(null);
     try {
-      const { state } = await contentAddRoot({ path: picked });
+      const { state } = await contentAddRoot({
+        path: picked,
+        portable: addPortable,
+      });
       setState(state);
       setAddError(null);
     } catch (e) {
@@ -83,6 +88,7 @@ export default function FoldersSection() {
       const { state } = await contentAddRoot({
         path: addError.path,
         force: true,
+        portable: addPortable,
       });
       setState(state);
     } catch (e) {
@@ -133,6 +139,17 @@ export default function FoldersSection() {
             Spring/Recoil data roots, auto-detected and added by hand.
           </p>
           <div className="flex items-center gap-2">
+            {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control */}
+            <label
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+              title="Store the added folder as a path relative to the app dir, so it follows the executable in a portable install. The folder must be inside the app folder."
+            >
+              <Checkbox
+                checked={addPortable}
+                onCheckedChange={(v) => setAddPortable(v === true)}
+              />
+              Portable
+            </label>
             <Button
               type="button"
               variant="outline"

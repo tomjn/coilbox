@@ -60,6 +60,10 @@ pub struct ContentRoot {
     pub origins: Vec<String>,
     pub exists: bool,
     pub valid: bool,
+    /// True when this root is stored as a path *relative* to the app dir — a
+    /// portable root that follows the executable when the package is moved.
+    #[serde(default)]
+    pub portable: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub forced: Option<bool>,
     pub counts: RootCounts,
