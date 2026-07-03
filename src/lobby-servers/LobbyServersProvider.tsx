@@ -19,6 +19,11 @@ export function LobbyServersProvider({ children }: { children: ReactNode }) {
 }
 
 function useLobbyServersMigration() {
+  // Assumes the settings store is fully hydrated synchronously before first render:
+  // the effect reads `lobbyServers.directory` once and latches `migratedV2`/`ranRef`
+  // after a single pass, so an async-hydrating store would run against the empty
+  // default and flip the flag -> silent data loss. Safe here because `main.tsx` awaits
+  // `createTauriSettingsStorage` (synchronous `get()`) before `render` — non-local.
   const [migrated, setMigrated] = useSetting("lobbyServers.migratedV2", false);
   const [oldDir] = useSetting<LegacyLobbyServerDir>("lobbyServers.directory", {
     servers: [],
