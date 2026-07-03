@@ -33,4 +33,5 @@ permissions = [
   "allow-mp-set-start-rect",
   "allow-mp-set-script-tags",
   "allow-mp-build-battle-config",
+  "allow-mp-build-host-config",
 ]

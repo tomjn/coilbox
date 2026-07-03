@@ -126,6 +126,8 @@ export interface LobbyState {
   battles: Record<string, Battle>;
   currentBattle: number | null;
   lastBattle: number | null;
+  /** The UDP port the server assigned for a battle we host (`HOSTPORT`). */
+  hostPort: number | null;
   channelDirectory: DirChannel[];
 }
 
@@ -425,3 +427,13 @@ export const mpBuildBattleConfig = defineCommand<
   { serverKey: string },
   { config: BattleConfig }
 >("coilbox-multiplayer", "mp_build_battle_config");
+
+/**
+ * Map the battle WE host into a host-mode `BattleConfig` (`isHost:true`, bound to
+ * our assigned `HOSTPORT`, teams/allies renumbered contiguously). Errors if we are
+ * not the founder of the current battle.
+ */
+export const mpBuildHostConfig = defineCommand<
+  { serverKey: string },
+  { config: BattleConfig }
+>("coilbox-multiplayer", "mp_build_host_config");

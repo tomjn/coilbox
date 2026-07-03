@@ -34,6 +34,7 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-set-start-rect`
 - `allow-mp-set-script-tags`
 - `allow-mp-build-battle-config`
+- `allow-mp-build-host-config`
 
 ## Permission Table
 
@@ -118,6 +119,32 @@ Enables the mp_build_battle_config command without any pre-configured scope.
 <td>
 
 Denies the mp_build_battle_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-build-host-config`
+
+</td>
+<td>
+
+Enables the mp_build_host_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-build-host-config`
+
+</td>
+<td>
+
+Denies the mp_build_host_config command without any pre-configured scope.
 
 </td>
 </tr>

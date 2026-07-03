@@ -194,6 +194,14 @@ async fn run_loop(
                         outbound.push(command::pong(token.as_deref()));
                     }
 
+                    // On joining/opening a battle the server prompts us for our
+                    // battle status; reply with our current (or default) status so we
+                    // register as a participant. The frontend refines it afterwards.
+                    if matches!(&msg, ServerMessage::RequestBattleStatus) {
+                        let (bs, color) = state.lock().unwrap().my_battle_status_or_default();
+                        outbound.push(command::my_battle_status(bs, color));
+                    }
+
                     let now = now_ms();
                     let deltas = reduce_at(&mut state.lock().unwrap(), msg, now);
                     for delta in deltas {

@@ -14,6 +14,7 @@ import {
   mpSayBattle,
   mpSetBattleStatus,
   mpSetScriptTags,
+  mpSetStatus,
 } from "../bindings";
 import { useMultiplayer } from "../store";
 import { canEditBattleOptions } from "./battleOptions";
@@ -41,6 +42,8 @@ export interface BattleRoomView {
   myStatus: MemberStatus | undefined;
   /** Whether the logged-in user founded the battle (rare — usually the autohost). */
   isFounder: boolean;
+  /** We founded this battle AND we host it ourselves (not via an autohost bot). */
+  selfHost: boolean;
   target: PlayTarget | null;
   targetLoading: boolean;
   enginePath: string | undefined;
@@ -80,6 +83,8 @@ export interface BattleRoomView {
   setTeam: (teamId: number) => void;
   setAlly: (ally: number) => void;
   setColor: (hex: string) => void;
+  /** Set our own in-game flag (MYSTATUS); the host flips this to start the match. */
+  setIngame: (ingame: boolean) => void;
   leave: () => Promise<void>;
   autohostSend: (command: string) => Promise<void>;
   /** Ask the autohost to start the match (`!start`). */
@@ -128,6 +133,9 @@ export function useBattleRoom(): BattleRoomView {
   const mapOptionsSchema = mapInfo.info?.options ?? [];
   const hostIsBot = !!battle && !!state?.users[battle.host]?.status.bot;
   const canEditOptions = canEditBattleOptions(isFounder, hostIsBot);
+  // We founded the battle and run it ourselves (no autohost bot relaying it), so we
+  // drive the roster/options over the protocol and launch the game as founder.
+  const selfHost = isFounder && !hostIsBot;
 
   const [contentNonce, setContentNonce] = useState(0);
 
@@ -217,10 +225,31 @@ export function useBattleRoom(): BattleRoomView {
     pushStatus({ color: hexToColorInt(hex) });
   }, [activeKey, battle, myStatus, savedColor, setSavedColor, pushStatus]);
 
+  // A host joins their own battle as a spectator by default (protocol default
+  // status); flip us to a player once, so the founder appears in the game. Gated
+  // per battle so the user can still choose to spectate afterwards.
+  const hostSeatedBattle = useRef<number | null>(null);
+  useEffect(() => {
+    if (!activeKey || !battle || !myStatus || !selfHost) return;
+    if (hostSeatedBattle.current === battle.id) return;
+    hostSeatedBattle.current = battle.id;
+    if (!myStatus.battleStatus.mode) pushStatus({ mode: true });
+  }, [activeKey, battle, myStatus, selfHost, pushStatus]);
+
   const leave = useCallback(async () => {
     if (!activeKey) return;
     await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
   }, [activeKey]);
+
+  const setIngame = useCallback(
+    (ingame: boolean) => {
+      if (!activeKey) return;
+      mpSetStatus({ serverKey: activeKey, ingame, away: false }).catch(
+        () => {},
+      );
+    },
+    [activeKey],
+  );
 
   const autohostSend = useCallback(
     async (command: string) => {
@@ -261,6 +290,7 @@ export function useBattleRoom(): BattleRoomView {
     me,
     myStatus,
     isFounder,
+    selfHost,
     target,
     targetLoading,
     enginePath,
@@ -292,6 +322,7 @@ export function useBattleRoom(): BattleRoomView {
       setSavedColor(hex);
       pushStatus({ color: hexToColorInt(hex) });
     },
+    setIngame,
     leave,
     autohostSend,
     startGame: () => autohostSend("!start"),
