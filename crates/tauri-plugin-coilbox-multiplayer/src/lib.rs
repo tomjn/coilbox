@@ -456,17 +456,33 @@ fn mp_open_battle(
     enqueue(registry.inner(), &server_key, line)
 }
 
-/// `mp_add_bot` — add an AI bot. `battle_status` is the packed status integer.
+/// `mp_add_bot` — add an AI bot. Takes decoded battle-status fields (packed here,
+/// the single source of truth) mirroring `mp_set_battle_status`.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 fn mp_add_bot(
     registry: State<'_, Registry>,
     server_key: String,
     name: String,
-    battle_status: i32,
+    ready: bool,
+    team_id: u8,
+    ally: u8,
+    mode: bool,
+    handicap: u8,
+    sync: u8,
+    side: u8,
     color: u32,
     ai_dll: String,
 ) -> CliResult {
-    let status = BattleStatus::from_int(battle_status);
+    let status = BattleStatus {
+        ready,
+        team_id,
+        ally,
+        mode,
+        handicap,
+        sync,
+        side,
+    };
     enqueue(
         registry.inner(),
         &server_key,
@@ -474,16 +490,31 @@ fn mp_add_bot(
     )
 }
 
-/// `mp_update_bot` — update a bot's status/color.
+/// `mp_update_bot` — update a bot's status/color (decoded fields, as `mp_add_bot`).
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 fn mp_update_bot(
     registry: State<'_, Registry>,
     server_key: String,
     name: String,
-    battle_status: i32,
+    ready: bool,
+    team_id: u8,
+    ally: u8,
+    mode: bool,
+    handicap: u8,
+    sync: u8,
+    side: u8,
     color: u32,
 ) -> CliResult {
-    let status = BattleStatus::from_int(battle_status);
+    let status = BattleStatus {
+        ready,
+        team_id,
+        ally,
+        mode,
+        handicap,
+        sync,
+        side,
+    };
     enqueue(
         registry.inner(),
         &server_key,

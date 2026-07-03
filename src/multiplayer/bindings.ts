@@ -363,7 +363,13 @@ export const mpAddBot = defineCommand<
   {
     serverKey: string;
     name: string;
-    battleStatus: number;
+    ready: boolean;
+    teamId: number;
+    ally: number;
+    mode: boolean;
+    handicap: number;
+    sync: number;
+    side: number;
     color: number;
     aiDll: string;
   },
@@ -371,7 +377,18 @@ export const mpAddBot = defineCommand<
 >("coilbox-multiplayer", "mp_add_bot");
 
 export const mpUpdateBot = defineCommand<
-  { serverKey: string; name: string; battleStatus: number; color: number },
+  {
+    serverKey: string;
+    name: string;
+    ready: boolean;
+    teamId: number;
+    ally: number;
+    mode: boolean;
+    handicap: number;
+    sync: number;
+    side: number;
+    color: number;
+  },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_update_bot");
 

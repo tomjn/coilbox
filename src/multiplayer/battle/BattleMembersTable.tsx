@@ -1,6 +1,9 @@
+import { Button } from "@picoframe/frame";
+import { useEffect, useState } from "react";
 import type { Side } from "@/content/bindings";
+import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { allyLetter, type MemberRow as Row } from "./config";
-import { MemberRow } from "./MemberRow";
+import { type MemberControls, MemberRow } from "./MemberRow";
 
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 
@@ -14,6 +17,10 @@ export function BattleMembersTable({
   rows,
   sides,
   maxSlots,
+  selfHost,
+  hostControls,
+  nativeAis,
+  onAddBot,
   onSide,
   onTeam,
   onAlly,
@@ -23,11 +30,33 @@ export function BattleMembersTable({
   sides: Side[];
   /** Upper bound for the team/ally pickers (typically the battle's maxPlayers). */
   maxSlots: number;
+  /** When true, the viewer hosts this battle and may force/kick other members. */
+  selfHost: boolean;
+  hostControls: {
+    forceTeam: (user: string, team: number) => void;
+    forceAlly: (user: string, ally: number) => void;
+    forceColor: (user: string, hex: string) => void;
+    forceSpectator: (user: string) => void;
+    kick: (user: string) => void;
+    removeBot: (name: string) => void;
+  };
+  /** Native AIs the host can add as bots. */
+  nativeAis: { shortName: string; name?: string }[];
+  onAddBot: (aiShortName: string) => void;
   onSide: (side: number) => void;
   onTeam: (teamId: number) => void;
   onAlly: (ally: number) => void;
   onColor: (hex: string) => void;
 }) {
+  // The native AI the host will add next; defaults to the first available.
+  const [chosenAi, setChosenAi] = useState("");
+  useEffect(() => {
+    if (nativeAis.length > 0)
+      setChosenAi((c) =>
+        nativeAis.some((a) => a.shortName === c) ? c : nativeAis[0].shortName,
+      );
+  }, [nativeAis]);
+
   const slots = Math.max(2, Math.min(maxSlots || 0, 16));
   const sideOptions = sides.map((s: Side, i) => ({
     value: String(i),
@@ -60,20 +89,45 @@ export function BattleMembersTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <MemberRow
-                key={`${row.kind}:${row.name}`}
-                row={row}
-                editable={row.self}
-                sideOptions={sideOptions}
-                teamOptions={teamOptions}
-                allyOptions={allyOptions}
-                onSide={onSide}
-                onTeam={onTeam}
-                onAlly={onAlly}
-                onColor={onColor}
-              />
-            ))}
+            {rows.map((row) => {
+              // The host controls other members: humans get force/kick, bots get
+              // removal only (MemberRow ignores the force handlers for bots). Our
+              // own row stays the self-editable path.
+              let control: MemberControls | null = null;
+              if (selfHost && row.kind === "human" && !row.self) {
+                control = {
+                  onForceTeam: (t) => hostControls.forceTeam(row.name, t),
+                  onForceAlly: (a) => hostControls.forceAlly(row.name, a),
+                  onForceColor: (c) => hostControls.forceColor(row.name, c),
+                  onForceSpectator: () => hostControls.forceSpectator(row.name),
+                  onKick: () => hostControls.kick(row.name),
+                };
+              } else if (selfHost && row.kind === "bot") {
+                const noop = () => {};
+                control = {
+                  onForceTeam: noop,
+                  onForceAlly: noop,
+                  onForceColor: noop,
+                  onForceSpectator: noop,
+                  onKick: () => hostControls.removeBot(row.name),
+                };
+              }
+              return (
+                <MemberRow
+                  key={`${row.kind}:${row.name}`}
+                  row={row}
+                  editable={row.self}
+                  control={control}
+                  sideOptions={sideOptions}
+                  teamOptions={teamOptions}
+                  allyOptions={allyOptions}
+                  onSide={onSide}
+                  onTeam={onTeam}
+                  onAlly={onAlly}
+                  onColor={onColor}
+                />
+              );
+            })}
             {rows.length === 0 && (
               <tr className="border-t border-border/40">
                 <td
@@ -87,6 +141,34 @@ export function BattleMembersTable({
           </tbody>
         </table>
       </div>
+
+      {selfHost && (
+        <div className="flex items-center gap-2 border-t border-border/40 p-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            Add AI
+          </span>
+          <OptionSelect
+            value={chosenAi}
+            onValueChange={setChosenAi}
+            options={nativeAis.map((a) => ({
+              value: a.shortName,
+              label: a.name ?? a.shortName,
+            }))}
+            size="sm"
+            className="w-auto min-w-40"
+            placeholder={
+              nativeAis.length > 0 ? "Select an AI" : "No AIs installed"
+            }
+          />
+          <Button
+            className="h-8 px-3"
+            disabled={!chosenAi}
+            onClick={() => chosenAi && onAddBot(chosenAi)}
+          >
+            Add
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
