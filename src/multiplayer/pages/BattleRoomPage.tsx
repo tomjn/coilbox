@@ -24,16 +24,19 @@ import { useMpRevealed } from "../store";
  */
 function BattleRoomPage() {
   const room = useBattleRoom();
-  const launch = useBattleLaunch(room.serverKey, room.target);
+  const launch = useBattleLaunch(room.serverKey, room.target, room.selfHost);
   const navigate = useNavigate();
 
-  // Auto-launch: the match start is driven by lobby protocol, not a button —
-  // when the host (autohost) goes in-game, launch the engine as a client. Guard
-  // against relaunching within one game; reset once the host leaves in-game.
+  // Auto-launch: for a battle we JOIN, match start is driven by the protocol, not a
+  // button — when the host goes in-game, launch the engine as a client. Guard against
+  // relaunching within one game; reset once the host leaves in-game. When we host it
+  // ourselves we launch via the Start button instead (see `onStart`), so this is
+  // skipped — our own in-game flag must not trigger a client launch.
   const launchedRef = useRef(false);
   const canRun = !!room.target && !room.mapMissing && !room.gameMissing;
   const { launch: doLaunch } = launch;
   useEffect(() => {
+    if (room.selfHost) return;
     if (!room.hostIngame) {
       launchedRef.current = false;
       return;
@@ -41,7 +44,23 @@ function BattleRoomPage() {
     if (launchedRef.current || !canRun) return;
     launchedRef.current = true;
     doLaunch();
-  }, [room.hostIngame, canRun, doLaunch]);
+  }, [room.selfHost, room.hostIngame, canRun, doLaunch]);
+
+  // Host start: flip our in-game flag (so joiners' clients auto-launch and connect),
+  // launch the engine in host mode, then clear the flag once it exits. A joined
+  // battle just asks its autohost to start.
+  async function onStart() {
+    if (!room.selfHost) {
+      await room.startGame();
+      return;
+    }
+    room.setIngame(true);
+    try {
+      await doLaunch();
+    } finally {
+      room.setIngame(false);
+    }
+  }
 
   if (!room.battle) {
     return (
@@ -74,7 +93,7 @@ function BattleRoomPage() {
         onToggleReady={room.setReady}
         onToggleSpectate={room.setSpectator}
         onLeave={onLeave}
-        onStart={room.startGame}
+        onStart={onStart}
       />
 
       {launch.error && (
@@ -95,6 +114,10 @@ function BattleRoomPage() {
             rows={room.rows}
             sides={room.sides}
             maxSlots={battle.maxPlayers}
+            selfHost={room.selfHost}
+            hostControls={room.hostControls}
+            nativeAis={room.nativeAis}
+            onAddBot={room.addBot}
             onSide={room.setSide}
             onTeam={room.setTeam}
             onAlly={room.setAlly}

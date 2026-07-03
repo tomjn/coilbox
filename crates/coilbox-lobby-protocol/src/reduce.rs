@@ -521,12 +521,16 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         ServerMessage::OpenBattle { id } => {
             state.current_battle = Some(id);
             state.last_battle = Some(id);
+            // A fresh host port arrives via HOSTPORT right after this ack; drop any
+            // stale one from a previous host session.
+            state.host_port = None;
             vec![]
         }
         ServerMessage::OpenBattleFailed { reason } => {
             vec![Delta::OpenBattleFailed { reason }]
         }
         ServerMessage::HostPort { port } => {
+            state.host_port = Some(port);
             vec![Delta::HostPort { port }]
         }
         ServerMessage::Ring { username } => {
@@ -733,6 +737,18 @@ mod tests {
         assert_eq!(b.map, "NewMap");
         reduce(&mut s, parse_line("BATTLECLOSED 9"));
         assert!(!s.battles.contains_key(&9));
+    }
+
+    #[test]
+    fn hostport_captured_and_reset_on_open() {
+        let mut s = LobbyState::new();
+        let d = reduce(&mut s, parse_line("HOSTPORT 8452"));
+        assert_eq!(s.host_port, Some(8452));
+        assert_eq!(d, vec![Delta::HostPort { port: 8452 }]);
+        // Opening a fresh battle drops the stale port ahead of the next HOSTPORT.
+        reduce(&mut s, parse_line("OPENBATTLE 3"));
+        assert_eq!(s.host_port, None);
+        assert_eq!(s.current_battle, Some(3));
     }
 
     #[test]

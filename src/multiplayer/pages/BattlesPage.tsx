@@ -8,7 +8,16 @@ import {
   type BattleFilters,
   filterSortBattles,
 } from "../battles/battleFilters";
-import { type Battle, mpJoinBattle, mpLeaveBattle } from "../bindings";
+import {
+  HostBattlePopover,
+  type OpenBattleArgs,
+} from "../battles/HostBattlePopover";
+import {
+  type Battle,
+  mpJoinBattle,
+  mpLeaveBattle,
+  mpOpenBattle,
+} from "../bindings";
 import { useMpRevealed, useMultiplayer } from "../store";
 
 /**
@@ -91,6 +100,19 @@ function BattlesPage() {
     }
   }
 
+  // Open a battle we host. The OPENBATTLE ack sets `currentBattle`, which the join
+  // effect above turns into navigation to the room (same path as joining).
+  async function onHost(args: OpenBattleArgs) {
+    if (!activeKey) return;
+    clearJoinError();
+    joiningRef.current = true;
+    try {
+      await mpOpenBattle({ serverKey: activeKey, ...args });
+    } catch {
+      joiningRef.current = false;
+    }
+  }
+
   async function leave() {
     if (!activeKey) return;
     await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
@@ -119,7 +141,10 @@ function BattlesPage() {
               : `(${shown.length} of ${all.length})`}
           </span>
         </div>
-        <BattleFilterPopover filters={filters} setFilters={setFilters} />
+        <div className="flex items-center gap-2">
+          <HostBattlePopover disabled={!canJoin} onHost={onHost} />
+          <BattleFilterPopover filters={filters} setFilters={setFilters} />
+        </div>
       </header>
 
       {lastJoinError && (

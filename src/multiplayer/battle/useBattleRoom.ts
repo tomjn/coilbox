@@ -7,13 +7,25 @@ import {
   useUnitsyncMapInfo,
   useUnitsyncScan,
 } from "@/content/config";
-import { type PlayTarget, usePreferredTarget } from "@/play/config";
+import {
+  type PlayTarget,
+  usePreferredTarget,
+  useSkirmishAis,
+} from "@/play/config";
 import type { Battle, MemberStatus } from "../bindings";
 import {
+  mpAddBot,
+  mpForceAlly,
+  mpForceColor,
+  mpForceSpectator,
+  mpForceTeam,
+  mpKick,
   mpLeaveBattle,
+  mpRemoveBot,
   mpSayBattle,
   mpSetBattleStatus,
   mpSetScriptTags,
+  mpSetStatus,
 } from "../bindings";
 import { useMultiplayer } from "../store";
 import { canEditBattleOptions } from "./battleOptions";
@@ -41,6 +53,8 @@ export interface BattleRoomView {
   myStatus: MemberStatus | undefined;
   /** Whether the logged-in user founded the battle (rare — usually the autohost). */
   isFounder: boolean;
+  /** We founded this battle AND we host it ourselves (not via an autohost bot). */
+  selfHost: boolean;
   target: PlayTarget | null;
   targetLoading: boolean;
   enginePath: string | undefined;
@@ -80,6 +94,21 @@ export interface BattleRoomView {
   setTeam: (teamId: number) => void;
   setAlly: (ally: number) => void;
   setColor: (hex: string) => void;
+  /** Set our own in-game flag (MYSTATUS); the host flips this to start the match. */
+  setIngame: (ingame: boolean) => void;
+  /** Host controls over another member (self-hosted battles only; no-op otherwise). */
+  hostControls: {
+    forceTeam: (user: string, team: number) => void;
+    forceAlly: (user: string, ally: number) => void;
+    forceColor: (user: string, hex: string) => void;
+    forceSpectator: (user: string) => void;
+    kick: (user: string) => void;
+    removeBot: (name: string) => void;
+  };
+  /** Native engine AIs available to add as bots (host only). */
+  nativeAis: { shortName: string; name?: string }[];
+  /** Add a native AI bot on the next free team/ally (host only). */
+  addBot: (aiShortName: string) => void;
   leave: () => Promise<void>;
   autohostSend: (command: string) => Promise<void>;
   /** Ask the autohost to start the match (`!start`). */
@@ -128,6 +157,17 @@ export function useBattleRoom(): BattleRoomView {
   const mapOptionsSchema = mapInfo.info?.options ?? [];
   const hostIsBot = !!battle && !!state?.users[battle.host]?.status.bot;
   const canEditOptions = canEditBattleOptions(isFounder, hostIsBot);
+  // We founded the battle and run it ourselves (no autohost bot relaying it), so we
+  // drive the roster/options over the protocol and launch the game as founder.
+  const selfHost = isFounder && !hostIsBot;
+
+  // Native engine AIs the host can add as bots (Lua AIs aren't addable over the
+  // lobby — they attach to a team via the start script, not ADDBOT).
+  const { ais } = useSkirmishAis(enginePath, dataDir, gameArchive);
+  const nativeAis = useMemo(
+    () => ais.filter((a) => a.kind === "native"),
+    [ais],
+  );
 
   const [contentNonce, setContentNonce] = useState(0);
 
@@ -217,10 +257,120 @@ export function useBattleRoom(): BattleRoomView {
     pushStatus({ color: hexToColorInt(hex) });
   }, [activeKey, battle, myStatus, savedColor, setSavedColor, pushStatus]);
 
+  // A host joins their own battle as a spectator by default (protocol default
+  // status); flip us to a player once, so the founder appears in the game. Gated
+  // per battle so the user can still choose to spectate afterwards.
+  const hostSeatedBattle = useRef<number | null>(null);
+  useEffect(() => {
+    if (!activeKey || !battle || !myStatus || !selfHost) return;
+    if (hostSeatedBattle.current === battle.id) return;
+    hostSeatedBattle.current = battle.id;
+    if (!myStatus.battleStatus.mode) pushStatus({ mode: true });
+  }, [activeKey, battle, myStatus, selfHost, pushStatus]);
+
   const leave = useCallback(async () => {
     if (!activeKey) return;
     await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
   }, [activeKey]);
+
+  const setIngame = useCallback(
+    (ingame: boolean) => {
+      if (!activeKey) return;
+      mpSetStatus({ serverKey: activeKey, ingame, away: false }).catch(
+        () => {},
+      );
+    },
+    [activeKey],
+  );
+
+  // Host-only actions over other members. Gated by the UI (only rendered when
+  // `selfHost`), but harmless otherwise — the server ignores force/kick from a
+  // non-founder.
+  const hostControls = useMemo(
+    () => ({
+      forceTeam: (user: string, team: number) => {
+        if (activeKey)
+          mpForceTeam({ serverKey: activeKey, username: user, team }).catch(
+            () => {},
+          );
+      },
+      forceAlly: (user: string, ally: number) => {
+        if (activeKey)
+          mpForceAlly({ serverKey: activeKey, username: user, ally }).catch(
+            () => {},
+          );
+      },
+      forceColor: (user: string, hex: string) => {
+        if (activeKey)
+          mpForceColor({
+            serverKey: activeKey,
+            username: user,
+            color: hexToColorInt(hex),
+          }).catch(() => {});
+      },
+      forceSpectator: (user: string) => {
+        if (activeKey)
+          mpForceSpectator({ serverKey: activeKey, username: user }).catch(
+            () => {},
+          );
+      },
+      kick: (user: string) => {
+        if (activeKey)
+          mpKick({ serverKey: activeKey, username: user }).catch(() => {});
+      },
+      removeBot: (name: string) => {
+        if (activeKey)
+          mpRemoveBot({ serverKey: activeKey, name }).catch(() => {});
+      },
+    }),
+    [activeKey],
+  );
+
+  // Add a native AI bot on the first free team/ally, with a fresh colour and a name
+  // unique within the battle. We're a player (mode) and marked synced.
+  const addBot = useCallback(
+    (aiShortName: string) => {
+      if (!activeKey || !battle) return;
+      const usedTeams = new Set<number>();
+      const usedAllies = new Set<number>();
+      const usedNames = new Set<string>();
+      for (const [name, m] of Object.entries(battle.members)) {
+        usedNames.add(name);
+        if (m.battleStatus.mode) {
+          usedTeams.add(m.battleStatus.teamId);
+          usedAllies.add(m.battleStatus.ally);
+        }
+      }
+      for (const [name, b] of Object.entries(battle.bots)) {
+        usedNames.add(name);
+        usedTeams.add(b.battleStatus.teamId);
+        usedAllies.add(b.battleStatus.ally);
+      }
+      const firstFree = (used: Set<number>) => {
+        let i = 0;
+        while (used.has(i)) i++;
+        return i;
+      };
+      const base = aiShortName.replace(/\s+/g, "") || "AI";
+      let name = base;
+      let n = 1;
+      while (usedNames.has(name)) name = `${base}${n++}`;
+      mpAddBot({
+        serverKey: activeKey,
+        name,
+        ready: true,
+        teamId: firstFree(usedTeams),
+        ally: firstFree(usedAllies),
+        mode: true,
+        handicap: 0,
+        sync: 1,
+        side: 0,
+        color: hexToColorInt(randomTeamColorHex()),
+        aiDll: aiShortName,
+      }).catch(() => {});
+    },
+    [activeKey, battle],
+  );
 
   const autohostSend = useCallback(
     async (command: string) => {
@@ -261,6 +411,7 @@ export function useBattleRoom(): BattleRoomView {
     me,
     myStatus,
     isFounder,
+    selfHost,
     target,
     targetLoading,
     enginePath,
@@ -292,6 +443,10 @@ export function useBattleRoom(): BattleRoomView {
       setSavedColor(hex);
       pushStatus({ color: hexToColorInt(hex) });
     },
+    setIngame,
+    hostControls,
+    nativeAis,
+    addBot,
     leave,
     autohostSend,
     startGame: () => autohostSend("!start"),

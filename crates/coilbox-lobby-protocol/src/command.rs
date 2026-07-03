@@ -120,6 +120,22 @@ pub fn leave_battle() -> String {
     "LEAVEBATTLE".to_string()
 }
 
+/// `JOINBATTLEACCEPT <username>` — as host, authorise a pending join. The server
+/// prompts us with `JOINBATTLEREQUEST` when a client wants into our battle (and, for
+/// NAT battles, carries the client's IP so hole punching can proceed); without this
+/// reply the join never completes.
+pub fn join_battle_accept(username: &str) -> String {
+    format!("JOINBATTLEACCEPT {username}")
+}
+
+/// `JOINBATTLEDENY <username> [reason]` — as host, reject a pending join.
+pub fn join_battle_deny(username: &str, reason: Option<&str>) -> String {
+    match reason {
+        Some(r) => format!("JOINBATTLEDENY {username} {r}"),
+        None => format!("JOINBATTLEDENY {username}"),
+    }
+}
+
 /// `MYSTATUS <status_int>`.
 pub fn my_status(status: ClientStatus) -> String {
     format!("MYSTATUS {}", status.to_int())
@@ -274,6 +290,16 @@ mod tests {
         assert_eq!(join_battle(3, Some("pw"), None), "JOINBATTLE 3 pw");
         assert_eq!(join_battle(3, None, Some("sp")), "JOINBATTLE 3 * sp");
         assert_eq!(join_battle(3, Some("pw"), Some("sp")), "JOINBATTLE 3 pw sp");
+    }
+
+    #[test]
+    fn join_battle_accept_deny() {
+        assert_eq!(join_battle_accept("carol"), "JOINBATTLEACCEPT carol");
+        assert_eq!(join_battle_deny("carol", None), "JOINBATTLEDENY carol");
+        assert_eq!(
+            join_battle_deny("carol", Some("full")),
+            "JOINBATTLEDENY carol full"
+        );
     }
 
     #[test]

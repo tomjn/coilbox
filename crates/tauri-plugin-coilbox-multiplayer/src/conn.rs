@@ -194,6 +194,22 @@ async fn run_loop(
                         outbound.push(command::pong(token.as_deref()));
                     }
 
+                    // On joining/opening a battle the server prompts us for our
+                    // battle status; reply with our current (or default) status so we
+                    // register as a participant. The frontend refines it afterwards.
+                    if matches!(&msg, ServerMessage::RequestBattleStatus) {
+                        let (bs, color) = state.lock().unwrap().my_battle_status_or_default();
+                        outbound.push(command::my_battle_status(bs, color));
+                    }
+
+                    // As a host, the server relays every client's join through us as
+                    // JOINBATTLEREQUEST (carrying their IP for NAT hole punching); auto-
+                    // accept so joins complete. Only hosts receive this, so it's safe to
+                    // answer unconditionally.
+                    if let ServerMessage::JoinBattleRequest { username, .. } = &msg {
+                        outbound.push(command::join_battle_accept(username));
+                    }
+
                     let now = now_ms();
                     let deltas = reduce_at(&mut state.lock().unwrap(), msg, now);
                     for delta in deltas {

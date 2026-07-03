@@ -134,6 +134,10 @@ pub struct LobbyState {
     pub battles: HashMap<u32, Battle>,
     pub current_battle: Option<u32>,
     pub last_battle: Option<u32>,
+    /// The UDP port the server told us to host our battle on (`HOSTPORT`), set only
+    /// while we are the founder of `current_battle`. The host-mode start script binds
+    /// the engine to this; cleared when we open a fresh battle.
+    pub host_port: Option<u16>,
     /// The last-fetched public channel directory (from `CHANNELS`).
     pub channel_directory: Vec<DirChannel>,
 }
@@ -142,5 +146,17 @@ impl LobbyState {
     /// A fresh, empty state.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Our current battle status + team colour, for answering `REQUESTBATTLESTATUS`.
+    /// Falls back to the protocol default when we are not yet a member (e.g. the
+    /// prompt races our own join), so the server always gets a well-formed reply.
+    pub fn my_battle_status_or_default(&self) -> (BattleStatus, u32) {
+        if let (Some(bid), Some(me)) = (self.current_battle, self.my_username.as_ref()) {
+            if let Some(m) = self.battles.get(&bid).and_then(|b| b.members.get(me)) {
+                return (m.battle_status, m.team_color);
+            }
+        }
+        (crate::status::default_battle_status(), 0)
     }
 }

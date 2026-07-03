@@ -456,17 +456,33 @@ fn mp_open_battle(
     enqueue(registry.inner(), &server_key, line)
 }
 
-/// `mp_add_bot` — add an AI bot. `battle_status` is the packed status integer.
+/// `mp_add_bot` — add an AI bot. Takes decoded battle-status fields (packed here,
+/// the single source of truth) mirroring `mp_set_battle_status`.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 fn mp_add_bot(
     registry: State<'_, Registry>,
     server_key: String,
     name: String,
-    battle_status: i32,
+    ready: bool,
+    team_id: u8,
+    ally: u8,
+    mode: bool,
+    handicap: u8,
+    sync: u8,
+    side: u8,
     color: u32,
     ai_dll: String,
 ) -> CliResult {
-    let status = BattleStatus::from_int(battle_status);
+    let status = BattleStatus {
+        ready,
+        team_id,
+        ally,
+        mode,
+        handicap,
+        sync,
+        side,
+    };
     enqueue(
         registry.inner(),
         &server_key,
@@ -474,16 +490,31 @@ fn mp_add_bot(
     )
 }
 
-/// `mp_update_bot` — update a bot's status/color.
+/// `mp_update_bot` — update a bot's status/color (decoded fields, as `mp_add_bot`).
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 fn mp_update_bot(
     registry: State<'_, Registry>,
     server_key: String,
     name: String,
-    battle_status: i32,
+    ready: bool,
+    team_id: u8,
+    ally: u8,
+    mode: bool,
+    handicap: u8,
+    sync: u8,
+    side: u8,
     color: u32,
 ) -> CliResult {
-    let status = BattleStatus::from_int(battle_status);
+    let status = BattleStatus {
+        ready,
+        team_id,
+        ally,
+        mode,
+        handicap,
+        sync,
+        side,
+    };
     enqueue(
         registry.inner(),
         &server_key,
@@ -721,6 +752,145 @@ fn team_value(ally: u8, color: u32) -> Value {
     })
 }
 
+/// Map the current battle into a HOST-mode `BattleConfig` (`isHost:true`), binding
+/// the engine to our assigned `HOSTPORT`. Unlike the join builder this renumbers the
+/// wire `team_id`/`ally` bitfields into the contiguous 0..N index space the engine's
+/// positional `[TEAMn]`/`[ALLYTEAMn]` blocks require (see `TODO(host)` above), so
+/// `players[].team` indexes the `teams[]` array directly.
+fn battle_to_host_config(state: &LobbyState) -> Result<Value, String> {
+    let bid = state.current_battle.ok_or("not currently in a battle")?;
+    let battle = state
+        .battles
+        .get(&bid)
+        .ok_or("current battle missing from state")?;
+    let me = state
+        .my_username
+        .clone()
+        .ok_or("not logged in (no username)")?;
+    if battle.host != me {
+        return Err("not the host of this battle".into());
+    }
+
+    // Deterministic ordering so the output (and its test) is stable.
+    let mut members: Vec<_> = battle.members.iter().collect();
+    members.sort_by(|a, b| a.0.cmp(b.0));
+    let mut bots: Vec<_> = battle.bots.iter().collect();
+    bots.sort_by(|a, b| a.0.cmp(b.0));
+
+    // The distinct wire team ids + ally numbers actually in play, each mapped to a
+    // contiguous engine index (BTreeSet keeps the mapping stable + gap-free).
+    let mut team_ids: BTreeSet<u8> = BTreeSet::new();
+    let mut ally_ids: BTreeSet<u8> = BTreeSet::new();
+    for (_, ms) in &members {
+        if ms.battle_status.mode {
+            team_ids.insert(ms.battle_status.team_id);
+            ally_ids.insert(ms.battle_status.ally);
+        }
+    }
+    for (_, bot) in &bots {
+        team_ids.insert(bot.battle_status.team_id);
+        ally_ids.insert(bot.battle_status.ally);
+    }
+    let team_index: BTreeMap<u8, usize> =
+        team_ids.iter().enumerate().map(|(i, t)| (*t, i)).collect();
+    let ally_index: BTreeMap<u8, usize> =
+        ally_ids.iter().enumerate().map(|(i, a)| (*a, i)).collect();
+
+    let mut teams: BTreeMap<usize, Value> = BTreeMap::new();
+    let mut players = Vec::new();
+    for (name, ms) in &members {
+        let bs = ms.battle_status;
+        let mut player = json!({ "name": name, "spectator": !bs.mode });
+        if bs.mode {
+            let pos = team_index[&bs.team_id];
+            player["team"] = json!(pos);
+            teams
+                .entry(pos)
+                .or_insert_with(|| host_team_value(ally_index[&bs.ally], ms.team_color));
+        }
+        players.push(player);
+    }
+
+    let mut ais = Vec::new();
+    for (name, bot) in &bots {
+        let bs = bot.battle_status;
+        let pos = team_index[&bs.team_id];
+        ais.push(json!({
+            "name": name,
+            "shortName": bot.ai_dll,
+            "team": pos,
+            "host": 0,
+        }));
+        teams
+            .entry(pos)
+            .or_insert_with(|| host_team_value(ally_index[&bs.ally], bot.team_color));
+    }
+
+    let (start_pos_type, mod_options, map_options) = split_script_tags(&battle.script_tags);
+
+    // One [ALLYTEAM] per distinct ally, in contiguous order, carrying its start box
+    // (converted from the 0..200 wire grid to the engine's 0..1
+    // `[top, left, bottom, right]`).
+    let ally_teams: Vec<Value> = ally_ids
+        .iter()
+        .map(|raw| {
+            let mut v = json!({ "numAllies": 0 });
+            if let Some(r) = battle.start_rects.get(raw) {
+                v["startRect"] = json!([
+                    r.top as f32 / 200.0,
+                    r.left as f32 / 200.0,
+                    r.bottom as f32 / 200.0,
+                    r.right as f32 / 200.0,
+                ]);
+            }
+            v
+        })
+        .collect();
+
+    Ok(json!({
+        "mapName": battle.map,
+        "gameType": battle.modname,
+        "myPlayerName": me,
+        "startPosType": start_pos_type,
+        "modOptions": mod_options,
+        "mapOptions": map_options,
+        "players": players,
+        "ais": ais,
+        "teams": teams.into_values().collect::<Vec<_>>(),
+        "allyTeams": ally_teams,
+        "isHost": true,
+        "hostIp": "0.0.0.0",
+        "hostPort": state.host_port.or_else(|| battle.port.parse::<u16>().ok()),
+    }))
+}
+
+/// One host-mode `teams[]` entry, with an already-renumbered ally index.
+fn host_team_value(ally: usize, color: u32) -> Value {
+    let (r, g, b) = team_color_rgb(color);
+    json!({
+        "teamLeader": 0,
+        "allyTeam": ally,
+        "rgbColor": [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0],
+    })
+}
+
+/// `mp_build_host_config` — return the current (hosted) battle as a host-mode
+/// `play` `BattleConfig`.
+#[tauri::command]
+fn mp_build_host_config(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    let map = registry.lock().unwrap();
+    match map.get(&server_key) {
+        Some(conn) => {
+            let state = conn.state.lock().unwrap();
+            match battle_to_host_config(&state) {
+                Ok(config) => CliResult::ok(json!({ "config": config })),
+                Err(e) => CliResult::err(e),
+            }
+        }
+        None => CliResult::err(format!("not connected: {server_key}")),
+    }
+}
+
 /// `mp_build_battle_config` — return the current battle as a `play` `BattleConfig`.
 #[tauri::command]
 fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> CliResult {
@@ -775,6 +945,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_set_start_rect,
             mp_set_script_tags,
             mp_build_battle_config,
+            mp_build_host_config,
         ])
         .build()
 }
@@ -782,7 +953,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use coilbox_lobby_protocol::{Battle, Bot, MemberStatus};
+    use coilbox_lobby_protocol::{Battle, Bot, MemberStatus, StartRect};
 
     /// A battle we've joined: us playing on team 0/ally 0 with a script password,
     /// plus one AI bot on team 1/ally 1.
@@ -891,5 +1062,139 @@ mod tests {
         let mut state = LobbyState::new();
         state.my_username = Some("me".into());
         assert!(battle_to_config(&state).is_err());
+    }
+
+    /// A battle WE host, with deliberately non-contiguous wire team ids/allies so the
+    /// renumbering is actually exercised: us (team 3/ally 5), an ally (team 7/ally 5),
+    /// a spectator, and a bot (team 2/ally 9). `HOSTPORT` is 8452.
+    fn hosted_state() -> LobbyState {
+        let mut state = LobbyState::new();
+        state.my_username = Some("me".into());
+        state.host_port = Some(8452);
+
+        let mut battle = Battle {
+            id: 9,
+            host: "me".into(),
+            port: "0".into(),
+            map: "Comet Catcher".into(),
+            modname: "BAR test".into(),
+            ..Default::default()
+        };
+        let player = |team_id, ally, color| MemberStatus {
+            battle_status: BattleStatus {
+                mode: true,
+                team_id,
+                ally,
+                ..Default::default()
+            },
+            team_color: color,
+            script_password: None,
+        };
+        battle.members.insert("me".into(), player(3, 5, 0x0000FF));
+        battle.members.insert("ally".into(), player(7, 5, 0x00FF00));
+        battle.members.insert(
+            "spec".into(),
+            MemberStatus {
+                battle_status: BattleStatus {
+                    mode: false,
+                    ..Default::default()
+                },
+                team_color: 0,
+                script_password: None,
+            },
+        );
+        battle.bots.insert(
+            "BARb".into(),
+            Bot {
+                name: "BARb".into(),
+                owner: "me".into(),
+                ai_dll: "BARb".into(),
+                battle_status: BattleStatus {
+                    mode: true,
+                    team_id: 2,
+                    ally: 9,
+                    ..Default::default()
+                },
+                team_color: 0xFF0000,
+            },
+        );
+        battle.start_rects.insert(
+            5,
+            StartRect {
+                left: 0,
+                top: 0,
+                right: 100,
+                bottom: 200,
+            },
+        );
+        battle.start_rects.insert(
+            9,
+            StartRect {
+                left: 100,
+                top: 0,
+                right: 200,
+                bottom: 200,
+            },
+        );
+
+        state.battles.insert(9, battle);
+        state.current_battle = Some(9);
+        state
+    }
+
+    #[test]
+    fn host_config_is_host_and_binds_hostport() {
+        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        assert_eq!(cfg["isHost"], true);
+        assert_eq!(cfg["hostIp"], "0.0.0.0");
+        assert_eq!(cfg["hostPort"], 8452);
+        assert_eq!(cfg["myPlayerName"], "me");
+        // Host scripts carry no client script password.
+        assert!(cfg.get("myPasswd").is_none());
+    }
+
+    #[test]
+    fn host_config_renumbers_teams_and_allies_contiguously() {
+        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+
+        // Wire teams {2,3,7} -> positions {0,1,2}; wire allies {5,9} -> {0,1}.
+        let teams = cfg["teams"].as_array().unwrap();
+        assert_eq!(teams.len(), 3);
+        let ally_teams = cfg["allyTeams"].as_array().unwrap();
+        assert_eq!(ally_teams.len(), 2);
+
+        // Players (sorted by name): ally, me, spec. `me` (wire team 3) -> pos 1;
+        // `ally` (wire team 7) -> pos 2; `spec` spectates (no team).
+        let players = cfg["players"].as_array().unwrap();
+        let by_name = |n: &str| players.iter().find(|p| p["name"] == n).unwrap();
+        assert_eq!(by_name("me")["team"], 1);
+        assert_eq!(by_name("ally")["team"], 2);
+        assert_eq!(by_name("spec")["spectator"], true);
+        assert!(by_name("spec").get("team").is_none());
+
+        // The bot (wire team 2) renumbers to position 0.
+        assert_eq!(cfg["ais"][0]["team"], 0);
+
+        // Each team references a contiguous ally index (0 or 1): pos 0 = bot's
+        // ally 9 -> 1; pos 1 = our ally 5 -> 0.
+        assert_eq!(teams[0]["allyTeam"], 1);
+        assert_eq!(teams[1]["allyTeam"], 0);
+    }
+
+    #[test]
+    fn host_config_converts_start_rects_to_unit_grid() {
+        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        // Ally 5 -> index 0: rect (l0,t0,r100,b200) -> [top,left,bottom,right] in 0..1.
+        let rect = &cfg["allyTeams"][0]["startRect"];
+        assert_eq!(rect[0], 0.0); // top
+        assert_eq!(rect[1], 0.0); // left
+        assert_eq!(rect[2], 1.0); // bottom (200/200)
+        assert_eq!(rect[3], 0.5); // right (100/200)
+    }
+
+    #[test]
+    fn host_config_errors_when_not_the_host() {
+        // The join fixture is founded by "hoster", not us.
+        assert!(battle_to_host_config(&joined_state()).is_err());
     }
 }

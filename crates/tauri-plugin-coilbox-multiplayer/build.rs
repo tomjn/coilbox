@@ -33,6 +33,7 @@ const COMMANDS: &[&str] = &[
     "mp_set_start_rect",
     "mp_set_script_tags",
     "mp_build_battle_config",
+    "mp_build_host_config",
 ];
 
 fn main() {
