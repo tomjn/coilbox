@@ -1,13 +1,14 @@
 import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
-import { mpJoinBattle, mpLeaveBattle, mpSay } from "../bindings";
+import { mpLeaveBattle, mpSayBattle } from "../bindings";
 import { useMultiplayer } from "../store";
 
 /**
  * The lobby client screen. Deliberately plain (UI/UX polish is a follow-up): a
- * server picker, a Connect/Disconnect control, the login phase, the online-user and
- * open-battle lists, a minimal chat for the joined battle, and a raw protocol
- * console. This exists to prove the connection/state/command plumbing end to end.
+ * server picker, a Connect/Disconnect control, the login phase, the online-user
+ * list, a minimal chat for the joined battle, and a raw protocol console. Browsing
+ * and joining battles lives on the dedicated Battles page. This exists to prove the
+ * connection/state/command plumbing end to end.
  *
  * Default-exported for the frame's lazy route convention.
  */
@@ -20,7 +21,6 @@ export default function LobbyPage() {
 
   const state = mirror.state;
   const users = state ? Object.values(state.users) : [];
-  const battles = state ? Object.values(state.battles) : [];
   const currentBattle =
     state?.currentBattle != null
       ? state.battles[String(state.currentBattle)]
@@ -29,15 +29,6 @@ export default function LobbyPage() {
     currentBattle?.channel != null
       ? state?.channels[currentBattle.channel]
       : undefined;
-
-  async function join(id: number) {
-    if (!activeKey) return;
-    try {
-      await mpJoinBattle({ serverKey: activeKey, id });
-    } catch (e) {
-      setError(String(e));
-    }
-  }
 
   async function leave() {
     if (!activeKey) return;
@@ -49,10 +40,9 @@ export default function LobbyPage() {
   }
 
   async function sendChat() {
-    const channel = currentBattle?.channel;
-    if (!activeKey || !channel || !chatInput.trim()) return;
+    if (!activeKey || !currentBattle || !chatInput.trim()) return;
     try {
-      await mpSay({ serverKey: activeKey, channel, message: chatInput.trim() });
+      await mpSayBattle({ serverKey: activeKey, message: chatInput.trim() });
       setChatInput("");
     } catch (e) {
       setError(String(e));
@@ -64,7 +54,8 @@ export default function LobbyPage() {
       <header>
         <h1 className="text-lg font-semibold">Lobby</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connect to a lobby server, browse open battles, and join a game.
+          Connect to a lobby server. Browse and join battles on the Battles
+          page.
         </p>
       </header>
 
@@ -82,68 +73,28 @@ export default function LobbyPage() {
       )}
 
       {state && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Open battles */}
-          <section>
-            <h2 className="mb-2 text-sm font-semibold">
-              Battles ({battles.length})
-            </h2>
-            <ul className="flex flex-col gap-2">
-              {battles.map((b) => (
-                <li
-                  key={b.id}
-                  className="flex items-center justify-between gap-3 rounded-md border border-border p-3"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {b.title || `Battle ${b.id}`}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {b.map} · {b.host} · {Object.keys(b.members).length}/
-                      {b.maxPlayers}
-                      {b.passworded ? " · locked" : ""}
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => join(b.id)}
-                    disabled={mirror.phase !== "ready"}
-                  >
-                    Join
-                  </Button>
-                </li>
-              ))}
-              {battles.length === 0 && (
-                <li className="text-sm text-muted-foreground">
-                  No open battles.
-                </li>
-              )}
-            </ul>
-          </section>
-
-          {/* Online users */}
-          <section>
-            <h2 className="mb-2 text-sm font-semibold">
-              Online ({users.length})
-            </h2>
-            <ul className="flex max-h-72 flex-col gap-1 overflow-auto">
-              {users.map((u) => (
-                <li key={u.name} className="text-sm">
-                  {u.name}
-                  {u.status.ingame && (
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      in-game
-                    </span>
-                  )}
-                  {u.status.away && (
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      away
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
+        <section>
+          <h2 className="mb-2 text-sm font-semibold">
+            Online ({users.length})
+          </h2>
+          <ul className="flex max-h-72 flex-col gap-1 overflow-auto">
+            {users.map((u) => (
+              <li key={u.name} className="text-sm">
+                {u.name}
+                {u.status.ingame && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    in-game
+                  </span>
+                )}
+                {u.status.away && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    away
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {/* Current battle chat */}
@@ -176,11 +127,8 @@ export default function LobbyPage() {
                 if (e.key === "Enter") sendChat();
               }}
               placeholder="Message the battle…"
-              disabled={!currentBattle.channel}
             />
-            <Button onClick={sendChat} disabled={!currentBattle.channel}>
-              Send
-            </Button>
+            <Button onClick={sendChat}>Send</Button>
           </div>
         </section>
       )}
