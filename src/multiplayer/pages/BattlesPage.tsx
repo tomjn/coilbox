@@ -1,20 +1,14 @@
 import { Button, Input } from "@picoframe/frame";
 import { LogOut } from "lucide-react";
 import { useMemo, useState } from "react";
+import { BattleFilterPopover } from "../battles/BattleFilterPopover";
 import { BattleList } from "../battles/BattleList";
 import {
   type BattleFilters,
-  type BattleSortKey,
   filterSortBattles,
 } from "../battles/battleFilters";
 import { type Battle, mpJoinBattle, mpLeaveBattle } from "../bindings";
 import { useMultiplayer } from "../store";
-
-const SORTS: { key: BattleSortKey; label: string }[] = [
-  { key: "players", label: "Players" },
-  { key: "map", label: "Map" },
-  { key: "game", label: "Game" },
-];
 
 /**
  * The Battles hub: search + filter/sort controls over the live battle list, with
@@ -85,57 +79,22 @@ export default function BattlesPage() {
       <header className="flex flex-col gap-3 border-b border-border p-4">
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold">Battles</h1>
-          <span className="text-sm text-muted-foreground">({all.length})</span>
+          <span className="text-sm text-muted-foreground">
+            {shown.length === all.length
+              ? `(${all.length})`
+              : `(${shown.length} of ${all.length})`}
+          </span>
         </div>
-        <Input
-          value={filters.search}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, search: e.target.value }))
-          }
-          placeholder="Search battles by title, map, host, or game"
-        />
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <Toggle
-            label="Hide empty"
-            on={filters.hideEmpty}
-            onClick={() =>
-              setFilters((f) => ({ ...f, hideEmpty: !f.hideEmpty }))
+        <div className="flex items-center gap-2">
+          <Input
+            className="flex-1"
+            value={filters.search}
+            onChange={(e) =>
+              setFilters((f) => ({ ...f, search: e.target.value }))
             }
+            placeholder="Search battles by title, map, host, or game"
           />
-          <Toggle
-            label="Hide locked"
-            on={filters.hideLockedPassworded}
-            onClick={() =>
-              setFilters((f) => ({
-                ...f,
-                hideLockedPassworded: !f.hideLockedPassworded,
-              }))
-            }
-          />
-          <Toggle
-            label="Hide full"
-            on={filters.hideFull}
-            onClick={() => setFilters((f) => ({ ...f, hideFull: !f.hideFull }))}
-          />
-          <span className="ml-2 text-muted-foreground">Sort:</span>
-          {SORTS.map((s) => (
-            <Toggle
-              key={s.key}
-              label={
-                s.key === filters.sortKey
-                  ? `${s.label} ${filters.sortDir === "desc" ? "↓" : "↑"}`
-                  : s.label
-              }
-              on={s.key === filters.sortKey}
-              onClick={() =>
-                setFilters((f) =>
-                  f.sortKey === s.key
-                    ? { ...f, sortDir: f.sortDir === "desc" ? "asc" : "desc" }
-                    : { ...f, sortKey: s.key, sortDir: "desc" },
-                )
-              }
-            />
-          ))}
+          <BattleFilterPopover filters={filters} setFilters={setFilters} />
         </div>
       </header>
 
@@ -172,25 +131,5 @@ export default function BattlesPage() {
         onJoin={onJoin}
       />
     </main>
-  );
-}
-
-function Toggle({
-  label,
-  on,
-  onClick,
-}: {
-  label: string;
-  on: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      className={`h-7 px-2 ${on ? "" : "opacity-60"}`}
-      aria-pressed={on}
-      onClick={onClick}
-    >
-      {label}
-    </Button>
   );
 }
