@@ -6,6 +6,7 @@ import {
   deriveSync,
   hexToColorInt,
   membersToRows,
+  randomTeamColorHex,
   readableText,
   startPosTypeOf,
 } from "./config";
@@ -72,6 +73,18 @@ describe("teamColor codec (0xBBGGRR)", () => {
   it("round-trips int -> hex -> int", () => {
     for (const c of [0x000000, 0xffffff, 0x123456, 0xab00cd]) {
       expect(hexToColorInt(colorIntToHex(c))).toBe(c);
+    }
+  });
+});
+
+describe("randomTeamColorHex", () => {
+  it("returns a valid #rrggbb that survives the codec round-trip", () => {
+    for (let i = 0; i < 50; i++) {
+      const hex = randomTeamColorHex();
+      expect(hex).toMatch(/^#[0-9a-f]{6}$/);
+      // Must not be black — the whole point is escaping the teamColor-0 default.
+      expect(hexToColorInt(hex)).not.toBe(0);
+      expect(colorIntToHex(hexToColorInt(hex))).toBe(hex);
     }
   });
 });
