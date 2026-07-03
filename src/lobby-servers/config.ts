@@ -15,8 +15,6 @@ export interface LobbyServer {
   allowSelfSigned: boolean;
   /** True for built-in catalog entries. Absent on user-defined custom servers. */
   builtin?: boolean;
-  /** @deprecated legacy field, removed once the account split lands (Task 4). */
-  username?: string;
 }
 
 /**
@@ -103,19 +101,4 @@ export const defaultAccounts: AccountsConfig = { accounts: [] };
 /** The user's saved logins, persisted under `lobbyServers.accounts`. */
 export function useLobbyAccounts() {
   return useSetting<AccountsConfig>("lobbyServers.accounts", defaultAccounts);
-}
-
-// --- Legacy (removed in Task 4 once consumers migrate) ---------------------
-
-export interface LobbyServerDir {
-  servers: LobbyServer[];
-}
-export const defaultLobbyServerDir: LobbyServerDir = { servers: [] };
-
-/** @deprecated the old conflated server+username directory. */
-export function useLobbyServers() {
-  return useSetting<LobbyServerDir>(
-    "lobbyServers.directory",
-    defaultLobbyServerDir,
-  );
 }

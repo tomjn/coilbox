@@ -30,8 +30,8 @@ import { conversationCounts } from "./chat/conversation";
  * any UI that needs to match a configured server against the live connection
  * (e.g. the settings "Connected" badge), so the derivation can't drift.
  */
-export function serverKeyFor(server: LobbyServer): string {
-  return `${server.username}@${server.host}:${server.port}`;
+export function serverKeyFor(server: LobbyServer, username: string): string {
+  return `${username}@${server.host}:${server.port}`;
 }
 
 /**
@@ -134,8 +134,8 @@ interface MultiplayerContextValue {
    */
   revealed: boolean;
   busy: boolean;
-  /** Open a connection to `server` (throws on missing username/password). */
-  connect: (server: LobbyServer) => Promise<void>;
+  /** Open a connection as `username` to `server` (throws if no stored password). */
+  connect: (server: LobbyServer, username: string) => Promise<void>;
   disconnect: () => Promise<void>;
   /** Unread count for a conversation id given its current message count. */
   unreadFor: (id: string, count: number) => number;
@@ -281,22 +281,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const connect = useCallback(
-    async (server: LobbyServer) => {
-      if (!server.username) {
-        throw new Error(
-          "This server has no configured username (set one in Settings).",
-        );
-      }
+    async (server: LobbyServer, username: string) => {
       setBusy(true);
-      const serverKey = serverKeyFor(server);
+      const serverKey = serverKeyFor(server, username);
       try {
-        const cred = await lsGetCredential({
-          serverId: server.id,
-          username: server.username,
-        });
+        const cred = await lsGetCredential({ serverId: server.id, username });
         if (!cred.secret) {
           throw new Error(
-            "No stored password for this server (set one in Settings).",
+            "No stored password for this login (set one in Settings).",
           );
         }
 
@@ -309,7 +301,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           port: server.port,
           tls: server.tls,
           allowSelfSigned: server.allowSelfSigned,
-          username: server.username,
+          username,
           password: cred.secret,
           compatFlags: ["u", "sp"],
           onEvent,

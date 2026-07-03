@@ -1,5 +1,5 @@
-import { Button, Input } from "@picoframe/frame";
-import { Plus, Server, Terminal, Trash2 } from "lucide-react";
+import { Button, cn, Input } from "@picoframe/frame";
+import { Plus, Server, Terminal, Trash2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ConsoleDrawer } from "../../multiplayer/ConsoleDrawer";
 import { serverKeyFor, useMultiplayer } from "../../multiplayer/store";
@@ -8,27 +8,68 @@ import {
   lsGetCredential,
   lsStoreCredential,
 } from "../bindings";
-import { type LobbyServer, useLobbyServers } from "../config";
+import {
+  allServers,
+  type LobbyAccount,
+  type LobbyServer,
+  useCustomServers,
+  useLobbyAccounts,
+} from "../config";
 import { CheckField, Field } from "./components/Field";
+import { OptionSelect } from "./components/OptionSelect";
+
+const H2_CLASS =
+  "flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground";
+const EMPTY_CLASS =
+  "rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground";
 
 /**
- * The lobby-servers settings section, hosted at `/settings/lobby-servers`. Owns the
- * shared lobby server directory (name/host/port/tls/allowSelfSigned/username), which
- * persists immediately via `useLobbyServers` (frame settings store, no Save button).
- *
- * Passwords are never written to settings: each row keeps its secret in local React
- * state and pushes it to the OS keychain (`ls_*_credential`) on blur, reading back a
- * "saved"/"not set" hint on mount. Removing a server also deletes its secret.
+ * The lobby-servers settings section (`/settings/lobby-servers`). Splits into
+ * Accounts (logins the user manages) and Servers (a read-only built-in catalog plus
+ * editable custom servers). Directory fields persist immediately via the frame
+ * settings store; passwords live only in the OS keychain (`ls_*_credential`).
  */
 export default function LobbyServersSettings() {
-  const [cfg, setCfg] = useLobbyServers();
+  const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
+  const [customCfg, setCustomCfg] = useCustomServers();
   const [consoleOpen, setConsoleOpen] = useState(false);
 
-  const addServer = () =>
-    setCfg({
-      ...cfg,
+  const servers = allServers(customCfg.servers);
+
+  const addAccount = () =>
+    setAccountsCfg({
+      accounts: [
+        ...accountsCfg.accounts,
+        {
+          id: crypto.randomUUID(),
+          serverId: servers[0]?.id ?? "",
+          username: "",
+        },
+      ],
+    });
+
+  const updateAccount = (id: string, patch: Partial<LobbyAccount>) =>
+    setAccountsCfg({
+      accounts: accountsCfg.accounts.map((a) =>
+        a.id === id ? { ...a, ...patch } : a,
+      ),
+    });
+
+  const removeAccount = (a: LobbyAccount) => {
+    setAccountsCfg({
+      accounts: accountsCfg.accounts.filter((x) => x.id !== a.id),
+    });
+    lsDeleteCredential({ serverId: a.serverId, username: a.username }).catch(
+      () => {
+        // best-effort cleanup; a leftover keychain entry is harmless
+      },
+    );
+  };
+
+  const addCustomServer = () =>
+    setCustomCfg({
       servers: [
-        ...cfg.servers,
+        ...customCfg.servers,
         {
           id: crypto.randomUUID(),
           name: "",
@@ -40,94 +81,140 @@ export default function LobbyServersSettings() {
       ],
     });
 
-  const updateServer = (id: string, patch: Partial<LobbyServer>) =>
-    setCfg({
-      ...cfg,
-      servers: cfg.servers.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+  const updateCustomServer = (id: string, patch: Partial<LobbyServer>) =>
+    setCustomCfg({
+      servers: customCfg.servers.map((s) =>
+        s.id === id ? { ...s, ...patch } : s,
+      ),
     });
 
-  const removeServer = (s: LobbyServer) => {
-    setCfg({ ...cfg, servers: cfg.servers.filter((x) => x.id !== s.id) });
-    lsDeleteCredential({ serverId: s.id, username: s.username ?? "" }).catch(
-      () => {
-        // best-effort cleanup; a leftover keychain entry is harmless
-      },
-    );
+  const removeCustomServer = (s: LobbyServer) => {
+    // Drop accounts pointing at this server (and best-effort delete their secrets).
+    for (const a of accountsCfg.accounts.filter((x) => x.serverId === s.id)) {
+      lsDeleteCredential({ serverId: a.serverId, username: a.username }).catch(
+        () => {},
+      );
+    }
+    setAccountsCfg({
+      accounts: accountsCfg.accounts.filter((a) => a.serverId !== s.id),
+    });
+    setCustomCfg({ servers: customCfg.servers.filter((x) => x.id !== s.id) });
   };
 
   return (
     <div className="space-y-8">
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            <Server size={15} /> Lobby servers
+          <h2 className={H2_CLASS}>
+            <Users size={15} /> Accounts
           </h2>
-          <Button variant="outline" size="sm" onClick={addServer}>
-            <Plus /> Add server
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addAccount}
+            disabled={servers.length === 0}
+          >
+            <Plus /> Add login
           </Button>
         </div>
-        {cfg.servers.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-            No servers yet. Add one to connect to a lobby.
+        {accountsCfg.accounts.length === 0 ? (
+          <p className={EMPTY_CLASS}>
+            No logins yet. Add one to connect to a lobby.
           </p>
         ) : (
           <ul className="space-y-4">
-            {cfg.servers.map((s) => (
-              <ServerRow
-                key={s.id}
-                server={s}
-                onChange={(patch) => updateServer(s.id, patch)}
-                onRemove={() => removeServer(s)}
+            {accountsCfg.accounts.map((a) => (
+              <AccountRow
+                key={a.id}
+                account={a}
+                servers={servers}
+                onChange={(patch) => updateAccount(a.id, patch)}
+                onRemove={() => removeAccount(a)}
                 onOpenConsole={() => setConsoleOpen(true)}
               />
             ))}
           </ul>
         )}
       </section>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className={H2_CLASS}>
+            <Server size={15} /> Servers
+          </h2>
+          <Button variant="outline" size="sm" onClick={addCustomServer}>
+            <Plus /> Add custom server
+          </Button>
+        </div>
+        <ul className="space-y-2">
+          {servers
+            .filter((s) => s.builtin)
+            .map((s) => (
+              <BuiltinServerRow key={s.id} server={s} />
+            ))}
+        </ul>
+        {customCfg.servers.length > 0 && (
+          <ul className="space-y-4">
+            {customCfg.servers.map((s) => (
+              <CustomServerRow
+                key={s.id}
+                server={s}
+                onChange={(patch) => updateCustomServer(s.id, patch)}
+                onRemove={() => removeCustomServer(s)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
       <ConsoleDrawer open={consoleOpen} onClose={() => setConsoleOpen(false)} />
     </div>
   );
 }
 
 /**
- * One editable server row. Directory fields persist through the parent's `onChange`;
- * the password lives only in local state and is synced to the keychain on blur.
+ * One login. `serverId`/`username` persist through the parent; the password lives in
+ * local state and syncs to the keychain (keyed by `{serverId, username}`) on blur.
  */
-function ServerRow({
-  server: s,
+function AccountRow({
+  account: a,
+  servers,
   onChange,
   onRemove,
   onOpenConsole,
 }: {
-  server: LobbyServer;
-  onChange: (patch: Partial<LobbyServer>) => void;
+  account: LobbyAccount;
+  servers: LobbyServer[];
+  onChange: (patch: Partial<LobbyAccount>) => void;
   onRemove: () => void;
   onOpenConsole: () => void;
 }) {
   const [password, setPassword] = useState("");
   const [saved, setSaved] = useState<boolean | null>(null);
+  const server = servers.find((s) => s.id === a.serverId);
 
-  // The app holds a single live lobby connection, so at most one configured row is
-  // "connected" — the one whose key matches `activeKey`. Its online count is just the
-  // size of the live user mirror.
+  // At most one account is "connected" — the one whose key matches `activeKey`.
   const { mirror, activeKey } = useMultiplayer();
-  const connected = mirror.connected && activeKey === serverKeyFor(s);
+  const connected =
+    mirror.connected &&
+    server != null &&
+    activeKey === serverKeyFor(server, a.username);
   const onlineCount = connected
     ? Object.keys(mirror.state?.users ?? {}).length
     : 0;
 
-  // On mount, reflect whether a secret already exists (never show the plaintext).
+  // On mount / key change, reflect whether a secret exists (never show plaintext).
   useEffect(() => {
-    lsGetCredential({ serverId: s.id, username: s.username ?? "" })
+    lsGetCredential({ serverId: a.serverId, username: a.username })
       .then(({ secret }) => setSaved(secret != null))
       .catch(() => setSaved(null));
-  }, [s.id, s.username]);
+  }, [a.serverId, a.username]);
 
   const savePassword = () => {
     if (password === "") return;
     lsStoreCredential({
-      serverId: s.id,
-      username: s.username ?? "",
+      serverId: a.serverId,
+      username: a.username,
       secret: password,
     })
       .then(() => setSaved(true))
@@ -158,17 +245,90 @@ function ServerRow({
             variant="outline"
             size="sm"
             onClick={onRemove}
-            aria-label={`Remove ${s.name || s.host || "server"}`}
+            aria-label={`Remove ${a.username || "login"}`}
           >
             <Trash2 />
           </Button>
         </div>
       </div>
+      <Field label="Server">
+        <OptionSelect
+          value={a.serverId}
+          onValueChange={(v) => onChange({ serverId: v })}
+          options={servers.map((s) => ({
+            value: s.id,
+            label: s.builtin ? s.name : `${s.name || s.host} (custom)`,
+          }))}
+          placeholder="Select a server"
+        />
+      </Field>
+      <Field label="Username">
+        <Input
+          value={a.username}
+          onChange={(e) => onChange({ username: e.target.value })}
+        />
+      </Field>
+      <Field
+        label="Password"
+        hint={
+          saved === null ? undefined : saved ? "Saved in keychain" : "Not set"
+        }
+      >
+        <Input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onBlur={savePassword}
+          placeholder={saved ? "•••••••• (saved)" : ""}
+        />
+      </Field>
+    </li>
+  );
+}
+
+/** A read-only built-in catalog entry. */
+function BuiltinServerRow({ server: s }: { server: LobbyServer }) {
+  const tag =
+    "rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground";
+  return (
+    <li className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+      <span className="font-medium">{s.name}</span>
+      <span className="font-mono text-xs text-muted-foreground">
+        {s.host}:{s.port}
+      </span>
+      {s.tls && <span className={tag}>TLS</span>}
+      <span className={cn("ml-auto", tag)}>Built-in</span>
+    </li>
+  );
+}
+
+/** An editable custom server (no username/password — those belong to accounts). */
+function CustomServerRow({
+  server: s,
+  onChange,
+  onRemove,
+}: {
+  server: LobbyServer;
+  onChange: (patch: Partial<LobbyServer>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <li className="space-y-3 rounded-md border border-border p-3">
+      <div className="flex items-center justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRemove}
+          aria-label={`Remove ${s.name || s.host || "server"}`}
+        >
+          <Trash2 />
+        </Button>
+      </div>
       <Field label="Name">
         <Input
           value={s.name}
           onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="Official server"
+          placeholder="My server"
         />
       </Field>
       <div className="grid grid-cols-3 gap-2">
@@ -185,27 +345,6 @@ function ServerRow({
             type="number"
             value={s.port}
             onChange={(e) => onChange({ port: Number(e.target.value) })}
-          />
-        </Field>
-        <Field label="Username">
-          <Input
-            value={s.username ?? ""}
-            onChange={(e) => onChange({ username: e.target.value })}
-          />
-        </Field>
-        <Field
-          label="Password"
-          hint={
-            saved === null ? undefined : saved ? "Saved in keychain" : "Not set"
-          }
-          className="col-span-2"
-        >
-          <Input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onBlur={savePassword}
-            placeholder={saved ? "•••••••• (saved)" : ""}
           />
         </Field>
       </div>
