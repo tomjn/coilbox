@@ -22,13 +22,13 @@ export function useBattleOptions(
   const [pending, setPending] = useState<PendingMap>({});
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  const clearTimer = (lower: string) => {
+  const clearTimer = useCallback((lower: string) => {
     const t = timers.current[lower];
     if (t) {
       clearTimeout(t);
       delete timers.current[lower];
     }
-  };
+  }, []);
 
   // Reconcile against server echoes whenever the confirmed tags change.
   useEffect(() => {
@@ -37,7 +37,7 @@ export function useBattleOptions(
       for (const key of Object.keys(prev)) if (!next[key]) clearTimer(key);
       return next;
     });
-  }, [scriptTags]);
+  }, [scriptTags, clearTimer]);
 
   const setOption = useCallback(
     (tagKey: string, spadsName: string, value: string) => {
@@ -51,7 +51,7 @@ export function useBattleOptions(
       }, ECHO_TIMEOUT_MS);
       send(tagKey, spadsName, value);
     },
-    [scriptTags, send],
+    [scriptTags, send, clearTimer],
   );
 
   // Clear any outstanding timers on unmount.

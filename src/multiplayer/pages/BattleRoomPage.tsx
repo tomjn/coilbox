@@ -7,6 +7,7 @@ import { BattleChatCard } from "../battle/BattleChatCard";
 import { BattleGameCard } from "../battle/BattleGameCard";
 import { BattleMapCard } from "../battle/BattleMapCard";
 import { BattleMembersTable } from "../battle/BattleMembersTable";
+import { BattleOptionsDrawer } from "../battle/BattleOptionsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import { StartPosOptions } from "../battle/StartPosOptions";
@@ -130,6 +131,15 @@ function BattleRoomPage() {
                 ? "The host hasn't set start boxes yet."
                 : undefined
             }
+          />
+          <BattleOptionsDrawer
+            battle={battle}
+            modOptionsSchema={room.modOptionsSchema}
+            mapOptionsSchema={room.mapOptionsSchema}
+            canEdit={room.canEditOptions}
+            gameMissing={room.gameMissing}
+            mapMissing={room.mapMissing}
+            sendOption={room.sendOption}
           />
           {room.gameMissing && (
             <MissingContentCard

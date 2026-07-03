@@ -15,8 +15,8 @@ import {
   type OptionScope,
   type PendingMap,
   rawOptionEntries,
-  scriptTagKey,
   STARTPOSTYPE_KEY,
+  scriptTagKey,
 } from "./battleOptions";
 import { useBattleOptions } from "./useBattleOptions";
 
@@ -46,7 +46,10 @@ export function BattleOptionsDrawer({
   sendOption: (tagKey: string, spadsName: string, value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { pending, setOption } = useBattleOptions(battle.scriptTags, sendOption);
+  const { pending, setOption } = useBattleOptions(
+    battle.scriptTags,
+    sendOption,
+  );
 
   const changed =
     changedCount(modOptionsSchema, battle.scriptTags, "mod") +
