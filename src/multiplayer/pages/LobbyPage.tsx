@@ -5,10 +5,11 @@ import { useMultiplayer } from "../store";
 
 /**
  * The lobby client screen. Deliberately plain (UI/UX polish is a follow-up): a
- * server picker, a Connect/Disconnect control, the login phase, the online-user
- * list, a minimal chat for the joined battle, and a raw protocol console. Browsing
- * and joining battles lives on the dedicated Battles page. This exists to prove the
- * connection/state/command plumbing end to end.
+ * server picker, a Connect/Disconnect control, the login phase, and a minimal chat
+ * for the joined battle. Browsing and joining battles lives on the dedicated Battles
+ * page; starting a direct message lives in Chat; the raw protocol console lives in
+ * Settings > Lobby servers. This exists to prove the connection/state/command
+ * plumbing end to end.
  *
  * Default-exported for the frame's lazy route convention.
  */
@@ -20,7 +21,6 @@ export default function LobbyPage() {
   const [chatInput, setChatInput] = useState("");
 
   const state = mirror.state;
-  const users = state ? Object.values(state.users) : [];
   const currentBattle =
     state?.currentBattle != null
       ? state.battles[String(state.currentBattle)]
@@ -72,31 +72,6 @@ export default function LobbyPage() {
         <p className="text-sm text-destructive">Disconnected: {mirror.error}</p>
       )}
 
-      {state && (
-        <section>
-          <h2 className="mb-2 text-sm font-semibold">
-            Online ({users.length})
-          </h2>
-          <ul className="flex max-h-72 flex-col gap-1 overflow-auto">
-            {users.map((u) => (
-              <li key={u.name} className="text-sm">
-                {u.name}
-                {u.status.ingame && (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    in-game
-                  </span>
-                )}
-                {u.status.away && (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    away
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
       {/* Current battle chat */}
       {currentBattle && (
         <section className="flex flex-col gap-2">
@@ -130,16 +105,6 @@ export default function LobbyPage() {
             />
             <Button onClick={sendChat}>Send</Button>
           </div>
-        </section>
-      )}
-
-      {/* Protocol console (debug) */}
-      {mirror.consoleLines.length > 0 && (
-        <section>
-          <h2 className="mb-2 text-sm font-semibold">Console</h2>
-          <pre className="max-h-48 overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs">
-            {mirror.consoleLines.join("\n")}
-          </pre>
         </section>
       )}
     </main>

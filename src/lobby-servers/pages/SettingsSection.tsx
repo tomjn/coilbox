@@ -1,6 +1,8 @@
 import { Button, Input } from "@picoframe/frame";
-import { Plus, Server, Trash2 } from "lucide-react";
+import { Plus, Server, Terminal, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ConsoleDrawer } from "../../multiplayer/ConsoleDrawer";
+import { serverKeyFor, useMultiplayer } from "../../multiplayer/store";
 import {
   lsDeleteCredential,
   lsGetCredential,
@@ -20,6 +22,7 @@ import { CheckField, Field } from "./components/Field";
  */
 export default function LobbyServersSettings() {
   const [cfg, setCfg] = useLobbyServers();
+  const [consoleOpen, setConsoleOpen] = useState(false);
 
   const addServer = () =>
     setCfg({
@@ -75,11 +78,13 @@ export default function LobbyServersSettings() {
                 server={s}
                 onChange={(patch) => updateServer(s.id, patch)}
                 onRemove={() => removeServer(s)}
+                onOpenConsole={() => setConsoleOpen(true)}
               />
             ))}
           </ul>
         )}
       </section>
+      <ConsoleDrawer open={consoleOpen} onClose={() => setConsoleOpen(false)} />
     </div>
   );
 }
@@ -92,13 +97,24 @@ function ServerRow({
   server: s,
   onChange,
   onRemove,
+  onOpenConsole,
 }: {
   server: LobbyServer;
   onChange: (patch: Partial<LobbyServer>) => void;
   onRemove: () => void;
+  onOpenConsole: () => void;
 }) {
   const [password, setPassword] = useState("");
   const [saved, setSaved] = useState<boolean | null>(null);
+
+  // The app holds a single live lobby connection, so at most one configured row is
+  // "connected" — the one whose key matches `activeKey`. Its online count is just the
+  // size of the live user mirror.
+  const { mirror, activeKey } = useMultiplayer();
+  const connected = mirror.connected && activeKey === serverKeyFor(s);
+  const onlineCount = connected
+    ? Object.keys(mirror.state?.users ?? {}).length
+    : 0;
 
   // On mount, reflect whether a secret already exists (never show the plaintext).
   useEffect(() => {
@@ -120,23 +136,41 @@ function ServerRow({
 
   return (
     <li className="space-y-3 rounded-md border border-border p-3">
-      <div className="flex items-end gap-2">
-        <Field label="Name" className="flex-1">
-          <Input
-            value={s.name}
-            onChange={(e) => onChange({ name: e.target.value })}
-            placeholder="Official server"
-          />
-        </Field>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRemove}
-          aria-label={`Remove ${s.name || s.host || "server"}`}
-        >
-          <Trash2 />
-        </Button>
+      <div className="flex items-center gap-2">
+        {connected && (
+          <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
+            Connected · {onlineCount} online
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          {connected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenConsole}
+              aria-label="Open protocol console"
+            >
+              <Terminal />
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRemove}
+            aria-label={`Remove ${s.name || s.host || "server"}`}
+          >
+            <Trash2 />
+          </Button>
+        </div>
       </div>
+      <Field label="Name">
+        <Input
+          value={s.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          placeholder="Official server"
+        />
+      </Field>
       <div className="grid grid-cols-3 gap-2">
         <Field label="Host" className="col-span-2">
           <Input

@@ -14,6 +14,7 @@ import {
   convId,
   isBattleChannel,
 } from "./conversation";
+import { DmPicker } from "./DmPicker";
 
 function Badge({ n }: { n: number }) {
   if (n <= 0) return null;
@@ -63,8 +64,8 @@ function Section({
 
 /**
  * The left rail: collapsible Channels and Direct messages sections with unread
- * badges. New DMs are started by selecting a user from a channel's member list,
- * so there's no free-text DM entry here.
+ * badges. New DMs are started either from the "+" picker here (search online
+ * users) or by selecting a user from a channel's member list.
  */
 export function ConversationSidebar({
   active,
@@ -185,6 +186,7 @@ export function ConversationSidebar({
         title="Direct messages"
         open={dmsOpen}
         onToggle={() => setDmsOpen((v) => !v)}
+        action={<DmPicker onPick={(peer) => onSelect({ kind: "dm", peer })} />}
       >
         <ul className="flex flex-col gap-0.5 px-2">
           {peers.map((peer) => {
@@ -206,7 +208,7 @@ export function ConversationSidebar({
           })}
           {peers.length === 0 && (
             <li className="px-2 py-1.5 text-xs text-muted-foreground">
-              No direct messages. Open one from a channel's member list.
+              No direct messages. Use + to message an online user.
             </li>
           )}
         </ul>

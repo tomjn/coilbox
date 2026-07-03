@@ -26,6 +26,15 @@ import {
 import { conversationCounts } from "./chat/conversation";
 
 /**
+ * The connection key for a server: `username@host:port`. Shared by the store and
+ * any UI that needs to match a configured server against the live connection
+ * (e.g. the settings "Connected" badge), so the derivation can't drift.
+ */
+export function serverKeyFor(server: LobbyServer): string {
+  return `${server.username}@${server.host}:${server.port}`;
+}
+
+/**
  * A per-connection mirror of the Rust-side lobby state. The Rust plugin owns the
  * authoritative parse; this mirror is refreshed wholesale from `mpSnapshot` on each
  * `delta` event (correctness over incremental cleverness) while `phase` and
@@ -263,7 +272,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         );
       }
       setBusy(true);
-      const serverKey = `${server.username}@${server.host}:${server.port}`;
+      const serverKey = serverKeyFor(server);
       try {
         const cred = await lsGetCredential({
           serverId: server.id,
