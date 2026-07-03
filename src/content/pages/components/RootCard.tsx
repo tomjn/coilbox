@@ -48,6 +48,9 @@ export function RootCard({
               {isManual ? "manual" : "auto"}
             </StatusBadge>
             <StatusBadge tone="neutral">{root.kind}</StatusBadge>
+            {root.portable ? (
+              <StatusBadge tone="info">portable</StatusBadge>
+            ) : null}
             {root.valid ? (
               <StatusBadge tone="good">valid</StatusBadge>
             ) : (

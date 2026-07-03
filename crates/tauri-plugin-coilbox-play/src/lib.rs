@@ -47,11 +47,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(150);
 
 /// Path the generated start script is written to: `<app-data>/play/script.txt`.
 fn script_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("could not resolve app data dir: {e}"))?
-        .join("play");
+    let dir = coilbox_portable::data_dir(app)?.join("play");
     Ok(dir.join("script.txt"))
 }
 

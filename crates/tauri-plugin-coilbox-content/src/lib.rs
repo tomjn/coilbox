@@ -63,6 +63,46 @@ fn canonical(p: &Path) -> PathBuf {
     std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
 }
 
+/// Resolve a *stored* user-root path to an absolute path before it's canonicalized.
+/// Absolute paths pass through; a **relative** stored path is a portable root,
+/// resolved against the app directory ([`coilbox_portable::app_dir`]) so a shipped
+/// package keeps working after it's moved. Falls back to the raw relative path only
+/// when the app dir can't be resolved (it then fails validation like any bad path).
+fn resolve_stored(p: &str) -> PathBuf {
+    let path = Path::new(p);
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+    match coilbox_portable::app_dir() {
+        Some(base) => base.join(path),
+        None => path.to_path_buf(),
+    }
+}
+
+/// Given a canonical absolute root and whether the caller asked for a portable
+/// root, decide how to *store* it: relative to the app dir (portable) or absolute.
+/// In portable mode (`.coilbox` present) roots under the app dir are relativized
+/// automatically; an explicit `portable` request for a folder outside the app dir
+/// is an error (there's nothing stable to make it relative to).
+fn stored_root_path(portable: bool, canon: &Path) -> Result<String, String> {
+    if portable || coilbox_portable::is_portable() {
+        if let Some(base) = coilbox_portable::app_dir() {
+            if let Ok(rel) = canon.strip_prefix(canonical(&base)) {
+                let s = display_path(rel);
+                return Ok(if s.is_empty() { ".".into() } else { s });
+            }
+        }
+        if portable {
+            return Err(
+                "Portable roots must live inside the app folder (next to the \
+                        coilbox executable)."
+                    .into(),
+            );
+        }
+    }
+    Ok(display_path(canon))
+}
+
 fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -71,10 +111,7 @@ fn now_ms() -> u64 {
 }
 
 fn store_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    Ok(app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("could not resolve app data dir: {e}"))?
+    Ok(coilbox_portable::data_dir(app)?
         .join("content")
         .join("state.json"))
 }
@@ -118,6 +155,8 @@ struct Acc {
     source: RootSource,
     label: Option<String>,
     forced: bool,
+    /// Stored as a relative (portable) path — surfaced as `ContentRoot.portable`.
+    portable: bool,
 }
 
 fn build_root(a: Acc, with_counts: bool, now: u64) -> ContentRoot {
@@ -149,6 +188,7 @@ fn build_root(a: Acc, with_counts: bool, now: u64) -> ContentRoot {
         origins: a.origins,
         exists,
         valid: kind_opt.is_some() || a.forced,
+        portable: a.portable,
         forced: if a.forced { Some(true) } else { None },
         counts,
         engines,
@@ -182,12 +222,14 @@ fn compute_state<R: Runtime>(
                 source: RootSource::Auto,
                 label: None,
                 forced: false,
+                portable: false,
             }),
         }
     }
 
     for u in &store.user_roots {
-        let canon = canonical(Path::new(&u.path));
+        let canon = canonical(&resolve_stored(&u.path));
+        let portable = Path::new(&u.path).is_relative();
         match accs.iter_mut().find(|a| a.canon == canon) {
             Some(a) => {
                 a.source = RootSource::Manual;
@@ -195,6 +237,7 @@ fn compute_state<R: Runtime>(
                     a.label = u.label.clone();
                 }
                 a.forced = u.forced;
+                a.portable = portable;
                 if !a.origins.iter().any(|o| o == "manual") {
                     a.origins.push("manual".into());
                 }
@@ -205,6 +248,7 @@ fn compute_state<R: Runtime>(
                 source: RootSource::Manual,
                 label: u.label.clone(),
                 forced: u.forced,
+                portable,
             }),
         }
     }
@@ -337,10 +381,13 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> Resul
             .iter()
             .find(|r| canonical(Path::new(&r.path)) == canon)
     });
-    let is_manual = store
+    // A matching manual root; `portable` tracks whether it's stored relative.
+    let manual = store
         .user_roots
         .iter()
-        .any(|u| canonical(Path::new(&u.path)) == canon);
+        .find(|u| canonical(&resolve_stored(&u.path)) == canon);
+    let is_manual = manual.is_some();
+    let portable = manual.is_some_and(|u| Path::new(&u.path).is_relative());
     let acc = match existing {
         Some(r) => Acc {
             canon: canon.clone(),
@@ -348,6 +395,7 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> Resul
             source: r.source,
             label: r.label.clone(),
             forced: r.forced.unwrap_or(false),
+            portable,
         },
         None => Acc {
             canon: canon.clone(),
@@ -359,6 +407,7 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> Resul
             },
             label: None,
             forced: false,
+            portable,
         },
     };
 
@@ -390,6 +439,7 @@ async fn content_add_root<R: Runtime>(
     path: String,
     label: Option<String>,
     force: Option<bool>,
+    portable: Option<bool>,
 ) -> Result<CliResult, ()> {
     let sp = match store_path(&app) {
         Ok(p) => p,
@@ -404,6 +454,12 @@ async fn content_add_root<R: Runtime>(
              or portable install). Add it anyway to force.",
         ));
     }
+    // How to persist it: relative (portable) or absolute. Errors when a portable
+    // root is explicitly requested for a folder outside the app dir.
+    let stored = match stored_root_path(portable.unwrap_or(false), &canon) {
+        Ok(s) => s,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
     let mut store = match load_store(&sp) {
         Ok(s) => s,
         Err(e) => return Ok(CliResult::err(e)),
@@ -411,10 +467,10 @@ async fn content_add_root<R: Runtime>(
     if !store
         .user_roots
         .iter()
-        .any(|u| canonical(Path::new(&u.path)) == canon)
+        .any(|u| canonical(&resolve_stored(&u.path)) == canon)
     {
         store.user_roots.push(UserRoot {
-            path: display_path(&canon),
+            path: stored,
             label,
             forced: force && !valid,
         });
@@ -440,7 +496,7 @@ async fn content_remove_root<R: Runtime>(app: AppHandle<R>, path: String) -> Res
     };
     store
         .user_roots
-        .retain(|u| canonical(Path::new(&u.path)) != canon);
+        .retain(|u| canonical(&resolve_stored(&u.path)) != canon);
     let state = compute_state(&app, &store, true, false);
     if let Err(e) = persist(&sp, store, &state) {
         return Ok(CliResult::err(e));
@@ -586,9 +642,7 @@ async fn content_demo_info(engine_path: String, replay_path: String) -> Result<C
 /// raw JSON text; the frontend parses/matches it (Rust stays schema-agnostic).
 #[tauri::command]
 async fn branding_catalog<R: Runtime>(app: AppHandle<R>, url: String) -> Result<CliResult, ()> {
-    let cache_file = app
-        .path()
-        .app_cache_dir()
+    let cache_file = coilbox_portable::cache_dir(&app)
         .ok()
         .map(|d| d.join("coilbox-branding").join("catalog.json"));
     let seed_file = app
@@ -611,9 +665,7 @@ async fn branding_image<R: Runtime>(
     urls: Vec<String>,
     reencode: bool,
 ) -> Result<CliResult, ()> {
-    let cache_dir = app
-        .path()
-        .app_cache_dir()
+    let cache_dir = coilbox_portable::cache_dir(&app)
         .ok()
         .map(|d| d.join("coilbox-branding-images"));
     let data_url = branding::resolve_image(&urls, cache_dir, reencode).await;
@@ -640,4 +692,48 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             branding_image
         ])
         .build()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_stored_passes_absolute_through() {
+        let abs = if cfg!(windows) {
+            "C:\\data\\spring"
+        } else {
+            "/data/spring"
+        };
+        assert_eq!(resolve_stored(abs), PathBuf::from(abs));
+    }
+
+    #[test]
+    fn resolve_stored_joins_relative_onto_app_dir() {
+        let r = resolve_stored("game-data");
+        // Resolved against the app dir (here the test binary's dir): absolute and
+        // ending in the relative component.
+        assert!(r.is_absolute());
+        assert!(r.ends_with("game-data"));
+    }
+
+    #[test]
+    fn stored_root_path_errors_when_portable_outside_app_dir() {
+        let far = if cfg!(windows) {
+            Path::new("C:\\definitely\\not\\under\\the\\app\\zzz")
+        } else {
+            Path::new("/definitely/not/under/the/app/zzz")
+        };
+        assert!(stored_root_path(true, far).is_err());
+    }
+
+    #[test]
+    fn stored_root_path_absolute_when_not_portable() {
+        let p = if cfg!(windows) {
+            Path::new("C:\\data\\spring")
+        } else {
+            Path::new("/data/spring")
+        };
+        assert_eq!(stored_root_path(false, p).unwrap(), display_path(p));
+    }
 }

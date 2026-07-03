@@ -1,0 +1,9 @@
+[package]
+name = "coilbox-portable"
+version = "0.0.0"
+description = "Portable-mode path resolution for Coilbox: when a `.coilbox` folder sits next to the executable, redirect all app data/cache into it so the install is self-contained. Shared by every Coilbox plugin."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+tauri = { version = "2" }

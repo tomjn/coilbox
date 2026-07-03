@@ -49,6 +49,9 @@ export interface ContentRoot {
   origins: string[];
   exists: boolean;
   valid: boolean;
+  /** Stored as a path relative to the app dir — a portable root that follows the
+   * executable when the whole package is moved. */
+  portable: boolean;
   /** Present when a manual root was added despite failing validation. */
   forced?: boolean;
   counts: RootCounts;
@@ -95,9 +98,13 @@ export const contentScanRoot = defineCommand<
   { root: ContentRoot }
 >("coilbox-content", "content_scan_root");
 
-/** Add a manually-picked root. Pass `force` to accept a folder that doesn't validate. */
+/**
+ * Add a manually-picked root. Pass `force` to accept a folder that doesn't
+ * validate; pass `portable` to store it relative to the app dir (must be inside
+ * the app folder) so it follows the executable in a portable install.
+ */
 export const contentAddRoot = defineCommand<
-  { path: string; label?: string; force?: boolean },
+  { path: string; label?: string; force?: boolean; portable?: boolean },
   { state: ContentState }
 >("coilbox-content", "content_add_root");
 

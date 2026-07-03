@@ -48,11 +48,7 @@ fn sidecar_path<R: Runtime>(app: &AppHandle<R>, name: &str) -> Option<PathBuf> {
 
 /// The plugin's settings-file path under app-data.
 fn settings_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    let base = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("could not resolve app data dir: {e}"))?
-        .join("mapconv");
+    let base = coilbox_portable::data_dir(app)?.join("mapconv");
     Ok(base.join("settings.json"))
 }
 
@@ -334,9 +330,7 @@ fn image_info_cached(
 #[tauri::command]
 async fn mc_image_info<R: Runtime>(app: AppHandle<R>, path: String, max: Option<u32>) -> CliResult {
     let max = max.unwrap_or(320).max(1);
-    let cache_dir = app
-        .path()
-        .app_cache_dir()
+    let cache_dir = coilbox_portable::cache_dir(&app)
         .ok()
         .map(|d| d.join("mapconv-thumbs"));
     let result = tauri::async_runtime::spawn_blocking(move || {
