@@ -8,7 +8,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { type LobbyServer, useLobbyServers } from "../lobby-servers/config";
+import {
+  type LobbyAccount,
+  resolveServer,
+  useCustomServers,
+  useLobbyAccounts,
+} from "../lobby-servers/config";
 import { useMultiplayer } from "./store";
 
 type DotStatus = "off" | "connecting" | "on" | "error";
@@ -30,11 +35,11 @@ const LABEL: Record<DotStatus, string> = {
 /**
  * topbar.right slot: an icon button that shows lobby connection status via a dot
  * and opens a popover to connect / view status / log out. Hidden entirely when no
- * server is configured and nothing is connected. The open state is controlled by
+ * login is configured and nothing is connected. The open state is controlled by
  * MultiplayerContext so not-connected CTAs elsewhere can open this same popover.
  */
 export default function LobbyStatusButton() {
-  const [cfg] = useLobbyServers();
+  const [accountsCfg] = useLobbyAccounts();
   const {
     mirror,
     activeKey,
@@ -44,8 +49,8 @@ export default function LobbyStatusButton() {
     closeLoginPopover,
   } = useMultiplayer();
 
-  const hasServers = cfg.servers.length > 0;
-  if (!hasServers && activeKey == null) return null;
+  const hasAccounts = accountsCfg.accounts.length > 0;
+  if (!hasAccounts && activeKey == null) return null;
 
   let status: DotStatus = "off";
   if (activeKey != null) {
@@ -84,19 +89,26 @@ export default function LobbyStatusButton() {
 }
 
 export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
-  const [cfg] = useLobbyServers();
-  const servers = cfg.servers;
+  const [accountsCfg] = useLobbyAccounts();
+  const [customCfg] = useCustomServers();
+  const accounts = accountsCfg.accounts;
   const { mirror, activeKey, revealed, busy, connect, disconnect } =
     useMultiplayer();
 
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<LobbyServer | null>(null);
+  const [pending, setPending] = useState<LobbyAccount | null>(null);
 
-  async function connectTo(server: LobbyServer) {
+  async function connectTo(account: LobbyAccount) {
     setError(null);
-    setPending(server);
+    setPending(account);
     try {
-      await connect(server);
+      const server = resolveServer(account.serverId, customCfg.servers);
+      if (!server) {
+        throw new Error(
+          "This login's server no longer exists (check Settings).",
+        );
+      }
+      await connect(server, account.username);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -140,7 +152,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   }
 
   if (busy) {
-    const label = pending?.username ?? pending?.name ?? "server";
+    const label = pending?.username ?? "server";
     return (
       <div className="flex flex-col items-center gap-3 py-4">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -157,27 +169,32 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
       <p className="px-2 pb-1 text-sm font-medium">
         {revealed ? "Reconnect to multiplayer" : "Connect to multiplayer"}
       </p>
-      {servers.map((s) => (
-        <button
-          key={s.id}
-          type="button"
-          onClick={() => connectTo(s)}
-          disabled={busy}
-          className="flex flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
-        >
-          <span className="text-base font-semibold leading-tight">
-            {s.username ?? s.name}
-          </span>
-          <span className="text-xs text-muted-foreground">{s.name}</span>
-        </button>
-      ))}
+      {accounts.map((a) => {
+        const server = resolveServer(a.serverId, customCfg.servers);
+        return (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => connectTo(a)}
+            disabled={busy}
+            className="flex flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+          >
+            <span className="text-base font-semibold leading-tight">
+              {a.username || "(no username)"}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {server?.name ?? "Unknown server"}
+            </span>
+          </button>
+        );
+      })}
       <Link
         to="/settings/lobby-servers"
         onClick={onNavigate}
         className="mt-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
       >
         <Plus className="size-4" />
-        Add a server
+        Add a login
       </Link>
       {error && <p className="px-2 pt-1 text-xs text-destructive">{error}</p>}
       {mirror.error && (
