@@ -53,6 +53,13 @@ describe("occupancy", () => {
       occupancy(mk({ host: "host", members: { host: M, alice: M } })),
     ).toBe(2);
   });
+
+  it("counts a host whose name collides with an Object.prototype key", () => {
+    // `constructor`/`toString` etc. exist on the prototype chain, so a naive
+    // `host in members` check would wrongly treat the host as already present.
+    expect(occupancy(mk({ host: "constructor", members: {} }))).toBe(1);
+    expect(occupancy(mk({ host: "toString", members: { alice: M } }))).toBe(2);
+  });
 });
 
 describe("filterSortBattles", () => {

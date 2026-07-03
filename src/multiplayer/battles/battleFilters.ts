@@ -18,7 +18,7 @@ export interface BattleFilters {
  */
 export function occupancy(b: Battle): number {
   const m = Object.keys(b.members).length;
-  return b.host in b.members ? m : m + 1;
+  return Object.hasOwn(b.members, b.host) ? m : m + 1;
 }
 
 function compareBy(key: BattleSortKey, a: Battle, b: Battle): number {
