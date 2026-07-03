@@ -25,10 +25,8 @@ export function parseMessage(text: string): Inline[] {
 /** Code spans first (literal), remaining runs handed to URL/emphasis parsing. */
 function parseInline(text: string): Inline[] {
   const out: Inline[] = [];
-  const codeRe = /`([^`]+)`/g;
   let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = codeRe.exec(text)) !== null) {
+  for (const m of text.matchAll(/`([^`]+)`/g)) {
     if (m.index > last) out.push(...parseUrls(text.slice(last, m.index)));
     out.push({ type: "code", value: m[1] });
     last = m.index + m[0].length;
@@ -40,10 +38,8 @@ function parseInline(text: string): Inline[] {
 /** Extract bare http(s) URLs; remaining runs handed to bold/italic parsing. */
 function parseUrls(text: string): Inline[] {
   const out: Inline[] = [];
-  const urlRe = /https?:\/\/\S+/g;
   let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = urlRe.exec(text)) !== null) {
+  for (const m of text.matchAll(/https?:\/\/\S+/g)) {
     if (m.index > last) out.push(...parseEmphasis(text.slice(last, m.index)));
     const url = m[0];
     const trail = /[.,!?)\]}:;]+$/.exec(url);
@@ -67,8 +63,7 @@ function parseEmphasis(text: string): Inline[] {
   const out: Inline[] = [];
   const re = /\*\*([^*]+)\*\*|\*([^*]+)\*|_([^_]+)_/g;
   let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
+  for (const m of text.matchAll(re)) {
     if (m.index > last) {
       out.push({ type: "text", value: text.slice(last, m.index) });
     }

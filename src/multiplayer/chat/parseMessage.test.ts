@@ -64,7 +64,9 @@ describe("parseMessage", () => {
     expect(parseMessage("**_x_**")).toEqual([
       {
         type: "bold",
-        children: [{ type: "italic", children: [{ type: "text", value: "x" }] }],
+        children: [
+          { type: "italic", children: [{ type: "text", value: "x" }] },
+        ],
       },
     ]);
   });
