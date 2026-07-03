@@ -28,6 +28,11 @@ export function BattleChatCard({ battle }: { battle: Battle }) {
     },
     [battle],
   );
+  const users = mirror.state?.users;
+  const isBot = useCallback(
+    (from: string): boolean => users?.[from]?.status.bot ?? false,
+    [users],
+  );
 
   if (!channel) {
     return (
@@ -48,6 +53,7 @@ export function BattleChatCard({ battle }: { battle: Battle }) {
         messages={conv.messages}
         currentUser={me}
         senderColor={senderColor}
+        isBot={isBot}
         onSend={conv.send}
         placeholder="Message the battle"
       />

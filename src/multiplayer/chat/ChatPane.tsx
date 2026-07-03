@@ -1,4 +1,5 @@
 import { Button, cn, Input } from "@picoframe/frame";
+import { Bot } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ChatMsg } from "../bindings";
 import { FormattedText } from "./FormattedText";
@@ -42,6 +43,9 @@ export interface ChatPaneProps {
   /** Optional per-sender accent colour (`#rrggbb`), e.g. a battle player's team
    * colour. Returns undefined when the sender has no colour (channels/DMs). */
   senderColor?: (from: string) => string | undefined;
+  /** Whether a sender is a bot account (SPADS autohosts included), marked with a
+   * bot glyph before the name. Returns false for humans / unknown senders. */
+  isBot?: (from: string) => boolean;
   /** `full` fills the viewport column; `embedded` fits a smaller host box. */
   variant?: "full" | "embedded";
   emptyState?: ReactNode;
@@ -62,6 +66,7 @@ export function ChatPane({
   onSend,
   headerActions,
   senderColor,
+  isBot,
   variant = "full",
   emptyState,
   placeholder = "Message…",
@@ -163,9 +168,12 @@ export function ChatPane({
                 >
                   {!own && !prevSame && (
                     <span
-                      className="mb-0.5 px-1 text-xs font-medium text-muted-foreground"
+                      className="mb-0.5 flex items-center gap-1 px-1 text-xs font-medium text-muted-foreground"
                       style={color ? { color } : undefined}
                     >
+                      {isBot?.(m.from) && (
+                        <Bot className="size-3 shrink-0" aria-label="Bot" />
+                      )}
                       {m.from}
                     </span>
                   )}

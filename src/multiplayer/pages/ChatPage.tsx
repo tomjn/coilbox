@@ -44,6 +44,11 @@ function ChatPage() {
     },
     [battle],
   );
+  const users = mirror.state?.users;
+  const isBot = useCallback(
+    (from: string): boolean => users?.[from]?.status.bot ?? false,
+    [users],
+  );
 
   // Mark the open conversation read as its message count changes.
   useEffect(() => {
@@ -106,6 +111,7 @@ function ChatPage() {
           messages={conv.messages}
           currentUser={me}
           senderColor={senderColor}
+          isBot={isBot}
           onSend={conv.send}
           placeholder={`Message ${conv.title}`}
           headerActions={
