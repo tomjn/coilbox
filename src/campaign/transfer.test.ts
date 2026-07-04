@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Campaign } from "./model";
+import { type Campaign, parseCampaignJson } from "./model";
 import {
   EXPORT_FORMAT,
   EXPORT_FORMAT_VERSION,
@@ -66,5 +66,27 @@ describe("parseCampaignExport", () => {
 
   it("rejects a bare campaign that isn't wrapped", () => {
     expect(parseCampaignExport(JSON.stringify(campaign))).toBeNull();
+  });
+});
+
+describe("parseCampaignJson with the export wrapper", () => {
+  // A bundled campaign may be the exported file dropped in as-is, so the
+  // general validator unwraps the envelope before validating.
+  it("accepts a wrapped export file", () => {
+    const json = JSON.stringify(wrapCampaignForExport(campaign));
+    expect(parseCampaignJson(json)?.id).toBe("abc");
+  });
+
+  it("still accepts a bare campaign document", () => {
+    expect(parseCampaignJson(JSON.stringify(campaign))?.id).toBe("abc");
+  });
+
+  it("rejects a wrapper around an invalid campaign", () => {
+    const json = JSON.stringify({
+      format: EXPORT_FORMAT,
+      formatVersion: EXPORT_FORMAT_VERSION,
+      campaign: { type: "ta", id: "x" },
+    });
+    expect(parseCampaignJson(json)).toBeNull();
   });
 });

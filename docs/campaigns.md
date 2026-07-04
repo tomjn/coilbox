@@ -65,14 +65,11 @@ folder:
       my-campaign.json
 ```
 
-Each file in `campaigns/` is a **plain campaign document** — the inner
-`campaign` object from an exported file, not the export wrapper. To bundle a
-campaign you've built and exported in the app:
-
-1. Export it from Campaign Builder.
-2. Open the exported `.json` and take just the `campaign` object (drop the
-   `format`/`formatVersion` wrapper).
-3. Save that as `.coilbox/campaigns/<any-name>.json`.
+Each file in `campaigns/` is an exported campaign, dropped in as-is: export
+from Campaign Builder and save the resulting `.json` as
+`.coilbox/campaigns/<any-name>.json`. (A bare campaign document — the inner
+`campaign` object without the export wrapper — is also accepted.) Panoramas
+are embedded in the export, so the single file is self-contained.
 
 Bundled campaigns show up in the Campaigns list marked read-only (no edit/delete
 in the builder) but otherwise play exactly like local ones, and their progress
