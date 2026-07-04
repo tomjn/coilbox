@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { quitApp } from "../general/quit";
 import { getProfile } from "./profile";
 
 /**
@@ -9,9 +11,32 @@ import { getProfile } from "./profile";
  * binary), and by design carries no `<script>` — declarative content only, so no
  * CSP relaxation is needed. Only used when `welcome` is present (main.tsx omits the
  * home override otherwise), so this component always has content to show.
+ *
+ * Because the HTML can't run JavaScript, the one interactive hook an author gets is
+ * the `data-coilbox-action` attribute: a delegated click handler on the container
+ * reads it off the nearest ancestor of the click target. Currently only "quit" is
+ * understood, letting an author's own button/link close the app.
  */
 export default function BrandedWelcome() {
   const welcome = getProfile().welcome;
+  // Delegated listener attached to the injected-HTML container (not a JSX `onClick`,
+  // which would trip a11y lints on a static div): a bubbled click on any element
+  // carrying `data-coilbox-action="quit"` closes the app.
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onClick = (e: Event) => {
+      const target = (e.target as HTMLElement).closest("[data-coilbox-action]");
+      if (target?.getAttribute("data-coilbox-action") === "quit") {
+        e.preventDefault();
+        quitApp();
+      }
+    };
+    el.addEventListener("click", onClick);
+    return () => el.removeEventListener("click", onClick);
+  }, []);
+
   if (!welcome) return null;
   return (
     <main className="h-full overflow-auto">
@@ -21,6 +46,7 @@ export default function BrandedWelcome() {
       )}
       {welcome.html && (
         <div
+          ref={ref}
           className="coilbox-welcome"
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted bundler-authored profile HTML
           dangerouslySetInnerHTML={{ __html: welcome.html }}

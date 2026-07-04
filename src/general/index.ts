@@ -2,6 +2,7 @@ import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Settings2 } from "lucide-react";
 import { FullscreenControls } from "./fullscreen";
 import GeneralSettings from "./pages/SettingsSection";
+import { QuitControl } from "./quit";
 
 /**
  * The general plugin: app-wide preferences with no routes/nav of its own, just a
@@ -17,7 +18,10 @@ const generalPlugin: FramePlugin = {
   id: "general",
   version: "0.0.0",
   routes: [],
-  slots: [{ slot: "topbar.right", Component: FullscreenControls }],
+  slots: [
+    { slot: "topbar.right", Component: FullscreenControls },
+    { slot: "sidebar.footer", Component: QuitControl },
+  ],
   settings: [
     {
       id: "general",
