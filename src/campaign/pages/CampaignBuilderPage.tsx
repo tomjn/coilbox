@@ -14,15 +14,12 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
-import {
-  campaignDelete,
-  campaignImageImportData,
-  campaignImport,
-  campaignSave,
-} from "../bindings";
+import { campaignDelete, campaignImport, campaignSave } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
-import type { Campaign, CampaignMission } from "../model";
+import { materializeCampaignImages } from "../images";
+import type { Campaign } from "../model";
 import { parseCampaignExport } from "../transfer";
+import { CampaignIconBox } from "./components/CampaignImage";
 
 /**
  * Campaign builder landing: create a new campaign, import a shared one, and list
@@ -83,28 +80,14 @@ export default function CampaignBuilderPage() {
         return;
       }
       // Mint a fresh id so importing never collides with an existing campaign,
-      // then materialize each inlined (data-URI) panorama to disk as a file.
+      // then materialize every inlined (data-URI) image — icon, background and each
+      // mission's panorama + side graphic — to disk as files under the new id.
       const id = crypto.randomUUID();
-      const missions: CampaignMission[] = await Promise.all(
-        parsed.missions.map(async (m) => {
-          if (m.panorama?.kind !== "data") return m;
-          try {
-            const { file } = await campaignImageImportData({
-              campaignId: id,
-              dataUri: m.panorama.dataUri,
-            });
-            return { ...m, panorama: { kind: "file", file } };
-          } catch {
-            // A broken embedded image shouldn't sink the whole import.
-            return { ...m, panorama: undefined };
-          }
-        }),
-      );
+      const materialized = await materializeCampaignImages(parsed, id);
       const now = new Date().toISOString();
       const campaign: Campaign = {
-        ...parsed,
+        ...materialized,
         id,
-        missions,
         createdAt: parsed.createdAt || now,
         updatedAt: now,
       };
@@ -186,6 +169,10 @@ export default function CampaignBuilderPage() {
                 key={campaign.id}
                 className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3"
               >
+                <CampaignIconBox
+                  campaignId={campaign.id}
+                  icon={campaign.icon}
+                />
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium">

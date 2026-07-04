@@ -19,7 +19,7 @@
 
 mod images;
 
-use images::{data_uri_bytes, data_url, reencode_panorama};
+use images::{data_uri_bytes, data_url, reencode_image, ImageKind};
 use picoframe_core::CliResult;
 use serde::Serialize;
 use serde_json::json;
@@ -164,44 +164,48 @@ async fn campaign_delete<R: Runtime>(app: AppHandle<R>, id: String) -> CliResult
     CliResult::ok(json!({}))
 }
 
-/// Shared tail of both image imports: bound + re-encode the decoded bytes, mint a
-/// uuid filename, and write it under the campaign's image folder. Returns the bare
-/// filename the frontend stores in the campaign document.
-fn store_panorama<R: Runtime>(
+/// Shared tail of both image imports: bound + re-encode the decoded bytes for the
+/// given kind, mint a uuid filename (with the kind's extension), and write it under
+/// the campaign's image folder. Returns the bare filename the frontend stores.
+fn store_image<R: Runtime>(
     app: &AppHandle<R>,
     campaign_id: &str,
     raw: &[u8],
+    kind: ImageKind,
 ) -> Result<String, String> {
     if !valid_id(campaign_id) {
         return Err(format!("invalid campaign id: {campaign_id}"));
     }
-    let jpeg = reencode_panorama(raw).ok_or("could not decode image")?;
+    let bytes = reencode_image(raw, kind).ok_or("could not decode image")?;
     let dir = images_dir(app)?.join(campaign_id);
     std::fs::create_dir_all(&dir).map_err(|e| format!("could not create image dir: {e}"))?;
-    let file = format!("{}.jpg", uuid::Uuid::new_v4());
-    std::fs::write(dir.join(&file), jpeg).map_err(|e| format!("could not write image: {e}"))?;
+    let file = format!("{}.{}", uuid::Uuid::new_v4(), kind.ext());
+    std::fs::write(dir.join(&file), bytes).map_err(|e| format!("could not write image: {e}"))?;
     Ok(file)
 }
 
-/// `campaign_image_import` — import a panorama from a file the user picked: read,
-/// decode, downscale to bounds, re-encode JPEG, and store it. Returns the filename.
+/// `campaign_image_import` — import an image from a file the user picked: read,
+/// decode, downscale to the kind's bounds, re-encode (opaque JPEG or alpha PNG),
+/// and store it. `kind` is one of panorama/background/icon/sideGraphic (absent =
+/// panorama). Returns the stored filename.
 #[tauri::command]
 async fn campaign_image_import<R: Runtime>(
     app: AppHandle<R>,
     campaign_id: String,
     src_path: String,
+    kind: Option<String>,
 ) -> CliResult {
     let raw = match std::fs::read(&src_path) {
         Ok(b) => b,
         Err(e) => return CliResult::err(format!("could not read image: {e}")),
     };
-    match store_panorama(&app, &campaign_id, &raw) {
+    match store_image(&app, &campaign_id, &raw, ImageKind::parse(kind.as_deref())) {
         Ok(file) => CliResult::ok(json!({ "file": file })),
         Err(e) => CliResult::err(e),
     }
 }
 
-/// `campaign_image_import_data` — import a panorama from a base64 `data:` URI (used
+/// `campaign_image_import_data` — import an image from a base64 `data:` URI (used
 /// when an imported campaign carries embedded art). Enforces the same decode +
 /// downscale + re-encode bounds as the file path, so a hostile import file can't
 /// write unbounded data to disk.
@@ -210,19 +214,21 @@ async fn campaign_image_import_data<R: Runtime>(
     app: AppHandle<R>,
     campaign_id: String,
     data_uri: String,
+    kind: Option<String>,
 ) -> CliResult {
     let raw = match data_uri_bytes(&data_uri) {
         Some(b) => b,
         None => return CliResult::err("invalid image data URI"),
     };
-    match store_panorama(&app, &campaign_id, &raw) {
+    match store_image(&app, &campaign_id, &raw, ImageKind::parse(kind.as_deref())) {
         Ok(file) => CliResult::ok(json!({ "file": file })),
         Err(e) => CliResult::err(e),
     }
 }
 
-/// `campaign_image_read` — read a stored panorama and return it as a `data:` URL
-/// (this codebase never uses `convertFileSrc`).
+/// `campaign_image_read` — read a stored image and return it as a `data:` URL (this
+/// codebase never uses `convertFileSrc`). Content type follows the stored
+/// extension, so alpha-preserving PNG icons/side graphics keep their transparency.
 #[tauri::command]
 async fn campaign_image_read<R: Runtime>(
     app: AppHandle<R>,
@@ -233,8 +239,12 @@ async fn campaign_image_read<R: Runtime>(
         Ok(p) => p,
         Err(e) => return CliResult::err(e),
     };
+    let content_type = match path.extension().and_then(|e| e.to_str()) {
+        Some("png") => "image/png",
+        _ => "image/jpeg",
+    };
     match std::fs::read(&path) {
-        Ok(bytes) => CliResult::ok(json!({ "dataUrl": data_url("image/jpeg", &bytes) })),
+        Ok(bytes) => CliResult::ok(json!({ "dataUrl": data_url(content_type, &bytes) })),
         Err(e) => CliResult::err(format!("could not read image: {e}")),
     }
 }

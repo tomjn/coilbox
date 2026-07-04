@@ -4,6 +4,7 @@ import { SkeletonList } from "../../content/pages/components/states";
 import { useCampaignProgress, useCampaigns } from "../campaigns";
 import type { CampaignMission } from "../model";
 import { type MissionState, missionStates } from "../progress";
+import { CampaignIconBox, CampaignImage } from "./components/CampaignImage";
 
 /**
  * A campaign's detail page: the title/description header and the mission sequence
@@ -46,45 +47,83 @@ export default function CampaignDetailPage() {
 
   const { campaign, source } = loaded;
   const states = missionStates(campaign, progress.campaigns[campaign.id]);
+  const total = campaign.missions.length;
   const completed = campaign.missions.filter(
     (m) => states.get(m.id) === "complete",
   ).length;
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
-    <div className="flex flex-col gap-5 p-4">
-      <BackLink />
-
-      <header className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold">{campaign.title}</h1>
-          {source === "bundled" && (
-            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-              Bundled
-            </span>
-          )}
-        </div>
-        {campaign.description && (
-          <p className="max-w-prose text-sm text-muted-foreground">
-            {campaign.description}
-          </p>
-        )}
-        <span className="text-xs text-muted-foreground/80">
-          {completed}/{campaign.missions.length} mission
-          {campaign.missions.length === 1 ? "" : "s"} complete
-        </span>
-      </header>
-
-      <ol className="flex flex-col gap-2">
-        {campaign.missions.map((mission, i) => (
-          <MissionRow
-            key={mission.id}
+    <div className="relative min-h-full">
+      {/* Static campaign backdrop (if any), dimmed for text contrast. */}
+      {campaign.background && (
+        <div className="absolute inset-0" aria-hidden>
+          <CampaignImage
             campaignId={campaign.id}
-            mission={mission}
-            index={i}
-            state={states.get(mission.id) ?? "locked"}
+            image={campaign.background}
+            alt=""
+            className="size-full object-cover"
           />
-        ))}
-      </ol>
+          <div className="absolute inset-0 bg-background/85" />
+        </div>
+      )}
+
+      <div className="relative z-10 flex flex-col gap-5 p-4">
+        <BackLink />
+
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+          <aside className="flex flex-col gap-3 rounded-xl border border-border/50 bg-card/80 p-4 backdrop-blur-sm lg:sticky lg:top-4 lg:self-start">
+            <div className="flex items-start gap-3">
+              <CampaignIconBox campaignId={campaign.id} icon={campaign.icon} />
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-lg font-semibold">{campaign.title}</h1>
+                  {source === "bundled" && (
+                    <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                      Bundled
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {campaign.description && (
+              <p className="text-sm text-muted-foreground">
+                {campaign.description}
+              </p>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-muted-foreground/80">
+                {completed}/{total} mission{total === 1 ? "" : "s"} complete
+              </span>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-[width]"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          </aside>
+
+          <section className="flex min-w-0 flex-col gap-2">
+            <h2 className="text-sm font-medium text-muted-foreground">
+              Missions
+            </h2>
+            <ol className="flex flex-col gap-2">
+              {campaign.missions.map((mission, i) => (
+                <MissionRow
+                  key={mission.id}
+                  campaignId={campaign.id}
+                  mission={mission}
+                  index={i}
+                  state={states.get(mission.id) ?? "locked"}
+                />
+              ))}
+            </ol>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

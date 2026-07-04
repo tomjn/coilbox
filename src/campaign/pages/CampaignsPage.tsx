@@ -7,6 +7,7 @@ import {
 } from "../../content/pages/components/states";
 import { useCampaignProgress, useCampaigns } from "../campaigns";
 import type { Campaign } from "../model";
+import { CampaignIconBox } from "./components/CampaignImage";
 
 /**
  * The Campaigns landing page: lists every stored campaign (local and bundled),
@@ -79,6 +80,7 @@ function CampaignCard({
       to={`/campaign/${encodeURIComponent(campaign.id)}`}
       className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-border hover:bg-accent/50"
     >
+      <CampaignIconBox campaignId={campaign.id} icon={campaign.icon} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{campaign.title}</span>

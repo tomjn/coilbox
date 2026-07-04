@@ -33,21 +33,33 @@ export const campaignDelete = defineCommand<
 >("coilbox-campaign", "campaign_delete");
 
 /**
- * Import a panorama from a file the user picked: decoded, downscaled to bounds and
- * re-encoded as JPEG by the plugin. Returns the bare stored filename.
+ * What an imported image is for. Selects the plugin's size bound and encoder:
+ * `panorama`/`background` re-encode to opaque JPEG; `icon`/`sideGraphic` keep
+ * alpha as PNG so a transparent logo/emblem isn't flattened onto black. Omitting it
+ * defaults to `panorama`.
+ */
+export type CampaignImageKind =
+  | "panorama"
+  | "background"
+  | "icon"
+  | "sideGraphic";
+
+/**
+ * Import an image from a file the user picked: decoded, downscaled to the kind's
+ * bounds and re-encoded by the plugin. Returns the bare stored filename.
  */
 export const campaignImageImport = defineCommand<
-  { campaignId: string; srcPath: string },
+  { campaignId: string; srcPath: string; kind?: CampaignImageKind },
   { file: string }
 >("coilbox-campaign", "campaign_image_import");
 
 /**
- * Import a panorama from a base64 `data:` URI (materializing an image embedded in
- * an imported campaign). Same decode + downscale + re-encode bounds as the file
+ * Import an image from a base64 `data:` URI (materializing an image embedded in an
+ * imported campaign). Same decode + downscale + re-encode bounds as the file
  * import. Returns the bare stored filename.
  */
 export const campaignImageImportData = defineCommand<
-  { campaignId: string; dataUri: string },
+  { campaignId: string; dataUri: string; kind?: CampaignImageKind },
   { file: string }
 >("coilbox-campaign", "campaign_image_import_data");
 
