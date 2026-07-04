@@ -4,8 +4,8 @@ A **distribution profile** lets you ship Coilbox alongside a game (or otherwise
 brand/narrow it) **without forking or rebuilding**. You drop a single
 `profile.json` file next to the app; Coilbox reads it once at startup and applies
 it: window title, hidden features, a preset game filter, a branded welcome screen,
-theme colours, hidden settings sections, and a GitHub-releases update source for the
-game.
+theme colours, hidden settings sections, extra sidebar links, and a GitHub-releases
+update source for the game.
 
 If no profile is present, Coilbox behaves exactly as normal.
 
@@ -206,6 +206,40 @@ CSS only (no JavaScript).
 
 The HTML is trusted (it ships inside your distribution). It is injected verbatim, so
 only put content you control in it.
+
+### `links` (object[])
+
+Adds external links to the sidebar **and** the home launcher — e.g. a Discord
+invite or a wiki. Each entry:
+
+| Field   | Required | Meaning                                                        |
+| ------- | -------- | -------------------------------------------------------------- |
+| `label` | yes      | Sidebar/launcher text, e.g. `"Discord"`.                       |
+| `href`  | yes      | URL opened in the system browser. Must be `http(s)` / `mailto` / `tel`. |
+| `icon`  | no       | Icon name from the list below; unknown or omitted uses a generic link icon. |
+| `group` | no       | Sidebar group heading. Links sharing a `group` merge into one section; omitting it uses a default **Links** group. These groups sit below the built-in navigation. |
+
+```json
+{
+  "version": 1,
+  "links": [
+    { "label": "Discord", "href": "https://discord.gg/xxxx", "icon": "discord" },
+    { "label": "Wiki", "href": "https://wiki.example", "icon": "docs", "group": "Community" },
+    { "label": "Donate", "href": "https://example.com/donate", "icon": "heart", "group": "Community" }
+  ]
+}
+```
+
+Malformed entries (missing `label` / `href`, or an href scheme the browser opener
+won't open) are skipped; the rest still load.
+
+**Icon names:** `discord`, `forum` / `forums`, `chat` / `message`,
+`globe` / `website` / `web`, `docs` / `book` / `wiki`, `news` / `blog`,
+`rss` / `feed`, `heart` / `donate`, `support` / `help`, `users` / `community`,
+`mail` / `email` / `contact`, `link`, `game` / `play`, `calendar` / `events`,
+`star`, `info`, `hash` / `channel`, `bell` / `updates`, `trophy`. Anything else
+falls back to a generic external-link icon. (lucide ships no brand marks, so
+`discord` uses a generic chat glyph.)
 
 ### `splash` (object)
 
