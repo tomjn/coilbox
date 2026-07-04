@@ -199,6 +199,51 @@ CSS only (no JavaScript).
 The HTML is trusted (it ships inside your distribution). It is injected verbatim, so
 only put content you control in it.
 
+### `splash` (object)
+
+Shows a brand splash over the whole window at startup: a centered image that fades in
+on a solid background, holds, then fades out. Plays on every launch; the user can turn
+it off (Settings > General > Display > "Startup splash") and can dismiss it early by
+clicking it or pressing Escape.
+
+```json
+{
+  "version": 1,
+  "splash": {
+    "image": "logo.webp",
+    "background": "hsl(240 6% 7%)",
+    "duration": 3000
+  }
+}
+```
+
+- `image` — the centered image. Either a path **relative to the `.coilbox/` folder**
+  (read locally, so it works offline — put e.g. `logo.webp` next to `profile.json`),
+  or an inline `data:` / `https:` URL used as-is. Paths can't escape `.coilbox/`
+  (no `..` or absolute paths).
+- `background` (optional) — solid backdrop CSS colour. Defaults to the profile's
+  top-level [`background`](#background-string) if set, else the theme background.
+- `duration` (optional) — total time in ms (fade in + hold + fade out). Defaults to
+  `3000`.
+
+Honours `prefers-reduced-motion` (skips the fades). If the image can't be loaded the
+splash is silently skipped — it never blocks startup.
+
+### `background` (string)
+
+A solid CSS colour painted behind everything from the first frame until the app has
+rendered. A dark distribution otherwise briefly flashes the default white page while
+it loads; setting this paints your colour instead. It's also the splash's default
+backdrop, so one colour covers the boot screen and the splash seamlessly.
+
+```json
+{ "version": 1, "mode": "dark", "background": "hsl(240 6% 7%)" }
+```
+
+The colour is cached so it applies before the first paint on subsequent launches (the
+very first launch of a fresh install still shows one brief flash). A vanilla install
+(no profile) is unaffected.
+
 ### `theme` (object)
 
 Fine-grained override of Coilbox's colour tokens app-wide, for anything the named
