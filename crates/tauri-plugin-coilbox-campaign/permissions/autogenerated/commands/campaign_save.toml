@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-campaign-save"
+description = "Enables the campaign_save command without any pre-configured scope."
+commands.allow = ["campaign_save"]
+
+[[permission]]
+identifier = "deny-campaign-save"
+description = "Denies the campaign_save command without any pre-configured scope."
+commands.deny = ["campaign_save"]

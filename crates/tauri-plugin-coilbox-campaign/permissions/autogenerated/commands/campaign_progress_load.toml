@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-campaign-progress-load"
+description = "Enables the campaign_progress_load command without any pre-configured scope."
+commands.allow = ["campaign_progress_load"]
+
+[[permission]]
+identifier = "deny-campaign-progress-load"
+description = "Denies the campaign_progress_load command without any pre-configured scope."
+commands.deny = ["campaign_progress_load"]

@@ -1,0 +1,17 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows the campaign plugin's storage, image import/read and progress commands."
+permissions = [
+  "allow-campaign-list",
+  "allow-campaign-save",
+  "allow-campaign-delete",
+  "allow-campaign-image-import",
+  "allow-campaign-image-import-data",
+  "allow-campaign-image-read",
+  "allow-campaign-image-delete",
+  "allow-campaign-export",
+  "allow-campaign-import",
+  "allow-campaign-progress-load",
+  "allow-campaign-progress-save",
+]

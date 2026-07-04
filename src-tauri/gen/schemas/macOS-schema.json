@@ -375,6 +375,144 @@
           "markdownDescription": "Denies the anim_cob_disasm command without any pre-configured scope."
         },
         {
+          "description": "Allows the campaign plugin's storage, image import/read and progress commands.\n#### This default permission set includes:\n\n- `allow-campaign-list`\n- `allow-campaign-save`\n- `allow-campaign-delete`\n- `allow-campaign-image-import`\n- `allow-campaign-image-import-data`\n- `allow-campaign-image-read`\n- `allow-campaign-image-delete`\n- `allow-campaign-export`\n- `allow-campaign-import`\n- `allow-campaign-progress-load`\n- `allow-campaign-progress-save`",
+          "type": "string",
+          "const": "coilbox-campaign:default",
+          "markdownDescription": "Allows the campaign plugin's storage, image import/read and progress commands.\n#### This default permission set includes:\n\n- `allow-campaign-list`\n- `allow-campaign-save`\n- `allow-campaign-delete`\n- `allow-campaign-image-import`\n- `allow-campaign-image-import-data`\n- `allow-campaign-image-read`\n- `allow-campaign-image-delete`\n- `allow-campaign-export`\n- `allow-campaign-import`\n- `allow-campaign-progress-load`\n- `allow-campaign-progress-save`"
+        },
+        {
+          "description": "Enables the campaign_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:allow-campaign-delete",
+          "markdownDescription": "Enables the campaign_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the campaign_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:allow-campaign-export",
+          "markdownDescription": "Enables the campaign_export command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the campaign_image_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:allow-campaign-image-delete",
+          "markdownDescription": "Enables the campaign_image_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the campaign_image_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:allow-campaign-image-import",
+          "markdownDescription": "Enables the campaign_image_import command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the campaign_image_import_data command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:allow-campaign-image-import-data",
+          "markdownDescription": "Enables the campaign_image_import_data command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the campaign_image_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:allow-campaign-image-read",
+          "markdownDescription": "Enables the campaign_image_read command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the campaign_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:allow-campaign-import",
+          "markdownDescription": "Enables the campaign_import command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the campaign_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:allow-campaign-list",
+          "markdownDescription": "Enables the campaign_list command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the campaign_progress_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:allow-campaign-progress-load",
+          "markdownDescription": "Enables the campaign_progress_load command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the campaign_progress_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:allow-campaign-progress-save",
+          "markdownDescription": "Enables the campaign_progress_save command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the campaign_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:allow-campaign-save",
+          "markdownDescription": "Enables the campaign_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:deny-campaign-delete",
+          "markdownDescription": "Denies the campaign_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:deny-campaign-export",
+          "markdownDescription": "Denies the campaign_export command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_image_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:deny-campaign-image-delete",
+          "markdownDescription": "Denies the campaign_image_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_image_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:deny-campaign-image-import",
+          "markdownDescription": "Denies the campaign_image_import command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_image_import_data command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:deny-campaign-image-import-data",
+          "markdownDescription": "Denies the campaign_image_import_data command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_image_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:deny-campaign-image-read",
+          "markdownDescription": "Denies the campaign_image_read command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:deny-campaign-import",
+          "markdownDescription": "Denies the campaign_import command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:deny-campaign-list",
+          "markdownDescription": "Denies the campaign_list command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_progress_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:deny-campaign-progress-load",
+          "markdownDescription": "Denies the campaign_progress_load command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_progress_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:deny-campaign-progress-save",
+          "markdownDescription": "Denies the campaign_progress_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-campaign:deny-campaign-save",
+          "markdownDescription": "Denies the campaign_save command without any pre-configured scope."
+        },
+        {
           "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`",
           "type": "string",
           "const": "coilbox-content:default",
