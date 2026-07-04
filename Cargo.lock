@@ -568,6 +568,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-coilbox-anim",
+ "tauri-plugin-coilbox-campaign",
  "tauri-plugin-coilbox-content",
  "tauri-plugin-coilbox-downloads",
  "tauri-plugin-coilbox-lobby-servers",
@@ -4640,6 +4641,21 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-coilbox-campaign"
+version = "0.0.0"
+dependencies = [
+ "coilbox-portable",
+ "image 0.25.10",
+ "picoframe-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tempfile",
+ "uuid",
 ]
 
 [[package]]

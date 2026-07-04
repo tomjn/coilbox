@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-campaign-image-read"
+description = "Enables the campaign_image_read command without any pre-configured scope."
+commands.allow = ["campaign_image_read"]
+
+[[permission]]
+identifier = "deny-campaign-image-read"
+description = "Denies the campaign_image_read command without any pre-configured scope."
+commands.deny = ["campaign_image_read"]

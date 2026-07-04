@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-campaign-delete"
+description = "Enables the campaign_delete command without any pre-configured scope."
+commands.allow = ["campaign_delete"]
+
+[[permission]]
+identifier = "deny-campaign-delete"
+description = "Denies the campaign_delete command without any pre-configured scope."
+commands.deny = ["campaign_delete"]

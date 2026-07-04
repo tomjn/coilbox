@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-campaign-export"
+description = "Enables the campaign_export command without any pre-configured scope."
+commands.allow = ["campaign_export"]
+
+[[permission]]
+identifier = "deny-campaign-export"
+description = "Denies the campaign_export command without any pre-configured scope."
+commands.deny = ["campaign_export"]

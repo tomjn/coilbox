@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "campaign",
+  "description": "Grants the campaign plugin's storage, image import/read and progress commands to the main window, plus the open/save dialogs used to import and export campaigns and panorama images.",
+  "windows": ["main"],
+  "permissions": [
+    "coilbox-campaign:default",
+    "dialog:allow-open",
+    "dialog:allow-save"
+  ]
+}
