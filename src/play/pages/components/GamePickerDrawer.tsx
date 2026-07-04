@@ -6,6 +6,7 @@ import type { GameItem } from "@/content/bindings";
 import { useBrandingEntry, useBrandingImage } from "@/content/branding";
 import { isSdd } from "@/content/format";
 import { GameCardShell } from "@/content/pages/components/GameCardShell";
+import { getGameMatcher } from "@/profile/profile";
 
 /** Unique id for a game: its name plus its own primary archive (matches GamesPage). */
 const gameId = (g: GameItem) => `${g.primaryArchive.name}:${g.name}`;
@@ -73,15 +74,21 @@ export function GamePickerDrawer({
   onSelect: (name: string) => void;
 }) {
   const [query, setQuery] = useState("");
+  // A distribution profile can preset a game filter; when set, the picker only ever
+  // offers that game (matched on name). No profile => every installed game.
+  const scoped = useMemo(() => {
+    const match = getGameMatcher();
+    return match ? games.filter((g) => match(g.name)) : games;
+  }, [games]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return games;
-    return games.filter(
+    if (!q) return scoped;
+    return scoped.filter(
       (g) =>
         g.name.toLowerCase().includes(q) ||
         g.primaryArchive.name.toLowerCase().includes(q),
     );
-  }, [games, query]);
+  }, [scoped, query]);
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -105,7 +112,7 @@ export function GamePickerDrawer({
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={`Search ${games.length} games…`}
+                placeholder={`Search ${scoped.length} games…`}
                 className="pl-9"
               />
             </div>

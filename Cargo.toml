@@ -13,6 +13,7 @@ members = [
   "crates/tauri-plugin-coilbox-anim",
   "crates/tauri-plugin-coilbox-content",
   "crates/tauri-plugin-coilbox-play",
+  "crates/tauri-plugin-coilbox-profile",
   "crates/tauri-plugin-coilbox-lobby-servers",
   "crates/tauri-plugin-coilbox-multiplayer",
 ]

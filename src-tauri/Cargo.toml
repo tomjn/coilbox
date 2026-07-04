@@ -18,6 +18,7 @@ tauri-plugin-coilbox-anim = { path = "../crates/tauri-plugin-coilbox-anim" }
 tauri-plugin-coilbox-content = { path = "../crates/tauri-plugin-coilbox-content" }
 tauri-plugin-coilbox-unitsync = { path = "../crates/tauri-plugin-coilbox-unitsync" }
 tauri-plugin-coilbox-play = { path = "../crates/tauri-plugin-coilbox-play" }
+tauri-plugin-coilbox-profile = { path = "../crates/tauri-plugin-coilbox-profile" }
 tauri-plugin-coilbox-lobby-servers = { path = "../crates/tauri-plugin-coilbox-lobby-servers" }
 tauri-plugin-coilbox-multiplayer = { path = "../crates/tauri-plugin-coilbox-multiplayer" }
 tauri-plugin-dialog = "2"

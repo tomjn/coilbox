@@ -2,6 +2,7 @@ import { Button, NavGate } from "@picoframe/frame";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useScanTargetSelection } from "../../content/config";
+import { getGameMatcher } from "../../profile/profile";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
 import { BattleList } from "../battles/BattleList";
 import {
@@ -50,7 +51,18 @@ function BattlesPage() {
     () => Object.values(mirror.state?.battles ?? {}),
     [mirror.state?.battles],
   );
-  const shown = useMemo(() => filterSortBattles(all, filters), [all, filters]);
+  // A distribution profile can preset a game filter; when set, the battle list is
+  // hard-scoped to that game (matched on modname) — the bundled build only ever
+  // shows its own game's battles. No profile => no scoping.
+  const gameMatch = useMemo(() => getGameMatcher(), []);
+  const scoped = useMemo(
+    () => (gameMatch ? all.filter((b) => gameMatch(b.modname)) : all),
+    [all, gameMatch],
+  );
+  const shown = useMemo(
+    () => filterSortBattles(scoped, filters),
+    [scoped, filters],
+  );
 
   // Selected engine + content root for rendering local minimaps in the rows.
   const { selected } = useScanTargetSelection();
@@ -136,9 +148,9 @@ function BattlesPage() {
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold">Battles</h1>
           <span className="text-sm text-muted-foreground">
-            {shown.length === all.length
-              ? `(${all.length})`
-              : `(${shown.length} of ${all.length})`}
+            {shown.length === scoped.length
+              ? `(${scoped.length})`
+              : `(${shown.length} of ${scoped.length})`}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -158,7 +170,7 @@ function BattlesPage() {
 
       <BattleList
         battles={shown}
-        totalCount={all.length}
+        totalCount={scoped.length}
         joinedBattle={joinedBattle}
         joinedId={joinedId}
         inProgressIds={inProgressIds}

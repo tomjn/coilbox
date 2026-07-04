@@ -1,0 +1,19 @@
+[package]
+name = "tauri-plugin-coilbox-profile"
+version = "0.0.0"
+description = "Distribution-profile loader for Coilbox (Rust half): reads a bundler-supplied .coilbox/profile.json. ACL identifier: coilbox-profile"
+edition = "2021"
+license = "MIT"
+# Tauri requires `links` to equal `package.name`. The ACL identifier is this name
+# with the `tauri-plugin-` prefix stripped -> `coilbox-profile`.
+links = "tauri-plugin-coilbox-profile"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+picoframe-core = "0.0.2"
+coilbox-portable = { path = "../coilbox-portable" }

@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import ContentStartupProvider from "./ContentStartupProvider";
 import EngineSettingsSection from "./pages/EngineSettingsSection";
 import EnginesSection from "./pages/EnginesSection";
@@ -55,6 +56,8 @@ const contentPlugin: FramePlugin = {
           to: "/content/games",
           order: 1,
           icon: Gamepad2,
+          // A single-game distribution can hide the multi-game browser.
+          useVisible: () => !isProfileHidden("content.games"),
         },
         {
           // Archive explorer is a modding tool — gated behind advanced mode,
@@ -89,12 +92,18 @@ const contentPlugin: FramePlugin = {
     },
     {
       path: "content/games",
-      lazy: () => import("./pages/GamesPage"),
+      lazy: gateProfileHidden(
+        "content.games",
+        () => import("./pages/GamesPage"),
+      ),
       crumb: "Games",
     },
     {
       path: "content/games/:name",
-      lazy: () => import("./pages/GameDetailPage"),
+      lazy: gateProfileHidden(
+        "content.games",
+        () => import("./pages/GameDetailPage"),
+      ),
       crumb: (c) => c.params.name ?? "Game",
     },
     {

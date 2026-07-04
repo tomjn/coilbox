@@ -18,8 +18,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@picoframe/frame": "^0.0.15",
-    "@picoframe/plugin-sdk": "^0.0.6",
+    "@picoframe/frame": "^0.0.17",
+    "@picoframe/plugin-sdk": "^0.0.7",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2.5.0",

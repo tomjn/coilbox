@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-profile-load"
+description = "Enables the profile_load command without any pre-configured scope."
+commands.allow = ["profile_load"]
+
+[[permission]]
+identifier = "deny-profile-load"
+description = "Denies the profile_load command without any pre-configured scope."
+commands.deny = ["profile_load"]
