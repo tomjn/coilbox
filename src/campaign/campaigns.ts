@@ -15,59 +15,114 @@ export interface LoadedCampaign {
 /**
  * Session cache of the parsed campaign list, so navigating back to the Campaigns
  * page shows results instantly instead of re-reading and re-parsing every
- * document. Mirrors the module-cache pattern the content hooks use; a `refresh`
- * bypasses it.
+ * document. Mirrors the module-cache pattern the content hooks use.
+ *
+ * The set of listeners lets a mutation in one consumer (the builder saving a
+ * campaign) push the fresh list to *every* mounted {@link useCampaigns} — most
+ * importantly the sidebar nav's visibility gate, which must reveal/hide the
+ * Campaigns item the instant the first/last campaign is saved or deleted, with no
+ * app restart. This mirrors the epoch-listener invalidation in `content/config.ts`.
  */
 let cache: LoadedCampaign[] | null = null;
+const listeners = new Set<(loaded: LoadedCampaign[]) => void>();
+
+/** Read + parse every stored campaign document, skipping invalid ones. */
+async function fetchCampaigns(): Promise<LoadedCampaign[]> {
+  const { items } = await campaignList({});
+  const loaded: LoadedCampaign[] = [];
+  for (const item of items) {
+    const campaign = parseCampaignJson(item.json);
+    if (campaign) {
+      loaded.push({ campaign, source: item.source });
+    } else {
+      console.warn("skipping invalid campaign document", item.source);
+    }
+  }
+  return loaded;
+}
 
 /**
- * Load every stored campaign. Reads the raw documents from the plugin, parses each
- * with {@link parseCampaignJson}, and skips (with a console warning) any that fail
- * validation so one malformed bundled/imported campaign can't break the list.
+ * Re-read the campaign list from disk, refresh the shared session cache, and push
+ * the result to every mounted {@link useCampaigns}. Call after a builder
+ * save/delete/import so a newly-added (or removed) campaign updates the sidebar nav
+ * — whose visibility is gated on the campaign count — without an app restart.
+ */
+export async function refreshCampaigns(): Promise<LoadedCampaign[]> {
+  const loaded = await fetchCampaigns();
+  cache = loaded;
+  for (const l of listeners) l(loaded);
+  return loaded;
+}
+
+/**
+ * Load every stored campaign. Serves the session cache on mount, else reads and
+ * parses each document (skipping — with a console warning — any that fail
+ * validation, so one malformed bundled/imported campaign can't break the list).
+ * Subscribes to {@link refreshCampaigns} so a mutation elsewhere updates this
+ * consumer in lockstep.
  */
 export function useCampaigns() {
   const [campaigns, setCampaigns] = useState<LoadedCampaign[]>(cache ?? []);
   const [loading, setLoading] = useState(cache === null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (force: boolean) => {
-    if (!force && cache) {
+  // Stay in lockstep with refreshes triggered by any other consumer.
+  useEffect(() => {
+    const listener = (loaded: LoadedCampaign[]) => setCampaigns(loaded);
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
+
+  // First mount: serve the cache, else fetch once.
+  useEffect(() => {
+    if (cache) {
       setCampaigns(cache);
       setLoading(false);
       return;
     }
+    let cancelled = false;
     setLoading(true);
+    fetchCampaigns()
+      .then((loaded) => {
+        cache = loaded;
+        if (!cancelled) {
+          setCampaigns(loaded);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const refresh = useCallback(async () => {
     setError(null);
     try {
-      const { items } = await campaignList({});
-      const loaded: LoadedCampaign[] = [];
-      for (const item of items) {
-        const campaign = parseCampaignJson(item.json);
-        if (campaign) {
-          loaded.push({ campaign, source: item.source });
-        } else {
-          console.warn("skipping invalid campaign document", item.source);
-        }
-      }
-      cache = loaded;
-      setCampaigns(loaded);
+      await refreshCampaigns();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
     }
   }, []);
 
-  const refresh = useCallback(() => {
-    cache = null;
-    return load(true);
-  }, [load]);
-
-  useEffect(() => {
-    load(false);
-  }, [load]);
-
   return { campaigns, loading, error, refresh };
+}
+
+/**
+ * Nav visibility gate for the player-facing Campaigns item: true once at least one
+ * campaign (local or bundled) exists. Hidden while the first load is still in
+ * flight, so the item doesn't flash in and then out.
+ */
+export function useHasCampaigns(): boolean {
+  const { campaigns, loading } = useCampaigns();
+  return !loading && campaigns.length > 0;
 }
 
 /** The empty progress document, matching the plugin's default. */
