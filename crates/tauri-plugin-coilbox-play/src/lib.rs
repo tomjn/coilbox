@@ -7,6 +7,7 @@
 //! this plugin adds is a byte-correct start script and a reliable "game finished"
 //! signal — the `play_launch` command simply resolves when the process exits.
 
+mod focus;
 mod launch;
 mod script;
 
@@ -224,6 +225,19 @@ async fn play_cancel(reg: State<'_, RunRegistry>, run_id: String) -> Result<CliR
     })
 }
 
+/// `play_focus` — bring the running game's window back to the foreground (the user
+/// alt-tabbed to Coilbox mid-game). Maps the run id to the live child's PID so the
+/// PID never crosses the IPC boundary. Best-effort: returns `focused: false` when
+/// no window could be raised (e.g. Wayland, or the process has no window yet).
+#[tauri::command]
+async fn play_focus(reg: State<'_, RunRegistry>, run_id: String) -> Result<CliResult, ()> {
+    let pid = reg.lock().unwrap().get(&run_id).map(|c| c.id());
+    Ok(match pid {
+        Some(pid) => CliResult::ok(json!({ "focused": focus::focus_pid(pid) })),
+        None => CliResult::err("no running game with that id"),
+    })
+}
+
 /// Build the plugin. Registered as `"coilbox-play"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-play|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -236,7 +250,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             play_generate_script,
             play_launch,
             play_launch_replay,
-            play_cancel
+            play_cancel,
+            play_focus
         ])
         .build()
 }
