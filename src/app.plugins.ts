@@ -8,6 +8,7 @@ import lobbyServersPlugin from "./lobby-servers";
 import mapconvPlugin from "./mapconv";
 import multiplayerPlugin from "./multiplayer";
 import playPlugin from "./play";
+import profilePlugin from "./profile";
 import uberstressPlugin from "./uberstress";
 import updaterPlugin from "./updater";
 // picoframe:imports-end
@@ -26,5 +27,6 @@ export const plugins: FramePlugin[] = [
   multiplayerPlugin,
   // picoframe:plugins-end
   generalPlugin,
+  profilePlugin,
   updaterPlugin,
 ];

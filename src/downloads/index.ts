@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Download, Gamepad2, Map as MapIcon, Package } from "lucide-react";
+import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import DownloadsSettings from "./pages/SettingsSection";
 
 /**
@@ -29,6 +30,7 @@ const downloadsPlugin: FramePlugin = {
           end: true,
           order: 0,
           icon: Package,
+          useVisible: () => !isProfileHidden("downloads.browse"),
         },
         {
           id: "downloads.maps",
@@ -43,6 +45,8 @@ const downloadsPlugin: FramePlugin = {
           to: "/downloads/games",
           order: 2,
           icon: Gamepad2,
+          // A distribution bundled with a single game can hide game downloads.
+          useVisible: () => !isProfileHidden("downloads.games"),
         },
       ],
     },
@@ -50,7 +54,10 @@ const downloadsPlugin: FramePlugin = {
   routes: [
     {
       path: "downloads",
-      lazy: () => import("./pages/ExplorerPage"),
+      lazy: gateProfileHidden(
+        "downloads.browse",
+        () => import("./pages/ExplorerPage"),
+      ),
       crumb: "Browse Rapid",
     },
     {
@@ -60,7 +67,10 @@ const downloadsPlugin: FramePlugin = {
     },
     {
       path: "downloads/games",
-      lazy: () => import("./pages/GamesPage"),
+      lazy: gateProfileHidden(
+        "downloads.games",
+        () => import("./pages/GamesPage"),
+      ),
       crumb: "Games",
     },
   ],
