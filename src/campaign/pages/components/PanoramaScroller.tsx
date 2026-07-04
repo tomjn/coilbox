@@ -20,14 +20,22 @@ export function PanoramaScroller({
   campaignId,
   panorama,
   className,
+  fill = false,
 }: {
   campaignId: string;
   panorama: PanoramaRef;
   className?: string;
+  /**
+   * Stretch the track to fill its container (`h-full`) instead of the default
+   * fixed 112px band. Used by the mission briefing, where the panorama is the
+   * full-bleed page background; the builder preview keeps the compact band.
+   */
+  fill?: boolean;
 }) {
   const src = useCampaignPanorama(campaignId, panorama);
   const trackRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  const height = fill ? "h-full" : "h-28";
 
   // One image-width of travel takes (naturalWidth / speed) seconds, so wider art
   // scrolls for longer at the same px/s. Set as a CSS var the keyframes read.
@@ -41,7 +49,7 @@ export function PanoramaScroller({
   if (!src) {
     return (
       <div
-        className={cn("h-28 animate-pulse rounded-md bg-muted", className)}
+        className={cn("animate-pulse rounded-md bg-muted", height, className)}
       />
     );
   }
@@ -50,7 +58,7 @@ export function PanoramaScroller({
     <div className={cn("overflow-hidden rounded-md bg-muted", className)}>
       <div
         ref={trackRef}
-        className={cn("flex h-28 w-max", ready && "campaign-panorama-track")}
+        className={cn("flex w-max", height, ready && "campaign-panorama-track")}
       >
         <img
           src={src}

@@ -15,8 +15,9 @@ import {
   playLaunchReplay,
 } from "./bindings";
 
-/** Which kind of run is live, for labelling. */
-export type RunKind = "skirmish" | "battle" | "replay";
+/** Which kind of run is live, for labelling. A campaign mission launches through
+ * the same skirmish path — the label only distinguishes it for the UI. */
+export type RunKind = "skirmish" | "battle" | "replay" | "campaign";
 
 interface LaunchOpts {
   config: BattleConfig;
@@ -36,9 +37,9 @@ interface PlayContextValue {
   /** Run id of the live game, for `focusGame`. Null when idle. */
   activeRunId: string | null;
   kind: RunKind | null;
-  /** Launch a skirmish or battle; resolves when the engine exits. */
+  /** Launch a skirmish, battle or campaign mission; resolves when the engine exits. */
   launch: (
-    kind: "skirmish" | "battle",
+    kind: "skirmish" | "battle" | "campaign",
     opts: LaunchOpts,
   ) => Promise<{ exitCode: number | null }>;
   /** Launch a replay; resolves when the engine exits. */
@@ -95,7 +96,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
   );
 
   const launch = useCallback(
-    (runKind: "skirmish" | "battle", opts: LaunchOpts) =>
+    (runKind: "skirmish" | "battle" | "campaign", opts: LaunchOpts) =>
       start(runKind, (runId, onEvent) =>
         playLaunch({ ...opts, runId, onEvent }),
       ),
