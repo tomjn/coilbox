@@ -128,7 +128,7 @@ export const playCancel = defineCommand<
  * live engine process on the Rust side. Best-effort — resolves `focused:false`
  * when no window could be raised (e.g. Wayland).
  */
-export const playFocus = defineCommand<
-  { runId: string },
-  { focused: boolean }
->("coilbox-play", "play_focus");
+export const playFocus = defineCommand<{ runId: string }, { focused: boolean }>(
+  "coilbox-play",
+  "play_focus",
+);
