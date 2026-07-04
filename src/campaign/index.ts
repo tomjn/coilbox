@@ -1,7 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Hammer, Milestone } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
-import { useHasCampaigns } from "./campaigns";
+import { getCachedCampaign, useHasCampaigns } from "./campaigns";
 
 /**
  * The Campaigns plugin's frontend half — a player-facing Campaigns list plus an
@@ -58,14 +58,27 @@ const campaignPlugin: FramePlugin = {
       crumb: "Campaigns",
     },
     {
+      // Crumbs resolve the campaign/mission *titles* from the session cache; the
+      // route params are opaque UUIDs. A cache miss (deep link before the list has
+      // loaded) falls back to a generic label.
       path: "campaign/:id",
       lazy: () => import("./pages/CampaignDetailPage"),
-      crumb: "Campaign",
+      crumb: (c) =>
+        (c.params.id && getCachedCampaign(c.params.id)?.campaign.title) ||
+        "Campaign",
     },
     {
-      path: "campaign/:id/briefing/:missionId",
+      // No literal segment between the ids, so the breadcrumb trail is
+      // Campaigns / <campaign> / <mission> with no phantom intermediate crumb.
+      path: "campaign/:id/:missionId",
       lazy: () => import("./pages/MissionBriefingPage"),
-      crumb: "Briefing",
+      crumb: (c) => {
+        const loaded = c.params.id ? getCachedCampaign(c.params.id) : undefined;
+        const mission = loaded?.campaign.missions.find(
+          (m) => m.id === c.params.missionId,
+        );
+        return mission?.title || "Mission";
+      },
     },
     {
       path: "campaign-builder",

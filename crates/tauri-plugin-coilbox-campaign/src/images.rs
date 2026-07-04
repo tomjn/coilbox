@@ -1,17 +1,71 @@
-//! Panorama image handling: decode arbitrary raster input, bound its size, and
-//! re-encode as a compact JPEG. Both import paths (a file the user picked, and an
-//! embedded base64 `data:` URI from an imported campaign) funnel through
-//! [`reencode_panorama`] so nothing hostile can write unbounded data to disk.
+//! Campaign image handling: decode arbitrary raster input, bound its size, and
+//! re-encode compactly. Both import paths (a file the user picked, and an embedded
+//! base64 `data:` URI from an imported campaign) funnel through [`reencode_image`]
+//! so nothing hostile can write unbounded data to disk.
+//!
+//! Photographic art (panorama backdrops, campaign backgrounds) re-encodes to opaque
+//! JPEG; icons and mission side graphics keep their alpha as PNG so a logo/emblem
+//! isn't flattened onto black. [`ImageKind`] selects the bound and encoder.
 //!
 //! The base64 helpers are hand-rolled (mirroring the content plugin's `branding`
 //! module) so we don't pull a crate just to build/parse `data:` URLs.
 
-/// Downscale bound + JPEG quality for imported panorama art. Wide-and-short bound
-/// because briefing panoramas are ultra-wide strips; aspect ratio is always
-/// preserved and images are never upscaled.
-const PANO_MAX_W: u32 = 8192;
-const PANO_MAX_H: u32 = 1440;
-const PANO_JPEG_QUALITY: u8 = 80;
+use image::ImageEncoder;
+
+/// The role an imported image plays, which sets its size bound and encoding.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum ImageKind {
+    /// Ultra-wide briefing backdrop; opaque JPEG.
+    Panorama,
+    /// Campaign detail background; opaque JPEG.
+    Background,
+    /// Campaign list emblem; alpha-preserving PNG.
+    Icon,
+    /// Graphic beside a mission briefing; alpha-preserving PNG.
+    SideGraphic,
+}
+
+/// JPEG quality for the opaque (photographic) kinds.
+const JPEG_QUALITY: u8 = 82;
+
+impl ImageKind {
+    /// Parse the frontend's kind tag. An unknown or absent tag falls back to
+    /// `Panorama` — the original single-kind behaviour, so older callers that send
+    /// no kind are unaffected.
+    pub(crate) fn parse(tag: Option<&str>) -> Self {
+        match tag {
+            Some("background") => Self::Background,
+            Some("icon") => Self::Icon,
+            Some("sideGraphic") => Self::SideGraphic,
+            _ => Self::Panorama,
+        }
+    }
+
+    /// Max (width, height) the image is downscaled to fit (aspect-preserving, never
+    /// upscaled). Panorama is wide-and-short because briefings are ultra-wide strips.
+    fn bounds(self) -> (u32, u32) {
+        match self {
+            Self::Panorama => (8192, 1440),
+            Self::Background => (2560, 1440),
+            Self::Icon => (512, 512),
+            Self::SideGraphic => (1024, 1024),
+        }
+    }
+
+    /// Whether to keep alpha (PNG) rather than flatten to opaque JPEG.
+    fn keeps_alpha(self) -> bool {
+        matches!(self, Self::Icon | Self::SideGraphic)
+    }
+
+    /// The stored file extension, matching the encoder `keeps_alpha` selects.
+    pub(crate) fn ext(self) -> &'static str {
+        if self.keeps_alpha() {
+            "png"
+        } else {
+            "jpg"
+        }
+    }
+}
 
 /// Standard base64 (RFC 4648, with padding).
 pub(crate) fn base64_encode(input: &[u8]) -> String {
@@ -84,27 +138,41 @@ pub(crate) fn data_uri_bytes(uri: &str) -> Option<Vec<u8>> {
     base64_decode(&payload[1..])
 }
 
-/// Decode arbitrary raster bytes, downscale to fit `PANO_MAX_W`x`PANO_MAX_H`
-/// (aspect-preserving, never upscaled), drop alpha, and re-encode as a JPEG.
-/// Returns `None` if the bytes aren't a decodable raster.
-pub(crate) fn reencode_panorama(bytes: &[u8]) -> Option<Vec<u8>> {
+/// Decode arbitrary raster bytes, downscale to fit the kind's bound
+/// (aspect-preserving, never upscaled), and re-encode: opaque JPEG for the
+/// photographic kinds, alpha-preserving PNG for icons/side graphics. Returns
+/// `None` if the bytes aren't a decodable raster.
+pub(crate) fn reencode_image(bytes: &[u8], kind: ImageKind) -> Option<Vec<u8>> {
+    let (max_w, max_h) = kind.bounds();
     let img = image::load_from_memory(bytes).ok()?;
-    let img = if img.width() > PANO_MAX_W || img.height() > PANO_MAX_H {
-        img.thumbnail(PANO_MAX_W, PANO_MAX_H)
+    let img = if img.width() > max_w || img.height() > max_h {
+        img.thumbnail(max_w, max_h)
     } else {
         img
     };
-    let rgb = img.to_rgb8();
-    let mut jpeg = Vec::new();
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, PANO_JPEG_QUALITY)
-        .encode(
-            rgb.as_raw(),
-            rgb.width(),
-            rgb.height(),
-            image::ExtendedColorType::Rgb8,
-        )
-        .ok()?;
-    Some(jpeg)
+    let mut out = Vec::new();
+    if kind.keeps_alpha() {
+        let rgba = img.to_rgba8();
+        image::codecs::png::PngEncoder::new(&mut out)
+            .write_image(
+                rgba.as_raw(),
+                rgba.width(),
+                rgba.height(),
+                image::ExtendedColorType::Rgba8,
+            )
+            .ok()?;
+    } else {
+        let rgb = img.to_rgb8();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY)
+            .encode(
+                rgb.as_raw(),
+                rgb.width(),
+                rgb.height(),
+                image::ExtendedColorType::Rgb8,
+            )
+            .ok()?;
+    }
+    Some(out)
 }
 
 #[cfg(test)]
@@ -155,30 +223,63 @@ mod tests {
 
     #[test]
     fn reencode_downsamples_oversized_and_emits_jpeg() {
-        // An ultra-wide source that exceeds the width bound.
-        let jpeg = reencode_panorama(&png_bytes(10000, 1000)).unwrap();
+        // An ultra-wide source that exceeds the panorama width bound (8192).
+        let jpeg = reencode_image(&png_bytes(10000, 1000), ImageKind::Panorama).unwrap();
         let out = image::load_from_memory(&jpeg).unwrap();
-        assert!(out.width() <= PANO_MAX_W && out.height() <= PANO_MAX_H);
-        assert_eq!(out.width(), PANO_MAX_W); // 10:1 source hits the width bound
+        assert!(out.width() <= 8192 && out.height() <= 1440);
+        assert_eq!(out.width(), 8192); // 10:1 source hits the width bound
     }
 
     #[test]
     fn reencode_bounds_tall_source_by_height() {
-        let jpeg = reencode_panorama(&png_bytes(2000, 4000)).unwrap();
+        let jpeg = reencode_image(&png_bytes(2000, 4000), ImageKind::Panorama).unwrap();
         let out = image::load_from_memory(&jpeg).unwrap();
-        assert!(out.width() <= PANO_MAX_W && out.height() <= PANO_MAX_H);
-        assert_eq!(out.height(), PANO_MAX_H); // tall source hits the height bound
+        assert!(out.width() <= 8192 && out.height() <= 1440);
+        assert_eq!(out.height(), 1440); // tall source hits the height bound
     }
 
     #[test]
     fn reencode_keeps_small_images_unscaled() {
-        let jpeg = reencode_panorama(&png_bytes(640, 200)).unwrap();
+        let jpeg = reencode_image(&png_bytes(640, 200), ImageKind::Panorama).unwrap();
         let out = image::load_from_memory(&jpeg).unwrap();
         assert_eq!((out.width(), out.height()), (640, 200));
     }
 
     #[test]
     fn reencode_rejects_undecodable_bytes() {
-        assert!(reencode_panorama(b"not an image").is_none());
+        assert!(reencode_image(b"not an image", ImageKind::Panorama).is_none());
+    }
+
+    #[test]
+    fn icon_kind_preserves_alpha_as_png_and_bounds_at_512() {
+        // A semi-transparent, oversized icon: must come back as RGBA PNG within 512.
+        let img = image::RgbaImage::from_pixel(1024, 1024, image::Rgba([10, 20, 30, 128]));
+        let mut src = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut src, image::ImageFormat::Png)
+            .unwrap();
+
+        let png = reencode_image(&src.into_inner(), ImageKind::Icon).unwrap();
+        let out = image::load_from_memory(&png).unwrap();
+        assert!(out.width() <= 512 && out.height() <= 512);
+        assert_eq!(out.color(), image::ColorType::Rgba8);
+        // The alpha survived the round-trip (a JPEG re-encode would have dropped it).
+        assert_eq!(out.to_rgba8().get_pixel(0, 0)[3], 128);
+    }
+
+    #[test]
+    fn kind_parse_and_ext_map_as_expected() {
+        assert_eq!(ImageKind::parse(None), ImageKind::Panorama);
+        assert_eq!(ImageKind::parse(Some("nonsense")), ImageKind::Panorama);
+        assert_eq!(ImageKind::parse(Some("background")), ImageKind::Background);
+        assert_eq!(ImageKind::parse(Some("icon")), ImageKind::Icon);
+        assert_eq!(
+            ImageKind::parse(Some("sideGraphic")),
+            ImageKind::SideGraphic
+        );
+        assert_eq!(ImageKind::Panorama.ext(), "jpg");
+        assert_eq!(ImageKind::Background.ext(), "jpg");
+        assert_eq!(ImageKind::Icon.ext(), "png");
+        assert_eq!(ImageKind::SideGraphic.ext(), "png");
     }
 }

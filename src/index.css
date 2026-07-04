@@ -20,24 +20,28 @@ body,
   }
 }
 
-/* Seamless mission-panorama scroll (see PanoramaScroller): the track holds two
-   copies of the art and translates one image-width (-50%), so the loop wraps with
-   no visible seam. Duration comes from a per-image custom property so the speed is
-   constant regardless of image width. */
-@keyframes campaign-panorama-scroll {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-.campaign-panorama-track {
+/* Seamless mission-panorama scroll (see PanoramaScroller): the art is tiled with
+   repeat-x so it always fills the element (no solid backdrop showing through for
+   narrow/tiling art), and the background scrolls by exactly one tile width per loop
+   for a seamless wrap. Tile width + duration come from per-element custom
+   properties so the speed is constant regardless of image size. */
+.campaign-panorama {
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+  background-position-x: 0;
   animation: campaign-panorama-scroll var(--panorama-duration, 20s) linear
     infinite;
 }
+@keyframes campaign-panorama-scroll {
+  from {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: calc(-1 * var(--panorama-tile, 0px));
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .campaign-panorama-track {
+  .campaign-panorama {
     animation: none;
   }
 }

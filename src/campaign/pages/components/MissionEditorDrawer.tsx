@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { campaignImageDelete, campaignImageImport } from "../../bindings";
 import type { CampaignMission } from "../../model";
+import { CampaignImage, CampaignImageField } from "./CampaignImage";
 import { PanoramaScroller } from "./PanoramaScroller";
 import { UnitRestrictions } from "./UnitRestrictions";
 
@@ -223,6 +224,25 @@ export function MissionEditorDrawer({
           )}
         </div>
       </div>
+
+      <CampaignImageField
+        campaignId={campaignId}
+        kind="sideGraphic"
+        value={mission.sideGraphic}
+        onChange={(sideGraphic) => patch({ sideGraphic })}
+        label="Side graphic"
+        help="Optional still image shown beside the briefing (e.g. a unit render or emblem). Transparency is kept."
+        preview={
+          <div className="rounded-md border border-border/50 bg-muted p-2">
+            <CampaignImage
+              campaignId={campaignId}
+              image={mission.sideGraphic}
+              alt=""
+              className="mx-auto max-h-40 object-contain"
+            />
+          </div>
+        }
+      />
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">Unit restrictions</span>

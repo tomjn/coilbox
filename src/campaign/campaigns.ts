@@ -116,6 +116,16 @@ export function useCampaigns() {
 }
 
 /**
+ * Synchronous read of a loaded campaign from the session cache, or `undefined` if
+ * the list hasn't loaded yet (or has no such id). For non-React callers that need a
+ * best-effort title now — chiefly the breadcrumb `crumb` resolvers, which run
+ * outside React and only have the route's id params to work with.
+ */
+export function getCachedCampaign(id: string): LoadedCampaign | undefined {
+  return cache?.find((l) => l.campaign.id === id);
+}
+
+/**
  * Nav visibility gate for the player-facing Campaigns item: true once at least one
  * campaign (local or bundled) exists. Hidden while the first load is still in
  * flight, so the item doesn't flash in and then out.

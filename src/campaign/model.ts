@@ -11,14 +11,18 @@ import type { SkirmishDraft } from "../play/drafts";
  */
 
 /**
- * How a mission's briefing panorama is referenced. Locally-authored campaigns hold
- * a `file` (a bare filename under the campaign's image folder, materialized by the
- * campaign plugin); an exported campaign inlines the image as a base64 `data` URI
- * so it travels in a single file.
+ * How a stored image is referenced. Locally-authored campaigns hold a `file` (a
+ * bare filename under the campaign's image folder, materialized by the campaign
+ * plugin); an exported campaign inlines the image as a base64 `data` URI so it
+ * travels in a single file. Used for every campaign image — panoramas, icons,
+ * backgrounds and mission side graphics.
  */
-export type PanoramaRef =
+export type ImageRef =
   | { kind: "file"; file: string }
   | { kind: "data"; dataUri: string };
+
+/** @deprecated Use {@link ImageRef}; kept so existing panorama imports still type. */
+export type PanoramaRef = ImageRef;
 
 export interface CampaignMission {
   /** UUID — a stable node id, so a future DAG progression can reference missions. */
@@ -28,7 +32,10 @@ export interface CampaignMission {
   subtitle?: string;
   briefing: string;
   objectives: string[];
-  panorama?: PanoramaRef;
+  /** Scrolling briefing backdrop. */
+  panorama?: ImageRef;
+  /** Optional still graphic shown beside the mission briefing card. */
+  sideGraphic?: ImageRef;
   /**
    * A full skirmish setup copied from a preset when the mission was attached. It is
    * a snapshot, never a live reference — editing the source preset never changes an
@@ -47,6 +54,10 @@ export interface Campaign {
   type: "ta";
   title: string;
   description: string;
+  /** Small emblem shown on the campaign in lists. */
+  icon?: ImageRef;
+  /** Still backdrop shown behind the campaign detail page. */
+  background?: ImageRef;
   /** Array order IS the linear play order. */
   missions: CampaignMission[];
   createdAt: string;
@@ -72,8 +83,8 @@ export interface CampaignExportFile {
   campaign: Campaign;
 }
 
-/** Narrow an unknown to a `PanoramaRef`, or drop it (returns undefined). */
-function parsePanorama(value: unknown): PanoramaRef | undefined {
+/** Narrow an unknown to an `ImageRef`, or drop it (returns undefined). */
+function parseImageRef(value: unknown): ImageRef | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const p = value as Record<string, unknown>;
   if (p.kind === "file" && typeof p.file === "string") {
@@ -145,7 +156,8 @@ export function parseCampaignJson(json: string): Campaign | null {
       subtitle: typeof m.subtitle === "string" ? m.subtitle : undefined,
       briefing: typeof m.briefing === "string" ? m.briefing : "",
       objectives: stringArray(m.objectives),
-      panorama: parsePanorama(m.panorama),
+      panorama: parseImageRef(m.panorama),
+      sideGraphic: parseImageRef(m.sideGraphic),
       snapshot: m.snapshot as SkirmishDraft,
       disabledUnits: stringArray(m.disabledUnits),
       skippable: m.skippable === true,
@@ -158,6 +170,8 @@ export function parseCampaignJson(json: string): Campaign | null {
     type: "ta",
     title: d.title,
     description: typeof d.description === "string" ? d.description : "",
+    icon: parseImageRef(d.icon),
+    background: parseImageRef(d.background),
     missions,
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",

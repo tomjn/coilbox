@@ -14,6 +14,7 @@ import { Link, useParams } from "react-router";
 import { useCampaigns } from "../campaigns";
 import type { Campaign, CampaignMission } from "../model";
 import { type MissionRequirement, useMissionRun } from "../run";
+import { CampaignImage } from "./components/CampaignImage";
 import { PanoramaScroller } from "./components/PanoramaScroller";
 
 /**
@@ -129,46 +130,63 @@ function Briefing({
   run: ReturnType<typeof useMissionRun>;
 }) {
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-4 rounded-xl border border-border/50 bg-card/80 p-5 backdrop-blur-sm">
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {campaign.title}
-        </span>
-        <h1 className="text-2xl font-semibold">{mission.title}</h1>
-        {mission.subtitle && (
-          <p className="text-sm text-muted-foreground">{mission.subtitle}</p>
+    <div className="flex w-full items-end gap-4">
+      <div className="flex w-full max-w-2xl flex-col gap-4 rounded-xl border border-border/50 bg-card/80 p-5 backdrop-blur-sm">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {campaign.title}
+          </span>
+          <h1 className="text-2xl font-semibold">{mission.title}</h1>
+          {mission.subtitle && (
+            <p className="text-sm text-muted-foreground">{mission.subtitle}</p>
+          )}
+        </div>
+
+        {mission.briefing && (
+          <p className="max-h-40 overflow-auto whitespace-pre-line text-sm leading-relaxed text-foreground/90">
+            {mission.briefing}
+          </p>
         )}
+
+        {mission.objectives.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Objectives
+            </span>
+            <ul className="flex flex-col gap-1.5">
+              {mission.objectives.map((o) => (
+                <li key={o} className="flex items-start gap-2 text-sm">
+                  <Target className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <span>{o}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {run.error && (
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            {run.error}
+          </p>
+        )}
+
+        <StartArea run={run} />
       </div>
 
-      {mission.briefing && (
-        <p className="max-h-40 overflow-auto whitespace-pre-line text-sm leading-relaxed text-foreground/90">
-          {mission.briefing}
-        </p>
-      )}
-
-      {mission.objectives.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Objectives
-          </span>
-          <ul className="flex flex-col gap-1.5">
-            {mission.objectives.map((o) => (
-              <li key={o} className="flex items-start gap-2 text-sm">
-                <Target className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <span>{o}</span>
-              </li>
-            ))}
-          </ul>
+      {/* Optional still graphic, centered (both axes) in the space between the
+          briefing card and the page's right edge. `self-stretch` overrides the
+          row's bottom alignment so the region spans the card height and can
+          centre vertically. Hidden on narrow screens. */}
+      {mission.sideGraphic && (
+        <div className="hidden flex-1 items-center justify-center self-stretch lg:flex">
+          <CampaignImage
+            campaignId={campaign.id}
+            image={mission.sideGraphic}
+            alt=""
+            className="max-h-[60vh] w-72 max-w-full object-contain drop-shadow-xl"
+          />
         </div>
       )}
-
-      {run.error && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {run.error}
-        </p>
-      )}
-
-      <StartArea run={run} />
     </div>
   );
 }
@@ -286,7 +304,7 @@ function Victory({
       <div className="flex flex-wrap gap-3">
         {next ? (
           <Link
-            to={`/campaign/${encodeURIComponent(campaign.id)}/briefing/${encodeURIComponent(
+            to={`/campaign/${encodeURIComponent(campaign.id)}/${encodeURIComponent(
               next.id,
             )}`}
             className={cn(buttonVariants())}

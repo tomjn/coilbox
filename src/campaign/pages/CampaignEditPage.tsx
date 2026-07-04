@@ -12,6 +12,8 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Textarea } from "@/components/ui/textarea";
+import { useUnitsyncThumbnails } from "@/content/config";
+import { usePreferredTarget } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
 import {
@@ -21,10 +23,12 @@ import {
 } from "../../content/pages/components/states";
 import { campaignExport, campaignImageDelete, campaignSave } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
+import { inlineCampaignImages } from "../images";
 import type { Campaign, CampaignMission } from "../model";
-import { resolvePanoramaDataUri } from "../panorama";
 import { wrapCampaignForExport } from "../transfer";
+import { CampaignImage, CampaignImageField } from "./components/CampaignImage";
 import { MissionEditorDrawer } from "./components/MissionEditorDrawer";
+import { PanoramaScroller } from "./components/PanoramaScroller";
 import { PresetPickerDrawer } from "./components/PresetPickerDrawer";
 
 const BACK = "/campaign-builder";
@@ -57,6 +61,9 @@ export default function CampaignEditPage() {
   const { campaigns, loading } = useCampaigns();
   const { presets } = useSkirmishPresets();
   const drawer = useDrawer();
+  // Map minimaps for the mission-row thumbnails, keyed by map name.
+  const { target } = usePreferredTarget();
+  const { thumbs } = useUnitsyncThumbnails(target?.enginePath, target?.dataDir);
 
   const loaded = campaigns.find((c) => c.campaign.id === id);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -177,25 +184,9 @@ export default function CampaignEditPage() {
   const exportCampaign = async () => {
     setError(null);
     try {
-      // Inline every file panorama as a data URI so the export is self-contained.
-      const missions = await Promise.all(
-        campaign.missions.map(async (m) => {
-          if (m.panorama?.kind !== "file") return m;
-          try {
-            const dataUri = await resolvePanoramaDataUri(
-              campaign.id,
-              m.panorama.file,
-            );
-            return {
-              ...m,
-              panorama: { kind: "data" as const, dataUri },
-            };
-          } catch {
-            return { ...m, panorama: undefined };
-          }
-        }),
-      );
-      const file = wrapCampaignForExport({ ...campaign, missions });
+      // Inline every stored image (icon, background, each mission's panorama and
+      // side graphic) as a data URI so the export is a single self-contained file.
+      const file = wrapCampaignForExport(await inlineCampaignImages(campaign));
       const dest = await save({
         title: "Export campaign",
         defaultPath: `${campaign.title || "campaign"}.json`,
@@ -248,6 +239,45 @@ export default function CampaignEditPage() {
         </Button>
       </header>
 
+      <section className="grid gap-4 rounded-lg border border-border/50 bg-card p-4 sm:grid-cols-2">
+        <CampaignImageField
+          campaignId={campaign.id}
+          kind="icon"
+          value={campaign.icon}
+          onChange={(icon) => void persist({ ...campaign, icon })}
+          label="Icon"
+          help="Small emblem shown on this campaign in lists. Transparency is kept."
+          preview={
+            <div className="flex size-20 items-center justify-center overflow-hidden rounded-md border border-border/50 bg-muted">
+              <CampaignImage
+                campaignId={campaign.id}
+                image={campaign.icon}
+                alt=""
+                className="size-full object-contain p-1.5"
+              />
+            </div>
+          }
+        />
+        <CampaignImageField
+          campaignId={campaign.id}
+          kind="background"
+          value={campaign.background}
+          onChange={(background) => void persist({ ...campaign, background })}
+          label="Background"
+          help="Still backdrop shown behind the campaign's mission list."
+          preview={
+            <div className="overflow-hidden rounded-md border border-border/50 bg-muted">
+              <CampaignImage
+                campaignId={campaign.id}
+                image={campaign.background}
+                alt=""
+                className="h-24 w-full object-cover"
+              />
+            </div>
+          }
+        />
+      </section>
+
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-medium">
@@ -268,63 +298,91 @@ export default function CampaignEditPage() {
             No missions yet. Add one from a saved skirmish preset.
           </div>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {campaign.missions.map((m, i) => (
-              <li
-                key={m.id}
-                className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3"
-              >
-                <div className="flex flex-col">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={`Move ${m.title} up`}
-                    disabled={i === 0}
-                    onClick={() => move(i, -1)}
-                  >
-                    <ArrowUp className="size-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={`Move ${m.title} down`}
-                    disabled={i === campaign.missions.length - 1}
-                    onClick={() => move(i, 1)}
-                  >
-                    <ArrowDown className="size-4" />
-                  </Button>
-                </div>
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="truncate text-sm font-medium">
-                    {i + 1}. {m.title}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {m.subtitle ? `${m.subtitle} · ` : ""}
-                    {m.snapshot.gameName || "No game"} ·{" "}
-                    {m.snapshot.mapName || "No map"}
-                    {m.skippable ? " · skippable" : ""}
-                  </span>
-                </div>
-                <div className="ml-auto flex shrink-0 items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={() => openMission(m)}
-                  >
-                    <Pencil className="size-4" /> Edit
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={`Remove ${m.title}`}
-                    onClick={() => void removeMission(m)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              </li>
-            ))}
+          <ul className="flex flex-col gap-3">
+            {campaign.missions.map((m, i) => {
+              const thumb = thumbs.get(m.snapshot.mapName)?.dataUrl;
+              return (
+                <li
+                  key={m.id}
+                  className="overflow-hidden rounded-lg border border-border/50 bg-card"
+                >
+                  {/* Header strip: the mission panorama, with the map minimap
+                      overlaid so a mission is identifiable at a glance. */}
+                  <div className="relative h-20">
+                    {m.panorama ? (
+                      <PanoramaScroller
+                        campaignId={campaign.id}
+                        panorama={m.panorama}
+                        className="h-20 rounded-none"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center bg-muted text-xs text-muted-foreground/60">
+                        No panorama
+                      </div>
+                    )}
+                    {thumb && (
+                      <img
+                        src={thumb}
+                        alt=""
+                        className="absolute right-2 top-2 size-16 rounded border border-black/50 object-cover shadow-md"
+                      />
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3">
+                    <div className="flex flex-col">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Move ${m.title} up`}
+                        disabled={i === 0}
+                        onClick={() => move(i, -1)}
+                      >
+                        <ArrowUp className="size-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Move ${m.title} down`}
+                        disabled={i === campaign.missions.length - 1}
+                        onClick={() => move(i, 1)}
+                      >
+                        <ArrowDown className="size-4" />
+                      </Button>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="truncate text-sm font-medium">
+                        {i + 1}. {m.title}
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {m.subtitle ? `${m.subtitle} · ` : ""}
+                        {m.snapshot.gameName || "No game"} ·{" "}
+                        {m.snapshot.mapName || "No map"}
+                        {m.skippable ? " · skippable" : ""}
+                      </span>
+                    </div>
+                    <div className="ml-auto flex shrink-0 items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => openMission(m)}
+                      >
+                        <Pencil className="size-4" /> Edit
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Remove ${m.title}`}
+                        onClick={() => void removeMission(m)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

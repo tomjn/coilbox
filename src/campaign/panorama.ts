@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { campaignImageRead } from "./bindings";
-import type { PanoramaRef } from "./model";
+import type { ImageRef } from "./model";
 
 /**
  * Session cache of resolved panorama data URLs, keyed by `campaignId::file`.
@@ -31,7 +31,7 @@ export function resolvePanoramaDataUri(
  */
 export function useCampaignPanorama(
   campaignId: string,
-  panorama?: PanoramaRef,
+  panorama?: ImageRef,
 ): string | undefined {
   const dataUri = panorama?.kind === "data" ? panorama.dataUri : undefined;
   const file = panorama?.kind === "file" ? panorama.file : undefined;
@@ -63,3 +63,11 @@ export function useCampaignPanorama(
 
   return src;
 }
+
+/**
+ * The resolver is image-kind-agnostic (it just reads a stored `file` back or uses
+ * an inline `data` URI), so these aliases let icon/background/side-graphic code
+ * read naturally without a panorama-flavoured name.
+ */
+export const useCampaignImage = useCampaignPanorama;
+export const resolveImageDataUri = resolvePanoramaDataUri;
