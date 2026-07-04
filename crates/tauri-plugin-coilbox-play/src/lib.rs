@@ -59,6 +59,17 @@ async fn play_generate_script(config: BattleConfig) -> CliResult {
     CliResult::ok(json!({ "script": generate_script(&config) }))
 }
 
+/// `play_export_script` — render a `BattleConfig` and write it to a caller-chosen
+/// path (the frontend picks `dest` via the save dialog). There is no frontend fs
+/// plugin, so the write happens here.
+#[tauri::command]
+async fn play_export_script(config: BattleConfig, dest: String) -> CliResult {
+    match std::fs::write(&dest, generate_script(&config)) {
+        Ok(()) => CliResult::ok(json!({ "dest": dest })),
+        Err(e) => CliResult::err(format!("could not write start script: {e}")),
+    }
+}
+
 /// Synchronous launch body (runs on a blocking thread). Spawns the engine, records
 /// the child, emits `Started`, then polls for exit — re-checking the registry each
 /// tick so `play_cancel` can remove/kill it. Returns the exit code, or `None` if
@@ -248,6 +259,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         })
         .invoke_handler(tauri::generate_handler![
             play_generate_script,
+            play_export_script,
             play_launch,
             play_launch_replay,
             play_cancel,

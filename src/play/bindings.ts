@@ -86,6 +86,16 @@ export const playGenerateScript = defineCommand<
 >("coilbox-play", "play_generate_script");
 
 /**
+ * Render a `BattleConfig` and write it to `dest` (a path the user picked via the
+ * save dialog). The write happens in the plugin since there's no frontend fs
+ * plugin. Rejects if the file couldn't be written.
+ */
+export const playExportScript = defineCommand<
+  { config: BattleConfig; dest: string },
+  { dest: string }
+>("coilbox-play", "play_export_script");
+
+/**
  * Write the start script and launch the engine, resolving when the engine
  * process exits (the UI's unfreeze signal). `executable` is the engine binary;
  * `dataDir` the content root. Refuses a second launch while one is running.

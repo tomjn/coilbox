@@ -5,6 +5,7 @@ Allows the play plugin's start-script generation, engine launch and cancel comma
 #### This default permission set includes the following:
 
 - `allow-play-generate-script`
+- `allow-play-export-script`
 - `allow-play-launch`
 - `allow-play-launch-replay`
 - `allow-play-cancel`
@@ -41,6 +42,32 @@ Enables the play_cancel command without any pre-configured scope.
 <td>
 
 Denies the play_cancel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:allow-play-export-script`
+
+</td>
+<td>
+
+Enables the play_export_script command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:deny-play-export-script`
+
+</td>
+<td>
+
+Denies the play_export_script command without any pre-configured scope.
 
 </td>
 </tr>
