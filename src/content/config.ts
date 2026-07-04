@@ -469,6 +469,20 @@ export function useUnitsyncGameInfo(
   return { info, status, reload, loading: status === "loading" };
 }
 
+/**
+ * Drop a game's session-cached info so the next `reload()` refetches from the
+ * worker instead of serving the cache. Needed by "reload units"-style retries:
+ * a ready result is cached for the session, so `reload()` alone would no-op.
+ */
+export function invalidateGameInfo(
+  enginePath?: string,
+  dataDir?: string,
+  gameArchive?: string,
+) {
+  if (!enginePath || !dataDir || !gameArchive) return;
+  gameInfoCache.delete(`${dataDir}::${enginePath}::${gameArchive}`);
+}
+
 /** Session cache of unit build icons, keyed by dataDir::engine::game::units. */
 const buildpicsCache = new Map<string, UnitBuildpicsResult>();
 
