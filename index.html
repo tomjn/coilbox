@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>coilbox</title>
+    <!--
+      Paint a branded boot background before first paint, so a dark distribution
+      doesn't flash the default white while the app loads. The colour is cached by
+      the profile loader (localStorage key mirrored in src/profile/profile.ts); a
+      vanilla install has nothing cached and is untouched. Runs synchronously during
+      head parse, before the body paints.
+    -->
+    <script>
+      try {
+        const bg = localStorage.getItem("coilbox.bootBackground");
+        if (bg) document.documentElement.style.background = bg;
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

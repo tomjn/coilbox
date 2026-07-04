@@ -1347,16 +1347,28 @@
           "markdownDescription": "Denies the play_launch_replay command without any pre-configured scope."
         },
         {
-          "description": "Allows reading the bundler-supplied distribution profile.\n#### This default permission set includes:\n\n- `allow-profile-load`",
+          "description": "Allows reading the bundler-supplied distribution profile and its assets.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`",
           "type": "string",
           "const": "coilbox-profile:default",
-          "markdownDescription": "Allows reading the bundler-supplied distribution profile.\n#### This default permission set includes:\n\n- `allow-profile-load`"
+          "markdownDescription": "Allows reading the bundler-supplied distribution profile and its assets.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`"
+        },
+        {
+          "description": "Enables the profile_asset command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-profile:allow-profile-asset",
+          "markdownDescription": "Enables the profile_asset command without any pre-configured scope."
         },
         {
           "description": "Enables the profile_load command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-profile:allow-profile-load",
           "markdownDescription": "Enables the profile_load command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the profile_asset command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-profile:deny-profile-asset",
+          "markdownDescription": "Denies the profile_asset command without any pre-configured scope."
         },
         {
           "description": "Denies the profile_load command without any pre-configured scope.",

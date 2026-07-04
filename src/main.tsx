@@ -3,9 +3,16 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { plugins } from "./app.plugins";
+import { SPLASH_ENABLED_KEY } from "./general/splash";
 import BrandedWelcome from "./profile/BrandedWelcome";
 import { applyProfileSettingsHiding } from "./profile/hidden";
-import { forceProfileTheme, loadProfile } from "./profile/profile";
+import {
+  applyBootBackground,
+  forceProfileTheme,
+  loadProfile,
+  resolveSplashSrc,
+} from "./profile/profile";
+import Splash from "./profile/Splash";
 import { createTauriSettingsStorage } from "./settings-storage";
 import "./index.css";
 
@@ -21,6 +28,11 @@ const settingsStorage = await createTauriSettingsStorage();
 // default. Absent profile => empty, so vanilla Coilbox is untouched.
 const { profile } = await loadProfile();
 const appTitle = profile.title ?? "Coilbox";
+
+// Paint the profile's boot background immediately (ending any white flash this
+// session) and cache it so the index.html boot script applies it before first paint
+// next launch. No-op when the profile sets no background.
+applyBootBackground();
 
 // Force the profile's colour scheme / accent (if set) before render — pre-seeds
 // picoframe's persisted theme so the brand wins even over a player's prior choice.
@@ -68,6 +80,13 @@ const home: HomeOverride | undefined = profile.welcome
   ? { Component: BrandedWelcome }
   : undefined;
 
+// Resolve the startup splash before first paint (so the image is ready and there's
+// no empty-overlay flash). Skipped when the profile has no splash or the user turned
+// it off — only an explicit "false" suppresses it, so an unset key still shows.
+const splashOn =
+  profile.splash != null && settingsStorage.get(SPLASH_ENABLED_KEY) !== "false";
+const splashSrc = splashOn ? await resolveSplashSrc() : null;
+
 // Dev-only: install the tauri-plugin-mcp webview bridge so the Tauri MCP server's
 // execute_js / query_page / type_text / wait_for / manage_storage tools work.
 // Statically dropped from release builds (import.meta.env.DEV === false).
@@ -84,5 +103,8 @@ createRoot(root).render(
       home={home}
       settingsStorage={settingsStorage}
     />
+    {profile.splash && splashSrc && (
+      <Splash config={profile.splash} src={splashSrc} />
+    )}
   </StrictMode>,
 );

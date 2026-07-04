@@ -12,8 +12,9 @@
 //! folder at all — resolves to an empty `{"version":1}` default, leaving vanilla
 //! behaviour untouched.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use picoframe_core::CliResult;
 use serde_json::json;
 use tauri::{
@@ -62,10 +63,72 @@ async fn profile_load() -> CliResult {
     CliResult::ok(json!({ "json": json_text, "source": source, "root": root }))
 }
 
+/// Guess a data-URI MIME type from a file extension. Covers the image formats a
+/// splash would plausibly use; anything else falls back to a generic binary type
+/// (still a valid data URI, just not image-optimized).
+fn mime_for(path: &Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("webp") => "image/webp",
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("svg") => "image/svg+xml",
+        _ => "application/octet-stream",
+    }
+}
+
+/// Reject anything that could escape the portable root: absolute paths, a Windows
+/// drive/root prefix, or any `..` component. Only plain forward-relative paths pass.
+fn is_safe_rel(rel: &Path) -> bool {
+    rel.components()
+        .all(|c| matches!(c, Component::Normal(_) | Component::CurDir))
+        && !rel.as_os_str().is_empty()
+}
+
+/// Pure core of [`profile_asset`]: resolve `<root>/<rel>`, read it via the supplied
+/// reader, and return a `data:<mime>;base64,...` URI. Returns an empty string when
+/// there's no portable root, the path is unsafe, or the read fails — the frontend
+/// treats empty as "no splash", so this never hard-fails.
+fn read_asset_from(
+    root: Option<PathBuf>,
+    rel: &str,
+    read: impl Fn(&Path) -> std::io::Result<Vec<u8>>,
+) -> String {
+    let Some(root) = root else {
+        return String::new();
+    };
+    let rel_path = Path::new(rel);
+    if !is_safe_rel(rel_path) {
+        return String::new();
+    }
+    let full = root.join(rel_path);
+    match read(&full) {
+        Ok(bytes) => format!("data:{};base64,{}", mime_for(&full), STANDARD.encode(bytes)),
+        Err(_) => String::new(),
+    }
+}
+
+/// `profile_asset` — read a file from the portable `.coilbox/` folder and return it
+/// as a `data:` URI, so the webview can show a splash image that ships offline beside
+/// `profile.json`. Path-traversal guarded; empty string on any miss (see
+/// [`read_asset_from`]).
+#[tauri::command]
+async fn profile_asset(path: String) -> CliResult {
+    let data_uri = read_asset_from(coilbox_portable::portable_root(), &path, |p| {
+        std::fs::read(p)
+    });
+    CliResult::ok(json!({ "dataUri": data_uri }))
+}
+
 /// Build the plugin. Registered as `"coilbox-profile"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-profile")
-        .invoke_handler(tauri::generate_handler![profile_load])
+        .invoke_handler(tauri::generate_handler![profile_load, profile_asset])
         .build()
 }
 
@@ -99,5 +162,49 @@ mod tests {
         });
         assert_eq!(source, "default");
         assert_eq!(json, DEFAULT_PROFILE);
+    }
+
+    #[test]
+    fn asset_serves_present_file_as_data_uri() {
+        let uri = read_asset_from(Some(PathBuf::from("/pkg/.coilbox")), "logo.png", |p| {
+            assert_eq!(p, Path::new("/pkg/.coilbox/logo.png"));
+            Ok(vec![0x89, 0x50]) // arbitrary bytes
+        });
+        assert_eq!(
+            uri,
+            format!("data:image/png;base64,{}", STANDARD.encode([0x89, 0x50]))
+        );
+    }
+
+    #[test]
+    fn asset_rejects_parent_traversal() {
+        let uri = read_asset_from(Some(PathBuf::from("/pkg/.coilbox")), "../secret", |_| {
+            panic!("reader must not run for an unsafe path")
+        });
+        assert_eq!(uri, "");
+    }
+
+    #[test]
+    fn asset_rejects_absolute_path() {
+        let uri = read_asset_from(Some(PathBuf::from("/pkg/.coilbox")), "/etc/passwd", |_| {
+            panic!("reader must not run for an absolute path")
+        });
+        assert_eq!(uri, "");
+    }
+
+    #[test]
+    fn asset_empty_when_not_portable() {
+        let uri = read_asset_from(None, "logo.png", |_| {
+            panic!("reader must not run without a portable root")
+        });
+        assert_eq!(uri, "");
+    }
+
+    #[test]
+    fn asset_empty_when_read_fails() {
+        let uri = read_asset_from(Some(PathBuf::from("/pkg/.coilbox")), "missing.png", |_| {
+            Err(std::io::Error::from(std::io::ErrorKind::NotFound))
+        });
+        assert_eq!(uri, "");
     }
 }

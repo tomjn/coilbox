@@ -2,6 +2,7 @@ import { Maximize2, Wrench } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useAdvancedModeSetting } from "../advanced";
 import { isFullscreenLocked, useFullscreenSetting } from "../fullscreen";
+import { hasProfileSplash, useSplashSetting } from "../splash";
 
 /**
  * The General settings section (frame settings page at `/settings/general`).
@@ -12,8 +13,11 @@ import { isFullscreenLocked, useFullscreenSetting } from "../fullscreen";
 export default function GeneralSettings() {
   const [advanced, setAdvanced] = useAdvancedModeSetting();
   const [fullscreen, setFullscreen] = useFullscreenSetting();
+  const [splash, setSplash] = useSplashSetting();
   // A kiosk-locked build forces fullscreen and hides the toggle entirely.
   const fullscreenLocked = isFullscreenLocked();
+  // The splash toggle only makes sense when the profile actually ships one.
+  const showSplashToggle = hasProfileSplash();
 
   return (
     <div className="space-y-8">
@@ -42,29 +46,53 @@ export default function GeneralSettings() {
         </label>
       </section>
 
-      {!fullscreenLocked && (
+      {(!fullscreenLocked || showSplashToggle) && (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             <Maximize2 size={15} /> Display
           </h2>
-          <label
-            htmlFor="fullscreen-mode"
-            className="flex cursor-pointer items-start gap-3"
-          >
-            <Switch
-              id="fullscreen-mode"
-              checked={fullscreen}
-              onCheckedChange={(v) => setFullscreen(v === true)}
-              className="mt-0.5"
-            />
-            <span className="space-y-1">
-              <span className="block text-sm font-medium">Fullscreen</span>
-              <span className="block text-xs text-muted-foreground">
-                Run Coilbox in fullscreen. Also toggleable with F11 or the
-                top-bar button; the choice is remembered across restarts.
+          {!fullscreenLocked && (
+            <label
+              htmlFor="fullscreen-mode"
+              className="flex cursor-pointer items-start gap-3"
+            >
+              <Switch
+                id="fullscreen-mode"
+                checked={fullscreen}
+                onCheckedChange={(v) => setFullscreen(v === true)}
+                className="mt-0.5"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium">Fullscreen</span>
+                <span className="block text-xs text-muted-foreground">
+                  Run Coilbox in fullscreen. Also toggleable with F11 or the
+                  top-bar button; the choice is remembered across restarts.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          )}
+          {showSplashToggle && (
+            <label
+              htmlFor="startup-splash"
+              className="flex cursor-pointer items-start gap-3"
+            >
+              <Switch
+                id="startup-splash"
+                checked={splash}
+                onCheckedChange={(v) => setSplash(v === true)}
+                className="mt-0.5"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium">
+                  Startup splash
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Show the brand splash when Coilbox launches. Click it or press
+                  Escape to dismiss it early.
+                </span>
+              </span>
+            </label>
+          )}
         </section>
       )}
     </div>
