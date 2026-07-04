@@ -83,6 +83,13 @@ export interface Profile {
    */
   fullscreenLocked?: boolean;
   /**
+   * Show a Quit button in the sidebar footer. An intentional escape hatch for
+   * fullscreen/kiosk builds where a player may have no other obvious way out, so
+   * it is deliberately not suppressed by {@link fullscreenLocked}. Independent of
+   * the `data-coilbox-action="quit"` welcome-HTML marker (see `BrandedWelcome`).
+   */
+  quit?: boolean;
+  /**
    * Seed the initial "Advanced mode" state (developer/modding tools). Same
    * default-not-force semantics as {@link fullscreen}: a user's General-settings
    * toggle persists over the profile seed.

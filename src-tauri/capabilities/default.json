@@ -9,6 +9,7 @@
     "core:window:allow-set-fullscreen",
     "opener:default",
     "updater:default",
-    "process:allow-restart"
+    "process:allow-restart",
+    "process:allow-exit"
   ]
 }

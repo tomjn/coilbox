@@ -195,6 +195,14 @@ CSS only (no JavaScript).
   navigates inside the app without a reload. Useful routes include
   `#/play/skirmish`, `#/content/maps`, `#/content/replays`, `#/battles`,
   `#/settings`.
+- **Quit action**: the welcome HTML can't run JavaScript, but any element carrying
+  `data-coilbox-action="quit"` closes Coilbox when clicked — the one interactive hook
+  available. Use it to add your own exit control to a branded landing page (handy for
+  fullscreen builds). This works regardless of the [`quit`](#quit-boolean) flag.
+
+  ```json
+  { "html": "<button data-coilbox-action=\"quit\">Exit</button>" }
+  ```
 
 The HTML is trusted (it ships inside your distribution). It is injected verbatim, so
 only put content you control in it.
@@ -290,6 +298,20 @@ topbar badge offer a one-click download that installs the archive and rescans co
 an asset named exactly `profile.json`, Coilbox installs it into `.coilbox/` alongside
 the game archive; because the profile is read once at startup, the app then prompts for
 a restart to apply the updated profile.
+
+### `quit` (boolean)
+
+Adds a **Quit** button to the bottom of the sidebar that closes Coilbox. Off by
+default. It's an escape hatch for fullscreen or kiosk (`fullscreenLocked`) builds,
+where a player may otherwise have no obvious way out — so unlike the fullscreen
+toggle, this button is **not** removed by the kiosk lock.
+
+```json
+{ "version": 1, "fullscreen": true, "quit": true }
+```
+
+For a fully branded exit instead of (or in addition to) the sidebar button, put a
+`data-coilbox-action="quit"` element in your [`welcome`](#welcome-object) HTML.
 
 ## Verifying it's active
 
