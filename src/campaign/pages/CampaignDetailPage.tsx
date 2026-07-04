@@ -146,7 +146,7 @@ function MissionRow({
   return (
     <li>
       <Link
-        to={`/campaign/${encodeURIComponent(campaignId)}/briefing/${encodeURIComponent(
+        to={`/campaign/${encodeURIComponent(campaignId)}/${encodeURIComponent(
           mission.id,
         )}`}
         className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-border hover:bg-accent/50"

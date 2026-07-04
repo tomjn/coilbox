@@ -286,7 +286,7 @@ function Victory({
       <div className="flex flex-wrap gap-3">
         {next ? (
           <Link
-            to={`/campaign/${encodeURIComponent(campaign.id)}/briefing/${encodeURIComponent(
+            to={`/campaign/${encodeURIComponent(campaign.id)}/${encodeURIComponent(
               next.id,
             )}`}
             className={cn(buttonVariants())}
