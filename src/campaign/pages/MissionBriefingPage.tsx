@@ -2,6 +2,7 @@ import { Button, buttonVariants, cn } from "@picoframe/frame";
 import {
   ArrowLeft,
   ChevronRight,
+  Loader2,
   Play,
   RotateCcw,
   Skull,
@@ -18,9 +19,10 @@ import { PanoramaScroller } from "./components/PanoramaScroller";
 /**
  * The mission briefing and play flow. A full-bleed panorama (or a dark gradient
  * fallback) backs the page under a scrim; the overlaid content moves through the
- * phases {@link useMissionRun} exposes — briefing → result → victory/defeat —
- * without ever leaving the page, so the launch promise and its exit code stay in
- * one place.
+ * phases {@link useMissionRun} exposes — briefing → checking → result →
+ * victory/defeat, with "checking" and "result" both skippable when the replay's
+ * winner can be auto-detected — without ever leaving the page, so the launch
+ * promise and its exit code stay in one place.
  */
 export default function MissionBriefingPage() {
   const { id, missionId } = useParams();
@@ -103,6 +105,7 @@ function MissionStage({
           {run.phase === "briefing" && (
             <Briefing campaign={campaign} mission={mission} run={run} />
           )}
+          {run.phase === "checking" && <Checking />}
           {run.phase === "result" && <ResultPrompt run={run} />}
           {run.phase === "victory" && <Victory campaign={campaign} run={run} />}
           {run.phase === "defeat" && <Defeat run={run} />}
@@ -217,6 +220,21 @@ function MissingRequirement({ missing }: { missing: MissionRequirement }) {
   );
 }
 
+/** Shown briefly while the just-finished replay is being decoded for its winner. */
+function Checking() {
+  return (
+    <PhaseCard>
+      <div className="flex items-center gap-2">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        <h2 className="text-lg font-semibold">Checking result…</h2>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Reading the replay to see how the mission went.
+      </p>
+    </PhaseCard>
+  );
+}
+
 function ResultPrompt({ run }: { run: ReturnType<typeof useMissionRun> }) {
   return (
     <PhaseCard>
@@ -264,6 +282,7 @@ function Victory({
           ? "Mission complete. The next mission is ready."
           : "Mission complete — you've finished the campaign!"}
       </p>
+      {run.autoDetected && <AutoDetectedNote />}
       <div className="flex flex-wrap gap-3">
         {next ? (
           <Link
@@ -297,6 +316,7 @@ function Defeat({ run }: { run: ReturnType<typeof useMissionRun> }) {
       <p className="text-sm text-muted-foreground">
         No progress lost — regroup and try again.
       </p>
+      {run.autoDetected && <AutoDetectedNote />}
       <div className="flex flex-wrap gap-3">
         <Button onClick={run.reset}>
           <RotateCcw className="size-4" /> Retry
@@ -309,6 +329,16 @@ function Defeat({ run }: { run: ReturnType<typeof useMissionRun> }) {
         </Link>
       </div>
     </PhaseCard>
+  );
+}
+
+/** Small aside on an auto-resolved Victory/Defeat screen, so it's clear the
+ * result came from the replay rather than a manual report. */
+function AutoDetectedNote() {
+  return (
+    <p className="text-xs text-muted-foreground/80">
+      Result detected from the replay.
+    </p>
   );
 }
 
