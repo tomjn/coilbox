@@ -53,3 +53,40 @@ export function useSkirmishPresets() {
 
   return { presets, savePreset, touchPreset, removePreset };
 }
+
+/**
+ * Parse the raw JSON of an imported preset file into a `SkirmishDraft` (plus its
+ * original name), or `null` if the shape doesn't match — an imported file is
+ * untrusted input, so validate the five draft fields before adopting it. Identity
+ * and timestamps are intentionally dropped: the importer mints fresh ones via
+ * `savePreset`, so importing never collides with an existing preset's id.
+ */
+export function parsePresetJson(
+  json: string,
+): (SkirmishDraft & { name?: string }) | null {
+  let data: unknown;
+  try {
+    data = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (typeof data !== "object" || data === null) return null;
+  const d = data as Record<string, unknown>;
+  if (
+    !Array.isArray(d.participants) ||
+    typeof d.gameName !== "string" ||
+    typeof d.mapName !== "string" ||
+    typeof d.startPosType !== "number" ||
+    typeof d.modOptionValues !== "object" ||
+    d.modOptionValues === null
+  )
+    return null;
+  return {
+    participants: d.participants as SkirmishDraft["participants"],
+    gameName: d.gameName,
+    mapName: d.mapName,
+    startPosType: d.startPosType,
+    modOptionValues: d.modOptionValues as SkirmishDraft["modOptionValues"],
+    name: typeof d.name === "string" ? d.name : undefined,
+  };
+}

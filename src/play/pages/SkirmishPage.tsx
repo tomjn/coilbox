@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
-import { save } from "@tauri-apps/plugin-dialog";
-import { Play } from "lucide-react";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { Bookmark, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -10,9 +10,8 @@ import {
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "@/content/config";
-import { useAdvancedMode } from "@/general/advanced";
 import type { BattleConfig } from "../bindings";
-import { playExportScript } from "../bindings";
+import { playExportPreset, playImportPreset } from "../bindings";
 import {
   aiKey,
   defaultAi,
@@ -27,12 +26,16 @@ import {
 } from "../config";
 import { useSkirmishDraft } from "../drafts";
 import { usePlay } from "../PlayProvider";
-import { type SkirmishPreset, useSkirmishPresets } from "../presets";
+import {
+  parsePresetJson,
+  type SkirmishPreset,
+  useSkirmishPresets,
+} from "../presets";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
 import { GameSelectCard } from "./components/GameSelectCard";
 import { MapCard } from "./components/MapCard";
 import { ParticipantsTable } from "./components/ParticipantsTable";
-import { PresetBar } from "./components/PresetBar";
+import { PresetsDrawer } from "./components/PresetsDrawer";
 
 /** Basic singleplayer (skirmish) launcher: pick a game, map and opponents, then
  * launch the engine. Uses the preferred engine silently (no picker). */
@@ -60,7 +63,7 @@ export default function SkirmishPage() {
   >(() => draft.modOptionValues);
   const [error, setError] = useState<string | null>(null);
 
-  const advanced = useAdvancedMode();
+  const [presetsOpen, setPresetsOpen] = useState(false);
   const { presets, savePreset, touchPreset, removePreset } =
     useSkirmishPresets();
 
@@ -243,25 +246,6 @@ export default function SkirmishPage() {
     }
   }
 
-  // Advanced mode: render the exact start script and save it to a file the user
-  // picks — no launch. Uses the shared `buildConfig` so it matches what a real
-  // launch would feed the engine.
-  async function onExport() {
-    const config = buildConfig();
-    if (!config) return;
-    setError(null);
-    try {
-      const dest = await save({
-        title: "Export start script",
-        defaultPath: "script.txt",
-      });
-      if (!dest) return;
-      await playExportScript({ config, dest });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
-
   const saveCurrentPreset = (name: string): SkirmishPreset =>
     savePreset(name, {
       participants,
@@ -287,6 +271,48 @@ export default function SkirmishPage() {
     touchPreset(p.id);
   };
 
+  // Share a preset: serialize it and write to a file the user picks. The write
+  // goes through the plugin (no frontend fs plugin), mirroring the start-script
+  // export above.
+  async function onExportPreset(preset: SkirmishPreset) {
+    setError(null);
+    try {
+      const dest = await save({
+        title: "Export preset",
+        defaultPath: `${preset.name || "preset"}.json`,
+        filters: [{ name: "Coilbox preset", extensions: ["json"] }],
+      });
+      if (!dest) return;
+      await playExportPreset({ json: JSON.stringify(preset, null, 2), dest });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  // Import a shared preset file: read it, validate the shape, then add it as a
+  // new preset (fresh id/timestamps via savePreset) without touching the current
+  // setup.
+  async function onImportPreset() {
+    setError(null);
+    try {
+      const src = await open({
+        title: "Import preset",
+        multiple: false,
+        filters: [{ name: "Coilbox preset", extensions: ["json"] }],
+      });
+      if (typeof src !== "string") return;
+      const { json } = await playImportPreset({ src });
+      const parsed = parsePresetJson(json);
+      if (!parsed) {
+        setError("That file isn't a valid coilbox preset.");
+        return;
+      }
+      savePreset(parsed.name?.trim() || "Imported preset", parsed);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5 p-4">
       <header className="flex items-center justify-between gap-4">
@@ -308,6 +334,13 @@ export default function SkirmishPage() {
               Spectate
             </label>
           )}
+          <Button
+            variant="outline"
+            onClick={() => setPresetsOpen(true)}
+            disabled={running}
+          >
+            <Bookmark className="size-4" /> Presets
+          </Button>
           <Button onClick={onStart} disabled={!canStart}>
             <Play className="size-4" />{" "}
             {running ? "Game running…" : "Start Game"}
@@ -315,13 +348,16 @@ export default function SkirmishPage() {
         </div>
       </header>
 
-      <PresetBar
+      <PresetsDrawer
+        open={presetsOpen}
+        onOpenChange={setPresetsOpen}
         presets={presets}
+        thumbs={thumbs}
         onLoad={loadPreset}
         onSave={saveCurrentPreset}
         onDelete={removePreset}
-        showExport={advanced}
-        onExport={onExport}
+        onExportPreset={onExportPreset}
+        onImport={onImportPreset}
         disabled={running}
       />
 
