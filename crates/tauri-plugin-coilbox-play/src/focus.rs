@@ -19,7 +19,8 @@ pub fn focus_pid(pid: u32) -> bool {
 
 #[cfg(target_os = "windows")]
 pub fn focus_pid(pid: u32) -> bool {
-    use windows::Win32::Foundation::{BOOL, FALSE, HWND, LPARAM, TRUE};
+    use windows::core::BOOL;
+    use windows::Win32::Foundation::{HWND, LPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{
         EnumWindows, GetWindowThreadProcessId, IsWindowVisible, SetForegroundWindow,
     };
@@ -35,9 +36,9 @@ pub fn focus_pid(pid: u32) -> bool {
         GetWindowThreadProcessId(hwnd, Some(&mut wpid));
         if wpid == search.pid && IsWindowVisible(hwnd).as_bool() {
             search.hwnd = hwnd;
-            return FALSE; // found a visible top-level window; stop enumerating
+            return BOOL(0); // found a visible top-level window; stop enumerating
         }
-        TRUE // keep going
+        BOOL(1) // keep going
     }
 
     let mut search = Search {
