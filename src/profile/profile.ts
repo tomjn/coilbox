@@ -25,6 +25,18 @@ export interface WelcomeConfig {
   css?: string;
 }
 
+/** An external link a profile adds to the sidebar (and home launcher). */
+export interface LinkConfig {
+  /** Sidebar label, e.g. "Discord". */
+  label: string;
+  /** External URL, opened in the system browser. Must be http(s)/mailto/tel. */
+  href: string;
+  /** Curated lucide icon name (see docs); unknown or omitted → ExternalLink. */
+  icon?: string;
+  /** Display label of the sidebar group; omitted → the default "Links" group. */
+  group?: string;
+}
+
 /** Startup brand splash: a centered image over a solid backdrop, fade in/out. */
 export interface SplashConfig {
   /**
@@ -54,6 +66,8 @@ export interface Profile {
   gameFilter?: GameFilter;
   /** Branded landing page shown in place of the default launcher. */
   welcome?: WelcomeConfig;
+  /** External links added to the sidebar/launcher, e.g. a Discord invite. */
+  links?: LinkConfig[];
   /** Brand splash shown over the whole window at startup. */
   splash?: SplashConfig;
   /**
