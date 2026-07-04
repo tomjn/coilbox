@@ -173,14 +173,17 @@ function Briefing({
         <StartArea run={run} />
       </div>
 
-      {/* Optional still graphic beside the briefing (hidden on narrow screens). */}
+      {/* Optional still graphic, centered (both axes) in the space between the
+          briefing card and the page's right edge. `self-stretch` overrides the
+          row's bottom alignment so the region spans the card height and can
+          centre vertically. Hidden on narrow screens. */}
       {mission.sideGraphic && (
-        <div className="hidden w-72 shrink-0 lg:block">
+        <div className="hidden flex-1 items-center justify-center self-stretch lg:flex">
           <CampaignImage
             campaignId={campaign.id}
             image={mission.sideGraphic}
             alt=""
-            className="max-h-[60vh] w-full object-contain drop-shadow-xl"
+            className="max-h-[60vh] w-72 max-w-full object-contain drop-shadow-xl"
           />
         </div>
       )}
