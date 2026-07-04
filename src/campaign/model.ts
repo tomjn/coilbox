@@ -107,7 +107,18 @@ export function parseCampaignJson(json: string): Campaign | null {
     return null;
   }
   if (typeof data !== "object" || data === null) return null;
-  const d = data as Record<string, unknown>;
+  let d = data as Record<string, unknown>;
+
+  // Also accept the export/share wrapper (`CampaignExportFile`), so a bundled
+  // campaign can be the exact file the builder exported, dropped into
+  // `.coilbox/campaigns/` as-is.
+  if (
+    d.format === "coilbox-campaign" &&
+    typeof d.campaign === "object" &&
+    d.campaign !== null
+  ) {
+    d = d.campaign as Record<string, unknown>;
+  }
 
   if (
     d.type !== "ta" ||
