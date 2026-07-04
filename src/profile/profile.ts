@@ -43,6 +43,24 @@ export interface Profile {
   accent?: Accent;
   /** Force the colour scheme each launch: "light" | "dark" | "system". */
   mode?: ThemeMode;
+  /**
+   * Seed the initial fullscreen state. A default, not a force: it applies only
+   * until the user toggles fullscreen (F11 / top-bar button / setting), after
+   * which their persisted choice wins on every subsequent launch.
+   */
+  fullscreen?: boolean;
+  /**
+   * Kiosk lock: force fullscreen every launch and remove the ways out — the
+   * top-bar button and General-settings toggle are hidden and F11 is inert.
+   * Overrides both {@link fullscreen} and any stored user choice while set.
+   */
+  fullscreenLocked?: boolean;
+  /**
+   * Seed the initial "Advanced mode" state (developer/modding tools). Same
+   * default-not-force semantics as {@link fullscreen}: a user's General-settings
+   * toggle persists over the profile seed.
+   */
+  advanced?: boolean;
   /** GitHub repo ("owner/name") whose latest release ships this game's archive. */
   release?: { repo: string };
 }

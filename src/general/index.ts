@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Settings2 } from "lucide-react";
+import { FullscreenControls } from "./fullscreen";
 import GeneralSettings from "./pages/SettingsSection";
 
 /**
@@ -16,6 +17,7 @@ const generalPlugin: FramePlugin = {
   id: "general",
   version: "0.0.0",
   routes: [],
+  slots: [{ slot: "topbar.right", Component: FullscreenControls }],
   settings: [
     {
       id: "general",
