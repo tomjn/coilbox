@@ -337,8 +337,17 @@ export function toBattleConfig(opts: {
   gameType: string;
   startPosType: number;
   modOptions: Record<string, string>;
+  /** Units to disable entirely (rendered as `[RESTRICT]` limit 0). */
+  disabledUnits?: string[];
 }): BattleConfig {
-  const { participants, mapName, gameType, startPosType, modOptions } = opts;
+  const {
+    participants,
+    mapName,
+    gameType,
+    startPosType,
+    modOptions,
+    disabledUnits,
+  } = opts;
   const you = participants[0];
   const active = participants.filter((p) => !(p.kind === "you" && p.spectator));
 
@@ -385,5 +394,9 @@ export function toBattleConfig(opts: {
     teams,
     allyTeams: allyValues.map(() => ({ numAllies: 0 })),
     modOptions: Object.keys(modOptions).length > 0 ? modOptions : undefined,
+    restrictedUnits:
+      disabledUnits && disabledUnits.length > 0
+        ? Object.fromEntries(disabledUnits.map((name) => [name, 0]))
+        : undefined,
   };
 }

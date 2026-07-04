@@ -36,6 +36,11 @@ pub struct BattleConfig {
     pub mod_options: BTreeMap<String, String>,
     #[serde(default)]
     pub map_options: BTreeMap<String, String>,
+    /// `[RESTRICT]` — per-unit build limits. Key = unit internal name, value =
+    /// limit (0 disables the unit). Engine-level: applies to all teams, not just
+    /// one side (`RecoilEngine/doc/StartScriptFormat.txt`).
+    #[serde(default)]
+    pub restricted_units: BTreeMap<String, u32>,
     /// Whether this machine hosts the game. Singleplayer/skirmish and lobby-host
     /// are hosts (`true`, the default — the engine runs a local host); a client
     /// joining a remote lobby battle sets this `false` and gets a minimal script
@@ -77,6 +82,7 @@ impl Default for BattleConfig {
             ally_teams: Vec::new(),
             mod_options: BTreeMap::new(),
             map_options: BTreeMap::new(),
+            restricted_units: BTreeMap::new(),
             is_host: true,
             host_ip: None,
             host_port: None,
@@ -259,6 +265,22 @@ pub fn generate_script(cfg: &BattleConfig) -> String {
         section(&mut s, 1, "MAPOPTIONS", |s| {
             for (k, v) in &cfg.map_options {
                 kv(s, 2, k, v);
+            }
+        });
+    }
+    // RESTRICT is engine-level: it caps build counts for all teams, not just one
+    // side (RecoilEngine/doc/StartScriptFormat.txt).
+    if !cfg.restricted_units.is_empty() {
+        section(&mut s, 1, "RESTRICT", |s| {
+            kv(
+                s,
+                2,
+                "NumRestrictions",
+                &cfg.restricted_units.len().to_string(),
+            );
+            for (i, (name, limit)) in cfg.restricted_units.iter().enumerate() {
+                kv(s, 2, &format!("Unit{i}"), name);
+                kv(s, 2, &format!("Limit{i}"), &limit.to_string());
             }
         });
     }
@@ -492,5 +514,27 @@ mod tests {
         let s = generate_script(&cfg);
         assert!(s.contains("StartRectRight=0.3;"));
         assert!(s.contains("StartPosType=2;"));
+    }
+
+    #[test]
+    fn restrict_section_renders_sequential_indices() {
+        let mut cfg = sample();
+        cfg.restricted_units.insert("armcom".into(), 1);
+        cfg.restricted_units.insert("armflash".into(), 0);
+        let s = generate_script(&cfg);
+        assert!(s.contains("[RESTRICT]"));
+        assert!(s.contains("NumRestrictions=2;"));
+        // BTreeMap orders by key, so armcom (Unit0) sorts before armflash (Unit1).
+        assert!(s.contains("Unit0=armcom;"));
+        assert!(s.contains("Limit0=1;"));
+        assert!(s.contains("Unit1=armflash;"));
+        assert!(s.contains("Limit1=0;"));
+    }
+
+    #[test]
+    fn restrict_section_omitted_when_empty() {
+        let s = generate_script(&sample());
+        assert!(!s.contains("[RESTRICT]"));
+        assert!(!s.contains("NumRestrictions"));
     }
 }
