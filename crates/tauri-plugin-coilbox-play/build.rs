@@ -7,6 +7,7 @@ const COMMANDS: &[&str] = &[
     "play_launch",
     "play_launch_replay",
     "play_cancel",
+    "play_focus",
 ];
 
 fn main() {
