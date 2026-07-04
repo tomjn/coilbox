@@ -43,6 +43,8 @@ export interface Profile {
   accent?: Accent;
   /** Force the colour scheme each launch: "light" | "dark" | "system". */
   mode?: ThemeMode;
+  /** GitHub repo ("owner/name") whose latest release ships this game's archive. */
+  release?: { repo: string };
 }
 
 /** Where the profile came from. "seed" is reserved for a future bundled default. */
@@ -51,6 +53,8 @@ export type ProfileSource = "file" | "seed" | "default";
 interface ProfileResult {
   json: string;
   source: string;
+  /** Portable root (`<app_dir>/.coilbox`), or "" when not portable. */
+  root: string;
 }
 
 const profileLoadCmd = defineCommand<Record<string, never>, ProfileResult>(
@@ -65,6 +69,7 @@ const EMPTY_PROFILE: Profile = { version: 1 };
 // anywhere afterwards — the same pattern the settings cache uses.
 let loaded: Profile = EMPTY_PROFILE;
 let loadedSource: ProfileSource = "default";
+let loadedRoot = "";
 let loadPromise: Promise<{ profile: Profile; source: ProfileSource }> | null =
   null;
 
@@ -86,6 +91,7 @@ export function loadProfile(): Promise<{
           loaded = EMPTY_PROFILE;
         }
         loadedSource = (res.source as ProfileSource) ?? "default";
+        loadedRoot = res.root ?? "";
         return { profile: loaded, source: loadedSource };
       })
       .catch((e) => {
@@ -129,6 +135,15 @@ export function getProfile(): Profile {
 /** Where the loaded profile came from. */
 export function getProfileSource(): ProfileSource {
   return loadedSource;
+}
+
+/**
+ * The portable root (`<app_dir>/.coilbox`) the profile was loaded from, or "" for
+ * a non-portable install. Used to write an updated `profile.json` back into the
+ * portable folder when a game release ships one.
+ */
+export function getProfileRoot(): string {
+  return loadedRoot;
 }
 
 /**
