@@ -1,7 +1,18 @@
+import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { ExternalLink, MessagesSquare } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
-import { buildProfileNav, resolveLinkIcon } from "./links";
-import type { Profile } from "./profile";
+
+// profile.ts transitively pulls in @picoframe/plugin-sdk, whose published dist
+// uses extensionless relative imports that Vitest's node resolver won't load from
+// node_modules (see multiplayer/store.test.ts). The applyProfileLinks tests read
+// the profile singleton but never invoke a command, so stubbing the leaf is enough
+// to let the module load.
+vi.mock("@picoframe/plugin-sdk", () => ({
+  defineCommand: () => async () => ({}),
+}));
+
+import { applyProfileLinks, buildProfileNav, resolveLinkIcon } from "./links";
+import { getProfile, type Profile } from "./profile";
 
 const base: Profile = { version: 1 };
 
@@ -91,5 +102,35 @@ describe("buildProfileNav", () => {
     expect(nav[0].items).toHaveLength(1);
     expect(nav[0].items[0].label).toBe("Good");
     warn.mockRestore();
+  });
+});
+
+describe("applyProfileLinks", () => {
+  const profilePlugin: FramePlugin = {
+    id: "profile",
+    version: "0.0.0",
+    routes: [],
+  };
+  const otherPlugin: FramePlugin = {
+    id: "other",
+    version: "0.0.0",
+    routes: [],
+  };
+
+  it("returns the list unchanged when the profile has no links", () => {
+    const plugins = [otherPlugin, profilePlugin];
+    expect(applyProfileLinks(plugins)).toBe(plugins);
+  });
+
+  it("attaches built nav groups to the profile plugin", () => {
+    const loaded = getProfile();
+    loaded.links = [{ label: "Discord", href: "https://discord.gg/x" }];
+    const result = applyProfileLinks([otherPlugin, profilePlugin]);
+    const profile = result.find((p) => p.id === "profile");
+    expect(profile?.nav).toHaveLength(1);
+    expect(profile?.nav?.[0].items[0].label).toBe("Discord");
+    // untouched plugin passes through by identity
+    expect(result.find((p) => p.id === "other")).toBe(otherPlugin);
+    loaded.links = undefined;
   });
 });

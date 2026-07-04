@@ -1,4 +1,9 @@
-import type { IconComponent, NavGroup, NavItem } from "@picoframe/plugin-sdk";
+import type {
+  FramePlugin,
+  IconComponent,
+  NavGroup,
+  NavItem,
+} from "@picoframe/plugin-sdk";
 import {
   Bell,
   BookOpen,
@@ -20,7 +25,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import type { Profile } from "./profile";
+import { getProfile, type Profile } from "./profile";
 
 /**
  * Curated map of profile-facing icon names to lucide components. Kept small and
@@ -132,4 +137,19 @@ export function buildProfileNav(profile: Profile): NavGroup[] {
     order: PROFILE_GROUP_ORDER + gi,
     items: byGroup.get(label) ?? [],
   }));
+}
+
+/**
+ * Inject the profile's sidebar links into the `profile` plugin's nav. Called from
+ * `main.tsx` after `loadProfile()` resolves (the plugin list is imported before the
+ * profile loads, so the nav can't be built at plugin-construction time). Mirrors
+ * `applyProfileSettingsHiding`. No-op - returns the same array - when there are no
+ * valid links, so vanilla Coilbox is untouched.
+ */
+export function applyProfileLinks(plugins: FramePlugin[]): FramePlugin[] {
+  const groups = buildProfileNav(getProfile());
+  if (groups.length === 0) return plugins;
+  return plugins.map((p) =>
+    p.id === "profile" ? { ...p, nav: [...(p.nav ?? []), ...groups] } : p,
+  );
 }

@@ -6,6 +6,7 @@ import { plugins } from "./app.plugins";
 import { SPLASH_ENABLED_KEY } from "./general/splash";
 import BrandedWelcome from "./profile/BrandedWelcome";
 import { applyProfileSettingsHiding } from "./profile/hidden";
+import { applyProfileLinks } from "./profile/links";
 import {
   applyBootBackground,
   forceProfileTheme,
@@ -40,7 +41,7 @@ forceProfileTheme();
 
 // Hide any settings sections the profile lists (uses SettingsSection.useVisible,
 // injected centrally so no plugin needs to opt in). No-op without a profile.
-const appPlugins = applyProfileSettingsHiding(plugins);
+const appPlugins = applyProfileLinks(applyProfileSettingsHiding(plugins));
 
 // The OS title bar is a separate surface from the AppFrame `title` prop (which
 // drives in-app chrome), and is otherwise fixed by tauri.conf.json. Best-effort:
