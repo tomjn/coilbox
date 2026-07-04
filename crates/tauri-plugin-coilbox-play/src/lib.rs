@@ -70,6 +70,29 @@ async fn play_export_script(config: BattleConfig, dest: String) -> CliResult {
     }
 }
 
+/// `play_export_preset` — write a preset's JSON (already serialized by the
+/// frontend) to a caller-chosen path, so users can share a saved setup. Like
+/// `play_export_script`, the write lives here because there's no frontend fs
+/// plugin; the plugin treats the preset as an opaque string and never models its
+/// shape.
+#[tauri::command]
+async fn play_export_preset(json: String, dest: String) -> CliResult {
+    match std::fs::write(&dest, json) {
+        Ok(()) => CliResult::ok(json!({ "dest": dest })),
+        Err(e) => CliResult::err(format!("could not write preset: {e}")),
+    }
+}
+
+/// `play_import_preset` — read a preset JSON file the user picked and hand its raw
+/// contents back for the frontend to parse and validate.
+#[tauri::command]
+async fn play_import_preset(src: String) -> CliResult {
+    match std::fs::read_to_string(&src) {
+        Ok(json) => CliResult::ok(json!({ "json": json })),
+        Err(e) => CliResult::err(format!("could not read preset: {e}")),
+    }
+}
+
 /// Synchronous launch body (runs on a blocking thread). Spawns the engine, records
 /// the child, emits `Started`, then polls for exit — re-checking the registry each
 /// tick so `play_cancel` can remove/kill it. Returns the exit code, or `None` if
@@ -260,6 +283,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             play_generate_script,
             play_export_script,
+            play_export_preset,
+            play_import_preset,
             play_launch,
             play_launch_replay,
             play_cancel,

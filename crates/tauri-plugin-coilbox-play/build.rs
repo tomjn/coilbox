@@ -5,6 +5,8 @@
 const COMMANDS: &[&str] = &[
     "play_generate_script",
     "play_export_script",
+    "play_export_preset",
+    "play_import_preset",
     "play_launch",
     "play_launch_replay",
     "play_cancel",

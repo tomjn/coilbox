@@ -96,6 +96,21 @@ export const playExportScript = defineCommand<
 >("coilbox-play", "play_export_script");
 
 /**
+ * Write a saved preset's JSON (serialized by the caller) to `dest` so it can be
+ * shared. Opaque string round-trip — the plugin doesn't model the preset shape.
+ */
+export const playExportPreset = defineCommand<
+  { json: string; dest: string },
+  { dest: string }
+>("coilbox-play", "play_export_preset");
+
+/** Read a preset JSON file the user picked; the caller parses/validates it. */
+export const playImportPreset = defineCommand<
+  { src: string },
+  { json: string }
+>("coilbox-play", "play_import_preset");
+
+/**
  * Write the start script and launch the engine, resolving when the engine
  * process exits (the UI's unfreeze signal). `executable` is the engine binary;
  * `dataDir` the content root. Refuses a second launch while one is running.

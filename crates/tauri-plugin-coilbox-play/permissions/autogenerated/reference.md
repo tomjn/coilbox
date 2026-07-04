@@ -6,6 +6,8 @@ Allows the play plugin's start-script generation, engine launch and cancel comma
 
 - `allow-play-generate-script`
 - `allow-play-export-script`
+- `allow-play-export-preset`
+- `allow-play-import-preset`
 - `allow-play-launch`
 - `allow-play-launch-replay`
 - `allow-play-cancel`
@@ -42,6 +44,32 @@ Enables the play_cancel command without any pre-configured scope.
 <td>
 
 Denies the play_cancel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:allow-play-export-preset`
+
+</td>
+<td>
+
+Enables the play_export_preset command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:deny-play-export-preset`
+
+</td>
+<td>
+
+Denies the play_export_preset command without any pre-configured scope.
 
 </td>
 </tr>
@@ -120,6 +148,32 @@ Enables the play_generate_script command without any pre-configured scope.
 <td>
 
 Denies the play_generate_script command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:allow-play-import-preset`
+
+</td>
+<td>
+
+Enables the play_import_preset command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:deny-play-import-preset`
+
+</td>
+<td>
+
+Denies the play_import_preset command without any pre-configured scope.
 
 </td>
 </tr>
