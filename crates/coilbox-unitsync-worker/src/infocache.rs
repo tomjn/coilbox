@@ -20,7 +20,7 @@ use std::path::Path;
 
 /// Bump when the cached `GameInfoOutput` / `MapInfoOutput` shape changes so stale
 /// entries from an older build are ignored.
-const INFO_CACHE_VERSION: u32 = 2;
+const INFO_CACHE_VERSION: u32 = 3;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.

@@ -206,6 +206,16 @@ pub struct Side {
     pub start_unit_name: Option<String>,
 }
 
+/// One unit available in a game (from `GetUnitName`/`GetFullUnitName`).
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct UnitEntry {
+    pub name: String,
+    /// Human-friendly name of the unit (from `GetFullUnitName`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub full_name: Option<String>,
+}
+
 /// Output of the lazy `game` mode: a game's sides and unit count (requires
 /// loading the game's archive set, so it's fetched on demand, not during scan).
 #[derive(Serialize, Deserialize, Default)]
@@ -213,6 +223,8 @@ pub struct Side {
 pub struct GameInfoOutput {
     pub sides: Vec<Side>,
     pub unit_count: u32,
+    /// Every unit in the game, sorted by internal name.
+    pub units: Vec<UnitEntry>,
     /// Game options (from modoptions.lua), when present.
     pub options: Vec<ConfigOption>,
     /// Sync checksum (from GetPrimaryModChecksum via the primary archive) —

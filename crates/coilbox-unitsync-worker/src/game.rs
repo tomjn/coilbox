@@ -6,7 +6,7 @@
 
 use crate::ffi::Unitsync;
 use crate::infocache;
-use crate::model::{GameInfoOutput, Side};
+use crate::model::{GameInfoOutput, Side, UnitEntry};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -58,14 +58,19 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameIn
     let unit_count = us.unit_count().max(0);
 
     // Map internal unit name -> friendly full name, to resolve side start units.
+    // Also collect the full unit list for the UI, sorted by internal name.
     let mut full_by_name: HashMap<String, String> = HashMap::new();
+    let mut units = Vec::new();
     for i in 0..unit_count {
         if let Some(name) = us.unit_name(i) {
-            if let Some(full) = us.full_unit_name(i) {
-                full_by_name.insert(name.to_lowercase(), full);
+            let full_name = us.full_unit_name(i);
+            if let Some(full) = &full_name {
+                full_by_name.insert(name.to_lowercase(), full.clone());
             }
+            units.push(UnitEntry { name, full_name });
         }
     }
+    units.sort_by(|a, b| a.name.cmp(&b.name));
 
     let mut sides = Vec::new();
     for s in 0..us.side_count() {
@@ -108,6 +113,7 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameIn
     let out = GameInfoOutput {
         sides,
         unit_count: unit_count as u32,
+        units,
         options,
         checksum,
         errors,

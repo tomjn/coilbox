@@ -299,9 +299,18 @@ export interface Side {
   startUnitName?: string;
 }
 
+/** A unit available in a game (from `GetUnitName`/`GetFullUnitName`). */
+export interface UnitEntry {
+  name: string;
+  /** Friendly name of the unit, when the engine can enumerate units. */
+  fullName?: string;
+}
+
 export interface GameInfoResult {
   sides: Side[];
   unitCount: number;
+  /** Every unit in the game, sorted by internal name. */
+  units: UnitEntry[];
   /** Game options (from modoptions.lua). */
   options: ConfigOption[];
   /** Hex CRC (from the primary archive), computed lazily here. */
