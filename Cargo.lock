@@ -3177,9 +3177,9 @@ dependencies = [
 
 [[package]]
 name = "picoframe-core"
-version = "0.0.2"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db0397907b76d73a1c59e5ee7ae6456f0f7908d42dd68ad4fc1ccac1b88c97a3"
+checksum = "abf2bee40b2fdda26710446ddd54ae37f7e2a3581cbf087163a96e6e5ac8788b"
 dependencies = [
  "block2",
  "objc2",
@@ -3187,6 +3187,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tauri",
+ "tauri-plugin-store",
 ]
 
 [[package]]
@@ -4868,6 +4869,22 @@ checksum = "d55511a7bf6cd70c8767b02c97bf8134fa434daf3926cfc1be0a0f94132d165a"
 dependencies = [
  "tauri",
  "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-store"
+version = "2.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c72dda16786eb4a3f903e43a17b64d8d78dc0f00fe2aa4b757c28f617a8630b"
+dependencies = [
+ "dunce",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
