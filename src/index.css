@@ -20,6 +20,28 @@ body,
   }
 }
 
+/* Seamless mission-panorama scroll (see PanoramaScroller): the track holds two
+   copies of the art and translates one image-width (-50%), so the loop wraps with
+   no visible seam. Duration comes from a per-image custom property so the speed is
+   constant regardless of image width. */
+@keyframes campaign-panorama-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.campaign-panorama-track {
+  animation: campaign-panorama-scroll var(--panorama-duration, 20s) linear
+    infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .campaign-panorama-track {
+    animation: none;
+  }
+}
+
 /* Native colour input: make the colour fill the (square) box with no inset,
    so the swatch matches the control's shape instead of showing a small rectangle. */
 .color-swatch::-webkit-color-swatch-wrapper {
