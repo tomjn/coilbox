@@ -10,9 +10,10 @@ import { useHasCampaigns } from "./campaigns";
  * `tauri-plugin-coilbox-campaign` crate (ACL id `coilbox-campaign`); the schema
  * lives in `model.ts`.
  *
- * Both nav items join the existing **Play** group (nav groups merge by id): the
- * player-facing Campaigns item is shown only once a campaign exists
- * ({@link useHasCampaigns}), and the builder only in advanced mode — its routes are
+ * The player-facing Campaigns item joins the existing **Play** group (nav groups
+ * merge by id) and is shown only once a campaign exists ({@link useHasCampaigns}).
+ * The builder gets its own group like the other advanced tools (uberstress,
+ * mapconv, animation), visible only in advanced mode — its routes are
  * additionally `gateAdvanced`-wrapped so a deep link isn't reachable while hidden.
  */
 const campaignPlugin: FramePlugin = {
@@ -32,11 +33,18 @@ const campaignPlugin: FramePlugin = {
           icon: Milestone,
           useVisible: useHasCampaigns,
         },
+      ],
+    },
+    {
+      id: "campaign-builder",
+      label: "Campaign Builder",
+      order: 35,
+      items: [
         {
           id: "campaign.builder",
-          label: "Campaign Builder",
+          label: "Builder",
           to: "/campaign-builder",
-          order: 2,
+          order: 1,
           icon: Hammer,
           useVisible: useAdvancedMode,
         },
