@@ -8,6 +8,7 @@ Allows the play plugin's start-script generation, engine launch and cancel comma
 - `allow-play-launch`
 - `allow-play-launch-replay`
 - `allow-play-cancel`
+- `allow-play-focus`
 
 ## Permission Table
 
@@ -40,6 +41,32 @@ Enables the play_cancel command without any pre-configured scope.
 <td>
 
 Denies the play_cancel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:allow-play-focus`
+
+</td>
+<td>
+
+Enables the play_focus command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:deny-play-focus`
+
+</td>
+<td>
+
+Denies the play_focus command without any pre-configured scope.
 
 </td>
 </tr>
