@@ -1,4 +1,5 @@
 import { Button } from "@picoframe/frame";
+import { save } from "@tauri-apps/plugin-dialog";
 import { Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,6 +10,9 @@ import {
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { useAdvancedMode } from "@/general/advanced";
+import type { BattleConfig } from "../bindings";
+import { playExportScript } from "../bindings";
 import {
   aiKey,
   defaultAi,
@@ -23,10 +27,12 @@ import {
 } from "../config";
 import { useSkirmishDraft } from "../drafts";
 import { usePlay } from "../PlayProvider";
+import { type SkirmishPreset, useSkirmishPresets } from "../presets";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
 import { GameSelectCard } from "./components/GameSelectCard";
 import { MapCard } from "./components/MapCard";
 import { ParticipantsTable } from "./components/ParticipantsTable";
+import { PresetBar } from "./components/PresetBar";
 
 /** Basic singleplayer (skirmish) launcher: pick a game, map and opponents, then
  * launch the engine. Uses the preferred engine silently (no picker). */
@@ -53,6 +59,10 @@ export default function SkirmishPage() {
     Record<string, string>
   >(() => draft.modOptionValues);
   const [error, setError] = useState<string | null>(null);
+
+  const advanced = useAdvancedMode();
+  const { presets, savePreset, touchPreset, removePreset } =
+    useSkirmishPresets();
 
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
@@ -194,24 +204,32 @@ export default function SkirmishPage() {
       makeAiParticipant(ps, sides[0]?.name ?? "", defaultAi(lastAi, ais)),
     ]);
 
+  // Derive the engine `BattleConfig` from the current setup, or null if a game
+  // or map isn't selected yet. Shared by launch and export so they never drift.
+  function buildConfig(): BattleConfig | null {
+    if (!selectedGame || !selectedMap) return null;
+    // Only send options the user actually changed from their default; the
+    // engine applies the rest.
+    const overrides: Record<string, string> = {};
+    for (const o of modOptions) {
+      const v = modOptionValues[o.key];
+      if (v !== undefined && v !== (o.default ?? "")) overrides[o.key] = v;
+    }
+    return toBattleConfig({
+      participants,
+      mapName: selectedMap.name,
+      gameType: selectedGame.name,
+      startPosType,
+      modOptions: overrides,
+    });
+  }
+
   async function onStart() {
-    if (!target || !selectedGame || !selectedMap) return;
+    if (!target) return;
+    const config = buildConfig();
+    if (!config) return;
     setError(null);
     try {
-      // Only send options the user actually changed from their default; the
-      // engine applies the rest.
-      const overrides: Record<string, string> = {};
-      for (const o of modOptions) {
-        const v = modOptionValues[o.key];
-        if (v !== undefined && v !== (o.default ?? "")) overrides[o.key] = v;
-      }
-      const config = toBattleConfig({
-        participants,
-        mapName: selectedMap.name,
-        gameType: selectedGame.name,
-        startPosType,
-        modOptions: overrides,
-      });
       const res = await launch("skirmish", {
         config,
         executable: target.executable,
@@ -224,6 +242,50 @@ export default function SkirmishPage() {
       setError(e instanceof Error ? e.message : String(e));
     }
   }
+
+  // Advanced mode: render the exact start script and save it to a file the user
+  // picks — no launch. Uses the shared `buildConfig` so it matches what a real
+  // launch would feed the engine.
+  async function onExport() {
+    const config = buildConfig();
+    if (!config) return;
+    setError(null);
+    try {
+      const dest = await save({
+        title: "Export start script",
+        defaultPath: "script.txt",
+      });
+      if (!dest) return;
+      await playExportScript({ config, dest });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  const saveCurrentPreset = (name: string): SkirmishPreset =>
+    savePreset(name, {
+      participants,
+      gameName,
+      mapName,
+      startPosType,
+      modOptionValues,
+    });
+
+  const loadPreset = (p: SkirmishPreset) => {
+    // The mod-option reset effect wipes values whenever the game archive changes
+    // to a different defined value. Pre-seed `prevArchive` to the incoming game's
+    // archive so restoring a preset for a different game doesn't discard the
+    // preset's own mod options (mirrors the initial draft-hydration escape).
+    prevArchive.current = games.find(
+      (g) => g.name === p.gameName,
+    )?.primaryArchive.name;
+    setParticipants(p.participants);
+    setGameName(p.gameName);
+    setMapName(p.mapName);
+    setStartPosType(p.startPosType);
+    setModOptionValues(p.modOptionValues);
+    touchPreset(p.id);
+  };
 
   return (
     <div className="flex flex-col gap-5 p-4">
@@ -252,6 +314,16 @@ export default function SkirmishPage() {
           </Button>
         </div>
       </header>
+
+      <PresetBar
+        presets={presets}
+        onLoad={loadPreset}
+        onSave={saveCurrentPreset}
+        onDelete={removePreset}
+        showExport={advanced}
+        onExport={onExport}
+        disabled={running}
+      />
 
       {!target && !scan.loading && (
         <p className="rounded-md border border-border/50 bg-card p-3 text-sm text-muted-foreground">

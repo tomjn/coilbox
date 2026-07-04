@@ -1281,16 +1281,22 @@
           "markdownDescription": "Denies the mp_update_bot command without any pre-configured scope."
         },
         {
-          "description": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-launch`\n- `allow-play-launch-replay`\n- `allow-play-cancel`\n- `allow-play-focus`",
+          "description": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-export-script`\n- `allow-play-launch`\n- `allow-play-launch-replay`\n- `allow-play-cancel`\n- `allow-play-focus`",
           "type": "string",
           "const": "coilbox-play:default",
-          "markdownDescription": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-launch`\n- `allow-play-launch-replay`\n- `allow-play-cancel`\n- `allow-play-focus`"
+          "markdownDescription": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-export-script`\n- `allow-play-launch`\n- `allow-play-launch-replay`\n- `allow-play-cancel`\n- `allow-play-focus`"
         },
         {
           "description": "Enables the play_cancel command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-play:allow-play-cancel",
           "markdownDescription": "Enables the play_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the play_export_script command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-play:allow-play-export-script",
+          "markdownDescription": "Enables the play_export_script command without any pre-configured scope."
         },
         {
           "description": "Enables the play_focus command without any pre-configured scope.",
@@ -1321,6 +1327,12 @@
           "type": "string",
           "const": "coilbox-play:deny-play-cancel",
           "markdownDescription": "Denies the play_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the play_export_script command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-play:deny-play-export-script",
+          "markdownDescription": "Denies the play_export_script command without any pre-configured scope."
         },
         {
           "description": "Denies the play_focus command without any pre-configured scope.",

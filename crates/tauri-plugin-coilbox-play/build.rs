@@ -4,6 +4,7 @@
 // `coilbox-play:default`.
 const COMMANDS: &[&str] = &[
     "play_generate_script",
+    "play_export_script",
     "play_launch",
     "play_launch_replay",
     "play_cancel",
