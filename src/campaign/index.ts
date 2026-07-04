@@ -58,6 +58,16 @@ const campaignPlugin: FramePlugin = {
       crumb: "Campaigns",
     },
     {
+      path: "campaign/:id",
+      lazy: () => import("./pages/CampaignDetailPage"),
+      crumb: "Campaign",
+    },
+    {
+      path: "campaign/:id/briefing/:missionId",
+      lazy: () => import("./pages/MissionBriefingPage"),
+      crumb: "Briefing",
+    },
+    {
       path: "campaign-builder",
       lazy: gateAdvanced(() => import("./pages/CampaignBuilderPage")),
       crumb: "Campaign Builder",
