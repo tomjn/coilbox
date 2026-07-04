@@ -49,12 +49,17 @@ fn resolve_profile() -> (String, &'static str) {
     })
 }
 
-/// `profile_load` — return the distribution profile JSON text and where it came
-/// from (`"file"` | `"default"`). The frontend parses/validates the JSON.
+/// `profile_load` — return the distribution profile JSON text, where it came from
+/// (`"file"` | `"default"`), and the portable root (`<app_dir>/.coilbox`, or `""`
+/// when not portable). The frontend parses/validates the JSON; `root` lets it write
+/// an updated `profile.json` back into the portable folder (game-updates feature).
 #[tauri::command]
 async fn profile_load() -> CliResult {
     let (json_text, source) = resolve_profile();
-    CliResult::ok(json!({ "json": json_text, "source": source }))
+    let root = coilbox_portable::portable_root()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+    CliResult::ok(json!({ "json": json_text, "source": source, "root": root }))
 }
 
 /// Build the plugin. Registered as `"coilbox-profile"`.

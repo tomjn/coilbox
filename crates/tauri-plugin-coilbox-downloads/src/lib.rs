@@ -462,6 +462,29 @@ async fn dl_recoil_engines() -> CliResult {
     }
 }
 
+/// `dl_github_latest_release` — the latest GitHub release for an `owner/name`
+/// repo, reshaped for the game-updates screen. A distribution profile names the
+/// repo whose latest release ships a game archive (and optionally an updated
+/// `profile.json`). "Latest" is whatever GitHub's `/releases/latest` returns.
+#[tauri::command]
+async fn dl_github_latest_release(repo: String) -> CliResult {
+    let repo = match sources::validate_repo(&repo) {
+        Ok(r) => r,
+        Err(e) => return CliResult::err(e),
+    };
+    let url = sources::latest_release_url(&repo);
+    match fetch_github(&url).await {
+        Ok(body) => match serde_json::from_str::<sources::GithubRelease>(&body) {
+            Ok(rel) => match serde_json::to_value(sources::ReleaseInfo::from(rel)) {
+                Ok(v) => CliResult::ok(v),
+                Err(e) => CliResult::err(format!("could not encode release: {e}")),
+            },
+            Err(e) => CliResult::err(format!("could not parse GitHub release: {e}")),
+        },
+        Err(e) => CliResult::err(format!("failed to fetch latest release: {e}")),
+    }
+}
+
 /// Download a Recoil `.7z` release and extract it into `<write_path>/engine/<version>/`,
 /// emitting download progress then an indeterminate `extracting` phase.
 async fn install_recoil_engine(
@@ -645,6 +668,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_download_map,
             dl_download_file,
             dl_recoil_engines,
+            dl_github_latest_release,
             dl_download_engine_recoil,
             dl_download_engine_spring,
             dl_installed_content

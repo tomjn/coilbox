@@ -53,6 +53,7 @@ export default function ProfileSettings() {
             value={hiddenSettings.length ? hiddenSettings.join(", ") : "None"}
           />
           <Row label="Game filter" value={filterText ?? "None"} />
+          <Row label="Update repo" value={profile.release?.repo ?? "None"} />
           <Row
             label="Welcome screen"
             value={profile.welcome ? "Custom" : "Default"}

@@ -14,6 +14,7 @@ const COMMANDS: &[&str] = &[
     "dl_download_map",
     "dl_download_file",
     "dl_recoil_engines",
+    "dl_github_latest_release",
     "dl_download_engine_recoil",
     "dl_download_engine_spring",
     "dl_installed_content",
