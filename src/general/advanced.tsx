@@ -1,5 +1,6 @@
 import { NavGate, useSetting } from "@picoframe/frame";
 import type { ComponentType } from "react";
+import { getProfile } from "../profile/profile";
 
 /**
  * "Advanced mode" hides the developer/modding tools (uberstress, mapconv,
@@ -10,9 +11,13 @@ import type { ComponentType } from "react";
  */
 const ADVANCED_MODE_KEY = "advanced.enabled";
 
-/** `[enabled, setEnabled]` for the General settings toggle. */
+/**
+ * `[enabled, setEnabled]` for the General settings toggle. The default seeds from
+ * the distribution profile (`profile.advanced`) so a branded build can ship with
+ * the developer/modding tools on; a user's persisted toggle shadows it thereafter.
+ */
 export function useAdvancedModeSetting() {
-  return useSetting<boolean>(ADVANCED_MODE_KEY, false);
+  return useSetting<boolean>(ADVANCED_MODE_KEY, getProfile().advanced ?? false);
 }
 
 /**

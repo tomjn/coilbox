@@ -37,6 +37,23 @@ getCurrentWindow()
   .setTitle(appTitle)
   .catch((e) => console.warn("profile: could not set window title", e));
 
+// Apply the fullscreen state before render so a fullscreen session doesn't flash
+// a windowed frame on launch. `fullscreenLocked` (kiosk) forces it on, overriding
+// everything. Otherwise seed semantics apply: an unset key falls back to the
+// profile's `fullscreen` default; once the user has toggled it the stored value
+// wins. The settings cache holds JSON-serialized values, so the boolean is "true".
+const fullscreenRaw = settingsStorage.get("window.fullscreen");
+const fullscreenOn = profile.fullscreenLocked
+  ? true
+  : fullscreenRaw === null
+    ? profile.fullscreen === true
+    : fullscreenRaw === "true";
+if (fullscreenOn) {
+  getCurrentWindow()
+    .setFullscreen(true)
+    .catch((e) => console.warn("fullscreen: boot apply failed", e));
+}
+
 // Theme overrides re-point picoframe's CSS variables app-wide (every colour token
 // is a CSS var), so a branded build recolours the whole shell, not just the welcome.
 if (profile.theme) {
