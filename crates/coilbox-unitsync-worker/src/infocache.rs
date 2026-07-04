@@ -18,9 +18,11 @@ use serde::Serialize;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
-/// Bump when the cached `GameInfoOutput` / `MapInfoOutput` shape changes so stale
-/// entries from an older build are ignored.
-const INFO_CACHE_VERSION: u32 = 3;
+/// Bump when the cached `GameInfoOutput` / `MapInfoOutput` shape *or* the way its
+/// contents are produced changes, so stale entries from an older build are
+/// ignored. v4: game info gained the Lua-shim unit fallback, so previously-cached
+/// zero-unit results must be re-resolved.
+const INFO_CACHE_VERSION: u32 = 4;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.
