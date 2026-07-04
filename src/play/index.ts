@@ -1,5 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Swords } from "lucide-react";
+import InGameBadge from "./InGameBadge";
+import { PlayProvider } from "./PlayProvider";
 
 /**
  * The Play plugin's frontend half — a **Play** sidebar section whose first screen
@@ -34,6 +36,8 @@ const playPlugin: FramePlugin = {
       crumb: "Singleplayer",
     },
   ],
+  Provider: PlayProvider,
+  slots: [{ slot: "topbar.right", order: -10, Component: InGameBadge }],
 };
 
 export default playPlugin;

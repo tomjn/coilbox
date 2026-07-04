@@ -1,5 +1,4 @@
 import { Button } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
 import { Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,7 +9,6 @@ import {
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "@/content/config";
-import { type LaunchEvent, playLaunch } from "../bindings";
 import {
   aiKey,
   defaultAi,
@@ -24,6 +22,7 @@ import {
   useSkirmishAis,
 } from "../config";
 import { useSkirmishDraft } from "../drafts";
+import { usePlay } from "../PlayProvider";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
 import { GameSelectCard } from "./components/GameSelectCard";
 import { MapCard } from "./components/MapCard";
@@ -35,6 +34,7 @@ export default function SkirmishPage() {
   const { target } = usePreferredTarget();
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
+  const { running, launch } = usePlay();
 
   const scan = useUnitsyncScan(enginePath, dataDir);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
@@ -52,7 +52,6 @@ export default function SkirmishPage() {
   const [modOptionValues, setModOptionValues] = useState<
     Record<string, string>
   >(() => draft.modOptionValues);
-  const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const games = scan.data?.games ?? [];
@@ -197,12 +196,7 @@ export default function SkirmishPage() {
 
   async function onStart() {
     if (!target || !selectedGame || !selectedMap) return;
-    setRunning(true);
     setError(null);
-    const onEvent = new Channel<LaunchEvent>();
-    // The authoritative unfreeze is playLaunch resolving; the channel is unused
-    // here beyond keeping the "running" state honest.
-    onEvent.onmessage = () => {};
     try {
       // Only send options the user actually changed from their default; the
       // engine applies the rest.
@@ -218,20 +212,16 @@ export default function SkirmishPage() {
         startPosType,
         modOptions: overrides,
       });
-      const res = await playLaunch({
+      const res = await launch("skirmish", {
         config,
         executable: target.executable,
         dataDir: target.dataDir,
-        runId: crypto.randomUUID(),
-        onEvent,
       });
       if (res.exitCode && res.exitCode !== 0) {
         setError(`Engine exited with code ${res.exitCode}.`);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setRunning(false);
     }
   }
 

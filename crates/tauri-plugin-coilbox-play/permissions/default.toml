@@ -7,4 +7,5 @@ permissions = [
   "allow-play-launch",
   "allow-play-launch-replay",
   "allow-play-cancel",
+  "allow-play-focus",
 ]
