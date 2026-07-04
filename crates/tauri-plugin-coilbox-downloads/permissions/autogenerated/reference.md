@@ -15,6 +15,7 @@ Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR
 - `allow-dl-download-map`
 - `allow-dl-download-file`
 - `allow-dl-recoil-engines`
+- `allow-dl-github-latest-release`
 - `allow-dl-download-engine-recoil`
 - `allow-dl-download-engine-spring`
 - `allow-dl-installed-content`
@@ -180,6 +181,32 @@ Enables the dl_download_map command without any pre-configured scope.
 <td>
 
 Denies the dl_download_map command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:allow-dl-github-latest-release`
+
+</td>
+<td>
+
+Enables the dl_github_latest_release command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-github-latest-release`
+
+</td>
+<td>
+
+Denies the dl_github_latest_release command without any pre-configured scope.
 
 </td>
 </tr>

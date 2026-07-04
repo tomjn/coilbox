@@ -4,7 +4,8 @@ A **distribution profile** lets you ship Coilbox alongside a game (or otherwise
 brand/narrow it) **without forking or rebuilding**. You drop a single
 `profile.json` file next to the app; Coilbox reads it once at startup and applies
 it: window title, hidden features, a preset game filter, a branded welcome screen,
-theme colours, and hidden settings sections.
+theme colours, hidden settings sections, and a GitHub-releases update source for the
+game.
 
 If no profile is present, Coilbox behaves exactly as normal.
 
@@ -134,6 +135,7 @@ section can be hidden:
 | `uberstress`      | uberstress         |
 | `mapconv`         | mapconv            |
 | `updates`         | Updates            |
+| `game-updates`    | Game updates       |
 | `profile`         | Distribution profile |
 | `frame.appearance`| Appearance (theme/accent) |
 
@@ -224,6 +226,25 @@ defaults.
 > Coilbox also ships built-in named accents (zinc, blue, green, rose, violet,
 > orange) selectable under Settings > Appearance. A `theme` override takes
 > precedence over the user's accent choice.
+
+### `release` (object)
+
+Points Coilbox at a GitHub repository whose **releases** ship the game's archive
+(`.sdz` / `.sd7`) — for games distributed outside the rapid ecosystem (e.g. straight
+from GitHub). On launch Coilbox checks the repo's latest release; if none of that
+release's archives are already installed, a **Game updates** settings section and a
+topbar badge offer a one-click download that installs the archive and rescans content.
+
+```json
+{ "version": 1, "release": { "repo": "your-org/your-game" } }
+```
+
+- `repo` — the GitHub repository as `"owner/name"`.
+
+"Latest" is whatever GitHub marks as the latest release. If that release also carries
+an asset named exactly `profile.json`, Coilbox installs it into `.coilbox/` alongside
+the game archive; because the profile is read once at startup, the app then prompts for
+a restart to apply the updated profile.
 
 ## Verifying it's active
 

@@ -212,12 +212,16 @@ pub fn parse_hakora_index(html: &str) -> Vec<HakoraMap> {
     out
 }
 
-/// A GitHub release (subset) from the RecoilEngine repo's releases API.
+/// A GitHub release (subset) from the releases API. `name`/`body` are `Option`
+/// because GitHub sends them as JSON `null` (not absent) for an unnamed release
+/// or an empty changelog, which `#[serde(default)]` alone wouldn't tolerate.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 pub struct GithubRelease {
     pub tag_name: String,
     pub prerelease: bool,
+    pub name: Option<String>,
+    pub body: Option<String>,
     pub assets: Vec<GithubAsset>,
 }
 
@@ -242,6 +246,72 @@ pub struct EngineRelease {
 
 pub const RECOIL_RELEASES_URL: &str =
     "https://api.github.com/repos/beyond-all-reason/RecoilEngine/releases?per_page=40";
+
+/// A GitHub release reshaped for the game-updates screen: the tag, display name,
+/// markdown changelog, and downloadable assets. A distribution profile names an
+/// `owner/name` repo whose latest release ships a game archive (and optionally an
+/// updated `profile.json`).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseInfo {
+    pub tag: String,
+    pub name: String,
+    pub body: String,
+    pub assets: Vec<ReleaseAsset>,
+}
+
+/// A single downloadable asset within a [`ReleaseInfo`].
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseAsset {
+    pub name: String,
+    pub url: String,
+    pub size: u64,
+}
+
+impl From<GithubRelease> for ReleaseInfo {
+    fn from(r: GithubRelease) -> Self {
+        ReleaseInfo {
+            tag: r.tag_name,
+            name: r.name.unwrap_or_default(),
+            body: r.body.unwrap_or_default(),
+            assets: r
+                .assets
+                .into_iter()
+                .map(|a| ReleaseAsset {
+                    name: a.name,
+                    url: a.browser_download_url,
+                    size: a.size,
+                })
+                .collect(),
+        }
+    }
+}
+
+/// Build the GitHub "latest release" API URL for an `owner/name` repo.
+pub fn latest_release_url(repo: &str) -> String {
+    format!("https://api.github.com/repos/{repo}/releases/latest")
+}
+
+/// Validate an `owner/name` GitHub repo slug: exactly one `/`, both segments
+/// non-empty, no whitespace or `..` path-traversal. Returns the trimmed slug so
+/// it can be interpolated straight into the API URL.
+pub fn validate_repo(repo: &str) -> Result<String, String> {
+    let repo = repo.trim();
+    if repo.is_empty() {
+        return Err("repo is required".into());
+    }
+    if repo.contains(char::is_whitespace) || repo.contains("..") {
+        return Err("repo must be a plain \"owner/name\" slug".into());
+    }
+    let mut parts = repo.split('/');
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(owner), Some(name), None) if !owner.is_empty() && !name.is_empty() => {
+            Ok(repo.to_string())
+        }
+        _ => Err("repo must be \"owner/name\"".into()),
+    }
+}
 
 /// The Recoil 7z asset suffix for the current platform, e.g. `amd64-linux.7z`.
 /// `None` on platforms with no official build (macOS).
@@ -361,6 +431,47 @@ mod tests {
         assert_eq!(maps[0].size, "6.9M");
         assert_eq!(maps[1].filename, "some_map.sdz");
         assert_eq!(maps[1].size, "12M"); // right-aligned cell, trimmed
+    }
+
+    #[test]
+    fn validate_repo_accepts_owner_name_and_rejects_junk() {
+        assert_eq!(validate_repo("  owner/name  ").unwrap(), "owner/name");
+        assert!(validate_repo("").is_err());
+        assert!(validate_repo("noslash").is_err());
+        assert!(validate_repo("a/b/c").is_err());
+        assert!(validate_repo("owner/").is_err());
+        assert!(validate_repo("/name").is_err());
+        assert!(validate_repo("own er/name").is_err());
+        assert!(validate_repo("../../etc/passwd").is_err());
+    }
+
+    #[test]
+    fn release_info_maps_from_github_release() {
+        // `name`/`body` arrive as JSON null; the mapping must not blow up.
+        let json = r#"{"tag_name":"v1.3","prerelease":false,"name":null,"body":null,"assets":[
+            {"name":"splinter_v1.3.sdz","browser_download_url":"http://x/g","size":42},
+            {"name":"profile.json","browser_download_url":"http://x/p","size":7}
+        ]}"#;
+        let rel: GithubRelease = serde_json::from_str(json).unwrap();
+        let info = ReleaseInfo::from(rel);
+        assert_eq!(info.tag, "v1.3");
+        assert_eq!(info.name, "");
+        assert_eq!(info.body, "");
+        assert_eq!(info.assets.len(), 2);
+        assert_eq!(info.assets[0].name, "splinter_v1.3.sdz");
+        assert_eq!(info.assets[0].url, "http://x/g");
+        assert_eq!(info.assets[0].size, 42);
+        // camelCase for the frontend (`browserDownloadUrl` -> `url`).
+        let out = serde_json::to_string(&info).unwrap();
+        assert!(out.contains("\"url\":\"http://x/g\""));
+    }
+
+    #[test]
+    fn latest_release_url_targets_the_latest_endpoint() {
+        assert_eq!(
+            latest_release_url("owner/name"),
+            "https://api.github.com/repos/owner/name/releases/latest"
+        );
     }
 
     #[test]
