@@ -60,6 +60,11 @@ export interface BattleConfig {
   modOptions?: Record<string, string>;
   mapOptions?: Record<string, string>;
   /**
+   * `[RESTRICT]` — per-unit build limits. Key = unit internal name, value =
+   * limit (0 disables the unit).
+   */
+  restrictedUnits?: Record<string, number>;
+  /**
    * Whether this machine hosts the game. Defaults to true (singleplayer/skirmish
    * and lobby-host); a client joining a remote lobby battle sets false and gets a
    * minimal script pointing at the host.
