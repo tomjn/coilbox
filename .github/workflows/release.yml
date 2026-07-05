@@ -1,9 +1,10 @@
 name: release
 
 # Build Coilbox for macOS, Linux, and Windows on a version tag (or manually).
-# All platforms use the committed sidecars under src-tauri/binaries/ per target
-# triple — tauri-build bundles them automatically, no per-OS fetch or build.
-# macOS is arm64-only by design (Apple Silicon).
+# Sidecars come from committed prebuilts under src-tauri/binaries/ per target
+# triple. uberstress is an externalBin (tauri-build bundles it automatically);
+# pr-downloader is assembled into the `prdownloader/` resource folder per runner
+# (so its Windows DLLs ship beside it). macOS is arm64-only by design.
 #
 # KNOWN LIMITATION: the committed macOS binary links Homebrew dylibs (e.g.
 # minizip), so the bundled sidecar needs those present at runtime. A portable mac
@@ -97,6 +98,13 @@ jobs:
       - name: Build unitsync worker sidecar
         shell: bash
         run: bash scripts/build-unitsync-worker.sh
+
+      # Assemble the pr-downloader resource folder for this runner's platform:
+      # the committed prebuilt binary beside its Windows DLLs. Bundled as a
+      # resource folder (not externalBin) so the DLLs ship in the same directory.
+      - name: Assemble pr-downloader sidecar
+        shell: bash
+        run: bash scripts/assemble-prdownloader.sh
 
       - uses: tauri-apps/tauri-action@v0
         env:

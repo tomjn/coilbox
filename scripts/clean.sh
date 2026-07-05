@@ -8,8 +8,9 @@
 #
 # Left untouched on purpose:
 #   - committed prebuilts (pr-downloader-*, uberstress-*) — they are checked in
-#   - the fetched mapconv resource (src-tauri/mapconv/) — tauri-build needs the
-#     directory to exist, so wiping it breaks the next `cargo`/`tauri` build
+#   - the fetched mapconv resource (src-tauri/mapconv/) and the assembled
+#     pr-downloader resource (src-tauri/prdownloader/) — tauri-build needs these
+#     directories to exist, so wiping them breaks the next `cargo`/`tauri` build
 #   - the shared cargo target for every other crate (use `cargo clean` yourself
 #     if you really want a full rebuild)
 set -euo pipefail

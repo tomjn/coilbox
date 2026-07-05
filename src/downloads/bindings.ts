@@ -165,6 +165,16 @@ export const dlInstalledContent = defineCommand<
   { maps: string[]; games: string[] }
 >("coilbox-downloads", "dl_installed_content");
 
+/**
+ * Register installed-engine directories so the sidecar prefers an engine's own
+ * pr-downloader (which ships beside its complete DLL set) over coilbox's bundled
+ * bootstrap copy. Pushed from content state whenever roots/engines change.
+ */
+export const dlSetEngineDirs = defineCommand<
+  { dirs: string[] },
+  Record<string, never>
+>("coilbox-downloads", "dl_set_engine_dirs");
+
 /** A Recoil engine release matching the running platform. */
 export interface EngineRelease {
   version: string;

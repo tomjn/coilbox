@@ -11,6 +11,12 @@ src-tauri/target
 # Bundled as a Tauri resource folder (binaries + their libs/).
 src-tauri/mapconv/
 
+# pr-downloader is bundled as a Tauri resource folder too (binary beside its
+# Windows DLLs), assembled per-platform from the committed prebuilts by
+# scripts/assemble-prdownloader.sh. The assembled folder is a build artifact; the
+# sources (src-tauri/binaries/pr-downloader-*) stay committed.
+src-tauri/prdownloader/
+
 # The unitsync worker is our own workspace crate, built as an externalBin sidecar
 # (scripts/build-unitsync-worker.sh locally, release.yml per-platform in CI).
 # It's a build artifact, not a committed prebuilt like pr-downloader/uberstress.

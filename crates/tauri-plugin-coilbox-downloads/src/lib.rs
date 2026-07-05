@@ -25,7 +25,7 @@ use tauri::{
 const DEFAULT_MASTER: &str = "https://repos.springrts.com";
 
 const SIDECAR_MISSING: &str =
-    "pr-downloader sidecar not found. Bundle it via tauri.conf.json `externalBin` or set PRD_SIDECAR.";
+    "pr-downloader sidecar not found. Bundle the `prdownloader` resource folder (scripts/assemble-prdownloader.sh) or set PRD_SIDECAR.";
 
 /// Fetch a gzipped rapid index over HTTPS and inflate it to text.
 async fn fetch_gz(url: String) -> Result<String, String> {
@@ -38,6 +38,21 @@ async fn fetch_gz(url: String) -> Result<String, String> {
         .read_to_string(&mut body)
         .map_err(|e| format!("gunzip failed: {e}"))?;
     Ok(body)
+}
+
+/// Suppress the console window Windows would otherwise pop for the console-mode
+/// pr-downloader child (CREATE_NO_WINDOW). No-op on other platforms.
+fn hide_console(cmd: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = cmd;
+    }
 }
 
 /// Run the sidecar with the given args on a blocking thread, returning its output.
@@ -59,6 +74,7 @@ async fn run_sidecar_env(
         for (k, v) in &envs {
             cmd.env(k, v);
         }
+        hide_console(&mut cmd);
         cmd.output()
     })
     .await
@@ -92,6 +108,7 @@ async fn run_sidecar_streaming(
         for (k, v) in &envs {
             cmd.env(k, v);
         }
+        hide_console(&mut cmd);
         let mut child = cmd
             .spawn()
             .map_err(|e| format!("failed to run pr-downloader: {e}"))?;
@@ -651,11 +668,33 @@ async fn dl_installed_content(paths: Vec<String>) -> CliResult {
     }))
 }
 
+/// `dl_set_engine_dirs` — register installed-engine directories so the sidecar
+/// prefers an engine's own pr-downloader (which ships beside a complete, matched
+/// set of runtime DLLs) over the bundled bootstrap copy. The frontend pushes
+/// these from content state whenever the roots/engines change.
+#[tauri::command]
+fn dl_set_engine_dirs(dirs: Vec<String>) -> CliResult {
+    let paths = dirs
+        .into_iter()
+        .filter(|s| !s.trim().is_empty())
+        .map(std::path::PathBuf::from)
+        .collect();
+    sidecar::set_engine_dirs(paths);
+    CliResult::ok(json!({}))
+}
+
 /// Build the plugin. Registered as `"coilbox-downloads"` (crate name minus
 /// the `tauri-plugin-` prefix); the frontend invokes
 /// `plugin:coilbox-downloads|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-downloads")
+        // Capture the resource dir once so the handle-free run_sidecar* helpers can
+        // find the bundled `prdownloader/` folder (the sidecar + its Windows DLLs).
+        .setup(|app, _api| {
+            use tauri::Manager;
+            sidecar::set_resource_dir(app.path().resource_dir().ok());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             dl_version,
             dl_repos,
@@ -671,7 +710,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_github_latest_release,
             dl_download_engine_recoil,
             dl_download_engine_spring,
-            dl_installed_content
+            dl_installed_content,
+            dl_set_engine_dirs
         ])
         .build()
 }
