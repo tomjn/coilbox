@@ -1,31 +1,75 @@
 //! Locate and run the bundled `pr-downloader` sidecar, plus pure parsers for its
 //! human-readable output (it has no `--json` mode).
 //!
-//! The binary is bundled via Tauri `externalBin`, which places it next to the app
-//! executable at runtime (and in the target dir during `tauri dev`). We resolve it
-//! there rather than going through the shell plugin, so the plugin's ACL grant
-//! stays uniform with every other picoframe plugin (just
-//! `coilbox-downloads:default`, no extra shell-execute scope).
+//! The binary is bundled as a Tauri *resource folder* (`prdownloader/`), not an
+//! `externalBin`: the Windows build is MinGW and loads libcurl/zlib/winpthread
+//! DLLs from its own directory, so it must ship beside those DLLs (externalBin
+//! copies only the lone binary — a clean Windows machine then hits
+//! STATUS_DLL_NOT_FOUND). We resolve it under `resource_dir()/prdownloader/`
+//! rather than going through the shell plugin, so the plugin's ACL grant stays
+//! uniform with every other picoframe plugin (just `coilbox-downloads:default`,
+//! no extra shell-execute scope).
 
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
 
-/// Resolve the sidecar path. `PRD_SIDECAR` overrides everything (handy for dev and
-/// tests); otherwise look next to the current executable for `pr-downloader`
-/// (`.exe` on Windows), as Tauri's `externalBin` bundling arranges.
+/// App resource dir, captured once at plugin setup (where the `AppHandle` is
+/// available) so the handle-free `run_sidecar*` helpers can resolve the bundled
+/// folder without threading an `AppHandle` through every command.
+static RESOURCE_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
+
+/// Directories of installed engines, each of which may hold its own
+/// pr-downloader beside a complete, self-matched set of runtime DLLs (a Recoil
+/// build ships pr-downloader next to `spring`). Registered from the frontend via
+/// `dl_set_engine_dirs` and consulted on every resolve, so a freshly installed
+/// engine is used without a restart. Preferred over the bundled bootstrap copy.
+static ENGINE_DIRS: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
+/// Record the app resource dir at plugin setup. First write wins; later calls are
+/// no-ops (there is only one resource dir per process).
+pub fn set_resource_dir(dir: Option<PathBuf>) {
+    let _ = RESOURCE_DIR.set(dir);
+}
+
+/// Replace the set of installed-engine directories to search for a bundled
+/// pr-downloader. Called whenever the content roots / engines change.
+pub fn set_engine_dirs(dirs: Vec<PathBuf>) {
+    if let Ok(mut guard) = ENGINE_DIRS.lock() {
+        *guard = dirs;
+    }
+}
+
+/// First registered engine directory that actually contains a pr-downloader
+/// binary named `name`, if any.
+fn engine_sidecar(name: &str) -> Option<PathBuf> {
+    let dirs = ENGINE_DIRS.lock().ok()?;
+    dirs.iter().map(|d| d.join(name)).find(|c| c.exists())
+}
+
+/// Resolve the sidecar path (`.exe` suffix added on Windows), in priority order:
+/// 1. `PRD_SIDECAR` env override (dev and tests);
+/// 2. an installed engine's own pr-downloader (a complete, self-matched runtime);
+/// 3. the bundled `prdownloader/` resource folder (bootstrap copy);
+/// 4. next to the current executable (legacy/fallback layout).
 pub fn resolve_sidecar() -> Option<PathBuf> {
     if let Ok(p) = std::env::var("PRD_SIDECAR") {
         if !p.is_empty() {
             return Some(PathBuf::from(p));
         }
     }
-    let exe = std::env::current_exe().ok()?;
-    let dir = exe.parent()?;
-    let candidate = dir.join(format!("pr-downloader{}", std::env::consts::EXE_SUFFIX));
-    if candidate.exists() {
-        Some(candidate)
-    } else {
-        None
+    let name = format!("pr-downloader{}", std::env::consts::EXE_SUFFIX);
+    if let Some(p) = engine_sidecar(&name) {
+        return Some(p);
     }
+    if let Some(Some(dir)) = RESOURCE_DIR.get() {
+        let candidate = dir.join("prdownloader").join(&name);
+        if candidate.exists() {
+            return Some(candidate);
+        }
+    }
+    let exe = std::env::current_exe().ok()?;
+    let candidate = exe.parent()?.join(&name);
+    candidate.exists().then_some(candidate)
 }
 
 /// Extract the version token from `pr-downloader --version` output, e.g.

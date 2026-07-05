@@ -52,6 +52,15 @@ The frame, CLI, and plugin contract come from the published `@picoframe/*` packa
 (Linux/Windows) and built from source for macOS (no official macOS build exists).
 The binaries are committed under `src-tauri/binaries/pr-downloader-<target-triple>`.
 
+It is bundled as a Tauri **resource folder** (`prdownloader/`), not an
+`externalBin`: the Windows build is MinGW and loads `libcurl.dll` / `zlib1.dll` /
+`libwinpthread-1.dll` from its own directory, so those DLLs (committed under
+`src-tauri/binaries/pr-downloader-win-dll/`, a matched set from one engine
+release) must ship beside it. `scripts/assemble-prdownloader.sh` builds the
+per-platform folder from the committed prebuilts (run automatically by
+`bun tauri dev` and in CI); the assembled folder is gitignored. For dev, set
+`PRD_SIDECAR` if the sidecar isn't found via the resource dir.
+
 > **Note:** macOS is arm64-only (Apple Silicon) by design. The committed
 > `aarch64-apple-darwin` binary links Homebrew dylibs, so the bundled sidecar
 > needs those at runtime; a portable distribution needs a static/self-contained

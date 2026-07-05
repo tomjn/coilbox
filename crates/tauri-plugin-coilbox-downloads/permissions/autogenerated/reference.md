@@ -19,6 +19,7 @@ Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR
 - `allow-dl-download-engine-recoil`
 - `allow-dl-download-engine-spring`
 - `allow-dl-installed-content`
+- `allow-dl-set-engine-dirs`
 
 ## Permission Table
 
@@ -311,6 +312,32 @@ Enables the dl_repos command without any pre-configured scope.
 <td>
 
 Denies the dl_repos command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:allow-dl-set-engine-dirs`
+
+</td>
+<td>
+
+Enables the dl_set_engine_dirs command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-set-engine-dirs`
+
+</td>
+<td>
+
+Denies the dl_set_engine_dirs command without any pre-configured scope.
 
 </td>
 </tr>
