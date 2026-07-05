@@ -70,6 +70,16 @@ export function randomTeamColorHex(): string {
 /** Ally-team letters (A, B, C…) mapped to 0-based indices. */
 export const allyLetter = (n: number): string => String.fromCharCode(65 + n);
 
+/**
+ * Parse a unitsync hex CRC into the signed 32-bit int the OPENBATTLE /
+ * UPDATEBATTLEINFO wire carries. `| 0` folds a >2^31 checksum into the signed
+ * range the server reads it back in.
+ */
+export function hexToI32(hex?: string): number {
+  if (!hex) return 0;
+  return Number.parseInt(hex, 16) | 0;
+}
+
 /** Black or white text, whichever reads better on `hex` (perceived luminance). */
 export function readableText(hex: string): string {
   const n = Number.parseInt(hex.replace("#", ""), 16);

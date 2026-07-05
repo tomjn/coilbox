@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-remove-script-tags"
+description = "Enables the mp_remove_script_tags command without any pre-configured scope."
+commands.allow = ["mp_remove_script_tags"]
+
+[[permission]]
+identifier = "deny-mp-remove-script-tags"
+description = "Denies the mp_remove_script_tags command without any pre-configured scope."
+commands.deny = ["mp_remove_script_tags"]

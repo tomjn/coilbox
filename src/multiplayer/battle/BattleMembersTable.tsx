@@ -86,6 +86,11 @@ export function BattleMembersTable({
               <th className="px-3 pb-2 pt-3 text-left font-medium">Faction</th>
               <th className="px-3 pb-2 pt-3 text-left font-medium">Team</th>
               <th className="px-3 pb-2 pt-3 text-left font-medium">Ally</th>
+              {selfHost && (
+                <th className="px-2 pb-2 pt-3">
+                  <span className="sr-only">Actions</span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -118,6 +123,7 @@ export function BattleMembersTable({
                   row={row}
                   editable={row.self}
                   control={control}
+                  showActions={selfHost}
                   sideOptions={sideOptions}
                   teamOptions={teamOptions}
                   allyOptions={allyOptions}
@@ -131,7 +137,7 @@ export function BattleMembersTable({
             {rows.length === 0 && (
               <tr className="border-t border-border/40">
                 <td
-                  colSpan={5}
+                  colSpan={selfHost ? 6 : 5}
                   className="px-3 py-6 text-center text-sm text-muted-foreground"
                 >
                   Waiting for players…

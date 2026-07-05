@@ -1,8 +1,13 @@
+import { useEffect, useState } from "react";
 import type { MapItem } from "@/content/bindings";
-import { useUnitsyncMinimap, useUnitsyncThumbnails } from "@/content/config";
+import {
+  useUnitsyncMapInfo,
+  useUnitsyncMinimap,
+  useUnitsyncThumbnails,
+} from "@/content/config";
 import { MapCard } from "@/play/pages/components/MapCard";
 import type { Battle } from "../bindings";
-import type { MemberRow } from "./config";
+import { hexToI32, type MemberRow } from "./config";
 import { MissingMapBox } from "./MissingMapBox";
 import { StartBoxOverlay } from "./StartBoxOverlay";
 
@@ -10,8 +15,9 @@ import { StartBoxOverlay } from "./StartBoxOverlay";
  * The battle's map, rendered through the shared singleplayer `MapCard` so it
  * carries the same minimap + name + info tags. Adds an ally start-box overlay for
  * "choose in-game" battles (hiding the fixed-position dots, which don't apply
- * then), and repurposes the picker as a map *suggestion* to the autohost (`!map`)
- * — our own selection never changes the local view; the host's does.
+ * then). When we host the battle ourselves the picker changes the map directly
+ * (`onChangeMap` → UPDATEBATTLEINFO); otherwise it's a *suggestion* to the
+ * autohost (`!map`) — a suggestion never changes the local view, the host's does.
  */
 export function BattleMapCard({
   battle,
@@ -22,7 +28,9 @@ export function BattleMapCard({
   localMap,
   mapMissing,
   startPosType,
+  selfHost,
   onSuggestMap,
+  onChangeMap,
   onRescan,
 }: {
   battle: Battle;
@@ -33,11 +41,37 @@ export function BattleMapCard({
   localMap: MapItem | undefined;
   mapMissing: boolean;
   startPosType: number;
+  /** We host this battle: the picker changes the map instead of suggesting it. */
+  selfHost: boolean;
   onSuggestMap: (name: string) => void;
+  onChangeMap: (name: string, maphash: number) => void;
   onRescan: () => Promise<void>;
 }) {
   const minimap = useUnitsyncMinimap(enginePath, dataDir, battle.map);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
+
+  // As host, changing the map needs the new map's CRC for UPDATEBATTLEINFO so
+  // joiners can sync. The checksum comes from the unitsync worker (a hook keyed
+  // on map name), so a pick stashes the name and we fire onChangeMap once its
+  // info resolves; a hash failure just drops the pick.
+  const [pendingMap, setPendingMap] = useState<string | null>(null);
+  const pendingInfo = useUnitsyncMapInfo(
+    enginePath,
+    dataDir,
+    pendingMap ?? undefined,
+  );
+  useEffect(() => {
+    if (!pendingMap) return;
+    if (pendingInfo.status === "ready") {
+      onChangeMap(pendingMap, hexToI32(pendingInfo.info?.checksum));
+      setPendingMap(null);
+    } else if (
+      pendingInfo.status === "error" ||
+      pendingInfo.status === "unsyncable"
+    ) {
+      setPendingMap(null);
+    }
+  }, [pendingMap, pendingInfo.status, pendingInfo.info, onChangeMap]);
 
   const players = rows
     .filter((r) => !r.spectator)
@@ -70,8 +104,10 @@ export function BattleMapCard({
       minimapLoading={minimap.loading}
       markerColors={markerColors}
       env={minimap.env}
-      onSelectMap={onSuggestMap}
-      selectLabel="Suggest map"
+      onSelectMap={selfHost ? setPendingMap : onSuggestMap}
+      selectLabel={
+        selfHost ? (pendingMap ? "Changing map…" : "Change map") : "Suggest map"
+      }
       overlay={
         showBoxes ? (
           <StartBoxOverlay rects={battle.startRects} allyColors={allyColors} />

@@ -314,6 +314,11 @@ export const mpJoinBattle = defineCommand<
   { sent: boolean }
 >("coilbox-multiplayer", "mp_join_battle");
 
+export const mpJoinBattleDeny = defineCommand<
+  { serverKey: string; username: string; reason?: string | null },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_join_battle_deny");
+
 export const mpLeaveBattle = defineCommand<
   { serverKey: string },
   { sent: boolean }
@@ -358,6 +363,22 @@ export const mpOpenBattle = defineCommand<
   },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_open_battle");
+
+/**
+ * Host: change the open battle's map, lock flag and advertised spectator count
+ * (`UPDATEBATTLEINFO`). The four fields travel together, so resend the current
+ * values for whatever isn't changing. `maphash` is the signed 32-bit map CRC.
+ */
+export const mpUpdateBattleInfo = defineCommand<
+  {
+    serverKey: string;
+    spectators: number;
+    locked: boolean;
+    maphash: number;
+    map: string;
+  },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_update_battle_info");
 
 export const mpAddBot = defineCommand<
   {
@@ -434,10 +455,20 @@ export const mpSetStartRect = defineCommand<
   { sent: boolean }
 >("coilbox-multiplayer", "mp_set_start_rect");
 
+export const mpRemoveStartRect = defineCommand<
+  { serverKey: string; ally: number },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_remove_start_rect");
+
 export const mpSetScriptTags = defineCommand<
   { serverKey: string; tags: Record<string, string> },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_set_script_tags");
+
+export const mpRemoveScriptTags = defineCommand<
+  { serverKey: string; tags: string[] },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_remove_script_tags");
 
 /** Map the current battle to a `play` `BattleConfig` ready to pass to `playLaunch`. */
 export const mpBuildBattleConfig = defineCommand<

@@ -4,9 +4,16 @@ import {
   CheckCircle2,
   Crown,
   Eye,
+  MoreVertical,
   UserX,
   XCircle,
 } from "lucide-react";
+import { useState } from "react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { allyLetter, type MemberRow as Row } from "./config";
@@ -37,14 +44,18 @@ function ReadyIcon({ row }: { row: Row }) {
 /**
  * One player/bot row. The logged-in user's own row is editable (faction, team,
  * ally, colour → MYBATTLESTATUS). In a battle WE host, `control` is also supplied
- * for OTHER members so the host can force their team/ally/colour, spectate or kick
- * them (there's no force-faction command, so side stays read-only for others).
- * Every remaining row is read-only.
+ * for OTHER members so the host can force their team/ally/colour (inline), and
+ * spectate or kick them from a trailing `⋮` menu (there's no force-faction
+ * command, so side stays read-only for others). Every remaining row is read-only.
+ *
+ * `showActions` reserves the trailing actions column so every row lines up even
+ * when a particular row has no menu (our own row, or a non-hosted battle).
  */
 export function MemberRow({
   row,
   editable,
   control,
+  showActions,
   sideOptions,
   teamOptions,
   allyOptions,
@@ -56,6 +67,7 @@ export function MemberRow({
   row: Row;
   editable: boolean;
   control?: MemberControls | null;
+  showActions: boolean;
   sideOptions: { value: string; label: string }[];
   teamOptions: { value: string; label: string }[];
   allyOptions: { value: string; label: string }[];
@@ -64,6 +76,8 @@ export function MemberRow({
   onAlly: (ally: number) => void;
   onColor: (hex: string) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const canSpectate = row.kind === "human" && !row.spectator;
   const subtitle = row.host
     ? "Host"
     : row.kind === "bot"
@@ -124,39 +138,9 @@ export function MemberRow({
                 {row.name}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">
-                {subtitle}
-              </span>
-              {control && (
-                <span className="flex items-center gap-1.5">
-                  {row.kind === "human" && !row.spectator && (
-                    <button
-                      type="button"
-                      onClick={control.onForceSpectator}
-                      title={`Move ${row.name} to spectators`}
-                      className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground hover:text-foreground"
-                    >
-                      <Eye className="size-3" />
-                      Spectate
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={control.onKick}
-                    title={
-                      row.kind === "bot"
-                        ? `Remove ${row.name}`
-                        : `Kick ${row.name}`
-                    }
-                    className="inline-flex items-center gap-0.5 text-[11px] text-destructive/80 hover:text-destructive"
-                  >
-                    <UserX className="size-3" />
-                    {row.kind === "bot" ? "Remove" : "Kick"}
-                  </button>
-                </span>
-              )}
-            </div>
+            <span className="text-[11px] text-muted-foreground">
+              {subtitle}
+            </span>
           </div>
         </div>
       </td>
@@ -214,6 +198,50 @@ export function MemberRow({
           <span className="text-sm">Ally {allyLetter(row.ally)}</span>
         )}
       </td>
+
+      {showActions && (
+        <td className="px-2 py-2 text-right">
+          {control && (
+            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`Actions for ${row.name}`}
+                  className="inline-flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <MoreVertical className="size-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-44 p-1">
+                {canSpectate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      control.onForceSpectator();
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                  >
+                    <Eye className="size-4" />
+                    Force spectate
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    control.onKick();
+                  }}
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
+                >
+                  <UserX className="size-4" />
+                  {row.kind === "bot" ? "Remove" : "Kick"}
+                </button>
+              </PopoverContent>
+            </Popover>
+          )}
+        </td>
+      )}
     </tr>
   );
 }
