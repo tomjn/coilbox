@@ -479,6 +479,43 @@ fn mp_open_battle(
     enqueue(registry.inner(), &server_key, line)
 }
 
+/// `mp_update_battle_info` — host: change the open battle's map, lock flag, and
+/// advertised spectator count via `UPDATEBATTLEINFO`. The four fields travel
+/// together, so callers resend the current values for whichever they aren't
+/// changing (the frontend `setMap`/`setLocked` helpers do this). The server
+/// echoes the change back as `UPDATEBATTLEINFO`, which the reducer applies (and
+/// turns into a system chat notice).
+#[tauri::command]
+fn mp_update_battle_info(
+    registry: State<'_, Registry>,
+    server_key: String,
+    spectators: u32,
+    locked: bool,
+    maphash: i32,
+    map: String,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::update_battle_info(spectators, locked, maphash, &map),
+    )
+}
+
+/// `mp_join_battle_deny` — host: reject a pending join request (`JOINBATTLEDENY`).
+#[tauri::command]
+fn mp_join_battle_deny(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+    reason: Option<String>,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::join_battle_deny(&username, reason.as_deref()),
+    )
+}
+
 /// `mp_add_bot` — add an AI bot. Takes decoded battle-status fields (packed here,
 /// the single source of truth) mirroring `mp_set_battle_status`.
 #[tauri::command]
@@ -639,6 +676,16 @@ fn mp_set_start_rect(
     )
 }
 
+/// `mp_remove_start_rect` — host: clear an ally team's start rectangle.
+#[tauri::command]
+fn mp_remove_start_rect(registry: State<'_, Registry>, server_key: String, ally: u8) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::remove_start_rect(ally),
+    )
+}
+
 /// `mp_set_script_tags` — host: set game script tags.
 #[tauri::command]
 fn mp_set_script_tags(
@@ -650,6 +697,21 @@ fn mp_set_script_tags(
         registry.inner(),
         &server_key,
         command::set_script_tags(&tags),
+    )
+}
+
+/// `mp_remove_script_tags` — host: clear game script tags by key.
+#[tauri::command]
+fn mp_remove_script_tags(
+    registry: State<'_, Registry>,
+    server_key: String,
+    tags: Vec<String>,
+) -> CliResult {
+    let refs: Vec<&str> = tags.iter().map(String::as_str).collect();
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::remove_script_tags(&refs),
     )
 }
 
@@ -953,10 +1015,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_leave_channel,
             mp_list_channels,
             mp_join_battle,
+            mp_join_battle_deny,
             mp_leave_battle,
             mp_set_status,
             mp_set_battle_status,
             mp_open_battle,
+            mp_update_battle_info,
             mp_add_bot,
             mp_remove_bot,
             mp_update_bot,
@@ -966,7 +1030,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_force_spectator,
             mp_kick,
             mp_set_start_rect,
+            mp_remove_start_rect,
             mp_set_script_tags,
+            mp_remove_script_tags,
             mp_build_battle_config,
             mp_build_host_config,
         ])

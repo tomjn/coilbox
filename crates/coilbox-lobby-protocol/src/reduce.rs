@@ -351,13 +351,45 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             maphash,
             map,
         } => {
+            // Turn map/lock changes into non-bubble "system" chat notices, derived
+            // from the diff against current state before we overwrite it. The server
+            // echoes UPDATEBATTLEINFO to every member (the founder included), so all
+            // clients synthesize the same notice from the real change.
+            let mut notices: Vec<(String, String)> = Vec::new();
             if let Some(b) = state.battles.get_mut(&id) {
+                if let Some(chan) = b.channel.clone() {
+                    if b.map != map {
+                        notices.push((chan.clone(), format!("Host changed the map to {map}")));
+                    }
+                    if b.locked != locked {
+                        let text = if locked {
+                            "Host locked the battle"
+                        } else {
+                            "Host unlocked the battle"
+                        };
+                        notices.push((chan, text.to_string()));
+                    }
+                }
                 b.spectator_count = spectator_count;
                 b.locked = locked;
                 b.maphash = maphash;
                 b.map = map;
             }
-            vec![Delta::BattleInfoChanged { id }]
+            let mut deltas = vec![Delta::BattleInfoChanged { id }];
+            for (chan, text) in notices {
+                deltas.extend(push_chat(
+                    state,
+                    &chan,
+                    ChatMsg {
+                        channel: Some(chan.clone()),
+                        from: String::new(),
+                        text,
+                        kind: ChatKind::System,
+                        at: now_ms,
+                    },
+                ));
+            }
+            deltas
         }
         ServerMessage::BattleClosed { id } => {
             state.battles.remove(&id);

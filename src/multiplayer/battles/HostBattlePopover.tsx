@@ -13,6 +13,7 @@ import {
 } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { hexToI32 } from "../battle/config";
 import type { mpOpenBattle } from "../bindings";
 
 /** The `mpOpenBattle` argument shape, minus the connection key the parent supplies. */
@@ -20,13 +21,6 @@ export type OpenBattleArgs = Omit<
   Parameters<typeof mpOpenBattle>[0],
   "serverKey"
 >;
-
-/** Parse a unitsync hex CRC into the signed 32-bit int the OPENBATTLE wire carries. */
-function hexToI32(hex?: string): number {
-  if (!hex) return 0;
-  // `| 0` folds a >2^31 checksum into the signed range the server reads it back in.
-  return Number.parseInt(hex, 16) | 0;
-}
 
 /** Spring's conventional lobby-host port; editable for power users / multi-host. */
 const DEFAULT_HOST_PORT = 8452;

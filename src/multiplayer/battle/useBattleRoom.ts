@@ -26,6 +26,7 @@ import {
   mpSetBattleStatus,
   mpSetScriptTags,
   mpSetStatus,
+  mpUpdateBattleInfo,
 } from "../bindings";
 import { useMultiplayer } from "../store";
 import { canEditBattleOptions } from "./battleOptions";
@@ -115,6 +116,13 @@ export interface BattleRoomView {
   startGame: () => Promise<void>;
   /** Ask the autohost to switch to a map (`!map <name>`). */
   suggestMap: (name: string) => Promise<void>;
+  /**
+   * Host: change the battle's map directly (UPDATEBATTLEINFO), preserving the
+   * current lock/spectator fields. `maphash` is the map's signed 32-bit CRC.
+   */
+  setMap: (name: string, maphash: number) => void;
+  /** Host: lock/unlock the battle directly (UPDATEBATTLEINFO), preserving the map. */
+  setLocked: (locked: boolean) => void;
   /** Force a unitsync rescan and drop cached previews for the battle's map. */
   rescan: () => Promise<void>;
 }
@@ -261,6 +269,40 @@ export function useBattleRoom(): BattleRoomView {
     if (!activeKey) return;
     await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
   }, [activeKey]);
+
+  // Host map/lock edits. UPDATEBATTLEINFO carries map + lock + spectator count
+  // together, so each helper resends the current values for the fields it isn't
+  // touching. The server echoes the change back (→ snapshot + a system chat
+  // notice), so the local view reconciles from the real state, not optimistically.
+  const setMap = useCallback(
+    (name: string, maphash: number) => {
+      if (!activeKey || !battle) return;
+      mpUpdateBattleInfo({
+        serverKey: activeKey,
+        spectators: battle.spectatorCount,
+        locked: battle.locked,
+        maphash,
+        map: name,
+      }).catch(() => {});
+    },
+    [activeKey, battle],
+  );
+
+  const setLocked = useCallback(
+    (locked: boolean) => {
+      if (!activeKey || !battle) return;
+      mpUpdateBattleInfo({
+        serverKey: activeKey,
+        spectators: battle.spectatorCount,
+        locked,
+        // The mirror keeps maphash as the raw (decimal) wire token; fold it back
+        // into the signed 32-bit int the command expects.
+        maphash: Number(battle.maphash) | 0,
+        map: battle.map,
+      }).catch(() => {});
+    },
+    [activeKey, battle],
+  );
 
   const setIngame = useCallback(
     (ingame: boolean) => {
@@ -440,6 +482,8 @@ export function useBattleRoom(): BattleRoomView {
     autohostSend,
     startGame: () => autohostSend("!start"),
     suggestMap: (name) => autohostSend(`!map ${name}`),
+    setMap,
+    setLocked,
     rescan,
   };
 }

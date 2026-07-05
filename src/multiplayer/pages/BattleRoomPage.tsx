@@ -94,6 +94,9 @@ function BattleRoomPage() {
         onToggleSpectate={room.setSpectator}
         onLeave={onLeave}
         onStart={onStart}
+        selfHost={room.selfHost}
+        locked={battle.locked}
+        onToggleLock={room.setLocked}
       />
 
       {launch.error && (
@@ -137,7 +140,9 @@ function BattleRoomPage() {
             localMap={room.localMap}
             mapMissing={room.mapMissing}
             startPosType={room.startPosType}
+            selfHost={room.selfHost}
             onSuggestMap={room.suggestMap}
+            onChangeMap={room.setMap}
             onRescan={room.rescan}
           />
           <BattleGameCard
@@ -170,10 +175,15 @@ function BattleRoomPage() {
               onRescan={room.rescan}
             />
           )}
-          <AutohostControls
-            locked={battle.locked}
-            onCommand={room.autohostSend}
-          />
+          {/* The `!`-command panel only makes sense with a SPADS autohost; when
+              we host the battle ourselves those commands are inert (lock moves to
+              the header, map changes go through the map card). */}
+          {!room.selfHost && (
+            <AutohostControls
+              locked={battle.locked}
+              onCommand={room.autohostSend}
+            />
+          )}
         </aside>
       </div>
     </main>

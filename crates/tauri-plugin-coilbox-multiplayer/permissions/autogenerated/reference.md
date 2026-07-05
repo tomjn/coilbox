@@ -19,10 +19,12 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-leave-channel`
 - `allow-mp-list-channels`
 - `allow-mp-join-battle`
+- `allow-mp-join-battle-deny`
 - `allow-mp-leave-battle`
 - `allow-mp-set-status`
 - `allow-mp-set-battle-status`
 - `allow-mp-open-battle`
+- `allow-mp-update-battle-info`
 - `allow-mp-add-bot`
 - `allow-mp-remove-bot`
 - `allow-mp-update-bot`
@@ -32,7 +34,9 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-force-spectator`
 - `allow-mp-kick`
 - `allow-mp-set-start-rect`
+- `allow-mp-remove-start-rect`
 - `allow-mp-set-script-tags`
+- `allow-mp-remove-script-tags`
 - `allow-mp-build-battle-config`
 - `allow-mp-build-host-config`
 
@@ -360,6 +364,32 @@ Denies the mp_join_battle command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-multiplayer:allow-mp-join-battle-deny`
+
+</td>
+<td>
+
+Enables the mp_join_battle_deny command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-join-battle-deny`
+
+</td>
+<td>
+
+Denies the mp_join_battle_deny command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-multiplayer:allow-mp-join-channel`
 
 </td>
@@ -594,6 +624,58 @@ Denies the mp_remove_bot command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-multiplayer:allow-mp-remove-script-tags`
+
+</td>
+<td>
+
+Enables the mp_remove_script_tags command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-remove-script-tags`
+
+</td>
+<td>
+
+Denies the mp_remove_script_tags command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-remove-start-rect`
+
+</td>
+<td>
+
+Enables the mp_remove_start_rect command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-remove-start-rect`
+
+</td>
+<td>
+
+Denies the mp_remove_start_rect command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-multiplayer:allow-mp-say`
 
 </td>
@@ -821,6 +903,32 @@ Enables the mp_snapshot command without any pre-configured scope.
 <td>
 
 Denies the mp_snapshot command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-update-battle-info`
+
+</td>
+<td>
+
+Enables the mp_update_battle_info command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-update-battle-info`
+
+</td>
+<td>
+
+Denies the mp_update_battle_info command without any pre-configured scope.
 
 </td>
 </tr>
