@@ -284,6 +284,21 @@ export async function primeScan(
   return promise;
 }
 
+/**
+ * Drop every cached unitsync scan so the next open re-scans from disk. Called
+ * after a content download so a freshly-installed game/map shows up (e.g. in the
+ * singleplayer picker) without a manual rescan. Also bumps each known target's
+ * epoch so the derived batch loaders (thumbnails, headers) refetch. Lazy by
+ * design: an already-mounted picker refreshes when it next reads the cache
+ * (typically on re-navigation after the download).
+ */
+export function invalidateScans(): void {
+  const keys = new Set([...scanCache.keys(), ...scanErrorCache.keys()]);
+  scanCache.clear();
+  scanErrorCache.clear();
+  for (const key of keys) bumpScanEpoch(key);
+}
+
 /* -------------------------------------------------------------------------- *
  * Content epoch — a per-target counter bumped on each forced rescan. The batch
  * loaders (map thumbnails, game headers) fold it into their cache key + effect
@@ -1157,10 +1172,16 @@ export function useReplays(rootPath?: string) {
   const [replays, setReplays] = useState<ReplayFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The rootPath whose listing `replays`/`error` currently reflect. Until it
+  // matches the requested rootPath the list hasn't loaded yet — which the UI
+  // must distinguish from "loaded and empty" (a root with no replays), or it
+  // would show a skeleton forever instead of an empty state.
+  const [loadedFor, setLoadedFor] = useState<string | undefined>(undefined);
 
   const refresh = useCallback(async () => {
     if (!rootPath) {
       setReplays([]);
+      setLoadedFor(undefined);
       return;
     }
     setLoading(true);
@@ -1171,6 +1192,7 @@ export function useReplays(rootPath?: string) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      setLoadedFor(rootPath);
       setLoading(false);
     }
   }, [rootPath]);
@@ -1179,7 +1201,7 @@ export function useReplays(rootPath?: string) {
     refresh();
   }, [refresh]);
 
-  return { replays, loading, error, refresh };
+  return { replays, loading, error, refresh, ready: loadedFor === rootPath };
 }
 
 /** Session cache of decoded demos, keyed by `enginePath::replayPath`. */

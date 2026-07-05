@@ -44,6 +44,10 @@ jobs:
       # its contents, so an empty placeholder satisfies the check.
       - name: Placeholder mapconv resource dir
         run: mkdir -p src-tauri/mapconv
+      # Same for the pr-downloader resource folder (assembled at build time from
+      # the committed prebuilts, gitignored). Clippy only needs the path to exist.
+      - name: Placeholder pr-downloader resource dir
+        run: mkdir -p src-tauri/prdownloader
       # tauri-build also verifies the externalBin sidecars exist. The unitsync
       # worker is our own crate (gitignored build artifact), so build it for the
       # runner's triple before clippy compiles the app crate.

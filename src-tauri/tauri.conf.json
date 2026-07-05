@@ -28,11 +28,10 @@
   },
   "bundle": {
     "externalBin": [
-      "binaries/pr-downloader",
       "binaries/uberstress",
       "binaries/coilbox-unitsync-worker"
     ],
-    "resources": ["mapconv", "branding/catalog.json"],
+    "resources": ["mapconv", "prdownloader", "branding/catalog.json"],
     "active": true,
     "createUpdaterArtifacts": true,
     "targets": "all",

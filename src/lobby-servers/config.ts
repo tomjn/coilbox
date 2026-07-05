@@ -24,6 +24,15 @@ export interface LobbyServer {
  */
 export const BUILTIN_SERVERS: LobbyServer[] = [
   {
+    id: "recoil-official",
+    name: "Recoil Official",
+    host: "lobby.recoilengine.org",
+    port: 8200,
+    // The official Recoil lobby is TLS with a self-signed cert (like uberserver).
+    tls: true,
+    allowSelfSigned: true,
+  },
+  {
     id: "spring-official",
     name: "Spring Official",
     host: "lobby.springrts.com",

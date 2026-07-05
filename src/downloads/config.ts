@@ -2,6 +2,7 @@ import { useSetting } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
 import type { ContentState } from "../content/bindings";
 import { contentStateLoad } from "../content/bindings";
+import { dlSetEngineDirs } from "./bindings";
 
 /** A user-configured rapid master. `url` is the base; `dl_repos` appends `/repos.gz`. */
 export interface RapidRepo {
@@ -69,6 +70,27 @@ export function useDefaultWriteRoot(): (state: ContentState) => void {
     },
     [cfg, setCfg],
   );
+}
+
+/**
+ * Register installed-engine directories with the downloads sidecar so it prefers
+ * an engine's own pr-downloader (bundled with a complete, matched DLL set) over
+ * coilbox's bootstrap copy. Loads engine dirs from content state at mount; an
+ * engine installed later this session falls back to the bundled copy (which
+ * works) until the next launch picks it up. Mounted app-wide via a plugin
+ * Provider so it covers every download entrypoint (downloads pages + battle).
+ */
+export function useRegisterEngineDirs(): void {
+  useEffect(() => {
+    contentStateLoad(undefined)
+      .then(({ state }) => {
+        const dirs = Array.from(
+          new Set(state.roots.flatMap((r) => r.engines.map((e) => e.path))),
+        );
+        return dlSetEngineDirs({ dirs });
+      })
+      .catch((e) => console.warn("engine-dirs: register failed", e));
+  }, []);
 }
 
 /**

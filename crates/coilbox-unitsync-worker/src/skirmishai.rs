@@ -42,8 +42,9 @@ pub fn render(lib: &str, game_archive: Option<&str>) -> SkirmishAiOutput {
                 ais.push(read_ai(&us, i, "lua"));
             }
             // Honour the game's validais.lua whitelist while its archive is still
-            // mounted (the Lua parser reads from the VFS). Absent file -> `None` ->
-            // every AI stays.
+            // mounted (the Lua parser reads from the VFS). Absent file -> `None`,
+            // and an empty/garbled whitelist -> no usable patterns; both fall back
+            // to keeping every AI (see `retain_valid`).
             if let Some(patterns) = us.valid_ais() {
                 ais = retain_valid(ais, &patterns);
             }
@@ -74,11 +75,15 @@ fn read_ai(us: &Unitsync, i: i32, kind: &str) -> SkirmishAi {
 /// Keep only the AIs whose `short_name` matches one of the `validais.lua` name
 /// patterns. Each pattern is compiled as a regex and matched with `is_match`
 /// (unanchored — a substring hit counts), mirroring skylobby's `re-find`; a
-/// pattern that fails to compile is skipped. With no usable patterns nothing
-/// matches, so the list empties — a game that ships an empty/garbled whitelist
-/// gets no AIs, exactly as it declared.
+/// pattern that fails to compile is skipped. When no pattern is usable (an
+/// empty or entirely-garbled whitelist), fall back to showing every AI rather
+/// than hiding them all — a broken whitelist shouldn't nuke the AI list, and to
+/// the user it's indistinguishable from having no whitelist at all.
 fn retain_valid(ais: Vec<SkirmishAi>, patterns: &[String]) -> Vec<SkirmishAi> {
     let regexes: Vec<Regex> = patterns.iter().filter_map(|p| Regex::new(p).ok()).collect();
+    if regexes.is_empty() {
+        return ais;
+    }
     ais.into_iter()
         .filter(|ai| regexes.iter().any(|re| re.is_match(&ai.short_name)))
         .collect()
@@ -143,13 +148,26 @@ mod tests {
         );
     }
 
-    // A garbled pattern is skipped; if nothing compiles, everything is filtered out.
+    // A garbled pattern is skipped; usable patterns still filter normally.
     #[test]
     fn invalid_pattern_is_skipped() {
         assert_eq!(
             kept(vec![ai("ChickensAI"), ai("Sandbox")], &["Chickens", "("]),
             vec!["ChickensAI"],
         );
-        assert!(kept(vec![ai("ChickensAI"), ai("Sandbox")], &["("]).is_empty());
+    }
+
+    // When NO pattern is usable (empty or entirely-garbled whitelist), fall back
+    // to keeping every AI rather than hiding them all.
+    #[test]
+    fn no_usable_patterns_keeps_all() {
+        assert_eq!(
+            kept(vec![ai("ChickensAI"), ai("Sandbox")], &["("]),
+            vec!["ChickensAI", "Sandbox"],
+        );
+        assert_eq!(
+            kept(vec![ai("ChickensAI"), ai("Sandbox")], &[]),
+            vec!["ChickensAI", "Sandbox"],
+        );
     }
 }

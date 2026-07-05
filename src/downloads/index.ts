@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Download, Gamepad2, Map as MapIcon, Package } from "lucide-react";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
+import { EngineDirsProvider } from "./EngineDirsProvider";
 import DownloadsSettings from "./pages/SettingsSection";
 
 /**
@@ -17,6 +18,9 @@ import DownloadsSettings from "./pages/SettingsSection";
 const downloadsPlugin: FramePlugin = {
   id: "downloads",
   version: "0.0.0",
+  // App-wide: syncs installed-engine dirs to the sidecar so pr-downloader
+  // resolution can prefer an engine's own copy over the bundled bootstrap one.
+  Provider: EngineDirsProvider,
   nav: [
     {
       id: "downloads",
