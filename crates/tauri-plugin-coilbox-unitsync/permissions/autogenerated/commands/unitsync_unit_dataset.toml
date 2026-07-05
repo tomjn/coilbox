@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-unitsync-unit-dataset"
+description = "Enables the unitsync_unit_dataset command without any pre-configured scope."
+commands.allow = ["unitsync_unit_dataset"]
+
+[[permission]]
+identifier = "deny-unitsync-unit-dataset"
+description = "Denies the unitsync_unit_dataset command without any pre-configured scope."
+commands.deny = ["unitsync_unit_dataset"]

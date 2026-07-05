@@ -15,7 +15,8 @@ use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
     build_config_args, build_game_args, build_game_headers_args, build_heightmap_args,
     build_lua_args, build_map_info_args, build_minimap_args, build_skirmish_ai_args,
-    build_thumbnails_args, build_unit_buildpics_args, find_unitsync, resolve_sidecar,
+    build_thumbnails_args, build_unit_buildpics_args, build_unit_dataset_args, find_unitsync,
+    resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -437,6 +438,32 @@ async fn unitsync_unit_buildpics<R: Runtime>(
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit buildpics", None).await)
 }
 
+/// `unitsync_unit_dataset` — load one game's archives to read its reusable unit
+/// graph (every unit plus the internal names it can build, `buildoptions`). Feeds
+/// the per-faction build-tree viewer and unit include/exclude filters. Fetched on
+/// demand (mounts the game), disk-cached in the info-blob cache dir.
+#[tauri::command]
+async fn unitsync_unit_dataset<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    game_archive: String,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_unit_dataset_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &game_archive,
+        cache_dir.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit dataset", None).await)
+}
+
 /// `unitsync_map_info` — load one map's archive set to read its options + any
 /// attributed diagnostics. Fetched on demand (mounts the map), not during scan.
 #[tauri::command]
@@ -630,6 +657,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_thumbnails,
             unitsync_game_info,
             unitsync_unit_buildpics,
+            unitsync_unit_dataset,
             unitsync_map_info,
             unitsync_skirmish_ais,
             unitsync_engine_config,

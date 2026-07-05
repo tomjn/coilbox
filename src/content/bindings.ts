@@ -356,6 +356,33 @@ export const unitsyncUnitBuildpics = defineCommand<
   UnitBuildpicsResult
 >("coilbox-unitsync", "unitsync_unit_buildpics");
 
+/** One unit in the reusable unit dataset: its names plus the internal names of the
+ * units it can build (`buildoptions`, lowercased). */
+export interface UnitDatasetEntry {
+  name: string;
+  fullName?: string;
+  buildOptions?: string[];
+  /** Whether the unit can move (mobile unit) vs a static building. */
+  mobile?: boolean;
+}
+
+export interface UnitDatasetResult {
+  /** Every unit in the game, sorted by internal name. */
+  units: UnitDatasetEntry[];
+  checksum?: string;
+  errors: string[];
+}
+
+/**
+ * Load a game's reusable unit graph (units + their `buildoptions` edges) — lazy,
+ * since it mounts the game's archive set. Powers the per-faction build-tree viewer
+ * and unit include/exclude filters. `gameArchive` is the primary archive name.
+ */
+export const unitsyncUnitDataset = defineCommand<
+  { enginePath: string; dataDir: string; gameArchive: string },
+  UnitDatasetResult
+>("coilbox-unitsync", "unitsync_unit_dataset");
+
 export interface MapInfoResult {
   options: ConfigOption[];
   checksum?: string;
