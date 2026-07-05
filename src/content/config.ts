@@ -12,6 +12,7 @@ import {
   type ArchiveFileResult,
   type ArchiveTreeResult,
   type ContentState,
+  contentCandidates,
   contentDemoInfo,
   contentListReplays,
   contentStateLoad,
@@ -43,6 +44,9 @@ import {
   unitsyncUnitDataset,
 } from "./bindings";
 import { newestEngineId } from "./engineVersion";
+import { deriveSetup } from "./setup";
+
+export type { SetupStatus } from "./setup";
 
 /** Lightweight UI prefs (the only thing routed through the frame settings store;
  * the roots/engines themselves live in the plugin's own Rust state.json). */
@@ -90,6 +94,28 @@ export function useContentState() {
   }, [refresh]);
 
   return { state, setState, loading, error, refresh };
+}
+
+/* -------------------------------------------------------------------------- *
+ * First-run setup guidance — what's missing for a playable setup.
+ * -------------------------------------------------------------------------- */
+
+/** Setup status driven by live content state + the OS-standard candidate path. */
+export function useSetupStatus() {
+  const { state, loading, refresh } = useContentState();
+  const [standardPath, setStandardPath] = useState<string | undefined>();
+
+  useEffect(() => {
+    contentCandidates(undefined)
+      .then(({ candidates }) => {
+        setStandardPath(
+          candidates.find((c) => c.origin === "prd-default")?.path,
+        );
+      })
+      .catch(() => setStandardPath(undefined));
+  }, []);
+
+  return { ...deriveSetup(state, standardPath), loading, refresh };
 }
 
 /* -------------------------------------------------------------------------- *
