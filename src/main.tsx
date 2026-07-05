@@ -3,8 +3,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { plugins } from "./app.plugins";
+import SetupHome from "./content/pages/SetupHome";
 import { SPLASH_ENABLED_KEY } from "./general/splash";
-import BrandedWelcome from "./profile/BrandedWelcome";
 import { applyProfileSettingsHiding } from "./profile/hidden";
 import { applyProfileLinks } from "./profile/links";
 import {
@@ -75,11 +75,10 @@ if (profile.theme) {
   }
 }
 
-// A profile with a `welcome` block replaces the default launcher home with the
-// branded landing page; without one, the default home is kept.
-const home: HomeOverride | undefined = profile.welcome
-  ? { Component: BrandedWelcome }
-  : undefined;
+// picoframe has no home slot, so the `/` page is always overridden: SetupHome
+// shows the first-run setup card above the profile's branded welcome (if any)
+// or a minimal default welcome otherwise.
+const home: HomeOverride = { Component: SetupHome };
 
 // Resolve the startup splash before first paint (so the image is ready and there's
 // no empty-overlay flash). Skipped when the profile has no splash or the user turned

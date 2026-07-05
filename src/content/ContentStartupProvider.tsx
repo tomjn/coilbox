@@ -1,5 +1,6 @@
 import { useSetting } from "@picoframe/frame";
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
+import { useDownloadsConfig } from "../downloads/config";
 import { contentRescan, contentStateLoad } from "./bindings";
 import {
   primeScan,
@@ -29,6 +30,7 @@ export default function ContentStartupProvider({
 }) {
   const [prefs] = useContentPrefs();
   const [selectedKey] = useSetting<string>("content.scanTarget", "");
+  const [dlConfig, setDlConfig] = useDownloadsConfig();
   const ran = useRef(false);
 
   const warmUp = useCallback(async () => {
@@ -62,6 +64,19 @@ export default function ContentStartupProvider({
     if (!prefs.autoScanOnStartup) return;
     warmUp();
   }, [prefs.autoScanOnStartup, warmUp]);
+
+  // Back-fill the downloads write root on first run so the download
+  // destination works without a trip to Downloads settings. Never overrides
+  // a value the user (or a prior run of this effect) already set.
+  useEffect(() => {
+    if (dlConfig.writeRootId) return;
+    contentStateLoad(undefined)
+      .then(({ state }) => {
+        const first = state.roots[0];
+        if (first) setDlConfig({ ...dlConfig, writeRootId: first.id });
+      })
+      .catch(() => {});
+  }, [dlConfig, setDlConfig]);
 
   return <>{children}</>;
 }

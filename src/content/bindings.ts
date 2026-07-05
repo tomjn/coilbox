@@ -114,6 +114,12 @@ export const contentRemoveRoot = defineCommand<
   { state: ContentState }
 >("coilbox-content", "content_remove_root");
 
+/** Create the OS-standard content folder on disk and register it (forced). */
+export const contentCreateStandardRoot = defineCommand<
+  undefined,
+  { state: ContentState }
+>("coilbox-content", "content_create_standard_root");
+
 /** Every engine across tracked roots (cross-plugin read API). */
 export const contentListEngines = defineCommand<
   undefined,

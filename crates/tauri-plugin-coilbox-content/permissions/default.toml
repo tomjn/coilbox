@@ -8,6 +8,7 @@ permissions = [
   "allow-content-rescan",
   "allow-content-scan-root",
   "allow-content-add-root",
+  "allow-content-create-standard-root",
   "allow-content-remove-root",
   "allow-content-list-engines",
   "allow-content-verify-engine",

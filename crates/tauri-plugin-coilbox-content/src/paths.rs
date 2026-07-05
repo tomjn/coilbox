@@ -67,6 +67,16 @@ fn push(out: &mut Vec<Candidate>, path: Option<PathBuf>, origin: &str) {
     }
 }
 
+/// The single OS-standard content-root path to offer for quick-create: the
+/// pr-downloader default write dir (Windows `Documents\My Games\Spring`,
+/// otherwise `~/.spring`). Mirrors the `prd-default` candidate in `candidate_roots`.
+pub fn standard_root_path(os: Os, b: &BaseDirs) -> Option<PathBuf> {
+    candidate_roots(os, b)
+        .into_iter()
+        .find(|c| c.origin == "prd-default")
+        .map(|c| c.path)
+}
+
 /// Compute all standard candidate roots for `os` given `b`. Results may contain
 /// duplicate paths under different origins; the caller dedupes by canonical path.
 pub fn candidate_roots(os: Os, b: &BaseDirs) -> Vec<Candidate> {
@@ -320,6 +330,23 @@ mod tests {
         assert!(candidate_roots(Os::Linux, &b)
             .iter()
             .any(|c| c.origin == "zerok"));
+    }
+
+    #[test]
+    fn standard_root_path_is_prd_default() {
+        let b = BaseDirs {
+            home: Some(PathBuf::from("/home/u")),
+            documents: Some(PathBuf::from("/home/u/Documents")),
+            ..BaseDirs::default()
+        };
+        assert_eq!(
+            standard_root_path(Os::Windows, &b),
+            Some(PathBuf::from("/home/u/Documents/My Games/Spring"))
+        );
+        assert_eq!(
+            standard_root_path(Os::Linux, &b),
+            Some(PathBuf::from("/home/u/.spring"))
+        );
     }
 
     #[test]

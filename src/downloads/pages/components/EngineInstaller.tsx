@@ -5,12 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 import { contentRescan } from "../../../content/bindings";
 import {
   type DownloadProgress,
-  dlDownloadEngineRecoil,
   dlDownloadEngineSpring,
   dlRecoilEngines,
   dlSpringfilesEngines,
 } from "../../bindings";
 import { useWriteRootPath } from "../../config";
+import { installRecoil } from "../../engineInstall";
 import { OptionSelect } from "./OptionSelect";
 import { ProgressBar } from "./ProgressBar";
 import { errMessage } from "./states";
@@ -106,25 +106,31 @@ export function EngineInstaller() {
     const onProgress = new Channel<DownloadProgress>();
     onProgress.onmessage = (p) => setProgress(p);
     try {
-      const { message } =
-        source === "recoil"
-          ? await dlDownloadEngineRecoil({
-              version: item.key,
-              assetUrl: item.assetUrl ?? "",
-              writePath,
-              onProgress,
-            })
-          : await dlDownloadEngineSpring({
-              version: item.key,
-              writePath,
-              onProgress,
-            });
-      setResult({ ok: true, message });
-      // Rescan content so the freshly-installed engine appears in the list above.
-      try {
-        await contentRescan(undefined);
-      } catch {
-        // non-fatal: the engine is installed, the list just won't auto-refresh
+      if (source === "recoil") {
+        const message = await installRecoil(
+          {
+            version: item.key,
+            assetUrl: item.assetUrl ?? "",
+            size: 0,
+            prerelease: !!item.prerelease,
+          },
+          writePath,
+          onProgress,
+        );
+        setResult({ ok: true, message });
+      } else {
+        const { message } = await dlDownloadEngineSpring({
+          version: item.key,
+          writePath,
+          onProgress,
+        });
+        setResult({ ok: true, message });
+        // Rescan content so the freshly-installed engine appears in the list above.
+        try {
+          await contentRescan(undefined);
+        } catch {
+          // non-fatal: the engine is installed, the list just won't auto-refresh
+        }
       }
     } catch (e) {
       setResult({ ok: false, message: errMessage(e) });

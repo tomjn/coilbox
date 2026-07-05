@@ -3,15 +3,17 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { AlertCircle, FolderPlus, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useDefaultWriteRoot } from "../../downloads/config";
 import {
   type ContentState,
   contentAddRoot,
+  contentCreateStandardRoot,
   contentOpenPath,
   contentRemoveRoot,
   contentRescan,
   contentScanRoot,
 } from "../bindings";
-import { useContentPrefs, useContentState } from "../config";
+import { useContentPrefs, useContentState, useSetupStatus } from "../config";
 import { RootCard } from "./components/RootCard";
 
 const msg = (e: unknown): string =>
@@ -35,6 +37,8 @@ export default function FoldersSection() {
   } | null>(null);
   // Store the next added folder as a path relative to the app dir (portable).
   const [addPortable, setAddPortable] = useState(false);
+  const { standardPath } = useSetupStatus();
+  const ensureWriteRoot = useDefaultWriteRoot();
 
   const doRescan = useCallback(async () => {
     setRescanning(true);
@@ -76,9 +80,21 @@ export default function FoldersSection() {
         portable: addPortable,
       });
       setState(state);
+      ensureWriteRoot(state);
       setAddError(null);
     } catch (e) {
       setAddError({ path: picked, message: msg(e) });
+    }
+  };
+
+  const createStandard = async () => {
+    setActionError(null);
+    try {
+      const { state } = await contentCreateStandardRoot(undefined);
+      setState(state);
+      ensureWriteRoot(state);
+    } catch (e) {
+      setActionError(msg(e));
     }
   };
 
@@ -91,6 +107,7 @@ export default function FoldersSection() {
         portable: addPortable,
       });
       setState(state);
+      ensureWriteRoot(state);
     } catch (e) {
       setActionError(msg(e));
     } finally {
@@ -220,15 +237,23 @@ export default function FoldersSection() {
               No content folders found yet. Rescan to detect standard locations,
               or add one manually.
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={pickAndAdd}
-            >
-              <FolderPlus className="size-4" />
-              Add folder
-            </Button>
+            <div className="flex items-center gap-2">
+              {standardPath && (
+                <Button type="button" size="sm" onClick={createStandard}>
+                  <FolderPlus className="size-4" />
+                  Create folder at {standardPath}
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={pickAndAdd}
+              >
+                <FolderPlus className="size-4" />
+                Add folder
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
