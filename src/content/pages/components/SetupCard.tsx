@@ -16,6 +16,7 @@ import { ProgressBar } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
 import { contentCreateStandardRoot, contentRecreateRoot } from "../../bindings";
 import { useSetupStatus } from "../../config";
+import { GetStartedCard } from "./GetStartedCard";
 
 export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
   const {
@@ -211,9 +212,15 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
 
 /**
  * Slot wrapper for picoframe's built-in home page (`home.top`): the dismissible
- * setup card. Renders `null` once setup is complete, so a healthy install shows
- * nothing above the launcher. Slot Components take no props, hence this wrapper.
+ * setup card, followed by the get-started suggestions once setup is complete. Both
+ * render `null` when not needed, so a healthy install with content shows nothing
+ * above the launcher. Slot Components take no props, hence this wrapper.
  */
 export function HomeSetupCard() {
-  return <SetupCard dismissible />;
+  return (
+    <div className="flex flex-col gap-4">
+      <SetupCard dismissible />
+      <GetStartedCard />
+    </div>
+  );
 }

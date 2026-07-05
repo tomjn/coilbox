@@ -1,6 +1,6 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { useEffect, useState } from "react";
-import type { GameItem } from "./bindings";
+import type { GameItem, MapItem } from "./bindings";
 
 /**
  * Branding catalog: GitHub-hosted JSON mapping a game identity to branding assets
@@ -40,10 +40,48 @@ export interface BrandingEntry {
   videos?: BrandingVideo[];
   links?: BrandingLink[];
 }
+/**
+ * How a suggested item is fetched. Mirrors the three downloads-plugin commands:
+ * `rapid` -> dlDownload (a rapid tag), `map` -> dlDownloadMap (a springname), and
+ * `url` -> dlDownloadFile (a direct mirror URL streamed into `<root>/<subdir>`).
+ */
+export type SuggestedDownload =
+  | { kind: "rapid"; tag: string; masterUrl?: string }
+  | { kind: "map"; springName: string; searchUrl?: string }
+  | { kind: "url"; url: string; filename: string; subdir?: "games" | "maps" };
+
+/**
+ * A curated game offered on the first-run/empty screens. `entryId` borrows a
+ * branding entry's banner art and `match` (so an installed copy is detected even
+ * for rapid content, which has no on-disk filename in `games/`). `filename` gives
+ * cheap filename-based dedup for `url`/`map` kinds.
+ */
+export interface SuggestedGame {
+  id: string;
+  title: string;
+  download: SuggestedDownload;
+  entryId?: string;
+  banner?: string[];
+  filename?: string;
+  blurb?: string;
+}
+
+/** A curated map offered on the first-run/empty screens. */
+export interface SuggestedMap {
+  id: string;
+  title: string;
+  download: SuggestedDownload;
+  filename?: string;
+  thumb?: string[];
+  blurb?: string;
+}
+
 export interface BrandingCatalog {
   version: number;
   updated?: string;
   entries: BrandingEntry[];
+  /** Pre-curated content offered when the user has none yet. */
+  suggested?: { games?: SuggestedGame[]; maps?: SuggestedMap[] };
 }
 
 interface CatalogResult {
@@ -116,22 +154,39 @@ export function resolveBranding(
 
 // --- hooks -----------------------------------------------------------------
 
-let catalogPromise: Promise<CompiledEntry[]> | null = null;
+interface LoadedCatalog {
+  entries: CompiledEntry[];
+  games: SuggestedGame[];
+  maps: SuggestedMap[];
+}
+
+const EMPTY_CATALOG: LoadedCatalog = { entries: [], games: [], maps: [] };
+
+let catalogPromise: Promise<LoadedCatalog> | null = null;
 
 /** Load + compile the catalog once per session (module-level promise cache). */
-export function loadBrandingCatalog(): Promise<CompiledEntry[]> {
+function loadCatalog(): Promise<LoadedCatalog> {
   if (!catalogPromise) {
     catalogPromise = brandingCatalogCmd({ url: DEFAULT_BRANDING_CATALOG_URL })
       .then((res) => {
         const parsed = JSON.parse(res.json) as BrandingCatalog;
-        return compile(parsed.entries ?? []);
+        return {
+          entries: compile(parsed.entries ?? []),
+          games: parsed.suggested?.games ?? [],
+          maps: parsed.suggested?.maps ?? [],
+        };
       })
       .catch((e) => {
         console.warn("branding: catalog load failed", e);
-        return [] as CompiledEntry[];
+        return EMPTY_CATALOG;
       });
   }
   return catalogPromise;
+}
+
+/** Load + compile just the branding entries once per session. */
+export function loadBrandingCatalog(): Promise<CompiledEntry[]> {
+  return loadCatalog().then((c) => c.entries);
 }
 
 /** The compiled catalog entries, loaded once. */
@@ -147,6 +202,100 @@ export function useBrandingCatalog(): CompiledEntry[] {
     };
   }, []);
   return entries;
+}
+
+/** The curated game suggestions from the catalog (empty on load failure). */
+export function useSuggestedGames(): SuggestedGame[] {
+  const [games, setGames] = useState<SuggestedGame[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    loadCatalog().then((c) => {
+      if (!cancelled) setGames(c.games);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return games;
+}
+
+/** The curated map suggestions from the catalog (empty on load failure). */
+export function useSuggestedMaps(): SuggestedMap[] {
+  const [maps, setMaps] = useState<SuggestedMap[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    loadCatalog().then((c) => {
+      if (!cancelled) setMaps(c.maps);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return maps;
+}
+
+/**
+ * Art URLs for a suggested game: the referenced branding entry's banner wins,
+ * else the suggestion's own inline `banner`. Undefined when neither is present.
+ */
+export function resolveSuggestedArt(
+  entries: CompiledEntry[],
+  game: SuggestedGame,
+): string[] | undefined {
+  const entry = game.entryId
+    ? entries.find((e) => e.id === game.entryId)
+    : undefined;
+  const art = entry?.banner ?? game.banner;
+  return art?.length ? art : undefined;
+}
+
+const has = (set: Set<string>, name?: string) =>
+  !!name && set.has(name.toLowerCase());
+
+/**
+ * Drop suggested games the user already has. `url`/`map` kinds are matched by
+ * filename against `installed` (from dlInstalledContent); `rapid` kinds have no
+ * on-disk filename in `games/`, so they're matched by the referenced branding
+ * entry's `match` against the scanned game names (empty until a scan exists).
+ */
+export function filterUninstalledGames(
+  suggestions: SuggestedGame[],
+  entries: CompiledEntry[],
+  installed: Set<string>,
+  scannedGames: GameItem[],
+): SuggestedGame[] {
+  return suggestions.filter((g) => {
+    if (has(installed, g.filename)) return false;
+    const entry = g.entryId
+      ? entries.find((e) => e.id === g.entryId)
+      : undefined;
+    if (
+      entry &&
+      scannedGames.some((s) => entryMatches(entry, s.name, s.info.shortname))
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Drop suggested maps the user already has: by filename against `installed`, or
+ * by the map's spring name / title against the scanned map names.
+ */
+export function filterUninstalledMaps(
+  suggestions: SuggestedMap[],
+  installed: Set<string>,
+  scannedMaps: MapItem[],
+): SuggestedMap[] {
+  const names = new Set(scannedMaps.map((m) => m.name.toLowerCase()));
+  return suggestions.filter((m) => {
+    if (has(installed, m.filename)) return false;
+    const springName =
+      m.download.kind === "map" ? m.download.springName : undefined;
+    if (has(names, springName) || has(names, m.title)) return false;
+    return true;
+  });
 }
 
 /**

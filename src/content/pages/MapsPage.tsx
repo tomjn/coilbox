@@ -1,5 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { dlInstalledContent } from "../../downloads/bindings";
+import { useContentRootPaths, useWriteRootPath } from "../../downloads/config";
+import { filterUninstalledMaps, useSuggestedMaps } from "../branding";
 import {
   useScanTargetSelection,
   useUnitsyncScan,
@@ -8,6 +11,7 @@ import {
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
 import { MapThumb, mapSizeLabel } from "./components/MapThumb";
+import { SuggestionsList } from "./components/SuggestionsList";
 import {
   Diagnostics,
   EmptyState,
@@ -54,6 +58,22 @@ export default function MapsPage() {
     [data],
   );
   const busy = loading || (!!selected && !data && !error && !cancelled);
+
+  // Curated download suggestions shown when this engine sees no maps.
+  const writePath = useWriteRootPath();
+  const suggested = useSuggestedMaps();
+  const rootPaths = useContentRootPaths();
+  const [installed, setInstalled] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (rootPaths.length === 0) return;
+    dlInstalledContent({ paths: rootPaths })
+      .then(({ maps }) => setInstalled(new Set(maps)))
+      .catch(() => setInstalled(new Set()));
+  }, [rootPaths]);
+  const suggestions = useMemo(
+    () => filterUninstalledMaps(suggested, installed, maps),
+    [suggested, installed, maps],
+  );
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -119,7 +139,17 @@ export default function MapsPage() {
       ) : cancelled && maps.length === 0 ? (
         <EmptyState label="Scan cancelled. Press Rescan to load maps." />
       ) : maps.length === 0 ? (
-        <EmptyState label="No maps found for this engine." />
+        suggestions.length > 0 ? (
+          <SuggestionsList
+            kind="map"
+            heading="No maps yet — try one of these"
+            items={suggestions}
+            writePath={writePath}
+            onComplete={() => run(true)}
+          />
+        ) : (
+          <EmptyState label="No maps found for this engine." />
+        )
       ) : sorted.length === 0 ? (
         <EmptyState label={`No maps match “${filter.trim()}”.`} />
       ) : (

@@ -1,6 +1,41 @@
 {
   "version": 1,
   "updated": "2026-07-05",
+  "suggested": {
+    "games": [
+      {
+        "id": "metal-factions",
+        "title": "Metal Factions",
+        "entryId": "metal-factions",
+        "blurb": "Fast-paced multi-faction RTS.",
+        "download": { "kind": "rapid", "tag": "PLACEHOLDER-metal-factions-rapid-tag" }
+      },
+      {
+        "id": "mechcommander-legacy",
+        "title": "MechCommander: Legacy",
+        "entryId": "mechcommander-legacy",
+        "blurb": "BattleTech-inspired mech combat.",
+        "download": { "kind": "rapid", "tag": "PLACEHOLDER-mcl-rapid-tag" }
+      }
+    ],
+    "maps": [
+      {
+        "id": "all-that-glitters",
+        "title": "All That Glitters",
+        "download": { "kind": "map", "springName": "All That Glitters" }
+      },
+      {
+        "id": "supreme-isthmus",
+        "title": "Supreme Isthmus v2.1",
+        "download": { "kind": "map", "springName": "Supreme Isthmus v2.1" }
+      },
+      {
+        "id": "crystallized-plains",
+        "title": "Crystallized Plains 1.1",
+        "download": { "kind": "map", "springName": "Crystallized Plains 1.1" }
+      }
+    ]
+  },
   "entries": [
     {
       "id": "mechcommander-legacy",

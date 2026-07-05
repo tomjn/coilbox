@@ -1,4 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { dlInstalledContent } from "../../downloads/bindings";
+import { useContentRootPaths, useWriteRootPath } from "../../downloads/config";
+import {
+  filterUninstalledGames,
+  useBrandingCatalog,
+  useSuggestedGames,
+} from "../branding";
 import {
   useScanTargetSelection,
   useUnitsyncGameHeaders,
@@ -8,6 +15,7 @@ import { usePlayGame } from "../usePlayGame";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
 import { GameCard } from "./components/GameCard";
+import { SuggestionsList } from "./components/SuggestionsList";
 import {
   Diagnostics,
   EmptyState,
@@ -47,6 +55,23 @@ export default function GamesPage() {
 
   const games = data?.games ?? [];
   const busy = loading || (!!selected && !data && !error && !cancelled);
+
+  // Curated download suggestions shown when this engine sees no games.
+  const writePath = useWriteRootPath();
+  const suggested = useSuggestedGames();
+  const entries = useBrandingCatalog();
+  const rootPaths = useContentRootPaths();
+  const [installed, setInstalled] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (rootPaths.length === 0) return;
+    dlInstalledContent({ paths: rootPaths })
+      .then(({ games }) => setInstalled(new Set(games)))
+      .catch(() => setInstalled(new Set()));
+  }, [rootPaths]);
+  const suggestions = useMemo(
+    () => filterUninstalledGames(suggested, entries, installed, games),
+    [suggested, entries, installed, games],
+  );
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -117,7 +142,17 @@ export default function GamesPage() {
       ) : cancelled && games.length === 0 ? (
         <EmptyState label="Scan cancelled. Press Rescan to load games." />
       ) : games.length === 0 ? (
-        <EmptyState label="No games found for this engine." />
+        suggestions.length > 0 ? (
+          <SuggestionsList
+            kind="game"
+            heading="No games yet — try one of these"
+            items={suggestions}
+            writePath={writePath}
+            onComplete={() => run(true)}
+          />
+        ) : (
+          <EmptyState label="No games found for this engine." />
+        )
       ) : sorted.length === 0 ? (
         <EmptyState label={`No games match “${filter.trim()}”.`} />
       ) : (
