@@ -78,9 +78,9 @@ export default function MapDetailPage() {
         }))
       : [];
 
-  // The 3D preview only renders when both its inputs are ready. When it does, the
-  // minimap is height-capped to it (see the preview row below).
-  const show3D = !!(heightmap.data?.dataUrl && minimap.dataUrl);
+  // Aspect ratio of the map (unitsync minimaps are square, so the box carries the
+  // true shape and `object-fill` stretches the square source back into it).
+  const ratio = map.width && map.height ? map.width / map.height : 1;
 
   return (
     <div className="flex flex-col gap-5 p-4">
@@ -117,45 +117,47 @@ export default function MapDetailPage() {
             ? ` · ${minimap.startPositions.length} start positions`
             : ""}
         </h2>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
-          <div className="relative w-full max-w-sm shrink-0 overflow-hidden rounded-lg border border-border/50 bg-card">
-            {/* When the 3D preview is shown, this layer is absolutely filled on
-                `lg` so the minimap doesn't drive the row height — the 3D preview
-                does, and the minimap is contained (centered, capped) within it. */}
-            <div
-              className={`flex h-full items-center justify-center${show3D ? " lg:absolute lg:inset-0" : ""}`}
-            >
-              {minimap.loading ? (
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
+            {minimap.loading ? (
+              <div className="flex size-64 max-w-full items-center justify-center">
                 <div className="size-32 animate-pulse rounded bg-muted" />
-              ) : minimap.dataUrl ? (
-                <div className="relative inline-flex max-h-full max-w-full">
-                  <img
-                    src={minimap.dataUrl}
-                    alt={`Minimap of ${map.name}`}
-                    style={{
-                      aspectRatio:
-                        map.width && map.height
-                          ? `${map.width} / ${map.height}`
-                          : "1 / 1",
-                    }}
-                    className="block max-h-full max-w-full object-fill"
+              </div>
+            ) : minimap.dataUrl ? (
+              // Give the box a definite width derived from the 32rem height cap
+              // (`width = ratio * 32rem` ⇒ `height = 32rem`), capped by `max-w-sm`
+              // for wide maps (then `max-w` binds and the height shrinks instead —
+              // aspect stays correct). The `shrink-0` card collapses to this width,
+              // so a tall map yields a narrow card and the `flex-1` 3D preview grows
+              // to fill the freed space. `object-fill` stretches the square source
+              // back to the true shape.
+              <div
+                className="relative max-h-[32rem] max-w-sm"
+                style={{
+                  aspectRatio: `${ratio}`,
+                  width: `calc(${ratio} * 32rem)`,
+                }}
+              >
+                <img
+                  src={minimap.dataUrl}
+                  alt={`Minimap of ${map.name}`}
+                  className="absolute inset-0 size-full object-fill"
+                />
+                {markers.map((m, i) => (
+                  <span
+                    key={m.key}
+                    className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow"
+                    style={{ left: `${m.left}%`, top: `${m.top}%` }}
+                    title={`Start position ${i + 1}`}
                   />
-                  {markers.map((m, i) => (
-                    <span
-                      key={m.key}
-                      className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow"
-                      style={{ left: `${m.left}%`, top: `${m.top}%` }}
-                      title={`Start position ${i + 1}`}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-1 text-muted-foreground">
-                  <ImageOff className="size-6" />
-                  <span className="text-xs">No minimap</span>
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex size-64 max-w-full flex-col items-center justify-center gap-1 text-muted-foreground">
+                <ImageOff className="size-6" />
+                <span className="text-xs">No minimap</span>
+              </div>
+            )}
           </div>
 
           {heightmap.data?.dataUrl && minimap.dataUrl && (
