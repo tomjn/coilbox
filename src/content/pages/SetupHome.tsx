@@ -1,4 +1,5 @@
 import BrandedWelcome from "../../profile/BrandedWelcome";
+import { GetStartedCard } from "./components/GetStartedCard";
 import { SetupCard } from "./components/SetupCard";
 
 /**
@@ -11,6 +12,7 @@ export default function SetupHome() {
   return (
     <div className="flex flex-col gap-4 p-4">
       <SetupCard dismissible />
+      <GetStartedCard />
       <BrandedWelcome />
     </div>
   );
