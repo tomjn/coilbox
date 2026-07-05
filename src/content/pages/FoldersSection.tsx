@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { AlertCircle, FolderPlus, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useDefaultWriteRoot } from "../../downloads/config";
 import {
   type ContentState,
   contentAddRoot,
@@ -37,6 +38,7 @@ export default function FoldersSection() {
   // Store the next added folder as a path relative to the app dir (portable).
   const [addPortable, setAddPortable] = useState(false);
   const { standardPath } = useSetupStatus();
+  const ensureWriteRoot = useDefaultWriteRoot();
 
   const doRescan = useCallback(async () => {
     setRescanning(true);
@@ -78,6 +80,7 @@ export default function FoldersSection() {
         portable: addPortable,
       });
       setState(state);
+      ensureWriteRoot(state);
       setAddError(null);
     } catch (e) {
       setAddError({ path: picked, message: msg(e) });
@@ -89,6 +92,7 @@ export default function FoldersSection() {
     try {
       const { state } = await contentCreateStandardRoot(undefined);
       setState(state);
+      ensureWriteRoot(state);
     } catch (e) {
       setActionError(msg(e));
     }
@@ -103,6 +107,7 @@ export default function FoldersSection() {
         portable: addPortable,
       });
       setState(state);
+      ensureWriteRoot(state);
     } catch (e) {
       setActionError(msg(e));
     } finally {

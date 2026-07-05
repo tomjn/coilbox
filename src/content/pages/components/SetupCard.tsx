@@ -4,7 +4,10 @@ import { Download, FolderPlus, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { DownloadProgress } from "../../../downloads/bindings";
-import { useWriteRootPath } from "../../../downloads/config";
+import {
+  useDefaultWriteRoot,
+  useWriteRootPath,
+} from "../../../downloads/config";
 import {
   fetchNewestRecoil,
   installRecoil,
@@ -18,6 +21,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
   const { needsFolder, needsEngine, complete, standardPath, refresh } =
     useSetupStatus();
   const writePath = useWriteRootPath();
+  const ensureWriteRoot = useDefaultWriteRoot();
   const [dismissed, setDismissed] = useSetting<boolean>(
     "setup.dismissed",
     false,
@@ -51,7 +55,10 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
     setBusy("folder");
     setError(null);
     try {
-      await contentCreateStandardRoot(undefined);
+      const { state } = await contentCreateStandardRoot(undefined);
+      // Default the download destination to the new folder so the engine step
+      // isn't a disabled button this same session.
+      ensureWriteRoot(state);
       await refresh();
     } catch (e) {
       setError(errMessage(e));
@@ -72,7 +79,10 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
     onProgress.onmessage = (p) => setProgress(p);
     try {
       const { release } = await fetchNewestRecoil();
-      if (!release) return;
+      if (!release) {
+        setError("No engine is available to download for this platform.");
+        return;
+      }
       await installRecoil(release, writePath, onProgress);
       await refresh();
     } catch (e) {
@@ -142,7 +152,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
       {dismissible && (
         <button
           type="button"
-          className="text-xs text-muted-foreground underline"
+          className="-mx-1 px-1 py-1.5 text-xs text-muted-foreground underline"
           onClick={() => setDismissed(true)}
         >
           Dismiss

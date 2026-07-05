@@ -1,5 +1,6 @@
 import { useSetting } from "@picoframe/frame";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { ContentState } from "../content/bindings";
 import { contentStateLoad } from "../content/bindings";
 
 /** A user-configured rapid master. `url` is the base; `dl_repos` appends `/repos.gz`. */
@@ -49,6 +50,25 @@ export function useContentRootPaths(): string[] {
       .catch(() => setPaths([]));
   }, []);
   return paths;
+}
+
+/**
+ * Returns a function that back-fills the download destination from a fresh
+ * content state: if `writeRootId` is unset, it selects the first root. Call it
+ * right after adding/creating a root so the destination is ready the same
+ * session (the app-startup back-fill in ContentStartupProvider only covers roots
+ * that already exist at launch). Never overrides a value already set.
+ */
+export function useDefaultWriteRoot(): (state: ContentState) => void {
+  const [cfg, setCfg] = useDownloadsConfig();
+  return useCallback(
+    (state: ContentState) => {
+      if (cfg.writeRootId) return;
+      const first = state.roots[0];
+      if (first) setCfg({ ...cfg, writeRootId: first.id });
+    },
+    [cfg, setCfg],
+  );
 }
 
 /**
