@@ -513,10 +513,10 @@
           "markdownDescription": "Denies the campaign_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`",
+          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`",
           "type": "string",
           "const": "coilbox-content:default",
-          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`"
+          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`"
         },
         {
           "description": "Enables the branding_catalog command without any pre-configured scope.",
@@ -543,6 +543,12 @@
           "markdownDescription": "Enables the content_candidates command without any pre-configured scope."
         },
         {
+          "description": "Enables the content_create_standard_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-create-standard-root",
+          "markdownDescription": "Enables the content_create_standard_root command without any pre-configured scope."
+        },
+        {
           "description": "Enables the content_demo_info command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-content:allow-content-demo-info",
@@ -565,6 +571,12 @@
           "type": "string",
           "const": "coilbox-content:allow-content-open-path",
           "markdownDescription": "Enables the content_open_path command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_recreate_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-recreate-root",
+          "markdownDescription": "Enables the content_recreate_root command without any pre-configured scope."
         },
         {
           "description": "Enables the content_remove_root command without any pre-configured scope.",
@@ -621,6 +633,12 @@
           "markdownDescription": "Denies the content_candidates command without any pre-configured scope."
         },
         {
+          "description": "Denies the content_create_standard_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-create-standard-root",
+          "markdownDescription": "Denies the content_create_standard_root command without any pre-configured scope."
+        },
+        {
           "description": "Denies the content_demo_info command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-content:deny-content-demo-info",
@@ -643,6 +661,12 @@
           "type": "string",
           "const": "coilbox-content:deny-content-open-path",
           "markdownDescription": "Denies the content_open_path command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_recreate_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-recreate-root",
+          "markdownDescription": "Denies the content_recreate_root command without any pre-configured scope."
         },
         {
           "description": "Denies the content_remove_root command without any pre-configured scope.",

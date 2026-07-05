@@ -10,6 +10,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-scan-root`
 - `allow-content-add-root`
 - `allow-content-create-standard-root`
+- `allow-content-recreate-root`
 - `allow-content-remove-root`
 - `allow-content-list-engines`
 - `allow-content-verify-engine`
@@ -258,6 +259,32 @@ Enables the content_open_path command without any pre-configured scope.
 <td>
 
 Denies the content_open_path command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-recreate-root`
+
+</td>
+<td>
+
+Enables the content_recreate_root command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-recreate-root`
+
+</td>
+<td>
+
+Denies the content_recreate_root command without any pre-configured scope.
 
 </td>
 </tr>

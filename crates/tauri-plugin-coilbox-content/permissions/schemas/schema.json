@@ -403,6 +403,18 @@
           "markdownDescription": "Denies the content_open_path command without any pre-configured scope."
         },
         {
+          "description": "Enables the content_recreate_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-recreate-root",
+          "markdownDescription": "Enables the content_recreate_root command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_recreate_root command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-recreate-root",
+          "markdownDescription": "Denies the content_recreate_root command without any pre-configured scope."
+        },
+        {
           "description": "Enables the content_remove_root command without any pre-configured scope.",
           "type": "string",
           "const": "allow-content-remove-root",
@@ -463,10 +475,10 @@
           "markdownDescription": "Denies the content_verify_engine command without any pre-configured scope."
         },
         {
-          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`",
+          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`"
+          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`"
         }
       ]
     }

@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "content_scan_root",
     "content_add_root",
     "content_create_standard_root",
+    "content_recreate_root",
     "content_remove_root",
     "content_list_engines",
     "content_verify_engine",
