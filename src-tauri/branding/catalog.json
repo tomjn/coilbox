@@ -1,7 +1,27 @@
 {
   "version": 1,
-  "updated": "2026-07-02",
+  "updated": "2026-07-05",
   "entries": [
+    {
+      "id": "mechcommander-legacy",
+      "match": { "regex": "^MechCommander:? *Legacy", "names": ["MCL"] },
+      "title": "MechCommander: Legacy",
+      "banner": ["https://i.imgur.com/2VqTu99.jpg"],
+      "logo": [],
+      "screenshots": [],
+      "videos": [],
+      "links": [
+        {
+          "label": "GitHub",
+          "url": "https://github.com/SpringMCLegacy/SpringMCLegacy"
+        },
+        {
+          "label": "Wiki",
+          "url": "https://github.com/SpringMCLegacy/SpringMCLegacy/wiki"
+        },
+        { "label": "Discord", "url": "https://discord.com/invite/QMCChXp4zH" }
+      ]
+    },
     {
       "id": "splinter-faction",
       "match": { "regex": "^Splinter *Faction" },
