@@ -9,6 +9,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-rescan`
 - `allow-content-scan-root`
 - `allow-content-add-root`
+- `allow-content-create-standard-root`
 - `allow-content-remove-root`
 - `allow-content-list-engines`
 - `allow-content-verify-engine`
@@ -127,6 +128,32 @@ Enables the content_candidates command without any pre-configured scope.
 <td>
 
 Denies the content_candidates command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-create-standard-root`
+
+</td>
+<td>
+
+Enables the content_create_standard_root command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-create-standard-root`
+
+</td>
+<td>
+
+Denies the content_create_standard_root command without any pre-configured scope.
 
 </td>
 </tr>

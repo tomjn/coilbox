@@ -431,39 +431,28 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> Resul
     Ok(CliResult::ok(json!({ "root": root })))
 }
 
-/// `content_add_root` — add a manually-picked root. Rejects non-roots unless
-/// `force`, then recomputes and returns the full state.
-#[tauri::command]
-async fn content_add_root<R: Runtime>(
-    app: AppHandle<R>,
-    path: String,
+/// Add a root by canonical path: validate (unless `force`), record the user root
+/// (relative when `portable`), recompute and persist, returning the new state.
+fn add_root_inner<R: Runtime>(
+    app: &AppHandle<R>,
+    canon: &Path,
     label: Option<String>,
-    force: Option<bool>,
-    portable: Option<bool>,
-) -> Result<CliResult, ()> {
-    let sp = match store_path(&app) {
-        Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
-    };
-    let canon = canonical(Path::new(&path));
-    let valid = canon.is_dir() && scan::classify(&canon).is_some();
-    let force = force.unwrap_or(false);
+    force: bool,
+    portable: bool,
+) -> Result<ContentState, String> {
+    let sp = store_path(app)?;
+    let valid = canon.is_dir() && scan::classify(canon).is_some();
     if !valid && !force {
-        return Ok(CliResult::err(
+        return Err(
             "That folder doesn't look like a Spring data root (no engine/games/maps/rapid layout \
-             or portable install). Add it anyway to force.",
-        ));
+             or portable install). Add it anyway to force."
+                .into(),
+        );
     }
     // How to persist it: relative (portable) or absolute. Errors when a portable
     // root is explicitly requested for a folder outside the app dir.
-    let stored = match stored_root_path(portable.unwrap_or(false), &canon) {
-        Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(e)),
-    };
-    let mut store = match load_store(&sp) {
-        Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(e)),
-    };
+    let stored = stored_root_path(portable, canon)?;
+    let mut store = load_store(&sp)?;
     if !store
         .user_roots
         .iter()
@@ -475,11 +464,56 @@ async fn content_add_root<R: Runtime>(
             forced: force && !valid,
         });
     }
-    let state = compute_state(&app, &store, true, false);
-    if let Err(e) = persist(&sp, store, &state) {
-        return Ok(CliResult::err(e));
+    let state = compute_state(app, &store, true, false);
+    persist(&sp, store, &state)?;
+    Ok(state)
+}
+
+/// `content_add_root` — add a manually-picked root. Rejects non-roots unless
+/// `force`, then recomputes and returns the full state.
+#[tauri::command]
+async fn content_add_root<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    label: Option<String>,
+    force: Option<bool>,
+    portable: Option<bool>,
+) -> Result<CliResult, ()> {
+    let canon = canonical(Path::new(&path));
+    match add_root_inner(
+        &app,
+        &canon,
+        label,
+        force.unwrap_or(false),
+        portable.unwrap_or(false),
+    ) {
+        Ok(state) => Ok(CliResult::ok(json!({ "state": state }))),
+        Err(e) => Ok(CliResult::err(e)),
     }
-    Ok(CliResult::ok(json!({ "state": state })))
+}
+
+/// `content_create_standard_root` — create the OS-standard content folder on disk
+/// and register it as a forced root (it is empty, so it fails the normal Spring
+/// layout check). Returns the recomputed state, so the caller learns the new id.
+#[tauri::command]
+async fn content_create_standard_root<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
+    let base = base_dirs(&app, false);
+    let Some(path) = paths::standard_root_path(current_os(), &base) else {
+        return Ok(CliResult::err(
+            "No standard content location is known for this platform.",
+        ));
+    };
+    if let Err(e) = std::fs::create_dir_all(&path) {
+        return Ok(CliResult::err(format!(
+            "Couldn't create {}: {e}",
+            path.display()
+        )));
+    }
+    let canon = canonical(&path);
+    match add_root_inner(&app, &canon, None, true, false) {
+        Ok(state) => Ok(CliResult::ok(json!({ "state": state }))),
+        Err(e) => Ok(CliResult::err(e)),
+    }
 }
 
 /// `content_remove_root` — remove a manual root (auto roots can't be removed).
@@ -682,6 +716,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_rescan,
             content_scan_root,
             content_add_root,
+            content_create_standard_root,
             content_remove_root,
             content_list_engines,
             content_verify_engine,

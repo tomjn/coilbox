@@ -70,9 +70,6 @@ fn push(out: &mut Vec<Candidate>, path: Option<PathBuf>, origin: &str) {
 /// The single OS-standard content-root path to offer for quick-create: the
 /// pr-downloader default write dir (Windows `Documents\My Games\Spring`,
 /// otherwise `~/.spring`). Mirrors the `prd-default` candidate in `candidate_roots`.
-///
-/// Not yet wired into a command; a later task calls this from `lib.rs`.
-#[allow(dead_code)]
 pub fn standard_root_path(os: Os, b: &BaseDirs) -> Option<PathBuf> {
     candidate_roots(os, b)
         .into_iter()
