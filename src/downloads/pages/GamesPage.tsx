@@ -9,6 +9,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { invalidateScans } from "../../content/config";
 import {
   type DownloadProgress,
   dlDownloadFile,
@@ -107,6 +108,9 @@ export default function GamesPage() {
       });
       setResult({ ok: true, message });
       await refreshInstalled();
+      // A newly-downloaded game must show up in the singleplayer picker without a
+      // manual rescan, so drop the stale unitsync scan cache.
+      invalidateScans();
     } catch (e) {
       setResult({ ok: false, message: errMessage(e) });
     } finally {
