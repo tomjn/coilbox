@@ -1071,8 +1071,9 @@ impl Unitsync {
     ///
     /// `None` means "no whitelist" — the file is absent, unparseable, or this
     /// build lacks the Lua parser — and the caller then shows every AI. `Some`
-    /// (even empty) means the game shipped a whitelist and only matching AIs
-    /// should be shown.
+    /// carries the declared patterns; the caller filters by any that compile, and
+    /// falls back to showing every AI when a whitelist yields no usable pattern
+    /// (empty or entirely garbled).
     pub fn valid_ais(&self) -> Option<Vec<String>> {
         let (
             Some(open),

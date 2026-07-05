@@ -9,6 +9,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { invalidateScans } from "../../content/config";
 import {
   type BarMap,
   type DownloadProgress,
@@ -206,6 +207,9 @@ export default function MapsPage() {
           });
       setResult({ ok: true, message });
       await refreshInstalled();
+      // Surface the new map in the singleplayer/battle pickers without a manual
+      // rescan by dropping the stale unitsync scan cache.
+      invalidateScans();
     } catch (e) {
       setResult({ ok: false, message: errMessage(e) });
     } finally {

@@ -60,7 +60,9 @@ function formatDuration(sec: number): string {
 export default function ReplaysPage() {
   const { targets, selected, selectedKey, setSelectedKey } =
     useScanTargetSelection();
-  const { replays, loading, error, refresh } = useReplays(selected?.rootPath);
+  const { replays, loading, error, refresh, ready } = useReplays(
+    selected?.rootPath,
+  );
   const { thumbs, loading: thumbsLoading } = useUnitsyncThumbnails(
     selected?.enginePath,
     selected?.rootPath,
@@ -96,7 +98,10 @@ export default function ReplaysPage() {
     return arr;
   }, [filtered, sort]);
 
-  const busy = loading || (!!selected && replays.length === 0 && !error);
+  // Busy only while actually loading or before the first load completes for the
+  // selected target — NOT when a load finished and simply found no replays (that
+  // must fall through to the empty state, not spin a skeleton forever).
+  const busy = loading || (!!selected && !ready);
 
   return (
     <div className="flex flex-col gap-4 p-4">
