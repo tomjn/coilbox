@@ -16,6 +16,7 @@
 mod archive;
 mod buildpic;
 mod config;
+mod dataset;
 mod ffi;
 mod game;
 mod heightmap;
@@ -56,6 +57,9 @@ struct Args {
     /// `--unit-buildpics`: resolve start-unit build icons for `--game`, for the
     /// units listed in `--units` (comma-separated).
     unit_buildpics: bool,
+    /// `--unit-dataset`: read `--game`'s reusable unit graph (units + their
+    /// `buildoptions` edges), for the build-tree viewer and unit filters.
+    unit_dataset: bool,
     units: Vec<String>,
     /// `--lua`: run a Lua snippet through the parser against `--archive`, reading
     /// the script from `--source-file`.
@@ -172,6 +176,25 @@ fn run() -> i32 {
             }
             Err(_) => {
                 buildpic::emit_error("worker panicked while resolving unit build pics".into());
+                1
+            }
+        };
+    }
+
+    // Unit dataset: read one game's reusable unit graph (units + buildoptions
+    // edges) in one Init, disk-cached like game info. Checked before the --game
+    // game-detail mode because it also keys off --game.
+    if args.unit_dataset {
+        let game_archive = args.game.clone().unwrap_or_default();
+        return match std::panic::catch_unwind(|| {
+            dataset::render(&args.lib, &game_archive, cache_dir)
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                dataset::emit_error("worker panicked while reading unit dataset".into());
                 1
             }
         };
@@ -357,6 +380,7 @@ fn parse_args() -> Result<Args, String> {
     let mut skirmish_ais = false;
     let mut game_headers = false;
     let mut unit_buildpics = false;
+    let mut unit_dataset = false;
     let mut units: Vec<String> = Vec::new();
     let mut lua = false;
     let mut source_file = None;
@@ -387,6 +411,7 @@ fn parse_args() -> Result<Args, String> {
             "--skirmish-ais" => skirmish_ais = true,
             "--game-headers" => game_headers = true,
             "--unit-buildpics" => unit_buildpics = true,
+            "--unit-dataset" => unit_dataset = true,
             "--units" => {
                 units = it
                     .next()
@@ -425,6 +450,7 @@ fn parse_args() -> Result<Args, String> {
         skirmish_ais,
         game_headers,
         unit_buildpics,
+        unit_dataset,
         units,
         lua,
         source_file,

@@ -235,6 +235,39 @@ pub struct GameInfoOutput {
     pub errors: Vec<String>,
 }
 
+/// One unit in the reusable unit dataset: its internal name, friendly name, and
+/// the internal names of the units it can build (`buildoptions`, lowercased). The
+/// general graph the build-tree viewer, unit include/exclude settings, and the
+/// campaign unit restrictions can all read from.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct UnitDatasetEntry {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub full_name: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub build_options: Vec<String>,
+    /// Whether the unit can move (a mobile unit) vs a static building — derived
+    /// from the unitdef's speed. Static buildings are `false`.
+    pub mobile: bool,
+}
+
+/// Output of the lazy `--unit-dataset` mode: the whole game's unit graph (units +
+/// their `buildoptions` edges). Loaded on demand (mounts the game's archive set),
+/// never produced during the scan. Disk-cached like `GameInfoOutput`, in its own
+/// key namespace.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct UnitDatasetOutput {
+    /// Every unit in the game, sorted by internal name.
+    pub units: Vec<UnitDatasetEntry>,
+    /// Sync checksum (from GetPrimaryModChecksum) — hashes the archive plus its
+    /// dependencies, so it's computed lazily here, not during the scan.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
+    pub errors: Vec<String>,
+}
+
 /// One resolved start unit: its human-friendly name (from the unitdef `name`
 /// field) and its build-icon `data:` URL. Either may be absent. Also the on-disk
 /// cache record (round-tripped as JSON), so it derives Deserialize too.

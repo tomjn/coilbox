@@ -26,6 +26,7 @@ import {
   type ScanResult,
   type StartPos,
   type UnitBuildpicsResult,
+  type UnitDatasetResult,
   unitsyncArchiveFile,
   unitsyncArchiveTree,
   unitsyncCancel,
@@ -39,6 +40,7 @@ import {
   unitsyncScan,
   unitsyncThumbnails,
   unitsyncUnitBuildpics,
+  unitsyncUnitDataset,
 } from "./bindings";
 import { newestEngineId } from "./engineVersion";
 
@@ -481,6 +483,67 @@ export function invalidateGameInfo(
 ) {
   if (!enginePath || !dataDir || !gameArchive) return;
   gameInfoCache.delete(`${dataDir}::${enginePath}::${gameArchive}`);
+}
+
+/** Session cache of unit datasets, keyed by `dataDir::enginePath::gameArchive`. */
+const unitDatasetCache = new Map<string, UnitDatasetResult>();
+
+/**
+ * Lazily load a game's reusable unit graph (units + `buildoptions` edges). Loads
+ * the game's archive set, so it's fetched on demand — never during the scan.
+ * Cached for the session only when syncable (mirrors the worker's disk cache).
+ */
+export function useUnitsyncUnitDataset(
+  enginePath?: string,
+  dataDir?: string,
+  gameArchive?: string,
+) {
+  const [dataset, setDataset] = useState<UnitDatasetResult | null>(null);
+  const [status, setStatus] = useState<UnitsyncInfoStatus>("idle");
+  const [nonce, setNonce] = useState(0);
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: nonce is a manual retry trigger that re-runs the fetch, not read in the body
+  useEffect(() => {
+    if (!enginePath || !dataDir || !gameArchive) {
+      setDataset(null);
+      setStatus("idle");
+      return;
+    }
+    const key = `${dataDir}::${enginePath}::${gameArchive}`;
+    const cached = unitDatasetCache.get(key);
+    if (cached) {
+      setDataset(cached);
+      setStatus("ready");
+      return;
+    }
+    let cancelled = false;
+    setStatus("loading");
+    unitsyncUnitDataset({ enginePath, dataDir, gameArchive })
+      .then((res) => {
+        if (cancelled) return;
+        setDataset(res);
+        // Only a syncable result is cached (mirrors the worker's disk cache), so
+        // a zero-checksum result stays retryable rather than sticking forever.
+        if (res.checksum) {
+          unitDatasetCache.set(key, res);
+          setStatus("ready");
+        } else {
+          setStatus("unsyncable");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDataset(null);
+          setStatus("error");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, gameArchive, nonce]);
+
+  return { dataset, status, reload, loading: status === "loading" };
 }
 
 /** Session cache of unit build icons, keyed by dataDir::engine::game::units. */

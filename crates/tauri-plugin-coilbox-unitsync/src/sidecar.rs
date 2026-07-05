@@ -107,6 +107,22 @@ pub fn build_unit_buildpics_args(
     args
 }
 
+/// Build args for `--unit-dataset` mode: the game whose unit graph (units +
+/// `buildoptions` edges) to read, plus the optional on-disk info-blob cache dir.
+pub fn build_unit_dataset_args(
+    lib: &str,
+    datadir: &str,
+    game: &str,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--unit-dataset".into());
+    args.push("--game".into());
+    args.push(game.into());
+    push_cache_dir(&mut args, cache_dir);
+    args
+}
+
 /// Build args for heightmap mode: scan args plus the map name, the `--heightmap`
 /// flag, the longest-side pixel cap, and the optional on-disk PNG cache directory.
 pub fn build_heightmap_args(
@@ -411,6 +427,24 @@ mod tests {
         let without =
             build_unit_buildpics_args("/eng/libunitsync.so", "/data", "BAR.sdd", &[], None);
         assert!(without.contains(&"--unit-buildpics".to_string()));
+        assert!(!without.iter().any(|x| x == "--cache-dir"));
+    }
+
+    #[test]
+    fn build_unit_dataset_args_carry_game_and_cache_dir() {
+        let a = build_unit_dataset_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "BAR.sdd",
+            Some("/cache/info"),
+        );
+        assert!(a.contains(&"--unit-dataset".to_string()));
+        let g = a.iter().position(|x| x == "--game").unwrap();
+        assert_eq!(a[g + 1], "BAR.sdd");
+        assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/info"]);
+
+        let without = build_unit_dataset_args("/eng/libunitsync.so", "/data", "BAR.sdd", None);
+        assert!(without.contains(&"--unit-dataset".to_string()));
         assert!(!without.iter().any(|x| x == "--cache-dir"));
     }
 
