@@ -14,19 +14,27 @@ import {
 } from "../../../downloads/engineInstall";
 import { ProgressBar } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
-import { contentCreateStandardRoot } from "../../bindings";
+import { contentCreateStandardRoot, contentRecreateRoot } from "../../bindings";
 import { useSetupStatus } from "../../config";
 
 export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
-  const { needsFolder, needsEngine, complete, standardPath, refresh } =
-    useSetupStatus();
+  const {
+    needsFolder,
+    needsEngine,
+    complete,
+    standardPath,
+    missingRoot,
+    refresh,
+  } = useSetupStatus();
   const writePath = useWriteRootPath();
   const ensureWriteRoot = useDefaultWriteRoot();
   const [dismissed, setDismissed] = useSetting<boolean>(
     "setup.dismissed",
     false,
   );
-  const [busy, setBusy] = useState<null | "folder" | "engine">(null);
+  const [busy, setBusy] = useState<null | "folder" | "recreate" | "engine">(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [newest, setNewest] = useState<{
@@ -58,6 +66,21 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
       const { state } = await contentCreateStandardRoot(undefined);
       // Default the download destination to the new folder so the engine step
       // isn't a disabled button this same session.
+      ensureWriteRoot(state);
+      await refresh();
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function recreateFolder() {
+    if (!missingRoot) return;
+    setBusy("recreate");
+    setError(null);
+    try {
+      const { state } = await contentRecreateRoot({ path: missingRoot.path });
       ensureWriteRoot(state);
       await refresh();
     } catch (e) {
@@ -102,18 +125,42 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
         </p>
       </div>
 
-      {needsFolder && (
-        <Button onClick={createFolder} disabled={busy !== null}>
-          {busy === "folder" ? (
-            <Loader2 className="animate-spin" />
-          ) : (
-            <FolderPlus />
-          )}
-          {standardPath
-            ? `Create folder at ${standardPath}`
-            : "Create content folder"}
-        </Button>
-      )}
+      {needsFolder &&
+        (missingRoot ? (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Your content folder{" "}
+              <code className="break-all rounded bg-muted px-1 py-0.5 text-foreground">
+                {missingRoot.path}
+              </code>{" "}
+              is missing. Recreate it to continue, or add a different folder
+              from the{" "}
+              <Link className="underline" to="/settings/content-folders">
+                Content Folders
+              </Link>{" "}
+              page.
+            </p>
+            <Button onClick={recreateFolder} disabled={busy !== null}>
+              {busy === "recreate" ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <FolderPlus />
+              )}
+              Recreate folder
+            </Button>
+          </div>
+        ) : (
+          <Button onClick={createFolder} disabled={busy !== null}>
+            {busy === "folder" ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <FolderPlus />
+            )}
+            {standardPath
+              ? `Create folder at ${standardPath}`
+              : "Create content folder"}
+          </Button>
+        ))}
 
       {needsEngine &&
         (newest?.available ? (
@@ -160,4 +207,13 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
       )}
     </section>
   );
+}
+
+/**
+ * Slot wrapper for picoframe's built-in home page (`home.top`): the dismissible
+ * setup card. Renders `null` once setup is complete, so a healthy install shows
+ * nothing above the launcher. Slot Components take no props, hence this wrapper.
+ */
+export function HomeSetupCard() {
+  return <SetupCard dismissible />;
 }

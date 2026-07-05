@@ -276,6 +276,57 @@ fn persist(path: &Path, mut store: StoreFile, state: &ContentState) -> Result<()
     save_store(path, &store)
 }
 
+/// Re-derive the filesystem-dependent fields of a cached snapshot without a full
+/// rescan. The snapshot freezes `exists` / `valid` / `engines` at scan time, but a
+/// content folder or engine can be deleted between runs — so any read that gates UI
+/// (first-run setup, engine-download buttons) must re-check disk, or it acts on
+/// stale truth. Cheap: re-stats each root and re-scans only the `engine/` layout,
+/// deliberately skipping the content-count walk (those counts self-correct on the
+/// next explicit rescan). Not persisted — a read must stay read-only.
+fn refresh_against_disk(state: ContentState) -> ContentState {
+    let ContentState {
+        schema_version,
+        roots,
+        last_scan_at,
+    } = state;
+    let mut roots: Vec<ContentRoot> = roots
+        .into_iter()
+        .map(|mut r| {
+            let canon = canonical(Path::new(&r.path));
+            let exists = canon.is_dir();
+            let forced = r.forced == Some(true);
+            let kind = if exists { scan::classify(&canon) } else { None };
+            let engines = if exists {
+                scan::discover_engines(&canon)
+            } else {
+                Vec::new()
+            };
+            r.exists = exists;
+            r.valid = kind.is_some() || forced;
+            if let Some(k) = kind {
+                r.kind = k;
+            }
+            if exists {
+                r.counts.engines = engines.len() as u32;
+            } else {
+                // Folder gone: zero counts so nothing reports a stale total.
+                r.counts = RootCounts::default();
+            }
+            r.engines = engines;
+            r
+        })
+        .collect();
+    // Mirror compute_state: keep valid roots and every manual root (so a vanished
+    // manual root stays visible and recreatable); drop auto roots that no longer
+    // validate (noise).
+    roots.retain(|r| r.valid || matches!(r.source, RootSource::Manual));
+    ContentState {
+        schema_version,
+        roots,
+        last_scan_at,
+    }
+}
+
 // ---- commands --------------------------------------------------------------
 
 /// `content_candidates` — the standard per-OS locations, with exists/valid flags.
@@ -306,7 +357,8 @@ async fn content_candidates<R: Runtime>(
     Ok(CliResult::ok(json!({ "candidates": out })))
 }
 
-/// `content_state_load` — the persisted snapshot (the cross-plugin read API).
+/// `content_state_load` — the persisted snapshot (the cross-plugin read API),
+/// re-validated against disk so a folder/engine deleted between runs is reflected.
 #[tauri::command]
 async fn content_state_load<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
     let path = match store_path(&app) {
@@ -317,7 +369,7 @@ async fn content_state_load<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, 
         Ok(s) => s,
         Err(e) => return Ok(CliResult::err(e)),
     };
-    let state = store.snapshot.unwrap_or_default();
+    let state = refresh_against_disk(store.snapshot.unwrap_or_default());
     Ok(CliResult::ok(json!({ "state": state })))
 }
 
@@ -538,6 +590,58 @@ async fn content_remove_root<R: Runtime>(app: AppHandle<R>, path: String) -> Res
     Ok(CliResult::ok(json!({ "state": state })))
 }
 
+/// `content_recreate_root` — recreate the on-disk folder for a configured root
+/// whose directory was deleted, then re-register it as forced (an empty folder
+/// fails the Spring-layout check, exactly as `content_create_standard_root`). The
+/// path is expected to already be one of the user's roots.
+#[tauri::command]
+async fn content_recreate_root<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+) -> Result<CliResult, ()> {
+    let sp = match store_path(&app) {
+        Ok(p) => p,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let target = resolve_stored(&path);
+    if let Err(e) = std::fs::create_dir_all(&target) {
+        return Ok(CliResult::err(format!(
+            "Couldn't create {}: {e}",
+            target.display()
+        )));
+    }
+    let canon = canonical(&target);
+    let mut store = match load_store(&sp) {
+        Ok(s) => s,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    // Force the matching user root so the freshly-created (empty) folder validates.
+    match store
+        .user_roots
+        .iter_mut()
+        .find(|u| canonical(&resolve_stored(&u.path)) == canon)
+    {
+        Some(u) => u.forced = true,
+        None => {
+            // Not previously tracked — register it so the new folder is usable.
+            let stored = match stored_root_path(false, &canon) {
+                Ok(s) => s,
+                Err(e) => return Ok(CliResult::err(e)),
+            };
+            store.user_roots.push(UserRoot {
+                path: stored,
+                label: None,
+                forced: true,
+            });
+        }
+    }
+    let state = compute_state(&app, &store, true, false);
+    if let Err(e) = persist(&sp, store, &state) {
+        return Ok(CliResult::err(e));
+    }
+    Ok(CliResult::ok(json!({ "state": state })))
+}
+
 /// `content_list_engines` — every engine across tracked roots (read API).
 #[tauri::command]
 async fn content_list_engines<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
@@ -551,7 +655,13 @@ async fn content_list_engines<R: Runtime>(app: AppHandle<R>) -> Result<CliResult
     };
     let engines: Vec<_> = store
         .snapshot
-        .map(|s| s.roots.into_iter().flat_map(|r| r.engines).collect())
+        .map(|s| {
+            refresh_against_disk(s)
+                .roots
+                .into_iter()
+                .flat_map(|r| r.engines)
+                .collect()
+        })
         .unwrap_or_default();
     Ok(CliResult::ok(json!({ "engines": engines })))
 }
@@ -717,6 +827,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_scan_root,
             content_add_root,
             content_create_standard_root,
+            content_recreate_root,
             content_remove_root,
             content_list_engines,
             content_verify_engine,
@@ -770,5 +881,76 @@ mod tests {
             Path::new("/data/spring")
         };
         assert_eq!(stored_root_path(false, p).unwrap(), display_path(p));
+    }
+
+    /// A snapshot root with the (stale) `exists: true` and inflated counts a real
+    /// snapshot carries at scan time.
+    fn stale_root(path: &str, source: RootSource, forced: bool) -> ContentRoot {
+        ContentRoot {
+            id: hash_id(&[path]),
+            path: path.into(),
+            source,
+            kind: RootKind::Data,
+            label: None,
+            origins: Vec::new(),
+            exists: true,
+            valid: true,
+            portable: false,
+            forced: if forced { Some(true) } else { None },
+            counts: RootCounts {
+                games: 9,
+                maps: 9,
+                engines: 9,
+                packages: 9,
+            },
+            engines: Vec::new(),
+            last_scanned_at: Some(0),
+        }
+    }
+
+    #[test]
+    fn refresh_against_disk_revalidates_roots() {
+        let base = std::env::temp_dir().join("coilbox_refresh_against_disk_test");
+        let _ = std::fs::remove_dir_all(&base);
+        let live = base.join("live");
+        std::fs::create_dir_all(live.join("games")).unwrap(); // valid Data layout
+        let empty = base.join("empty");
+        std::fs::create_dir_all(&empty).unwrap(); // exists but not a Spring root
+        let gone = base.join("gone"); // never created
+
+        let state = ContentState {
+            schema_version: SCHEMA_VERSION,
+            roots: vec![
+                stale_root(&display_path(&live), RootSource::Manual, false),
+                stale_root(&display_path(&empty), RootSource::Manual, true), // forced-empty
+                stale_root(&display_path(&gone), RootSource::Manual, false), // vanished manual
+                stale_root(&display_path(&gone), RootSource::Auto, false),   // vanished auto
+            ],
+            last_scan_at: Some(0),
+        };
+
+        let out = refresh_against_disk(state);
+        // The dead auto root is dropped; all three manual roots survive.
+        assert_eq!(out.roots.len(), 3);
+
+        let find = |p: &std::path::Path, src: RootSource| {
+            out.roots
+                .iter()
+                .find(|r| r.path == display_path(p) && r.source == src)
+                .unwrap()
+        };
+        let live_r = find(&live, RootSource::Manual);
+        assert!(live_r.exists && live_r.valid);
+
+        let empty_r = find(&empty, RootSource::Manual);
+        assert!(empty_r.exists, "empty folder still exists");
+        assert!(empty_r.valid, "forced root stays valid even when empty");
+
+        let gone_r = find(&gone, RootSource::Manual);
+        assert!(!gone_r.exists, "deleted folder is detected as gone");
+        assert!(!gone_r.valid, "gone, unforced root is invalid");
+        assert_eq!(gone_r.counts.games, 0, "stale counts zeroed when gone");
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

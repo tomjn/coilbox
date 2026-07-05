@@ -75,10 +75,14 @@ if (profile.theme) {
   }
 }
 
-// picoframe has no home slot, so the `/` page is always overridden: SetupHome
-// shows the first-run setup card above the profile's branded welcome (if any)
-// or a minimal default welcome otherwise.
-const home: HomeOverride = { Component: SetupHome };
+// Vanilla Coilbox uses picoframe's built-in launcher home; the content plugin
+// contributes the first-run setup card via the `home.top` slot, so it rides above
+// the launcher's tool grid. A branded build (profile.welcome present) instead
+// overrides `/` with SetupHome, letting its welcome take over the page (with the
+// setup card above it).
+const home: HomeOverride | undefined = profile.welcome
+  ? { Component: SetupHome }
+  : undefined;
 
 // Resolve the startup splash before first paint (so the image is ready and there's
 // no empty-overlay flash). Skipped when the profile has no splash or the user turned

@@ -120,6 +120,12 @@ export const contentCreateStandardRoot = defineCommand<
   { state: ContentState }
 >("coilbox-content", "content_create_standard_root");
 
+/** Recreate a configured root's folder on disk after it was deleted (forced). */
+export const contentRecreateRoot = defineCommand<
+  { path: string },
+  { state: ContentState }
+>("coilbox-content", "content_recreate_root");
+
 /** Every engine across tracked roots (cross-plugin read API). */
 export const contentListEngines = defineCommand<
   undefined,
