@@ -521,6 +521,23 @@ export const unitsyncHeightmap = defineCommand<
   HeightmapResult
 >("coilbox-unitsync", "unitsync_heightmap");
 
+export interface MapSkyboxResult {
+  /** `data:` URL of the raw skybox DDS bytes (parsed by three.js `DDSLoader`),
+   * when the map declares `atmosphere.skyBox`. */
+  dataUrl?: string;
+  errors: string[];
+}
+
+/**
+ * Read one map's `atmosphere.skyBox` DDS cube map as raw bytes (a `data:` URL),
+ * for the 3D preview's sky. Lazy — a separate unitsync session. Absent for the
+ * common case of a map with no skybox.
+ */
+export const unitsyncMapSkybox = defineCommand<
+  { enginePath: string; dataDir: string; mapName: string },
+  MapSkyboxResult
+>("coilbox-unitsync", "unitsync_map_skybox");
+
 export interface ThumbnailsResult {
   thumbnails: {
     name: string;

@@ -189,6 +189,16 @@ pub fn build_map_info_args(
     args
 }
 
+/// Build args for map-skybox mode: scan args plus the map name and the
+/// `--map-skybox` flag (read the map's `atmosphere.skyBox` DDS).
+pub fn build_map_skybox_args(lib: &str, datadir: &str, map_name: &str) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--map".into());
+    args.push(map_name.into());
+    args.push("--map-skybox".into());
+    args
+}
+
 /// Build args for skirmish-AI mode: scan args plus the `--skirmish-ais` flag and,
 /// when a game is given, `--game <archive>` so its Lua AIs are enumerated too.
 pub fn build_skirmish_ai_args(lib: &str, datadir: &str, game: Option<&str>) -> Vec<String> {
@@ -322,6 +332,15 @@ mod tests {
         assert_eq!(a[i + 1], "Map v1");
         let j = a.iter().position(|x| x == "--max-side").unwrap();
         assert_eq!(a[j + 1], "512");
+    }
+
+    #[test]
+    fn build_map_skybox_args_carry_map_and_flag() {
+        let a = build_map_skybox_args("/eng/libunitsync.so", "/data", "Map v1");
+        assert_eq!(a.last(), Some(&"--map-skybox".to_string()));
+        let i = a.iter().position(|x| x == "--map").unwrap();
+        assert_eq!(a[i + 1], "Map v1");
+        assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
     }
 
     #[test]

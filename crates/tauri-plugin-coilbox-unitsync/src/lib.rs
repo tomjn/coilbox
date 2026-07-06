@@ -14,9 +14,9 @@ use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
     build_config_args, build_game_args, build_game_headers_args, build_heightmap_args,
-    build_lua_args, build_map_info_args, build_minimap_args, build_skirmish_ai_args,
-    build_thumbnails_args, build_unit_buildpics_args, build_unit_dataset_args, find_unitsync,
-    resolve_sidecar,
+    build_lua_args, build_map_info_args, build_map_skybox_args, build_minimap_args,
+    build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
+    build_unit_dataset_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -488,6 +488,25 @@ async fn unitsync_map_info<R: Runtime>(
     Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map info", None).await)
 }
 
+/// `unitsync_map_skybox` — read one map's `atmosphere.skyBox` DDS cube map as raw
+/// bytes (a `data:` URL the frontend's `DDSLoader` parses), for the 3D preview's
+/// sky. Returns `{ dataUrl?, errors }`; `dataUrl` is absent for the common case of
+/// a map with no skybox.
+#[tauri::command]
+async fn unitsync_map_skybox(
+    engine_path: String,
+    data_dir: String,
+    map_name: String,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let args = build_map_skybox_args(&libpath.to_string_lossy(), &data_dir, &map_name);
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map skybox", None).await)
+}
+
 /// `unitsync_skirmish_ais` — list the skirmish AIs available to play against:
 /// native engine AIs, plus the selected game's bundled Lua AIs when
 /// `game_archive` is given. Returns `{ ais: [{ shortName, version?, name?,
@@ -659,6 +678,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_unit_buildpics,
             unitsync_unit_dataset,
             unitsync_map_info,
+            unitsync_map_skybox,
             unitsync_skirmish_ais,
             unitsync_engine_config,
             unitsync_archive_tree,

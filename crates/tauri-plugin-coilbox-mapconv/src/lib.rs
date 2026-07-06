@@ -180,6 +180,16 @@ async fn mc_suggest_sources(texture_path: String) -> CliResult {
     }))
 }
 
+/// The directories searched for a map's `mapinfo.lua` near a chosen path: the
+/// path's own directory (or itself when it's a directory) and its parent.
+fn nearby_dirs(base: &Path) -> Vec<PathBuf> {
+    let mut dirs = vec![base.to_path_buf()];
+    if let Some(parent) = base.parent() {
+        dirs.push(parent.to_path_buf());
+    }
+    dirs
+}
+
 /// First `.smf` found directly inside any of `dirs` (the height fallback for
 /// maps without a `mapinfo.lua`).
 fn find_smf_near(dirs: &[PathBuf]) -> Option<PathBuf> {
@@ -214,10 +224,7 @@ async fn mc_read_mapinfo(path: String) -> CliResult {
         } else {
             p.parent().map(Path::to_path_buf).unwrap_or(p)
         };
-        let mut dirs = vec![base.clone()];
-        if let Some(parent) = base.parent() {
-            dirs.push(parent.to_path_buf());
-        }
+        let dirs = nearby_dirs(&base);
 
         let mut info = mapinfo::MapAppearance::default();
         for d in &dirs {
@@ -246,6 +253,85 @@ async fn mc_read_mapinfo(path: String) -> CliResult {
     match result {
         Ok(info) => CliResult::ok(serde_json::to_value(info).unwrap_or_else(|_| json!({}))),
         Err(e) => CliResult::err(format!("mapinfo task failed: {e}")),
+    }
+}
+
+/// A skybox DDS is read up to this size (a 1024² DXT5 cube map with mips is
+/// ~8 MiB; leave headroom for uncompressed or larger faces).
+const SKYBOX_MAX_BYTES: u64 = 32 * 1024 * 1024;
+
+/// Normalise a `mapinfo` file reference to a safe relative path: forward slashes,
+/// no leading `/`, and rejecting any `..` component so a reference can't escape the
+/// map directory. `None` when it resolves to nothing usable.
+fn sanitize_rel(reference: &str) -> Option<PathBuf> {
+    let mut out = PathBuf::new();
+    for comp in reference.replace('\\', "/").split('/') {
+        match comp {
+            "" | "." => continue,
+            ".." => return None,
+            other => out.push(other),
+        }
+    }
+    (!out.as_os_str().is_empty()).then_some(out)
+}
+
+/// `mc_read_skybox` — read a map's `atmosphere.skyBox` DDS (a loose file next to
+/// `mapinfo.lua`) and return it as a raw-bytes `data:` URL for the 3D preview's
+/// sky. Locates `mapinfo.lua` near `path` (same search as `mc_read_mapinfo`), reads
+/// its skybox reference, resolves the referenced file within the map directory, and
+/// base64-wraps it. Returns `{ dataUrl }` — `dataUrl` is null when the map declares
+/// no skybox or the file is missing/oversized, so the preview keeps its flat sky.
+#[tauri::command]
+async fn mc_read_skybox(path: String) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || -> Option<String> {
+        let p = PathBuf::from(&path);
+        let base = if p.is_dir() {
+            p.clone()
+        } else {
+            p.parent().map(Path::to_path_buf).unwrap_or(p)
+        };
+        let dirs = nearby_dirs(&base);
+
+        // Find mapinfo.lua and read its skyBox reference (eval first, then scanner).
+        let mut reference = None;
+        let mut mapinfo_dir = None;
+        for d in &dirs {
+            if let Ok(src) = std::fs::read_to_string(d.join("mapinfo.lua")) {
+                let info = mapinfo::eval_appearance(d, &src)
+                    .unwrap_or_else(|| mapinfo::parse_appearance(&src));
+                reference = info.sky_box;
+                mapinfo_dir = Some(d.clone());
+                break;
+            }
+        }
+        let rel = sanitize_rel(&reference?)?;
+
+        // Resolve the referenced file relative to the mapinfo dir (then its
+        // neighbours), read it, and wrap as a data URL.
+        let mut search = Vec::new();
+        if let Some(d) = mapinfo_dir {
+            search.push(d);
+        }
+        search.extend(dirs.iter().cloned());
+        for d in &search {
+            let candidate = d.join(&rel);
+            if let Ok(meta) = std::fs::metadata(&candidate) {
+                if meta.is_file() && meta.len() <= SKYBOX_MAX_BYTES {
+                    if let Ok(bytes) = std::fs::read(&candidate) {
+                        return Some(format!(
+                            "data:application/octet-stream;base64,{}",
+                            base64_encode(&bytes)
+                        ));
+                    }
+                }
+            }
+        }
+        None
+    })
+    .await;
+    match result {
+        Ok(url) => CliResult::ok(json!({ "dataUrl": url })),
+        Err(e) => CliResult::err(format!("skybox task failed: {e}")),
     }
 }
 
@@ -615,6 +701,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mc_probe,
             mc_suggest_sources,
             mc_read_mapinfo,
+            mc_read_skybox,
             mc_image_info,
             mc_compile,
             mc_decompile,

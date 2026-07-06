@@ -26,6 +26,7 @@ import {
   useReplays,
   useScanTargetSelection,
   useUnitsyncHeightmap,
+  useUnitsyncMapSkybox,
   useUnitsyncMinimap,
 } from "../config";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
@@ -179,6 +180,7 @@ function ReplayMapPreview({
   const writePath = useWriteRootPath();
   const minimap = useUnitsyncMinimap(enginePath, dataDir, mapName);
   const heightmap = useUnitsyncHeightmap(enginePath, dataDir, mapName);
+  const skybox = useUnitsyncMapSkybox(enginePath, dataDir, mapName);
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [dlError, setDlError] = useState<string | null>(null);
@@ -279,6 +281,7 @@ function ReplayMapPreview({
             heightSrc={heightmap.data.dataUrl}
             textureSrc={minimap.dataUrl}
             appearance={minimap.appearance}
+            skyboxSrc={skybox.dataUrl}
             minHeight={heightmap.data.minHeight ?? 0}
             maxHeight={heightmap.data.maxHeight ?? 0}
             worldWidth={

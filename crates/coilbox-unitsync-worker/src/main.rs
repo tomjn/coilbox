@@ -48,6 +48,8 @@ struct Args {
     heightmap: bool,
     /// `--map-info`: lazily read one map's options (combined with `--map`).
     map_info: bool,
+    /// `--map-skybox`: read one map's `atmosphere.skyBox` DDS (combined with `--map`).
+    map_skybox: bool,
     config: bool,
     /// `--skirmish-ais`: list native skirmish AIs (+ a game's Lua AIs when
     /// combined with `--game`).
@@ -313,6 +315,24 @@ fn run() -> i32 {
         return 1;
     }
 
+    // Map skybox: read one map's `atmosphere.skyBox` DDS cube map as raw bytes.
+    if args.map_skybox {
+        if let Some(map) = args.map.clone() {
+            return match std::panic::catch_unwind(|| archive::map_skybox(&args.lib, &map)) {
+                Ok(out) => {
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    0
+                }
+                Err(_) => {
+                    archive::emit_skybox_error("worker panicked while reading map skybox".into());
+                    1
+                }
+            };
+        }
+        emit_error("missing --map <name> for --map-skybox".into());
+        return 1;
+    }
+
     // Heightmap: render one map's height infomap to a grayscale PNG data URL.
     if args.heightmap {
         if let Some(map) = args.map.clone() {
@@ -376,6 +396,7 @@ fn parse_args() -> Result<Args, String> {
     let mut thumbnails = false;
     let mut heightmap = false;
     let mut map_info = false;
+    let mut map_skybox = false;
     let mut config = false;
     let mut skirmish_ais = false;
     let mut game_headers = false;
@@ -400,6 +421,7 @@ fn parse_args() -> Result<Args, String> {
             "--thumbnails" => thumbnails = true,
             "--heightmap" => heightmap = true,
             "--map-info" => map_info = true,
+            "--map-skybox" => map_skybox = true,
             "--max-side" => {
                 max_side = it
                     .next()
@@ -446,6 +468,7 @@ fn parse_args() -> Result<Args, String> {
         thumbnails,
         heightmap,
         map_info,
+        map_skybox,
         config,
         skirmish_ais,
         game_headers,

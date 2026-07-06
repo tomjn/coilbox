@@ -391,6 +391,18 @@
           "markdownDescription": "Denies the mc_read_mapinfo command without any pre-configured scope."
         },
         {
+          "description": "Enables the mc_read_skybox command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mc-read-skybox",
+          "markdownDescription": "Enables the mc_read_skybox command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mc_read_skybox command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mc-read-skybox",
+          "markdownDescription": "Denies the mc_read_skybox command without any pre-configured scope."
+        },
+        {
           "description": "Enables the mc_settings_load command without any pre-configured scope.",
           "type": "string",
           "const": "allow-mc-settings-load",
@@ -427,10 +439,10 @@
           "markdownDescription": "Denies the mc_suggest_sources command without any pre-configured scope."
         },
         {
-          "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
+          "description": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-read-skybox`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`"
+          "markdownDescription": "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings).\n#### This default permission set includes:\n\n- `allow-mc-probe`\n- `allow-mc-suggest-sources`\n- `allow-mc-read-mapinfo`\n- `allow-mc-read-skybox`\n- `allow-mc-image-info`\n- `allow-mc-compile`\n- `allow-mc-decompile`\n- `allow-mc-cancel`\n- `allow-mc-open-path`\n- `allow-mc-open-url`\n- `allow-mc-settings-load`\n- `allow-mc-settings-save`"
         }
       ]
     }

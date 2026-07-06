@@ -24,6 +24,7 @@ import {
   mcOpenPath,
   mcProbe,
   mcReadMapinfo,
+  mcReadSkybox,
 } from "../bindings";
 import { useMapconvConfig } from "../config";
 import { type DecompileResult, useDecompileDraft } from "../drafts";
@@ -161,11 +162,16 @@ export default function DecompilePage() {
       const appearance = await mcReadMapinfo({ path: res.directory }).catch(
         () => null,
       );
+      // And the skybox DDS, if the decompiled output includes one.
+      const skybox = await mcReadSkybox({ path: res.directory }).catch(
+        () => null,
+      );
       setResult({
         directory: res.directory,
         mapInfo: res.mapInfo,
         minimap: res.minimap,
         appearance,
+        skyboxSrc: skybox?.dataUrl ?? null,
       });
       // Record (or refresh) this map as a project. mapdecompile writes
       // texture.png into the directory, so that's a reliable preview.
@@ -340,6 +346,7 @@ export default function DecompilePage() {
                   worldWidth={result.mapInfo.worldWidth}
                   worldHeight={result.mapInfo.worldHeight}
                   appearance={result.appearance}
+                  skyboxSrc={result.skyboxSrc}
                 />
               )}
               <div className="mt-3 flex flex-wrap gap-2">

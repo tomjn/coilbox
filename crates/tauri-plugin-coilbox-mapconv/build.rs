@@ -6,6 +6,7 @@ const COMMANDS: &[&str] = &[
     "mc_probe",
     "mc_suggest_sources",
     "mc_read_mapinfo",
+    "mc_read_skybox",
     "mc_image_info",
     "mc_compile",
     "mc_decompile",

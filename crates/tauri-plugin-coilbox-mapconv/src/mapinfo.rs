@@ -44,6 +44,9 @@ pub struct MapAppearance {
     pub fog_color: Option<[f32; 3]>,
     pub sun_dir: Option<[f32; 3]>,
     pub sun_color: Option<[f32; 3]>,
+    /// `atmosphere.skyBox` — a DDS cube map (relative to the map root) used as the
+    /// sky. Read by `mc_read_skybox` to load the file for the 3D preview.
+    pub sky_box: Option<String>,
 }
 
 fn is_ident(b: u8) -> bool {
@@ -145,6 +148,7 @@ pub fn parse_appearance(src: &str) -> MapAppearance {
         fog_color: scan_vec3(&lower, "fogcolor"),
         sun_dir: scan_vec3(&lower, "sundir"),
         sun_color: scan_vec3(&lower, "suncolor"),
+        sky_box: scan_str(&stripped, &lower, "skybox"),
     }
 }
 
@@ -186,6 +190,7 @@ struct Atmosphere {
     skycolor: Option<[f32; 3]>,
     fogcolor: Option<[f32; 3]>,
     suncolor: Option<[f32; 3]>,
+    skybox: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -211,6 +216,7 @@ impl From<MapInfoRaw> for MapAppearance {
             fog_color: r.atmosphere.fogcolor,
             sun_dir: r.lighting.sundir,
             sun_color: r.atmosphere.suncolor,
+            sky_box: r.atmosphere.skybox,
         }
     }
 }
@@ -341,6 +347,16 @@ mod tests {
     #[test]
     fn empty_on_no_match() {
         assert_eq!(parse_appearance("return {}"), MapAppearance::default());
+    }
+
+    #[test]
+    fn parses_skybox_reference() {
+        let s = r#"atmosphere = { skyBox = "spacey.dds", skyColor = {0.1, 0.2, 0.3} },"#;
+        assert_eq!(parse_appearance(s).sky_box.as_deref(), Some("spacey.dds"));
+        // A commented-out skyBox is stripped before scanning.
+        let commented = "atmosphere = { --skyBox = \"old.dds\", }";
+        assert_eq!(parse_appearance(commented).sky_box, None);
+        assert_eq!(parse_appearance("return {}").sky_box, None);
     }
 
     // TMA is a `local mapinfo = {…}` block; wrapping it with `return mapinfo`

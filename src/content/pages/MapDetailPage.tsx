@@ -6,6 +6,7 @@ import {
   useScanTargetSelection,
   useUnitsyncHeightmap,
   useUnitsyncMapInfo,
+  useUnitsyncMapSkybox,
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
@@ -42,6 +43,11 @@ export default function MapDetailPage() {
     decoded,
   );
   const mapInfo = useUnitsyncMapInfo(
+    selected?.enginePath,
+    selected?.rootPath,
+    decoded,
+  );
+  const skybox = useUnitsyncMapSkybox(
     selected?.enginePath,
     selected?.rootPath,
     decoded,
@@ -166,6 +172,7 @@ export default function MapDetailPage() {
               heightSrc={heightmap.data.dataUrl}
               textureSrc={minimap.dataUrl}
               appearance={minimap.appearance}
+              skyboxSrc={skybox.dataUrl}
               minHeight={heightmap.data.minHeight ?? 0}
               maxHeight={heightmap.data.maxHeight ?? 0}
               worldWidth={

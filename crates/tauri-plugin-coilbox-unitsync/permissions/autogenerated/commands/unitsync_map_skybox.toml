@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-unitsync-map-skybox"
+description = "Enables the unitsync_map_skybox command without any pre-configured scope."
+commands.allow = ["unitsync_map_skybox"]
+
+[[permission]]
+identifier = "deny-unitsync-map-skybox"
+description = "Denies the unitsync_map_skybox command without any pre-configured scope."
+commands.deny = ["unitsync_map_skybox"]

@@ -71,6 +71,8 @@ export interface MapAppearance {
   fogColor?: [number, number, number] | null;
   sunDir?: [number, number, number] | null;
   sunColor?: [number, number, number] | null;
+  /** `atmosphere.skyBox` — a DDS cube map (relative to the map root), if any. */
+  skyBox?: string | null;
 }
 
 /** Plugin config, persisted through the frame settings store. */
@@ -111,6 +113,17 @@ export const mcReadMapinfo = defineCommand<{ path: string }, MapAppearance>(
   "coilbox-mapconv",
   "mc_read_mapinfo",
 );
+
+/**
+ * Read a map's `atmosphere.skyBox` DDS (a loose file next to `mapinfo.lua`,
+ * searched the same way as `mc_read_mapinfo`) as a raw-bytes `data:` URL for the
+ * 3D preview's sky. `dataUrl` is null when the map declares no skybox or the file
+ * is missing.
+ */
+export const mcReadSkybox = defineCommand<
+  { path: string },
+  { dataUrl?: string | null }
+>("coilbox-mapconv", "mc_read_skybox");
 
 /**
  * Decode an image to its true pixel size plus a small preview thumbnail (data
