@@ -16,17 +16,66 @@ function colorFrom(rgb: Rgb | null | undefined, fallback: number): THREE.Color {
     : new THREE.Color(fallback);
 }
 
+/** A small tiling grey-centred noise texture, used as the generic detail overlay
+ * when a map ships no `detailtex` of its own. Grey (~0.5) is neutral under the
+ * shader's `detail * 2` multiply; the noise breaks up base-texture blur when
+ * zoomed in and mip-averages back to neutral from a distance. Mirrored wrapping
+ * tiles it seamlessly (no visible seam grid). */
+function makeProceduralDetail(): THREE.Texture {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(size, size);
+    for (let i = 0; i < size * size; i++) {
+      const v = 112 + Math.floor(Math.random() * 32); // ~grey, modest contrast
+      img.data[i * 4] = v;
+      img.data[i * 4 + 1] = v;
+      img.data[i * 4 + 2] = v;
+      img.data[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.MirroredRepeatWrapping;
+  tex.wrapT = THREE.MirroredRepeatWrapping;
+  tex.colorSpace = THREE.NoColorSpace;
+  return tex;
+}
+
 /** Longest side requested from `mc_image_info` for each map. The heightmap needs
  * enough samples to displace with relief; the colour can be a touch crisper. */
-const HEIGHT_MAX = 512;
-const TEXTURE_MAX = 1024;
-/** Plane subdivisions. ~131k tris — cheap, and the ≤512px heightmap is the real
- * detail bound, so more segments wouldn't show. */
-const SEGMENTS = 256;
+const HEIGHT_MAX = 1024;
+const TEXTURE_MAX = 2048;
+/** Plane subdivisions. ~524k tris — still cheap, and the ≤1024px heightmap is the
+ * real detail bound, so more segments wouldn't show. */
+const SEGMENTS = 512;
 /** Horizontal extent the longer map side is normalised to, keeping scene
  * coordinates friendly regardless of true map size. Height is scaled by the
  * same factor, so vertical proportions stay physically correct. */
 const BASE = 100;
+/** How many times the detail texture repeats across the map's longest side, and
+ * how strongly it modulates the base colour (0 = off, 1 = full engine-style
+ * `detail * 2` multiply). Emulates the engine's tiled detail texture that hides
+ * base-texture blur on close zoom. */
+const DETAIL_TILES = 40;
+const DETAIL_STRENGTH = 0.7;
+/** Water plane subdivisions — dense enough to resolve fine animated ripple
+ * normals without aliasing (the preview is viewed from a height, so ripples read
+ * as many small crests, not a few large waves). */
+const WATER_SEG = 240;
+/** Directional ripple waves, each `[angleRad, freq, amp, speed]`. Odd angles and
+ * incommensurate frequencies (no axis/45° alignment, no harmonic ratios) so the
+ * summed surface reads as irregular chop rather than repeating bands. Kept fine
+ * and short so they distort the reflection into small glints, not large blobs. */
+const RIPPLE_WAVES: [number, number, number, number][] = [
+  [0.35, 3.1, 0.8, 1.3],
+  [1.25, 4.6, 0.6, 1.6],
+  [2.35, 5.9, 0.45, 1.05],
+  [3.35, 6.6, 0.35, 2.1],
+];
 
 type Srcs = { height: string; texture: string };
 
@@ -45,6 +94,7 @@ export function MapPreview3D({
   texturePath,
   heightSrc,
   textureSrc,
+  detailSrc,
   minHeight,
   maxHeight,
   worldWidth,
@@ -60,6 +110,9 @@ export function MapPreview3D({
   heightSrc?: string;
   /** Pre-resolved colour source (data URL); used instead of `texturePath`. */
   textureSrc?: string;
+  /** Optional detail-texture source (data URL) — the map's own `detailtex` when
+   * it ships one; otherwise a generic procedural detail texture is used. */
+  detailSrc?: string;
   minHeight: number;
   maxHeight: number;
   worldWidth: number;
@@ -137,6 +190,7 @@ export function MapPreview3D({
     let renderer: THREE.WebGLRenderer | undefined;
     let controls: OrbitControls | undefined;
     let observer: ResizeObserver | undefined;
+    let animationFrame: number | undefined;
 
     const longest = Math.max(worldWidth, worldHeight);
     const s = BASE / longest;
@@ -165,6 +219,28 @@ export function MapPreview3D({
       heightTex.colorSpace = THREE.NoColorSpace;
       disposables.push(colorTex, heightTex);
 
+      // Detail texture: the map's own `detailtex` (data URL) when supplied, else a
+      // generic procedural one. Tiled and multiplied over the base colour below to
+      // break up the low-res base texture's blur when zoomed in.
+      let detailTex: THREE.Texture;
+      if (detailSrc) {
+        try {
+          detailTex = await loader.loadAsync(detailSrc);
+          detailTex.wrapS = THREE.RepeatWrapping;
+          detailTex.wrapT = THREE.RepeatWrapping;
+        } catch {
+          detailTex = makeProceduralDetail();
+        }
+      } else {
+        detailTex = makeProceduralDetail();
+      }
+      if (cancelled) {
+        detailTex.dispose();
+        return;
+      }
+      detailTex.colorSpace = THREE.NoColorSpace;
+      disposables.push(detailTex);
+
       const scene = new THREE.Scene();
       // Sky colour from mapinfo becomes the backdrop; otherwise stay transparent
       // so the card background shows through.
@@ -184,19 +260,59 @@ export function MapPreview3D({
         metalness: 0,
         wireframe: wantWire.current,
       });
+      // Tiled detail-texture multiply, patched into the standard material: after
+      // the base colour is sampled, modulate it by the detail texture sampled at a
+      // higher tiling frequency. `detail * 2` centres neutral at mid-grey (engine
+      // convention); `detailStrength` fades the whole effect.
+      material.onBeforeCompile = (shader) => {
+        shader.uniforms.detailMap = { value: detailTex };
+        shader.uniforms.detailRepeat = {
+          value: new THREE.Vector2(
+            (DETAIL_TILES * planeW) / BASE,
+            (DETAIL_TILES * planeH) / BASE,
+          ),
+        };
+        shader.uniforms.detailStrength = { value: DETAIL_STRENGTH };
+        shader.fragmentShader = shader.fragmentShader
+          .replace(
+            "#include <common>",
+            `#include <common>
+uniform sampler2D detailMap;
+uniform vec2 detailRepeat;
+uniform float detailStrength;`,
+          )
+          .replace(
+            "#include <map_fragment>",
+            `#include <map_fragment>
+{
+  vec3 detail = texture2D( detailMap, vMapUv * detailRepeat ).rgb;
+  diffuseColor.rgb *= mix( vec3( 1.0 ), detail * 2.0, detailStrength );
+}`,
+          );
+      };
       disposables.push(material);
       materialRef.current = material;
       scene.add(new THREE.Mesh(geo, material));
 
-      // Flat translucent water plane at world height 0 (== scene y 0).
-      const waterGeo = new THREE.PlaneGeometry(planeW, planeH);
+      // Translucent water plane at world height 0 (== scene y 0). Subdivided so
+      // the animation loop below can ripple its surface.
+      const waterGeo = new THREE.PlaneGeometry(
+        planeW,
+        planeH,
+        WATER_SEG,
+        WATER_SEG,
+      );
       waterGeo.rotateX(-Math.PI / 2);
       const waterMat = new THREE.MeshStandardMaterial({
         color: colorFrom(appearance?.waterColor, 0x2f6f9f),
         transparent: true,
         opacity: appearance?.waterAlpha ?? 0.55,
-        roughness: 0.25,
+        // Low roughness + the scene environment map (set below) make the surface
+        // glossy and mirror-like, so it reads as reflective water rather than a
+        // matte sheet; the ripple normals then distort that reflection.
+        roughness: 0.1,
         metalness: 0,
+        envMapIntensity: 0.1,
       });
       disposables.push(waterGeo, waterMat);
       const waterMesh = new THREE.Mesh(waterGeo, waterMat);
@@ -227,16 +343,127 @@ export function MapPreview3D({
       renderer.domElement.style.width = "100%";
       renderer.domElement.style.height = "100%";
 
+      // Capture the terrain + sky into a prefiltered environment map once, so the
+      // water reflects the actual islands and sky (image-based reflection). The
+      // water is hidden during the capture and, if the map has no sky colour, a
+      // neutral sky is used just for the reflection so glossy water isn't mirror-
+      // black. Static (not re-rendered on orbit) — a good approximation for a
+      // slowly-orbited preview, and far cheaper than live planar reflections.
+      // Applied to the water material only (not `scene.environment`), so it never
+      // adds image-based light to the terrain — that must match the flat minimap.
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const prevBg = scene.background;
+      if (!prevBg) scene.background = new THREE.Color(0x9fb8cc);
+      waterMesh.visible = false;
+      const envRT = pmrem.fromScene(scene, 0, 0.1, 1000);
+      scene.background = prevBg;
+      waterMesh.visible = wantWater.current;
+      waterMat.envMap = envRT.texture;
+      waterMat.needsUpdate = true;
+      pmrem.dispose();
+      disposables.push(envRT);
+
       const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
       camera.position.set(0, BASE * 0.7, BASE * 1.0);
 
       controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = false;
       controls.target.set(0, 0, 0);
+      // Zoom toward the cursor (not the scene centre) and pan with the middle
+      // button; orbit stays on the left. Clamp the dolly range and keep the
+      // camera above the map plane so you can't zoom through the terrain or
+      // drop underneath it.
+      controls.zoomToCursor = true;
+      controls.mouseButtons = {
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.PAN,
+        RIGHT: THREE.MOUSE.PAN,
+      };
+      controls.minDistance = BASE * 0.12;
+      controls.maxDistance = BASE * 3;
+      controls.maxPolarAngle = Math.PI * 0.49;
 
-      const render = () => renderer?.render(scene, camera);
+      // Keep the camera above the terrain's highest point (peak displaced Y is
+      // `maxHeight * s`), with a small margin. OrbitControls' distance/angle
+      // clamps are relative to the moving zoom-to-cursor target and can't see
+      // the surface, so this hard Y floor is what actually stops you zooming
+      // under the map. Never below the water plane at y 0.
+      const camFloor = Math.max(maxHeight * s, 0) + BASE * 0.02;
+      const render = () => {
+        if (camera.position.y < camFloor) camera.position.y = camFloor;
+        renderer?.render(scene, camera);
+      };
       renderRef.current = render;
       controls.addEventListener("change", render);
+
+      // Animated water ripples. The scene otherwise renders on demand (orbit /
+      // resize / toggle); this is the only continuous loop, and it runs only
+      // while the water is visible so a dry map or a hidden plane stays idle.
+      // Ripples are driven mostly by the surface NORMALS, not geometry: a layered
+      // high-frequency wave field's analytic slope (`dx`/`dz`) tilts each vertex
+      // normal so the ripples catch the directional light, while the actual Y
+      // displacement stays a hair (`dispAmp`). Decoupling the two lets the ripples
+      // be dense and fine without crests poking up through terrain that sits near
+      // the water line. Skipped under `prefers-reduced-motion`, leaving it flat.
+      const waterPos = waterGeo.attributes.position;
+      const waterNor = waterGeo.attributes.normal;
+      const dispAmp = BASE * 0.0004;
+      const slope = 0.012; // normal-tilt strength (independent of wave height)
+      // Per-wave phase gradients, constant across the animation: WX/WZ are the
+      // x/z components of the direction × frequency; AKX/AKZ fold in amplitude
+      // for the analytic normal slope.
+      const wn = RIPPLE_WAVES.length;
+      const wWX = new Float64Array(wn);
+      const wWZ = new Float64Array(wn);
+      const wAmp = new Float64Array(wn);
+      const wSpd = new Float64Array(wn);
+      const wAKX = new Float64Array(wn);
+      const wAKZ = new Float64Array(wn);
+      for (let j = 0; j < wn; j++) {
+        const [ang, freq, amp, spd] = RIPPLE_WAVES[j];
+        const wx = Math.cos(ang) * freq;
+        const wz = Math.sin(ang) * freq;
+        wWX[j] = wx;
+        wWZ[j] = wz;
+        wAmp[j] = amp;
+        wSpd[j] = spd;
+        wAKX[j] = amp * wx;
+        wAKZ[j] = amp * wz;
+      }
+      const tmpN = new THREE.Vector3();
+      const rippleWater = (t: number) => {
+        for (let i = 0; i < waterPos.count; i++) {
+          const x = waterPos.getX(i);
+          const z = waterPos.getZ(i);
+          let h = 0;
+          let dx = 0;
+          let dz = 0;
+          for (let j = 0; j < wn; j++) {
+            const ph = wWX[j] * x + wWZ[j] * z + wSpd[j] * t;
+            const c = Math.cos(ph);
+            h += wAmp[j] * Math.sin(ph);
+            dx += wAKX[j] * c;
+            dz += wAKZ[j] * c;
+          }
+          waterPos.setY(i, h * dispAmp);
+          tmpN.set(-dx * slope, 1, -dz * slope).normalize();
+          waterNor.setXYZ(i, tmpN.x, tmpN.y, tmpN.z);
+        }
+        waterPos.needsUpdate = true;
+        waterNor.needsUpdate = true;
+      };
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      if (!reduceMotion) {
+        const animate = () => {
+          animationFrame = requestAnimationFrame(animate);
+          if (!waterRef.current?.visible) return;
+          rippleWater(performance.now() / 1000);
+          render();
+        };
+        animationFrame = requestAnimationFrame(animate);
+      }
 
       const resize = () => {
         if (!renderer) return;
@@ -256,6 +483,7 @@ export function MapPreview3D({
     return () => {
       cancelled = true;
       setBuilt(false);
+      if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
       observer?.disconnect();
       if (controls) {
         if (renderRef.current)
@@ -271,7 +499,7 @@ export function MapPreview3D({
       waterRef.current = null;
       renderRef.current = null;
     };
-  }, [srcs, minHeight, maxHeight, worldWidth, worldHeight, appSig]);
+  }, [srcs, detailSrc, minHeight, maxHeight, worldWidth, worldHeight, appSig]);
 
   // Spring's water plane sits at world height 0, so water is only visible where
   // terrain drops below it. Default the toggle off for a "dry" map (lowest point
