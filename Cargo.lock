@@ -563,6 +563,7 @@ dependencies = [
 name = "coilbox"
 version = "0.0.0"
 dependencies = [
+ "coilbox-portable",
  "picoframe-core",
  "serde_json",
  "tauri",

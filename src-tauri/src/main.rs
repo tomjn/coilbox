@@ -1,6 +1,8 @@
 // Prevents an extra console window on Windows in release.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod asset_protocol;
+
 // Work around a WebKitGTK + AppImage failure on Linux: the AppImage bundles its
 // own (Ubuntu-built) libwayland-client and GPU stack, which shadow the host's
 // and break EGL display creation on modern Wayland systems
@@ -80,7 +82,17 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build());
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        // Serve local media (images/audio/video/fonts) from the portable `.coilbox`
+        // folder and per-campaign app-data over `coilbox://`, with HTTP range support
+        // so `<video>` can seek. Registered here rather than in a picoframe plugin so
+        // it's shared and needs no command ACL. Blocking file IO runs off-thread.
+        .register_asynchronous_uri_scheme_protocol("coilbox", |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            std::thread::spawn(move || {
+                responder.respond(asset_protocol::handle(&app, &request));
+            });
+        });
     // picoframe:plugins-start
     builder = builder.plugin(tauri_plugin_coilbox_downloads::init());
     builder = builder.plugin(tauri_plugin_coilbox_uberstress::init());

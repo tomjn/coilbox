@@ -189,8 +189,14 @@ CSS only (no JavaScript).
 
 - `html` — injected into the welcome page body. Style it via `.coilbox-welcome …`.
 - `css` — injected alongside the HTML.
-- **Images**: remote `https` images work directly (e.g. a hosted logo). No embedding
-  needed.
+- **Local media**: reference files bundled in your `.coilbox/` folder by relative path,
+  and Coilbox resolves them at load time — in both the HTML and the CSS. So
+  `<img src="images/logo.webp">`, `background: url(images/hero.gif)`, and even
+  `@font-face { src: url(fonts/brand.woff2) }` all pull from `.coilbox/images/…`,
+  `.coilbox/fonts/…`, etc. Images, animated GIFs, audio (`<audio src="…">`), video
+  (`<video>`) and web fonts are supported. Absolute URLs (`https:`, `data:`) and
+  app-absolute paths (`/…`) are left untouched, so remote `https` images still work
+  directly with no embedding.
 - **In-app links**: because Coilbox uses hash routing, an `<a href="#/play/skirmish">`
   navigates inside the app without a reload. Useful routes include
   `#/play/skirmish`, `#/content/maps`, `#/content/replays`, `#/battles`,
@@ -204,8 +210,8 @@ CSS only (no JavaScript).
   { "html": "<button data-coilbox-action=\"quit\">Exit</button>" }
   ```
 
-The HTML is trusted (it ships inside your distribution). It is injected verbatim, so
-only put content you control in it.
+The HTML is trusted (it ships inside your distribution): apart from rewriting relative
+asset URLs (above), it is injected as-is, so only put content you control in it.
 
 ### `links` (object[])
 

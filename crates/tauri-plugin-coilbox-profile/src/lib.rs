@@ -12,9 +12,10 @@
 //! folder at all — resolves to an empty `{"version":1}` default, leaving vanilla
 //! behaviour untouched.
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use coilbox_portable::{is_safe_rel, mime_for};
 use picoframe_core::CliResult;
 use serde_json::json;
 use tauri::{
@@ -61,33 +62,6 @@ async fn profile_load() -> CliResult {
         .map(|p| p.display().to_string())
         .unwrap_or_default();
     CliResult::ok(json!({ "json": json_text, "source": source, "root": root }))
-}
-
-/// Guess a data-URI MIME type from a file extension. Covers the image formats a
-/// splash would plausibly use; anything else falls back to a generic binary type
-/// (still a valid data URI, just not image-optimized).
-fn mime_for(path: &Path) -> &'static str {
-    match path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(str::to_ascii_lowercase)
-        .as_deref()
-    {
-        Some("webp") => "image/webp",
-        Some("png") => "image/png",
-        Some("jpg" | "jpeg") => "image/jpeg",
-        Some("gif") => "image/gif",
-        Some("svg") => "image/svg+xml",
-        _ => "application/octet-stream",
-    }
-}
-
-/// Reject anything that could escape the portable root: absolute paths, a Windows
-/// drive/root prefix, or any `..` component. Only plain forward-relative paths pass.
-fn is_safe_rel(rel: &Path) -> bool {
-    rel.components()
-        .all(|c| matches!(c, Component::Normal(_) | Component::CurDir))
-        && !rel.as_os_str().is_empty()
 }
 
 /// Pure core of [`profile_asset`]: resolve `<root>/<rel>`, read it via the supplied

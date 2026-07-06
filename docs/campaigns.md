@@ -2,9 +2,10 @@
 
 A **campaign** is an authored, linear sequence of skirmish missions. Each mission
 is a full skirmish setup (map, game, players/AI, mod options, unit restrictions)
-plus a briefing, objectives and an optional panorama background. Playing a
-mission launches it like any other skirmish; on exit Coilbox works out whether
-you won or lost and advances your progress.
+plus a Markdown briefing, objectives, and optional media — a panorama backdrop,
+side graphic, briefing voiceover and intro cutscene. Playing a mission launches it
+like any other skirmish; on exit Coilbox works out whether you won or lost and
+advances your progress.
 
 ## Authoring a campaign
 
@@ -18,6 +19,30 @@ mission, its full configuration (map, game, participants, start positions, mod
 options) is copied in at that point. Editing the source preset later does not
 change missions that already used it — a campaign always plays the setup it was
 authored with.
+
+### Mission media
+
+Missions carry more than a still panorama:
+
+- **Briefing** — authored as **Markdown**. Embed media inline by relative path with the
+  image syntax: `![](images/intro.jpg)` shows an image, and a source ending in an
+  audio or video extension renders an `<audio>` / `<video>` player instead
+  (`![](briefings/vo.mp3)`, `![](briefings/intro.mp4)`).
+- **Panorama** and **side graphic** — each can be a still image **or** a looping,
+  muted video, in addition to the existing live-3D-map option.
+- **Voiceover** (audio) and **cutscene** (video) — optional players shown on the
+  briefing screen.
+
+How the files are stored depends on where the campaign comes from:
+
+- **Local (Campaign Builder)** campaigns import media into app-data: images are
+  decoded and re-encoded, while audio/video are copied verbatim (they're streamed to
+  the app, never re-encoded or inlined as data URIs).
+- **Bundled / distribution** campaigns reference files by relative path from the
+  `.coilbox/` folder (a `"local"` media reference) — the same mechanism a
+  [distribution profile](distribution-profile.md) uses for welcome-screen media. This
+  is how a campaign ships audio/video, which are too large to inline (see
+  *Export / import* below).
 
 ### Unit restrictions
 
@@ -44,11 +69,17 @@ campaign > Export) for sharing. The export format:
 }
 ```
 
-Any panorama images are inlined as base64 `data:` URIs, so the file is fully
+Any campaign **images** are inlined as base64 `data:` URIs, so the file is
 self-contained — no separate images to send along. Import (Campaign Builder >
 Import) reads the same file back and validates it before adding it as an
 editable local campaign; a malformed or unrecognised file is rejected with an
 inline error rather than crashing anything.
+
+**Audio and video are not inlined** (they'd be far too large, and can't be streamed
+from a data URI). A single-file export of a campaign that uses imported audio/video
+therefore keeps references that only resolve on the machine that authored it. To
+distribute a campaign with audio/video, bundle it (below) and ship the media files
+alongside it, referenced by relative path.
 
 ## Bundling a campaign in a distribution
 
@@ -63,13 +94,22 @@ folder:
     profile.json
     campaigns/
       my-campaign.json
+    images/            # media referenced by relative "local" paths
+    briefings/
 ```
 
 Each file in `campaigns/` is an exported campaign, dropped in as-is: export
 from Campaign Builder and save the resulting `.json` as
 `.coilbox/campaigns/<any-name>.json`. (A bare campaign document — the inner
-`campaign` object without the export wrapper — is also accepted.) Panoramas
-are embedded in the export, so the single file is self-contained.
+`campaign` object without the export wrapper — is also accepted.) Images are
+embedded in the export, so a still-image campaign is a single self-contained file.
+
+To ship **audio or video** (which can't be embedded), reference the files by
+relative path from `.coilbox/` — a `"local"` media reference such as
+`{ "kind": "local", "path": "briefings/intro.mp4" }` for a panorama, voiceover or
+cutscene, or `![](images/art.jpg)` inline in a Markdown briefing — and place the
+files under `.coilbox/` alongside the campaign. These paths resolve the same way as
+[distribution-profile](distribution-profile.md) welcome-screen media.
 
 Bundled campaigns show up in the Campaigns list marked read-only (no edit/delete
 in the builder) but otherwise play exactly like local ones, and their progress

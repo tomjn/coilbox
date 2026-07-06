@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { quitApp } from "../general/quit";
 import { getProfile } from "./profile";
+import { rewriteBrandedCss, rewriteBrandedHtml } from "./welcomeAssets";
 
 /**
  * The branded welcome landing page: replaces the default launcher home when the
@@ -19,6 +20,17 @@ import { getProfile } from "./profile";
  */
 export default function BrandedWelcome() {
   const welcome = getProfile().welcome;
+  // Rewrite relative asset URLs (images/audio/video/fonts) to the `coilbox://`
+  // protocol so a bundler can reference `.coilbox/`-relative files by path. Memoised
+  // on the raw strings so the DOM parse runs once, not every render.
+  const html = useMemo(
+    () => (welcome?.html ? rewriteBrandedHtml(welcome.html) : undefined),
+    [welcome?.html],
+  );
+  const css = useMemo(
+    () => (welcome?.css ? rewriteBrandedCss(welcome.css) : undefined),
+    [welcome?.css],
+  );
   // Delegated listener attached to the injected-HTML container (not a JSX `onClick`,
   // which would trip a11y lints on a static div): a bubbled click on any element
   // carrying `data-coilbox-action="quit"` closes the app.
@@ -40,16 +52,16 @@ export default function BrandedWelcome() {
   if (!welcome) return null;
   return (
     <main className="h-full overflow-auto">
-      {welcome.css && (
+      {css && (
         // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted bundler-authored profile CSS
-        <style dangerouslySetInnerHTML={{ __html: welcome.css }} />
+        <style dangerouslySetInnerHTML={{ __html: css }} />
       )}
-      {welcome.html && (
+      {html && (
         <div
           ref={ref}
           className="coilbox-welcome"
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted bundler-authored profile HTML
-          dangerouslySetInnerHTML={{ __html: welcome.html }}
+          dangerouslySetInnerHTML={{ __html: html }}
         />
       )}
     </main>

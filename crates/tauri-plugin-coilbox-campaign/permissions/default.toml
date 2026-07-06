@@ -10,6 +10,7 @@ permissions = [
   "allow-campaign-image-import-data",
   "allow-campaign-image-read",
   "allow-campaign-image-delete",
+  "allow-campaign-media-import",
   "allow-campaign-export",
   "allow-campaign-import",
   "allow-campaign-progress-load",
