@@ -113,6 +113,10 @@ const TEXTURE_MAX = 2048;
 /** Plane subdivisions. ~524k tris — still cheap, and the ≤1024px heightmap is the
  * real detail bound, so more segments wouldn't show. */
 const SEGMENTS = 512;
+/** Far coarser grid for the wireframe render: at the full `SEGMENTS` the edges
+ * merge into a solid fill, so a visible mesh grid needs a low subdivision. Relief
+ * still comes from the per-vertex `displacementMap`, just sampled more coarsely. */
+const WIRE_SEGMENTS = 70;
 /** Horizontal extent the longer map side is normalised to, keeping scene
  * coordinates friendly regardless of true map size. Height is scaled by the
  * same factor, so vertical proportions stay physically correct. */
@@ -163,6 +167,15 @@ export function MapPreview3D({
   appearance,
   skyboxSrc,
   className,
+  autoSpin,
+  interactive = true,
+  chrome = true,
+  framed = true,
+  showSky = true,
+  forceWireframe = false,
+  enableZoom = true,
+  enablePan = true,
+  initialWater,
 }: {
   /** File path to the heightmap image (mapconv flow); resolved via `mc_image_info`. */
   heightmapPath?: string;
@@ -186,6 +199,31 @@ export function MapPreview3D({
    * flat `skyColor` sky is kept. */
   skyboxSrc?: string | null;
   className?: string;
+  /** Continuous auto-orbit as an `OrbitControls.autoRotateSpeed` multiplier
+   * (1 = default). Undefined / 0 = no spin. Disabled under `prefers-reduced-motion`. */
+  autoSpin?: number;
+  /** Allow pointer orbit/zoom. When false the scene is a non-interactive backdrop
+   * (auto-spin still advances). Default true. */
+  interactive?: boolean;
+  /** Render the surrounding UI chrome (fullscreen button, Water/Wireframe panel,
+   * caption). Default true; false for the embedded mission slots. */
+  chrome?: boolean;
+  /** Render the default bordered/aspect container. When false the canvas fills its
+   * parent (no border/rounded/aspect). Default true. */
+  framed?: boolean;
+  /** Draw the sky (skybox / `skyColor`) as the background. When false the canvas
+   * stays transparent so it layers over whatever is behind it. Default true. */
+  showSky?: boolean;
+  /** Wireframe relief render — the displaced mesh is drawn as an unlit uniform-colour
+   * grid with no diffuse texture, so it needs only the heightmap. Default false. */
+  forceWireframe?: boolean;
+  /** Allow dolly/zoom. Default true; false for a fixed-frame preview. */
+  enableZoom?: boolean;
+  /** Allow panning. Default true; false to lock the target (rotate-only). */
+  enablePan?: boolean;
+  /** Seed the water toggle explicitly (used when the chrome is hidden); undefined
+   * falls back to the map's own water heuristic (and to "no water" for wireframe). */
+  initialWater?: boolean;
 }) {
   const [srcs, setSrcs] = useState<Srcs | null>(null);
   // True once the three.js scene is actually on screen. Drives the "building"
@@ -202,6 +240,7 @@ export function MapPreview3D({
   const materialRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const waterRef = useRef<THREE.Mesh | null>(null);
   const renderRef = useRef<(() => void) | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
   // Mirror current toggle state so a freshly (re)built scene starts consistent.
   const wantWater = useRef(water);
   wantWater.current = water;
@@ -225,6 +264,12 @@ export function MapPreview3D({
     let cancelled = false;
     setSrcs(null);
     setFailed(false);
+    // A wireframe render uses no diffuse texture, so it builds from the heightmap
+    // alone and needn't wait on the minimap fetch.
+    if (forceWireframe && heightSrc) {
+      setSrcs({ height: heightSrc, texture: heightSrc });
+      return;
+    }
     if (heightSrc && textureSrc) {
       setSrcs({ height: heightSrc, texture: textureSrc });
       return;
@@ -243,11 +288,11 @@ export function MapPreview3D({
     return () => {
       cancelled = true;
     };
-  }, [heightmapPath, texturePath, heightSrc, textureSrc]);
+  }, [heightmapPath, texturePath, heightSrc, textureSrc, forceWireframe]);
 
   // Build the three.js scene from the loaded maps + dimensions. Fully torn down
   // on any dependency change or unmount, so navigating away leaks no GL context.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `appearance` is read in the build but tracked via the stable `appSig` (its object identity changes every render)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `appearance` is tracked via the stable `appSig`; `autoSpin`/`initialWater` are applied live (below) so they seed the build without forcing a rebuild
   useEffect(() => {
     const container = containerRef.current;
     if (!srcs || !container || worldWidth <= 0 || worldHeight <= 0) return;
@@ -258,6 +303,8 @@ export function MapPreview3D({
     let controls: OrbitControls | undefined;
     let observer: ResizeObserver | undefined;
     let animationFrame: number | undefined;
+    let spinStart: (() => void) | undefined;
+    let spinEnd: (() => void) | undefined;
 
     const longest = Math.max(worldWidth, worldHeight);
     const s = BASE / longest;
@@ -310,8 +357,9 @@ export function MapPreview3D({
 
       const scene = new THREE.Scene();
       // Sky colour from mapinfo becomes the backdrop; otherwise stay transparent
-      // so the card background shows through.
-      if (appearance?.skyColor)
+      // so the card background shows through. `showSky=false` keeps it transparent
+      // regardless, so the canvas layers over whatever is behind it.
+      if (showSky && appearance?.skyColor)
         scene.background = colorFrom(appearance.skyColor, 0);
 
       // If the map declares a skybox DDS, decode it and (when it's a cube map) use
@@ -319,7 +367,7 @@ export function MapPreview3D({
       // capture below so the water mirrors the real sky. Any failure — a fetch/parse
       // error, an unsupported DDS variant (DX10/BC7 fail in DDSLoader), or a
       // non-cubemap DDS — silently falls back to the flat `skyColor` sky.
-      if (skyboxSrc) {
+      if (showSky && skyboxSrc) {
         const cube = await loadSkyboxCube(skyboxSrc);
         if (cancelled) {
           cube?.dispose();
@@ -331,49 +379,56 @@ export function MapPreview3D({
         }
       }
 
-      const geo = new THREE.PlaneGeometry(planeW, planeH, SEGMENTS, SEGMENTS);
+      const segments = forceWireframe ? WIRE_SEGMENTS : SEGMENTS;
+      const geo = new THREE.PlaneGeometry(planeW, planeH, segments, segments);
       geo.rotateX(-Math.PI / 2); // lie flat in XZ; displacement then runs along +Y
       disposables.push(geo);
 
+      // A wireframe relief drops the diffuse texture entirely and draws the mesh as
+      // an unlit uniform-colour grid, so the displaced geometry reads as the terrain
+      // shape on its own.
       const material = new THREE.MeshStandardMaterial({
-        map: colorTex,
+        map: forceWireframe ? undefined : colorTex,
+        color: forceWireframe ? 0x8fb3c9 : 0xffffff,
         displacementMap: heightTex,
         displacementScale: (maxHeight - minHeight) * s,
         displacementBias: minHeight * s,
         roughness: 1,
         metalness: 0,
-        wireframe: wantWire.current,
+        wireframe: forceWireframe || wantWire.current,
       });
       // Tiled detail-texture multiply, patched into the standard material: after
       // the base colour is sampled, modulate it by the detail texture sampled at a
       // higher tiling frequency. `detail * 2` centres neutral at mid-grey (engine
-      // convention); `detailStrength` fades the whole effect.
-      material.onBeforeCompile = (shader) => {
-        shader.uniforms.detailMap = { value: detailTex };
-        shader.uniforms.detailRepeat = {
-          value: new THREE.Vector2(
-            (DETAIL_TILES * planeW) / BASE,
-            (DETAIL_TILES * planeH) / BASE,
-          ),
-        };
-        shader.uniforms.detailStrength = { value: DETAIL_STRENGTH };
-        shader.fragmentShader = shader.fragmentShader
-          .replace(
-            "#include <common>",
-            `#include <common>
+      // convention); `detailStrength` fades the whole effect. Skipped for the
+      // wireframe render, which has no diffuse to modulate.
+      if (!forceWireframe)
+        material.onBeforeCompile = (shader) => {
+          shader.uniforms.detailMap = { value: detailTex };
+          shader.uniforms.detailRepeat = {
+            value: new THREE.Vector2(
+              (DETAIL_TILES * planeW) / BASE,
+              (DETAIL_TILES * planeH) / BASE,
+            ),
+          };
+          shader.uniforms.detailStrength = { value: DETAIL_STRENGTH };
+          shader.fragmentShader = shader.fragmentShader
+            .replace(
+              "#include <common>",
+              `#include <common>
 uniform sampler2D detailMap;
 uniform vec2 detailRepeat;
 uniform float detailStrength;`,
-          )
-          .replace(
-            "#include <map_fragment>",
-            `#include <map_fragment>
+            )
+            .replace(
+              "#include <map_fragment>",
+              `#include <map_fragment>
 {
   vec3 detail = texture2D( detailMap, vMapUv * detailRepeat ).rgb;
   diffuseColor.rgb *= mix( vec3( 1.0 ), detail * 2.0, detailStrength );
 }`,
-          );
-      };
+            );
+        };
       disposables.push(material);
       materialRef.current = material;
       scene.add(new THREE.Mesh(geo, material));
@@ -453,19 +508,48 @@ uniform float detailStrength;`,
       controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = false;
       controls.target.set(0, 0, 0);
-      // Zoom toward the cursor (not the scene centre) and pan with the middle
-      // button; orbit stays on the left. Clamp the dolly range and keep the
-      // camera above the map plane so you can't zoom through the terrain or
-      // drop underneath it.
-      controls.zoomToCursor = true;
-      controls.mouseButtons = {
-        LEFT: THREE.MOUSE.ROTATE,
-        MIDDLE: THREE.MOUSE.PAN,
-        RIGHT: THREE.MOUSE.PAN,
-      };
       controls.minDistance = BASE * 0.12;
       controls.maxDistance = BASE * 3;
       controls.maxPolarAngle = Math.PI * 0.49;
+      controls.enableZoom = enableZoom;
+      controls.enablePan = enablePan;
+      if (interactive) {
+        // Zoom toward the cursor (not the scene centre) and pan with the middle
+        // button; orbit stays on the left. Clamp the dolly range and keep the
+        // camera above the map plane so you can't zoom through the terrain or
+        // drop underneath it.
+        controls.zoomToCursor = true;
+        controls.mouseButtons = {
+          LEFT: THREE.MOUSE.ROTATE,
+          MIDDLE: THREE.MOUSE.PAN,
+          RIGHT: THREE.MOUSE.PAN,
+        };
+      } else {
+        // Non-interactive backdrop: no pointer input, but `update()` still advances
+        // the auto-orbit from the animation loop below.
+        controls.enabled = false;
+      }
+      // Auto-orbit (disabled under reduced motion). `wantSpin` also gates the
+      // pause-on-drag listeners so an interactive slot resumes spinning on release.
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      // A signed `autoSpin` also picks the direction: a negative value reverses the
+      // orbit via a negative `autoRotateSpeed`.
+      const wantSpin = autoSpin != null && autoSpin !== 0 && !reduceMotion;
+      controls.autoRotate = wantSpin;
+      controls.autoRotateSpeed = 2.0 * (autoSpin ?? 1);
+      controlsRef.current = controls;
+      if (wantSpin && interactive) {
+        spinStart = () => {
+          if (controls) controls.autoRotate = false;
+        };
+        spinEnd = () => {
+          if (controls) controls.autoRotate = true;
+        };
+        controls.addEventListener("start", spinStart);
+        controls.addEventListener("end", spinEnd);
+      }
 
       // Keep the camera above the terrain's highest point (peak displaced Y is
       // `maxHeight * s`), with a small margin. OrbitControls' distance/angle
@@ -536,15 +620,22 @@ uniform float detailStrength;`,
         waterPos.needsUpdate = true;
         waterNor.needsUpdate = true;
       };
-      const reduceMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
+      // One continuous loop drives both the ripples and the auto-orbit; it idles
+      // (renders nothing) whenever neither is active, so a static, dry, non-spinning
+      // preview stays on-demand. `controls.autoRotate` is read live so the editor's
+      // spin-speed changes and the pause-on-drag listeners take effect without a
+      // rebuild. Skipped entirely under `prefers-reduced-motion`.
       if (!reduceMotion) {
         const animate = () => {
           animationFrame = requestAnimationFrame(animate);
-          if (!waterRef.current?.visible) return;
-          rippleWater(performance.now() / 1000);
-          render();
+          const spinning = !!controls?.autoRotate;
+          const waterVisible = !!waterRef.current?.visible;
+          if (!spinning && !waterVisible) return;
+          if (waterVisible) rippleWater(performance.now() / 1000);
+          // `update()` advances the orbit and fires "change" → render(); a
+          // water-only frame renders directly.
+          if (spinning) controls?.update();
+          else render();
         };
         animationFrame = requestAnimationFrame(animate);
       }
@@ -572,6 +663,8 @@ uniform float detailStrength;`,
       if (controls) {
         if (renderRef.current)
           controls.removeEventListener("change", renderRef.current);
+        if (spinStart) controls.removeEventListener("start", spinStart);
+        if (spinEnd) controls.removeEventListener("end", spinEnd);
         controls.dispose();
       }
       for (const d of disposables) d.dispose();
@@ -582,6 +675,7 @@ uniform float detailStrength;`,
       materialRef.current = null;
       waterRef.current = null;
       renderRef.current = null;
+      controlsRef.current = null;
     };
   }, [
     srcs,
@@ -592,6 +686,11 @@ uniform float detailStrength;`,
     worldHeight,
     appSig,
     skyboxSrc,
+    forceWireframe,
+    showSky,
+    interactive,
+    enableZoom,
+    enablePan,
   ]);
 
   // Spring's water plane sits at world height 0, so water is only visible where
@@ -600,17 +699,35 @@ uniform float detailStrength;`,
   // under entirely-above-water terrain just looks wrong. The user can still switch
   // it back on. Resets on map change (minHeight / voidWater are the deps).
   const hasWater = appearance?.voidWater !== true && minHeight < 0;
+  // A wireframe render defaults to no water plane (a solid sheet under a bare mesh
+  // reads oddly); an explicit `initialWater` still wins.
+  const resolvedWater = initialWater ?? (forceWireframe ? false : hasWater);
   useEffect(() => {
-    setWater(hasWater);
-  }, [hasWater]);
+    setWater(resolvedWater);
+  }, [resolvedWater]);
 
-  // Live toggles — mutate the existing scene, no rebuild.
+  // Apply spin-speed changes to a live scene without rebuilding it (the editor's
+  // slider), and keep `prefers-reduced-motion` authoritative.
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const wantSpin = autoSpin != null && autoSpin !== 0 && !reduceMotion;
+    controls.autoRotate = wantSpin;
+    controls.autoRotateSpeed = 2.0 * (autoSpin ?? 1);
+    renderRef.current?.();
+  }, [autoSpin]);
+
+  // Live toggles — mutate the existing scene, no rebuild. `forceWireframe` always
+  // wins so the mission heightmap slot can't be switched to solid.
   useEffect(() => {
     if (materialRef.current) {
-      materialRef.current.wireframe = wireframe;
+      materialRef.current.wireframe = forceWireframe || wireframe;
       renderRef.current?.();
     }
-  }, [wireframe]);
+  }, [wireframe, forceWireframe]);
   useEffect(() => {
     if (waterRef.current) {
       waterRef.current.visible = water;
@@ -642,14 +759,16 @@ uniform float detailStrength;`,
         expanded
           ? "fixed inset-0 z-50 overflow-hidden bg-background"
           : cn(
-              "relative aspect-[16/10] max-h-[32rem] w-full overflow-hidden rounded-md border border-border bg-gradient-to-b from-muted/20 to-muted/40",
+              framed
+                ? "relative aspect-[16/10] max-h-[32rem] w-full overflow-hidden rounded-md border border-border bg-gradient-to-b from-muted/20 to-muted/40"
+                : "relative h-full w-full overflow-hidden",
               className,
             )
       }
     >
       <div ref={containerRef} className="absolute inset-0" />
 
-      {built && (
+      {chrome && built && (
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
@@ -667,7 +786,7 @@ uniform float detailStrength;`,
         </div>
       )}
 
-      {built && (
+      {chrome && built && (
         <>
           <div className="absolute right-2 top-2 flex flex-col gap-1.5 rounded-md border border-border bg-card/80 px-2.5 py-2 text-xs backdrop-blur">
             {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control (implicit label association) */}

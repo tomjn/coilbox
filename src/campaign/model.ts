@@ -24,6 +24,34 @@ export type ImageRef =
 /** @deprecated Use {@link ImageRef}; kept so existing panorama imports still type. */
 export type PanoramaRef = ImageRef;
 
+/** Render style for a live map-preview slot. */
+export type MapPreviewStyle = "textured" | "heightmap";
+
+/**
+ * Per-slot live map-preview configuration. When present on a mission's
+ * `panoramaMap` / `sideGraphicMap`, that slot renders the mission's map as a
+ * spinning 3D preview instead of its still image. The map itself is always the
+ * mission `snapshot.mapName`.
+ */
+export interface MapPreviewConfig {
+  style: MapPreviewStyle;
+  /** Auto-orbit speed multiplier (1 = default). Clamped to 0.25–4 on read. */
+  spinSpeed?: number;
+  /** Show the water plane. Undefined = fall back to the map's own water heuristic. */
+  water?: boolean;
+}
+
+/**
+ * Optional author override for downloading a mission's map through the install
+ * gate. Absent = best-effort by `snapshot.mapName` (works for most rapid /
+ * springfiles / BAR maps); set these when the map's springname or search URL
+ * differs from its name.
+ */
+export interface MapDownloadHint {
+  springName?: string;
+  searchUrl?: string;
+}
+
 export interface CampaignMission {
   /** UUID — a stable node id, so a future DAG progression can reference missions. */
   id: string;
@@ -36,6 +64,12 @@ export interface CampaignMission {
   panorama?: ImageRef;
   /** Optional still graphic shown beside the mission briefing card. */
   sideGraphic?: ImageRef;
+  /** When set, the panorama slot renders a live 3D map preview instead of `panorama`. */
+  panoramaMap?: MapPreviewConfig;
+  /** When set, the side-graphic slot renders a live 3D map preview instead of `sideGraphic`. */
+  sideGraphicMap?: MapPreviewConfig;
+  /** Optional install-gate download override for the mission's map. */
+  mapDownload?: MapDownloadHint;
   /**
    * A full skirmish setup copied from a preset when the mission was attached. It is
    * a snapshot, never a live reference — editing the source preset never changes an
@@ -94,6 +128,29 @@ function parseImageRef(value: unknown): ImageRef | undefined {
     return { kind: "data", dataUri: p.dataUri };
   }
   return undefined;
+}
+
+/** Narrow an unknown to a {@link MapPreviewConfig}, or drop it (returns undefined). */
+function parseMapPreview(value: unknown): MapPreviewConfig | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const p = value as Record<string, unknown>;
+  if (p.style !== "textured" && p.style !== "heightmap") return undefined;
+  return {
+    style: p.style,
+    spinSpeed: typeof p.spinSpeed === "number" ? p.spinSpeed : undefined,
+    water: typeof p.water === "boolean" ? p.water : undefined,
+  };
+}
+
+/** Narrow an unknown to a {@link MapDownloadHint}, or drop it (returns undefined). */
+function parseMapDownload(value: unknown): MapDownloadHint | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const p = value as Record<string, unknown>;
+  const springName =
+    typeof p.springName === "string" ? p.springName : undefined;
+  const searchUrl = typeof p.searchUrl === "string" ? p.searchUrl : undefined;
+  if (!springName && !searchUrl) return undefined;
+  return { springName, searchUrl };
 }
 
 /** Coerce an unknown into a string array, dropping non-string members. */
@@ -158,6 +215,9 @@ export function parseCampaignJson(json: string): Campaign | null {
       objectives: stringArray(m.objectives),
       panorama: parseImageRef(m.panorama),
       sideGraphic: parseImageRef(m.sideGraphic),
+      panoramaMap: parseMapPreview(m.panoramaMap),
+      sideGraphicMap: parseMapPreview(m.sideGraphicMap),
+      mapDownload: parseMapDownload(m.mapDownload),
       snapshot: m.snapshot as SkirmishDraft,
       disabledUnits: stringArray(m.disabledUnits),
       skippable: m.skippable === true,
