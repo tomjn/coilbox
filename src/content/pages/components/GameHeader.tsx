@@ -10,7 +10,7 @@ import { GameArt } from "./GameArt";
 import { SddBadge } from "./SddBadge";
 
 /**
- * Steam-library-style hero banner for a game. Always renders a full-bleed 192px
+ * Steam-library-style hero banner for a game. Always renders a full-bleed 292px
  * banner: a deterministic gradient placeholder as the base layer, with the game's
  * resolved loading-screen art (when available) cropped over it. The back-link,
  * title, version and Play button overlay the banner.
@@ -37,14 +37,20 @@ export function GameHeader({
   const artUrl = brandBanner ?? headers.get(game.name);
 
   return (
-    <header className="relative -mx-4 -mt-4 h-48 overflow-hidden">
-      {/* Base + art layers (deterministic gradient, then loading-screen image). */}
-      <GameArt
-        name={game.name}
-        artUrl={artUrl}
-        alt={`${game.name} loading screen`}
-      />
-      {/* Scrim: fade into the page background along the bottom for text contrast. */}
+    <header className="relative -mx-4 -mt-4 h-[292px] overflow-hidden">
+      {/* Base + art layers (deterministic gradient, then loading-screen image).
+          Constrained to the top 75% so the image's bottom edge lands exactly
+          where the scrim below reaches full opacity, rather than being drawn
+          (and wasted) underneath it. */}
+      <div className="absolute inset-x-0 top-0 bottom-1/4">
+        <GameArt
+          name={game.name}
+          artUrl={artUrl}
+          alt={`${game.name} loading screen`}
+        />
+      </div>
+      {/* Scrim: fade into the page background along the bottom for text contrast.
+          Fully opaque across the bottom 25% (where the art stops). */}
       <div
         className="absolute inset-0 bg-gradient-to-t from-background from-25% to-transparent to-50%"
         aria-hidden
