@@ -21,11 +21,13 @@ import { usePreferredTarget } from "../../play/config";
 import { useCampaigns } from "../campaigns";
 import type { Campaign, CampaignMission } from "../model";
 import { type MissionRequirement, useMissionRun } from "../run";
+import { BriefingProse } from "./components/Briefing";
 import { CampaignImage } from "./components/CampaignImage";
 import {
   MissionMapBackground,
   MissionMapSideGraphic,
 } from "./components/MissionMapPreview";
+import { MissionMediaPlayer } from "./components/MissionMediaFields";
 import { PanoramaScroller } from "./components/PanoramaScroller";
 
 /**
@@ -183,10 +185,16 @@ function Briefing({
         </div>
 
         {mission.briefing && (
-          <p className="max-h-40 overflow-auto whitespace-pre-line text-sm leading-relaxed text-foreground/90">
+          <BriefingProse className="max-h-40 overflow-auto">
             {mission.briefing}
-          </p>
+          </BriefingProse>
         )}
+
+        <MissionMediaPlayer
+          campaignId={campaign.id}
+          voiceover={mission.voiceover}
+          cutscene={mission.cutscene}
+        />
 
         {mission.objectives.length > 0 && (
           <div className="flex flex-col gap-2">

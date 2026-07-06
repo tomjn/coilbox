@@ -1,5 +1,6 @@
 import { cn } from "@picoframe/frame";
 import { useEffect, useRef } from "react";
+import { mediaKind } from "../../../lib/assetUrl";
 import type { ImageRef } from "../../model";
 import { useCampaignImage } from "../../panorama";
 
@@ -37,6 +38,7 @@ export function PanoramaScroller({
   fill?: boolean;
 }) {
   const src = useCampaignImage(campaignId, panorama);
+  const isVideo = src ? mediaKind(src) === "video" : false;
   const ref = useRef<HTMLDivElement>(null);
   const height = fill ? "h-full" : "h-28";
 
@@ -45,7 +47,8 @@ export function PanoramaScroller({
   // resize so a responsive full-bleed background stays seamless.
   useEffect(() => {
     const el = ref.current;
-    if (!el || !src) return;
+    // A video backdrop (below) fills via object-cover — no tile measurement needed.
+    if (!el || !src || isVideo) return;
     let ratio = 0;
     const apply = () => {
       if (!ratio) return;
@@ -66,12 +69,33 @@ export function PanoramaScroller({
     const observer = new ResizeObserver(apply);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [src]);
+  }, [src, isVideo]);
 
   if (!src) {
     return (
       <div
         className={cn("animate-pulse rounded-md bg-muted", height, className)}
+      />
+    );
+  }
+
+  // A video backdrop autoplays muted and loops as a silent background clip (audio
+  // belongs in the mission voiceover slot). `object-cover` fills the band the same
+  // way the tiled image background does.
+  if (isVideo) {
+    return (
+      <video
+        aria-hidden
+        src={src}
+        autoPlay
+        loop
+        muted
+        playsInline
+        className={cn(
+          "w-full rounded-md bg-muted object-cover",
+          height,
+          className,
+        )}
       />
     );
   }

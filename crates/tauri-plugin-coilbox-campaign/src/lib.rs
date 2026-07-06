@@ -19,11 +19,12 @@
 
 mod images;
 
+use coilbox_portable::{is_safe_rel, valid_id};
 use images::{data_uri_bytes, data_url, reencode_image, ImageKind};
 use picoframe_core::CliResult;
 use serde::Serialize;
 use serde_json::json;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use tauri::{
     plugin::{Builder, TauriPlugin},
     AppHandle, Runtime,
@@ -54,22 +55,16 @@ fn images_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(campaign_dir(app)?.join("images"))
 }
 
+/// Audio/video assets live under `<data_dir>/campaign/media/<campaignId>/` and are
+/// served to the webview by the `coilbox://` protocol's `campaign` root (never as
+/// data URIs — large AV would blow up memory and can't be range-served). Kept
+/// separate from `images/` because images are re-encoded and read back as data URIs.
+fn media_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(campaign_dir(app)?.join("media"))
+}
+
 fn progress_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(campaign_dir(app)?.join("progress.json"))
-}
-
-/// Campaign ids are used verbatim as filenames, so whitelist the charset that's
-/// safe on every filesystem and free of path syntax: `[A-Za-z0-9-]+`.
-fn valid_id(id: &str) -> bool {
-    !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
-}
-
-/// Reject anything that could escape a campaign's image folder: absolute paths, a
-/// drive/root prefix, or any `..` component (mirrors the profile plugin's guard).
-fn is_safe_rel(rel: &Path) -> bool {
-    rel.components()
-        .all(|c| matches!(c, Component::Normal(_) | Component::CurDir))
-        && !rel.as_os_str().is_empty()
 }
 
 /// Read every `*.json` file in `dir` (non-recursive) and append it to `items` with
@@ -159,6 +154,9 @@ async fn campaign_delete<R: Runtime>(app: AppHandle<R>, id: String) -> CliResult
         }
     }
     if let Ok(dir) = images_dir(&app) {
+        let _ = std::fs::remove_dir_all(dir.join(&id));
+    }
+    if let Ok(dir) = media_dir(&app) {
         let _ = std::fs::remove_dir_all(dir.join(&id));
     }
     CliResult::ok(json!({}))
@@ -263,6 +261,49 @@ async fn campaign_image_delete<R: Runtime>(
     CliResult::ok(json!({}))
 }
 
+/// `campaign_media_import` — copy an audio/video file the user picked into the
+/// campaign's `media/<campaignId>/` folder **verbatim** (no re-encode: AV is served
+/// as-is by the `coilbox://` protocol, which range-serves it for `<video>` seeking).
+/// Unlike images, AV is never inlined as a data URI. Returns the bare stored
+/// filename to reference as a `{ kind: "file" }` media ref.
+#[tauri::command]
+async fn campaign_media_import<R: Runtime>(
+    app: AppHandle<R>,
+    campaign_id: String,
+    src_path: String,
+) -> CliResult {
+    if !valid_id(&campaign_id) {
+        return CliResult::err(format!("invalid campaign id: {campaign_id}"));
+    }
+    // Preserve the source extension (alnum-sanitized) so the protocol's `mime_for`
+    // picks the right content type; default to `bin` when there's no usable one.
+    let ext: String = Path::new(&src_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    let ext = if ext.is_empty() {
+        "bin".to_string()
+    } else {
+        ext
+    };
+    let dir = match media_dir(&app) {
+        Ok(d) => d.join(&campaign_id),
+        Err(e) => return CliResult::err(e),
+    };
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return CliResult::err(format!("could not create media dir: {e}"));
+    }
+    let file = format!("{}.{}", uuid::Uuid::new_v4(), ext);
+    match std::fs::copy(&src_path, dir.join(&file)) {
+        Ok(_) => CliResult::ok(json!({ "file": file })),
+        Err(e) => CliResult::err(format!("could not import media: {e}")),
+    }
+}
+
 /// `campaign_export` — write a caller-serialized campaign export document to a
 /// caller-chosen path (opaque; the frontend builds the export shape and picks the
 /// destination via the save dialog).
@@ -325,6 +366,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             campaign_image_import_data,
             campaign_image_read,
             campaign_image_delete,
+            campaign_media_import,
             campaign_export,
             campaign_import,
             campaign_progress_load,

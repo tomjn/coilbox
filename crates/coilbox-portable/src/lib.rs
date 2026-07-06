@@ -14,7 +14,7 @@
 //!
 //! Detection is lazy + memoized, so there's nothing to wire up in `main()`.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
 use tauri::{AppHandle, Manager, Runtime};
@@ -92,9 +92,91 @@ pub fn cache_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
         .map_err(|e| format!("could not resolve app cache dir: {e}"))
 }
 
+/// Reject anything that could escape a resolved root: absolute paths, a Windows
+/// drive/root prefix, or any `..` component. Only plain forward-relative paths pass.
+/// Shared by the profile/campaign plugins and the `coilbox://` asset protocol so the
+/// path-traversal guard is defined once.
+pub fn is_safe_rel(rel: &Path) -> bool {
+    rel.components()
+        .all(|c| matches!(c, Component::Normal(_) | Component::CurDir))
+        && !rel.as_os_str().is_empty()
+}
+
+/// Ids used verbatim as directory/file names (campaign ids, asset-protocol path
+/// segments) must be free of path syntax and safe on every filesystem: `[A-Za-z0-9-]+`.
+pub fn valid_id(id: &str) -> bool {
+    !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+/// Guess a MIME type from a file extension, covering the media a distribution can
+/// ship: images, audio, video and web fonts. Anything unknown falls back to a
+/// generic binary type. Shared by `profile_asset` (data URIs) and the `coilbox://`
+/// protocol (streamed responses) so both agree on content types.
+pub fn mime_for(path: &Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        // Images
+        Some("webp") => "image/webp",
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("svg") => "image/svg+xml",
+        Some("avif") => "image/avif",
+        // Audio
+        Some("ogg" | "oga") => "audio/ogg",
+        Some("mp3") => "audio/mpeg",
+        Some("wav") => "audio/wav",
+        Some("flac") => "audio/flac",
+        Some("opus") => "audio/opus",
+        Some("m4a") => "audio/mp4",
+        // Video
+        Some("mp4") => "video/mp4",
+        Some("webm") => "video/webm",
+        Some("mov") => "video/quicktime",
+        Some("ogv") => "video/ogg",
+        // Fonts (profile CSS @font-face)
+        Some("woff2") => "font/woff2",
+        Some("woff") => "font/woff",
+        Some("ttf") => "font/ttf",
+        Some("otf") => "font/otf",
+        _ => "application/octet-stream",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn is_safe_rel_accepts_forward_paths_only() {
+        assert!(is_safe_rel(Path::new("images/x.jpg")));
+        assert!(!is_safe_rel(Path::new("")));
+        assert!(!is_safe_rel(Path::new("../x.jpg")));
+        assert!(!is_safe_rel(Path::new("/abs.jpg")));
+        assert!(!is_safe_rel(Path::new("a/../b.jpg")));
+    }
+
+    #[test]
+    fn valid_id_charset() {
+        assert!(valid_id("Camp-01"));
+        assert!(!valid_id(""));
+        assert!(!valid_id("a/b"));
+        assert!(!valid_id("../etc"));
+        assert!(!valid_id("café"));
+    }
+
+    #[test]
+    fn mime_covers_media_and_fonts() {
+        assert_eq!(mime_for(Path::new("a.mp4")), "video/mp4");
+        assert_eq!(mime_for(Path::new("a.OGG")), "audio/ogg");
+        assert_eq!(mime_for(Path::new("a.woff2")), "font/woff2");
+        assert_eq!(mime_for(Path::new("a.png")), "image/png");
+        assert_eq!(mime_for(Path::new("a.xyz")), "application/octet-stream");
+    }
 
     #[test]
     fn app_dir_is_exe_parent_on_plain_layout() {

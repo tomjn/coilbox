@@ -11,15 +11,31 @@ import type { SkirmishDraft } from "../play/drafts";
  */
 
 /**
- * How a stored image is referenced. Locally-authored campaigns hold a `file` (a
- * bare filename under the campaign's image folder, materialized by the campaign
- * plugin); an exported campaign inlines the image as a base64 `data` URI so it
- * travels in a single file. Used for every campaign image — panoramas, icons,
- * backgrounds and mission side graphics.
+ * How a stored media file (image, audio or video) is referenced:
+ *
+ * - `local` — a path relative to the portable `.coilbox/` folder, served straight to
+ *   the webview by the `coilbox://` protocol. The way a *distribution* bundles media
+ *   (including audio/video, which can't be a data URI). Only resolves in portable mode.
+ * - `file` — a bare filename under the campaign's own app-data folder (`images/<id>/`
+ *   for re-encoded images, `media/<id>/` for verbatim AV, picked by extension). How a
+ *   *user-authored* campaign stores imported media; works on any install.
+ * - `data` — a base64 `data:` URI inlined into the campaign JSON so an exported
+ *   campaign travels in a single file. Images only (AV is far too large to inline).
+ *
+ * Used for every campaign image — panoramas, icons, backgrounds, side graphics — and,
+ * via {@link MediaRef}, for mission audio/video.
  */
 export type ImageRef =
+  | { kind: "local"; path: string }
   | { kind: "file"; file: string }
   | { kind: "data"; dataUri: string };
+
+/**
+ * A reference to any campaign media (image, audio or video). Structurally identical
+ * to {@link ImageRef} — the alias just documents intent at audio/video fields, which
+ * in practice only use `local` (bundled) or `file` (user-imported AV).
+ */
+export type MediaRef = ImageRef;
 
 /** @deprecated Use {@link ImageRef}; kept so existing panorama imports still type. */
 export type PanoramaRef = ImageRef;
@@ -60,10 +76,14 @@ export interface CampaignMission {
   subtitle?: string;
   briefing: string;
   objectives: string[];
-  /** Scrolling briefing backdrop. */
+  /** Scrolling briefing backdrop — a still image or a looping muted video. */
   panorama?: ImageRef;
-  /** Optional still graphic shown beside the mission briefing card. */
+  /** Graphic beside the mission briefing card — a still image or a looping muted video. */
   sideGraphic?: ImageRef;
+  /** Optional briefing voiceover (audio) played on the briefing screen. */
+  voiceover?: MediaRef;
+  /** Optional intro cutscene (video) offered on the briefing screen. */
+  cutscene?: MediaRef;
   /** When set, the panorama slot renders a live 3D map preview instead of `panorama`. */
   panoramaMap?: MapPreviewConfig;
   /** When set, the side-graphic slot renders a live 3D map preview instead of `sideGraphic`. */
@@ -117,10 +137,13 @@ export interface CampaignExportFile {
   campaign: Campaign;
 }
 
-/** Narrow an unknown to an `ImageRef`, or drop it (returns undefined). */
-function parseImageRef(value: unknown): ImageRef | undefined {
+/** Narrow an unknown to a {@link MediaRef}, or drop it (returns undefined). */
+function parseImageRef(value: unknown): MediaRef | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const p = value as Record<string, unknown>;
+  if (p.kind === "local" && typeof p.path === "string") {
+    return { kind: "local", path: p.path };
+  }
   if (p.kind === "file" && typeof p.file === "string") {
     return { kind: "file", file: p.file };
   }
@@ -215,6 +238,8 @@ export function parseCampaignJson(json: string): Campaign | null {
       objectives: stringArray(m.objectives),
       panorama: parseImageRef(m.panorama),
       sideGraphic: parseImageRef(m.sideGraphic),
+      voiceover: parseImageRef(m.voiceover),
+      cutscene: parseImageRef(m.cutscene),
       panoramaMap: parseMapPreview(m.panoramaMap),
       sideGraphicMap: parseMapPreview(m.sideGraphicMap),
       mapDownload: parseMapDownload(m.mapDownload),

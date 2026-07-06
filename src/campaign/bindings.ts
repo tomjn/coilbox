@@ -63,6 +63,16 @@ export const campaignImageImportData = defineCommand<
   { file: string }
 >("coilbox-campaign", "campaign_image_import_data");
 
+/**
+ * Import an audio/video file the user picked, copied **verbatim** (no re-encode) into
+ * the campaign's `media/<id>/` folder. Returns the bare stored filename; reference it
+ * as a `{ kind: "file" }` media ref, resolved to a `coilbox://` URL for playback.
+ */
+export const campaignMediaImport = defineCommand<
+  { campaignId: string; srcPath: string },
+  { file: string }
+>("coilbox-campaign", "campaign_media_import");
+
 /** Read a stored panorama back as a `data:` URL for display. */
 export const campaignImageRead = defineCommand<
   { campaignId: string; file: string },

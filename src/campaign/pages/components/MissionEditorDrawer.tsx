@@ -12,13 +12,19 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { campaignImageDelete, campaignImageImport } from "../../bindings";
+import { mediaKind } from "../../../lib/assetUrl";
+import {
+  campaignImageDelete,
+  campaignImageImport,
+  campaignMediaImport,
+} from "../../bindings";
 import type { CampaignMission, MapPreviewConfig } from "../../model";
 import { CampaignImage, CampaignImageField } from "./CampaignImage";
 import {
   MissionMapBackground,
   MissionMapSideGraphic,
 } from "./MissionMapPreview";
+import { MissionAvField } from "./MissionMediaFields";
 import { PanoramaScroller } from "./PanoramaScroller";
 import { UnitRestrictions } from "./UnitRestrictions";
 
@@ -179,14 +185,31 @@ export function MissionEditorDrawer({
     setError(null);
     try {
       const src = await open({
-        title: "Choose panorama image",
+        title: "Choose panorama image or video",
         multiple: false,
         filters: [
-          { name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "bmp"] },
+          {
+            name: "Image or video",
+            extensions: [
+              "png",
+              "jpg",
+              "jpeg",
+              "webp",
+              "bmp",
+              "mp4",
+              "webm",
+              "mov",
+              "ogv",
+            ],
+          },
         ],
       });
       if (typeof src !== "string") return;
-      const { file } = await campaignImageImport({ campaignId, srcPath: src });
+      // A video backdrop is copied verbatim; an image is re-encoded/downscaled.
+      const { file } =
+        mediaKind(src) === "video"
+          ? await campaignMediaImport({ campaignId, srcPath: src })
+          : await campaignImageImport({ campaignId, srcPath: src });
       discardSessionPanorama();
       sessionFiles.current.add(file);
       patch({ panorama: { kind: "file", file } });
@@ -262,6 +285,11 @@ export function MissionEditorDrawer({
         <label htmlFor="mission-briefing" className="text-sm font-medium">
           Briefing
         </label>
+        <p className="text-xs text-muted-foreground">
+          Markdown supported. Embed bundled media with{" "}
+          <code className="font-mono">![](images/art.jpg)</code> — image, audio
+          or video by file extension.
+        </p>
         <Textarea
           id="mission-briefing"
           value={mission.briefing}
@@ -319,8 +347,8 @@ export function MissionEditorDrawer({
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">Panorama</span>
         <p className="text-xs text-muted-foreground">
-          The briefing backdrop — a horizontally-tiling image, or the mission's
-          map as a full-screen spinning 3D preview.
+          The briefing backdrop — a horizontally-tiling image, a looping muted
+          video, or the mission's map as a full-screen spinning 3D preview.
         </p>
         <SlotSourceSelect
           value={slotSourceValue(mission.panoramaMap)}
@@ -357,7 +385,7 @@ export function MissionEditorDrawer({
                 onClick={pickImage}
               >
                 <Image className="size-4" />{" "}
-                {mission.panorama ? "Replace image" : "Choose image"}
+                {mission.panorama ? "Replace media" : "Choose image or video"}
               </Button>
               {mission.panorama && (
                 <Button
@@ -377,8 +405,9 @@ export function MissionEditorDrawer({
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">Side graphic</span>
         <p className="text-xs text-muted-foreground">
-          Shown beside the briefing card — a still image, or the mission's map
-          as a drag-to-rotate spinning preview layered over the backdrop.
+          Shown beside the briefing card — a still image, a looping muted video,
+          or the mission's map as a drag-to-rotate spinning preview layered over
+          the backdrop.
         </p>
         <SlotSourceSelect
           value={slotSourceValue(mission.sideGraphicMap)}
@@ -405,8 +434,9 @@ export function MissionEditorDrawer({
             kind="sideGraphic"
             value={mission.sideGraphic}
             onChange={(sideGraphic) => patch({ sideGraphic })}
-            label="Image"
-            help="A unit render or emblem, for example. Transparency is kept."
+            label="Image or video"
+            help="A unit render or emblem, for example. Image transparency is kept; a video loops muted."
+            allowVideo
             preview={
               <div className="rounded-md border border-border/50 bg-muted p-2">
                 <CampaignImage
@@ -420,6 +450,24 @@ export function MissionEditorDrawer({
           />
         )}
       </div>
+
+      <MissionAvField
+        campaignId={campaignId}
+        kind="audio"
+        value={mission.voiceover}
+        onChange={(voiceover) => patch({ voiceover })}
+        label="Briefing voiceover"
+        help="Optional audio played on the briefing screen."
+      />
+
+      <MissionAvField
+        campaignId={campaignId}
+        kind="video"
+        value={mission.cutscene}
+        onChange={(cutscene) => patch({ cutscene })}
+        label="Intro cutscene"
+        help="Optional video offered on the briefing screen."
+      />
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">Unit restrictions</span>

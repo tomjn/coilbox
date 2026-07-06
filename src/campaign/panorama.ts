@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { assetUrl, campaignMediaUrl, mediaKind } from "../lib/assetUrl";
 import { campaignImageRead } from "./bindings";
 import type { ImageRef } from "./model";
 
@@ -24,42 +25,56 @@ export function resolvePanoramaDataUri(
 }
 
 /**
- * Resolve a mission panorama to a displayable `data:` URL. `data` panoramas (from
- * an exported campaign) carry their URI inline; `file` panoramas are read off disk
- * via the plugin and cached for the session. Returns `undefined` while a file read
- * is in flight (or when there's no panorama).
+ * Resolve a mission media ref to a displayable URL. Most kinds resolve synchronously:
+ * `data` carries its URI inline; `local` maps to a `coilbox://` URL under the portable
+ * root; and an audio/video `file` maps to the campaign's `coilbox://` media URL (never
+ * a data URI — AV is range-served). Only an *image* `file` needs an async round-trip:
+ * it's read off disk into a data URL and cached for the session. Returns `undefined`
+ * while that read is in flight (or when there's no ref).
  */
 export function useCampaignPanorama(
   campaignId: string,
   panorama?: ImageRef,
 ): string | undefined {
-  const dataUri = panorama?.kind === "data" ? panorama.dataUri : undefined;
-  const file = panorama?.kind === "file" ? panorama.file : undefined;
-  const [src, setSrc] = useState<string | undefined>(dataUri);
+  // Synchronous URLs, decided from the ref kind + extension.
+  const syncSrc =
+    panorama?.kind === "data"
+      ? panorama.dataUri
+      : panorama?.kind === "local"
+        ? assetUrl(panorama.path)
+        : panorama?.kind === "file" && mediaKind(panorama.file) !== "image"
+          ? campaignMediaUrl(campaignId, panorama.file)
+          : undefined;
+  // The one async case: an image stored as a `file` must be read into a data URL.
+  const imageFile =
+    panorama?.kind === "file" && mediaKind(panorama.file) === "image"
+      ? panorama.file
+      : undefined;
+  const [src, setSrc] = useState<string | undefined>(syncSrc);
 
   useEffect(() => {
-    if (dataUri) {
-      setSrc(dataUri);
+    if (syncSrc) {
+      setSrc(syncSrc);
       return;
     }
-    if (!file) {
+    if (!imageFile) {
       setSrc(undefined);
       return;
     }
     let cancelled = false;
-    resolvePanoramaDataUri(campaignId, file)
+    resolvePanoramaDataUri(campaignId, imageFile)
       .then((url) => {
         if (!cancelled) setSrc(url);
       })
       .catch(() => {
         // A failed read shouldn't stick forever — drop it so a later render retries.
-        panoramaCache.delete(`${campaignId}::${file}`);
+        panoramaCache.delete(`${campaignId}::${imageFile}`);
         if (!cancelled) setSrc(undefined);
       });
     return () => {
       cancelled = true;
     };
-  }, [campaignId, file, dataUri]);
+  }, [campaignId, imageFile, syncSrc]);
 
   return src;
 }

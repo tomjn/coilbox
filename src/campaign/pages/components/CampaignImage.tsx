@@ -2,7 +2,12 @@ import { Button, cn } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ImageIcon, Milestone, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { type CampaignImageKind, campaignImageImport } from "../../bindings";
+import { mediaKind } from "../../../lib/assetUrl";
+import {
+  type CampaignImageKind,
+  campaignImageImport,
+  campaignMediaImport,
+} from "../../bindings";
 import type { ImageRef } from "../../model";
 import { useCampaignImage } from "../../panorama";
 
@@ -27,6 +32,20 @@ export function CampaignImage({
 }) {
   const src = useCampaignImage(campaignId, image);
   if (!src) return <>{fallback}</>;
+  // A side graphic can be a looping muted video, not just a still image.
+  if (mediaKind(src) === "video") {
+    return (
+      <video
+        src={src}
+        aria-label={alt || undefined}
+        className={className}
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
+    );
+  }
   return <img src={src} alt={alt} className={className} />;
 }
 
@@ -81,6 +100,7 @@ export function CampaignImageField({
   label,
   help,
   preview,
+  allowVideo = false,
 }: {
   campaignId: string;
   kind: CampaignImageKind;
@@ -90,25 +110,37 @@ export function CampaignImageField({
   help?: string;
   /** The preview element to show when a value is set (sized by the caller). */
   preview: ReactNode;
+  /**
+   * Also accept a video file. A picked video is copied verbatim via
+   * `campaignMediaImport` (not re-encoded) and stored as a `file` ref; the resolver
+   * serves it over `coilbox://`. Used for the mission side graphic, which can loop a
+   * muted video. Off for icon/background (images only).
+   */
+  allowVideo?: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
 
   const pick = async () => {
     setError(null);
     try {
+      const imageExts = ["png", "jpg", "jpeg", "webp", "bmp"];
+      const videoExts = ["mp4", "webm", "mov", "ogv"];
       const src = await open({
         title: `Choose ${label.toLowerCase()}`,
         multiple: false,
         filters: [
-          { name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "bmp"] },
+          {
+            name: allowVideo ? "Image or video" : "Image",
+            extensions: allowVideo ? [...imageExts, ...videoExts] : imageExts,
+          },
         ],
       });
       if (typeof src !== "string") return;
-      const { file } = await campaignImageImport({
-        campaignId,
-        srcPath: src,
-        kind,
-      });
+      // Videos are copied as-is; images are decoded, downscaled and re-encoded.
+      const { file } =
+        allowVideo && mediaKind(src) === "video"
+          ? await campaignMediaImport({ campaignId, srcPath: src })
+          : await campaignImageImport({ campaignId, srcPath: src, kind });
       onChange({ kind: "file", file });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

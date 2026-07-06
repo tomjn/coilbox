@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-campaign-media-import"
+description = "Enables the campaign_media_import command without any pre-configured scope."
+commands.allow = ["campaign_media_import"]
+
+[[permission]]
+identifier = "deny-campaign-media-import"
+description = "Denies the campaign_media_import command without any pre-configured scope."
+commands.deny = ["campaign_media_import"]
