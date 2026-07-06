@@ -1041,7 +1041,9 @@ export function useUnitsyncMinimap(
     let cancelled = false;
     setLoading(true);
     setError(null);
-    unitsyncMinimap({ enginePath, dataDir, mapName })
+    // mip 0 = 1024px, the engine's minimap ceiling — it's the diffuse texture
+    // draped over the 3D preview (and the 2D minimap), so take the full res.
+    unitsyncMinimap({ enginePath, dataDir, mapName, mip: 0 })
       .then((res) => {
         if (cancelled) return;
         minimapCache.set(key, res);

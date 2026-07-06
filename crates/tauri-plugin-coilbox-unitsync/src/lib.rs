@@ -349,7 +349,7 @@ async fn unitsync_heightmap<R: Runtime>(
         &libpath.to_string_lossy(),
         &data_dir,
         &map_name,
-        max_side.unwrap_or(512),
+        max_side.unwrap_or(1024),
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
