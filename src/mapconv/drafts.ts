@@ -39,6 +39,8 @@ export interface DecompileResult {
   mapInfo?: MapInfo | null;
   minimap?: string | null;
   appearance?: MapAppearance | null;
+  /** Raw-bytes `data:` URL of the map's skybox DDS, if it ships one. */
+  skyboxSrc?: string | null;
 }
 
 export interface DecompileDraft {

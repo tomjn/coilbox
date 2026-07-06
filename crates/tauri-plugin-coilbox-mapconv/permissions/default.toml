@@ -6,6 +6,7 @@ permissions = [
   "allow-mc-probe",
   "allow-mc-suggest-sources",
   "allow-mc-read-mapinfo",
+  "allow-mc-read-skybox",
   "allow-mc-image-info",
   "allow-mc-compile",
   "allow-mc-decompile",

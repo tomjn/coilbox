@@ -1063,6 +1063,64 @@ impl Unitsync {
         app
     }
 
+    /// Parse `mapinfo.lua` (the map's archives must be added) for the map's
+    /// `atmosphere.skyBox` — the path, inside the map archive, of a DDS cube map
+    /// used as the sky. Returns the referenced path, or `None` when the map omits
+    /// it or the build lacks the Lua parser's string accessor. The key is queried
+    /// case-tolerantly (`skyBox`/`skybox`) since unitsync only lowercases keys when
+    /// the map calls `lowerkeys(mapinfo)`.
+    pub fn map_skybox_name(&self) -> Option<String> {
+        let (
+            Some(open),
+            Some(execute),
+            Some(close),
+            Some(root),
+            Some(sub_str),
+            Some(pop),
+            Some(str_sval),
+        ) = (
+            self.lp_open_file_fn,
+            self.lp_execute_fn,
+            self.lp_close_fn,
+            self.lp_root_table_fn,
+            self.lp_sub_table_str_fn,
+            self.lp_pop_table_fn,
+            self.lp_str_key_str_val_fn,
+        )
+        else {
+            return None;
+        };
+        let (Ok(file), Ok(modes)) = (CString::new("mapinfo.lua"), CString::new("rmMbe")) else {
+            return None;
+        };
+        let atmosphere = CString::new("atmosphere").unwrap_or_default();
+        let empty = CString::new("").unwrap_or_default();
+
+        let mut out = None;
+        unsafe {
+            if open(file.as_ptr(), modes.as_ptr(), modes.as_ptr()) == 0 {
+                return None;
+            }
+            execute();
+            if root() != 0 && sub_str(atmosphere.as_ptr()) != 0 {
+                for key in ["skyBox", "skybox"] {
+                    let Ok(k) = CString::new(key) else {
+                        continue;
+                    };
+                    if let Some(s) = cstr(str_sval(k.as_ptr(), empty.as_ptr())) {
+                        if !s.is_empty() {
+                            out = Some(s);
+                            break;
+                        }
+                    }
+                }
+                pop(); // atmosphere
+            }
+            close();
+        }
+        out
+    }
+
     /// Read a game's `validais.lua` (the game's archives must be added) — a
     /// whitelist of skirmish-AI name *patterns* the game declares compatible, so a
     /// lobby can hide AIs that won't work. The file `return`s an array of

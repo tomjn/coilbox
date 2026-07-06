@@ -136,6 +136,19 @@ pub struct MinimapOutput {
     pub errors: Vec<String>,
 }
 
+/// Output of the lazy `--map --map-skybox` mode: a map's skybox DDS cube map as a
+/// raw-bytes `data:` URL, for the 3D preview's sky. `data_url` is absent when the
+/// map declares no `atmosphere.skyBox`, or the referenced member can't be read.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MapSkyboxOutput {
+    /// `data:application/octet-stream` URL of the raw DDS bytes (parsed by the
+    /// frontend's `DDSLoader`), when the map ships a skybox.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_url: Option<String>,
+    pub errors: Vec<String>,
+}
+
 /// One game's resolved header art in the batch `game-headers` output. `data_url`
 /// is absent when the game has no usable loadpicture/folder art.
 #[derive(Serialize)]

@@ -6,7 +6,7 @@
 use crate::ffi::Unitsync;
 use crate::model::{
     ArchiveExtractOutput, ArchiveFileEntry, ArchiveFileOutput, ArchiveTreeOutput, GameHeaderItem,
-    GameHeadersOutput,
+    GameHeadersOutput, MapSkyboxOutput,
 };
 use base64::Engine;
 use std::path::Path;
@@ -578,6 +578,95 @@ fn write_header_hit(dir: &Path, checksum: &str, data_url: &str) {
 fn write_header_negative(dir: &Path, checksum: &str) {
     let _ = std::fs::create_dir_all(dir);
     let _ = std::fs::write(dir.join(format!("{checksum}.none")), b"");
+}
+
+/// A skybox DDS cube map is read up to this size (a 1024² DXT5 cube map with
+/// mips is ~8 MiB; leave generous headroom for uncompressed or larger faces).
+const SKYBOX_CAP: usize = 32 * 1024 * 1024;
+
+/// Read a map's `atmosphere.skyBox` DDS cube map and return its raw bytes as a
+/// `data:` URL (the frontend's `DDSLoader` parses it). Mounts the map's archives
+/// so the Lua parser can read the skybox reference, then opens the map archive to
+/// read that member. `None` (no skybox, or the member is missing/oversized) is the
+/// common case and simply leaves the preview with its flat sky colour.
+pub fn map_skybox(lib: &str, map_name: &str) -> MapSkyboxOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(u) => u,
+        Err(e) => {
+            return MapSkyboxOutput {
+                errors: vec![e],
+                ..Default::default()
+            }
+        }
+    };
+    us.init(false, 0);
+    let mut errors = us.drain_errors();
+
+    // The Lua parser reads mapinfo.lua from the VFS, so mount the map first.
+    let mut skybox_name = None;
+    if let Some(first) = us.map_archives(map_name).into_iter().next() {
+        us.add_all_archives(&first);
+        skybox_name = us.map_skybox_name();
+    }
+    // Mount/parse diagnostics are per-map noise, not a failure here.
+    let _ = us.drain_errors();
+
+    let data_url = match skybox_name {
+        Some(name) => {
+            let open_path = resolve_open_path(&us, map_name);
+            let _ = us.drain_errors();
+            match open_path.as_deref().and_then(|p| us.open_archive(p)) {
+                Some(handle) => {
+                    let url = read_skybox_member(&us, handle, &name);
+                    us.close_archive(handle);
+                    url
+                }
+                None => None,
+            }
+        }
+        None => None,
+    };
+    let _ = us.drain_errors();
+
+    errors.extend(us.drain_errors());
+    us.uninit();
+    MapSkyboxOutput { data_url, errors }
+}
+
+/// Within an open archive, locate the member the skybox reference points at
+/// (case-insensitively; falling back to a basename match, since maps reference it
+/// a few different ways) and return its raw bytes as a `data:` URL, or `None`.
+fn read_skybox_member(us: &Unitsync, handle: i32, reference: &str) -> Option<String> {
+    let want = reference.replace('\\', "/").to_lowercase();
+    let base = want.rsplit('/').next().unwrap_or(&want).to_string();
+    let files = us.list_archive_files(handle);
+    let member = files
+        .iter()
+        .map(|(p, _)| p)
+        .find(|p| p.to_lowercase() == want)
+        .or_else(|| {
+            files
+                .iter()
+                .map(|(p, _)| p)
+                .find(|p| p.to_lowercase().rsplit('/').next() == Some(base.as_str()))
+        })?
+        .clone();
+
+    let (size, bytes) = us.read_archive_member(handle, &member, SKYBOX_CAP)?;
+    if size as usize > SKYBOX_CAP {
+        return None;
+    }
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Some(format!("data:application/octet-stream;base64,{b64}"))
+}
+
+/// Print a skybox error envelope to stdout (used on panic).
+pub fn emit_skybox_error(msg: String) {
+    let out = MapSkyboxOutput {
+        errors: vec![msg],
+        ..Default::default()
+    };
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
 }
 
 /// Print a tree error envelope to stdout (used on panic).

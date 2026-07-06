@@ -23,6 +23,7 @@ import {
   mcOpenPath,
   mcProbe,
   mcReadMapinfo,
+  mcReadSkybox,
   mcSuggestSources,
 } from "../bindings";
 import { useMapconvConfig } from "../config";
@@ -120,6 +121,7 @@ export default function CompilePage() {
     height: number;
   } | null>(null);
   const [appearance, setAppearance] = useState<MapAppearance | null>(null);
+  const [skyboxSrc, setSkyboxSrc] = useState<string | null>(null);
 
   // mapcompile requires the texture's dimensions to be a multiple of 1024.
   const textureSizeBad =
@@ -244,7 +246,12 @@ export default function CompilePage() {
     setMaintexture(path);
     setTextureInfo(null);
     setAppearance(null);
+    setSkyboxSrc(null);
     if (!path) return;
+    // A map may ship a skybox DDS next to mapinfo.lua; load it for the preview.
+    mcReadSkybox({ path })
+      .then((r) => setSkyboxSrc(r.dataUrl ?? null))
+      .catch(() => {});
     // Read mapinfo.lua (or .smf-header fallback) for the height range + the
     // appearance hints the 3D preview uses. Prefill the height fields only when
     // empty, so we never clobber values the user typed; reveal Advanced if found.
@@ -514,6 +521,7 @@ export default function CompilePage() {
                 worldWidth={textureInfo?.width ?? 0}
                 worldHeight={textureInfo?.height ?? 0}
                 appearance={appearance}
+                skyboxSrc={skyboxSrc}
               />
             </div>
           )}

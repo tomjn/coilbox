@@ -22,6 +22,7 @@ import {
   type HeightmapResult,
   type LuaExecResult,
   type MapInfoResult,
+  type MapSkyboxResult,
   type MinimapResult,
   type ReplayFile,
   type ScanResult,
@@ -37,6 +38,7 @@ import {
   unitsyncHeightmap,
   unitsyncLuaExec,
   unitsyncMapInfo,
+  unitsyncMapSkybox,
   unitsyncMinimap,
   unitsyncScan,
   unitsyncThumbnails,
@@ -1127,6 +1129,49 @@ export function useUnitsyncHeightmap(
   }, [enginePath, dataDir, mapName]);
 
   return { data, loading, error };
+}
+
+/** Session cache of skybox results, keyed by `dataDir::enginePath::mapName`. */
+const skyboxCache = new Map<string, MapSkyboxResult>();
+
+/**
+ * Lazily read and cache a map's skybox DDS (raw-bytes `data:` URL) for the 3D
+ * preview's sky. `dataUrl` is null for the common case of a map without a skybox.
+ */
+export function useUnitsyncMapSkybox(
+  enginePath?: string,
+  dataDir?: string,
+  mapName?: string,
+) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !mapName) {
+      setDataUrl(null);
+      return;
+    }
+    const key = `${dataDir}::${enginePath}::${mapName}`;
+    const cached = skyboxCache.get(key);
+    if (cached) {
+      setDataUrl(cached.dataUrl ?? null);
+      return;
+    }
+    let cancelled = false;
+    setDataUrl(null);
+    unitsyncMapSkybox({ enginePath, dataDir, mapName })
+      .then((res) => {
+        if (cancelled) return;
+        skyboxCache.set(key, res);
+        setDataUrl(res.dataUrl ?? null);
+      })
+      // A skybox is optional; a failed read just leaves the flat sky colour.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, mapName]);
+
+  return { dataUrl };
 }
 
 /**

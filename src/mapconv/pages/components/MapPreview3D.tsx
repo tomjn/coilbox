@@ -3,6 +3,7 @@ import { Box, ImageOff, Loader2, Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { DDSLoader } from "three/addons/loaders/DDSLoader.js";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { MapAppearance } from "../../bindings";
 import { getImageInfo } from "../../imageCache";
@@ -43,6 +44,66 @@ function makeProceduralDetail(): THREE.Texture {
   tex.wrapT = THREE.MirroredRepeatWrapping;
   tex.colorSpace = THREE.NoColorSpace;
   return tex;
+}
+
+/** Shape of `DDSLoader.parse` output (three doesn't export this type). */
+type DdsData = {
+  isCubemap: boolean;
+  mipmaps: { data: Uint8Array; width: number; height: number }[];
+  width: number;
+  height: number;
+  format: number;
+  mipmapCount: number;
+};
+
+/**
+ * Decode a skybox DDS `data:` URL into a `CompressedCubeTexture` usable as
+ * `scene.background`, or `null` when it isn't a cube map or can't be decoded.
+ *
+ * `DDSLoader.load` yields a plain `CompressedTexture` that three's background
+ * renderer treats as a flat plane (it only takes the cube path for
+ * `isCubeTexture`). So we `parse()` the bytes ourselves and assemble the six faces
+ * into a `CompressedCubeTexture` (`isCubeTexture === true`) — the same face layout
+ * `CompressedTextureLoader` builds internally. Any failure returns `null`, leaving
+ * the caller's flat sky colour in place.
+ */
+async function loadSkyboxCube(
+  src: string,
+): Promise<THREE.CompressedCubeTexture | null> {
+  try {
+    const buffer = await (await fetch(src)).arrayBuffer();
+    const data = new DDSLoader().parse(buffer, true) as unknown as DdsData;
+    if (!data.isCubemap) return null;
+    const faceCount = data.mipmaps.length / data.mipmapCount;
+    if (faceCount !== 6) return null;
+    const faces = [];
+    for (let f = 0; f < faceCount; f++) {
+      const mipmaps = [];
+      for (let i = 0; i < data.mipmapCount; i++) {
+        mipmaps.push(data.mipmaps[f * data.mipmapCount + i]);
+      }
+      faces.push({
+        mipmaps,
+        width: data.width,
+        height: data.height,
+        format: data.format,
+      });
+    }
+    // three types the `images` param as CompressedTexture[], but the loader really
+    // passes these lightweight face records (mipmaps + dimensions + format).
+    const tex = new THREE.CompressedCubeTexture(
+      faces as unknown as THREE.CompressedTexture[],
+      data.format as THREE.CompressedPixelFormat,
+      THREE.UnsignedByteType,
+    );
+    // No mip chain in the file — don't ask the sampler for levels that don't exist.
+    if (data.mipmapCount === 1) tex.minFilter = THREE.LinearFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  } catch {
+    return null;
+  }
 }
 
 /** Longest side requested from `mc_image_info` for each map. The heightmap needs
@@ -100,6 +161,7 @@ export function MapPreview3D({
   worldWidth,
   worldHeight,
   appearance,
+  skyboxSrc,
   className,
 }: {
   /** File path to the heightmap image (mapconv flow); resolved via `mc_image_info`. */
@@ -119,6 +181,10 @@ export function MapPreview3D({
   worldHeight: number;
   /** Optional `mapinfo.lua` hints — water colour/visibility, sky, sun. */
   appearance?: MapAppearance | null;
+  /** Optional `data:` URL of a skybox DDS cube map (`atmosphere.skyBox`). When it
+   * is a cube map it becomes the sky (and the water's reflection); otherwise the
+   * flat `skyColor` sky is kept. */
+  skyboxSrc?: string | null;
   className?: string;
 }) {
   const [srcs, setSrcs] = useState<Srcs | null>(null);
@@ -149,6 +215,7 @@ export function MapPreview3D({
     appearance?.skyColor,
     appearance?.sunDir,
     appearance?.sunColor,
+    skyboxSrc,
   ]);
 
   // Fetch both maps as downscaled data URLs whenever the inputs change. When
@@ -246,6 +313,23 @@ export function MapPreview3D({
       // so the card background shows through.
       if (appearance?.skyColor)
         scene.background = colorFrom(appearance.skyColor, 0);
+
+      // If the map declares a skybox DDS, decode it and (when it's a cube map) use
+      // it as the sky, replacing the flat colour. Done before the water reflection
+      // capture below so the water mirrors the real sky. Any failure — a fetch/parse
+      // error, an unsupported DDS variant (DX10/BC7 fail in DDSLoader), or a
+      // non-cubemap DDS — silently falls back to the flat `skyColor` sky.
+      if (skyboxSrc) {
+        const cube = await loadSkyboxCube(skyboxSrc);
+        if (cancelled) {
+          cube?.dispose();
+          return;
+        }
+        if (cube) {
+          scene.background = cube;
+          disposables.push(cube);
+        }
+      }
 
       const geo = new THREE.PlaneGeometry(planeW, planeH, SEGMENTS, SEGMENTS);
       geo.rotateX(-Math.PI / 2); // lie flat in XZ; displacement then runs along +Y
@@ -499,7 +583,16 @@ uniform float detailStrength;`,
       waterRef.current = null;
       renderRef.current = null;
     };
-  }, [srcs, detailSrc, minHeight, maxHeight, worldWidth, worldHeight, appSig]);
+  }, [
+    srcs,
+    detailSrc,
+    minHeight,
+    maxHeight,
+    worldWidth,
+    worldHeight,
+    appSig,
+    skyboxSrc,
+  ]);
 
   // Spring's water plane sits at world height 0, so water is only visible where
   // terrain drops below it. Default the toggle off for a "dry" map (lowest point
