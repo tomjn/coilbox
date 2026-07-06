@@ -1,7 +1,9 @@
 import { Button, buttonVariants, cn } from "@picoframe/frame";
+import { Channel } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
   ChevronRight,
+  Download,
   Loader2,
   Play,
   RotateCcw,
@@ -9,12 +11,21 @@ import {
   Target,
   Trophy,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link, useParams } from "react-router";
+import { invalidateMapPreview, invalidateScans } from "../../content/config";
+import { type DownloadProgress, dlDownloadMap } from "../../downloads/bindings";
+import { useWriteRootPath } from "../../downloads/config";
+import { ProgressBar } from "../../downloads/pages/components/ProgressBar";
+import { usePreferredTarget } from "../../play/config";
 import { useCampaigns } from "../campaigns";
 import type { Campaign, CampaignMission } from "../model";
 import { type MissionRequirement, useMissionRun } from "../run";
 import { CampaignImage } from "./components/CampaignImage";
+import {
+  MissionMapBackground,
+  MissionMapSideGraphic,
+} from "./components/MissionMapPreview";
 import { PanoramaScroller } from "./components/PanoramaScroller";
 
 /**
@@ -80,9 +91,16 @@ function MissionStage({
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
-      {/* Background: full-bleed panorama, or a dark gradient when there's none. */}
+      {/* Background: the mission map as a spinning backdrop, else a full-bleed
+          panorama, else a dark gradient. The map backdrop is suppressed while the
+          map is missing (the gate below shows instead — there's nothing to render). */}
       <div className="absolute inset-0" aria-hidden>
-        {mission.panorama ? (
+        {mission.panoramaMap && !run.missing ? (
+          <MissionMapBackground
+            mapName={mission.snapshot.mapName}
+            config={mission.panoramaMap}
+          />
+        ) : mission.panorama ? (
           <PanoramaScroller
             fill
             campaignId={campaign.id}
@@ -93,9 +111,17 @@ function MissionStage({
           <div className="h-full w-full bg-gradient-to-br from-slate-900 to-slate-950" />
         )}
       </div>
-      {/* Scrim: darken for text contrast, heaviest at the bottom. */}
+      {/* Scrim: darken for text contrast, heaviest at the bottom. A live map
+          backdrop is the subject rather than a texture behind text, so it gets a
+          much lighter scrim (the briefing card carries its own contrast) — the
+          image-panorama design keeps the heavier one. */}
       <div
-        className="absolute inset-0 bg-gradient-to-t from-background via-background/85 to-background/40"
+        className={cn(
+          "absolute inset-0 bg-gradient-to-t",
+          mission.panoramaMap && !run.missing
+            ? "from-background/70 via-background/10 to-transparent"
+            : "from-background via-background/85 to-background/40",
+        )}
         aria-hidden
       />
 
@@ -103,13 +129,27 @@ function MissionStage({
         <BackLink campaignId={campaign.id} />
 
         <div className="flex min-h-0 flex-1 items-end">
-          {run.phase === "briefing" && (
-            <Briefing campaign={campaign} mission={mission} run={run} />
+          {/* A missing game/map hard-blocks the mission: the briefing and its map
+              preview are withheld until the requirement is installed. */}
+          {run.missing ? (
+            <MissionRequiredGate
+              mission={mission}
+              missing={run.missing}
+              run={run}
+            />
+          ) : (
+            <>
+              {run.phase === "briefing" && (
+                <Briefing campaign={campaign} mission={mission} run={run} />
+              )}
+              {run.phase === "checking" && <Checking />}
+              {run.phase === "result" && <ResultPrompt run={run} />}
+              {run.phase === "victory" && (
+                <Victory campaign={campaign} run={run} />
+              )}
+              {run.phase === "defeat" && <Defeat run={run} />}
+            </>
           )}
-          {run.phase === "checking" && <Checking />}
-          {run.phase === "result" && <ResultPrompt run={run} />}
-          {run.phase === "victory" && <Victory campaign={campaign} run={run} />}
-          {run.phase === "defeat" && <Defeat run={run} />}
         </div>
       </div>
     </div>
@@ -173,11 +213,19 @@ function Briefing({
         <StartArea run={run} />
       </div>
 
-      {/* Optional still graphic, centered (both axes) in the space between the
-          briefing card and the page's right edge. `self-stretch` overrides the
-          row's bottom alignment so the region spans the card height and can
-          centre vertically. Hidden on narrow screens. */}
-      {mission.sideGraphic && (
+      {/* Optional side graphic — a spinning 3D map preview, or a still image —
+          centered (both axes) in the space between the briefing card and the page's
+          right edge. `self-stretch` overrides the row's bottom alignment so the
+          region spans the card height and can centre vertically. Hidden on narrow
+          screens. */}
+      {mission.sideGraphicMap ? (
+        <div className="hidden flex-1 items-stretch self-stretch lg:flex">
+          <MissionMapSideGraphic
+            mapName={mission.snapshot.mapName}
+            config={mission.sideGraphicMap}
+          />
+        </div>
+      ) : mission.sideGraphic ? (
         <div className="hidden flex-1 items-center justify-center self-stretch lg:flex">
           <CampaignImage
             campaignId={campaign.id}
@@ -186,7 +234,7 @@ function Briefing({
             className="max-h-[60vh] w-72 max-w-full object-contain drop-shadow-xl"
           />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -200,10 +248,6 @@ function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
         <span className="font-medium">Settings → Content Folders</span> first.
       </p>
     );
-  }
-
-  if (run.missing) {
-    return <MissingRequirement missing={run.missing} />;
   }
 
   return (
@@ -220,21 +264,106 @@ function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
   );
 }
 
-/** "Requires <name>" with a link to the matching Downloads page. */
-function MissingRequirement({ missing }: { missing: MissionRequirement }) {
-  const to = missing.kind === "map" ? "/downloads/maps" : "/downloads/games";
+/**
+ * The hard gate shown in place of the briefing when the mission's game or map is
+ * not installed. A missing map can be downloaded and installed inline (best-effort
+ * by name, or the mission's `mapDownload` override); once the rescan clears the
+ * requirement the briefing takes over. A missing game just links to Downloads.
+ */
+function MissionRequiredGate({
+  mission,
+  missing,
+  run,
+}: {
+  mission: CampaignMission;
+  missing: MissionRequirement;
+  run: ReturnType<typeof useMissionRun>;
+}) {
+  const { target } = usePreferredTarget();
+  const writePath = useWriteRootPath();
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const isMap = missing.kind === "map";
+  const downloadsLink = isMap ? "/downloads/maps" : "/downloads/games";
+
+  const download = async () => {
+    setDownloading(true);
+    setProgress(null);
+    setError(null);
+    const onProgress = new Channel<DownloadProgress>();
+    onProgress.onmessage = (p) => setProgress(p);
+    try {
+      await dlDownloadMap({
+        springName: mission.mapDownload?.springName ?? mission.snapshot.mapName,
+        searchUrl: mission.mapDownload?.searchUrl,
+        writePath,
+        onProgress,
+      });
+      // Drop the stale scan + map-preview caches so the rescan sees the new map.
+      invalidateScans();
+      if (target?.enginePath && target?.dataDir)
+        invalidateMapPreview(
+          target.enginePath,
+          target.dataDir,
+          mission.snapshot.mapName,
+        );
+      await run.recheck();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDownloading(false);
+      setProgress(null);
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-      <span className="text-amber-700 dark:text-amber-400">
-        Requires <span className="font-medium">{missing.name}</span>
-      </span>
-      <Link
-        to={to}
-        className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"
-      >
-        Get it in Downloads <ChevronRight className="size-3.5" />
-      </Link>
-    </div>
+    <PhaseCard>
+      <div className="flex items-center gap-2">
+        <Download className="size-5 text-muted-foreground" />
+        <h2 className="text-lg font-semibold">
+          {isMap ? "Map required" : "Game required"}
+        </h2>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        This mission needs{" "}
+        <span className="font-medium text-foreground">{missing.name}</span>{" "}
+        installed before you can play it.
+      </p>
+
+      {error && (
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+
+      {isMap ? (
+        <div className="flex flex-col gap-2">
+          <Button onClick={download} disabled={downloading}>
+            {downloading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            {downloading ? "Downloading…" : "Download & Install"}
+          </Button>
+          {downloading && progress && <ProgressBar progress={progress} />}
+          {/* Best-effort by name can miss maps whose springname differs; the manual
+              Downloads page is the fallback (and the only option for games). */}
+          <Link
+            to={downloadsLink}
+            className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"
+          >
+            Find it in Downloads <ChevronRight className="size-3.5" />
+          </Link>
+        </div>
+      ) : (
+        <Link to={downloadsLink} className={cn(buttonVariants(), "w-fit")}>
+          <Download className="size-4" /> Get it in Downloads
+        </Link>
+      )}
+    </PhaseCard>
   );
 }
 

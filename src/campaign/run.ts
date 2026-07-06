@@ -279,5 +279,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     recordVictory,
     recordDefeat,
     reset,
+    /** Force a rescan so a just-installed game/map clears `missing` (install gate). */
+    recheck: () => scan.run(true),
   };
 }
