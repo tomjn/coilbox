@@ -280,7 +280,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     if (mirror.phase === "ready" && rejoinedForRef.current !== activeKey) {
       rejoinedForRef.current = activeKey;
       for (const name of joinedChannels[activeKey] ?? []) {
-        mpJoinChannel({ serverKey: activeKey, channel: name }).catch(() => {});
+        mpJoinChannel({ serverKey: activeKey, channel: name }).catch((e) =>
+          console.warn("multiplayer: auto-rejoin channel failed", name, e),
+        );
       }
     }
   }, [activeKey, mirror.phase, joinedChannels]);
@@ -410,7 +412,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         });
       } finally {
         // Free the registry slot (the register connection stays open on success).
-        await mpDisconnect({ serverKey }).catch(() => {});
+        await mpDisconnect({ serverKey }).catch((e) =>
+          console.warn("multiplayer: disconnect cleanup failed", e),
+        );
         setBusy(false);
       }
     },
