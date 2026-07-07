@@ -74,20 +74,29 @@ export function starTypeFor(nodeId: string, capital: boolean) {
   return STAR_TYPES[h % STAR_TYPES.length];
 }
 
+/** One lane segment in 3D: [x1, y1, z1, x2, y2, z2]. */
+type LaneSeg = [number, number, number, number, number, number];
+
 /**
  * A merged flat-quad geometry for the lanes: `LineBasicMaterial` linewidth is
- * ignored on nearly every platform, so thin translucent rectangles on the
- * play plane give the thick, anti-aliased connections lines can't.
+ * ignored on nearly every platform, so thin translucent quads give the thick,
+ * anti-aliased connections lines can't. Endpoint heights interpolate so a
+ * lane meets each node's ring at the ring's own height. UVs run along each
+ * quad (u = length axis) so a capsule alpha texture rounds the ends; an
+ * optional per-segment colour becomes a vertex-colour attribute.
  */
 function laneQuadGeometry(
-  segments: [x1: number, z1: number, x2: number, z2: number][],
+  segments: LaneSeg[],
   width: number,
-  y: number,
+  colors?: THREE.Color[],
 ): THREE.BufferGeometry {
   const positions = new Float32Array(segments.length * 4 * 3);
   const uvs = new Float32Array(segments.length * 4 * 2);
+  const colorAttr = colors
+    ? new Float32Array(segments.length * 4 * 3)
+    : undefined;
   const indices: number[] = [];
-  segments.forEach(([x1, z1, x2, z2], i) => {
+  segments.forEach(([x1, y1, z1, x2, y2, z2], i) => {
     const dx = x2 - x1;
     const dz = z2 - z1;
     const len = Math.hypot(dx, dz) || 1;
@@ -97,51 +106,60 @@ function laneQuadGeometry(
     positions.set(
       [
         x1 + px,
-        y,
+        y1,
         z1 + pz,
         x1 - px,
-        y,
+        y1,
         z1 - pz,
         x2 + px,
-        y,
+        y2,
         z2 + pz,
         x2 - px,
-        y,
+        y2,
         z2 - pz,
       ],
       i * 12,
     );
-    // u runs along the lane so a capsule alpha texture rounds the ends.
     uvs.set([0, 1, 0, 0, 1, 1, 1, 0], i * 8);
+    if (colorAttr && colors) {
+      const c = colors[i];
+      for (let v = 0; v < 4; v++) {
+        colorAttr.set([c.r, c.g, c.b], i * 12 + v * 3);
+      }
+    }
     const b = i * 4;
     indices.push(b, b + 1, b + 2, b + 2, b + 1, b + 3);
   });
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  if (colorAttr) {
+    geo.setAttribute("color", new THREE.BufferAttribute(colorAttr, 3));
+  }
   geo.setIndex(indices);
   return geo;
 }
 
 /** Split segments into short dashes (for the contested-lane overlay). */
 function dashSegments(
-  segments: [number, number, number, number][],
+  segments: LaneSeg[],
   dashLen: number,
   gapLen: number,
-): [number, number, number, number][] {
-  const out: [number, number, number, number][] = [];
-  for (const [x1, z1, x2, z2] of segments) {
-    const dx = x2 - x1;
-    const dz = z2 - z1;
-    const len = Math.hypot(dx, dz);
+): LaneSeg[] {
+  const out: LaneSeg[] = [];
+  for (const [x1, y1, z1, x2, y2, z2] of segments) {
+    const len = Math.hypot(x2 - x1, z2 - z1);
     if (len === 0) continue;
-    const ux = dx / len;
-    const uz = dz / len;
+    const at3 = (t: number): [number, number, number] => [
+      x1 + (x2 - x1) * t,
+      y1 + (y2 - y1) * t,
+      z1 + (z2 - z1) * t,
+    ];
     for (let at = 0; at < len; at += dashLen + gapLen) {
       const end = Math.min(at + dashLen, len);
       // Skip stubby leftovers — a dash shorter than its own caps looks messy.
       if (end - at < dashLen * 0.5) break;
-      out.push([x1 + ux * at, z1 + uz * at, x1 + ux * end, z1 + uz * end]);
+      out.push([...at3(at / len), ...at3(end / len)] as LaneSeg);
     }
   }
   return out;
@@ -166,24 +184,54 @@ function capsuleTexture(): THREE.Texture {
   return tex;
 }
 
-/** Radial-gradient sprite texture (glows and nebulae). */
+/** Parse `#rrggbb` / `#rrggbbaa` into 0-255 channels. */
+function hexRgba(hex: string): [number, number, number, number] {
+  const h = hex.replace("#", "");
+  const n = Number.parseInt(h.length === 6 ? `${h}ff` : h, 16);
+  return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+}
+
+/**
+ * Radial-gradient sprite texture (star cores, glows and nebulae), computed
+ * per-pixel into ImageData rather than via `createRadialGradient`: WebKit's
+ * CoreGraphics dithers canvas gradients with per-channel noise, which — once
+ * magnified and additively blended — showed up as coloured speckles on the
+ * stars. Pure maths has no dither.
+ */
 function radialTexture(size: number, stops: [number, string][]): THREE.Texture {
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    const g = ctx.createRadialGradient(
-      size / 2,
-      size / 2,
-      0,
-      size / 2,
-      size / 2,
-      size / 2,
-    );
-    for (const [at, color] of stops) g.addColorStop(at, color);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, size, size);
+    const rgba = stops.map(([at, color]) => [at, hexRgba(color)] as const);
+    const img = ctx.createImageData(size, size);
+    const half = size / 2;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const d = Math.min(
+          1,
+          Math.hypot(x + 0.5 - half, y + 0.5 - half) / half,
+        );
+        // Find the bracketing stops and lerp between them.
+        let lo = rgba[0];
+        let hi = rgba[rgba.length - 1];
+        for (let i = 0; i < rgba.length - 1; i++) {
+          if (d >= rgba[i][0] && d <= rgba[i + 1][0]) {
+            lo = rgba[i];
+            hi = rgba[i + 1];
+            break;
+          }
+        }
+        const span = hi[0] - lo[0];
+        const t = span > 0 ? (d - lo[0]) / span : 0;
+        const o = (y * size + x) * 4;
+        for (let c = 0; c < 4; c++) {
+          img.data[o + c] = Math.round(lo[1][c] + (hi[1][c] - lo[1][c]) * t);
+        }
+      }
+    }
+    ctx.putImageData(img, 0, 0);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -283,7 +331,6 @@ export function GalaxyView({
 
     /* ------------------------- decorative backdrop ------------------------- */
 
-    const starCount = performanceMode ? 5000 : 12000;
     const makeStars = (
       count: number,
       radius: number,
@@ -291,6 +338,8 @@ export function GalaxyView({
       yOffset: number,
       seedSuffix: string,
       pointSize: number,
+      center?: [number, number, number],
+      palette?: string[],
     ) => {
       const stars = buildStarfield({
         count,
@@ -298,7 +347,8 @@ export function GalaxyView({
         thickness,
         yOffset,
         seed: galaxy.id + seedSuffix,
-        palette: galaxy.theme?.starPalette,
+        palette: palette ?? galaxy.theme?.starPalette,
+        center,
       });
       const geo = new THREE.BufferGeometry();
       geo.setAttribute(
@@ -326,14 +376,74 @@ export function GalaxyView({
       return points;
     };
 
-    // Far layer: the galactic disc, several times wider than the play region
-    // and slightly below it — we look down onto the plane at an angle.
-    scene.add(makeStars(starCount, PLAY_EXTENT * 4, 30, -22, "", 1.4));
-    // Near layer: sparse dim scatter around the play plane; being at a
-    // different depth it parallaxes against the far disc as the camera pans.
-    if (!performanceMode) {
-      scene.add(makeStars(1500, PLAY_EXTENT * 1.8, 16, -6, "-near", 1.0));
+    // The decorative galaxy is far bigger than the playable patch, and the
+    // playable stars sit out in its arms rather than at its centre: the disc
+    // is centred on a distant galactic core (direction hashed per galaxy)
+    // placed well beyond the pan clamp and zoom range — you can look toward
+    // the bright core but never reach it.
+    const coreAngle = ((hashString(`${galaxy.id}-core`) % 360) * Math.PI) / 180;
+    const CORE_DIST = PLAY_EXTENT * 5.5;
+    const core: [number, number, number] = [
+      Math.cos(coreAngle) * CORE_DIST,
+      -42,
+      Math.sin(coreAngle) * CORE_DIST,
+    ];
+    scene.add(
+      makeStars(
+        performanceMode ? 9000 : 22000,
+        PLAY_EXTENT * 7,
+        55,
+        0,
+        "",
+        1.5,
+        core,
+      ),
+    );
+    // The core itself: a dense warm cluster plus stacked glow sprites.
+    scene.add(
+      makeStars(performanceMode ? 1200 : 3000, 65, 30, 0, "-core", 1.7, core, [
+        "#ffe9c9",
+        "#ffd9a0",
+        "#fff4e0",
+      ]),
+    );
+    const coreGlowTex = radialTexture(128, [
+      [0, "#ffe7c2ee"],
+      [0.35, "#ffdba066"],
+      [1, "#ffd99000"],
+    ]);
+    disposables.push(coreGlowTex);
+    for (const [scale, opacity] of [
+      [430, 0.1],
+      [260, 0.16],
+      [130, 0.26],
+    ] as const) {
+      const mat = new THREE.SpriteMaterial({
+        map: coreGlowTex,
+        transparent: true,
+        opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      disposables.push(mat);
+      const sprite = new THREE.Sprite(mat);
+      sprite.position.set(core[0], core[1], core[2]);
+      sprite.scale.set(scale, scale * 0.7, 1);
+      sprite.raycast = () => {};
+      scene.add(sprite);
     }
+    // Near layer: a deep scatter around and *below* the play plane, so
+    // tilting reveals stars underneath the map and panning parallaxes.
+    scene.add(
+      makeStars(
+        performanceMode ? 2000 : 4500,
+        PLAY_EXTENT * 2.4,
+        60,
+        -14,
+        "-near",
+        1.0,
+      ),
+    );
 
     // A few soft nebula sprites tint the disc (skipped in performance mode).
     if (!performanceMode && effects) {
@@ -374,46 +484,71 @@ export function GalaxyView({
 
     /* ----------------------------- play layer ------------------------------ */
 
-    // Lanes: thick translucent quads on the play plane (see
-    // laneQuadGeometry) — a quiet neutral base, with a brighter overlay
-    // re-drawing frontier lanes (player side ↔ attackable side) so "where
-    // can I go" reads at a glance.
-    const laneSegs: [number, number, number, number][] = [];
-    for (const [a, b] of galaxy.links) {
-      const pa = positions.get(a);
-      const pb = positions.get(b);
-      if (pa && pb) laneSegs.push([pa[0], pa[2], pb[0], pb[2]]);
-    }
+    // Lanes: thick translucent capsule quads connecting ring edge to ring
+    // edge (each end trimmed back from the node centre and drawn at that
+    // node's ring height). Three overlays, all rebuilt when ownership
+    // changes: a quiet neutral base, faction-coloured lanes where both ends
+    // share an owner, and dashed contested lanes on the player's frontier.
     const LANE_WIDTH = 0.5;
+    const RING_Y = -0.4; // matches the ownership rings below
+    const LANE_TRIM = 2.45; // just outside the ring's outer radius
+    const laneEnd = (id: string): [number, number, number] | null => {
+      const p = positions.get(id);
+      return p ? [p[0], p[1] + RING_Y, p[2]] : null;
+    };
+    const trimmedSeg = (aId: string, bId: string): LaneSeg | null => {
+      const a = laneEnd(aId);
+      const b = laneEnd(bId);
+      if (!a || !b) return null;
+      const len = Math.hypot(b[0] - a[0], b[2] - a[2]);
+      if (len <= LANE_TRIM * 2 + 0.5) return null;
+      const at = (t: number): [number, number, number] => [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t,
+      ];
+      const t0 = LANE_TRIM / len;
+      return [...at(t0), ...at(1 - t0)] as LaneSeg;
+    };
     const laneTex = capsuleTexture();
     disposables.push(laneTex);
-    const laneGeo = laneQuadGeometry(laneSegs, LANE_WIDTH, -0.6);
-    const laneMat = new THREE.MeshBasicMaterial({
-      map: laneTex,
-      color: 0x93a7c8,
-      transparent: true,
-      opacity: 0.25,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    disposables.push(laneGeo, laneMat);
-    const lanes = new THREE.Mesh(laneGeo, laneMat);
-    lanes.raycast = () => {};
-    scene.add(lanes);
-
-    // Contested lanes re-draw dashed at the same width, capsule-capped.
-    const frontierMat = new THREE.MeshBasicMaterial({
-      map: laneTex,
-      color: 0xdbe7ff,
-      transparent: true,
-      opacity: 0.8,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    disposables.push(frontierMat);
-    const frontier = new THREE.Mesh(new THREE.BufferGeometry(), frontierMat);
-    frontier.raycast = () => {};
-    scene.add(frontier);
+    const makeLaneMesh = (mat: THREE.MeshBasicMaterial) => {
+      disposables.push(mat);
+      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+      mesh.raycast = () => {};
+      scene.add(mesh);
+      return mesh;
+    };
+    const lanes = makeLaneMesh(
+      new THREE.MeshBasicMaterial({
+        map: laneTex,
+        color: 0x93a7c8,
+        transparent: true,
+        opacity: 0.25,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    const factionLanes = makeLaneMesh(
+      new THREE.MeshBasicMaterial({
+        map: laneTex,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    const frontier = makeLaneMesh(
+      new THREE.MeshBasicMaterial({
+        map: laneTex,
+        color: 0xdbe7ff,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
 
     // Node hit targets: one invisible InstancedMesh gives the raycaster a
     // generous, stable click area. The visible star is drawn by sprites — a
@@ -441,13 +576,13 @@ export function GalaxyView({
 
     // Shared sprite textures: a tight hot centre for the star itself and a
     // wide soft falloff for the coloured corona.
-    const starTex = radialTexture(64, [
+    const starTex = radialTexture(128, [
       [0, "#ffffffff"],
       [0.2, "#ffffffee"],
       [0.42, "#ffffff33"],
       [1, "#ffffff00"],
     ]);
-    const coronaTex = radialTexture(64, [
+    const coronaTex = radialTexture(128, [
       [0, "#ffffffcc"],
       [0.4, "#ffffff44"],
       [1, "#ffffff00"],
@@ -477,12 +612,14 @@ export function GalaxyView({
       const p = positions.get(n.id);
       if (!p) return;
       const stellar = new THREE.Color(nodeType[i].color);
+      // Normal blending (not additive): the hot core is near-opaque, so the
+      // decorative starfield behind a node can't shine through it as
+      // coloured speckles.
       const starMat = new THREE.SpriteMaterial({
         map: starTex,
         color: starTint(stellar),
         transparent: true,
         opacity: 1,
-        blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
       const star = new THREE.Sprite(starMat);
@@ -611,7 +748,7 @@ export function GalaxyView({
     controls.target.set(0, 0, 0);
     // A strategy-map control scheme: drag pans across the plane, the view
     // stays a tilted look-down (no free orbit, no flat top-down, no edge-on).
-    controls.minPolarAngle = 0.9;
+    controls.minPolarAngle = 0.12; // allow a near-top-down view
     controls.maxPolarAngle = 1.25;
     controls.minAzimuthAngle = -0.4;
     controls.maxAzimuthAngle = 0.4;
@@ -623,7 +760,8 @@ export function GalaxyView({
     };
     controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
     controls.minDistance = 25;
-    controls.maxDistance = 170;
+    controls.maxDistance = 220;
+    controls.zoomToCursor = true;
     controls.enableDamping = !reduceMotion;
 
     // Hard-clamp the pan target to the play region (+ margin): you can browse
@@ -662,22 +800,41 @@ export function GalaxyView({
             owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75;
         }
       });
-      // Rebuild the frontier overlay (player-owned end ↔ non-player end).
-      const frontierSegs: [number, number, number, number][] = [];
+      // Re-categorise every lane: contested (exactly one player end, drawn
+      // dashed), same-owner (both ends one faction, drawn in its colour),
+      // else the quiet neutral base.
+      const baseSegs: LaneSeg[] = [];
+      const factionSegs: LaneSeg[] = [];
+      const factionSegColors: THREE.Color[] = [];
+      const frontierSegs: LaneSeg[] = [];
       for (const [a, b] of galaxy.links) {
-        const aPlayer = current[a] === playerFactionId;
-        const bPlayer = current[b] === playerFactionId;
+        const seg = trimmedSeg(a, b);
+        if (!seg) continue;
+        const ownerA = current[a] ?? NEUTRAL;
+        const ownerB = current[b] ?? NEUTRAL;
+        const aPlayer = ownerA === playerFactionId;
+        const bPlayer = ownerB === playerFactionId;
         if (aPlayer !== bPlayer) {
-          const pa = positions.get(a);
-          const pb = positions.get(b);
-          if (pa && pb) frontierSegs.push([pa[0], pa[2], pb[0], pb[2]]);
+          frontierSegs.push(seg);
+        } else if (ownerA === ownerB && ownerA !== NEUTRAL) {
+          factionSegs.push(seg);
+          factionSegColors.push(ownerColor(ownerA));
+        } else {
+          baseSegs.push(seg);
         }
       }
+      lanes.geometry.dispose();
+      lanes.geometry = laneQuadGeometry(baseSegs, LANE_WIDTH);
+      factionLanes.geometry.dispose();
+      factionLanes.geometry = laneQuadGeometry(
+        factionSegs,
+        LANE_WIDTH,
+        factionSegColors,
+      );
       frontier.geometry.dispose();
       frontier.geometry = laneQuadGeometry(
         dashSegments(frontierSegs, 2.2, 1.7),
         LANE_WIDTH,
-        -0.5,
       );
     };
     applyOwnersRef.current = applyOwners;
@@ -794,6 +951,8 @@ export function GalaxyView({
       renderer?.domElement.removeEventListener("pointerup", onPointerUp);
       controls?.dispose();
       for (const label of labelObjects) label.removeFromParent();
+      lanes.geometry.dispose();
+      factionLanes.geometry.dispose();
       frontier.geometry.dispose();
       for (const d of disposables) d.dispose();
       labelRenderer?.domElement.remove();

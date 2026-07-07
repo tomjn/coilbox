@@ -21,6 +21,8 @@ export interface StarfieldOptions {
   seed: string;
   /** Optional `#rrggbb` tints; defaults to a white/blue/amber temperature mix. */
   palette?: string[];
+  /** World-space centre of the disc (default origin). */
+  center?: [number, number, number];
 }
 
 export interface StarfieldBuffers {
@@ -73,6 +75,7 @@ export function buildStarfield(opts: StarfieldOptions): StarfieldBuffers {
     ? opts.palette.map(hexToRgb01)
     : DEFAULT_PALETTE;
 
+  const [cx, cy, cz] = opts.center ?? [0, 0, 0];
   const positions = new Float32Array(opts.count * 3);
   const colors = new Float32Array(opts.count * 3);
   const sizes = new Float32Array(opts.count);
@@ -89,15 +92,15 @@ export function buildStarfield(opts: StarfieldOptions): StarfieldBuffers {
     const angle = armAngle + gaussian(rng) * (0.18 + 0.25 * (r / opts.radius));
     const y = opts.yOffset + gaussian(rng) * (opts.thickness / 2);
 
-    positions[i * 3] = Math.cos(angle) * r;
-    positions[i * 3 + 1] = y;
-    positions[i * 3 + 2] = Math.sin(angle) * r;
+    positions[i * 3] = cx + Math.cos(angle) * r;
+    positions[i * 3 + 1] = cy + y;
+    positions[i * 3 + 2] = cz + Math.sin(angle) * r;
 
     const [cr, cg, cb] = palette[Math.floor(rng() * palette.length)];
     // Wide spread with a hot tail so a few stars pop and most recede, plus a
     // per-star temperature jitter so no two neighbours read identical.
     const brightness = 0.4 + 0.8 * rng() ** 2;
-    const warm = 0.92 + rng() * 0.16;
+    const warm = 0.95 + rng() * 0.1;
     colors[i * 3] = Math.min(1, cr * brightness * warm);
     colors[i * 3 + 1] = cg * brightness;
     colors[i * 3 + 2] = Math.min(1, cb * brightness * (2 - warm));
