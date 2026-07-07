@@ -45,6 +45,11 @@ body,
     animation: none;
   }
 }
+/* App-level stillness (reduce-motion / effects-off settings) - same effect as
+   the media query, applied by the component. */
+.campaign-panorama-still {
+  animation: none;
+}
 
 /* Native colour input: make the colour fill the (square) box with no inset,
    so the swatch matches the control's shape instead of showing a small rectangle. */

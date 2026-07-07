@@ -1,4 +1,5 @@
 import { ArrowLeft, ChevronRight, CircleCheck, Lock } from "lucide-react";
+import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router";
 import { SkeletonList } from "../../content/pages/components/states";
 import { useCampaignProgress, useCampaigns } from "../campaigns";
@@ -54,7 +55,17 @@ export default function CampaignDetailPage() {
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
-    <div className="relative min-h-full">
+    // An authored accent recolours the primary token for this campaign's
+    // pages only (profile.json proves --primary overriding is safe app-wide;
+    // this is the same trick scoped to a subtree).
+    <div
+      className="relative min-h-full"
+      style={
+        campaign.accent
+          ? ({ "--primary": campaign.accent } as CSSProperties)
+          : undefined
+      }
+    >
       {/* Static campaign backdrop (if any), dimmed for text contrast. */}
       {campaign.background && (
         <div className="absolute inset-0" aria-hidden>

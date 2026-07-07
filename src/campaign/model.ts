@@ -108,6 +108,9 @@ export interface Campaign {
   type: "ta";
   title: string;
   description: string;
+  /** Author accent colour (`H S% L%` HSL triple, like the theme tokens),
+   * applied as a scoped `--primary` on the campaign's own pages. */
+  accent?: string;
   /** Small emblem shown on the campaign in lists. */
   icon?: ImageRef;
   /** Still backdrop shown behind the campaign detail page. */
@@ -255,6 +258,8 @@ export function parseCampaignJson(json: string): Campaign | null {
     type: "ta",
     title: d.title,
     description: typeof d.description === "string" ? d.description : "",
+    accent:
+      typeof d.accent === "string" && d.accent !== "" ? d.accent : undefined,
     icon: parseImageRef(d.icon),
     background: parseImageRef(d.background),
     missions,

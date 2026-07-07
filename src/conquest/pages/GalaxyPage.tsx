@@ -8,6 +8,12 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
+import {
+  useEffectsEnabled,
+  usePerformanceMode,
+  useReduceMotion,
+} from "../../general/display";
+import { assetUrl } from "../../lib/assetUrl";
 import { usePreferredTarget } from "../../play/config";
 import { useConquestState, useGalaxies } from "../conquests";
 import { GalaxyView } from "../galaxy3d/GalaxyView";
@@ -60,6 +66,9 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Faction preview while setting up a run (before any state exists).
   const [setupFaction, setSetupFaction] = useState(galaxy.playerFactionId);
+  const reduceMotion = useReduceMotion();
+  const effects = useEffectsEnabled();
+  const performanceMode = usePerformanceMode();
 
   const playerFactionId = state?.playerFactionId ?? setupFaction;
   const owners = useMemo(
@@ -84,8 +93,10 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
         selectedId={selectedId}
         incursion={state?.incursion}
         onSelect={setSelectedId}
+        display={{ reduceMotion, effects, performanceMode }}
         className="absolute inset-0"
       />
+      {effects && <AmbienceAudio galaxy={galaxy} />}
 
       {/* Top status bar */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-3">
@@ -177,14 +188,21 @@ function TerritoryTally({
     counts.set(o, (counts.get(o) ?? 0) + 1);
   }
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex items-center gap-2.5">
       {galaxy.factions.map((f) => (
         <span
           key={f.id}
-          className="flex items-center gap-1 text-xs text-muted-foreground"
+          className={`flex items-center gap-1 text-xs ${
+            f.id === state.playerFactionId
+              ? "font-medium text-foreground"
+              : "text-muted-foreground"
+          }`}
           title={f.name}
         >
           <FactionDot color={f.color} />
+          {f.id === state.playerFactionId && (
+            <span className="uppercase tracking-wide text-[10px]">You</span>
+          )}
           {counts.get(f.id) ?? 0}
         </span>
       ))}
@@ -409,5 +427,34 @@ function EndScreen({
         </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * Author-supplied looping ambience for the galaxy (theme.ambience). Only
+ * `local` (portable `.coilbox` media, served by `coilbox://`) and `data` refs
+ * resolve — conquest has no per-document media store. Rendered only while
+ * ambient effects are enabled; volume kept low so it stays atmosphere.
+ */
+function AmbienceAudio({ galaxy }: { galaxy: GalaxyDoc }) {
+  const ambience = galaxy.theme?.ambience;
+  const src =
+    ambience?.kind === "local"
+      ? assetUrl(ambience.path)
+      : ambience?.kind === "data"
+        ? ambience.dataUri
+        : undefined;
+  if (!src) return null;
+  return (
+    // biome-ignore lint/a11y/useMediaCaption: decorative looping ambience, no speech to caption
+    <audio
+      aria-hidden
+      src={src}
+      autoPlay
+      loop
+      ref={(el) => {
+        if (el) el.volume = 0.3;
+      }}
+    />
   );
 }

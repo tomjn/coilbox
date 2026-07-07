@@ -11,6 +11,7 @@ import {
   Target,
   Trophy,
 } from "lucide-react";
+import type { CSSProperties } from "react";
 import { type ReactNode, useState } from "react";
 import { Link, useParams } from "react-router";
 import { invalidateMapPreview, invalidateScans } from "../../content/config";
@@ -92,7 +93,14 @@ function MissionStage({
   const run = useMissionRun(campaign, mission);
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden">
+    <div
+      className="relative flex h-full flex-col overflow-hidden"
+      style={
+        campaign.accent
+          ? ({ "--primary": campaign.accent } as CSSProperties)
+          : undefined
+      }
+    >
       {/* Background: the mission map as a spinning backdrop, else a full-bleed
           panorama, else a dark gradient. The map backdrop is suppressed while the
           map is missing (the gate below shows instead — there's nothing to render). */}
