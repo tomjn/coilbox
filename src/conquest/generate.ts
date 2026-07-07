@@ -1,7 +1,9 @@
 import { aiKey } from "../play/participants";
 import type { Faction, GalaxyDoc, GalaxyNode } from "./model";
 import { MAX_DIFFICULTY, NEUTRAL } from "./model";
-import { mulberry32, pick, type Rng, shuffled } from "./rng";
+import type { ConquestNames } from "./names";
+import { factionSpecs, makeStarNamer, resolveConquestNames } from "./names";
+import { mulberry32, pick, type Rng } from "./rng";
 
 /**
  * Procedural galaxy generation — the fallback when a game ships no authored
@@ -22,135 +24,149 @@ export interface GenAi {
   name?: string;
 }
 
+/** How node positions are scattered on the strategic plane. */
+export type GalaxyLayout = "scatter" | "spiral" | "clusters" | "ring";
+
 export interface GenerateOptions {
   seed: number;
   game: { shortname: string };
   maps: GenMap[];
   ais: GenAi[];
-  /** Total nodes, clamped to 8..40. */
+  /** Total nodes, clamped to 8..80. */
   nodeCount: number;
   /** Enemy factions, clamped to 1..3. */
   factionCount: number;
+  /** Point-scatter shape; `random` picks one from the seed. Default `scatter`. */
+  layout?: GalaxyLayout | "random";
+  /** Strategic-map presentation; sets `theme.skin`. Default `galaxy`. */
+  skin?: "galaxy" | "theatre";
+  /**
+   * Starting systems per faction (1..4): the capital plus that many minus one
+   * nearest neighbours. Omitted keeps the capital plus *all* its neighbours.
+   */
+  startingSystems?: number;
+  /** Hide systems more than two jumps from your territory (sets `rules.fogOfWar`). */
+  fogOfWar?: boolean;
+  /** Naming pools / faction presets from a profile and/or the branding catalog. */
+  names?: ConquestNames;
   /** Document id; defaults to `generated-<seed>`. */
   id?: string;
   title?: string;
 }
 
-const STAR_FIRST = [
-  "Al",
-  "Be",
-  "Cal",
-  "Dra",
-  "Eri",
-  "Fom",
-  "Gal",
-  "Hel",
-  "Ika",
-  "Jun",
-  "Kel",
-  "Lyr",
-  "Mira",
-  "Nadi",
-  "Oph",
-  "Pol",
-  "Quo",
-  "Rig",
-  "Sar",
-  "Tau",
-  "Ur",
-  "Vel",
-  "Wez",
-  "Xi",
-  "Yed",
-  "Zos",
-];
-const STAR_LAST = [
-  "an",
-  "ara",
-  "bar",
-  "dar",
-  "el",
-  "eus",
-  "gol",
-  "ion",
-  "ith",
-  "mar",
-  "nak",
-  "os",
-  "phus",
-  "ran",
-  "sha",
-  "tis",
-  "una",
-  "vor",
-  "wen",
-  "zar",
-];
-const FACTION_ADJ = [
-  "Crimson",
-  "Obsidian",
-  "Auric",
-  "Verdant",
-  "Umbral",
-  "Radiant",
-  "Ashen",
-  "Sovereign",
-];
-/**
- * Faction colours: fully saturated so territory rings and UI chips read
- * unmistakably against the muted starfield. Player first (blue).
- */
-const FACTION_COLORS = [
-  "#2f7dff", // vivid blue (player default)
-  "#ff3524", // red
-  "#ffb300", // amber
-  "#00c853", // green
-] as const;
-
-const FACTION_NOUN = [
-  "Dominion",
-  "Concord",
-  "Ascendancy",
-  "Compact",
-  "Hegemony",
-  "Syndicate",
-  "Covenant",
-  "Remnant",
-];
-
-/** A pronounceable star name, unique within one generation run. */
-function starName(rng: Rng, used: Set<string>): string {
-  for (let attempt = 0; ; attempt++) {
-    let name = pick(rng, STAR_FIRST) + pick(rng, STAR_LAST);
-    if (attempt > 8) name = `${name} ${Math.floor(rng() * 90) + 10}`;
-    if (!used.has(name)) {
-      used.add(name);
-      return name;
-    }
-  }
-}
-
 type Pt = [number, number];
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
-/** Scatter points in a disc with a minimum spacing (dart throwing). */
-function scatter(rng: Rng, count: number, radius: number): Pt[] {
+/** Standard-normal sample (Box–Muller, one output). */
+function gaussian(rng: Rng): number {
+  const u = Math.max(rng(), 1e-9);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng());
+}
+
+/**
+ * Pack `count` points with a minimum spacing by dart-throwing: draw a
+ * candidate from `sample`, accept it if it clears every placed point, and ease
+ * the spacing as the plane crowds so the loop always finishes. Shared by all
+ * layouts so only the candidate distribution differs.
+ */
+function packWithSampler(
+  count: number,
+  radius: number,
+  sample: () => Pt,
+): Pt[] {
   const minDist = (radius * 1.6) / Math.sqrt(count);
   const pts: Pt[] = [];
   let relax = 0;
   while (pts.length < count) {
-    const r = radius * Math.sqrt(rng());
-    const t = rng() * Math.PI * 2;
-    const p: Pt = [r * Math.cos(t), r * Math.sin(t)];
+    const p = sample();
     if (pts.every((q) => dist(p, q) >= minDist - relax)) {
       pts.push(p);
       relax = 0;
     } else {
-      // Ease the spacing if the disc is getting crowded, so we always finish.
       relax += minDist / 50;
     }
   }
   return pts;
+}
+
+/** Even disc scatter — the original galaxy shape. */
+function scatterDisc(rng: Rng, count: number, radius: number): Pt[] {
+  return packWithSampler(count, radius, () => {
+    const r = radius * Math.sqrt(rng());
+    const t = rng() * Math.PI * 2;
+    return [r * Math.cos(t), r * Math.sin(t)];
+  });
+}
+
+/** Two-armed log-spiral: stars hug winding arms with gaussian scatter. */
+function scatterSpiral(rng: Rng, count: number, radius: number): Pt[] {
+  const arms = 2 + Math.floor(rng() * 2); // 2 or 3
+  const wind = 3.2;
+  return packWithSampler(count, radius, () => {
+    const arm = Math.floor(rng() * arms);
+    const r = radius * (0.12 + 0.88 * Math.sqrt(rng()));
+    const spread = 0.16 + 0.22 * (r / radius);
+    const angle =
+      (arm * 2 * Math.PI) / arms +
+      Math.log(1 + r / radius) * wind +
+      gaussian(rng) * spread;
+    return [Math.cos(angle) * r, Math.sin(angle) * r];
+  });
+}
+
+/** Several gaussian blobs — connectivity repair bridges them into a whole. */
+function scatterClusters(rng: Rng, count: number, radius: number): Pt[] {
+  const k = 3 + Math.floor(rng() * 3); // 3..5 clusters
+  const centres: Pt[] = Array.from({ length: k }, () => {
+    const r = radius * 0.62 * Math.sqrt(rng());
+    const t = rng() * Math.PI * 2;
+    return [r * Math.cos(t), r * Math.sin(t)];
+  });
+  const spread = radius * 0.28;
+  return packWithSampler(count, radius, () => {
+    const c = centres[Math.floor(rng() * k)];
+    return [c[0] + gaussian(rng) * spread, c[1] + gaussian(rng) * spread];
+  });
+}
+
+/** An annulus: an open core with the systems ringing it. */
+function scatterRing(rng: Rng, count: number, radius: number): Pt[] {
+  return packWithSampler(count, radius, () => {
+    const r = radius * (0.55 + 0.45 * rng());
+    const t = rng() * Math.PI * 2;
+    return [r * Math.cos(t), r * Math.sin(t)];
+  });
+}
+
+/** Resolve a (possibly `random`) layout to a concrete one, seed-deterministic. */
+function resolveLayout(
+  layout: GenerateOptions["layout"],
+  rng: Rng,
+): GalaxyLayout {
+  if (!layout || layout === "scatter") return "scatter";
+  if (layout === "random") {
+    return pick(rng, ["scatter", "spiral", "clusters", "ring"] as const);
+  }
+  return layout;
+}
+
+/** Scatter points for a resolved layout. */
+function scatterFor(
+  layout: GalaxyLayout,
+  rng: Rng,
+  count: number,
+  radius: number,
+): Pt[] {
+  switch (layout) {
+    case "spiral":
+      return scatterSpiral(rng, count, radius);
+    case "clusters":
+      return scatterClusters(rng, count, radius);
+    case "ring":
+      return scatterRing(rng, count, radius);
+    default:
+      return scatterDisc(rng, count, radius);
+  }
 }
 
 /** Do segments a-b and c-d properly intersect (shared endpoints excluded)? */
@@ -271,10 +287,12 @@ export function generateGalaxy(
   now: string = new Date().toISOString(),
 ): GalaxyDoc {
   const rng = mulberry32(opts.seed);
-  const nodeCount = Math.min(40, Math.max(8, Math.round(opts.nodeCount)));
+  const nodeCount = Math.min(80, Math.max(8, Math.round(opts.nodeCount)));
   const enemyCount = Math.min(3, Math.max(1, Math.round(opts.factionCount)));
+  const names = resolveConquestNames(opts.names);
 
-  const pts = scatter(rng, nodeCount, 100);
+  const layout = resolveLayout(opts.layout, rng);
+  const pts = scatterFor(layout, rng, nodeCount, 100);
   const links = buildLinks(pts);
 
   // Player capital: the westernmost node. Enemy capitals: farthest-point
@@ -298,38 +316,44 @@ export function generateGalaxy(
     capitals.push(far);
   }
 
-  // Factions: player first, then enemies, colours cycled from the palette.
+  // Factions: player first, then enemies. Names/colours/sides come from the
+  // resolved pools (a game's lore factions when supplied, else synthesized);
+  // aggression uses a preset when given, else a generated spread.
   const usedNames = new Set<string>();
-  const nouns = shuffled(rng, FACTION_NOUN);
-  const factionNames = shuffled(rng, FACTION_ADJ).map(
-    (adj, i) => `${adj} ${nouns[i % nouns.length]}`,
-  );
-  const factions: Faction[] = [];
-  for (let i = 0; i <= enemyCount; i++) {
-    factions.push({
-      id: i === 0 ? "player" : `enemy-${i}`,
-      name: factionNames[i],
-      color: FACTION_COLORS[i % FACTION_COLORS.length],
-      aggression: i === 0 ? 0 : 0.3 + rng() * 0.2,
-      aiKey:
-        opts.ais.length > 0 ? aiKey(opts.ais[i % opts.ais.length]) : undefined,
-    });
-  }
+  const starName = makeStarNamer(rng, names);
+  const specs = factionSpecs(rng, names, enemyCount + 1);
+  const factions: Faction[] = specs.map((spec, i) => ({
+    id: i === 0 ? "player" : `enemy-${i}`,
+    name: spec.name,
+    color: spec.color,
+    aggression: i === 0 ? 0 : (spec.aggression ?? 0.3 + rng() * 0.2),
+    side: spec.side,
+    aiKey:
+      opts.ais.length > 0 ? aiKey(opts.ais[i % opts.ais.length]) : undefined,
+  }));
 
-  // Ownership: capitals plus their immediate neighbours; everything else
-  // starts neutral so early expansion has low-stakes targets.
+  // Ownership: each capital plus a ring of its nearest neighbours. Without a
+  // `startingSystems` cap this is *all* neighbours (the original behaviour);
+  // with one it is the capital plus that many minus one nearest neighbours, so
+  // a lean start still leaves an attackable frontier on turn 0.
   const owners = new Array<string>(nodeCount).fill(NEUTRAL);
   const adj: number[][] = Array.from({ length: nodeCount }, () => []);
   for (const [a, b] of links) {
     adj[a].push(b);
     adj[b].push(a);
   }
+  const startCount =
+    opts.startingSystems === undefined
+      ? undefined
+      : Math.min(4, Math.max(1, Math.round(opts.startingSystems)));
   capitals.forEach((cap, f) => {
     owners[cap] = factions[f].id;
-    for (const n of adj[cap]) {
-      if (!capitals.includes(n) && owners[n] === NEUTRAL) {
-        owners[n] = factions[f].id;
-      }
+    const neighbours = adj[cap]
+      .filter((n) => !capitals.includes(n))
+      .sort((a, b) => dist(pts[cap], pts[a]) - dist(pts[cap], pts[b]));
+    const take = startCount === undefined ? neighbours.length : startCount - 1;
+    for (const n of neighbours.slice(0, take)) {
+      if (owners[n] === NEUTRAL) owners[n] = factions[f].id;
     }
   });
 
@@ -368,7 +392,7 @@ export function generateGalaxy(
 
   const nodes: GalaxyNode[] = pts.map((p, i) => ({
     id: `node-${i}`,
-    name: starName(rng, usedNames),
+    name: starName(usedNames),
     pos: [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10],
     owner: owners[i],
     kind: capitals.includes(i) ? "capital" : undefined,
@@ -388,6 +412,8 @@ export function generateGalaxy(
     factions,
     nodes,
     links: links.map(([a, b]) => [`node-${a}`, `node-${b}`]),
+    rules: opts.fogOfWar ? { fogOfWar: true } : undefined,
+    theme: opts.skin === "theatre" ? { skin: "theatre" } : undefined,
     createdAt: now,
     updatedAt: now,
     generated: { seed: opts.seed },

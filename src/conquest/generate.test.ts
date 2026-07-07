@@ -102,12 +102,102 @@ describe("generateGalaxy", () => {
     expect(avg(hard)).toBeGreaterThan(avg(easy));
   });
 
-  it("clamps node and faction counts", () => {
+  it("clamps node and faction counts (cap raised to 80)", () => {
     const doc = generateGalaxy(
       { ...base, nodeCount: 500, factionCount: 9 },
       "t0",
     );
-    expect(doc.nodes).toHaveLength(40);
+    expect(doc.nodes).toHaveLength(80);
     expect(doc.factions).toHaveLength(4);
+  });
+
+  const connected = (doc: ReturnType<typeof generateGalaxy>): boolean => {
+    const adj = new Map<string, string[]>(doc.nodes.map((n) => [n.id, []]));
+    for (const [a, b] of doc.links) {
+      adj.get(a)?.push(b);
+      adj.get(b)?.push(a);
+    }
+    const seen = new Set([doc.nodes[0].id]);
+    const queue = [doc.nodes[0].id];
+    while (queue.length > 0) {
+      const cur = queue.shift();
+      if (cur === undefined) break;
+      for (const n of adj.get(cur) ?? []) {
+        if (!seen.has(n)) {
+          seen.add(n);
+          queue.push(n);
+        }
+      }
+    }
+    return seen.size === doc.nodes.length;
+  };
+
+  it("keeps every layout connected and deterministic", () => {
+    for (const layout of ["scatter", "spiral", "clusters", "ring"] as const) {
+      for (const seed of [11, 222, 3003]) {
+        const opts = { ...base, seed, layout, nodeCount: 40 };
+        const a = generateGalaxy(opts, "t0");
+        const b = generateGalaxy(opts, "t0");
+        expect(a).toEqual(b);
+        expect(connected(a)).toBe(true);
+      }
+    }
+  });
+
+  it("resolves a random layout deterministically from the seed", () => {
+    const opts = { ...base, layout: "random" as const };
+    expect(generateGalaxy(opts, "t0")).toEqual(generateGalaxy(opts, "t0"));
+  });
+
+  it("sets the theatre skin and fog flag from options", () => {
+    const doc = generateGalaxy(
+      { ...base, skin: "theatre", fogOfWar: true },
+      "t0",
+    );
+    expect(doc.theme?.skin).toBe("theatre");
+    expect(doc.rules?.fogOfWar).toBe(true);
+    // Still valid after its own validator.
+    expect(parseGalaxyJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it("startingSystems=1 gives each faction only its capital, keeping a frontier", () => {
+    const doc = generateGalaxy({ ...base, startingSystems: 1 }, "t0");
+    for (const f of doc.factions) {
+      const owned = doc.nodes.filter((n) => n.owner === f.id);
+      expect(owned).toHaveLength(1);
+      expect(owned[0].kind).toBe("capital");
+    }
+    // The player capital still touches at least one non-player node to attack.
+    const cap = doc.nodes.find((n) => n.owner === "player");
+    const adj = new Set<string>();
+    for (const [a, b] of doc.links) {
+      if (a === cap?.id) adj.add(b);
+      if (b === cap?.id) adj.add(a);
+    }
+    const attackable = [...adj].some(
+      (id) => doc.nodes.find((n) => n.id === id)?.owner !== "player",
+    );
+    expect(attackable).toBe(true);
+  });
+
+  it("applies faction presets in order", () => {
+    const doc = generateGalaxy(
+      {
+        ...base,
+        factionCount: 1,
+        names: {
+          factions: [
+            { name: "Cortex", color: "#112233", side: "Core" },
+            { name: "Arm", side: "Armada" },
+          ],
+        },
+      },
+      "t0",
+    );
+    expect(doc.factions[0].name).toBe("Cortex");
+    expect(doc.factions[0].color).toBe("#112233");
+    expect(doc.factions[0].side).toBe("Core");
+    expect(doc.factions[1].name).toBe("Arm");
+    expect(doc.factions[1].side).toBe("Armada");
   });
 });

@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { ArrowLeft, ShieldAlert, Swords } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldAlert, Swords } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useUnitsyncScan } from "../../content/config";
@@ -16,8 +16,13 @@ import {
 import { assetUrl } from "../../lib/assetUrl";
 import { usePreferredTarget } from "../../play/config";
 import { useConquestState, useGalaxies } from "../conquests";
+import { FOG_RANGE, withinJumps } from "../fog";
 import { factionSides } from "../galaxy3d/factionShape";
-import { GalaxyView, starTypeFor } from "../galaxy3d/GalaxyView";
+import {
+  GalaxyView,
+  starSystemFor,
+  starSystemLabel,
+} from "../galaxy3d/GalaxyView";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../model";
 import {
   NEUTRAL,
@@ -26,6 +31,7 @@ import {
   resolveGameByShortname,
 } from "../model";
 import { attackableNodes } from "../rules";
+import { BattleOverlay } from "./components/BattleOverlay";
 import { FactionDot, SidePicker } from "./components/RunSetup";
 
 /**
@@ -83,7 +89,45 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
     return new Set(attackableNodes(galaxy, state).map((n) => n.id));
   }, [galaxy, state]);
 
+  // Fog of war: the systems the player can see. Undefined = no fog (show all),
+  // which is also how a finished run reveals the whole map. During setup (no
+  // state) preview visibility around the faction being previewed.
+  const visibleIds = useMemo(() => {
+    if (!galaxy.rules?.fogOfWar) return undefined;
+    if (state) {
+      if (state.status !== "active") return undefined;
+      return new Set(state.revealed ?? []);
+    }
+    const owned = galaxy.nodes
+      .filter((n) => owners[n.id] === playerFactionId)
+      .map((n) => n.id);
+    return withinJumps(galaxy, owned, FOG_RANGE);
+  }, [galaxy, state, owners, playerFactionId]);
+
   const selected = galaxy.nodes.find((n) => n.id === selectedId);
+
+  // The battle briefing now lives on the map (no separate screen): opening it
+  // focuses the camera on the node; closing eases back to the overview.
+  const [battleNodeId, setBattleNodeId] = useState<string | null>(null);
+  const battleNode = battleNodeId
+    ? galaxy.nodes.find((n) => n.id === battleNodeId)
+    : undefined;
+  const battleMode: "attack" | "defend" =
+    state?.incursion?.nodeId === battleNodeId ? "defend" : "attack";
+
+  // Wait for the saved run to load before building the map: otherwise the first
+  // build frames the *default* faction (state not yet known) and recentres with
+  // a jump once the played faction resolves.
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#05070f]">
+        <Loader2
+          className="size-6 animate-spin text-muted-foreground"
+          aria-hidden
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-full overflow-hidden bg-[#05070f]">
@@ -94,6 +138,8 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
         selectedId={selectedId}
         incursion={state?.incursion}
         onSelect={setSelectedId}
+        visibleIds={visibleIds}
+        focusNodeId={battleNodeId}
         display={{ reduceMotion, effects, performanceMode }}
         className="absolute inset-0"
       />
@@ -114,7 +160,13 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
               Turn {state.turn}
             </span>
           )}
-          {state && <TerritoryTally galaxy={galaxy} state={state} />}
+          {state && (
+            <TerritoryTally
+              galaxy={galaxy}
+              state={state}
+              visible={visibleIds}
+            />
+          )}
         </div>
         {state?.incursion && state.status === "active" && (
           <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-950/70 px-3 py-2 text-xs text-amber-200 backdrop-blur-sm">
@@ -129,14 +181,26 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
         )}
       </div>
 
-      {/* Right-hand selection panel */}
-      {state && selected && state.status === "active" && (
+      {/* Right-hand selection panel (hidden while a battle briefing is open) */}
+      {state && selected && state.status === "active" && !battleNodeId && (
         <SelectionPanel
           galaxy={galaxy}
           state={state}
           node={selected}
           attackable={attackable.has(selected.id)}
+          onBattle={setBattleNodeId}
           onClose={() => setSelectedId(null)}
+        />
+      )}
+
+      {/* Battle briefing, over the live (zoomed) map */}
+      {state && battleNode && state.status === "active" && (
+        <BattleOverlay
+          galaxy={galaxy}
+          node={battleNode}
+          state={state}
+          mode={battleMode}
+          onClose={() => setBattleNodeId(null)}
         />
       )}
 
@@ -175,16 +239,20 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   );
 }
 
-/** Per-faction node counts as coloured dots in the status bar. */
+/** Per-faction node counts as coloured dots in the status bar. Under fog only
+ * revealed systems are counted, so the tally never leaks enemy positions. */
 function TerritoryTally({
   galaxy,
   state,
+  visible,
 }: {
   galaxy: GalaxyDoc;
   state: ConquestState;
+  visible?: Set<string>;
 }) {
   const counts = new Map<string, number>();
   for (const n of galaxy.nodes) {
+    if (visible && !visible.has(n.id)) continue;
     const o = state.owners[n.id] ?? NEUTRAL;
     counts.set(o, (counts.get(o) ?? 0) + 1);
   }
@@ -241,12 +309,14 @@ function SelectionPanel({
   state,
   node,
   attackable,
+  onBattle,
   onClose,
 }: {
   galaxy: GalaxyDoc;
   state: ConquestState;
   node: GalaxyNode;
   attackable: boolean;
+  onBattle: (nodeId: string) => void;
   onClose: () => void;
 }) {
   const owner = state.owners[node.id] ?? NEUTRAL;
@@ -269,7 +339,7 @@ function SelectionPanel({
           </span>
           {galaxy.theme?.skin !== "theatre" && (
             <span className="text-xs capitalize text-muted-foreground/70">
-              {starTypeFor(node.id, node.kind === "capital").name}
+              {starSystemLabel(starSystemFor(node.id, node.kind === "capital"))}
             </span>
           )}
         </div>
@@ -293,21 +363,13 @@ function SelectionPanel({
         <p className="text-xs text-muted-foreground">{node.blurb}</p>
       )}
       {underIncursion ? (
-        <Link
-          to={`/conquest/${encodeURIComponent(galaxy.id)}/battle/${encodeURIComponent(node.id)}`}
-        >
-          <Button className="w-full">
-            <ShieldAlert className="mr-1.5 size-4" aria-hidden /> Defend
-          </Button>
-        </Link>
+        <Button className="w-full" onClick={() => onBattle(node.id)}>
+          <ShieldAlert className="mr-1.5 size-4" aria-hidden /> Defend
+        </Button>
       ) : attackable ? (
-        <Link
-          to={`/conquest/${encodeURIComponent(galaxy.id)}/battle/${encodeURIComponent(node.id)}`}
-        >
-          <Button className="w-full">
-            <Swords className="mr-1.5 size-4" aria-hidden /> Attack
-          </Button>
-        </Link>
+        <Button className="w-full" onClick={() => onBattle(node.id)}>
+          <Swords className="mr-1.5 size-4" aria-hidden /> Attack
+        </Button>
       ) : isPlayers ? (
         <p className="text-xs text-muted-foreground">
           Under your control
@@ -349,7 +411,7 @@ function RunSetupPanel({
   );
 
   return (
-    <div className="absolute inset-x-0 bottom-8 z-10 mx-auto flex w-[26rem] max-w-[90%] flex-col gap-3 rounded-lg border border-border/50 bg-card/90 p-4 backdrop-blur-sm">
+    <div className="absolute right-3 top-16 z-10 flex max-h-[calc(100%-5rem)] w-[22rem] max-w-[90%] flex-col gap-3 overflow-auto rounded-lg border border-border/50 bg-card/90 p-4 backdrop-blur-sm">
       <h2 className="text-sm font-semibold">Begin conquest</h2>
       <p className="text-xs text-muted-foreground">{galaxy.description}</p>
       {choices.length > 1 && (

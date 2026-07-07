@@ -1,5 +1,6 @@
 import type { ImageRef, MapDownloadHint, MediaRef } from "../campaign/model";
 import { parseImageRef, parseMapDownload } from "../campaign/model";
+import { expandRevealed } from "./fog";
 
 /**
  * Galactic-conquest schema — the single source of truth for the shape of a
@@ -121,7 +122,11 @@ export interface GalaxyDoc {
   nodes: GalaxyNode[];
   /** Undirected node-id pairs. */
   links: [string, string][];
-  rules?: { graceTurns?: number };
+  rules?: {
+    graceTurns?: number;
+    /** Hide systems more than two jumps from your territory (see `../fog`). */
+    fogOfWar?: boolean;
+  };
   theme?: GalaxyTheme;
   createdAt: string;
   updatedAt: string;
@@ -156,6 +161,11 @@ export interface ConquestState {
   playerSide?: string;
   /** nodeId -> faction id or {@link NEUTRAL} (full denormalized map). */
   owners: Record<string, string>;
+  /**
+   * Node ids the player has seen, when the galaxy has `rules.fogOfWar`. Grows
+   * monotonically (see `../fog`); absent/ignored when fog is off.
+   */
+  revealed?: string[];
   incursion?: Incursion;
   status: "active" | "won" | "lost";
   /** Most recent battles, oldest first (capped, see {@link HISTORY_CAP}). */
@@ -407,6 +417,10 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
     Number.isFinite(rules.graceTurns)
       ? clamp(Math.round(rules.graceTurns), 1, 10)
       : undefined;
+  const fogOfWar =
+    typeof rules === "object" && rules !== null && rules.fogOfWar === true
+      ? true
+      : undefined;
 
   const generated = d.generated as Record<string, unknown> | null | undefined;
 
@@ -428,7 +442,10 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
     factions,
     nodes,
     links,
-    rules: graceTurns !== undefined ? { graceTurns } : undefined,
+    rules:
+      graceTurns !== undefined || fogOfWar !== undefined
+        ? { graceTurns, fogOfWar }
+        : undefined,
     theme: parseTheme(d.theme),
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
@@ -459,12 +476,17 @@ export function newConquestState(
   opts: { playerFactionId?: string; playerSide?: string; seed: number },
   now: string = new Date().toISOString(),
 ): ConquestState {
+  const playerFactionId = opts.playerFactionId ?? galaxy.playerFactionId;
+  const owners = Object.fromEntries(galaxy.nodes.map((n) => [n.id, n.owner]));
   return {
     seed: opts.seed,
     turn: 0,
-    playerFactionId: opts.playerFactionId ?? galaxy.playerFactionId,
+    playerFactionId,
     playerSide: opts.playerSide,
-    owners: Object.fromEntries(galaxy.nodes.map((n) => [n.id, n.owner])),
+    owners,
+    revealed: galaxy.rules?.fogOfWar
+      ? expandRevealed(galaxy, owners, playerFactionId)
+      : undefined,
     status: "active",
     history: [],
     updatedAt: now,
@@ -499,7 +521,16 @@ export function reconcileState(
     factionIds.has(state.incursion.factionId)
       ? state.incursion
       : undefined;
-  return { ...state, owners, playerFactionId, incursion };
+  // Fog of war: drop revealed ids for nodes that vanished, and seed a missing
+  // set from current territory so a save from before fog was enabled (or a
+  // corrupted one) heals into a sensible starting view.
+  let revealed: string[] | undefined;
+  if (galaxy.rules?.fogOfWar) {
+    const nodeIds = new Set(galaxy.nodes.map((n) => n.id));
+    const prev = (state.revealed ?? []).filter((id) => nodeIds.has(id));
+    revealed = expandRevealed(galaxy, owners, playerFactionId, prev);
+  }
+  return { ...state, owners, playerFactionId, revealed, incursion };
 }
 
 /**

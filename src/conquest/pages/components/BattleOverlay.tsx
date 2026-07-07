@@ -8,170 +8,130 @@ import {
   Swords,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
-import { invalidateMapPreview, invalidateScans } from "../../content/config";
+import { Link } from "react-router";
+import { invalidateMapPreview, invalidateScans } from "../../../content/config";
+import { ErrorBanner } from "../../../content/pages/components/states";
 import {
-  EmptyState,
-  ErrorBanner,
-  SkeletonList,
-} from "../../content/pages/components/states";
-import { type DownloadProgress, dlDownloadMap } from "../../downloads/bindings";
-import { usePreferredTarget } from "../../play/config";
-import { useConquestState, useGalaxies } from "../conquests";
-import { factionSides } from "../galaxy3d/factionShape";
-import type { ConquestState, GalaxyDoc, GalaxyNode } from "../model";
-import { difficultyHandicap, difficultyTable } from "../rules";
-import { useConquestBattleRun } from "../run";
-import { FactionDot } from "./components/RunSetup";
+  type DownloadProgress,
+  dlDownloadMap,
+} from "../../../downloads/bindings";
+import { usePreferredTarget } from "../../../play/config";
+import { factionSides } from "../../galaxy3d/factionShape";
+import type { ConquestState, GalaxyDoc, GalaxyNode } from "../../model";
+import { difficultyHandicap, difficultyTable } from "../../rules";
+import { useConquestBattleRun } from "../../run";
+import { FactionDot } from "./RunSetup";
 
 /**
- * One strategic battle: briefing → launch → checking → result, mirroring the
- * campaign mission flow. The mode derives from the run state — defending when
- * the node is the active incursion's target, attacking otherwise. Victory and
- * defeat screens report the territorial consequence and return to the galaxy.
+ * The strategic battle briefing, rendered as an overlay *on the galaxy map*
+ * (the map stays live behind it, camera zoomed on the contested system) rather
+ * than a separate screen. briefing → launch → checking → result, mirroring the
+ * campaign mission flow; the mode is passed in (defend when the node is the
+ * active incursion's target, attack otherwise). On a resolved outcome the run
+ * hook advances and persists the conquest, then `onClose` returns to the map.
  */
-export default function ConquestBattlePage() {
-  const { id, nodeId } = useParams();
-  const { galaxies, loading } = useGalaxies();
-  const loaded = galaxies.find((g) => g.galaxy.id === id);
-
-  if (loading) {
-    return (
-      <div className="p-4">
-        <SkeletonList />
-      </div>
-    );
-  }
-  const node = loaded?.galaxy.nodes.find((n) => n.id === nodeId);
-  if (!loaded || !node) {
-    return (
-      <div className="flex flex-col gap-4 p-4">
-        <EmptyState label="Battle not found." />
-        <Link to="/conquest" className="text-sm text-primary hover:underline">
-          Back to Conquest
-        </Link>
-      </div>
-    );
-  }
-  return (
-    <Battle
-      key={`${loaded.galaxy.id}:${node.id}`}
-      galaxy={loaded.galaxy}
-      node={node}
-    />
-  );
-}
-
-function Battle({ galaxy, node }: { galaxy: GalaxyDoc; node: GalaxyNode }) {
-  const { stateFor, loading } = useConquestState();
-  const state = stateFor(galaxy);
-  const mode: "attack" | "defend" =
-    state?.incursion?.nodeId === node.id ? "defend" : "attack";
+export function BattleOverlay({
+  galaxy,
+  node,
+  state,
+  mode,
+  onClose,
+}: {
+  galaxy: GalaxyDoc;
+  node: GalaxyNode;
+  state: ConquestState;
+  mode: "attack" | "defend";
+  onClose: () => void;
+}) {
   const run = useConquestBattleRun(galaxy, state, node, mode);
-  const navigate = useNavigate();
-
-  const backToGalaxy = () =>
-    navigate(`/conquest/${encodeURIComponent(galaxy.id)}`);
-
-  if (!loading && !state) {
-    return (
-      <div className="flex flex-col gap-4 p-4">
-        <EmptyState label="This conquest has not been started yet." />
-        <Link
-          to={`/conquest/${encodeURIComponent(galaxy.id)}`}
-          className="text-sm text-primary hover:underline"
-        >
-          Back to the galaxy
-        </Link>
-      </div>
-    );
-  }
 
   const enemyFactionId =
-    mode === "defend" ? state?.incursion?.factionId : state?.owners[node.id];
+    mode === "defend" ? state.incursion?.factionId : state.owners[node.id];
   const enemyFaction = galaxy.factions.find((f) => f.id === enemyFactionId);
   const enemyCount =
     node.battle.enemyAiCount ?? difficultyTable(node.difficulty);
   const handicap = node.battle.handicap ?? difficultyHandicap(node.difficulty);
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-gradient-to-br from-slate-900 to-slate-950">
-      <div className="relative z-10 flex h-full min-h-0 flex-col items-center justify-center gap-4 p-4">
-        <div className="flex w-[30rem] max-w-full flex-col gap-4 rounded-lg border border-border/50 bg-card/85 p-5 backdrop-blur-sm">
-          <header className="flex flex-col gap-1">
-            <Link
-              to={`/conquest/${encodeURIComponent(galaxy.id)}`}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="size-3.5" aria-hidden /> {galaxy.title}
-            </Link>
-            <h1 className="flex items-center gap-2 text-lg font-semibold">
-              {mode === "defend" ? (
-                <ShieldAlert className="size-5 text-amber-400" aria-hidden />
-              ) : (
-                <Swords className="size-5 text-primary" aria-hidden />
-              )}
-              {mode === "defend" ? "Defend" : "Attack"} {node.name}
-            </h1>
-            {node.blurb && (
-              <p className="text-sm text-muted-foreground">{node.blurb}</p>
+    // A transparent full-bleed layer captures clicks (so the map beneath isn't
+    // selectable while briefing) but lets the zoomed star show through. The card
+    // sticks to the bottom so it doesn't cover the focused system.
+    <div className="absolute inset-0 z-20 flex items-end justify-center p-4 pb-8">
+      <div className="flex w-[30rem] max-w-full flex-col gap-4 rounded-lg border border-border/50 bg-card/85 p-5 backdrop-blur-sm">
+        <header className="flex flex-col gap-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1 self-start text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" aria-hidden /> {galaxy.title}
+          </button>
+          <h1 className="flex items-center gap-2 text-lg font-semibold">
+            {mode === "defend" ? (
+              <ShieldAlert className="size-5 text-amber-400" aria-hidden />
+            ) : (
+              <Swords className="size-5 text-primary" aria-hidden />
             )}
-          </header>
+            {mode === "defend" ? "Defend" : "Attack"} {node.name}
+          </h1>
+          {node.blurb && (
+            <p className="text-sm text-muted-foreground">{node.blurb}</p>
+          )}
+        </header>
 
-          {run.phase === "briefing" && (
-            <Briefing
-              galaxy={galaxy}
-              node={node}
-              state={state}
-              mode={mode}
-              enemyName={enemyFaction?.name}
-              enemyColor={enemyFaction?.color}
-              enemySides={
-                enemyFaction ? factionSides(galaxy, enemyFaction.id) : 0
-              }
-              enemyCount={enemyCount}
-              handicap={handicap}
-              run={run}
-            />
-          )}
-          {run.phase === "checking" && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-              Reading the battle report…
+        {run.phase === "briefing" && (
+          <Briefing
+            galaxy={galaxy}
+            node={node}
+            state={state}
+            mode={mode}
+            enemyName={enemyFaction?.name}
+            enemyColor={enemyFaction?.color}
+            enemySides={
+              enemyFaction ? factionSides(galaxy, enemyFaction.id) : 0
+            }
+            enemyCount={enemyCount}
+            handicap={handicap}
+            run={run}
+          />
+        )}
+        {run.phase === "checking" && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Reading the battle report…
+          </div>
+        )}
+        {run.phase === "result" && (
+          <div className="flex flex-col gap-3">
+            {run.error && <ErrorBanner message={run.error} />}
+            <p className="text-sm text-muted-foreground">
+              The outcome could not be read from the replay. How did the battle
+              end?
+            </p>
+            <div className="flex gap-2">
+              <Button disabled={run.saving} onClick={run.recordVictory}>
+                Victory
+              </Button>
+              <Button
+                variant="outline"
+                disabled={run.saving}
+                onClick={run.recordDefeat}
+              >
+                Defeat
+              </Button>
             </div>
-          )}
-          {run.phase === "result" && (
-            <div className="flex flex-col gap-3">
-              {run.error && <ErrorBanner message={run.error} />}
-              <p className="text-sm text-muted-foreground">
-                The outcome could not be read from the replay. How did the
-                battle end?
-              </p>
-              <div className="flex gap-2">
-                <Button disabled={run.saving} onClick={run.recordVictory}>
-                  Victory
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={run.saving}
-                  onClick={run.recordDefeat}
-                >
-                  Defeat
-                </Button>
-              </div>
-            </div>
-          )}
-          {(run.phase === "victory" || run.phase === "defeat") && (
-            <Outcome
-              phase={run.phase}
-              mode={mode}
-              node={node}
-              resolved={run.resolved}
-              autoDetected={run.autoDetected}
-              onContinue={backToGalaxy}
-            />
-          )}
-        </div>
+          </div>
+        )}
+        {(run.phase === "victory" || run.phase === "defeat") && (
+          <Outcome
+            phase={run.phase}
+            mode={mode}
+            node={node}
+            resolved={run.resolved}
+            autoDetected={run.autoDetected}
+            onContinue={onClose}
+          />
+        )}
       </div>
     </div>
   );
@@ -191,7 +151,7 @@ function Briefing({
 }: {
   galaxy: GalaxyDoc;
   node: GalaxyNode;
-  state: ConquestState | undefined;
+  state: ConquestState;
   mode: "attack" | "defend";
   enemyName?: string;
   enemyColor?: string;
@@ -201,7 +161,7 @@ function Briefing({
   run: ReturnType<typeof useConquestBattleRun>;
 }) {
   const playerFaction = galaxy.factions.find(
-    (f) => f.id === state?.playerFactionId,
+    (f) => f.id === state.playerFactionId,
   );
   return (
     <div className="flex flex-col gap-3">
@@ -227,7 +187,7 @@ function Briefing({
                 sides={factionSides(galaxy, playerFaction.id)}
               />
               {playerFaction.name}
-              {state?.playerSide ? ` · ${state.playerSide}` : ""}
+              {state.playerSide ? ` · ${state.playerSide}` : ""}
             </dd>
           </div>
         )}
@@ -240,7 +200,7 @@ function Briefing({
           <p className="text-xs text-amber-300/90">
             Lose this defence and the system falls
             {node.kind === "capital" &&
-            state?.owners[node.id] === state?.playerFactionId
+            state.owners[node.id] === state.playerFactionId
               ? " — it is your homeworld"
               : ""}
             .

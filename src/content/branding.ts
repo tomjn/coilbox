@@ -1,5 +1,6 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { useEffect, useState } from "react";
+import type { ConquestNames } from "../conquest/names";
 import type { GameItem, MapItem } from "./bindings";
 
 /**
@@ -39,6 +40,8 @@ export interface BrandingEntry {
   screenshots?: BrandingScreenshot[];
   videos?: BrandingVideo[];
   links?: BrandingLink[];
+  /** Galactic-conquest naming defaults for this game (see `../conquest/names`). */
+  conquest?: ConquestNames;
 }
 /**
  * How a suggested item is fetched. Mirrors the three downloads-plugin commands:

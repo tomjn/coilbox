@@ -2,6 +2,8 @@ import { Button, Input, useDrawer } from "@picoframe/frame";
 import { ChevronRight, Dices, Orbit, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { Switch } from "@/components/ui/switch";
+import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
 import {
   EmptyState,
@@ -9,13 +11,14 @@ import {
   SkeletonList,
 } from "../../content/pages/components/states";
 import { usePreferredTarget, useSkirmishAis } from "../../play/config";
-import { getGameMatcher } from "../../profile/profile";
+import { getGameMatcher, getProfile } from "../../profile/profile";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import { conquestDelete, conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { generateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc } from "../model";
 import { compareGameVersions } from "../model";
+import { mergeConquestNames } from "../names";
 
 /**
  * The Conquest hub: in-progress runs first, then galaxies ready to start
@@ -203,11 +206,32 @@ const SIZE_OPTIONS = [
   { value: "18", label: "Medium (18 systems)" },
   { value: "28", label: "Large (28 systems)" },
   { value: "40", label: "Sprawling (40 systems)" },
+  { value: "56", label: "Vast (56 systems)" },
+  { value: "80", label: "Immense (80 systems)" },
 ];
 const FACTION_OPTIONS = [
   { value: "1", label: "One enemy faction" },
   { value: "2", label: "Two enemy factions" },
   { value: "3", label: "Three enemy factions" },
+];
+const LAYOUT_OPTIONS = [
+  { value: "random", label: "Surprise me" },
+  { value: "scatter", label: "Scattered disc" },
+  { value: "spiral", label: "Spiral arms" },
+  { value: "clusters", label: "Clusters" },
+  { value: "ring", label: "Ring" },
+];
+const STYLE_OPTIONS = [
+  { value: "galaxy", label: "Galaxy (starfield)" },
+  { value: "theatre", label: "Theatre map (flat chart)" },
+];
+// "" means the classic full-frontier start (capital + all neighbours).
+const STARTING_OPTIONS = [
+  { value: "", label: "Full frontier (default)" },
+  { value: "1", label: "Capital only" },
+  { value: "2", label: "Capital + 1 system" },
+  { value: "3", label: "Capital + 2 systems" },
+  { value: "4", label: "Capital + 3 systems" },
 ];
 
 /**
@@ -223,6 +247,7 @@ function GenerateGalaxyForm({
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const brandingEntries = useBrandingCatalog();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -249,10 +274,12 @@ function GenerateGalaxyForm({
   }, [scan.data]);
 
   const [gameShort, setGameShort] = useState("");
+  // Default to the first game so the create button is never a silent dead-end;
+  // the user can still switch games via the select.
   const selected =
     gameChoices.find(
       (g) => (g.info.shortname ?? g.name).trim().toLowerCase() === gameShort,
-    ) ?? (gameChoices.length === 1 ? gameChoices[0] : undefined);
+    ) ?? gameChoices[0];
   const effectiveShort = selected
     ? (selected.info.shortname ?? selected.name).trim()
     : "";
@@ -263,8 +290,22 @@ function GenerateGalaxyForm({
     selected?.primaryArchive.name,
   );
 
+  // Naming pools / faction presets: the matched game's catalog defaults, with
+  // a distribution's profile.json overriding on top.
+  const brandingEntry = selected
+    ? resolveBranding(brandingEntries, selected)
+    : null;
+  const names = useMemo(
+    () => mergeConquestNames(getProfile().conquest, brandingEntry?.conquest),
+    [brandingEntry],
+  );
+
   const [size, setSize] = useState("18");
   const [factions, setFactions] = useState("2");
+  const [layout, setLayout] = useState("random");
+  const [style, setStyle] = useState("galaxy");
+  const [starting, setStarting] = useState("");
+  const [fog, setFog] = useState(false);
   const [seed, setSeed] = useState(() =>
     String(Math.floor(Math.random() * 100000)),
   );
@@ -302,6 +343,11 @@ function GenerateGalaxyForm({
         })),
         nodeCount: Number(size),
         factionCount: Number(factions),
+        layout: layout as "random" | "scatter" | "spiral" | "clusters" | "ring",
+        skin: style === "theatre" ? "theatre" : "galaxy",
+        startingSystems: starting ? Number(starting) : undefined,
+        fogOfWar: fog,
+        names,
         id,
         title: `${effectiveShort} Conquest`,
       });
@@ -355,6 +401,39 @@ function GenerateGalaxyForm({
               onValueChange={setFactions}
               options={FACTION_OPTIONS}
             />
+          </div>
+          <div className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium">Shape</span>
+            <OptionSelect
+              value={layout}
+              onValueChange={setLayout}
+              options={LAYOUT_OPTIONS}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium">Map style</span>
+            <OptionSelect
+              value={style}
+              onValueChange={setStyle}
+              options={STYLE_OPTIONS}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium">Starting systems</span>
+            <OptionSelect
+              value={starting}
+              onValueChange={setStarting}
+              options={STARTING_OPTIONS}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <label htmlFor="conquest-fog" className="flex flex-col gap-0.5">
+              <span className="font-medium">Fog of war</span>
+              <span className="text-xs text-muted-foreground">
+                Hide systems more than two jumps from your territory.
+              </span>
+            </label>
+            <Switch id="conquest-fog" checked={fog} onCheckedChange={setFog} />
           </div>
           <div className="flex flex-col gap-1.5 text-sm">
             <span className="font-medium">Seed</span>

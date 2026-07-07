@@ -200,6 +200,28 @@ describe("advanceAfterBattle", () => {
   });
 });
 
+describe("fog of war", () => {
+  it("seeds revealed on a new run and grows it on capture", () => {
+    const g = galaxy({ rules: { fogOfWar: true } });
+    const s = fresh(g);
+    // Player holds a (capital) and e; within two jumps reveals a,b,e (and c via
+    // b), but not d (the enemy capital, three hops from a).
+    expect(s.revealed).toBeDefined();
+    expect(s.revealed).not.toContain("d");
+    const after = advanceAfterBattle(g, s, "b", "attack", "victory", "t1");
+    // Capturing b brings d into range; it stays revealed thereafter.
+    expect(after.revealed).toContain("d");
+  });
+
+  it("leaves revealed untouched when fog is off", () => {
+    const g = galaxy();
+    const s = fresh(g);
+    expect(s.revealed).toBeUndefined();
+    const after = advanceAfterBattle(g, s, "b", "attack", "victory", "t1");
+    expect(after.revealed).toBeUndefined();
+  });
+});
+
 describe("difficulty tables", () => {
   it("maps difficulty to AI count and handicap", () => {
     expect([1, 2, 3, 4, 5].map(difficultyTable)).toEqual([1, 1, 2, 2, 3]);

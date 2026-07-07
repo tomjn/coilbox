@@ -1,5 +1,6 @@
 import type { Accent, ThemeMode } from "@picoframe/frame";
 import { defineCommand } from "@picoframe/plugin-sdk";
+import type { ConquestNames } from "../conquest/names";
 
 /**
  * Distribution profile: a `profile.json` a bundler drops into the portable
@@ -111,6 +112,12 @@ export interface Profile {
   advanced?: boolean;
   /** GitHub repo ("owner/name") whose latest release ships this game's archive. */
   release?: { repo: string };
+  /**
+   * Galactic-conquest naming: star/faction name pools and lore faction presets
+   * for generated galaxies. Overrides the branding catalog's per-game defaults
+   * (see `../conquest/names`).
+   */
+  conquest?: ConquestNames;
 }
 
 /** Where the profile came from. "seed" is reserved for a future bundled default. */

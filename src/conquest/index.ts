@@ -49,21 +49,12 @@ const conquestPlugin: FramePlugin = {
       crumb: "Conquest",
     },
     {
+      // The battle briefing lives on this page as an overlay (camera zooms to
+      // the contested node) — there is no separate battle route.
       path: "conquest/:id",
       lazy: () => import("./pages/GalaxyPage"),
       crumb: (c) =>
         (c.params.id && getCachedGalaxy(c.params.id)?.galaxy.title) || "Galaxy",
-    },
-    {
-      // No literal segment between the ids, so the trail reads
-      // Conquest / <galaxy> / <node>.
-      path: "conquest/:id/battle/:nodeId",
-      lazy: () => import("./pages/ConquestBattlePage"),
-      crumb: (c) => {
-        const loaded = c.params.id ? getCachedGalaxy(c.params.id) : undefined;
-        const node = loaded?.galaxy.nodes.find((n) => n.id === c.params.nodeId);
-        return node?.name || "Battle";
-      },
     },
   ],
 };
