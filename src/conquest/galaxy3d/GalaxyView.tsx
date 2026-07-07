@@ -57,21 +57,31 @@ const NEUTRAL_COLOR = "#6b7280";
  * hash of the node id, with capitals biased toward the giant classes so they
  * read important.
  */
+// `tint` = how far the hot centre lerps toward white (dwarfs stay saturated,
+// hot stars blow out); `glow` scales the corona/flare intensity.
 const STAR_TYPES = [
-  { name: "red dwarf", color: "#ff6a45", size: 0.68 },
-  { name: "orange dwarf", color: "#ffa04d", size: 0.85 },
-  { name: "yellow star", color: "#ffd76e", size: 1.0 },
-  { name: "white star", color: "#f2f5ff", size: 1.05 },
-  { name: "white dwarf", color: "#cfe4ff", size: 0.58 },
-  { name: "blue giant", color: "#8fb4ff", size: 1.45 },
-  { name: "red giant", color: "#ff5f4e", size: 1.55 },
+  { name: "red dwarf", color: "#c92f12", size: 0.62, tint: 0.14, glow: 0.55 },
+  { name: "orange dwarf", color: "#ff8c3a", size: 0.8, tint: 0.28, glow: 0.75 },
+  { name: "yellow star", color: "#ffd76e", size: 1.0, tint: 0.45, glow: 1 },
+  { name: "white star", color: "#f2f5ff", size: 1.05, tint: 0.7, glow: 1 },
+  { name: "white dwarf", color: "#cfe4ff", size: 0.55, tint: 0.65, glow: 0.7 },
+  { name: "blue giant", color: "#7fa8ff", size: 1.45, tint: 0.5, glow: 1.25 },
+  { name: "red giant", color: "#ff5230", size: 1.55, tint: 0.3, glow: 1.2 },
 ] as const;
 const GIANT_TYPES = [5, 6]; // indices into STAR_TYPES
+// Dwarfs are common, giants rare — mirrors a real stellar population.
+const TYPE_WEIGHTS = [3, 3, 2, 2, 1, 1, 1];
+const WEIGHT_TOTAL = TYPE_WEIGHTS.reduce((a, b) => a + b, 0);
 
 export function starTypeFor(nodeId: string, capital: boolean) {
   const h = hashString(`${nodeId}-stellar`);
   if (capital) return STAR_TYPES[GIANT_TYPES[h % GIANT_TYPES.length]];
-  return STAR_TYPES[h % STAR_TYPES.length];
+  let roll = h % WEIGHT_TOTAL;
+  for (let i = 0; i < STAR_TYPES.length; i++) {
+    roll -= TYPE_WEIGHTS[i];
+    if (roll < 0) return STAR_TYPES[i];
+  }
+  return STAR_TYPES[2];
 }
 
 /** One lane segment in 3D: [x1, y1, z1, x2, y2, z2]. */
@@ -178,6 +188,45 @@ function capsuleTexture(): THREE.Texture {
     ctx.beginPath();
     ctx.roundRect(1, 1, w - 2, h - 2, h / 2 - 1);
     ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * A four-point diffraction-spike flare, computed per-pixel (dither-free):
+ * two perpendicular arms with gaussian cross-sections that fade with
+ * distance — the classic telescope-photograph star look.
+ */
+function spikesTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(size, size);
+    const half = size / 2;
+    const armWidth = size * 0.012;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = Math.abs(x + 0.5 - half);
+        const dy = Math.abs(y + 0.5 - half);
+        const armH =
+          Math.exp(-(dy * dy) / (2 * armWidth * armWidth)) *
+          Math.max(0, 1 - dx / half) ** 2;
+        const armV =
+          Math.exp(-(dx * dx) / (2 * armWidth * armWidth)) *
+          Math.max(0, 1 - dy / half) ** 2;
+        const v = Math.min(1, Math.max(armH, armV) * 1.2);
+        const o = (y * size + x) * 4;
+        img.data[o] = 255;
+        img.data[o + 1] = 255;
+        img.data[o + 2] = 255;
+        img.data[o + 3] = Math.round(v * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -432,6 +481,82 @@ export function GalaxyView({
       sprite.raycast = () => {};
       scene.add(sprite);
     }
+    // Distant sky: the void shouldn't be pure black. A huge gradient dome
+    // (vertex-coloured: a faint horizon band, warmed toward the galactic
+    // core) plus banks of dim dust clouds out past the zoom/pan limits give
+    // the far distance a presence the camera can never reach.
+    {
+      const domeGeo = new THREE.SphereGeometry(1900, 40, 24);
+      const domePos = domeGeo.attributes.position;
+      const domeColors = new Float32Array(domePos.count * 3);
+      const deep = new THREE.Color("#04050d");
+      const band = new THREE.Color("#10162b");
+      const warm = new THREE.Color("#1c1410");
+      const coreDir = new THREE.Vector2(core[0], core[2]).normalize();
+      const v = new THREE.Vector3();
+      const c = new THREE.Color();
+      for (let i = 0; i < domePos.count; i++) {
+        v.fromBufferAttribute(domePos, i);
+        // Horizon band: strongest near the galactic plane, fading with |y|.
+        const bandT = Math.exp(-((Math.abs(v.y) / 420) ** 2));
+        // Warmth toward the core's side of the sky.
+        const toward = Math.max(
+          0,
+          new THREE.Vector2(v.x, v.z).normalize().dot(coreDir),
+        );
+        c.copy(deep)
+          .lerp(band, bandT)
+          .add(warm.clone().multiplyScalar(bandT * toward * 0.9));
+        domeColors.set([c.r, c.g, c.b], i * 3);
+      }
+      domeGeo.setAttribute("color", new THREE.BufferAttribute(domeColors, 3));
+      const domeMat = new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        side: THREE.BackSide,
+        depthWrite: false,
+      });
+      disposables.push(domeGeo, domeMat);
+      const dome = new THREE.Mesh(domeGeo, domeMat);
+      dome.renderOrder = -1;
+      dome.raycast = () => {};
+      scene.add(dome);
+    }
+    if (!performanceMode && effects) {
+      const dustTex = radialTexture(128, [
+        [0, "#ffffff55"],
+        [0.45, "#ffffff22"],
+        [1, "#ffffff00"],
+      ]);
+      disposables.push(dustTex);
+      const dustColors = ["#3a3350", "#243447", "#453026", "#2c3a52"];
+      const dustRng = mulberry32(hashString(`${galaxy.id}-dust`));
+      const coreAngleXZ = Math.atan2(core[2], core[0]);
+      for (let i = 0; i < 8; i++) {
+        const mat = new THREE.SpriteMaterial({
+          map: dustTex,
+          color: dustColors[i % dustColors.length],
+          transparent: true,
+          opacity: 0.05 + dustRng() * 0.05,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        disposables.push(mat);
+        const sprite = new THREE.Sprite(mat);
+        // Banked along the core's side of the sky, far beyond the pan clamp.
+        const angle = coreAngleXZ + (dustRng() - 0.5) * 1.7;
+        const dist = 1200 + dustRng() * 450;
+        sprite.position.set(
+          Math.cos(angle) * dist,
+          -220 + dustRng() * 330,
+          Math.sin(angle) * dist,
+        );
+        const scale = 520 + dustRng() * 520;
+        sprite.scale.set(scale, scale * (0.4 + dustRng() * 0.3), 1);
+        sprite.raycast = () => {};
+        scene.add(sprite);
+      }
+    }
+
     // Near layer: a deep scatter around and *below* the play plane, so
     // tilting reveals stars underneath the map and panning parallaxes.
     scene.add(
@@ -574,12 +699,14 @@ export function GalaxyView({
     scene.add(cores);
     disposables.push({ dispose: () => cores.dispose() });
 
-    // Shared sprite textures: a tight hot centre for the star itself and a
-    // wide soft falloff for the coloured corona.
+    // Shared sprite textures: a gaussian-falloff hot centre, a wide soft
+    // corona, and a four-point diffraction flare.
     const starTex = radialTexture(128, [
       [0, "#ffffffff"],
-      [0.2, "#ffffffee"],
-      [0.42, "#ffffff33"],
+      [0.12, "#fffffff2"],
+      [0.25, "#ffffff88"],
+      [0.4, "#ffffff2a"],
+      [0.6, "#ffffff08"],
       [1, "#ffffff00"],
     ]);
     const coronaTex = radialTexture(128, [
@@ -587,14 +714,12 @@ export function GalaxyView({
       [0.4, "#ffffff44"],
       [1, "#ffffff00"],
     ]);
-    disposables.push(starTex, coronaTex);
-
-    /** Whiten a stellar colour so the star centre stays hot. */
-    const starTint = (c: THREE.Color) =>
-      c.clone().lerp(new THREE.Color(0xffffff), 0.55);
+    const spikeTex = spikesTexture(256);
+    disposables.push(starTex, coronaTex, spikeTex);
 
     const coronaSprites: THREE.Sprite[] = [];
     const ownerRingMats: THREE.MeshBasicMaterial[] = [];
+    const ownerRings: THREE.Mesh[] = [];
     // Star size = stellar class × role: a red giant capital dwarfs a white
     // dwarf border system, per-node hash keeps the mix stable.
     const nodeType = galaxy.nodes.map((n) =>
@@ -606,18 +731,19 @@ export function GalaxyView({
       const capital = galaxy.nodes[i].kind === "capital";
       return (capital ? 10.5 : 7.5) * nodeType[i].size * (hovered ? 1.35 : 1);
     };
-    const ringGeo = new THREE.RingGeometry(1.7, 2.15, 40);
+    const ringGeo = new THREE.RingGeometry(1.77, 2.08, 40);
     disposables.push(ringGeo);
     galaxy.nodes.forEach((n, i) => {
       const p = positions.get(n.id);
       if (!p) return;
-      const stellar = new THREE.Color(nodeType[i].color);
+      const type = nodeType[i];
+      const stellar = new THREE.Color(type.color);
       // Normal blending (not additive): the hot core is near-opaque, so the
-      // decorative starfield behind a node can't shine through it as
-      // coloured speckles.
+      // decorative starfield behind a node can't shine through it. Dwarfs
+      // keep their saturation; hot stars blow out toward white (type.tint).
       const starMat = new THREE.SpriteMaterial({
         map: starTex,
-        color: starTint(stellar),
+        color: stellar.clone().lerp(new THREE.Color(0xffffff), type.tint),
         transparent: true,
         opacity: 1,
         depthWrite: false,
@@ -626,11 +752,26 @@ export function GalaxyView({
       star.position.set(p[0], p[1], p[2]);
       star.scale.setScalar(starScale(i));
       star.raycast = () => {};
+      // Diffraction spikes — the telescope-photo flare that sells "star".
+      const spikeMat = new THREE.SpriteMaterial({
+        map: spikeTex,
+        color: stellar.clone().lerp(new THREE.Color(0xffffff), 0.4),
+        transparent: true,
+        opacity: Math.min(0.85, 0.5 * type.glow),
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const spikes = new THREE.Sprite(spikeMat);
+      spikes.position.set(p[0], p[1], p[2]);
+      spikes.scale.setScalar(starScale(i) * 2.9);
+      spikes.raycast = () => {};
+      disposables.push(spikeMat);
+      scene.add(spikes);
       const coronaMat = new THREE.SpriteMaterial({
         map: coronaTex,
         color: stellar,
         transparent: true,
-        opacity: 0.5,
+        opacity: Math.min(0.8, 0.45 * type.glow),
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
@@ -652,6 +793,7 @@ export function GalaxyView({
       ring.raycast = () => {};
       coronaSprites.push(corona);
       ownerRingMats.push(ringMat);
+      ownerRings.push(ring);
       disposables.push(starMat, coronaMat, ringMat);
       scene.add(star, corona, ring);
     });
@@ -679,26 +821,25 @@ export function GalaxyView({
       scene.add(home);
     }
 
-    // Selection + incursion rings, flat on the plane under the node.
-    const makeRing = (color: number) => {
-      const geo = new THREE.RingGeometry(2.6, 3.05, 48);
-      const mat = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 0.9,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      });
-      disposables.push(geo, mat);
-      const ring = new THREE.Mesh(geo, mat);
-      ring.rotation.x = -Math.PI / 2;
-      ring.visible = false;
-      ring.raycast = () => {};
-      scene.add(ring);
-      return ring;
-    };
-    const selectionRing = makeRing(0xe8f0ff);
-    const incursionRing = makeRing(0xffa726);
+    // Incursion marker: an unambiguous warning symbol floating above the
+    // threatened star (a pulsing ring read as decoration; a warning triangle
+    // doesn't). CSS2D so it stays screen-sized and crisp; the pulse is a CSS
+    // animation, dropped when effects are off.
+    const incursionEl = document.createElement("div");
+    incursionEl.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" ' +
+      'viewBox="0 0 24 24" fill="rgba(120,70,0,0.55)" stroke="#ffb020" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 20h16a2 2 0 0 0 1.73-2Z"/>' +
+      '<path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
+    incursionEl.style.cssText =
+      "pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.9));";
+    if (effects && !reduceMotion) {
+      incursionEl.className = "gx-incursion-marker";
+    }
+    const incursionMarker = new CSS2DObject(incursionEl);
+    incursionMarker.visible = false;
+    scene.add(incursionMarker);
 
     /* ------------------------------- labels -------------------------------- */
 
@@ -790,15 +931,8 @@ export function GalaxyView({
 
     const applyOwners = () => {
       const current = ownersRef.current;
-      galaxy.nodes.forEach((n, i) => {
-        const owner = current[n.id] ?? n.owner;
-        const ringMat = ownerRingMats[i];
-        if (ringMat) {
-          ringMat.color.copy(ownerColor(owner));
-          // Your territory reads solid; enemies dimmer; neutral faint.
-          ringMat.opacity =
-            owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75;
-        }
+      galaxy.nodes.forEach((_n, i) => {
+        if (i !== sel.idx) styleRing(i);
       });
       // Re-categorise every lane: contested (exactly one player end, drawn
       // dashed), same-owner (both ends one faction, drawn in its colour),
@@ -839,15 +973,44 @@ export function GalaxyView({
     };
     applyOwnersRef.current = applyOwners;
 
+    /** Reset a ring to its plain ownership style (colour + opacity). */
+    const styleRing = (i: number) => {
+      const mat = ownerRingMats[i];
+      if (!mat) return;
+      const owner =
+        ownersRef.current[galaxy.nodes[i].id] ?? galaxy.nodes[i].owner;
+      mat.color.copy(ownerColor(owner));
+      mat.opacity =
+        owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75;
+    };
+
+    // Selection enlarges the node's own ownership ring and pulses its colour
+    // (see the animation loop) — no second ring.
+    const sel = { idx: -1 };
     const applySelection = () => {
-      const sel = selectedRef.current;
-      const selPos = sel ? positions.get(sel) : undefined;
-      selectionRing.visible = !!selPos;
-      if (selPos) selectionRing.position.set(selPos[0], selPos[1], selPos[2]);
+      const selId = selectedRef.current;
+      const idx = selId ? nodeIds.indexOf(selId) : -1;
+      if (sel.idx >= 0 && sel.idx !== idx) {
+        ownerRings[sel.idx]?.scale.setScalar(1);
+        styleRing(sel.idx);
+      }
+      sel.idx = idx;
+      if (idx >= 0) {
+        ownerRings[idx]?.scale.setScalar(1.3);
+        // Static brighten covers the no-animation paths; the loop overrides
+        // it with a colour pulse while motion is on.
+        const mat = ownerRingMats[idx];
+        if (mat) {
+          mat.color.lerp(new THREE.Color(0xffffff), 0.3);
+          mat.opacity = 1;
+        }
+      }
       const inc = incursionRef.current;
       const incPos = inc ? positions.get(inc.nodeId) : undefined;
-      incursionRing.visible = !!incPos;
-      if (incPos) incursionRing.position.set(incPos[0], incPos[1], incPos[2]);
+      incursionMarker.visible = !!incPos;
+      if (incPos) {
+        incursionMarker.position.set(incPos[0], incPos[1] + 4.2, incPos[2]);
+      }
     };
     applySelectionRef.current = applySelection;
 
@@ -914,13 +1077,24 @@ export function GalaxyView({
       const animate = () => {
         animationFrame = requestAnimationFrame(animate);
         if (effects) {
-          uTime.value = performance.now() / 1000;
-          const pulse = 1 + 0.08 * Math.sin(performance.now() / 300);
-          if (selectionRing.visible) selectionRing.scale.setScalar(pulse);
-          if (incursionRing.visible) {
-            incursionRing.scale.setScalar(
-              1 + 0.14 * Math.sin(performance.now() / 180),
-            );
+          const now = performance.now();
+          uTime.value = now / 1000;
+          if (sel.idx >= 0) {
+            const ring = ownerRings[sel.idx];
+            const mat = ownerRingMats[sel.idx];
+            if (ring && mat) {
+              ring.scale.setScalar(1.3 + 0.06 * Math.sin(now / 280));
+              const owner =
+                ownersRef.current[galaxy.nodes[sel.idx].id] ??
+                galaxy.nodes[sel.idx].owner;
+              mat.color
+                .copy(ownerColor(owner))
+                .lerp(
+                  new THREE.Color(0xffffff),
+                  0.3 + 0.25 * Math.sin(now / 280),
+                );
+              mat.opacity = 1;
+            }
           }
         }
         controls?.update();
