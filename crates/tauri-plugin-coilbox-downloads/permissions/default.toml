@@ -19,4 +19,5 @@ permissions = [
   "allow-dl-download-engine-spring",
   "allow-dl-installed-content",
   "allow-dl-set-engine-dirs",
+  "allow-dl-path-writable",
 ]

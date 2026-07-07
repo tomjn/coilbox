@@ -683,6 +683,31 @@ fn dl_set_engine_dirs(dirs: Vec<String>) -> CliResult {
     CliResult::ok(json!({}))
 }
 
+/// Try to create and remove a temp file inside `dir`, reporting whether it's
+/// writable. A read-only folder silently blocks downloads and release updates, so
+/// the health panel probes the write root and the portable `.coilbox/data` dir.
+fn probe_writable(dir: &str) -> (bool, Option<String>) {
+    let path = std::path::Path::new(dir);
+    if !path.is_dir() {
+        return (false, Some("folder does not exist".into()));
+    }
+    let probe = path.join(format!(".coilbox-write-probe-{}", std::process::id()));
+    match std::fs::write(&probe, b"") {
+        Ok(()) => {
+            let _ = std::fs::remove_file(&probe);
+            (true, None)
+        }
+        Err(e) => (false, Some(e.to_string())),
+    }
+}
+
+/// `dl_path_writable` — report whether `path` can be written to.
+#[tauri::command]
+async fn dl_path_writable(path: String) -> CliResult {
+    let (writable, error) = probe_writable(&path);
+    CliResult::ok(json!({ "writable": writable, "error": error }))
+}
+
 /// Build the plugin. Registered as `"coilbox-downloads"` (crate name minus
 /// the `tauri-plugin-` prefix); the frontend invokes
 /// `plugin:coilbox-downloads|<cmd>`.
@@ -711,7 +736,28 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_download_engine_recoil,
             dl_download_engine_spring,
             dl_installed_content,
-            dl_set_engine_dirs
+            dl_set_engine_dirs,
+            dl_path_writable
         ])
         .build()
+}
+
+#[cfg(test)]
+mod writable_tests {
+    use super::probe_writable;
+
+    #[test]
+    fn writable_dir_reports_true() {
+        let dir = std::env::temp_dir();
+        let (writable, err) = probe_writable(dir.to_str().unwrap());
+        assert!(writable, "temp dir should be writable, got err: {err:?}");
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn missing_dir_reports_false() {
+        let (writable, err) = probe_writable("/no/such/path/coilbox-xyz");
+        assert!(!writable);
+        assert!(err.is_some());
+    }
 }

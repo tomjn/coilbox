@@ -19,6 +19,7 @@ const COMMANDS: &[&str] = &[
     "dl_download_engine_spring",
     "dl_installed_content",
     "dl_set_engine_dirs",
+    "dl_path_writable",
 ];
 
 fn main() {

@@ -161,6 +161,7 @@ const EMPTY_PROFILE: Profile = { version: 1 };
 let loaded: Profile = EMPTY_PROFILE;
 let loadedSource: ProfileSource = "default";
 let loadedRoot = "";
+let loadedError: string | null = null;
 let loadPromise: Promise<{ profile: Profile; source: ProfileSource }> | null =
   null;
 
@@ -177,9 +178,11 @@ export function loadProfile(): Promise<{
       .then((res) => {
         try {
           loaded = JSON.parse(res.json) as Profile;
+          loadedError = null;
         } catch (e) {
           console.warn("profile: failed to parse profile.json", e);
           loaded = EMPTY_PROFILE;
+          loadedError = e instanceof Error ? e.message : String(e);
         }
         loadedSource = (res.source as ProfileSource) ?? "default";
         loadedRoot = res.root ?? "";
@@ -187,6 +190,7 @@ export function loadProfile(): Promise<{
       })
       .catch((e) => {
         console.warn("profile: load failed", e);
+        loadedError = e instanceof Error ? e.message : String(e);
         return { profile: EMPTY_PROFILE, source: "default" as ProfileSource };
       });
   }
@@ -260,6 +264,15 @@ export function getProfileSource(): ProfileSource {
  */
 export function getProfileRoot(): string {
   return loadedRoot;
+}
+
+/**
+ * The error from the last profile load, or `null` when it loaded (or was absent)
+ * cleanly. A non-null value with source `"file"` means a `profile.json` was found
+ * but couldn't be parsed — surfaced by the health panel so the failure isn't silent.
+ */
+export function getProfileError(): string | null {
+  return loadedError;
 }
 
 /**
