@@ -22,6 +22,7 @@ use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::codec::{Framed, LinesCodec};
 
 use crate::dmlog::DmLog;
+use crate::lock_or_recover;
 use crate::tls::AsyncReadWrite;
 
 /// Unix-millis now, saturating to 0 on the (impossible) pre-epoch case.
@@ -55,7 +56,7 @@ pub type EventSink = Arc<Mutex<Channel<LobbyEvent>>>;
 
 /// Send one event to the current frontend channel, ignoring a detached/dead one.
 fn emit(sink: &EventSink, ev: LobbyEvent) {
-    let _ = sink.lock().unwrap().send(ev);
+    let _ = lock_or_recover(sink).send(ev);
 }
 
 /// One live connection, held in the plugin registry so commands can push lines and
@@ -120,7 +121,7 @@ pub fn spawn_connection(
     // Register after spawning. The task's first action is a network read (the
     // greeting), so it will not have removed itself before this insert completes
     // for any real connection.
-    registry.lock().unwrap().insert(
+    lock_or_recover(&registry).insert(
         server_key,
         ServerConn {
             tx,
@@ -173,7 +174,7 @@ async fn run_loop(
                     let before = login.phase();
                     outbound.extend(login.on_message(&msg));
                     if login.phase() != before {
-                        *phase_slot.lock().unwrap() = login.phase();
+                        *lock_or_recover(&phase_slot) = login.phase();
                         emit(&sink, LobbyEvent::Phase { phase: login.phase() });
                     }
 
@@ -198,7 +199,7 @@ async fn run_loop(
                     // battle status; reply with our current (or default) status so we
                     // register as a participant. The frontend refines it afterwards.
                     if matches!(&msg, ServerMessage::RequestBattleStatus) {
-                        let (bs, color) = state.lock().unwrap().my_battle_status_or_default();
+                        let (bs, color) = lock_or_recover(&state).my_battle_status_or_default();
                         outbound.push(command::my_battle_status(bs, color));
                     }
 
@@ -211,12 +212,10 @@ async fn run_loop(
                     }
 
                     let now = now_ms();
-                    let deltas = reduce_at(&mut state.lock().unwrap(), msg, now);
+                    let deltas = reduce_at(&mut lock_or_recover(&state), msg, now);
                     for delta in deltas {
                         if let Delta::PrivateMessage { from } = &delta {
-                            let last = state
-                                .lock()
-                                .unwrap()
+                            let last = lock_or_recover(&state)
                                 .dms
                                 .get(from)
                                 .and_then(|t| t.last())
@@ -237,7 +236,7 @@ async fn run_loop(
                     let before = login.phase();
                     outbound.extend(login.submit_agreement_code(code.as_deref()));
                     if login.phase() != before {
-                        *phase_slot.lock().unwrap() = login.phase();
+                        *lock_or_recover(&phase_slot) = login.phase();
                         emit(&sink, LobbyEvent::Phase { phase: login.phase() });
                     }
                 }
@@ -248,10 +247,8 @@ async fn run_loop(
                 Outbound::SayPrivate { peer, text } => {
                     let now = now_ms();
                     let deltas =
-                        record_outgoing_private(&mut state.lock().unwrap(), &peer, &text, now);
-                    let last = state
-                        .lock()
-                        .unwrap()
+                        record_outgoing_private(&mut lock_or_recover(&state), &peer, &text, now);
+                    let last = lock_or_recover(&state)
                         .dms
                         .get(&peer)
                         .and_then(|t| t.last())
@@ -289,5 +286,5 @@ async fn run_loop(
     };
 
     emit(&sink, LobbyEvent::Disconnected { reason });
-    registry.lock().unwrap().remove(&server_key);
+    lock_or_recover(&registry).remove(&server_key);
 }

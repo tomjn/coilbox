@@ -14,6 +14,7 @@ mod dmlog;
 mod tls;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Mutex, MutexGuard};
 
 use coilbox_lobby_protocol::{
     command, default_battle_status, password_hash, team_color_rgb, BattleStatus, ClientStatus,
@@ -28,12 +29,23 @@ use tauri::{
     Manager, Runtime, State,
 };
 
+/// Lock a mutex, recovering the guard if a previous holder panicked and poisoned
+/// it. All 35 `mp_*` commands and the connection task share the registry/state/
+/// sink/phase mutexes; a single panic while any is held would otherwise poison it,
+/// and every later `.lock().unwrap()` would then panic too — bricking the whole
+/// multiplayer surface until restart. The reducer/parser are panic-free today, so
+/// this is defence-in-depth: recover the (possibly partially-updated) state in
+/// place rather than cascade into a dead plugin.
+pub(crate) fn lock_or_recover<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// Enqueue one raw wire line on a live connection. The shared body behind every
 /// typed action command: look the connection up, push the line onto its writer
 /// channel, and translate the two failure modes (unknown key / closed socket) into
 /// a `CliResult` error.
 fn enqueue(registry: &Registry, server_key: &str, line: String) -> CliResult {
-    let map = registry.lock().unwrap();
+    let map = lock_or_recover(registry);
     match map.get(server_key) {
         Some(conn) => match conn.tx.send(Outbound::Line(line)) {
             Ok(()) => CliResult::ok(json!({ "sent": true })),
@@ -53,8 +65,8 @@ fn set_intended_battle_status(
     status: BattleStatus,
     color: u32,
 ) {
-    if let Some(conn) = registry.lock().unwrap().get(server_key) {
-        conn.state.lock().unwrap().my_intended_battle_status = Some((status, color));
+    if let Some(conn) = lock_or_recover(registry).get(server_key) {
+        lock_or_recover(&conn.state).my_intended_battle_status = Some((status, color));
     }
 }
 
@@ -79,7 +91,7 @@ async fn open_and_spawn<R: Runtime>(
     mode: LoginMode,
     on_event: Channel<LobbyEvent>,
 ) -> CliResult {
-    if registry.lock().unwrap().contains_key(&server_key) {
+    if lock_or_recover(registry).contains_key(&server_key) {
         return CliResult::err(format!("already connected: {server_key}"));
     }
 
@@ -200,7 +212,7 @@ fn mp_confirm_agreement(
     server_key: String,
     code: Option<String>,
 ) -> CliResult {
-    let map = registry.lock().unwrap();
+    let map = lock_or_recover(&registry);
     match map.get(&server_key) {
         Some(conn) => match conn.tx.send(Outbound::ConfirmAgreement { code }) {
             Ok(()) => CliResult::ok(json!({ "sent": true })),
@@ -215,7 +227,7 @@ fn mp_confirm_agreement(
 /// makes it idempotent; the queued `Shutdown` still reaches the task's receiver.
 #[tauri::command]
 fn mp_disconnect(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    let conn = registry.lock().unwrap().remove(&server_key);
+    let conn = lock_or_recover(&registry).remove(&server_key);
     match conn {
         Some(conn) => {
             let _ = conn.tx.send(Outbound::Shutdown);
@@ -235,12 +247,12 @@ fn mp_reattach(
     server_key: String,
     on_event: Channel<LobbyEvent>,
 ) -> CliResult {
-    let map = registry.lock().unwrap();
+    let map = lock_or_recover(&registry);
     match map.get(&server_key) {
         Some(conn) => {
-            *conn.sink.lock().unwrap() = on_event.clone();
+            *lock_or_recover(&conn.sink) = on_event.clone();
             let _ = on_event.send(LobbyEvent::Connected);
-            let phase = *conn.phase.lock().unwrap();
+            let phase = *lock_or_recover(&conn.phase);
             let _ = on_event.send(LobbyEvent::Phase { phase });
             CliResult::ok(json!({ "reattached": true }))
         }
@@ -252,7 +264,7 @@ fn mp_reattach(
 /// discover and re-adopt one after a reload.
 #[tauri::command]
 fn mp_active_keys(registry: State<'_, Registry>) -> CliResult {
-    let keys: Vec<String> = registry.lock().unwrap().keys().cloned().collect();
+    let keys: Vec<String> = lock_or_recover(&registry).keys().cloned().collect();
     CliResult::ok(json!({ "keys": keys }))
 }
 
@@ -260,10 +272,10 @@ fn mp_active_keys(registry: State<'_, Registry>) -> CliResult {
 /// the frontend can seed or resync its mirror.
 #[tauri::command]
 fn mp_snapshot(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    let map = registry.lock().unwrap();
+    let map = lock_or_recover(&registry);
     match map.get(&server_key) {
         Some(conn) => {
-            let state = conn.state.lock().unwrap().clone();
+            let state = lock_or_recover(&conn.state).clone();
             CliResult::ok(json!({ "state": state }))
         }
         None => CliResult::err(format!("not connected: {server_key}")),
@@ -301,7 +313,7 @@ fn mp_say_private(
     username: String,
     message: String,
 ) -> CliResult {
-    let map = registry.lock().unwrap();
+    let map = lock_or_recover(&registry);
     match map.get(&server_key) {
         Some(conn) => match conn.tx.send(Outbound::SayPrivate {
             peer: username,
@@ -355,8 +367,8 @@ fn mp_leave_channel(
 /// channel list (`CHANNELS`); the reply streams as `CHANNEL...ENDOFCHANNELS`.
 #[tauri::command]
 fn mp_list_channels(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    if let Some(conn) = registry.lock().unwrap().get(&server_key) {
-        coilbox_lobby_protocol::begin_channel_list(&mut conn.state.lock().unwrap());
+    if let Some(conn) = lock_or_recover(&registry).get(&server_key) {
+        coilbox_lobby_protocol::begin_channel_list(&mut lock_or_recover(&conn.state));
     }
     enqueue(registry.inner(), &server_key, command::list_channels())
 }
@@ -963,10 +975,10 @@ fn host_team_value(ally: usize, color: u32) -> Value {
 /// `play` `BattleConfig`.
 #[tauri::command]
 fn mp_build_host_config(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    let map = registry.lock().unwrap();
+    let map = lock_or_recover(&registry);
     match map.get(&server_key) {
         Some(conn) => {
-            let state = conn.state.lock().unwrap();
+            let state = lock_or_recover(&conn.state);
             match battle_to_host_config(&state) {
                 Ok(config) => CliResult::ok(json!({ "config": config })),
                 Err(e) => CliResult::err(e),
@@ -979,10 +991,10 @@ fn mp_build_host_config(registry: State<'_, Registry>, server_key: String) -> Cl
 /// `mp_build_battle_config` — return the current battle as a `play` `BattleConfig`.
 #[tauri::command]
 fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    let map = registry.lock().unwrap();
+    let map = lock_or_recover(&registry);
     match map.get(&server_key) {
         Some(conn) => {
-            let state = conn.state.lock().unwrap();
+            let state = lock_or_recover(&conn.state);
             match battle_to_config(&state) {
                 Ok(config) => CliResult::ok(json!({ "config": config })),
                 Err(e) => CliResult::err(e),
@@ -1043,6 +1055,26 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 mod tests {
     use super::*;
     use coilbox_lobby_protocol::{Battle, Bot, MemberStatus, StartRect};
+    use std::sync::Arc;
+
+    #[test]
+    fn lock_or_recover_survives_poison() {
+        let m = Arc::new(Mutex::new(0u32));
+        let m2 = m.clone();
+        // Poison the mutex by panicking while holding the guard.
+        let panicked = std::thread::spawn(move || {
+            let _g = m2.lock().unwrap();
+            panic!("poison the lock");
+        })
+        .join();
+        assert!(panicked.is_err(), "the holder thread panicked");
+        assert!(m.lock().is_err(), "mutex is now poisoned");
+
+        // The plain unwrap would panic here; lock_or_recover yields a usable guard.
+        let mut g = lock_or_recover(&m);
+        *g += 1;
+        assert_eq!(*g, 1, "recovered state is usable and mutable");
+    }
 
     /// A battle we've joined: us playing on team 0/ally 0 with a script password,
     /// plus one AI bot on team 1/ally 1.
