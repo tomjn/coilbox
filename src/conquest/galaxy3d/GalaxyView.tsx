@@ -956,8 +956,11 @@ export function GalaxyView({
       "display:block;width:100%;height:100%;position:absolute;inset:0;";
 
     labelRenderer = new CSS2DRenderer();
+    // z-index:0 gives the layer its own stacking context: CSS2DRenderer
+    // assigns big per-label z-indexes for depth sorting, and without the
+    // containment they'd escape and float above the page's overlay panels.
     labelRenderer.domElement.style.cssText =
-      "position:absolute;inset:0;pointer-events:none;overflow:hidden;";
+      "position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0;";
     container.appendChild(labelRenderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2500);
