@@ -175,6 +175,13 @@ export const dlSetEngineDirs = defineCommand<
   Record<string, never>
 >("coilbox-downloads", "dl_set_engine_dirs");
 
+/** Report whether a folder can be written to. A read-only write root or portable
+ * data dir silently blocks downloads and release updates. */
+export const dlPathWritable = defineCommand<
+  { path: string },
+  { writable: boolean; error: string | null }
+>("coilbox-downloads", "dl_path_writable");
+
 /** A Recoil engine release matching the running platform. */
 export interface EngineRelease {
   version: string;
