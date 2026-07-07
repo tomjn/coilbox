@@ -2,20 +2,30 @@ import { Button, cn } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ImageIcon, Milestone, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { mediaKind } from "../../../lib/assetUrl";
+import { IMAGE_EXTS, mediaKind, VIDEO_EXTS } from "../../../lib/assetUrl";
 import {
   type CampaignImageKind,
   campaignImageImport,
   campaignMediaImport,
 } from "../../bindings";
-import type { ImageRef } from "../../model";
+import type { ImageRef, MediaPlayback } from "../../model";
 import { useCampaignImage } from "../../panorama";
+import {
+  CampaignVideo,
+  DECORATIVE_DEFAULTS,
+  type PlaybackDefaults,
+} from "./MediaPlayer";
 
 /**
  * A stored campaign image (icon / background / side graphic) resolved to a data URL
  * and rendered as a plain `<img>`. While unresolved or absent it renders `fallback`
  * (or nothing). The scrolling briefing panorama has its own component
  * ({@link PanoramaScroller}); this is for the still images.
+ *
+ * A video ref renders as a looping muted `<video>`. Pass `controls` to swap in the
+ * full {@link CampaignVideo} inline player (pause/play + mute/unmute overlay,
+ * honouring `playback`) — used at runtime for the side graphic and campaign
+ * background. Left off, it stays a silent decorative loop (icon / editor previews).
  */
 export function CampaignImage({
   campaignId,
@@ -23,17 +33,41 @@ export function CampaignImage({
   alt,
   className,
   fallback = null,
+  playback,
+  playbackDefaults = DECORATIVE_DEFAULTS,
+  controls = false,
+  videoVariant = "inline",
 }: {
   campaignId: string;
   image?: ImageRef;
   alt: string;
   className?: string;
   fallback?: ReactNode;
+  /** Playback config applied when `image` resolves to a video. */
+  playback?: MediaPlayback;
+  /** Default profile merged under `playback` (decorative by default). */
+  playbackDefaults?: PlaybackDefaults;
+  /** Render the controllable inline player instead of a bare decorative loop. */
+  controls?: boolean;
+  /** How a controllable video fits: `inline` (natural size) or `background` (cover-fill). */
+  videoVariant?: "inline" | "background";
 }) {
   const src = useCampaignImage(campaignId, image);
   if (!src) return <>{fallback}</>;
-  // A side graphic can be a looping muted video, not just a still image.
+  // A side graphic / background can be a video, not just a still image.
   if (mediaKind(src) === "video") {
+    if (controls) {
+      return (
+        <CampaignVideo
+          src={src}
+          playback={playback}
+          defaults={playbackDefaults}
+          variant={videoVariant}
+          label={alt}
+          className={className}
+        />
+      );
+    }
     return (
       <video
         src={src}
@@ -123,15 +157,15 @@ export function CampaignImageField({
   const pick = async () => {
     setError(null);
     try {
-      const imageExts = ["png", "jpg", "jpeg", "webp", "bmp"];
-      const videoExts = ["mp4", "webm", "mov", "ogv"];
       const src = await open({
         title: `Choose ${label.toLowerCase()}`,
         multiple: false,
         filters: [
           {
             name: allowVideo ? "Image or video" : "Image",
-            extensions: allowVideo ? [...imageExts, ...videoExts] : imageExts,
+            extensions: allowVideo
+              ? [...IMAGE_EXTS, ...VIDEO_EXTS]
+              : [...IMAGE_EXTS],
           },
         ],
       });

@@ -82,3 +82,49 @@ describe("parseCampaignJson — map-preview fields", () => {
     expect(empty!.missions[0].mapDownload).toBeUndefined();
   });
 });
+
+describe("parseCampaignJson — media playback", () => {
+  it("leaves playback undefined on legacy campaigns", () => {
+    const m = parseCampaignJson(campaignJson())!.missions[0];
+    expect(m.panoramaPlayback).toBeUndefined();
+    expect(m.sideGraphicPlayback).toBeUndefined();
+    expect(m.voiceoverPlayback).toBeUndefined();
+    expect(m.cutscenePlayback).toBeUndefined();
+  });
+
+  it("keeps only known boolean keys, omitting others", () => {
+    const m = parseCampaignJson(
+      campaignJson({
+        panoramaPlayback: { scroll: false, junk: 1, muted: "no" },
+        cutscenePlayback: { autoplay: true, loop: false, muted: true },
+      }),
+    )!.missions[0];
+    // `junk` dropped, `muted: "no"` (non-boolean) dropped — no explicit undefined.
+    expect(m.panoramaPlayback).toEqual({ scroll: false });
+    expect(m.cutscenePlayback).toEqual({
+      autoplay: true,
+      loop: false,
+      muted: true,
+    });
+  });
+
+  it("drops an all-invalid / empty playback object", () => {
+    const m = parseCampaignJson(
+      campaignJson({ panoramaPlayback: { muted: "yes" } }),
+    )!.missions[0];
+    expect(m.panoramaPlayback).toBeUndefined();
+  });
+
+  it("parses a campaign-level background playback", () => {
+    const c = parseCampaignJson(
+      JSON.stringify({
+        type: "ta",
+        id: "c1",
+        title: "T",
+        backgroundPlayback: { autoplay: false, loop: true },
+        missions: [{ id: "m1", title: "M", snapshot: {} }],
+      }),
+    );
+    expect(c!.backgroundPlayback).toEqual({ autoplay: false, loop: true });
+  });
+});

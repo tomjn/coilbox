@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncThumbnails } from "@/content/config";
+import { refIsVideo } from "@/lib/assetUrl";
 import { usePreferredTarget } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
@@ -27,6 +28,7 @@ import { inlineCampaignImages } from "../images";
 import type { Campaign, CampaignMission } from "../model";
 import { wrapCampaignForExport } from "../transfer";
 import { CampaignImage, CampaignImageField } from "./components/CampaignImage";
+import { DECORATIVE_DEFAULTS, PlaybackTuning } from "./components/MediaPlayer";
 import { MissionEditorDrawer } from "./components/MissionEditorDrawer";
 import { PanoramaScroller } from "./components/PanoramaScroller";
 import { PresetPickerDrawer } from "./components/PresetPickerDrawer";
@@ -264,7 +266,8 @@ export default function CampaignEditPage() {
           value={campaign.background}
           onChange={(background) => void persist({ ...campaign, background })}
           label="Background"
-          help="Still backdrop shown behind the campaign's mission list."
+          help="Backdrop behind the campaign's mission list — an image or a looping video. A video imported here only plays back on this machine (it isn't bundled into a single-file export)."
+          allowVideo
           preview={
             <div className="overflow-hidden rounded-md border border-border/50 bg-muted">
               <CampaignImage
@@ -276,6 +279,19 @@ export default function CampaignEditPage() {
             </div>
           }
         />
+        {refIsVideo(campaign.background) && (
+          <PlaybackTuning
+            playback={campaign.backgroundPlayback}
+            defaults={DECORATIVE_DEFAULTS}
+            decorative
+            showAutoplay
+            showLoop
+            showMuted
+            onChange={(backgroundPlayback) =>
+              void persist({ ...campaign, backgroundPlayback })
+            }
+          />
+        )}
       </section>
 
       <section className="flex flex-col gap-2">

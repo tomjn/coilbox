@@ -2,9 +2,11 @@ import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Music, Trash2, Video } from "lucide-react";
 import { useState } from "react";
+import { AUDIO_EXTS, VIDEO_EXTS } from "../../../lib/assetUrl";
 import { campaignMediaImport } from "../../bindings";
-import type { MediaRef } from "../../model";
+import type { MediaPlayback, MediaRef } from "../../model";
 import { useCampaignImage } from "../../panorama";
+import { CampaignAudio, CampaignVideo, CUE_DEFAULTS } from "./MediaPlayer";
 
 /**
  * Audio/video widgets for missions. Unlike images, AV is copied verbatim into the
@@ -14,18 +16,19 @@ import { useCampaignImage } from "../../panorama";
  * ({@link MissionMediaPlayer}).
  */
 
-const AUDIO_EXTS = ["ogg", "oga", "mp3", "wav", "flac", "opus", "m4a"];
-const VIDEO_EXTS = ["mp4", "webm", "mov", "ogv"];
-
 /** The briefing-screen players for a mission's voiceover (audio) and cutscene (video). */
 export function MissionMediaPlayer({
   campaignId,
   voiceover,
+  voiceoverPlayback,
   cutscene,
+  cutscenePlayback,
 }: {
   campaignId: string;
   voiceover?: MediaRef;
+  voiceoverPlayback?: MediaPlayback;
   cutscene?: MediaRef;
+  cutscenePlayback?: MediaPlayback;
 }) {
   const audio = useCampaignImage(campaignId, voiceover);
   const video = useCampaignImage(campaignId, cutscene);
@@ -33,14 +36,19 @@ export function MissionMediaPlayer({
   return (
     <div className="flex flex-col gap-2">
       {audio && (
-        // biome-ignore lint/a11y/useMediaCaption: author-supplied voiceover has no caption track
-        <audio controls src={audio} className="w-full" />
+        <CampaignAudio
+          src={audio}
+          playback={voiceoverPlayback}
+          label="Briefing voiceover"
+        />
       )}
       {video && (
-        // biome-ignore lint/a11y/useMediaCaption: author-supplied cutscene has no caption track
-        <video
-          controls
+        <CampaignVideo
           src={video}
+          playback={cutscenePlayback}
+          defaults={CUE_DEFAULTS}
+          variant="inline"
+          label="Intro cutscene"
           className="max-h-64 w-full rounded-md bg-black"
         />
       )}
