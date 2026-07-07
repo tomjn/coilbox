@@ -1,18 +1,12 @@
 # Routes and nav ids
 
-A reference for the internal locations you can link to and the ids you can hide,
-so the [distribution profile](distribution-profile.md) `hide`, `hideSettings`,
-`welcome` and `links` fields have something concrete to point at.
+A reference for the internal locations you can link to and the ids you can hide, so the [distribution profile](distribution-profile.md) `hide`, `hideSettings`, `welcome` and `links` fields have something concrete to point at.
 
-Coilbox uses **hash routing**: every screen is a URL fragment beginning with
-`#/`. That's what makes in-app links work from a profile's welcome HTML —
-`<a href="#/play/skirmish">` navigates without a page reload.
+Coilbox uses **hash routing**: every screen is a URL fragment beginning with `#/`. That's what makes in-app links work from a profile's welcome HTML — `<a href="#/play/skirmish">` navigates without a page reload.
 
 ## Top-level pages
 
-These appear in the sidebar for every user (unless hidden). The **nav id** column
-is what you pass to the profile [`hide`](distribution-profile.md#hide-string) list
-(only the ids marked hideable can currently be hidden).
+These appear in the sidebar for every user (unless hidden). The **nav id** column is what you pass to the profile [`hide`](distribution-profile.md#hide-string) list (only the ids marked hideable can currently be hidden).
 
 | Sidebar group | Item          | Link (`href`)        | Nav id             | Hideable |
 | ------------- | ------------- | -------------------- | ------------------ | -------- |
@@ -29,22 +23,15 @@ is what you pass to the profile [`hide`](distribution-profile.md#hide-string) li
 | Downloads     | Maps          | `#/downloads/maps`   | `downloads.maps`   | no       |
 | Downloads     | Games         | `#/downloads/games`  | `downloads.games`  | **yes**  |
 
-¹ **Campaigns** only appears in the sidebar once at least one campaign exists
-(bundled or created locally). Until then the item is hidden automatically.
+¹ **Campaigns** only appears in the sidebar once at least one campaign exists (bundled or created locally). Until then the item is hidden automatically.
 
-² **Multiplayer** items appear contextually, not via the profile: **Login** shows
-only while logged out; **Chat** and **Battles** appear after the first connect;
-**Battle Room** only while you're in a battle.
+² **Multiplayer** items appear contextually, not via the profile: **Login** shows only while logged out; **Chat** and **Battles** appear after the first connect; **Battle Room** only while you're in a battle.
 
-> Want a nav item hideable that isn't yet? It's a one-line change per item in the
-> plugin — ask and the list can grow. Today only `content.games`,
-> `downloads.browse` and `downloads.games` are wired for hiding.
+> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin — ask and the list can grow. Today only `content.games`, `downloads.browse` and `downloads.games` are wired for hiding.
 
 ## Advanced-mode pages
 
-These are hidden unless **Advanced mode** is on (Settings > General). They're
-modding/authoring tools, not player-facing, so a game distribution usually leaves
-Advanced mode off and never sees them.
+These are hidden unless **Advanced mode** is on (Settings > General). They're modding/authoring tools, not player-facing, so a game distribution usually leaves Advanced mode off and never sees them.
 
 | Sidebar group    | Item        | Link (`href`)          |
 | ---------------- | ----------- | ---------------------- |
@@ -58,13 +45,11 @@ Advanced mode off and never sees them.
 | animation        | BOS → Lua   | `#/animation`          |
 | animation        | COB tools   | `#/animation/cob`      |
 
-(mapconv and animation also add a few external-link items — wiki/tool guides —
-that open in the browser rather than routing in-app.)
+(mapconv and animation also add a few external-link items — wiki/tool guides — that open in the browser rather than routing in-app.)
 
 ## Detail pages
 
-Reachable by clicking through the lists above; not sidebar items, but you can
-deep-link to them if you know the id/name. `:name` and `:id` are placeholders.
+Reachable by clicking through the lists above; not sidebar items, but you can deep-link to them if you know the id/name. `:name` and `:id` are placeholders.
 
 | Link (`href`)                       | What it is                     |
 | ----------------------------------- | ------------------------------ |
@@ -78,9 +63,7 @@ deep-link to them if you know the id/name. `:name` and `:id` are placeholders.
 
 ## Settings sections
 
-Each settings section lives at `#/settings/<id>`. **Any** of these ids can be
-hidden from the Settings nav via the profile
-[`hideSettings`](distribution-profile.md#hidesettings-string) list.
+Each settings section lives at `#/settings/<id>`. **Any** of these ids can be hidden from the Settings nav via the profile [`hideSettings`](distribution-profile.md#hidesettings-string) list.
 
 | Settings section     | Id                 | Link                          |
 | -------------------- | ------------------ | ----------------------------- |
@@ -97,13 +80,11 @@ hidden from the Settings nav via the profile
 | Distribution profile | `profile`          | `#/settings/profile`          |
 | Appearance           | `frame.appearance` | `#/settings/frame.appearance` |
 
-> Hiding is presentational: a hidden nav item or settings section is still
-> reachable by a direct `#/…` link. Hiding removes the button, not the page.
+> Hiding is presentational: a hidden nav item or settings section is still reachable by a direct `#/…` link. Hiding removes the button, not the page.
 
 ## Useful links for a welcome screen
 
-A profile's [`welcome`](distribution-profile.md#welcome-object) HTML commonly
-points at:
+A profile's [`welcome`](distribution-profile.md#welcome-object) HTML commonly points at:
 
 ```html
 <a href="#/play/skirmish">Play Skirmish</a>
