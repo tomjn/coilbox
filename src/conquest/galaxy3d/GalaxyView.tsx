@@ -66,8 +66,8 @@ const STAR_TYPES = [
   { name: "yellow star", color: "#ffd76e", size: 1.0, tint: 0.45, glow: 1 },
   { name: "white star", color: "#f2f5ff", size: 1.05, tint: 0.7, glow: 1 },
   { name: "white dwarf", color: "#cfe4ff", size: 0.55, tint: 0.65, glow: 0.7 },
-  { name: "blue giant", color: "#7fa8ff", size: 1.45, tint: 0.5, glow: 1.25 },
-  { name: "red giant", color: "#ff5230", size: 1.55, tint: 0.3, glow: 1.2 },
+  { name: "blue giant", color: "#7fa8ff", size: 1.9, tint: 0.5, glow: 1.25 },
+  { name: "red giant", color: "#ff5230", size: 2.05, tint: 0.3, glow: 1.2 },
 ] as const;
 const GIANT_TYPES = [5, 6]; // indices into STAR_TYPES
 // Dwarfs are common, giants rare — mirrors a real stellar population.
@@ -780,10 +780,10 @@ export function GalaxyView({
       starTypeFor(n.id, n.kind === "capital"),
     );
     const starScale = (i: number) =>
-      (galaxy.nodes[i].kind === "capital" ? 4.6 : 3.6) * nodeType[i].size;
+      (galaxy.nodes[i].kind === "capital" ? 4.2 : 3.6) * nodeType[i].size;
     const coronaScale = (i: number, hovered: boolean) => {
       const capital = galaxy.nodes[i].kind === "capital";
-      return (capital ? 10.5 : 7.5) * nodeType[i].size * (hovered ? 1.35 : 1);
+      return (capital ? 9 : 7.5) * nodeType[i].size * (hovered ? 1.35 : 1);
     };
     // Ownership rings take each faction's marker shape (circle, hexagon,
     // triangle, pentagon, diamond) — ownership reads by shape as well as
@@ -825,14 +825,14 @@ export function GalaxyView({
           map: spikeTex,
           color: stellar.clone().lerp(new THREE.Color(0xffffff), 0.4),
           transparent: true,
-          opacity: 0.5,
+          opacity: 0.22,
           rotation: ((hashString(`${n.id}-spin`) % 100) / 100 - 0.5) * 0.6,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
         const spikes = new THREE.Sprite(spikeMat);
         spikes.position.set(p[0], p[1], p[2]);
-        spikes.scale.setScalar(starScale(i) * 2.6);
+        spikes.scale.setScalar(starScale(i) * 1.7);
         spikes.raycast = () => {};
         disposables.push(spikeMat);
         scene.add(spikes);
@@ -909,7 +909,11 @@ export function GalaxyView({
       '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 20h16a2 2 0 0 0 1.73-2Z"/>' +
       '<path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
     incursionEl.style.cssText =
-      "pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.9));";
+      "pointer-events:auto;cursor:pointer;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.9));";
+    incursionEl.addEventListener("click", () => {
+      const inc = incursionRef.current;
+      if (inc) onSelectRef.current?.(inc.nodeId);
+    });
     if (effects && !reduceMotion) {
       incursionEl.className = "gx-incursion-marker";
     }
@@ -929,9 +933,9 @@ export function GalaxyView({
         el.style.cssText =
           "pointer-events:none;font-size:11px;letter-spacing:0.04em;" +
           "color:rgba(226,232,240,0.85);text-shadow:0 1px 3px rgba(0,0,0,0.9);" +
-          "transform:translateY(10px);";
+          "transform:translateY(14px);";
         const label = new CSS2DObject(el);
-        label.position.set(p[0], p[1] - 2.4, p[2]);
+        label.position.set(p[0], p[1] - 3.6, p[2]);
         labelObjects.push(label);
         scene.add(label);
       });
@@ -957,9 +961,9 @@ export function GalaxyView({
     container.appendChild(labelRenderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2500);
-    // Start tilted down onto the plane (~55° from vertical), pulled back to
-    // frame the whole play region.
-    camera.position.set(0, PLAY_EXTENT * 0.72, PLAY_EXTENT * 0.95);
+    // Start high above the plane (~27° from vertical), pulled back to frame
+    // the whole play region.
+    camera.position.set(0, PLAY_EXTENT * 1.05, PLAY_EXTENT * 0.55);
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0, 0);
@@ -967,8 +971,8 @@ export function GalaxyView({
     // stays a tilted look-down (no free orbit, no flat top-down, no edge-on).
     controls.minPolarAngle = 0.12; // allow a near-top-down view
     controls.maxPolarAngle = 1.25;
-    controls.minAzimuthAngle = -0.4;
-    controls.maxAzimuthAngle = 0.4;
+    // Free spin while dragging; the release handler below eases the heading
+    // back to the default so the map always settles facing the same way.
     controls.screenSpacePanning = false;
     controls.mouseButtons = {
       LEFT: THREE.MOUSE.PAN,
@@ -980,6 +984,43 @@ export function GalaxyView({
     controls.maxDistance = 220;
     controls.zoomToCursor = true;
     controls.enableDamping = !reduceMotion;
+
+    // Spin snap-back: while the pointer is down the user may rotate freely;
+    // on release the azimuth eases back to the default heading (instantly
+    // under reduce-motion). Driven from the animation loop.
+    let dragging = false;
+    let snapBack = false;
+    const UP = new THREE.Vector3(0, 1, 0);
+    controls.addEventListener("start", () => {
+      dragging = true;
+      snapBack = false;
+    });
+    controls.addEventListener("end", () => {
+      dragging = false;
+      if (!controls) return;
+      if (reduceMotion) {
+        const az = controls.getAzimuthalAngle();
+        camera.position
+          .sub(controls.target)
+          .applyAxisAngle(UP, -az)
+          .add(controls.target);
+        controls.update();
+      } else {
+        snapBack = true;
+      }
+    });
+    const easeHeading = () => {
+      if (!controls || dragging || !snapBack) return;
+      const az = controls.getAzimuthalAngle();
+      if (Math.abs(az) < 0.002) {
+        snapBack = false;
+        return;
+      }
+      camera.position
+        .sub(controls.target)
+        .applyAxisAngle(UP, -az * 0.12)
+        .add(controls.target);
+    };
 
     // Hard-clamp the pan target to the play region (+ margin): you can browse
     // the decorative disc's edge but never lose the playable subsection.
@@ -1106,14 +1147,32 @@ export function GalaxyView({
       return hit?.instanceId ?? -1;
     };
 
+    /** Hover: swell the corona and lift the ownership ring (the selection
+     * pulse owns the selected node's ring, so leave that one alone). */
+    const setHoverStyle = (i: number, on: boolean) => {
+      coronaSprites[i]?.scale.setScalar(coronaScale(i, on));
+      if (i === sel.idx) return;
+      const ring = ownerRings[i];
+      const mat = ownerRingMats[i];
+      if (!ring || !mat) return;
+      if (on) {
+        ring.scale.setScalar(1.15);
+        const owner =
+          ownersRef.current[galaxy.nodes[i].id] ?? galaxy.nodes[i].owner;
+        mat.color.copy(ownerColor(owner)).lerp(new THREE.Color(0xffffff), 0.35);
+        mat.opacity = 1;
+      } else {
+        ring.scale.setScalar(1);
+        styleRing(i);
+      }
+    };
+
     const onPointerMove = (event: PointerEvent) => {
       const idx = pickAt(event);
       if (idx === hovered) return;
-      if (hovered >= 0)
-        coronaSprites[hovered]?.scale.setScalar(coronaScale(hovered, false));
+      if (hovered >= 0) setHoverStyle(hovered, false);
       hovered = idx;
-      if (hovered >= 0)
-        coronaSprites[hovered]?.scale.setScalar(coronaScale(hovered, true));
+      if (hovered >= 0) setHoverStyle(hovered, true);
       if (renderer) {
         renderer.domElement.style.cursor = hovered >= 0 ? "pointer" : "";
       }
@@ -1167,6 +1226,7 @@ export function GalaxyView({
             }
           }
         }
+        easeHeading();
         controls?.update();
         render();
       };
