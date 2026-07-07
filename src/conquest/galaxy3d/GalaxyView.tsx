@@ -12,6 +12,7 @@ import { mulberry32 } from "../rng";
 import { factionSides } from "./factionShape";
 import { hashString, layoutNodes, PLAY_EXTENT, playBounds } from "./layout";
 import { buildStarfield } from "./starfield";
+import { radialTexture, spikesTexture } from "./textures";
 
 /**
  * The 3D strategic map: a tilted look-down over the galactic plane. The
@@ -46,6 +47,18 @@ interface GalaxyViewProps {
   selectedId?: string | null;
   incursion?: Incursion;
   onSelect?: (nodeId: string | null) => void;
+  /**
+   * Fog of war: the node ids the player can see. `undefined` means no fog —
+   * everything is shown. Fogged nodes render as dim, unlabelled, unselectable
+   * ghosts; lanes into the fog fade out.
+   */
+  visibleIds?: Set<string>;
+  /**
+   * Zoom the camera in on a node (e.g. the system being fought over) and lock
+   * user controls; `null`/undefined eases back to the framed overview. Driven
+   * live, no scene rebuild.
+   */
+  focusNodeId?: string | null;
   display?: Partial<GalaxyDisplay>;
   className?: string;
 }
@@ -75,7 +88,9 @@ const GIANT_TYPES = [5, 6]; // indices into STAR_TYPES
 const TYPE_WEIGHTS = [3, 3, 2, 2, 1, 1, 1];
 const WEIGHT_TOTAL = TYPE_WEIGHTS.reduce((a, b) => a + b, 0);
 
-export function starTypeFor(nodeId: string, capital: boolean) {
+export type StarType = (typeof STAR_TYPES)[number];
+
+export function starTypeFor(nodeId: string, capital: boolean): StarType {
   const h = hashString(`${nodeId}-stellar`);
   if (capital) return STAR_TYPES[GIANT_TYPES[h % GIANT_TYPES.length]];
   let roll = h % WEIGHT_TOTAL;
@@ -84,6 +99,41 @@ export function starTypeFor(nodeId: string, capital: boolean) {
     if (roll < 0) return STAR_TYPES[i];
   }
   return STAR_TYPES[2];
+}
+
+// A companion is drawn from the small/dim classes so a binary reads as a
+// primary with a lesser partner (dwarfs), never two giants.
+const COMPANION_TYPES = [0, 1, 4]; // red dwarf, orange dwarf, white dwarf
+
+export interface StarSystem {
+  primary: StarType;
+  /** Present ~1 in 6 systems — the map/backdrop draws a second, smaller star. */
+  companion?: StarType;
+}
+
+/**
+ * The stellar system for a node: its primary class plus, deterministically for
+ * roughly one node in six, a dwarf companion. Same hash-of-id approach as
+ * {@link starTypeFor} so map, panel and battle backdrop always agree.
+ */
+export function starSystemFor(nodeId: string, capital: boolean): StarSystem {
+  const primary = starTypeFor(nodeId, capital);
+  const binary = hashString(`${nodeId}-binary`) % 6 === 0;
+  const companion = binary
+    ? STAR_TYPES[
+        COMPANION_TYPES[
+          hashString(`${nodeId}-companion`) % COMPANION_TYPES.length
+        ]
+      ]
+    : undefined;
+  return { primary, companion };
+}
+
+/** A human label for a node's stellar system (selection panel). */
+export function starSystemLabel(system: StarSystem): string {
+  return system.companion
+    ? `binary pair — ${system.primary.name} + ${system.companion.name}`
+    : system.primary.name;
 }
 
 /** One lane segment in 3D: [x1, y1, z1, x2, y2, z2]. */
@@ -215,103 +265,11 @@ function filamentTexture(sigma: number): THREE.Texture {
 }
 
 /**
- * A four-point diffraction-spike flare, computed per-pixel (dither-free):
- * two perpendicular arms with gaussian cross-sections that fade with
- * distance — the classic telescope-photograph star look.
- */
-function spikesTexture(size: number): THREE.Texture {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    const img = ctx.createImageData(size, size);
-    const half = size / 2;
-    const armWidth = size * 0.012;
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const dx = Math.abs(x + 0.5 - half);
-        const dy = Math.abs(y + 0.5 - half);
-        const armH =
-          Math.exp(-(dy * dy) / (2 * armWidth * armWidth)) *
-          Math.max(0, 1 - dx / half) ** 2;
-        const armV =
-          Math.exp(-(dx * dx) / (2 * armWidth * armWidth)) *
-          Math.max(0, 1 - dy / half) ** 2;
-        const v = Math.min(1, Math.max(armH, armV) * 1.2);
-        const o = (y * size + x) * 4;
-        img.data[o] = 255;
-        img.data[o + 1] = 255;
-        img.data[o + 2] = 255;
-        img.data[o + 3] = Math.round(v * 255);
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-/** Parse `#rrggbb` / `#rrggbbaa` into 0-255 channels. */
-function hexRgba(hex: string): [number, number, number, number] {
-  const h = hex.replace("#", "");
-  const n = Number.parseInt(h.length === 6 ? `${h}ff` : h, 16);
-  return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
-}
-
-/**
- * Radial-gradient sprite texture (star cores, glows and nebulae), computed
- * per-pixel into ImageData rather than via `createRadialGradient`: WebKit's
- * CoreGraphics dithers canvas gradients with per-channel noise, which — once
- * magnified and additively blended — showed up as coloured speckles on the
- * stars. Pure maths has no dither.
- */
-function radialTexture(size: number, stops: [number, string][]): THREE.Texture {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    const rgba = stops.map(([at, color]) => [at, hexRgba(color)] as const);
-    const img = ctx.createImageData(size, size);
-    const half = size / 2;
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const d = Math.min(
-          1,
-          Math.hypot(x + 0.5 - half, y + 0.5 - half) / half,
-        );
-        // Find the bracketing stops and lerp between them.
-        let lo = rgba[0];
-        let hi = rgba[rgba.length - 1];
-        for (let i = 0; i < rgba.length - 1; i++) {
-          if (d >= rgba[i][0] && d <= rgba[i + 1][0]) {
-            lo = rgba[i];
-            hi = rgba[i + 1];
-            break;
-          }
-        }
-        const span = hi[0] - lo[0];
-        const t = span > 0 ? (d - lo[0]) / span : 0;
-        const o = (y * size + x) * 4;
-        for (let c = 0; c < 4; c++) {
-          img.data[o + c] = Math.round(lo[1][c] + (hi[1][c] - lo[1][c]) * t);
-        }
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-/**
  * Procedural theatre-map chart: a dark slate plane with a faint grid and a
  * per-pixel vignette — the fallback when a theatre theme ships no backdrop.
+ * Shared with the battle backdrop for theatre-skinned galaxies.
  */
-function theatreChartTexture(): THREE.Texture {
+export function theatreChartTexture(): THREE.Texture {
   const size = 1024;
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -400,6 +358,8 @@ export function GalaxyView({
   selectedId,
   incursion,
   onSelect,
+  visibleIds,
+  focusNodeId,
   display,
   className,
 }: GalaxyViewProps) {
@@ -409,10 +369,24 @@ export function GalaxyView({
   const ownersRef = useRef(owners);
   const selectedRef = useRef<string | null | undefined>(selectedId);
   const incursionRef = useRef(incursion);
+  const visibleRef = useRef<Set<string> | undefined>(visibleIds);
+  const focusRef = useRef<string | null | undefined>(focusNodeId);
   const onSelectRef = useRef(onSelect);
   const applyOwnersRef = useRef<(() => void) | null>(null);
   const applySelectionRef = useRef<(() => void) | null>(null);
+  const applyVisibilityRef = useRef<(() => void) | null>(null);
+  const applyFocusRef = useRef<(() => void) | null>(null);
   const renderRef = useRef<(() => void) | null>(null);
+  // The warp-in plays on a fresh mount but not when only the previewed faction
+  // changes. Comparing against the previous faction is robust to StrictMode's
+  // throwaway first mount (a persistent "played" flag would be consumed by it).
+  const prevFactionRef = useRef<string | undefined>(undefined);
+  // The camera pose carried across a faction-switch rebuild, so recentring on
+  // the new faction's worlds eases instead of snapping.
+  const camPoseRef = useRef<{
+    pos: THREE.Vector3;
+    target: THREE.Vector3;
+  } | null>(null);
 
   onSelectRef.current = onSelect;
 
@@ -452,6 +426,9 @@ export function GalaxyView({
     const ownerColor = (owner: string | undefined): THREE.Color =>
       (owner ? factionColor.get(owner) : undefined) ??
       new THREE.Color(NEUTRAL_COLOR);
+    // Fog of war: `undefined` visible set means no fog (show everything).
+    const isVisible = (id: string): boolean =>
+      !visibleRef.current || visibleRef.current.has(id);
 
     /* ------------------------- decorative backdrop ------------------------- */
 
@@ -877,11 +854,60 @@ export function GalaxyView({
     const coronaSprites: (THREE.Sprite | undefined)[] = [];
     const ownerRingMats: THREE.MeshBasicMaterial[] = [];
     const ownerRings: THREE.Mesh[] = [];
+    // Per-node visuals we may need to toggle for fog of war or animate for the
+    // intro (all `undefined` for theatre-skin region markers, index-aligned to
+    // galaxy.nodes).
+    const starSprites: (THREE.Sprite | undefined)[] = [];
+    const starMats: (THREE.SpriteMaterial | undefined)[] = [];
+    const spikeSprites: (THREE.Sprite | undefined)[] = [];
+    // Binary companions: a second, smaller star that orbits its primary.
+    interface Companion {
+      i: number;
+      star: THREE.Sprite;
+      corona: THREE.Sprite;
+      center: [number, number, number];
+      radius: number;
+      phase: number;
+    }
+    const companions: Companion[] = [];
+
+    // Intro warp-in: sprites pop from zero to their target scale (staggered by
+    // node), lanes fade up, and the camera eases in. Only when motion is on.
+    const factionOnlyRebuild =
+      prevFactionRef.current !== undefined &&
+      prevFactionRef.current !== playerFactionId;
+    prevFactionRef.current = playerFactionId;
+    const animateIntro = !reduceMotion && effects && !factionOnlyRebuild;
+    interface IntroSprite {
+      sprite: THREE.Sprite;
+      target: number;
+      delay: number;
+    }
+    const introSprites: IntroSprite[] = [];
+    const introLaneMats: { mat: THREE.Material; target: number }[] = [];
+    const registerIntro = (
+      sprite: THREE.Sprite,
+      target: number,
+      id: string,
+    ) => {
+      if (!animateIntro) {
+        sprite.scale.setScalar(target);
+        return;
+      }
+      sprite.scale.setScalar(0);
+      introSprites.push({
+        sprite,
+        target,
+        delay: (hashString(`${id}-intro`) % 100) / 100 / 2.5, // 0..0.4
+      });
+    };
+
     // Star size = stellar class × role: a red giant capital dwarfs a white
     // dwarf border system, per-node hash keeps the mix stable.
-    const nodeType = galaxy.nodes.map((n) =>
-      starTypeFor(n.id, n.kind === "capital"),
+    const nodeSystem = galaxy.nodes.map((n) =>
+      starSystemFor(n.id, n.kind === "capital"),
     );
+    const nodeType = nodeSystem.map((s) => s.primary);
     const starScale = (i: number) =>
       (galaxy.nodes[i].kind === "capital" ? 4.2 : 3.6) * nodeType[i].size;
     const coronaScale = (i: number, hovered: boolean) => {
@@ -907,9 +933,17 @@ export function GalaxyView({
     const discGeo = new THREE.CircleGeometry(1.35, 32);
     disposables.push(discGeo);
 
+    const WHITE = new THREE.Color(0xffffff);
     galaxy.nodes.forEach((n, i) => {
       const p = positions.get(n.id);
-      if (!p) return;
+      if (!p) {
+        starSprites.push(undefined);
+        starMats.push(undefined);
+        spikeSprites.push(undefined);
+        coronaSprites.push(undefined);
+        discMats.push(undefined);
+        return;
+      }
       if (skin === "theatre") {
         const discMat = new THREE.MeshBasicMaterial({
           color: 0x2a3242,
@@ -923,6 +957,9 @@ export function GalaxyView({
         disposables.push(discMat);
         scene.add(disc);
         discMats.push(discMat);
+        starSprites.push(undefined);
+        starMats.push(undefined);
+        spikeSprites.push(undefined);
         coronaSprites.push(undefined);
         return;
       }
@@ -934,31 +971,32 @@ export function GalaxyView({
       // keep their saturation; hot stars blow out toward white (type.tint).
       const starMat = new THREE.SpriteMaterial({
         map: starTex,
-        color: stellar.clone().lerp(new THREE.Color(0xffffff), type.tint),
+        color: stellar.clone().lerp(WHITE, type.tint),
         transparent: true,
         opacity: 1,
         depthWrite: false,
       });
       const star = new THREE.Sprite(starMat);
       star.position.set(p[0], p[1], p[2]);
-      star.scale.setScalar(starScale(i));
+      registerIntro(star, starScale(i), n.id);
       star.raycast = () => {};
       // Diffraction spikes only on the brilliant giants (a whole map of
       // four-point flares read as uniform); each rotated slightly so no two
       // look stamped from the same die.
+      let spikes: THREE.Sprite | undefined;
       if (type.glow >= 1.2) {
         const spikeMat = new THREE.SpriteMaterial({
           map: spikeTex,
-          color: stellar.clone().lerp(new THREE.Color(0xffffff), 0.4),
+          color: stellar.clone().lerp(WHITE, 0.4),
           transparent: true,
           opacity: 0.22,
           rotation: ((hashString(`${n.id}-spin`) % 100) / 100 - 0.5) * 0.6,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
-        const spikes = new THREE.Sprite(spikeMat);
+        spikes = new THREE.Sprite(spikeMat);
         spikes.position.set(p[0], p[1], p[2]);
-        spikes.scale.setScalar(starScale(i) * 1.7);
+        registerIntro(spikes, starScale(i) * 1.7, `${n.id}-spike`);
         spikes.raycast = () => {};
         disposables.push(spikeMat);
         scene.add(spikes);
@@ -973,7 +1011,7 @@ export function GalaxyView({
       });
       const corona = new THREE.Sprite(coronaMat);
       corona.position.set(p[0], p[1], p[2]);
-      corona.scale.setScalar(coronaScale(i, false));
+      registerIntro(corona, coronaScale(i, false), `${n.id}-corona`);
       corona.raycast = () => {};
       // Ownership lives on the ring alone (saturated faction colour).
       const ringMat = new THREE.MeshBasicMaterial({
@@ -987,12 +1025,79 @@ export function GalaxyView({
       ring.rotation.x = -Math.PI / 2;
       ring.position.set(p[0], p[1] - 0.4, p[2]);
       ring.raycast = () => {};
+      starSprites.push(star);
+      starMats.push(starMat);
+      spikeSprites.push(spikes);
       coronaSprites.push(corona);
       ownerRingMats.push(ringMat);
       ownerRings.push(ring);
       disposables.push(starMat, coronaMat, ringMat);
       scene.add(star, corona, ring);
+
+      // Binary companion: a smaller, dimmer partner star that orbits the
+      // primary (position animated in the loop; static offset when motion off).
+      const companion = nodeSystem[i].companion;
+      if (companion) {
+        const compColor = new THREE.Color(companion.color);
+        const compStarMat = new THREE.SpriteMaterial({
+          map: starTex,
+          color: compColor.clone().lerp(WHITE, companion.tint),
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+        });
+        const compCoronaMat = new THREE.SpriteMaterial({
+          map: coronaTex,
+          color: compColor,
+          transparent: true,
+          opacity: Math.min(0.7, 0.4 * companion.glow),
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const compStar = new THREE.Sprite(compStarMat);
+        const compCorona = new THREE.Sprite(compCoronaMat);
+        // Tight orbits that scale gently with the primary — never far enough
+        // to crowd an adjacent system. Red dwarfs hug closer still.
+        const close = companion.name === "red dwarf" ? 0.6 : 1;
+        const radius = starScale(i) * 0.4 * close;
+        const phase =
+          ((hashString(`${n.id}-cphase`) % 100) / 100) * Math.PI * 2;
+        const cx = p[0] + Math.cos(phase) * radius;
+        const cz = p[2] + Math.sin(phase) * radius;
+        compStar.position.set(cx, p[1], cz);
+        compCorona.position.set(cx, p[1], cz);
+        compStar.raycast = () => {};
+        compCorona.raycast = () => {};
+        registerIntro(compStar, starScale(i) * 0.42, `${n.id}-comp`);
+        registerIntro(
+          compCorona,
+          coronaScale(i, false) * 0.42,
+          `${n.id}-compc`,
+        );
+        disposables.push(compStarMat, compCoronaMat);
+        scene.add(compStar, compCorona);
+        companions.push({
+          i,
+          star: compStar,
+          corona: compCorona,
+          center: [p[0], p[1], p[2]],
+          radius,
+          phase,
+        });
+      }
     });
+
+    // Fade the lanes up during the intro (their target opacities are captured
+    // now, then restored as the intro clock advances).
+    if (animateIntro) {
+      for (const pair of [lanes, factionLanes, frontier]) {
+        for (const mesh of [pair.core, pair.halo]) {
+          const mat = mesh.material as THREE.Material & { opacity: number };
+          introLaneMats.push({ mat, target: mat.opacity });
+          mat.opacity = 0;
+        }
+      }
+    }
 
     // The player's homeworld gets a second, wider ring so "this is you, guard
     // it" is always legible at a glance.
@@ -1089,13 +1194,36 @@ export function GalaxyView({
       "position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0;";
     container.appendChild(labelRenderer.domElement);
 
+    // Centre the view on the player's own territory (the previewed faction
+    // during setup), so switching faction recentres on that faction's worlds
+    // rather than always framing the whole galaxy from the origin.
+    const focus = new THREE.Vector3(0, 0, 0);
+    {
+      let sx = 0;
+      let sz = 0;
+      let count = 0;
+      for (const n of galaxy.nodes) {
+        if ((ownersRef.current[n.id] ?? n.owner) !== playerFactionId) continue;
+        const p = positions.get(n.id);
+        if (!p) continue;
+        sx += p[0];
+        sz += p[2];
+        count++;
+      }
+      if (count > 0) focus.set(sx / count, 0, sz / count);
+    }
+
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2500);
-    // Start high above the plane (~27° from vertical), pulled back to frame
-    // the whole play region.
-    camera.position.set(0, PLAY_EXTENT * 1.05, PLAY_EXTENT * 0.55);
+    // Start high above the plane (~27° from vertical), pulled back to frame the
+    // player's region.
+    camera.position.set(
+      focus.x,
+      PLAY_EXTENT * 1.05,
+      focus.z + PLAY_EXTENT * 0.55,
+    );
 
     controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0, 0);
+    controls.target.copy(focus);
     // A strategy-map control scheme: drag pans across the plane, the view
     // stays a tilted look-down (no free orbit, no flat top-down, no edge-on).
     controls.minPolarAngle = 0.12; // allow a near-top-down view
@@ -1190,6 +1318,15 @@ export function GalaxyView({
       for (const [a, b] of galaxy.links) {
         const seg = trimmedSeg(a, b);
         if (!seg) continue;
+        // Fog: a lane with both ends hidden vanishes; one end hidden draws as
+        // the quiet neutral base ("something lies beyond").
+        const visA = isVisible(a);
+        const visB = isVisible(b);
+        if (!visA && !visB) continue;
+        if (!visA || !visB) {
+          baseSegs.push(seg);
+          continue;
+        }
         const ownerA = current[a] ?? NEUTRAL;
         const ownerB = current[b] ?? NEUTRAL;
         const aPlayer = ownerA === playerFactionId;
@@ -1263,8 +1400,36 @@ export function GalaxyView({
     };
     applySelectionRef.current = applySelection;
 
+    // Fog of war: dim and unlabel systems the player can't see, and hide their
+    // ownership rings, coronas, spikes and companions. Lanes are handled in
+    // applyOwners; picking skips fogged nodes (see pickAt).
+    const FOG_DIM = 0.16;
+    const applyVisibility = () => {
+      if (skin === "theatre") return; // theatre region markers have no fog styling
+      galaxy.nodes.forEach((n, i) => {
+        const vis = isVisible(n.id);
+        const starMat = starMats[i];
+        if (starMat) starMat.opacity = vis ? 1 : FOG_DIM;
+        const corona = coronaSprites[i];
+        if (corona) corona.visible = vis;
+        const spike = spikeSprites[i];
+        if (spike) spike.visible = vis;
+        const ring = ownerRings[i];
+        if (ring) ring.visible = vis;
+        const label = labelObjects[i];
+        if (label) label.visible = vis;
+      });
+      for (const c of companions) {
+        const vis = isVisible(galaxy.nodes[c.i].id);
+        c.star.visible = vis;
+        c.corona.visible = vis;
+      }
+    };
+    applyVisibilityRef.current = applyVisibility;
+
     applyOwners();
     applySelection();
+    applyVisibility();
 
     /* ------------------------------ picking -------------------------------- */
 
@@ -1282,7 +1447,10 @@ export function GalaxyView({
       );
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObject(cores, false)[0];
-      return hit?.instanceId ?? -1;
+      const idx = hit?.instanceId ?? -1;
+      // Fogged systems aren't selectable.
+      if (idx >= 0 && !isVisible(nodeIds[idx])) return -1;
+      return idx;
     };
 
     /** Hover: swell the corona and lift the ownership ring (the selection
@@ -1335,17 +1503,163 @@ export function GalaxyView({
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointerup", onPointerUp);
 
+    /* ------------------------------ intro warp ----------------------------- */
+
+    // The camera eases in from further out and higher up while the stars pop
+    // and the lanes fade (see the loop). Controls are handed back once done.
+    const INTRO_MS = 1400;
+    const introTo = camera.position.clone();
+    // Pull back along the framing offset (relative to the focus point, not the
+    // origin) so a recentred view still warps in toward its own centre.
+    const introFrom = focus
+      .clone()
+      .addScaledVector(introTo.clone().sub(focus), 1.9);
+    introFrom.y *= 1.3;
+    let introActive = animateIntro;
+    let introStartedAt = -1;
+    if (animateIntro) {
+      camera.position.copy(introFrom);
+      if (controls) controls.enabled = false;
+    }
+    const easeOut = (t: number) => 1 - (1 - t) ** 3;
+
+    /* ------------------------------ camera focus --------------------------- */
+
+    // Ease the camera in on a node (zoomed) when `focusNodeId` is set, and back
+    // to the framed overview when cleared. While a node is focused user controls
+    // are locked; the ease itself is driven from the loop (snapped under
+    // reduce-motion). Keeps the current view direction, just pulls closer.
+    // `introTo` is the framed overview position (captured before the intro
+    // pulled the camera back), so this must NOT read `camera.position` here.
+    const framedTarget = focus.clone();
+    const framedPos = introTo.clone();
+    const FOCUS_DIST = 30;
+    const FOCUS_MS = 650;
+    let focusAnim: {
+      fromT: THREE.Vector3;
+      toT: THREE.Vector3;
+      fromP: THREE.Vector3;
+      toP: THREE.Vector3;
+      t0: number;
+    } | null = null;
+    let focusShown: string | null = focusRef.current ?? null;
+
+    const focusGoal = (id: string | null) => {
+      const p = id ? positions.get(id) : undefined;
+      if (p) {
+        const target = new THREE.Vector3(p[0], p[1], p[2]);
+        const dir = framedPos.clone().sub(framedTarget).normalize();
+        return { target, pos: target.clone().addScaledVector(dir, FOCUS_DIST) };
+      }
+      return { target: framedTarget.clone(), pos: framedPos.clone() };
+    };
+
+    const applyFocus = (immediate: boolean) => {
+      const id = focusRef.current ?? null;
+      // No change (e.g. the mount-time effect firing with no focus) must not
+      // spawn an ease that fights the intro.
+      if (!immediate && id === focusShown) return;
+      const goal = focusGoal(id);
+      focusShown = id;
+      if (controls) controls.enabled = !id;
+      if (immediate || reduceMotion) {
+        controls?.target.copy(goal.target);
+        camera.position.copy(goal.pos);
+        controls?.update();
+        focusAnim = null;
+        render();
+        return;
+      }
+      focusAnim = {
+        fromT: controls ? controls.target.clone() : goal.target.clone(),
+        toT: goal.target,
+        fromP: camera.position.clone(),
+        toP: goal.pos,
+        t0: performance.now(),
+      };
+    };
+    applyFocusRef.current = () => applyFocus(false);
+    // A node focused at mount (rare) snaps; otherwise the intro/overview runs.
+    if (focusShown) applyFocus(true);
+    // A faction switch rebuilds the scene with a new focus centroid: start from
+    // the previous camera pose and ease to the new framed overview so the
+    // recentre is a transition, not a jump. (The focus loop drives the ease and
+    // suppresses controls while it runs.)
+    else if (factionOnlyRebuild && !reduceMotion && camPoseRef.current) {
+      camera.position.copy(camPoseRef.current.pos);
+      controls.target.copy(camPoseRef.current.target);
+      focusAnim = {
+        fromT: camPoseRef.current.target.clone(),
+        toT: framedTarget.clone(),
+        fromP: camPoseRef.current.pos.clone(),
+        toP: framedPos.clone(),
+        t0: performance.now(),
+      };
+    }
+
     /* ---------------------------- animation loop --------------------------- */
 
-    // Continuous only when motion is allowed: twinkle time, ring pulses and
-    // control damping. Under reduce-motion the scene renders on demand
-    // (controls change / resize / prop mutations) and stays perfectly still.
+    // Continuous only when motion is allowed: the intro warp, twinkle time,
+    // binary-companion orbits, ring pulses and control damping. Under
+    // reduce-motion the scene renders on demand and stays perfectly still.
     if (!reduceMotion) {
       const animate = () => {
         animationFrame = requestAnimationFrame(animate);
+        const now = performance.now();
+
+        // Intro warp-in: drive sprite scales, lane opacity and the camera.
+        if (introActive) {
+          if (introStartedAt < 0) introStartedAt = now;
+          const raw = Math.min(1, (now - introStartedAt) / INTRO_MS);
+          for (const it of introSprites) {
+            const local =
+              it.delay >= 1
+                ? raw
+                : Math.max(0, (raw - it.delay) / (1 - it.delay));
+            it.sprite.scale.setScalar(it.target * easeOut(Math.min(1, local)));
+          }
+          const laneT = easeOut(raw);
+          for (const lm of introLaneMats) {
+            (lm.mat as THREE.Material & { opacity: number }).opacity =
+              lm.target * laneT;
+          }
+          camera.position.lerpVectors(introFrom, introTo, easeOut(raw));
+          // Keep the camera aimed at the target while it moves; otherwise the
+          // orientation is frozen until controls resume and snaps at the end.
+          camera.lookAt(framedTarget);
+          if (raw >= 1) {
+            for (const it of introSprites) it.sprite.scale.setScalar(it.target);
+            for (const lm of introLaneMats) {
+              (lm.mat as THREE.Material & { opacity: number }).opacity =
+                lm.target;
+            }
+            // Hand controls back — unless a node was focused mid-intro.
+            if (controls) controls.enabled = !focusShown;
+            introActive = false;
+          }
+        }
+
+        // Camera focus ease (in on a node / back to the overview). Never during
+        // the intro — the two must not both drive the camera in one frame.
+        if (focusAnim && controls && !introActive) {
+          const e = easeOut(Math.min(1, (now - focusAnim.t0) / FOCUS_MS));
+          controls.target.lerpVectors(focusAnim.fromT, focusAnim.toT, e);
+          camera.position.lerpVectors(focusAnim.fromP, focusAnim.toP, e);
+          // Track the moving target so the orientation doesn't snap at the end.
+          camera.lookAt(controls.target);
+          if (e >= 1) focusAnim = null;
+        }
+
         if (effects) {
-          const now = performance.now();
           uTime.value = now / 1000;
+          // Binary companions orbit their primary in the map plane.
+          for (const c of companions) {
+            const a = c.phase + now / 2600;
+            const x = c.center[0] + Math.cos(a) * c.radius;
+            const z = c.center[2] + Math.sin(a) * c.radius;
+            c.star.position.set(x, c.center[1], z);
+            c.corona.position.set(x, c.center[1], z);
+          }
           if (sel.idx >= 0) {
             const ring = ownerRings[sel.idx];
             const mat = ownerRingMats[sel.idx];
@@ -1364,8 +1678,12 @@ export function GalaxyView({
             }
           }
         }
-        easeHeading();
-        controls?.update();
+        // Controls own the camera only in the free overview — not during the
+        // intro, a focus ease, or while a node is focused (controls locked).
+        if (!introActive && !focusAnim && !focusShown) {
+          easeHeading();
+          controls?.update();
+        }
         render();
       };
       animationFrame = requestAnimationFrame(animate);
@@ -1387,6 +1705,11 @@ export function GalaxyView({
 
     return () => {
       if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
+      // Remember the final pose so a faction-switch rebuild can ease from here.
+      camPoseRef.current = {
+        pos: camera.position.clone(),
+        target: controls ? controls.target.clone() : new THREE.Vector3(),
+      };
       observer?.disconnect();
       renderer?.domElement.removeEventListener("pointermove", onPointerMove);
       renderer?.domElement.removeEventListener("pointerdown", onPointerDown);
@@ -1405,16 +1728,21 @@ export function GalaxyView({
       renderRef.current = null;
       applyOwnersRef.current = null;
       applySelectionRef.current = null;
+      applyVisibilityRef.current = null;
+      applyFocusRef.current = null;
     };
   }, [galaxy, playerFactionId, reduceMotion, effects, performanceMode]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is
-  // idle under reduce-motion).
+  // idle under reduce-motion). Fog changes touch both lanes (via applyOwners)
+  // and the per-node styling.
   useEffect(() => {
     ownersRef.current = owners;
+    visibleRef.current = visibleIds;
     applyOwnersRef.current?.();
+    applyVisibilityRef.current?.();
     if (reduceMotion) renderRef.current?.();
-  }, [owners, reduceMotion]);
+  }, [owners, visibleIds, reduceMotion]);
 
   useEffect(() => {
     selectedRef.current = selectedId;
@@ -1422,6 +1750,11 @@ export function GalaxyView({
     applySelectionRef.current?.();
     if (reduceMotion) renderRef.current?.();
   }, [selectedId, incursion, reduceMotion]);
+
+  useEffect(() => {
+    focusRef.current = focusNodeId;
+    applyFocusRef.current?.();
+  }, [focusNodeId]);
 
   // The caller's className must make this element positioned (e.g. `absolute
   // inset-0` or `relative h-96`) — the canvas and label layers inside anchor

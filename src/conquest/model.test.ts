@@ -146,6 +146,20 @@ describe("reconcileState", () => {
     expect(healed.owners).toEqual({ a: "p", b: "e", c: "e" });
   });
 
+  it("seeds a missing revealed set and drops stale ids under fog", () => {
+    const doc = galaxy({ rules: { fogOfWar: true } });
+    // A save from before fog existed: no `revealed`, plus a stale id.
+    const state = newConquestState(doc, { seed: 1 }, "t0");
+    const healed = reconcileState(doc, {
+      ...state,
+      revealed: ["a", "gone"],
+    });
+    expect(healed.revealed).toContain("a");
+    expect(healed.revealed).not.toContain("gone");
+    // Player holds capital a; b is within two jumps and seeds in.
+    expect(healed.revealed).toContain("b");
+  });
+
   it("resets a vanished player faction and dangling incursion", () => {
     const doc = galaxy();
     const state = newConquestState(

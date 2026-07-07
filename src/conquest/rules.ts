@@ -1,3 +1,4 @@
+import { expandRevealed } from "./fog";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "./model";
 import { DEFAULT_AGGRESSION, DEFAULT_GRACE_TURNS, HISTORY_CAP } from "./model";
 import { mulberry32, type Rng } from "./rng";
@@ -236,5 +237,20 @@ export function advanceAfterBattle(
   // out; only then may a new one open.
   next = applyExpiry(galaxy, next, now);
   if (next.status !== "active") return next;
-  return enemyPhase(galaxy, next, turnRng(next), now);
+  next = enemyPhase(galaxy, next, turnRng(next), now);
+  // Fog of war: a captured system widens what you can see. Expanded once here
+  // (covers outcome + expiry) since every earlier return is a terminal state
+  // the map reveals in full anyway.
+  if (galaxy.rules?.fogOfWar) {
+    next = {
+      ...next,
+      revealed: expandRevealed(
+        galaxy,
+        next.owners,
+        next.playerFactionId,
+        next.revealed,
+      ),
+    };
+  }
+  return next;
 }
