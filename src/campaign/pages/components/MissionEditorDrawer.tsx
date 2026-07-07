@@ -12,7 +12,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { mediaKind } from "../../../lib/assetUrl";
+import { mediaKind, refIsVideo } from "../../../lib/assetUrl";
 import {
   campaignImageDelete,
   campaignImageImport,
@@ -20,6 +20,11 @@ import {
 } from "../../bindings";
 import type { CampaignMission, MapPreviewConfig } from "../../model";
 import { CampaignImage, CampaignImageField } from "./CampaignImage";
+import {
+  CUE_DEFAULTS,
+  DECORATIVE_DEFAULTS,
+  PlaybackTuning,
+} from "./MediaPlayer";
 import {
   MissionMapBackground,
   MissionMapSideGraphic,
@@ -375,8 +380,28 @@ export function MissionEditorDrawer({
               <PanoramaScroller
                 campaignId={campaignId}
                 panorama={mission.panorama}
+                playback={mission.panoramaPlayback}
               />
             )}
+            {mission.panorama &&
+              (refIsVideo(mission.panorama) ? (
+                <PlaybackTuning
+                  playback={mission.panoramaPlayback}
+                  defaults={DECORATIVE_DEFAULTS}
+                  decorative
+                  showAutoplay
+                  showLoop
+                  showMuted
+                  onChange={(panoramaPlayback) => patch({ panoramaPlayback })}
+                />
+              ) : (
+                <PlaybackTuning
+                  playback={mission.panoramaPlayback}
+                  defaults={DECORATIVE_DEFAULTS}
+                  showScroll
+                  onChange={(panoramaPlayback) => patch({ panoramaPlayback })}
+                />
+              ))}
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -429,45 +454,83 @@ export function MissionEditorDrawer({
             </PreviewBox>
           </>
         ) : (
-          <CampaignImageField
-            campaignId={campaignId}
-            kind="sideGraphic"
-            value={mission.sideGraphic}
-            onChange={(sideGraphic) => patch({ sideGraphic })}
-            label="Image or video"
-            help="A unit render or emblem, for example. Image transparency is kept; a video loops muted."
-            allowVideo
-            preview={
-              <div className="rounded-md border border-border/50 bg-muted p-2">
-                <CampaignImage
-                  campaignId={campaignId}
-                  image={mission.sideGraphic}
-                  alt=""
-                  className="mx-auto max-h-40 object-contain"
-                />
-              </div>
-            }
+          <>
+            <CampaignImageField
+              campaignId={campaignId}
+              kind="sideGraphic"
+              value={mission.sideGraphic}
+              onChange={(sideGraphic) => patch({ sideGraphic })}
+              label="Image or video"
+              help="A unit render or emblem, for example. Image transparency is kept; a video loops muted."
+              allowVideo
+              preview={
+                <div className="rounded-md border border-border/50 bg-muted p-2">
+                  <CampaignImage
+                    campaignId={campaignId}
+                    image={mission.sideGraphic}
+                    alt=""
+                    className="mx-auto max-h-40 object-contain"
+                  />
+                </div>
+              }
+            />
+            {refIsVideo(mission.sideGraphic) && (
+              <PlaybackTuning
+                playback={mission.sideGraphicPlayback}
+                defaults={DECORATIVE_DEFAULTS}
+                decorative
+                showAutoplay
+                showLoop
+                showMuted
+                onChange={(sideGraphicPlayback) =>
+                  patch({ sideGraphicPlayback })
+                }
+              />
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <MissionAvField
+          campaignId={campaignId}
+          kind="audio"
+          value={mission.voiceover}
+          onChange={(voiceover) => patch({ voiceover })}
+          label="Briefing voiceover"
+          help="Optional audio played on the briefing screen."
+        />
+        {mission.voiceover && (
+          <PlaybackTuning
+            playback={mission.voiceoverPlayback}
+            defaults={CUE_DEFAULTS}
+            showLoop
+            showMuted
+            onChange={(voiceoverPlayback) => patch({ voiceoverPlayback })}
           />
         )}
       </div>
 
-      <MissionAvField
-        campaignId={campaignId}
-        kind="audio"
-        value={mission.voiceover}
-        onChange={(voiceover) => patch({ voiceover })}
-        label="Briefing voiceover"
-        help="Optional audio played on the briefing screen."
-      />
-
-      <MissionAvField
-        campaignId={campaignId}
-        kind="video"
-        value={mission.cutscene}
-        onChange={(cutscene) => patch({ cutscene })}
-        label="Intro cutscene"
-        help="Optional video offered on the briefing screen."
-      />
+      <div className="flex flex-col gap-2">
+        <MissionAvField
+          campaignId={campaignId}
+          kind="video"
+          value={mission.cutscene}
+          onChange={(cutscene) => patch({ cutscene })}
+          label="Intro cutscene"
+          help="Optional video offered on the briefing screen."
+        />
+        {mission.cutscene && (
+          <PlaybackTuning
+            playback={mission.cutscenePlayback}
+            defaults={CUE_DEFAULTS}
+            showAutoplay
+            showLoop
+            showMuted
+            onChange={(cutscenePlayback) => patch({ cutscenePlayback })}
+          />
+        )}
+      </div>
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">Unit restrictions</span>

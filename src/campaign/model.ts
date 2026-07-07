@@ -40,6 +40,29 @@ export type MediaRef = ImageRef;
 /** @deprecated Use {@link ImageRef}; kept so existing panorama imports still type. */
 export type PanoramaRef = ImageRef;
 
+/**
+ * Author playback config for a media slot. All fields optional; an absent field
+ * falls back to a per-slot default at render time (decorative loops autoplay muted;
+ * cues start paused and audible), so a campaign with no playback field renders
+ * exactly as before this feature. Stored as a sibling of the media ref it configures
+ * (mirroring `panoramaMap`/`sideGraphicMap`), so it survives export/import untouched.
+ *
+ * - `autoplay` / `loop` / `muted` — video and audio. `muted` is the *initial*
+ *   mute-button state; the viewer can toggle it. Unmuted autoplay is never attempted
+ *   (browsers block it), so an autoplay decorative slot is always muted.
+ * - `scroll` — image panorama only: horizontally scroll the backdrop (true) or hold
+ *   it static and full-bleed (false). A no-op for video or non-panorama slots.
+ *
+ * Custom pause/play + mute/unmute controls are always rendered, so there is
+ * deliberately no stored `controls` toggle.
+ */
+export interface MediaPlayback {
+  autoplay?: boolean;
+  loop?: boolean;
+  muted?: boolean;
+  scroll?: boolean;
+}
+
 /** Render style for a live map-preview slot. */
 export type MapPreviewStyle = "textured" | "heightmap";
 
@@ -78,12 +101,20 @@ export interface CampaignMission {
   objectives: string[];
   /** Scrolling briefing backdrop — a still image or a looping muted video. */
   panorama?: ImageRef;
+  /** Playback config for `panorama` (scroll for images; autoplay/loop/muted for video). */
+  panoramaPlayback?: MediaPlayback;
   /** Graphic beside the mission briefing card — a still image or a looping muted video. */
   sideGraphic?: ImageRef;
+  /** Playback config for `sideGraphic` when it's a video. */
+  sideGraphicPlayback?: MediaPlayback;
   /** Optional briefing voiceover (audio) played on the briefing screen. */
   voiceover?: MediaRef;
+  /** Playback config for `voiceover` (loop/muted; autoplay is muted-only). */
+  voiceoverPlayback?: MediaPlayback;
   /** Optional intro cutscene (video) offered on the briefing screen. */
   cutscene?: MediaRef;
+  /** Playback config for `cutscene`. */
+  cutscenePlayback?: MediaPlayback;
   /** When set, the panorama slot renders a live 3D map preview instead of `panorama`. */
   panoramaMap?: MapPreviewConfig;
   /** When set, the side-graphic slot renders a live 3D map preview instead of `sideGraphic`. */
@@ -110,8 +141,10 @@ export interface Campaign {
   description: string;
   /** Small emblem shown on the campaign in lists. */
   icon?: ImageRef;
-  /** Still backdrop shown behind the campaign detail page. */
+  /** Still backdrop shown behind the campaign detail page — image or looping video. */
   background?: ImageRef;
+  /** Playback config for `background` when it's a video. */
+  backgroundPlayback?: MediaPlayback;
   /** Array order IS the linear play order. */
   missions: CampaignMission[];
   createdAt: string;
@@ -151,6 +184,23 @@ function parseImageRef(value: unknown): MediaRef | undefined {
     return { kind: "data", dataUri: p.dataUri };
   }
   return undefined;
+}
+
+/**
+ * Narrow an unknown to a {@link MediaPlayback}, or drop it (returns undefined).
+ * Only known boolean keys are kept, and undefined keys are *omitted* (not set to
+ * `undefined`) so a render-side `playback.autoplay ?? default` never sees an
+ * explicit undefined overwriting the default.
+ */
+function parsePlayback(value: unknown): MediaPlayback | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const p = value as Record<string, unknown>;
+  const out: MediaPlayback = {};
+  if (typeof p.autoplay === "boolean") out.autoplay = p.autoplay;
+  if (typeof p.loop === "boolean") out.loop = p.loop;
+  if (typeof p.muted === "boolean") out.muted = p.muted;
+  if (typeof p.scroll === "boolean") out.scroll = p.scroll;
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** Narrow an unknown to a {@link MapPreviewConfig}, or drop it (returns undefined). */
@@ -237,9 +287,13 @@ export function parseCampaignJson(json: string): Campaign | null {
       briefing: typeof m.briefing === "string" ? m.briefing : "",
       objectives: stringArray(m.objectives),
       panorama: parseImageRef(m.panorama),
+      panoramaPlayback: parsePlayback(m.panoramaPlayback),
       sideGraphic: parseImageRef(m.sideGraphic),
+      sideGraphicPlayback: parsePlayback(m.sideGraphicPlayback),
       voiceover: parseImageRef(m.voiceover),
+      voiceoverPlayback: parsePlayback(m.voiceoverPlayback),
       cutscene: parseImageRef(m.cutscene),
+      cutscenePlayback: parsePlayback(m.cutscenePlayback),
       panoramaMap: parseMapPreview(m.panoramaMap),
       sideGraphicMap: parseMapPreview(m.sideGraphicMap),
       mapDownload: parseMapDownload(m.mapDownload),
@@ -257,6 +311,7 @@ export function parseCampaignJson(json: string): Campaign | null {
     description: typeof d.description === "string" ? d.description : "",
     icon: parseImageRef(d.icon),
     background: parseImageRef(d.background),
+    backgroundPlayback: parsePlayback(d.backgroundPlayback),
     missions,
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",

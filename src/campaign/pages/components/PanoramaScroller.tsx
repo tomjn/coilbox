@@ -1,8 +1,13 @@
 import { cn } from "@picoframe/frame";
 import { useEffect, useRef } from "react";
 import { mediaKind } from "../../../lib/assetUrl";
-import type { ImageRef } from "../../model";
+import type { ImageRef, MediaPlayback } from "../../model";
 import { useCampaignImage } from "../../panorama";
+import {
+  CampaignVideo,
+  DECORATIVE_DEFAULTS,
+  resolvePlayback,
+} from "./MediaPlayer";
 
 /** Constant scroll speed; the per-image duration is derived to hold this. */
 const SCROLL_SPEED_PX_PER_SEC = 25;
@@ -20,15 +25,22 @@ const SCROLL_SPEED_PX_PER_SEC = 25;
  * image's aspect ratio and the element's rendered height, so the speed stays
  * constant regardless of image size; `prefers-reduced-motion` disables the motion
  * (see index.css).
+ *
+ * An image panorama can also be held *static* (full-bleed `background-size: cover`)
+ * via `playback.scroll === false`; a video panorama delegates to
+ * {@link CampaignVideo} for its autoplay/loop/muted config and control overlay.
  */
 export function PanoramaScroller({
   campaignId,
   panorama,
+  playback,
   className,
   fill = false,
 }: {
   campaignId: string;
   panorama: ImageRef;
+  /** Playback config: `scroll` for images, autoplay/loop/muted for video. */
+  playback?: MediaPlayback;
   className?: string;
   /**
    * Stretch to fill the container (`h-full`) instead of the default fixed band —
@@ -41,14 +53,16 @@ export function PanoramaScroller({
   const isVideo = src ? mediaKind(src) === "video" : false;
   const ref = useRef<HTMLDivElement>(null);
   const height = fill ? "h-full" : "h-28";
+  const scroll = resolvePlayback(playback, DECORATIVE_DEFAULTS).scroll;
 
   // Measure the tile width (image aspect × rendered height) and set the loop
   // distance + duration as custom properties the keyframes read. Re-measures on
   // resize so a responsive full-bleed background stays seamless.
   useEffect(() => {
     const el = ref.current;
-    // A video backdrop (below) fills via object-cover — no tile measurement needed.
-    if (!el || !src || isVideo) return;
+    // Only the scrolling image branch needs measurement: a video fills via
+    // object-cover, and a static image uses background-size: cover.
+    if (!el || !src || isVideo || !scroll) return;
     let ratio = 0;
     const apply = () => {
       if (!ratio) return;
@@ -69,7 +83,7 @@ export function PanoramaScroller({
     const observer = new ResizeObserver(apply);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [src, isVideo]);
+  }, [src, isVideo, scroll]);
 
   if (!src) {
     return (
@@ -79,23 +93,32 @@ export function PanoramaScroller({
     );
   }
 
-  // A video backdrop autoplays muted and loops as a silent background clip (audio
-  // belongs in the mission voiceover slot). `object-cover` fills the band the same
-  // way the tiled image background does.
+  // A video backdrop loops muted by default (audio belongs in the voiceover slot)
+  // but its playback and the control overlay come from CampaignVideo.
   if (isVideo) {
     return (
-      <video
-        aria-hidden
+      <CampaignVideo
         src={src}
-        autoPlay
-        loop
-        muted
-        playsInline
+        playback={playback}
+        defaults={DECORATIVE_DEFAULTS}
+        variant="background"
+        label="Briefing backdrop"
+        className={cn("rounded-md bg-muted", height, className)}
+      />
+    );
+  }
+
+  // A static image backdrop: full-bleed, centered, no scroll.
+  if (!scroll) {
+    return (
+      <div
+        aria-hidden
         className={cn(
-          "w-full rounded-md bg-muted object-cover",
+          "rounded-md bg-muted bg-cover bg-center",
           height,
           className,
         )}
+        style={{ backgroundImage: `url("${src}")` }}
       />
     );
   }
