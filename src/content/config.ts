@@ -20,7 +20,6 @@ import {
   type EngineConfigResult,
   type GameInfoResult,
   type HeightmapResult,
-  type LuaExecResult,
   type MapInfoResult,
   type MapSkyboxResult,
   type MinimapResult,
@@ -36,7 +35,6 @@ import {
   unitsyncGameHeaders,
   unitsyncGameInfo,
   unitsyncHeightmap,
-  unitsyncLuaExec,
   unitsyncMapInfo,
   unitsyncMapSkybox,
   unitsyncMinimap,
@@ -1172,42 +1170,6 @@ export function useUnitsyncMapSkybox(
   }, [enginePath, dataDir, mapName]);
 
   return { dataUrl };
-}
-
-/**
- * Run the Lua console for a target+archive. Unlike the other browser hooks this
- * is imperative (each Run re-executes; nothing is cached): call `run(source)` and
- * read `result` / `loading`. Backend/Lua errors surface in `result.error`.
- */
-export function useUnitsyncLuaExec(
-  enginePath?: string,
-  dataDir?: string,
-  archive?: string,
-) {
-  const [result, setResult] = useState<LuaExecResult | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const run = useCallback(
-    async (source: string) => {
-      if (!enginePath || !dataDir || !archive) return;
-      setLoading(true);
-      try {
-        setResult(
-          await unitsyncLuaExec({ enginePath, dataDir, archive, source }),
-        );
-      } catch (e) {
-        setResult({
-          error: e instanceof Error ? e.message : String(e),
-          errors: [],
-        });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [enginePath, dataDir, archive],
-  );
-
-  return { run, result, loading };
 }
 
 /* -------------------------------------------------------------------------- *

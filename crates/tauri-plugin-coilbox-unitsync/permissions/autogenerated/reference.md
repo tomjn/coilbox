@@ -19,6 +19,7 @@ Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-i
 - `allow-unitsync-archive-file`
 - `allow-unitsync-game-headers`
 - `allow-unitsync-lua-exec`
+- `allow-unitsync-lua-repl-exec`
 - `allow-unitsync-archive-extract`
 - `allow-unitsync-cancel`
 
@@ -261,6 +262,32 @@ Enables the unitsync_lua_exec command without any pre-configured scope.
 <td>
 
 Denies the unitsync_lua_exec command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-lua-repl-exec`
+
+</td>
+<td>
+
+Enables the unitsync_lua_repl_exec command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-lua-repl-exec`
+
+</td>
+<td>
+
+Denies the unitsync_lua_repl_exec command without any pre-configured scope.
 
 </td>
 </tr>

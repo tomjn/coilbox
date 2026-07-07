@@ -18,6 +18,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_archive_file",
     "unitsync_game_headers",
     "unitsync_lua_exec",
+    "unitsync_lua_repl_exec",
     "unitsync_archive_extract",
     "unitsync_cancel",
 ];

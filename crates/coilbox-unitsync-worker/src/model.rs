@@ -436,6 +436,26 @@ pub struct LuaExecOutput {
     pub errors: Vec<String>,
 }
 
+/// `--lua --chunks-file` (REPL) mode output. `result` is the pretty-printed
+/// value the *final* chunk returned; `error` is a compile/runtime error (or a
+/// "session replay diverged…" message when an earlier chunk failed, in which
+/// case `diverged_at` holds that chunk's 1-based index); `prints` is the final
+/// chunk's `print` output, newline-joined. `errors` carries non-fatal unitsync
+/// diagnostics.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LuaReplOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diverged_at: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prints: Option<String>,
+    pub errors: Vec<String>,
+}
+
 /// Output of the `--archive --file --extract` (download) mode: the number of
 /// bytes written to the destination path, plus any diagnostics.
 #[derive(Serialize, Default)]
