@@ -300,23 +300,27 @@ function patchTwinkle(
       attribute float aSpeed;
       uniform float uTime;
       varying float vTwinkle;
+      varying float vSize;
       ${shader.vertexShader.replace(
         "gl_PointSize = size;",
         `gl_PointSize = size * aSize;
+         vSize = aSize;
          vTwinkle = 0.72 + 0.28 * sin(uTime * aSpeed + aPhase);`,
       )}`;
     // Points rasterize as squares; a radial falloff on gl_PointCoord rounds
-    // them into soft star dots without needing a texture.
+    // them into star dots. Small points render as crisp pinpricks; big ones
+    // blend toward a wide soft halo, so the rare bright stars read as
+    // glowing orbs (No-Man's-Sky style) instead of scaled-up dots.
     shader.fragmentShader = `
       varying float vTwinkle;
+      varying float vSize;
       ${shader.fragmentShader.replace(
         "vec4 diffuseColor = vec4( diffuse, opacity );",
         `float starDist = length(gl_PointCoord - vec2(0.5));
-         // A crisp hot core plus a faint halo reads as a sharp star rather
-         // than a blurry blob.
-         float core = smoothstep(0.28, 0.05, starDist);
-         float halo = smoothstep(0.5, 0.18, starDist) * 0.3;
-         float starMask = core * 1.5 + halo;
+         float soft = smoothstep(1.4, 2.6, vSize);
+         float core = smoothstep(mix(0.3, 0.16, soft), 0.04, starDist);
+         float halo = exp(-starDist * starDist * 9.0) * mix(0.15, 0.85, soft);
+         float starMask = core * mix(1.6, 1.1, soft) + halo;
          if (starMask < 0.02) discard;
          vec4 diffuseColor = vec4( diffuse, opacity * vTwinkle * starMask );`,
       )}`;
@@ -614,7 +618,6 @@ export function GalaxyView({
     // node's ring height). Three overlays, all rebuilt when ownership
     // changes: a quiet neutral base, faction-coloured lanes where both ends
     // share an owner, and dashed contested lanes on the player's frontier.
-    const LANE_WIDTH = 0.5;
     const RING_Y = -0.4; // matches the ownership rings below
     const LANE_TRIM = 2.45; // just outside the ring's outer radius
     const laneEnd = (id: string): [number, number, number] | null => {
@@ -635,45 +638,75 @@ export function GalaxyView({
       const t0 = LANE_TRIM / len;
       return [...at(t0), ...at(1 - t0)] as LaneSeg;
     };
+    // No-Man's-Sky-style lines: each lane draws twice — a crisp thin core
+    // plus a wide, very faint additive halo — so it reads as a glowing
+    // filament rather than a flat ribbon.
+    const LANE_CORE_W = 0.16;
+    const LANE_HALO_W = 1.05;
     const laneTex = capsuleTexture();
     disposables.push(laneTex);
-    const makeLaneMesh = (mat: THREE.MeshBasicMaterial) => {
-      disposables.push(mat);
-      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
-      mesh.raycast = () => {};
-      scene.add(mesh);
-      return mesh;
+    interface LanePair {
+      core: THREE.Mesh;
+      halo: THREE.Mesh;
+    }
+    const makeLanePair = (opts: {
+      color?: number;
+      vertexColors?: boolean;
+      coreOpacity: number;
+      haloOpacity: number;
+    }): LanePair => {
+      const make = (opacity: number, halo: boolean) => {
+        const mat = new THREE.MeshBasicMaterial({
+          map: laneTex,
+          color: opts.color ?? 0xffffff,
+          vertexColors: opts.vertexColors ?? false,
+          transparent: true,
+          opacity,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: halo ? THREE.AdditiveBlending : THREE.NormalBlending,
+        });
+        disposables.push(mat);
+        const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+        mesh.raycast = () => {};
+        scene.add(mesh);
+        return mesh;
+      };
+      return {
+        core: make(opts.coreOpacity, false),
+        halo: make(opts.haloOpacity, true),
+      };
     };
-    const lanes = makeLaneMesh(
-      new THREE.MeshBasicMaterial({
-        map: laneTex,
-        color: 0x93a7c8,
-        transparent: true,
-        opacity: 0.25,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
-    );
-    const factionLanes = makeLaneMesh(
-      new THREE.MeshBasicMaterial({
-        map: laneTex,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.5,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
-    );
-    const frontier = makeLaneMesh(
-      new THREE.MeshBasicMaterial({
-        map: laneTex,
-        color: 0xdbe7ff,
-        transparent: true,
-        opacity: 0.8,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
-    );
+    const setLanePair = (
+      pair: LanePair,
+      segs: LaneSeg[],
+      colors?: THREE.Color[],
+    ) => {
+      pair.core.geometry.dispose();
+      pair.core.geometry = laneQuadGeometry(segs, LANE_CORE_W, colors);
+      pair.halo.geometry.dispose();
+      pair.halo.geometry = laneQuadGeometry(segs, LANE_HALO_W, colors);
+    };
+    const disposeLanePair = (pair: LanePair) => {
+      pair.core.geometry.dispose();
+      pair.halo.geometry.dispose();
+    };
+    const lanes = makeLanePair({
+      color: 0x93a7c8,
+      coreOpacity: 0.4,
+      haloOpacity: 0.06,
+    });
+    const factionLanes = makeLanePair({
+      vertexColors: true,
+      coreOpacity: 0.6,
+      haloOpacity: 0.1,
+    });
+    // Contested routes: fine warm-gold dashes, NMS plotted-course style.
+    const frontier = makeLanePair({
+      color: 0xffcf8a,
+      coreOpacity: 0.95,
+      haloOpacity: 0.14,
+    });
 
     // Node hit targets: one invisible InstancedMesh gives the raycaster a
     // generous, stable click area. The visible star is drawn by sprites — a
@@ -957,19 +990,9 @@ export function GalaxyView({
           baseSegs.push(seg);
         }
       }
-      lanes.geometry.dispose();
-      lanes.geometry = laneQuadGeometry(baseSegs, LANE_WIDTH);
-      factionLanes.geometry.dispose();
-      factionLanes.geometry = laneQuadGeometry(
-        factionSegs,
-        LANE_WIDTH,
-        factionSegColors,
-      );
-      frontier.geometry.dispose();
-      frontier.geometry = laneQuadGeometry(
-        dashSegments(frontierSegs, 2.2, 1.7),
-        LANE_WIDTH,
-      );
+      setLanePair(lanes, baseSegs);
+      setLanePair(factionLanes, factionSegs, factionSegColors);
+      setLanePair(frontier, dashSegments(frontierSegs, 1.15, 1.05));
     };
     applyOwnersRef.current = applyOwners;
 
@@ -1125,9 +1148,9 @@ export function GalaxyView({
       renderer?.domElement.removeEventListener("pointerup", onPointerUp);
       controls?.dispose();
       for (const label of labelObjects) label.removeFromParent();
-      lanes.geometry.dispose();
-      factionLanes.geometry.dispose();
-      frontier.geometry.dispose();
+      disposeLanePair(lanes);
+      disposeLanePair(factionLanes);
+      disposeLanePair(frontier);
       for (const d of disposables) d.dispose();
       labelRenderer?.domElement.remove();
       if (renderer) {

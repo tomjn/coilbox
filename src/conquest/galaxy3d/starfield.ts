@@ -38,13 +38,17 @@ export interface StarfieldBuffers {
   speeds: Float32Array;
 }
 
-/** Default star temperature palette: mostly white, some blue and amber. */
+/** Default star palette: mostly white with soft pastel tints (blue, amber,
+ * pink, green, violet) so a starfield sparkles subtly rather than uniformly. */
 const DEFAULT_PALETTE: [number, number, number][] = [
+  [1.0, 1.0, 1.0],
   [1.0, 1.0, 1.0],
   [0.75, 0.85, 1.0],
   [1.0, 0.9, 0.7],
   [0.85, 0.9, 1.0],
-  [1.0, 0.8, 0.8],
+  [1.0, 0.8, 0.85],
+  [0.8, 1.0, 0.85],
+  [0.92, 0.85, 1.0],
 ];
 
 function hexToRgb01(hex: string): [number, number, number] {
@@ -97,16 +101,18 @@ export function buildStarfield(opts: StarfieldOptions): StarfieldBuffers {
     positions[i * 3 + 2] = cz + Math.sin(angle) * r;
 
     const [cr, cg, cb] = palette[Math.floor(rng() * palette.length)];
-    // Wide spread with a hot tail so a few stars pop and most recede, plus a
-    // per-star temperature jitter so no two neighbours read identical.
-    const brightness = 0.4 + 0.8 * rng() ** 2;
+    // Two populations (No-Man's-Sky-style): almost everything is a tiny
+    // sharp pinprick, and a rare few are big bright orbs that the shader
+    // renders with a wide soft halo. Per-star temperature jitter keeps
+    // neighbours from reading identical.
+    const orb = rng() < 0.07;
+    const brightness = orb ? 0.85 + rng() * 0.35 : 0.3 + 0.55 * rng() ** 2;
     const warm = 0.95 + rng() * 0.1;
     colors[i * 3] = Math.min(1, cr * brightness * warm);
-    colors[i * 3 + 1] = cg * brightness;
+    colors[i * 3 + 1] = Math.min(1, cg * brightness);
     colors[i * 3 + 2] = Math.min(1, cb * brightness * (2 - warm));
 
-    // Mostly small with a long tail; ~4% are standout bright giants.
-    sizes[i] = 0.45 + rng() ** 1.6 * 1.9 + (rng() < 0.04 ? 1.2 : 0);
+    sizes[i] = orb ? 2.1 + rng() * 1.7 : 0.35 + rng() ** 2 * 0.85;
     phases[i] = rng() * Math.PI * 2;
     speeds[i] = 0.4 + rng() * 1.8;
   }
