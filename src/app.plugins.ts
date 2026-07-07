@@ -2,6 +2,7 @@ import { type FramePlugin, framePlugin } from "@picoframe/frame";
 import animationPlugin from "./animation";
 // picoframe:imports-start
 import campaignPlugin from "./campaign";
+import conquestPlugin from "./conquest";
 import contentPlugin from "./content";
 import downloadsPlugin from "./downloads";
 import gameUpdatesPlugin from "./game-updates";
@@ -26,6 +27,7 @@ export const plugins: FramePlugin[] = [
   contentPlugin,
   playPlugin,
   campaignPlugin,
+  conquestPlugin,
   lobbyServersPlugin,
   multiplayerPlugin,
   // picoframe:plugins-end
