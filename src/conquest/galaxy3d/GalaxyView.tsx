@@ -5,6 +5,7 @@ import {
   CSS2DObject,
   CSS2DRenderer,
 } from "three/addons/renderers/CSS2DRenderer.js";
+import { assetUrl } from "../../lib/assetUrl";
 import type { GalaxyDoc, Incursion } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
@@ -306,6 +307,52 @@ function radialTexture(size: number, stops: [number, string][]): THREE.Texture {
   return tex;
 }
 
+/**
+ * Procedural theatre-map chart: a dark slate plane with a faint grid and a
+ * per-pixel vignette — the fallback when a theatre theme ships no backdrop.
+ */
+function theatreChartTexture(): THREE.Texture {
+  const size = 1024;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = "#141a24";
+    ctx.fillRect(0, 0, size, size);
+    ctx.strokeStyle = "rgba(148, 168, 200, 0.07)";
+    ctx.lineWidth = 1;
+    const step = size / 24;
+    for (let i = 0; i <= 24; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * step, 0);
+      ctx.lineTo(i * step, size);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, i * step);
+      ctx.lineTo(size, i * step);
+      ctx.stroke();
+    }
+    // Per-pixel vignette (a canvas radial gradient would dither).
+    const img = ctx.getImageData(0, 0, size, size);
+    const half = size / 2;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const d = Math.hypot(x - half, y - half) / half;
+        const dim = 1 - 0.55 * Math.min(1, d) ** 2;
+        const o = (y * size + x) * 4;
+        img.data[o] *= dim;
+        img.data[o + 1] *= dim;
+        img.data[o + 2] *= dim;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 /** Patch a PointsMaterial with per-point size and a `uTime` twinkle. */
 function patchTwinkle(
   material: THREE.PointsMaterial,
@@ -391,7 +438,12 @@ export function GalaxyView({
     const scene = new THREE.Scene();
     const uTime = { value: 0 };
 
+    const skin = galaxy.theme?.skin ?? "galaxy";
     const positions = layoutNodes(galaxy.nodes);
+    // A theatre map is a flat chart: drop the galactic Y jitter.
+    if (skin === "theatre") {
+      for (const p of positions.values()) p[1] = 0;
+    }
     const bounds = playBounds(positions.values());
     const nodeIds = galaxy.nodes.map((n) => n.id);
     const factionColor = new Map(
@@ -448,153 +500,204 @@ export function GalaxyView({
       return points;
     };
 
-    // The decorative galaxy is far bigger than the playable patch, and the
-    // playable stars sit out in its arms rather than at its centre: the disc
-    // is centred on a distant galactic core (direction hashed per galaxy)
-    // placed well beyond the pan clamp and zoom range — you can look toward
-    // the bright core but never reach it.
-    const coreAngle = ((hashString(`${galaxy.id}-core`) % 360) * Math.PI) / 180;
-    const CORE_DIST = PLAY_EXTENT * 5.5;
-    const core: [number, number, number] = [
-      Math.cos(coreAngle) * CORE_DIST,
-      -42,
-      Math.sin(coreAngle) * CORE_DIST,
-    ];
-    scene.add(
-      makeStars(
-        performanceMode ? 9000 : 22000,
-        PLAY_EXTENT * 7,
-        55,
-        0,
-        "",
-        1.5,
-        core,
-      ),
-    );
-    // The core itself: a dense warm cluster plus stacked glow sprites.
-    scene.add(
-      makeStars(performanceMode ? 1200 : 3000, 65, 30, 0, "-core", 1.7, core, [
-        "#ffe9c9",
-        "#ffd9a0",
-        "#fff4e0",
-      ]),
-    );
-    const coreGlowTex = radialTexture(128, [
-      [0, "#ffe7c2ee"],
-      [0.35, "#ffdba066"],
-      [1, "#ffd99000"],
-    ]);
-    disposables.push(coreGlowTex);
-    for (const [scale, opacity] of [
-      [430, 0.1],
-      [260, 0.16],
-      [130, 0.26],
-    ] as const) {
-      const mat = new THREE.SpriteMaterial({
-        map: coreGlowTex,
-        transparent: true,
-        opacity,
-        blending: THREE.AdditiveBlending,
+    if (skin === "theatre") buildTheatreBackdrop();
+    if (skin === "galaxy") buildGalaxyBackdrop();
+
+    /**
+     * Theatre skin: a flat tactical-map plane under the play layer — an
+     * authored backdrop image when the theme ships one (local/data refs),
+     * else a procedural dark chart (grid + vignette). Used by terrestrial
+     * games (e.g. Spring 1944) where a starfield makes no sense.
+     */
+    function buildTheatreBackdrop() {
+      const size = PLAY_EXTENT * 3.4;
+      const planeGeo = new THREE.PlaneGeometry(size, size);
+      const planeMat = new THREE.MeshBasicMaterial({
+        map: theatreChartTexture(),
         depthWrite: false,
       });
-      disposables.push(mat);
-      const sprite = new THREE.Sprite(mat);
-      sprite.position.set(core[0], core[1], core[2]);
-      sprite.scale.set(scale, scale * 0.7, 1);
-      sprite.raycast = () => {};
-      scene.add(sprite);
-    }
-    // Distant sky: the void shouldn't be pure black. A huge gradient dome
-    // (vertex-coloured: a faint horizon band, warmed toward the galactic
-    // core) plus banks of dim dust clouds out past the zoom/pan limits give
-    // the far distance a presence the camera can never reach.
-    {
-      const domeGeo = new THREE.SphereGeometry(1900, 40, 24);
-      const domePos = domeGeo.attributes.position;
-      const domeColors = new Float32Array(domePos.count * 3);
-      const deep = new THREE.Color("#04050d");
-      const band = new THREE.Color("#10162b");
-      const warm = new THREE.Color("#1c1410");
-      const coreDir = new THREE.Vector2(core[0], core[2]).normalize();
-      const v = new THREE.Vector3();
-      const c = new THREE.Color();
-      for (let i = 0; i < domePos.count; i++) {
-        v.fromBufferAttribute(domePos, i);
-        // Horizon band: strongest near the galactic plane, fading with |y|.
-        const bandT = Math.exp(-((Math.abs(v.y) / 420) ** 2));
-        // Warmth toward the core's side of the sky.
-        const toward = Math.max(
-          0,
-          new THREE.Vector2(v.x, v.z).normalize().dot(coreDir),
-        );
-        c.copy(deep)
-          .lerp(band, bandT)
-          .add(warm.clone().multiplyScalar(bandT * toward * 0.9));
-        domeColors.set([c.r, c.g, c.b], i * 3);
+      disposables.push(planeGeo, planeMat);
+      if (planeMat.map) disposables.push(planeMat.map);
+      const plane = new THREE.Mesh(planeGeo, planeMat);
+      plane.rotation.x = -Math.PI / 2;
+      plane.position.y = -1.2;
+      plane.raycast = () => {};
+      plane.renderOrder = -1;
+      scene.add(plane);
+      const backdrop = galaxy.theme?.backdrop;
+      const url =
+        backdrop?.kind === "local"
+          ? assetUrl(backdrop.path)
+          : backdrop?.kind === "data"
+            ? backdrop.dataUri
+            : undefined;
+      if (url) {
+        new THREE.TextureLoader().load(url, (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          planeMat.map?.dispose();
+          planeMat.map = tex;
+          planeMat.needsUpdate = true;
+          disposables.push(tex);
+          renderRef.current?.();
+        });
       }
-      domeGeo.setAttribute("color", new THREE.BufferAttribute(domeColors, 3));
-      const domeMat = new THREE.MeshBasicMaterial({
-        vertexColors: true,
-        side: THREE.BackSide,
-        depthWrite: false,
-      });
-      disposables.push(domeGeo, domeMat);
-      const dome = new THREE.Mesh(domeGeo, domeMat);
-      dome.renderOrder = -1;
-      dome.raycast = () => {};
-      scene.add(dome);
     }
-    if (!performanceMode && effects) {
-      const dustTex = radialTexture(128, [
-        [0, "#ffffff55"],
-        [0.45, "#ffffff22"],
-        [1, "#ffffff00"],
+
+    function buildGalaxyBackdrop() {
+      // The decorative galaxy is far bigger than the playable patch, and the
+      // playable stars sit out in its arms rather than at its centre: the disc
+      // is centred on a distant galactic core (direction hashed per galaxy)
+      // placed well beyond the pan clamp and zoom range — you can look toward
+      // the bright core but never reach it.
+      const coreAngle =
+        ((hashString(`${galaxy.id}-core`) % 360) * Math.PI) / 180;
+      const CORE_DIST = PLAY_EXTENT * 5.5;
+      const core: [number, number, number] = [
+        Math.cos(coreAngle) * CORE_DIST,
+        -42,
+        Math.sin(coreAngle) * CORE_DIST,
+      ];
+      scene.add(
+        makeStars(
+          performanceMode ? 9000 : 22000,
+          PLAY_EXTENT * 7,
+          55,
+          0,
+          "",
+          1.5,
+          core,
+        ),
+      );
+      // The core itself: a dense warm cluster plus stacked glow sprites.
+      scene.add(
+        makeStars(
+          performanceMode ? 1200 : 3000,
+          65,
+          30,
+          0,
+          "-core",
+          1.7,
+          core,
+          ["#ffe9c9", "#ffd9a0", "#fff4e0"],
+        ),
+      );
+      const coreGlowTex = radialTexture(128, [
+        [0, "#ffe7c2ee"],
+        [0.35, "#ffdba066"],
+        [1, "#ffd99000"],
       ]);
-      disposables.push(dustTex);
-      const dustColors = ["#3a3350", "#243447", "#453026", "#2c3a52"];
-      const dustRng = mulberry32(hashString(`${galaxy.id}-dust`));
-      const coreAngleXZ = Math.atan2(core[2], core[0]);
-      for (let i = 0; i < 8; i++) {
+      disposables.push(coreGlowTex);
+      for (const [scale, opacity] of [
+        [430, 0.1],
+        [260, 0.16],
+        [130, 0.26],
+      ] as const) {
         const mat = new THREE.SpriteMaterial({
-          map: dustTex,
-          color: dustColors[i % dustColors.length],
+          map: coreGlowTex,
           transparent: true,
-          opacity: 0.05 + dustRng() * 0.05,
+          opacity,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
         disposables.push(mat);
         const sprite = new THREE.Sprite(mat);
-        // Banked along the core's side of the sky, far beyond the pan clamp.
-        const angle = coreAngleXZ + (dustRng() - 0.5) * 1.7;
-        const dist = 1200 + dustRng() * 450;
-        sprite.position.set(
-          Math.cos(angle) * dist,
-          -220 + dustRng() * 330,
-          Math.sin(angle) * dist,
-        );
-        const scale = 520 + dustRng() * 520;
-        sprite.scale.set(scale, scale * (0.4 + dustRng() * 0.3), 1);
+        sprite.position.set(core[0], core[1], core[2]);
+        sprite.scale.set(scale, scale * 0.7, 1);
         sprite.raycast = () => {};
         scene.add(sprite);
       }
+      // Distant sky: the void shouldn't be pure black. A huge gradient dome
+      // (vertex-coloured: a faint horizon band, warmed toward the galactic
+      // core) plus banks of dim dust clouds out past the zoom/pan limits give
+      // the far distance a presence the camera can never reach.
+      {
+        const domeGeo = new THREE.SphereGeometry(1900, 40, 24);
+        const domePos = domeGeo.attributes.position;
+        const domeColors = new Float32Array(domePos.count * 3);
+        const deep = new THREE.Color("#04050d");
+        const band = new THREE.Color("#10162b");
+        const warm = new THREE.Color("#1c1410");
+        const coreDir = new THREE.Vector2(core[0], core[2]).normalize();
+        const v = new THREE.Vector3();
+        const c = new THREE.Color();
+        for (let i = 0; i < domePos.count; i++) {
+          v.fromBufferAttribute(domePos, i);
+          // Horizon band: strongest near the galactic plane, fading with |y|.
+          const bandT = Math.exp(-((Math.abs(v.y) / 420) ** 2));
+          // Warmth toward the core's side of the sky.
+          const toward = Math.max(
+            0,
+            new THREE.Vector2(v.x, v.z).normalize().dot(coreDir),
+          );
+          c.copy(deep)
+            .lerp(band, bandT)
+            .add(warm.clone().multiplyScalar(bandT * toward * 0.9));
+          domeColors.set([c.r, c.g, c.b], i * 3);
+        }
+        domeGeo.setAttribute("color", new THREE.BufferAttribute(domeColors, 3));
+        const domeMat = new THREE.MeshBasicMaterial({
+          vertexColors: true,
+          side: THREE.BackSide,
+          depthWrite: false,
+        });
+        disposables.push(domeGeo, domeMat);
+        const dome = new THREE.Mesh(domeGeo, domeMat);
+        dome.renderOrder = -1;
+        dome.raycast = () => {};
+        scene.add(dome);
+      }
+      if (!performanceMode && effects) {
+        const dustTex = radialTexture(128, [
+          [0, "#ffffff55"],
+          [0.45, "#ffffff22"],
+          [1, "#ffffff00"],
+        ]);
+        disposables.push(dustTex);
+        const dustColors = ["#3a3350", "#243447", "#453026", "#2c3a52"];
+        const dustRng = mulberry32(hashString(`${galaxy.id}-dust`));
+        const coreAngleXZ = Math.atan2(core[2], core[0]);
+        for (let i = 0; i < 8; i++) {
+          const mat = new THREE.SpriteMaterial({
+            map: dustTex,
+            color: dustColors[i % dustColors.length],
+            transparent: true,
+            opacity: 0.05 + dustRng() * 0.05,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+          });
+          disposables.push(mat);
+          const sprite = new THREE.Sprite(mat);
+          // Banked along the core's side of the sky, far beyond the pan clamp.
+          const angle = coreAngleXZ + (dustRng() - 0.5) * 1.7;
+          const dist = 1200 + dustRng() * 450;
+          sprite.position.set(
+            Math.cos(angle) * dist,
+            -220 + dustRng() * 330,
+            Math.sin(angle) * dist,
+          );
+          const scale = 520 + dustRng() * 520;
+          sprite.scale.set(scale, scale * (0.4 + dustRng() * 0.3), 1);
+          sprite.raycast = () => {};
+          scene.add(sprite);
+        }
+      }
+
+      // Near layer: a deep scatter around and *below* the play plane, so
+      // tilting reveals stars underneath the map and panning parallaxes.
+      scene.add(
+        makeStars(
+          performanceMode ? 2000 : 4500,
+          PLAY_EXTENT * 2.4,
+          60,
+          -14,
+          "-near",
+          1.0,
+        ),
+      );
     }
 
-    // Near layer: a deep scatter around and *below* the play plane, so
-    // tilting reveals stars underneath the map and panning parallaxes.
-    scene.add(
-      makeStars(
-        performanceMode ? 2000 : 4500,
-        PLAY_EXTENT * 2.4,
-        60,
-        -14,
-        "-near",
-        1.0,
-      ),
-    );
-
     // A few soft nebula sprites tint the disc (skipped in performance mode).
-    if (!performanceMode && effects) {
+    if (skin === "galaxy" && !performanceMode && effects) {
       const nebulaColors = galaxy.theme?.nebulaColors ?? [
         "#4756b8",
         "#8a4bb8",
@@ -771,7 +874,7 @@ export function GalaxyView({
     const spikeTex = spikesTexture(256);
     disposables.push(starTex, coronaTex, spikeTex);
 
-    const coronaSprites: THREE.Sprite[] = [];
+    const coronaSprites: (THREE.Sprite | undefined)[] = [];
     const ownerRingMats: THREE.MeshBasicMaterial[] = [];
     const ownerRings: THREE.Mesh[] = [];
     // Star size = stellar class × role: a red giant capital dwarfs a white
@@ -798,9 +901,32 @@ export function GalaxyView({
       }
       return geo;
     };
+    // Theatre skin: flat filled region markers instead of star sprites,
+    // tinted a dark shade of the owner colour (kept in styleRing).
+    const discMats: (THREE.MeshBasicMaterial | undefined)[] = [];
+    const discGeo = new THREE.CircleGeometry(1.35, 32);
+    disposables.push(discGeo);
+
     galaxy.nodes.forEach((n, i) => {
       const p = positions.get(n.id);
       if (!p) return;
+      if (skin === "theatre") {
+        const discMat = new THREE.MeshBasicMaterial({
+          color: 0x2a3242,
+          depthWrite: false,
+        });
+        const disc = new THREE.Mesh(discGeo, discMat);
+        disc.rotation.x = -Math.PI / 2;
+        disc.position.set(p[0], p[1] - 0.2, p[2]);
+        disc.scale.setScalar(n.kind === "capital" ? 1.25 : 1);
+        disc.raycast = () => {};
+        disposables.push(discMat);
+        scene.add(disc);
+        discMats.push(discMat);
+        coronaSprites.push(undefined);
+        return;
+      }
+      discMats.push(undefined);
       const type = nodeType[i];
       const stellar = new THREE.Color(type.color);
       // Normal blending (not additive): the hot core is near-opaque, so the
@@ -1096,6 +1222,15 @@ export function GalaxyView({
       mat.color.copy(ownerColor(owner));
       mat.opacity =
         owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75;
+      // Theatre region markers fill with a dark shade of the owner colour.
+      const disc = discMats[i];
+      if (disc) {
+        disc.color
+          .copy(
+            owner === NEUTRAL ? new THREE.Color(0x39404e) : ownerColor(owner),
+          )
+          .multiplyScalar(owner === NEUTRAL ? 1 : 0.45);
+      }
     };
 
     // Selection enlarges the node's own ownership ring and pulses its colour

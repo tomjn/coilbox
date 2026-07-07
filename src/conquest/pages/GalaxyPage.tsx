@@ -267,9 +267,11 @@ function SelectionPanel({
             {faction?.name ?? "Unclaimed"}
             {node.kind === "capital" && " · Capital"}
           </span>
-          <span className="text-xs capitalize text-muted-foreground/70">
-            {starTypeFor(node.id, node.kind === "capital").name}
-          </span>
+          {galaxy.theme?.skin !== "theatre" && (
+            <span className="text-xs capitalize text-muted-foreground/70">
+              {starTypeFor(node.id, node.kind === "capital").name}
+            </span>
+          )}
         </div>
         <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
           ×
