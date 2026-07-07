@@ -114,6 +114,20 @@ How they're used when a galaxy is generated:
 Merge order per field is **profile > catalog > built-in**; an empty array is
 treated as absent, so an override never blanks a pool.
 
+The bundled catalog ships this for the Total Annihilation lineage — **Balanced
+Annihilation**, **XTA**, and **Basically OTA** — giving each a flat pool of
+world names drawn from the TA campaigns and expansions (the original planets
+Empyrrean, Core Prime, Thalassean, Barathrum, Rougpelt, …; *Core Contingency*
+worlds Hydross, Lusch, Temblor, Gelidus; *Battle Tactics* locales Destral II,
+Yrdac, Neovestral II, …; moons such as Dump, Novaspin IV and Nayrb; a few
+community easter-egg names; and the *TA: Kingdoms* kingdoms Aramon, Veruna,
+Taros, Zhon and Creon) plus the two **Arm** / **Core** lore factions. Names are
+drawn from one shared pool regardless of who holds the system (ownership shifts
+in play), so it reads as a TA galaxy rather than mapping planets to a side. Each
+faction's `side` uses that game's own casing (`ARM`/`CORE` for BA and BOTA,
+`Arm`/`Core` for XTA) so its AI launches on the right faction; colours are left
+to the palette (player blue, enemy red).
+
 ## Bundling a galaxy
 
 A conquest galaxy is a single JSON document. **Export** one from the Conquest
