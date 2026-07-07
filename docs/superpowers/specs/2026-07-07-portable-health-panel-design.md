@@ -18,14 +18,14 @@ Below the current facts summary in `src/profile/SettingsSection.tsx`. The sectio
 
 ## The checks
 
-Eight checks. Five compose existing data with no backend change; three need new plumbing (marked).
+Eight checks. Six compose existing data with no backend change; two need new plumbing (marked).
 
 1. **Portable mode** — active + resolved `.coilbox` path. Source: `getProfileRoot()` (`src/profile/profile.ts`); non-empty ⇒ portable. Status: informational (OK when portable, neutral "Not portable" otherwise).
 2. **Profile source / parse error** — where `profile.json` loaded from, or the parse error. Source: `getProfileSource()` plus a **new** `getProfileError()`. *(New plumbing: FE — see below.)*
 3. **Content roots** — each root listed Portable or Absolute, so the author sees what travels with the package. Source: content plugin state `state.roots` (each carries `path` + `portable`). Status: warn if portable mode is on but no root is portable (nothing would ship).
 4. **Game filter reality check** — "matches N installed games" (0 ⇒ warn) and an invalid-regex warning. Source: `getProfile().gameFilter` + `dlInstalledContent({ paths })` for the game set; invalid regex detected by re-running `new RegExp(f.regex, "i")` in the check. No backend change.
 5. **Write root portable** — warn when the Downloads write root isn't inside the package, because GitHub-release updates would then land outside it. Source: `useWriteRootPath()` compared against the app dir (`dirname` of `getProfileRoot()`). Only meaningful in portable mode.
-6. **Bundled campaign load errors** — warn when a bundled/local campaign fails to parse. *(New plumbing: extend `campaign_list` to also return per-file errors — see below.)*
+6. **Bundled campaign load errors** — warn when a bundled/local campaign fails to parse. Source: `campaignList()` returns each campaign's raw JSON, and the schema-agnostic plugin passes malformed files through as-is; the frontend validates each with `parseCampaignJson(item.json)` (`src/campaign/model.ts:193`, returns `null` on bad shape) and counts the failures. No backend change. (Rare files the Rust plugin can't even read are out of scope.)
 7. **Playable content present** — warn when no engine or no games were found (an empty package). Source: content plugin state (engines under roots) + `dlInstalledContent` (games). Reuses data the download screens already read.
 8. **Folders writable** — probe the Downloads write root and `.coilbox/data` for writability; a read-only folder silently blocks downloads and updates. *(New plumbing: new Rust command `dl_path_writable` — see below.)*
 
@@ -57,7 +57,7 @@ Renders `HealthCheck[]`: a status dot, the label, and the hint when present. No 
 
 - **`getProfileError()`** in `src/profile/profile.ts`. `loadProfile()` already catches parse failures (`profile.ts:181`) and transport failures (`:188`) and falls back to empty. Retain the message in a module singleton (`loadedError: string | null`) and expose it. No Rust change; `profile_load` already returns the raw `json`/`source`, so a `source === "file"` with a retained parse error is the "file present but unparseable" signal.
 - **`dl_path_writable({ path }) → { writable: boolean; error?: string }`** in the downloads plugin (`crates/tauri-plugin-coilbox-downloads`). Probe = create a temp file in the dir, delete it; map failure to `{ writable: false, error }`. Needs its `build.rs` COMMANDS entry + `permissions/default.toml` (per the project's ACL rule). FE binding in `src/downloads/bindings.ts`.
-- **`campaign_list` extended** to also return `errors: { file: string; message: string }[]` for bundled/local campaign files that failed to parse (the loader currently drops them silently). Frontend type updated in `src/campaign/bindings.ts`. If extending the existing command proves awkward, a sibling `campaign_load_errors` command is an acceptable fallback — either way check #6 reads a list of `{file, message}`.
+- **No campaign backend change.** Check #6 is frontend-only: it runs `campaignList()` and filters items where `parseCampaignJson(item.json)` is `null`, grouping the count by `item.source` (`bundled` / `local`). `CampaignListItem` carries no filename, so the check reports a count, not per-file names.
 
 ## Data flow
 
@@ -67,7 +67,7 @@ content plugin state ┤
 dlInstalledContent   ├─→ deriveHealthChecks(inputs) → HealthCheck[] → HealthChecklist
 useWriteRootPath     ┤        (pure)                                        ↑
 dl_path_writable     ┤                                              ProfileSettings
-campaign_list.errors ┘
+campaignList+parse   ┘
 ```
 
 ## Error handling & states
