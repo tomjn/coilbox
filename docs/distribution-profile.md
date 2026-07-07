@@ -359,6 +359,34 @@ toggle, this button is **not** removed by the kiosk lock.
 For a fully branded exit instead of (or in addition to) the sidebar button, put a
 `data-coilbox-action="quit"` element in your [`welcome`](#welcome-object) HTML.
 
+### `conquest` (object)
+
+Supplies system/faction names — and whole lore factions — for
+**[Galactic Conquest](conquest.md)** galaxies generated in this distribution, so
+they read as your game rather than generic space. Every field is optional and
+overrides the branding catalog's per-game defaults.
+
+```json
+{
+  "version": 1,
+  "conquest": {
+    "starNames": ["Uros", "Ophvor", "Loz"],
+    "factions": [
+      { "name": "Sovereign Syndicate", "color": "#00c853", "side": "Core", "aggression": 0.4 }
+    ]
+  }
+}
+```
+
+- `starNames` / `starPrefixes` / `starSuffixes` — full system names (used first),
+  then syllables synthesized names are built from.
+- `factionNames` — full faction names, used when no `factions` presets are given.
+- `factions` — lore factions assigned in order (the player first); each is
+  `{ name, color?, side?, aggression? }`.
+
+See the [Names and factions](conquest.md#names-and-factions) section for how the
+pools are drawn and the full merge order (profile over catalog over built-ins).
+
 ## Verifying it's active
 
 Open **Settings > Distribution profile**. It shows whether a profile is loaded, where
