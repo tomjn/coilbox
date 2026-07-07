@@ -138,7 +138,7 @@ export interface CampaignExportFile {
 }
 
 /** Narrow an unknown to a {@link MediaRef}, or drop it (returns undefined). */
-function parseImageRef(value: unknown): MediaRef | undefined {
+export function parseImageRef(value: unknown): MediaRef | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const p = value as Record<string, unknown>;
   if (p.kind === "local" && typeof p.path === "string") {
@@ -166,7 +166,7 @@ function parseMapPreview(value: unknown): MapPreviewConfig | undefined {
 }
 
 /** Narrow an unknown to a {@link MapDownloadHint}, or drop it (returns undefined). */
-function parseMapDownload(value: unknown): MapDownloadHint | undefined {
+export function parseMapDownload(value: unknown): MapDownloadHint | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const p = value as Record<string, unknown>;
   const springName =
