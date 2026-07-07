@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { DDSLoader } from "three/addons/loaders/DDSLoader.js";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useReduceMotion } from "../../../general/display";
 import type { MapAppearance } from "../../bindings";
 import { getImageInfo } from "../../imageCache";
 
@@ -225,6 +226,9 @@ export function MapPreview3D({
    * falls back to the map's own water heuristic (and to "no water" for wireframe). */
   initialWater?: boolean;
 }) {
+  // Setting-aware reduce-motion (General settings -> Motion & effects), which
+  // itself follows the OS preference in its default "system" mode.
+  const reduceMotion = useReduceMotion();
   const [srcs, setSrcs] = useState<Srcs | null>(null);
   // True once the three.js scene is actually on screen. Drives the "building"
   // overlay so it stays up through both the image fetch and the build (and while
@@ -531,9 +535,6 @@ uniform float detailStrength;`,
       }
       // Auto-orbit (disabled under reduced motion). `wantSpin` also gates the
       // pause-on-drag listeners so an interactive slot resumes spinning on release.
-      const reduceMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
       // A signed `autoSpin` also picks the direction: a negative value reverses the
       // orbit via a negative `autoRotateSpeed`.
       const wantSpin = autoSpin != null && autoSpin !== 0 && !reduceMotion;
@@ -691,6 +692,7 @@ uniform float detailStrength;`,
     interactive,
     enableZoom,
     enablePan,
+    reduceMotion,
   ]);
 
   // Spring's water plane sits at world height 0, so water is only visible where
@@ -707,18 +709,15 @@ uniform float detailStrength;`,
   }, [resolvedWater]);
 
   // Apply spin-speed changes to a live scene without rebuilding it (the editor's
-  // slider), and keep `prefers-reduced-motion` authoritative.
+  // slider), and keep the reduce-motion preference authoritative.
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
     const wantSpin = autoSpin != null && autoSpin !== 0 && !reduceMotion;
     controls.autoRotate = wantSpin;
     controls.autoRotateSpeed = 2.0 * (autoSpin ?? 1);
     renderRef.current?.();
-  }, [autoSpin]);
+  }, [autoSpin, reduceMotion]);
 
   // Live toggles — mutate the existing scene, no rebuild. `forceWireframe` always
   // wins so the mission heightmap slot can't be switched to solid.

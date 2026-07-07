@@ -1,6 +1,13 @@
-import { Maximize2, Wrench } from "lucide-react";
+import { Maximize2, Sparkles, Wrench } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import { useAdvancedModeSetting } from "../advanced";
+import {
+  type ReduceMotionSetting,
+  useEffectsSetting,
+  usePerformanceModeSetting,
+  useReduceMotionSetting,
+} from "../display";
 import { isFullscreenLocked, useFullscreenSetting } from "../fullscreen";
 import { hasProfileSplash, useSplashSetting } from "../splash";
 
@@ -14,6 +21,9 @@ export default function GeneralSettings() {
   const [advanced, setAdvanced] = useAdvancedModeSetting();
   const [fullscreen, setFullscreen] = useFullscreenSetting();
   const [splash, setSplash] = useSplashSetting();
+  const [reduceMotion, setReduceMotion] = useReduceMotionSetting();
+  const [effects, setEffects] = useEffectsSetting();
+  const [performance, setPerformance] = usePerformanceModeSetting();
   // A kiosk-locked build forces fullscreen and hides the toggle entirely.
   const fullscreenLocked = isFullscreenLocked();
   // The splash toggle only makes sense when the profile actually ships one.
@@ -95,6 +105,70 @@ export default function GeneralSettings() {
           )}
         </section>
       )}
+
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <Sparkles size={15} /> Motion &amp; effects
+        </h2>
+        <div className="flex items-start gap-3">
+          <div className="w-40">
+            <OptionSelect
+              value={reduceMotion}
+              onValueChange={(v) => setReduceMotion(v as ReduceMotionSetting)}
+              size="sm"
+              options={[
+                { value: "system", label: "Follow system" },
+                { value: "on", label: "Reduce motion" },
+                { value: "off", label: "Full motion" },
+              ]}
+            />
+          </div>
+          <span className="space-y-1">
+            <span className="block text-sm font-medium">Reduce motion</span>
+            <span className="block text-xs text-muted-foreground">
+              Stops ambient animation — the galaxy twinkle, scrolling panoramas,
+              spinning map previews and result flourishes. "Follow system"
+              respects your OS accessibility preference.
+            </span>
+          </span>
+        </div>
+        <label
+          htmlFor="display-effects"
+          className="flex cursor-pointer items-start gap-3"
+        >
+          <Switch
+            id="display-effects"
+            checked={effects}
+            onCheckedChange={(v) => setEffects(v === true)}
+            className="mt-0.5"
+          />
+          <span className="space-y-1">
+            <span className="block text-sm font-medium">Ambient effects</span>
+            <span className="block text-xs text-muted-foreground">
+              Star twinkle, nebulae, ambience audio and other decorative
+              touches. Turn off for a plainer, quieter interface.
+            </span>
+          </span>
+        </label>
+        <label
+          htmlFor="display-performance"
+          className="flex cursor-pointer items-start gap-3"
+        >
+          <Switch
+            id="display-performance"
+            checked={performance}
+            onCheckedChange={(v) => setPerformance(v === true)}
+            className="mt-0.5"
+          />
+          <span className="space-y-1">
+            <span className="block text-sm font-medium">Performance mode</span>
+            <span className="block text-xs text-muted-foreground">
+              Renders 3D views at a lower resolution with fewer particles — for
+              laptops and older GPUs.
+            </span>
+          </span>
+        </label>
+      </section>
     </div>
   );
 }

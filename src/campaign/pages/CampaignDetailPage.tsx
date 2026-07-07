@@ -1,4 +1,5 @@
 import { ArrowLeft, ChevronRight, CircleCheck, Lock } from "lucide-react";
+import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router";
 import { SkeletonList } from "../../content/pages/components/states";
 import { useCampaignProgress, useCampaigns } from "../campaigns";
@@ -54,7 +55,17 @@ export default function CampaignDetailPage() {
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
-    <div className="relative min-h-full">
+    // An authored accent recolours the primary token for this campaign's
+    // pages only (profile.json proves --primary overriding is safe app-wide;
+    // this is the same trick scoped to a subtree).
+    <div
+      className="relative min-h-full"
+      style={
+        campaign.accent
+          ? ({ "--primary": campaign.accent } as CSSProperties)
+          : undefined
+      }
+    >
       {/* Campaign backdrop (if any), dimmed for text contrast. A video backdrop
           renders reachable pause/mute controls, so the wrapper isn't aria-hidden;
           the empty-alt image and the dimming layer are decorative on their own. */}
@@ -118,7 +129,9 @@ export default function CampaignDetailPage() {
             <h2 className="text-sm font-medium text-muted-foreground">
               Missions
             </h2>
-            <ol className="flex flex-col gap-2">
+            {/* The rail: a vertical connector through the mission badges,
+                masked by each badge's solid background. */}
+            <ol className="relative flex flex-col gap-2 before:absolute before:bottom-6 before:left-[25px] before:top-6 before:w-px before:bg-border/60">
               {campaign.missions.map((mission, i) => (
                 <MissionRow
                   key={mission.id}
@@ -162,7 +175,13 @@ function MissionRow({
   const inner = (
     <>
       <span
-        className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border/60 text-xs font-medium text-muted-foreground"
+        className={`z-10 flex size-7 shrink-0 items-center justify-center rounded-full border bg-card text-xs font-medium ${
+          state === "complete"
+            ? "border-emerald-500/70 text-emerald-600 dark:text-emerald-400"
+            : state === "available"
+              ? "border-primary/70 text-primary"
+              : "border-border/60 text-muted-foreground"
+        }`}
         aria-hidden
       >
         {index + 1}

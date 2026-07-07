@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-conquest-delete"
+description = "Enables the conquest_delete command without any pre-configured scope."
+commands.allow = ["conquest_delete"]
+
+[[permission]]
+identifier = "deny-conquest-delete"
+description = "Denies the conquest_delete command without any pre-configured scope."
+commands.deny = ["conquest_delete"]

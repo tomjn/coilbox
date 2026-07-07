@@ -8,14 +8,14 @@ import { useUnitsyncScan } from "../content/config";
 import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
 import { toBattleConfig, usePreferredTarget } from "../play/config";
-import { usePlay } from "../play/PlayProvider";
-import { useCampaignProgress } from "./campaigns";
 import {
   type DetectedResult,
   diffNewReplays,
   pickNewestReplay,
   resultFromDemoInfo,
-} from "./detect";
+} from "../play/detect";
+import { usePlay } from "../play/PlayProvider";
+import { useCampaignProgress } from "./campaigns";
 import type { Campaign, CampaignMission } from "./model";
 import { applyDefeat, applyVictory, nextAvailableMission } from "./results";
 

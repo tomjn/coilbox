@@ -570,6 +570,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-coilbox-anim",
  "tauri-plugin-coilbox-campaign",
+ "tauri-plugin-coilbox-conquest",
  "tauri-plugin-coilbox-content",
  "tauri-plugin-coilbox-downloads",
  "tauri-plugin-coilbox-lobby-servers",
@@ -4657,6 +4658,19 @@ dependencies = [
  "tauri-plugin",
  "tempfile",
  "uuid",
+]
+
+[[package]]
+name = "tauri-plugin-coilbox-conquest"
+version = "0.0.0"
+dependencies = [
+ "coilbox-portable",
+ "picoframe-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tempfile",
 ]
 
 [[package]]

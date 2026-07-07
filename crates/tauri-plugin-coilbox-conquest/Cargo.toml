@@ -1,0 +1,22 @@
+[package]
+name = "tauri-plugin-coilbox-conquest"
+version = "0.0.0"
+description = "Galactic-conquest storage plugin for Coilbox (Rust half): stores galaxy documents and per-run conquest state. ACL identifier: coilbox-conquest"
+edition = "2021"
+license = "MIT"
+# Tauri requires `links` to equal `package.name`. The ACL identifier is this
+# name with the `tauri-plugin-` prefix stripped -> `coilbox-conquest`.
+links = "tauri-plugin-coilbox-conquest"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+picoframe-core = "0.0.4"
+coilbox-portable = { path = "../coilbox-portable" }
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,5 +1,6 @@
 import { cn } from "@picoframe/frame";
 import { useEffect, useRef } from "react";
+import { useEffectsEnabled, useReduceMotion } from "../../../general/display";
 import { mediaKind } from "../../../lib/assetUrl";
 import type { ImageRef, MediaPlayback } from "../../model";
 import { useCampaignImage } from "../../panorama";
@@ -54,6 +55,13 @@ export function PanoramaScroller({
   const ref = useRef<HTMLDivElement>(null);
   const height = fill ? "h-full" : "h-28";
   const scroll = resolvePlayback(playback, DECORATIVE_DEFAULTS).scroll;
+  // Settings-aware stillness: dropping the animation class leaves the first
+  // tile as a static backdrop. The CSS media query still covers the OS
+  // preference on its own (see index.css); this adds the app-level toggles
+  // on top of the author's `playback.scroll` choice.
+  const reduceMotion = useReduceMotion();
+  const effectsEnabled = useEffectsEnabled();
+  const still = reduceMotion || !effectsEnabled;
 
   // Measure the tile width (image aspect × rendered height) and set the loop
   // distance + duration as custom properties the keyframes read. Re-measures on
@@ -129,6 +137,7 @@ export function PanoramaScroller({
       aria-hidden
       className={cn(
         "campaign-panorama overflow-hidden rounded-md bg-muted",
+        still && "campaign-panorama-still",
         height,
         className,
       )}

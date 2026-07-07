@@ -525,6 +525,96 @@
           "markdownDescription": "Denies the campaign_save command without any pre-configured scope."
         },
         {
+          "description": "Allows the conquest plugin's galaxy storage, import/export and run-state commands.\n#### This default permission set includes:\n\n- `allow-conquest-list`\n- `allow-conquest-save`\n- `allow-conquest-delete`\n- `allow-conquest-export`\n- `allow-conquest-import`\n- `allow-conquest-state-load`\n- `allow-conquest-state-save`",
+          "type": "string",
+          "const": "coilbox-conquest:default",
+          "markdownDescription": "Allows the conquest plugin's galaxy storage, import/export and run-state commands.\n#### This default permission set includes:\n\n- `allow-conquest-list`\n- `allow-conquest-save`\n- `allow-conquest-delete`\n- `allow-conquest-export`\n- `allow-conquest-import`\n- `allow-conquest-state-load`\n- `allow-conquest-state-save`"
+        },
+        {
+          "description": "Enables the conquest_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:allow-conquest-delete",
+          "markdownDescription": "Enables the conquest_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the conquest_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:allow-conquest-export",
+          "markdownDescription": "Enables the conquest_export command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the conquest_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:allow-conquest-import",
+          "markdownDescription": "Enables the conquest_import command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the conquest_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:allow-conquest-list",
+          "markdownDescription": "Enables the conquest_list command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the conquest_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:allow-conquest-save",
+          "markdownDescription": "Enables the conquest_save command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the conquest_state_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:allow-conquest-state-load",
+          "markdownDescription": "Enables the conquest_state_load command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the conquest_state_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:allow-conquest-state-save",
+          "markdownDescription": "Enables the conquest_state_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the conquest_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:deny-conquest-delete",
+          "markdownDescription": "Denies the conquest_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the conquest_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:deny-conquest-export",
+          "markdownDescription": "Denies the conquest_export command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the conquest_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:deny-conquest-import",
+          "markdownDescription": "Denies the conquest_import command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the conquest_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:deny-conquest-list",
+          "markdownDescription": "Denies the conquest_list command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the conquest_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:deny-conquest-save",
+          "markdownDescription": "Denies the conquest_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the conquest_state_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:deny-conquest-state-load",
+          "markdownDescription": "Denies the conquest_state_load command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the conquest_state_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-conquest:deny-conquest-state-save",
+          "markdownDescription": "Denies the conquest_state_save command without any pre-configured scope."
+        },
+        {
           "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`",
           "type": "string",
           "const": "coilbox-content:default",
@@ -711,16 +801,22 @@
           "markdownDescription": "Denies the content_verify_engine command without any pre-configured scope."
         },
         {
-          "description": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-hakora-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-github-latest-release`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`\n- `allow-dl-set-engine-dirs`",
+          "description": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-cancel`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-hakora-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-github-latest-release`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`\n- `allow-dl-set-engine-dirs`\n- `allow-dl-path-writable`",
           "type": "string",
           "const": "coilbox-downloads:default",
-          "markdownDescription": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-hakora-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-github-latest-release`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`\n- `allow-dl-set-engine-dirs`"
+          "markdownDescription": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-cancel`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-hakora-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-github-latest-release`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`\n- `allow-dl-set-engine-dirs`\n- `allow-dl-path-writable`"
         },
         {
           "description": "Enables the dl_bar_maps command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-downloads:allow-dl-bar-maps",
           "markdownDescription": "Enables the dl_bar_maps command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the dl_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:allow-dl-cancel",
+          "markdownDescription": "Enables the dl_cancel command without any pre-configured scope."
         },
         {
           "description": "Enables the dl_download command without any pre-configured scope.",
@@ -771,6 +867,12 @@
           "markdownDescription": "Enables the dl_installed_content command without any pre-configured scope."
         },
         {
+          "description": "Enables the dl_path_writable command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:allow-dl-path-writable",
+          "markdownDescription": "Enables the dl_path_writable command without any pre-configured scope."
+        },
+        {
           "description": "Enables the dl_recoil_engines command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-downloads:allow-dl-recoil-engines",
@@ -819,6 +921,12 @@
           "markdownDescription": "Denies the dl_bar_maps command without any pre-configured scope."
         },
         {
+          "description": "Denies the dl_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:deny-dl-cancel",
+          "markdownDescription": "Denies the dl_cancel command without any pre-configured scope."
+        },
+        {
           "description": "Denies the dl_download command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-downloads:deny-dl-download",
@@ -865,6 +973,12 @@
           "type": "string",
           "const": "coilbox-downloads:deny-dl-installed-content",
           "markdownDescription": "Denies the dl_installed_content command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_path_writable command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-downloads:deny-dl-path-writable",
+          "markdownDescription": "Denies the dl_path_writable command without any pre-configured scope."
         },
         {
           "description": "Denies the dl_recoil_engines command without any pre-configured scope.",
