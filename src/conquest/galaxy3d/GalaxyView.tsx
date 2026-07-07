@@ -50,6 +50,122 @@ interface GalaxyViewProps {
 
 const NEUTRAL_COLOR = "#6b7280";
 
+/**
+ * Stellar classes for the selectable stars. The star itself is coloured by
+ * its class — red dwarfs to blue giants — while *ownership* lives entirely on
+ * the ring (and corona ring tint stays stellar too). Class is a deterministic
+ * hash of the node id, with capitals biased toward the giant classes so they
+ * read important.
+ */
+const STAR_TYPES = [
+  { name: "red dwarf", color: "#ff6a45", size: 0.68 },
+  { name: "orange dwarf", color: "#ffa04d", size: 0.85 },
+  { name: "yellow star", color: "#ffd76e", size: 1.0 },
+  { name: "white star", color: "#f2f5ff", size: 1.05 },
+  { name: "white dwarf", color: "#cfe4ff", size: 0.58 },
+  { name: "blue giant", color: "#8fb4ff", size: 1.45 },
+  { name: "red giant", color: "#ff5f4e", size: 1.55 },
+] as const;
+const GIANT_TYPES = [5, 6]; // indices into STAR_TYPES
+
+export function starTypeFor(nodeId: string, capital: boolean) {
+  const h = hashString(`${nodeId}-stellar`);
+  if (capital) return STAR_TYPES[GIANT_TYPES[h % GIANT_TYPES.length]];
+  return STAR_TYPES[h % STAR_TYPES.length];
+}
+
+/**
+ * A merged flat-quad geometry for the lanes: `LineBasicMaterial` linewidth is
+ * ignored on nearly every platform, so thin translucent rectangles on the
+ * play plane give the thick, anti-aliased connections lines can't.
+ */
+function laneQuadGeometry(
+  segments: [x1: number, z1: number, x2: number, z2: number][],
+  width: number,
+  y: number,
+): THREE.BufferGeometry {
+  const positions = new Float32Array(segments.length * 4 * 3);
+  const uvs = new Float32Array(segments.length * 4 * 2);
+  const indices: number[] = [];
+  segments.forEach(([x1, z1, x2, z2], i) => {
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const len = Math.hypot(dx, dz) || 1;
+    // Perpendicular in the plane, half-width each side.
+    const px = (-dz / len) * (width / 2);
+    const pz = (dx / len) * (width / 2);
+    positions.set(
+      [
+        x1 + px,
+        y,
+        z1 + pz,
+        x1 - px,
+        y,
+        z1 - pz,
+        x2 + px,
+        y,
+        z2 + pz,
+        x2 - px,
+        y,
+        z2 - pz,
+      ],
+      i * 12,
+    );
+    // u runs along the lane so a capsule alpha texture rounds the ends.
+    uvs.set([0, 1, 0, 0, 1, 1, 1, 0], i * 8);
+    const b = i * 4;
+    indices.push(b, b + 1, b + 2, b + 2, b + 1, b + 3);
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  return geo;
+}
+
+/** Split segments into short dashes (for the contested-lane overlay). */
+function dashSegments(
+  segments: [number, number, number, number][],
+  dashLen: number,
+  gapLen: number,
+): [number, number, number, number][] {
+  const out: [number, number, number, number][] = [];
+  for (const [x1, z1, x2, z2] of segments) {
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const len = Math.hypot(dx, dz);
+    if (len === 0) continue;
+    const ux = dx / len;
+    const uz = dz / len;
+    for (let at = 0; at < len; at += dashLen + gapLen) {
+      const end = Math.min(at + dashLen, len);
+      // Skip stubby leftovers — a dash shorter than its own caps looks messy.
+      if (end - at < dashLen * 0.5) break;
+      out.push([x1 + ux * at, z1 + uz * at, x1 + ux * end, z1 + uz * end]);
+    }
+  }
+  return out;
+}
+
+/** A white capsule (rounded-ends bar) alpha texture for the lane quads. */
+function capsuleTexture(): THREE.Texture {
+  const w = 128;
+  const h = 32;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.roundRect(1, 1, w - 2, h - 2, h / 2 - 1);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 /** Radial-gradient sprite texture (glows and nebulae). */
 function radialTexture(size: number, stops: [number, string][]): THREE.Texture {
   const canvas = document.createElement("canvas");
@@ -258,38 +374,44 @@ export function GalaxyView({
 
     /* ----------------------------- play layer ------------------------------ */
 
-    // Lanes: a quiet neutral base (ownership already lives on the nodes —
-    // coloured lanes just made the map noisy) with a bright overlay re-drawing
-    // frontier lanes (player side ↔ attackable side) so "where can I go"
-    // reads at a glance.
-    const laneGeo = new THREE.BufferGeometry();
-    const lanePos = new Float32Array(galaxy.links.length * 6);
-    galaxy.links.forEach(([a, b], i) => {
+    // Lanes: thick translucent quads on the play plane (see
+    // laneQuadGeometry) — a quiet neutral base, with a brighter overlay
+    // re-drawing frontier lanes (player side ↔ attackable side) so "where
+    // can I go" reads at a glance.
+    const laneSegs: [number, number, number, number][] = [];
+    for (const [a, b] of galaxy.links) {
       const pa = positions.get(a);
       const pb = positions.get(b);
-      if (!pa || !pb) return;
-      lanePos.set(pa, i * 6);
-      lanePos.set(pb, i * 6 + 3);
-    });
-    laneGeo.setAttribute("position", new THREE.BufferAttribute(lanePos, 3));
-    const laneMat = new THREE.LineBasicMaterial({
+      if (pa && pb) laneSegs.push([pa[0], pa[2], pb[0], pb[2]]);
+    }
+    const LANE_WIDTH = 0.5;
+    const laneTex = capsuleTexture();
+    disposables.push(laneTex);
+    const laneGeo = laneQuadGeometry(laneSegs, LANE_WIDTH, -0.6);
+    const laneMat = new THREE.MeshBasicMaterial({
+      map: laneTex,
       color: 0x93a7c8,
       transparent: true,
-      opacity: 0.2,
+      opacity: 0.25,
+      depthWrite: false,
+      side: THREE.DoubleSide,
     });
     disposables.push(laneGeo, laneMat);
-    const lanes = new THREE.LineSegments(laneGeo, laneMat);
+    const lanes = new THREE.Mesh(laneGeo, laneMat);
     lanes.raycast = () => {};
     scene.add(lanes);
 
-    const frontierGeo = new THREE.BufferGeometry();
-    const frontierMat = new THREE.LineBasicMaterial({
-      color: 0xd6e4ff,
+    // Contested lanes re-draw dashed at the same width, capsule-capped.
+    const frontierMat = new THREE.MeshBasicMaterial({
+      map: laneTex,
+      color: 0xdbe7ff,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.8,
+      depthWrite: false,
+      side: THREE.DoubleSide,
     });
-    disposables.push(frontierGeo, frontierMat);
-    const frontier = new THREE.LineSegments(frontierGeo, frontierMat);
+    disposables.push(frontierMat);
+    const frontier = new THREE.Mesh(new THREE.BufferGeometry(), frontierMat);
     frontier.raycast = () => {};
     scene.add(frontier);
 
@@ -332,29 +454,32 @@ export function GalaxyView({
     ]);
     disposables.push(starTex, coronaTex);
 
-    /** Whiten an owner colour so the star centre stays hot. */
+    /** Whiten a stellar colour so the star centre stays hot. */
     const starTint = (c: THREE.Color) =>
-      c.clone().lerp(new THREE.Color(0xffffff), 0.72);
+      c.clone().lerp(new THREE.Color(0xffffff), 0.55);
 
-    const starMats: THREE.SpriteMaterial[] = [];
-    const coronaMats: THREE.SpriteMaterial[] = [];
     const coronaSprites: THREE.Sprite[] = [];
     const ownerRingMats: THREE.MeshBasicMaterial[] = [];
+    // Star size = stellar class × role: a red giant capital dwarfs a white
+    // dwarf border system, per-node hash keeps the mix stable.
+    const nodeType = galaxy.nodes.map((n) =>
+      starTypeFor(n.id, n.kind === "capital"),
+    );
     const starScale = (i: number) =>
-      galaxy.nodes[i].kind === "capital" ? 5.4 : 3.8;
+      (galaxy.nodes[i].kind === "capital" ? 4.6 : 3.6) * nodeType[i].size;
     const coronaScale = (i: number, hovered: boolean) => {
       const capital = galaxy.nodes[i].kind === "capital";
-      return (capital ? 12.5 : 8.5) * (hovered ? 1.35 : 1);
+      return (capital ? 10.5 : 7.5) * nodeType[i].size * (hovered ? 1.35 : 1);
     };
-    const ringGeo = new THREE.RingGeometry(1.75, 2.0, 40);
+    const ringGeo = new THREE.RingGeometry(1.7, 2.15, 40);
     disposables.push(ringGeo);
     galaxy.nodes.forEach((n, i) => {
       const p = positions.get(n.id);
       if (!p) return;
-      const owner = ownerColor(ownersRef.current[n.id] ?? n.owner);
+      const stellar = new THREE.Color(nodeType[i].color);
       const starMat = new THREE.SpriteMaterial({
         map: starTex,
-        color: starTint(owner),
+        color: starTint(stellar),
         transparent: true,
         opacity: 1,
         blending: THREE.AdditiveBlending,
@@ -366,9 +491,9 @@ export function GalaxyView({
       star.raycast = () => {};
       const coronaMat = new THREE.SpriteMaterial({
         map: coronaTex,
-        color: owner,
+        color: stellar,
         transparent: true,
-        opacity: 0.6,
+        opacity: 0.5,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
@@ -376,8 +501,9 @@ export function GalaxyView({
       corona.position.set(p[0], p[1], p[2]);
       corona.scale.setScalar(coronaScale(i, false));
       corona.raycast = () => {};
+      // Ownership lives on the ring alone (saturated faction colour).
       const ringMat = new THREE.MeshBasicMaterial({
-        color: owner,
+        color: ownerColor(ownersRef.current[n.id] ?? n.owner),
         transparent: true,
         opacity: 0.7,
         side: THREE.DoubleSide,
@@ -387,8 +513,6 @@ export function GalaxyView({
       ring.rotation.x = -Math.PI / 2;
       ring.position.set(p[0], p[1] - 0.4, p[2]);
       ring.raycast = () => {};
-      starMats.push(starMat);
-      coronaMats.push(coronaMat);
       coronaSprites.push(corona);
       ownerRingMats.push(ringMat);
       disposables.push(starMat, coronaMat, ringMat);
@@ -530,31 +654,30 @@ export function GalaxyView({
       const current = ownersRef.current;
       galaxy.nodes.forEach((n, i) => {
         const owner = current[n.id] ?? n.owner;
-        const c = ownerColor(owner);
-        starMats[i]?.color.copy(starTint(c));
-        coronaMats[i]?.color.copy(c);
         const ringMat = ownerRingMats[i];
         if (ringMat) {
-          ringMat.color.copy(c);
+          ringMat.color.copy(ownerColor(owner));
           // Your territory reads solid; enemies dimmer; neutral faint.
           ringMat.opacity =
-            owner === playerFactionId ? 0.95 : owner === NEUTRAL ? 0.3 : 0.6;
+            owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75;
         }
       });
       // Rebuild the frontier overlay (player-owned end ↔ non-player end).
-      const frontierPos: number[] = [];
+      const frontierSegs: [number, number, number, number][] = [];
       for (const [a, b] of galaxy.links) {
         const aPlayer = current[a] === playerFactionId;
         const bPlayer = current[b] === playerFactionId;
         if (aPlayer !== bPlayer) {
           const pa = positions.get(a);
           const pb = positions.get(b);
-          if (pa && pb) frontierPos.push(...pa, ...pb);
+          if (pa && pb) frontierSegs.push([pa[0], pa[2], pb[0], pb[2]]);
         }
       }
-      frontierGeo.setAttribute(
-        "position",
-        new THREE.BufferAttribute(new Float32Array(frontierPos), 3),
+      frontier.geometry.dispose();
+      frontier.geometry = laneQuadGeometry(
+        dashSegments(frontierSegs, 2.2, 1.7),
+        LANE_WIDTH,
+        -0.5,
       );
     };
     applyOwnersRef.current = applyOwners;
@@ -671,6 +794,7 @@ export function GalaxyView({
       renderer?.domElement.removeEventListener("pointerup", onPointerUp);
       controls?.dispose();
       for (const label of labelObjects) label.removeFromParent();
+      frontier.geometry.dispose();
       for (const d of disposables) d.dispose();
       labelRenderer?.domElement.remove();
       if (renderer) {

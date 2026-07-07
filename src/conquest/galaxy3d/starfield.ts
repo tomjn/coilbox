@@ -94,13 +94,16 @@ export function buildStarfield(opts: StarfieldOptions): StarfieldBuffers {
     positions[i * 3 + 2] = Math.sin(angle) * r;
 
     const [cr, cg, cb] = palette[Math.floor(rng() * palette.length)];
-    // Wide spread with a hot tail so a few stars pop and most recede.
+    // Wide spread with a hot tail so a few stars pop and most recede, plus a
+    // per-star temperature jitter so no two neighbours read identical.
     const brightness = 0.4 + 0.8 * rng() ** 2;
-    colors[i * 3] = cr * brightness;
+    const warm = 0.92 + rng() * 0.16;
+    colors[i * 3] = Math.min(1, cr * brightness * warm);
     colors[i * 3 + 1] = cg * brightness;
-    colors[i * 3 + 2] = cb * brightness;
+    colors[i * 3 + 2] = Math.min(1, cb * brightness * (2 - warm));
 
-    sizes[i] = 0.55 + rng() * 1.55;
+    // Mostly small with a long tail; ~4% are standout bright giants.
+    sizes[i] = 0.45 + rng() ** 1.6 * 1.9 + (rng() < 0.04 ? 1.2 : 0);
     phases[i] = rng() * Math.PI * 2;
     speeds[i] = 0.4 + rng() * 1.8;
   }

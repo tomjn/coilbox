@@ -1,4 +1,4 @@
-import { aiKey, PALETTE, rgbToHex } from "../play/participants";
+import { aiKey } from "../play/participants";
 import type { Faction, GalaxyDoc, GalaxyNode } from "./model";
 import { MAX_DIFFICULTY, NEUTRAL } from "./model";
 import { mulberry32, pick, type Rng, shuffled } from "./rng";
@@ -96,6 +96,17 @@ const FACTION_ADJ = [
   "Ashen",
   "Sovereign",
 ];
+/**
+ * Faction colours: fully saturated so territory rings and UI chips read
+ * unmistakably against the muted starfield. Player first (blue).
+ */
+const FACTION_COLORS = [
+  "#2f7dff", // vivid blue (player default)
+  "#ff3524", // red
+  "#ffb300", // amber
+  "#00c853", // green
+] as const;
+
 const FACTION_NOUN = [
   "Dominion",
   "Concord",
@@ -298,7 +309,7 @@ export function generateGalaxy(
     factions.push({
       id: i === 0 ? "player" : `enemy-${i}`,
       name: factionNames[i],
-      color: rgbToHex(PALETTE[(i * 2 + 1) % PALETTE.length]),
+      color: FACTION_COLORS[i % FACTION_COLORS.length],
       aggression: i === 0 ? 0 : 0.3 + rng() * 0.2,
       aiKey:
         opts.ais.length > 0 ? aiKey(opts.ais[i % opts.ais.length]) : undefined,

@@ -16,7 +16,7 @@ import {
 import { assetUrl } from "../../lib/assetUrl";
 import { usePreferredTarget } from "../../play/config";
 import { useConquestState, useGalaxies } from "../conquests";
-import { GalaxyView } from "../galaxy3d/GalaxyView";
+import { GalaxyView, starTypeFor } from "../galaxy3d/GalaxyView";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../model";
 import {
   NEUTRAL,
@@ -262,6 +262,9 @@ function SelectionPanel({
             <FactionDot color={faction?.color ?? "#6b7280"} />
             {faction?.name ?? "Unclaimed"}
             {node.kind === "capital" && " · Capital"}
+          </span>
+          <span className="text-xs capitalize text-muted-foreground/70">
+            {starTypeFor(node.id, node.kind === "capital").name}
           </span>
         </div>
         <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
