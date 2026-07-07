@@ -14,6 +14,25 @@ The **Campaign Builder** is an advanced-mode tool: turn on Advanced mode
 can create a campaign, add missions, and edit each mission's briefing,
 objectives, panorama and skirmish setup.
 
+### Step by step
+
+1. **Turn on Advanced mode** — Settings > General. **Campaign Builder** now
+   appears in the sidebar (it lives in its own group, not under Play).
+2. **Set up a skirmish preset first.** A mission reuses a Singleplayer preset as
+   its starting point, so go to **Play > Singleplayer**, configure the map, game,
+   AI opponents, teams and mod options you want, and save it as a preset (the
+   presets drawer, button next to Spectate).
+3. **Create a campaign** — Campaign Builder > New. Give it a title; optionally add
+   a campaign icon and background image.
+4. **Add a mission** and open its editor. Attach the preset from step 2 — this
+   **snapshots** its whole setup into the mission (see the note below). Then write
+   the mission's briefing, objectives, and add any media.
+5. **Repeat** for each mission. Missions play in the order you list them.
+6. **Play-test** from the Campaigns list (visible once the campaign exists). Each
+   mission launches like a normal skirmish; on exit Coilbox works out win/loss.
+7. **Export** the campaign to a single `.json` to share it, or bundle it into a
+   distribution (both below).
+
 A mission's skirmish setup is a **snapshot**: when you attach a preset to a
 mission, its full configuration (map, game, participants, start positions, mod
 options) is copied in at that point. Editing the source preset later does not
@@ -85,8 +104,8 @@ alongside it, referenced by relative path.
 
 A [distribution profile](distribution-profile.md) can ship one or more
 campaigns as **read-only** content, so players get them out of the box without
-importing anything. Bundled campaigns live under the profile's `.coilbox`
-folder:
+importing anything. Bundled campaigns live under the profile's
+[`.coilbox`](portable-mode.md) folder:
 
 ```
 <YourGameFolder>/

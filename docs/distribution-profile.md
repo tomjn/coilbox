@@ -9,10 +9,15 @@ update source for the game.
 
 If no profile is present, Coilbox behaves exactly as normal.
 
+> New here? Read **[portable-mode.md](portable-mode.md)** first — it explains the
+> `.coilbox` folder this file lives in and how to package everything up. For the
+> exact route/nav ids the `hide`, `hideSettings`, `welcome` and `links` fields
+> below refer to, see **[routes.md](routes.md)**.
+
 ## Where the file goes
 
-Profiles ride on **portable mode**. Put a `.coilbox` folder next to the Coilbox
-executable and place `profile.json` inside it:
+Profiles ride on **[portable mode](portable-mode.md)**. Put a `.coilbox` folder
+next to the Coilbox executable and place `profile.json` inside it:
 
 ```
 <YourGameFolder>/
@@ -118,6 +123,7 @@ routes redirect home. Currently these nav ids can be hidden:
 
 > Adding a new hideable nav item is a one-line change in that plugin's `index.ts`
 > (`useVisible: () => !isProfileHidden("<id>")`), so this list can grow on request.
+> See **[routes.md](routes.md)** for the full list of pages and nav ids.
 
 ### `hideSettings` (string[])
 
@@ -200,7 +206,7 @@ CSS only (no JavaScript).
 - **In-app links**: because Coilbox uses hash routing, an `<a href="#/play/skirmish">`
   navigates inside the app without a reload. Useful routes include
   `#/play/skirmish`, `#/content/maps`, `#/content/replays`, `#/battles`,
-  `#/settings`.
+  `#/settings` — the full list is in **[routes.md](routes.md)**.
 - **Quit action**: the welcome HTML can't run JavaScript, but any element carrying
   `data-coilbox-action="quit"` closes Coilbox when clicked — the one interactive hook
   available. Use it to add your own exit control to a branded landing page (handy for
