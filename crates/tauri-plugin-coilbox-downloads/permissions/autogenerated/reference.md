@@ -5,6 +5,7 @@ Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR
 #### This default permission set includes the following:
 
 - `allow-dl-version`
+- `allow-dl-cancel`
 - `allow-dl-repos`
 - `allow-dl-versions`
 - `allow-dl-download`
@@ -20,6 +21,7 @@ Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR
 - `allow-dl-download-engine-spring`
 - `allow-dl-installed-content`
 - `allow-dl-set-engine-dirs`
+- `allow-dl-path-writable`
 
 ## Permission Table
 
@@ -52,6 +54,32 @@ Enables the dl_bar_maps command without any pre-configured scope.
 <td>
 
 Denies the dl_bar_maps command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:allow-dl-cancel`
+
+</td>
+<td>
+
+Enables the dl_cancel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-cancel`
+
+</td>
+<td>
+
+Denies the dl_cancel command without any pre-configured scope.
 
 </td>
 </tr>
@@ -260,6 +288,32 @@ Enables the dl_installed_content command without any pre-configured scope.
 <td>
 
 Denies the dl_installed_content command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:allow-dl-path-writable`
+
+</td>
+<td>
+
+Enables the dl_path_writable command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-path-writable`
+
+</td>
+<td>
+
+Denies the dl_path_writable command without any pre-configured scope.
 
 </td>
 </tr>

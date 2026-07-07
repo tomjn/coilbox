@@ -12,6 +12,8 @@
  * survives that rewrite unchanged.
  */
 
+import type { ImageRef } from "../campaign/model";
+
 /**
  * Windows serves custom schemes from `http://<scheme>.localhost/…` rather than
  * `<scheme>://localhost/…`. There's no `@tauri-apps/plugin-os` dependency here, so
@@ -51,8 +53,14 @@ export function isLocalRef(url: string): boolean {
   return !/^(https?:|data:|blob:|coilbox:|#|mailto:|tel:|\/)/i.test(url.trim());
 }
 
-const AUDIO_EXTS = ["ogg", "oga", "mp3", "wav", "flac", "opus", "m4a"];
-const VIDEO_EXTS = ["mp4", "webm", "mov", "ogv"];
+/**
+ * Media file extensions — the single source of truth for both file-dialog filters
+ * and {@link mediaKind} classification (previously duplicated across the campaign
+ * components). Anything not audio/video is treated as an image.
+ */
+export const AUDIO_EXTS = ["ogg", "oga", "mp3", "wav", "flac", "opus", "m4a"];
+export const VIDEO_EXTS = ["mp4", "webm", "mov", "ogv"];
+export const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "bmp"];
 
 /** The extension of a path/URL, lowercased and without query/hash, or "". */
 function extOf(path: string): string {
@@ -68,4 +76,16 @@ export function mediaKind(path: string): MediaKind {
   if (AUDIO_EXTS.includes(ext)) return "audio";
   if (VIDEO_EXTS.includes(ext)) return "video";
   return "image";
+}
+
+/**
+ * Whether a stored media ref points at a video, so the editor can show video-only
+ * playback toggles and renderers pick `<video>`. A `data` ref is always an image
+ * (AV is never inlined); `file`/`local` are classified by extension.
+ */
+export function refIsVideo(ref: ImageRef | undefined): boolean {
+  if (!ref) return false;
+  if (ref.kind === "file") return mediaKind(ref.file) === "video";
+  if (ref.kind === "local") return mediaKind(ref.path) === "video";
+  return false;
 }

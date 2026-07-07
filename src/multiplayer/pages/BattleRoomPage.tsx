@@ -78,8 +78,13 @@ function BattleRoomPage() {
   const battle = room.battle;
 
   async function onLeave() {
-    await room.leave();
-    navigate("/battles");
+    // `leave` reports its own failure via `room.actionError` and never throws;
+    // navigate regardless so a failed LEAVE can't strand the user in the room.
+    try {
+      await room.leave();
+    } finally {
+      navigate("/battles");
+    }
   }
 
   return (
@@ -102,6 +107,11 @@ function BattleRoomPage() {
       {launch.error && (
         <p className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {launch.error}
+        </p>
+      )}
+      {room.actionError && (
+        <p className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          {room.actionError}
         </p>
       )}
       {room.hostIngame && !canRun && (

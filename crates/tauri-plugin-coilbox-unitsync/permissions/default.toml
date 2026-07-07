@@ -18,6 +18,7 @@ permissions = [
   "allow-unitsync-archive-file",
   "allow-unitsync-game-headers",
   "allow-unitsync-lua-exec",
+  "allow-unitsync-lua-repl-exec",
   "allow-unitsync-archive-extract",
   "allow-unitsync-cancel",
 ]

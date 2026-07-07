@@ -40,6 +40,9 @@ import {
   startPosTypeOf,
 } from "./config";
 
+/** Format a rejected command for the action-error banner (matches useBattleLaunch). */
+const mpErr = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
 /**
  * The battle room's single data+action hook. It reads the current battle out of
  * the live mirror (never holding local battle state — the store replaces the
@@ -82,6 +85,12 @@ export interface BattleRoomView {
   /** True once local content presence is known (scan settled). */
   contentKnown: boolean;
   sync: SyncState;
+  /**
+   * The reason the last battle action (kick, force, ready, start, leave, …)
+   * failed, or null. Surfaced as a banner so a failed action isn't a silently
+   * dead button. Clears on the next successful action.
+   */
+  actionError: string | null;
   /** Whether the battle host (autohost) is in-game — i.e. the match has started. */
   hostIngame: boolean;
   /** Whether every non-spectator human player has readied up. */
@@ -179,6 +188,14 @@ export function useBattleRoom(): BattleRoomView {
 
   const [contentNonce, setContentNonce] = useState(0);
 
+  // Surface a failed battle action instead of the button silently doing nothing.
+  // Each action promise ends in `.then(clearErr, setErr)`: it clears the banner on
+  // success and records why it failed otherwise. The action stays best-effort
+  // (never throws to the caller), matching the prior swallow but with feedback.
+  const [actionError, setActionError] = useState<string | null>(null);
+  const clearErr = useCallback(() => setActionError(null), []);
+  const setErr = useCallback((e: unknown) => setActionError(mpErr(e)), []);
+
   // Content presence is scan-authoritative (the scanned map/game lists), so a
   // forced rescan after a download flips it. Only "known" once the scan settles,
   // so we don't briefly report content missing (and flag ourselves unsynced)
@@ -231,9 +248,9 @@ export function useBattleRoom(): BattleRoomView {
         sync: patch.sync ?? bs.sync,
         side: patch.side ?? bs.side,
         color: patch.color ?? myStatus.teamColor,
-      }).catch(() => {});
+      }).then(clearErr, setErr);
     },
-    [activeKey, myStatus],
+    [activeKey, myStatus, setErr, clearErr],
   );
 
   // Keep the server's view of OUR sync honest: report synced(1)/unsynced(2) based
@@ -267,8 +284,8 @@ export function useBattleRoom(): BattleRoomView {
 
   const leave = useCallback(async () => {
     if (!activeKey) return;
-    await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
-  }, [activeKey]);
+    await mpLeaveBattle({ serverKey: activeKey }).then(clearErr, setErr);
+  }, [activeKey, clearErr, setErr]);
 
   // Host map/lock edits. UPDATEBATTLEINFO carries map + lock + spectator count
   // together, so each helper resends the current values for the fields it isn't
@@ -283,9 +300,9 @@ export function useBattleRoom(): BattleRoomView {
         locked: battle.locked,
         maphash,
         map: name,
-      }).catch(() => {});
+      }).then(clearErr, setErr);
     },
-    [activeKey, battle],
+    [activeKey, battle, clearErr, setErr],
   );
 
   const setLocked = useCallback(
@@ -299,19 +316,20 @@ export function useBattleRoom(): BattleRoomView {
         // into the signed 32-bit int the command expects.
         maphash: Number(battle.maphash) | 0,
         map: battle.map,
-      }).catch(() => {});
+      }).then(clearErr, setErr);
     },
-    [activeKey, battle],
+    [activeKey, battle, setErr, clearErr],
   );
 
   const setIngame = useCallback(
     (ingame: boolean) => {
       if (!activeKey) return;
-      mpSetStatus({ serverKey: activeKey, ingame, away: false }).catch(
-        () => {},
+      mpSetStatus({ serverKey: activeKey, ingame, away: false }).then(
+        clearErr,
+        setErr,
       );
     },
-    [activeKey],
+    [activeKey, clearErr, setErr],
   );
 
   // Host-only actions over other members. Gated by the UI (only rendered when
@@ -321,14 +339,16 @@ export function useBattleRoom(): BattleRoomView {
     () => ({
       forceTeam: (user: string, team: number) => {
         if (activeKey)
-          mpForceTeam({ serverKey: activeKey, username: user, team }).catch(
-            () => {},
+          mpForceTeam({ serverKey: activeKey, username: user, team }).then(
+            clearErr,
+            setErr,
           );
       },
       forceAlly: (user: string, ally: number) => {
         if (activeKey)
-          mpForceAlly({ serverKey: activeKey, username: user, ally }).catch(
-            () => {},
+          mpForceAlly({ serverKey: activeKey, username: user, ally }).then(
+            clearErr,
+            setErr,
           );
       },
       forceColor: (user: string, hex: string) => {
@@ -337,24 +357,28 @@ export function useBattleRoom(): BattleRoomView {
             serverKey: activeKey,
             username: user,
             color: hexToColorInt(hex),
-          }).catch(() => {});
+          }).then(clearErr, setErr);
       },
       forceSpectator: (user: string) => {
         if (activeKey)
-          mpForceSpectator({ serverKey: activeKey, username: user }).catch(
-            () => {},
+          mpForceSpectator({ serverKey: activeKey, username: user }).then(
+            clearErr,
+            setErr,
           );
       },
       kick: (user: string) => {
         if (activeKey)
-          mpKick({ serverKey: activeKey, username: user }).catch(() => {});
+          mpKick({ serverKey: activeKey, username: user }).then(
+            clearErr,
+            setErr,
+          );
       },
       removeBot: (name: string) => {
         if (activeKey)
-          mpRemoveBot({ serverKey: activeKey, name }).catch(() => {});
+          mpRemoveBot({ serverKey: activeKey, name }).then(clearErr, setErr);
       },
     }),
-    [activeKey],
+    [activeKey, setErr, clearErr],
   );
 
   // Add a native AI bot on the first free team/ally, with a fresh colour and a name
@@ -398,18 +422,23 @@ export function useBattleRoom(): BattleRoomView {
         side: 0,
         color: hexToColorInt(randomTeamColorHex()),
         aiDll: aiShortName,
-      }).catch(() => {});
+      }).then(clearErr, setErr);
     },
-    [activeKey, battle],
+    [activeKey, battle, setErr, clearErr],
   );
 
   const autohostSend = useCallback(
     async (command: string) => {
       const trimmed = command.trim();
       if (!activeKey || !trimmed) return;
-      await mpSayBattle({ serverKey: activeKey, message: trimmed });
+      // Was an un-caught await (a failed `!start`/`!map` became an unhandled
+      // rejection in the caller). Report it and resolve instead.
+      await mpSayBattle({ serverKey: activeKey, message: trimmed }).then(
+        clearErr,
+        setErr,
+      );
     },
-    [activeKey],
+    [activeKey, clearErr, setErr],
   );
 
   // Route one option edit. Founder: set the script tag directly. Autohost battle:
@@ -421,21 +450,21 @@ export function useBattleRoom(): BattleRoomView {
         mpSetScriptTags({
           serverKey: activeKey,
           tags: { [tagKey]: value },
-        }).catch(() => {});
+        }).then(clearErr, setErr);
       } else {
         autohostSend(`!bSet ${spadsName} ${value}`);
       }
     },
-    [activeKey, isFounder, autohostSend],
+    [activeKey, isFounder, autohostSend, setErr, clearErr],
   );
 
   const rescan = useCallback(async () => {
     if (enginePath && dataDir && battle?.map) {
       invalidateMapPreview(enginePath, dataDir, battle.map);
     }
-    await scan.run(true).catch(() => {});
+    await scan.run(true).then(clearErr, setErr);
     setContentNonce((n) => n + 1);
-  }, [enginePath, dataDir, battle?.map, scan.run]);
+  }, [enginePath, dataDir, battle?.map, scan.run, setErr, clearErr]);
 
   return {
     battle,
@@ -461,6 +490,7 @@ export function useBattleRoom(): BattleRoomView {
     gameMissing,
     contentKnown,
     sync,
+    actionError,
     hostIngame,
     allReady,
     serverKey: activeKey,

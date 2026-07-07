@@ -14,8 +14,8 @@ use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
     build_config_args, build_game_args, build_game_headers_args, build_heightmap_args,
-    build_lua_args, build_map_info_args, build_map_skybox_args, build_minimap_args,
-    build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
+    build_lua_args, build_lua_repl_args, build_map_info_args, build_map_skybox_args,
+    build_minimap_args, build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
     build_unit_dataset_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
@@ -37,6 +37,9 @@ const WORKER_MISSING: &str =
 const SCAN_TIMEOUT: Duration = Duration::from_secs(300);
 /// A single minimap is a fast, bounded operation.
 const MINIMAP_TIMEOUT: Duration = Duration::from_secs(30);
+/// REPL replay re-runs the whole session each eval, so its cost grows with
+/// session length — give it more headroom than the one-shot console.
+const LUA_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// The timeout error string for an operation, e.g. "unitsync scan timed out after 300s".
 fn fmt_timeout(what: &str, timeout: Duration) -> String {
@@ -629,6 +632,42 @@ async fn unitsync_lua_exec(
     Ok(result)
 }
 
+/// `unitsync_lua_repl_exec` — REPL replay: run `chunks` (the session's
+/// previously-successful inputs plus the new one) sequentially in one fresh Lua
+/// state, with `archive` mounted. The chunks are handed to the worker as a JSON
+/// array via a temp file. Returns `{ result?, error?, divergedAt?, prints?,
+/// errors }`.
+#[tauri::command]
+async fn unitsync_lua_repl_exec(
+    engine_path: String,
+    data_dir: String,
+    archive: String,
+    chunks: Vec<String>,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let json = match serde_json::to_string(&chunks) {
+        Ok(s) => s,
+        Err(e) => return Ok(CliResult::err(format!("could not serialize chunks: {e}"))),
+    };
+    let script = match write_temp_script(&json) {
+        Ok(p) => p,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let args = build_lua_repl_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &archive,
+        &script.to_string_lossy(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    let result = run_worker(bin, args, envs, LUA_TIMEOUT, "lua repl", None).await;
+    let _ = std::fs::remove_file(&script);
+    Ok(result)
+}
+
 /// `unitsync_archive_extract` — write one member's full bytes to `dest` (the
 /// download action). `file` is the member's slash-separated path within `archive`;
 /// `dest` is an absolute path the user picked via a save dialog.
@@ -685,6 +724,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_archive_file,
             unitsync_game_headers,
             unitsync_lua_exec,
+            unitsync_lua_repl_exec,
             unitsync_archive_extract,
             unitsync_cancel
         ])

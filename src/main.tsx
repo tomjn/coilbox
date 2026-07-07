@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { plugins } from "./app.plugins";
 import SetupHome from "./content/pages/SetupHome";
+import { ErrorBoundary } from "./general/ErrorBoundary";
 import { SPLASH_ENABLED_KEY } from "./general/splash";
 import { applyProfileSettingsHiding } from "./profile/hidden";
 import { applyProfileLinks } from "./profile/links";
@@ -99,14 +100,27 @@ if (import.meta.env.DEV) {
   await setupTauriMcpBridge();
 }
 
+// A single logged choke-point for otherwise-silent failures: an un-`.catch`ed
+// command rejection or a stray runtime error would otherwise be console-only (or
+// nothing). We don't auto-surface these as UI — many rejections are best-effort
+// boot calls already handled above — but we make sure they're never invisible.
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("coilbox: unhandled promise rejection", e.reason);
+});
+window.addEventListener("error", (e) => {
+  console.error("coilbox: uncaught error", e.error ?? e.message);
+});
+
 createRoot(root).render(
   <StrictMode>
-    <AppFrame
-      plugins={appPlugins}
-      title={appTitle}
-      home={home}
-      settingsStorage={settingsStorage}
-    />
+    <ErrorBoundary>
+      <AppFrame
+        plugins={appPlugins}
+        title={appTitle}
+        home={home}
+        settingsStorage={settingsStorage}
+      />
+    </ErrorBoundary>
     {profile.splash && splashSrc && (
       <Splash config={profile.splash} src={splashSrc} />
     )}

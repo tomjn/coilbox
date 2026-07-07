@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-dl-path-writable"
+description = "Enables the dl_path_writable command without any pre-configured scope."
+commands.allow = ["dl_path_writable"]
+
+[[permission]]
+identifier = "deny-dl-path-writable"
+description = "Denies the dl_path_writable command without any pre-configured scope."
+commands.deny = ["dl_path_writable"]

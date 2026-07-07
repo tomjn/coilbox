@@ -4,6 +4,7 @@
 description = "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads)."
 permissions = [
   "allow-dl-version",
+  "allow-dl-cancel",
   "allow-dl-repos",
   "allow-dl-versions",
   "allow-dl-download",
@@ -19,4 +20,5 @@ permissions = [
   "allow-dl-download-engine-spring",
   "allow-dl-installed-content",
   "allow-dl-set-engine-dirs",
+  "allow-dl-path-writable",
 ]

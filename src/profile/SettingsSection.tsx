@@ -1,4 +1,5 @@
 import { Package } from "lucide-react";
+import HealthChecklist from "./HealthChecklist";
 import { getProfile, getProfileSource } from "./profile";
 
 /**
@@ -19,6 +20,7 @@ export default function ProfileSettings() {
         <p className="text-sm text-muted-foreground">
           No distribution profile loaded — standard Coilbox.
         </p>
+        <HealthChecklist />
       </div>
     );
   }
@@ -65,6 +67,7 @@ export default function ProfileSettings() {
           />
         </dl>
       </section>
+      <HealthChecklist />
     </div>
   );
 }

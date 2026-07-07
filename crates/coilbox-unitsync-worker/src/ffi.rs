@@ -70,6 +70,17 @@ pub struct MapAppearance {
     pub sun_color: Option<[f32; 3]>,
 }
 
+/// The raw four-field read-back from a REPL wrapper script (see
+/// [`Unitsync::run_lua_repl`] and [`crate::lua::wrap_chunks`]). Empty
+/// `lpGetStrKeyStrVal` results are normalized to `None`.
+pub struct LuaReplRaw {
+    pub result: Option<String>,
+    pub error: Option<String>,
+    /// The 1-based index (as a string) of a replayed chunk that failed, if any.
+    pub diverged: Option<String>,
+    pub prints: Option<String>,
+}
+
 /// Copy a library-owned C string into an owned `String`. Null -> `None`.
 pub(crate) unsafe fn cstr(p: *const c_char) -> Option<String> {
     if p.is_null() {
@@ -1251,6 +1262,72 @@ impl Unitsync {
                 Some(e) => Err(e),
                 None => Ok(result),
             }
+        }
+    }
+
+    /// Execute a REPL wrapper script (see [`crate::lua::wrap_chunks`]) and read
+    /// back its four string fields. Unlike [`Self::run_lua_source`], a set
+    /// `__error` does *not* become `Err` — the caller needs `prints` even when
+    /// the final chunk raised. Only a compile failure or a missing root table
+    /// (or absent parser symbols) are `Err`.
+    pub fn run_lua_repl(&self, source: &str, modes: &str) -> Result<LuaReplRaw, String> {
+        let (Some(open), Some(execute), Some(close), Some(root), Some(get_str)) = (
+            self.lp_open_source_fn,
+            self.lp_execute_fn,
+            self.lp_close_fn,
+            self.lp_root_table_fn,
+            self.lp_str_key_str_val_fn,
+        ) else {
+            return Err("this engine's libunitsync does not expose the Lua parser \
+                        (lpOpenSource/lpGetStrKeyStrVal)"
+                .into());
+        };
+        let (
+            Ok(csrc),
+            Ok(cmodes),
+            Ok(result_key),
+            Ok(err_key),
+            Ok(diverged_key),
+            Ok(prints_key),
+            Ok(empty),
+        ) = (
+            CString::new(source),
+            CString::new(modes),
+            CString::new("result"),
+            CString::new("__error"),
+            CString::new("__diverged"),
+            CString::new("prints"),
+            CString::new(""),
+        )
+        else {
+            return Err("Lua source or arguments contained a NUL byte".into());
+        };
+
+        unsafe {
+            if open(csrc.as_ptr(), cmodes.as_ptr()) == 0 {
+                return Err(self
+                    .lp_error_log()
+                    .unwrap_or_else(|| "could not compile the script".into()));
+            }
+            let _ = execute();
+            if root() == 0 {
+                let log = self.lp_error_log();
+                close();
+                return Err(log.unwrap_or_else(|| {
+                    "script did not produce a result table (lpRootTable failed)".into()
+                }));
+            }
+            let read = |key: &CString| {
+                cstr(get_str(key.as_ptr(), empty.as_ptr())).filter(|s| !s.is_empty())
+            };
+            let raw = LuaReplRaw {
+                result: read(&result_key),
+                error: read(&err_key),
+                diverged: read(&diverged_key),
+                prints: read(&prints_key),
+            };
+            close();
+            Ok(raw)
         }
     }
 

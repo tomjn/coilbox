@@ -4,6 +4,7 @@
 // `coilbox-downloads:default`.
 const COMMANDS: &[&str] = &[
     "dl_version",
+    "dl_cancel",
     "dl_repos",
     "dl_versions",
     "dl_download",
@@ -19,6 +20,7 @@ const COMMANDS: &[&str] = &[
     "dl_download_engine_spring",
     "dl_installed_content",
     "dl_set_engine_dirs",
+    "dl_path_writable",
 ];
 
 fn main() {

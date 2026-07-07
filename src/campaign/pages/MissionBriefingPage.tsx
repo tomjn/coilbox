@@ -104,31 +104,40 @@ function MissionStage({
     >
       {/* Background: the mission map as a spinning backdrop, else a full-bleed
           panorama, else a dark gradient. The map backdrop is suppressed while the
-          map is missing (the gate below shows instead — there's nothing to render). */}
-      <div className="absolute inset-0" aria-hidden>
+          map is missing (the gate below shows instead — there's nothing to render).
+          The wrapper is NOT aria-hidden: a video panorama renders reachable
+          pause/mute controls, so each purely-decorative branch hides itself. */}
+      <div className="absolute inset-0">
         {mission.panoramaMap && !run.missing ? (
-          <MissionMapBackground
-            mapName={mission.snapshot.mapName}
-            config={mission.panoramaMap}
-          />
+          <div className="h-full w-full" aria-hidden>
+            <MissionMapBackground
+              mapName={mission.snapshot.mapName}
+              config={mission.panoramaMap}
+            />
+          </div>
         ) : mission.panorama ? (
           <PanoramaScroller
             fill
             campaignId={campaign.id}
             panorama={mission.panorama}
+            playback={mission.panoramaPlayback}
             className="h-full w-full rounded-none"
           />
         ) : (
-          <div className="h-full w-full bg-gradient-to-br from-slate-900 to-slate-950" />
+          <div
+            className="h-full w-full bg-gradient-to-br from-slate-900 to-slate-950"
+            aria-hidden
+          />
         )}
       </div>
       {/* Scrim: darken for text contrast, heaviest at the bottom. A live map
           backdrop is the subject rather than a texture behind text, so it gets a
           much lighter scrim (the briefing card carries its own contrast) — the
-          image-panorama design keeps the heavier one. */}
+          image-panorama design keeps the heavier one. `pointer-events-none` so it
+          doesn't swallow clicks meant for the background video's controls beneath it. */}
       <div
         className={cn(
-          "absolute inset-0 bg-gradient-to-t",
+          "pointer-events-none absolute inset-0 bg-gradient-to-t",
           mission.panoramaMap && !run.missing
             ? "from-background/70 via-background/10 to-transparent"
             : "from-background via-background/85 to-background/40",
@@ -202,7 +211,9 @@ function Briefing({
         <MissionMediaPlayer
           campaignId={campaign.id}
           voiceover={mission.voiceover}
+          voiceoverPlayback={mission.voiceoverPlayback}
           cutscene={mission.cutscene}
+          cutscenePlayback={mission.cutscenePlayback}
         />
 
         {mission.objectives.length > 0 && (
@@ -249,6 +260,8 @@ function Briefing({
             image={mission.sideGraphic}
             alt=""
             className="max-h-[60vh] w-72 max-w-full object-contain drop-shadow-xl"
+            playback={mission.sideGraphicPlayback}
+            controls
           />
         </div>
       ) : null}

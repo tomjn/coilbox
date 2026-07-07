@@ -307,6 +307,18 @@
           "markdownDescription": "Denies the dl_bar_maps command without any pre-configured scope."
         },
         {
+          "description": "Enables the dl_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-dl-cancel",
+          "markdownDescription": "Enables the dl_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-dl-cancel",
+          "markdownDescription": "Denies the dl_cancel command without any pre-configured scope."
+        },
+        {
           "description": "Enables the dl_download command without any pre-configured scope.",
           "type": "string",
           "const": "allow-dl-download",
@@ -403,6 +415,18 @@
           "markdownDescription": "Denies the dl_installed_content command without any pre-configured scope."
         },
         {
+          "description": "Enables the dl_path_writable command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-dl-path-writable",
+          "markdownDescription": "Enables the dl_path_writable command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dl_path_writable command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-dl-path-writable",
+          "markdownDescription": "Denies the dl_path_writable command without any pre-configured scope."
+        },
+        {
           "description": "Enables the dl_recoil_engines command without any pre-configured scope.",
           "type": "string",
           "const": "allow-dl-recoil-engines",
@@ -487,10 +511,10 @@
           "markdownDescription": "Denies the dl_versions command without any pre-configured scope."
         },
         {
-          "description": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-hakora-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-github-latest-release`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`\n- `allow-dl-set-engine-dirs`",
+          "description": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-cancel`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-hakora-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-github-latest-release`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`\n- `allow-dl-set-engine-dirs`\n- `allow-dl-path-writable`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-hakora-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-github-latest-release`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`\n- `allow-dl-set-engine-dirs`"
+          "markdownDescription": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-cancel`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-hakora-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-github-latest-release`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`\n- `allow-dl-set-engine-dirs`\n- `allow-dl-path-writable`"
         }
       ]
     }

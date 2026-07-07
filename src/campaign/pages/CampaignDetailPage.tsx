@@ -66,16 +66,24 @@ export default function CampaignDetailPage() {
           : undefined
       }
     >
-      {/* Static campaign backdrop (if any), dimmed for text contrast. */}
+      {/* Campaign backdrop (if any), dimmed for text contrast. A video backdrop
+          renders reachable pause/mute controls, so the wrapper isn't aria-hidden;
+          the empty-alt image and the dimming layer are decorative on their own. */}
       {campaign.background && (
-        <div className="absolute inset-0" aria-hidden>
+        <div className="absolute inset-0">
           <CampaignImage
             campaignId={campaign.id}
             image={campaign.background}
             alt=""
             className="size-full object-cover"
+            playback={campaign.backgroundPlayback}
+            controls
+            videoVariant="background"
           />
-          <div className="absolute inset-0 bg-background/85" />
+          <div
+            className="pointer-events-none absolute inset-0 bg-background/85"
+            aria-hidden
+          />
         </div>
       )}
 

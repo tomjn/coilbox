@@ -672,6 +672,30 @@ export const unitsyncLuaExec = defineCommand<
   LuaExecResult
 >("coilbox-unitsync", "unitsync_lua_exec");
 
+export interface LuaReplResult {
+  /** The pretty-printed value the final chunk returned (set on success). */
+  result?: string;
+  /** A compile/runtime error, or a "session replay diverged…" message. */
+  error?: string;
+  /** 1-based index of a replayed chunk that failed (set with such an error). */
+  divergedAt?: number;
+  /** The final chunk's `print` output, newline-joined. */
+  prints?: string;
+  /** Non-fatal unitsync diagnostics (e.g. a missing dependency archive). */
+  errors: string[];
+}
+
+/**
+ * REPL replay: run `chunks` (the session's previously-successful inputs plus the
+ * new one) sequentially in one fresh Lua state, with `archive` mounted. Globals
+ * persist across chunks; only the final chunk's value, `print` output, and error
+ * are reported. There is no live VM — each eval re-runs the whole session.
+ */
+export const unitsyncLuaReplExec = defineCommand<
+  { enginePath: string; dataDir: string; archive: string; chunks: string[] },
+  LuaReplResult
+>("coilbox-unitsync", "unitsync_lua_repl_exec");
+
 export interface ArchiveExtractResult {
   /** Bytes written to the destination (0 when extraction failed). */
   size: number;

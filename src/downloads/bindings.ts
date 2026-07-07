@@ -38,6 +38,16 @@ export const dlVersion = defineCommand<undefined, { version: string }>(
   "dl_version",
 );
 
+/**
+ * Cancel a running download by the `opId` its start call was given. Trips the
+ * backend cancel flag (reqwest transfers) and kills the sidecar child (rapid /
+ * map / spring-engine downloads). No-op for an unknown/finished id.
+ */
+export const dlCancel = defineCommand<{ opId: string }, Record<string, never>>(
+  "coilbox-downloads",
+  "dl_cancel",
+);
+
 export const dlRepos = defineCommand<{ masterUrl?: string }, { repos: Repo[] }>(
   "coilbox-downloads",
   "dl_repos",
@@ -53,6 +63,8 @@ export const dlDownload = defineCommand<
     tag: string;
     masterUrl?: string;
     writePath?: string;
+    /** Pass a stable id to make the download cancellable via `dlCancel`. */
+    opId?: string;
     onProgress: Channel<DownloadProgress>;
   },
   { message: string; tag: string }
@@ -139,6 +151,8 @@ export const dlDownloadMap = defineCommand<
     springName: string;
     searchUrl?: string;
     writePath?: string;
+    /** Pass a stable id to make the download cancellable via `dlCancel`. */
+    opId?: string;
     onProgress: Channel<DownloadProgress>;
   },
   { message: string; springName: string }
@@ -150,6 +164,8 @@ export const dlDownloadFile = defineCommand<
     url: string;
     destDir: string;
     filename: string;
+    /** Pass a stable id to make the download cancellable via `dlCancel`. */
+    opId?: string;
     onProgress: Channel<DownloadProgress>;
   },
   { message: string; path: string }
@@ -175,6 +191,13 @@ export const dlSetEngineDirs = defineCommand<
   Record<string, never>
 >("coilbox-downloads", "dl_set_engine_dirs");
 
+/** Report whether a folder can be written to. A read-only write root or portable
+ * data dir silently blocks downloads and release updates. */
+export const dlPathWritable = defineCommand<
+  { path: string },
+  { writable: boolean; error: string | null }
+>("coilbox-downloads", "dl_path_writable");
+
 /** A Recoil engine release matching the running platform. */
 export interface EngineRelease {
   version: string;
@@ -195,6 +218,8 @@ export const dlDownloadEngineRecoil = defineCommand<
     version: string;
     assetUrl: string;
     writePath: string;
+    /** Pass a stable id to make the download phase cancellable via `dlCancel`. */
+    opId?: string;
     onProgress: Channel<DownloadProgress>;
   },
   { message: string; path: string }
@@ -205,6 +230,8 @@ export const dlDownloadEngineSpring = defineCommand<
   {
     version: string;
     writePath?: string;
+    /** Pass a stable id to make the download cancellable via `dlCancel`. */
+    opId?: string;
     onProgress: Channel<DownloadProgress>;
   },
   { message: string; version: string }
