@@ -121,7 +121,9 @@ export default function CampaignDetailPage() {
             <h2 className="text-sm font-medium text-muted-foreground">
               Missions
             </h2>
-            <ol className="flex flex-col gap-2">
+            {/* The rail: a vertical connector through the mission badges,
+                masked by each badge's solid background. */}
+            <ol className="relative flex flex-col gap-2 before:absolute before:bottom-6 before:left-[25px] before:top-6 before:w-px before:bg-border/60">
               {campaign.missions.map((mission, i) => (
                 <MissionRow
                   key={mission.id}
@@ -165,7 +167,13 @@ function MissionRow({
   const inner = (
     <>
       <span
-        className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border/60 text-xs font-medium text-muted-foreground"
+        className={`z-10 flex size-7 shrink-0 items-center justify-center rounded-full border bg-card text-xs font-medium ${
+          state === "complete"
+            ? "border-emerald-500/70 text-emerald-600 dark:text-emerald-400"
+            : state === "available"
+              ? "border-primary/70 text-primary"
+              : "border-border/60 text-muted-foreground"
+        }`}
         aria-hidden
       >
         {index + 1}

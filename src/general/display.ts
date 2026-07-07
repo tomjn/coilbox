@@ -64,3 +64,10 @@ export function useEffectsEnabled(): boolean {
 export function usePerformanceMode(): boolean {
   return usePerformanceModeSetting()[0];
 }
+
+/** One flag for "skip decorative animation": reduce-motion or effects-off. */
+export function useStillUi(): boolean {
+  const reduce = useReduceMotion();
+  const effects = useEffectsEnabled();
+  return reduce || !effects;
+}

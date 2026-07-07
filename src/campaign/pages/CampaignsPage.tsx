@@ -78,9 +78,11 @@ function CampaignCard({
   return (
     <Link
       to={`/campaign/${encodeURIComponent(campaign.id)}`}
-      className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-border hover:bg-accent/50"
+      className="group flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50"
     >
-      <CampaignIconBox campaignId={campaign.id} icon={campaign.icon} />
+      <div className="transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none">
+        <CampaignIconBox campaignId={campaign.id} icon={campaign.icon} />
+      </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{campaign.title}</span>

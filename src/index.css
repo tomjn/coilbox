@@ -51,6 +51,55 @@ body,
   animation: none;
 }
 
+/* Campaign phase polish: a cross-fade between briefing/checking/result cards,
+   a scale-in "stamp" for the Victory/Defeat card, and a scanning shimmer for
+   the checking phase. Components drop these classes under the app's
+   reduce-motion/effects settings; the media query covers the OS preference. */
+.phase-fade {
+  animation: fadein 240ms ease-out;
+}
+@keyframes result-stamp {
+  0% {
+    transform: scale(1.18);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(0.98);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.result-stamp {
+  animation: result-stamp 420ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+@keyframes checking-shimmer {
+  from {
+    background-position-x: 200%;
+  }
+  to {
+    background-position-x: -200%;
+  }
+}
+.checking-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 20%,
+    hsl(var(--primary) / 0.5) 50%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  animation: checking-shimmer 1.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .phase-fade,
+  .result-stamp,
+  .checking-shimmer {
+    animation: none;
+  }
+}
+
 /* Native colour input: make the colour fill the (square) box with no inset,
    so the swatch matches the control's shape instead of showing a small rectangle. */
 .color-swatch::-webkit-color-swatch-wrapper {

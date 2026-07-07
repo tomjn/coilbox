@@ -18,6 +18,7 @@ import { invalidateMapPreview, invalidateScans } from "../../content/config";
 import { type DownloadProgress, dlDownloadMap } from "../../downloads/bindings";
 import { useWriteRootPath } from "../../downloads/config";
 import { ProgressBar } from "../../downloads/pages/components/ProgressBar";
+import { useStillUi } from "../../general/display";
 import { usePreferredTarget } from "../../play/config";
 import { useCampaigns } from "../campaigns";
 import type { Campaign, CampaignMission } from "../model";
@@ -394,6 +395,7 @@ function Checking() {
       <p className="text-sm text-muted-foreground">
         Reading the replay to see how the mission went.
       </p>
+      <div className="checking-shimmer h-1.5 w-full rounded-full" aria-hidden />
     </PhaseCard>
   );
 }
@@ -435,7 +437,7 @@ function Victory({
 }) {
   const next = run.nextMission;
   return (
-    <PhaseCard>
+    <PhaseCard className="result-stamp">
       <div className="flex items-center gap-2">
         <Trophy className="size-6 text-amber-500" />
         <h2 className="text-xl font-semibold">Victory</h2>
@@ -471,7 +473,7 @@ function Victory({
 function Defeat({ run }: { run: ReturnType<typeof useMissionRun> }) {
   const { id } = useParams();
   return (
-    <PhaseCard>
+    <PhaseCard className="result-stamp">
       <div className="flex items-center gap-2">
         <Skull className="size-6 text-muted-foreground" />
         <h2 className="text-xl font-semibold">Defeat</h2>
@@ -505,9 +507,24 @@ function AutoDetectedNote() {
   );
 }
 
-function PhaseCard({ children }: { children: ReactNode }) {
+function PhaseCard({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  // Cross-fade between phases (and the Victory/Defeat stamp passed in via
+  // className); dropped entirely when the user prefers a still UI.
+  const still = useStillUi();
   return (
-    <div className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-border/50 bg-card/85 p-5 backdrop-blur-sm">
+    <div
+      className={cn(
+        "flex w-full max-w-md flex-col gap-4 rounded-xl border border-border/50 bg-card/85 p-5 backdrop-blur-sm",
+        !still && "phase-fade",
+        !still && className,
+      )}
+    >
       {children}
     </div>
   );
