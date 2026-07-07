@@ -1,10 +1,5 @@
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "./model";
-import {
-  DEFAULT_AGGRESSION,
-  DEFAULT_GRACE_TURNS,
-  HISTORY_CAP,
-  NEUTRAL,
-} from "./model";
+import { DEFAULT_AGGRESSION, DEFAULT_GRACE_TURNS, HISTORY_CAP } from "./model";
 import { mulberry32, type Rng } from "./rng";
 
 /**

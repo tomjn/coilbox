@@ -17,7 +17,12 @@ import {
 
 /** Which kind of run is live, for labelling. A campaign mission launches through
  * the same skirmish path — the label only distinguishes it for the UI. */
-export type RunKind = "skirmish" | "battle" | "replay" | "campaign";
+export type RunKind =
+  | "skirmish"
+  | "battle"
+  | "replay"
+  | "campaign"
+  | "conquest";
 
 interface LaunchOpts {
   config: BattleConfig;
@@ -39,7 +44,7 @@ interface PlayContextValue {
   kind: RunKind | null;
   /** Launch a skirmish, battle or campaign mission; resolves when the engine exits. */
   launch: (
-    kind: "skirmish" | "battle" | "campaign",
+    kind: "skirmish" | "battle" | "campaign" | "conquest",
     opts: LaunchOpts,
   ) => Promise<{ exitCode: number | null }>;
   /** Launch a replay; resolves when the engine exits. */
@@ -96,7 +101,10 @@ export function PlayProvider({ children }: { children: ReactNode }) {
   );
 
   const launch = useCallback(
-    (runKind: "skirmish" | "battle" | "campaign", opts: LaunchOpts) =>
+    (
+      runKind: "skirmish" | "battle" | "campaign" | "conquest",
+      opts: LaunchOpts,
+    ) =>
       start(runKind, (runId, onEvent) =>
         playLaunch({ ...opts, runId, onEvent }),
       ),

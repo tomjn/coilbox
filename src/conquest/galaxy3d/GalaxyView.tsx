@@ -6,7 +6,6 @@ import {
   CSS2DRenderer,
 } from "three/addons/renderers/CSS2DRenderer.js";
 import type { GalaxyDoc, Incursion } from "../model";
-import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
 import { hashString, layoutNodes, PLAY_EXTENT, playBounds } from "./layout";
 import { buildStarfield } from "./starfield";

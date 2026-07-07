@@ -1,12 +1,12 @@
 import type { DemoInfo, ReplayFile } from "../content/bindings";
 
 /**
- * Pure pieces of automatic win/loss detection from a mission's replay, kept apart
- * from the Tauri-calling orchestration in `run.ts` so they're directly
- * unit-testable (no plugin commands to mock — see `detect.test.ts`). `run.ts`
- * composes these with `contentListReplays`/`contentDemoInfo` to build the actual
- * detection flow: snapshot replays before launch, diff after, pick the newest,
- * decode it, and read off the local player's result.
+ * Pure pieces of automatic win/loss detection from a run's replay, kept apart
+ * from the Tauri-calling orchestration so they're directly unit-testable (no
+ * plugin commands to mock — see `detect.test.ts`). The campaign and conquest
+ * run hooks compose these with `contentListReplays`/`contentDemoInfo` to build
+ * the actual detection flow: snapshot replays before launch, diff after, pick
+ * the newest, decode it, and read off the local player's result.
  */
 
 export type DetectedResult = "victory" | "defeat" | "ambiguous";

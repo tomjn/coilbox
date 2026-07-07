@@ -54,6 +54,17 @@ const conquestPlugin: FramePlugin = {
       crumb: (c) =>
         (c.params.id && getCachedGalaxy(c.params.id)?.galaxy.title) || "Galaxy",
     },
+    {
+      // No literal segment between the ids, so the trail reads
+      // Conquest / <galaxy> / <node>.
+      path: "conquest/:id/battle/:nodeId",
+      lazy: () => import("./pages/ConquestBattlePage"),
+      crumb: (c) => {
+        const loaded = c.params.id ? getCachedGalaxy(c.params.id) : undefined;
+        const node = loaded?.galaxy.nodes.find((n) => n.id === c.params.nodeId);
+        return node?.name || "Battle";
+      },
+    },
   ],
 };
 

@@ -173,6 +173,10 @@ export function toBattleConfig(opts: {
       rgbColor: p.color,
       side: p.side || undefined,
     };
+    // Handicap % maps onto the engine's `Advantage` (a resource-income bonus
+    // fraction — the modern spelling of the legacy `Handicap` field), which
+    // the play crate already emits per team.
+    if (p.handicap) team.advantage = p.handicap / 100;
     if (p.ai?.kind === "lua") team.luaAi = p.ai.shortName;
     return team;
   });

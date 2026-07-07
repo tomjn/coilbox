@@ -266,21 +266,21 @@ function SelectionPanel({
         <p className="text-xs text-muted-foreground">{node.blurb}</p>
       )}
       {underIncursion ? (
-        <Button
-          className="w-full"
-          disabled
-          title="Battles arrive in the next milestone"
+        <Link
+          to={`/conquest/${encodeURIComponent(galaxy.id)}/battle/${encodeURIComponent(node.id)}`}
         >
-          <ShieldAlert className="mr-1.5 size-4" aria-hidden /> Defend
-        </Button>
+          <Button className="w-full">
+            <ShieldAlert className="mr-1.5 size-4" aria-hidden /> Defend
+          </Button>
+        </Link>
       ) : attackable ? (
-        <Button
-          className="w-full"
-          disabled
-          title="Battles arrive in the next milestone"
+        <Link
+          to={`/conquest/${encodeURIComponent(galaxy.id)}/battle/${encodeURIComponent(node.id)}`}
         >
-          <Swords className="mr-1.5 size-4" aria-hidden /> Attack
-        </Button>
+          <Button className="w-full">
+            <Swords className="mr-1.5 size-4" aria-hidden /> Attack
+          </Button>
+        </Link>
       ) : isPlayers ? (
         <p className="text-xs text-muted-foreground">
           Under your control
