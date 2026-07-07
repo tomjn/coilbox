@@ -7,13 +7,15 @@ import {
   Loader2,
   Map as MapIcon,
   Search,
+  X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invalidateScans } from "../../content/config";
 import {
   type BarMap,
   type DownloadProgress,
   dlBarMaps,
+  dlCancel,
   dlDownloadFile,
   dlDownloadMap,
   dlHakoraMaps,
@@ -182,10 +184,16 @@ export default function MapsPage() {
     refreshInstalled();
   }, [refreshInstalled]);
 
+  // Id of the in-flight download so the Cancel button can stop it. One download
+  // runs at a time (the button is gated on `downloading`), so a single ref holds.
+  const opIdRef = useRef<string | null>(null);
+
   async function download(item: MapItem) {
     // hakora has no springname, so it's fetched directly into `<root>/maps`,
     // which (unlike pr-downloader) has no default destination.
     if (item.url && !writePath) return;
+    const opId = crypto.randomUUID();
+    opIdRef.current = opId;
     setDownloading(item.springName);
     setProgress(null);
     setResult(null);
@@ -197,12 +205,14 @@ export default function MapsPage() {
             url: item.url,
             destDir: `${writePath}/maps`,
             filename: item.filename,
+            opId,
             onProgress,
           })
         : await dlDownloadMap({
             springName: item.springName,
             searchUrl: source === "bar" ? BAR_SEARCH_URL : undefined,
             writePath,
+            opId,
             onProgress,
           });
       setResult({ ok: true, message });
@@ -213,9 +223,16 @@ export default function MapsPage() {
     } catch (e) {
       setResult({ ok: false, message: errMessage(e) });
     } finally {
+      opIdRef.current = null;
       setDownloading(null);
       setProgress(null);
     }
+  }
+
+  // Best-effort: signal the backend to stop the running download. The awaited
+  // `download()` promise then rejects with the "cancelled" message via its catch.
+  function cancelDownload() {
+    if (opIdRef.current) dlCancel({ opId: opIdRef.current }).catch(() => {});
   }
 
   const filtered = useMemo(() => {
@@ -409,6 +426,18 @@ export default function MapsPage() {
                           ? "Already downloaded"
                           : "Download"}
                     </Button>
+                    {downloading === it.springName && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full"
+                        onClick={cancelDownload}
+                        aria-label={`Cancel downloading ${it.title}`}
+                      >
+                        <X />
+                        Cancel
+                      </Button>
+                    )}
                     {downloading === it.springName && progress && (
                       <ProgressBar progress={progress} className="mt-2" />
                     )}
