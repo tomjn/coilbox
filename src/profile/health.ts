@@ -178,7 +178,11 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       label: "No download write root set",
     });
   } else {
-    const inside = i.writeRootPath.startsWith(appDirOf(i.portableRoot));
+    const appDir = appDirOf(i.portableRoot);
+    const inside =
+      i.writeRootPath === appDir ||
+      i.writeRootPath.startsWith(`${appDir}/`) ||
+      i.writeRootPath.startsWith(`${appDir}\\`);
     checks.push(
       inside
         ? {

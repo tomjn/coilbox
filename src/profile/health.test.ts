@@ -64,6 +64,14 @@ describe("deriveHealthChecks", () => {
     expect(c.status).toBe("warn");
   });
 
+  it("does not treat a sibling folder sharing a name prefix as inside the package", () => {
+    const c = byId(
+      { ...base(), writeRootPath: "/pkg-backup/downloads" },
+      "writeRoot",
+    );
+    expect(c.status).toBe("warn");
+  });
+
   it("errors when a folder is read-only", () => {
     const c = byId(
       {
