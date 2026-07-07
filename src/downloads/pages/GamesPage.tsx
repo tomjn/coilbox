@@ -7,11 +7,13 @@ import {
   Gamepad2,
   Loader2,
   Search,
+  X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invalidateScans } from "../../content/config";
 import {
   type DownloadProgress,
+  dlCancel,
   dlDownloadFile,
   dlInstalledContent,
   dlSpringfilesList,
@@ -92,8 +94,14 @@ export default function GamesPage() {
     refreshInstalled();
   }, [refreshInstalled]);
 
+  // Id of the in-flight download so the Cancel button can stop it. One download
+  // runs at a time (the button is gated on `downloading`), so a single ref holds.
+  const opIdRef = useRef<string | null>(null);
+
   async function download(game: SpringFile) {
     if (!writePath || !game.mirrors[0]) return;
+    const opId = crypto.randomUUID();
+    opIdRef.current = opId;
     setDownloading(game.springname);
     setProgress(null);
     setResult(null);
@@ -104,6 +112,7 @@ export default function GamesPage() {
         url: game.mirrors[0],
         destDir: `${writePath}/games`,
         filename: game.filename,
+        opId,
         onProgress,
       });
       setResult({ ok: true, message });
@@ -114,9 +123,16 @@ export default function GamesPage() {
     } catch (e) {
       setResult({ ok: false, message: errMessage(e) });
     } finally {
+      opIdRef.current = null;
       setDownloading(null);
       setProgress(null);
     }
+  }
+
+  // Best-effort: signal the backend to stop the running download. The awaited
+  // `download()` promise then rejects with the "cancelled" message via its catch.
+  function cancelDownload() {
+    if (opIdRef.current) dlCancel({ opId: opIdRef.current }).catch(() => {});
   }
 
   const filtered = useMemo(() => {
@@ -262,6 +278,17 @@ export default function GamesPage() {
                           ? "Already downloaded"
                           : "Download"}
                     </Button>
+                    {downloading === g.springname && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={cancelDownload}
+                        aria-label={`Cancel downloading ${g.name || g.springname}`}
+                      >
+                        <X />
+                        Cancel
+                      </Button>
+                    )}
                   </div>
                   {downloading === g.springname && progress && (
                     <ProgressBar progress={progress} />

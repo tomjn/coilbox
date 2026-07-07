@@ -4,6 +4,7 @@
 // `coilbox-downloads:default`.
 const COMMANDS: &[&str] = &[
     "dl_version",
+    "dl_cancel",
     "dl_repos",
     "dl_versions",
     "dl_download",

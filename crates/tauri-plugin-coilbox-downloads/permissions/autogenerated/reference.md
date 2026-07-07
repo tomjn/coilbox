@@ -5,6 +5,7 @@ Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR
 #### This default permission set includes the following:
 
 - `allow-dl-version`
+- `allow-dl-cancel`
 - `allow-dl-repos`
 - `allow-dl-versions`
 - `allow-dl-download`
@@ -53,6 +54,32 @@ Enables the dl_bar_maps command without any pre-configured scope.
 <td>
 
 Denies the dl_bar_maps command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:allow-dl-cancel`
+
+</td>
+<td>
+
+Enables the dl_cancel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-cancel`
+
+</td>
+<td>
+
+Denies the dl_cancel command without any pre-configured scope.
 
 </td>
 </tr>
