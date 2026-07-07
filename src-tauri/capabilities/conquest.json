@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "conquest",
+  "description": "Grants the conquest plugin's galaxy storage and run-state commands to the main window, plus the open/save dialogs used to import and export galaxies.",
+  "windows": ["main"],
+  "permissions": [
+    "coilbox-conquest:default",
+    "dialog:allow-open",
+    "dialog:allow-save"
+  ]
+}
