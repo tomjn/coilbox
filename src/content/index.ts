@@ -122,6 +122,12 @@ const contentPlugin: FramePlugin = {
       crumb: (c) => c.params.name ?? "Archive",
     },
     {
+      path: "content/archives/:name/repl",
+      lazy: gateAdvanced(() => import("./pages/ArchiveReplPage")),
+      crumb: (c) =>
+        c.params.name ? `${c.params.name} · Lua REPL` : "Lua REPL",
+    },
+    {
       path: "content/replays",
       lazy: () => import("./pages/ReplaysPage"),
       crumb: "Replays",

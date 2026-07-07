@@ -67,6 +67,9 @@ struct Args {
     /// the script from `--source-file`.
     lua: bool,
     source_file: Option<String>,
+    /// `--chunks-file`: a JSON array of Lua chunks for REPL replay mode
+    /// (combined with `--lua`), an alternative to a single `--source-file`.
+    chunks_file: Option<String>,
     mip: i32,
     /// Longest-side pixel cap for the heightmap PNG downscale (heightmap mode).
     max_side: u32,
@@ -102,6 +105,32 @@ fn run() -> i32 {
     // Lua console: mount one archive and run a user snippet through the parser.
     if args.lua {
         let archive = args.archive.clone().unwrap_or_default();
+        // REPL replay mode: `--chunks-file` holds a JSON array of session chunks.
+        if let Some(p) = args.chunks_file.as_deref() {
+            let chunks: Vec<String> = match std::fs::read_to_string(p) {
+                Ok(s) => match serde_json::from_str(&s) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        lua::emit_repl_error(format!("could not parse chunks file {p}: {e}"));
+                        return 1;
+                    }
+                },
+                Err(e) => {
+                    lua::emit_repl_error(format!("could not read chunks file {p}: {e}"));
+                    return 1;
+                }
+            };
+            return match std::panic::catch_unwind(|| lua::run_repl(&args.lib, &archive, &chunks)) {
+                Ok(out) => {
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    0
+                }
+                Err(_) => {
+                    lua::emit_repl_error("worker panicked while executing Lua".into());
+                    1
+                }
+            };
+        }
         let source = match args.source_file.as_deref() {
             Some(p) => match std::fs::read_to_string(p) {
                 Ok(s) => s,
@@ -405,6 +434,7 @@ fn parse_args() -> Result<Args, String> {
     let mut units: Vec<String> = Vec::new();
     let mut lua = false;
     let mut source_file = None;
+    let mut chunks_file = None;
     let mut mip = 1; // 512x512 by default
     let mut max_side = 512u32;
     let mut cache_dir = None;
@@ -448,6 +478,7 @@ fn parse_args() -> Result<Args, String> {
             }
             "--lua" => lua = true,
             "--source-file" => source_file = it.next(),
+            "--chunks-file" => chunks_file = it.next(),
             "--mip" => {
                 mip = it
                     .next()
@@ -477,6 +508,7 @@ fn parse_args() -> Result<Args, String> {
         units,
         lua,
         source_file,
+        chunks_file,
         mip,
         max_side,
         cache_dir,

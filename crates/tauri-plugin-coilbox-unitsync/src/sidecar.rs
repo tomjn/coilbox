@@ -247,6 +247,24 @@ pub fn build_lua_args(lib: &str, datadir: &str, archive: &str, source_file: &str
     args
 }
 
+/// Build args for `--lua` REPL replay mode: scan args plus the `--lua` flag, the
+/// archive to mount, and the path of the temp file holding the JSON array of
+/// session chunks (`--chunks-file`, not `--source-file`).
+pub fn build_lua_repl_args(
+    lib: &str,
+    datadir: &str,
+    archive: &str,
+    chunks_file: &str,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--lua".into());
+    args.push("--archive".into());
+    args.push(archive.into());
+    args.push("--chunks-file".into());
+    args.push(chunks_file.into());
+    args
+}
+
 /// Build args for archive-extract (download) mode: the file-preview args plus the
 /// destination path the member's full bytes are written to.
 pub fn build_archive_extract_args(
@@ -507,6 +525,21 @@ mod tests {
                 "Map v1".to_string(),
                 "--source-file".to_string(),
                 "/tmp/x.lua".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn build_lua_repl_args_carry_archive_and_chunks_file() {
+        let a = build_lua_repl_args("/eng/libunitsync.so", "/data", "Map v1", "/tmp/c.json");
+        assert!(a.contains(&"--lua".to_string()));
+        assert_eq!(
+            &a[a.len() - 4..],
+            &[
+                "--archive".to_string(),
+                "Map v1".to_string(),
+                "--chunks-file".to_string(),
+                "/tmp/c.json".to_string(),
             ]
         );
     }
