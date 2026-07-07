@@ -91,11 +91,16 @@ function patchTwinkle(
         `gl_PointSize = size * aSize;
          vTwinkle = 0.72 + 0.28 * sin(uTime * aSpeed + aPhase);`,
       )}`;
+    // Points rasterize as squares; a radial falloff on gl_PointCoord rounds
+    // them into soft star dots without needing a texture.
     shader.fragmentShader = `
       varying float vTwinkle;
       ${shader.fragmentShader.replace(
         "vec4 diffuseColor = vec4( diffuse, opacity );",
-        "vec4 diffuseColor = vec4( diffuse, opacity * vTwinkle );",
+        `float starDist = length(gl_PointCoord - vec2(0.5));
+         float starMask = smoothstep(0.5, 0.12, starDist);
+         if (starMask < 0.01) discard;
+         vec4 diffuseColor = vec4( diffuse, opacity * vTwinkle * starMask );`,
       )}`;
   };
 }
@@ -624,11 +629,14 @@ export function GalaxyView({
     if (reduceMotion) renderRef.current?.();
   }, [selectedId, incursion, reduceMotion]);
 
+  // The caller's className must make this element positioned (e.g. `absolute
+  // inset-0` or `relative h-96`) — the canvas and label layers inside anchor
+  // to it with `position: absolute`.
   return (
     <div
       ref={containerRef}
       className={className}
-      style={{ position: "relative", overflow: "hidden" }}
+      style={{ overflow: "hidden" }}
     />
   );
 }
