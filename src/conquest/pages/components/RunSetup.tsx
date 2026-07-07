@@ -1,12 +1,21 @@
 import { useUnitsyncGameInfo } from "../../../content/config";
 import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
+import { shapeClipPath } from "../../galaxy3d/factionShape";
 
-/** Small coloured swatch for a faction. */
-export function FactionDot({ color }: { color: string }) {
+/** Small coloured swatch for a faction, matching its map marker shape
+ * (`sides` from `factionSides`; omitted/0 = circle). */
+export function FactionDot({
+  color,
+  sides,
+}: {
+  color: string;
+  sides?: number;
+}) {
+  const clipPath = sides ? shapeClipPath(sides) : undefined;
   return (
     <span
-      className="inline-block size-2 shrink-0 rounded-full"
-      style={{ backgroundColor: color }}
+      className={`inline-block size-2 shrink-0 ${clipPath ? "" : "rounded-full"}`}
+      style={{ backgroundColor: color, clipPath }}
       aria-hidden
     />
   );

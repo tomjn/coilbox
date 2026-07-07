@@ -16,6 +16,7 @@ import {
 import { assetUrl } from "../../lib/assetUrl";
 import { usePreferredTarget } from "../../play/config";
 import { useConquestState, useGalaxies } from "../conquests";
+import { factionSides } from "../galaxy3d/factionShape";
 import { GalaxyView, starTypeFor } from "../galaxy3d/GalaxyView";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../model";
 import {
@@ -199,7 +200,7 @@ function TerritoryTally({
           }`}
           title={f.name}
         >
-          <FactionDot color={f.color} />
+          <FactionDot color={f.color} sides={factionSides(galaxy, f.id)} />
           {f.id === state.playerFactionId && (
             <span className="uppercase tracking-wide text-[10px]">You</span>
           )}
@@ -259,7 +260,10 @@ function SelectionPanel({
         <div className="flex flex-col gap-0.5">
           <h2 className="text-sm font-semibold">{node.name}</h2>
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <FactionDot color={faction?.color ?? "#6b7280"} />
+            <FactionDot
+              color={faction?.color ?? "#6b7280"}
+              sides={faction ? factionSides(galaxy, faction.id) : 0}
+            />
             {faction?.name ?? "Unclaimed"}
             {node.kind === "capital" && " · Capital"}
           </span>
@@ -361,7 +365,10 @@ function RunSetupPanel({
                     : "border-border/50 hover:border-border"
                 }`}
               >
-                <FactionDot color={f.color} />
+                <FactionDot
+                  color={f.color}
+                  sides={factionSides(galaxy, f.id)}
+                />
                 {f.name}
               </button>
             ))}

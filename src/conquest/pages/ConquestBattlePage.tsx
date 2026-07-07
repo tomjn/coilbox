@@ -18,6 +18,7 @@ import {
 import { type DownloadProgress, dlDownloadMap } from "../../downloads/bindings";
 import { usePreferredTarget } from "../../play/config";
 import { useConquestState, useGalaxies } from "../conquests";
+import { factionSides } from "../galaxy3d/factionShape";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../model";
 import { difficultyHandicap, difficultyTable } from "../rules";
 import { useConquestBattleRun } from "../run";
@@ -125,6 +126,9 @@ function Battle({ galaxy, node }: { galaxy: GalaxyDoc; node: GalaxyNode }) {
               mode={mode}
               enemyName={enemyFaction?.name}
               enemyColor={enemyFaction?.color}
+              enemySides={
+                enemyFaction ? factionSides(galaxy, enemyFaction.id) : 0
+              }
               enemyCount={enemyCount}
               handicap={handicap}
               run={run}
@@ -180,6 +184,7 @@ function Briefing({
   mode,
   enemyName,
   enemyColor,
+  enemySides,
   enemyCount,
   handicap,
   run,
@@ -190,6 +195,7 @@ function Briefing({
   mode: "attack" | "defend";
   enemyName?: string;
   enemyColor?: string;
+  enemySides?: number;
   enemyCount: number;
   handicap: number;
   run: ReturnType<typeof useConquestBattleRun>;
@@ -207,7 +213,7 @@ function Briefing({
         <div className="flex justify-between gap-2">
           <dt className="text-muted-foreground">Opposition</dt>
           <dd className="flex items-center gap-1.5">
-            <FactionDot color={enemyColor ?? "#6b7280"} />
+            <FactionDot color={enemyColor ?? "#6b7280"} sides={enemySides} />
             {enemyCount} × {enemyName ?? "garrison"}
             {handicap > 0 ? ` (+${handicap}%)` : ""}
           </dd>
@@ -216,7 +222,10 @@ function Briefing({
           <div className="flex justify-between gap-2">
             <dt className="text-muted-foreground">Fighting for</dt>
             <dd className="flex items-center gap-1.5">
-              <FactionDot color={playerFaction.color} />
+              <FactionDot
+                color={playerFaction.color}
+                sides={factionSides(galaxy, playerFaction.id)}
+              />
               {playerFaction.name}
               {state?.playerSide ? ` · ${state.playerSide}` : ""}
             </dd>

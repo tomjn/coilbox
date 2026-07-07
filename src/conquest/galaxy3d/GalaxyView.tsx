@@ -8,6 +8,7 @@ import {
 import type { GalaxyDoc, Incursion } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
+import { factionSides } from "./factionShape";
 import { hashString, layoutNodes, PLAY_EXTENT, playBounds } from "./layout";
 import { buildStarfield } from "./starfield";
 
@@ -175,19 +176,37 @@ function dashSegments(
   return out;
 }
 
-/** A white capsule (rounded-ends bar) alpha texture for the lane quads. */
-function capsuleTexture(): THREE.Texture {
-  const w = 128;
-  const h = 32;
+/**
+ * A light-filament texture for the lane quads: a gaussian profile across the
+ * width (no hard edge at any zoom) rolled off smoothly at both ends.
+ * `sigma` is the gaussian width as a fraction of the quad's height — small
+ * for the crisp core line, large for the soft halo.
+ */
+function filamentTexture(sigma: number): THREE.Texture {
+  const w = 256;
+  const h = 64;
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.roundRect(1, 1, w - 2, h - 2, h / 2 - 1);
-    ctx.fill();
+    const img = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      const v = (y + 0.5) / h - 0.5;
+      const across = Math.exp(-(v * v) / (2 * sigma * sigma));
+      for (let x = 0; x < w; x++) {
+        const u = (x + 0.5) / w;
+        // Ease in/out over the end 12% so dashes and lane ends stay soft.
+        const along = Math.min(1, Math.min(u, 1 - u) / 0.12);
+        const a = across * along * (2 - along);
+        const o = (y * w + x) * 4;
+        img.data[o] = 255;
+        img.data[o + 1] = 255;
+        img.data[o + 2] = 255;
+        img.data[o + 3] = Math.round(Math.min(1, a) * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -639,12 +658,14 @@ export function GalaxyView({
       return [...at(t0), ...at(1 - t0)] as LaneSeg;
     };
     // No-Man's-Sky-style lines: each lane draws twice — a crisp thin core
-    // plus a wide, very faint additive halo — so it reads as a glowing
-    // filament rather than a flat ribbon.
-    const LANE_CORE_W = 0.16;
-    const LANE_HALO_W = 1.05;
-    const laneTex = capsuleTexture();
-    disposables.push(laneTex);
+    // plus a wide, very faint halo — both with gaussian cross-sections and
+    // additive blending, so at any zoom they read as glowing filaments with
+    // no hard edges.
+    const LANE_CORE_W = 0.55;
+    const LANE_HALO_W = 2.0;
+    const laneCoreTex = filamentTexture(0.11);
+    const laneHaloTex = filamentTexture(0.26);
+    disposables.push(laneCoreTex, laneHaloTex);
     interface LanePair {
       core: THREE.Mesh;
       halo: THREE.Mesh;
@@ -657,14 +678,14 @@ export function GalaxyView({
     }): LanePair => {
       const make = (opacity: number, halo: boolean) => {
         const mat = new THREE.MeshBasicMaterial({
-          map: laneTex,
+          map: halo ? laneHaloTex : laneCoreTex,
           color: opts.color ?? 0xffffff,
           vertexColors: opts.vertexColors ?? false,
           transparent: true,
           opacity,
           depthWrite: false,
           side: THREE.DoubleSide,
-          blending: halo ? THREE.AdditiveBlending : THREE.NormalBlending,
+          blending: THREE.AdditiveBlending,
         });
         disposables.push(mat);
         const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
@@ -693,19 +714,19 @@ export function GalaxyView({
     };
     const lanes = makeLanePair({
       color: 0x93a7c8,
-      coreOpacity: 0.4,
-      haloOpacity: 0.06,
+      coreOpacity: 0.5,
+      haloOpacity: 0.1,
     });
     const factionLanes = makeLanePair({
       vertexColors: true,
-      coreOpacity: 0.6,
-      haloOpacity: 0.1,
+      coreOpacity: 0.75,
+      haloOpacity: 0.16,
     });
     // Contested routes: fine warm-gold dashes, NMS plotted-course style.
     const frontier = makeLanePair({
       color: 0xffcf8a,
-      coreOpacity: 0.95,
-      haloOpacity: 0.14,
+      coreOpacity: 0.9,
+      haloOpacity: 0.1,
     });
 
     // Node hit targets: one invisible InstancedMesh gives the raycaster a
@@ -764,8 +785,19 @@ export function GalaxyView({
       const capital = galaxy.nodes[i].kind === "capital";
       return (capital ? 10.5 : 7.5) * nodeType[i].size * (hovered ? 1.35 : 1);
     };
-    const ringGeo = new THREE.RingGeometry(1.77, 2.08, 40);
-    disposables.push(ringGeo);
+    // Ownership rings take each faction's marker shape (circle, hexagon,
+    // triangle, pentagon, diamond) — ownership reads by shape as well as
+    // colour. Geometries are shared per shape and swapped on capture.
+    const ringGeoBySides = new Map<number, THREE.RingGeometry>();
+    const ringGeoFor = (sides: number) => {
+      let geo = ringGeoBySides.get(sides);
+      if (!geo) {
+        geo = new THREE.RingGeometry(1.77, 2.08, sides || 48, 1, Math.PI / 2);
+        ringGeoBySides.set(sides, geo);
+        disposables.push(geo);
+      }
+      return geo;
+    };
     galaxy.nodes.forEach((n, i) => {
       const p = positions.get(n.id);
       if (!p) return;
@@ -785,21 +817,26 @@ export function GalaxyView({
       star.position.set(p[0], p[1], p[2]);
       star.scale.setScalar(starScale(i));
       star.raycast = () => {};
-      // Diffraction spikes — the telescope-photo flare that sells "star".
-      const spikeMat = new THREE.SpriteMaterial({
-        map: spikeTex,
-        color: stellar.clone().lerp(new THREE.Color(0xffffff), 0.4),
-        transparent: true,
-        opacity: Math.min(0.85, 0.5 * type.glow),
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const spikes = new THREE.Sprite(spikeMat);
-      spikes.position.set(p[0], p[1], p[2]);
-      spikes.scale.setScalar(starScale(i) * 2.9);
-      spikes.raycast = () => {};
-      disposables.push(spikeMat);
-      scene.add(spikes);
+      // Diffraction spikes only on the brilliant giants (a whole map of
+      // four-point flares read as uniform); each rotated slightly so no two
+      // look stamped from the same die.
+      if (type.glow >= 1.2) {
+        const spikeMat = new THREE.SpriteMaterial({
+          map: spikeTex,
+          color: stellar.clone().lerp(new THREE.Color(0xffffff), 0.4),
+          transparent: true,
+          opacity: 0.5,
+          rotation: ((hashString(`${n.id}-spin`) % 100) / 100 - 0.5) * 0.6,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const spikes = new THREE.Sprite(spikeMat);
+        spikes.position.set(p[0], p[1], p[2]);
+        spikes.scale.setScalar(starScale(i) * 2.6);
+        spikes.raycast = () => {};
+        disposables.push(spikeMat);
+        scene.add(spikes);
+      }
       const coronaMat = new THREE.SpriteMaterial({
         map: coronaTex,
         color: stellar,
@@ -820,7 +857,7 @@ export function GalaxyView({
         side: THREE.DoubleSide,
         depthWrite: false,
       });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
+      const ring = new THREE.Mesh(ringGeoFor(0), ringMat);
       ring.rotation.x = -Math.PI / 2;
       ring.position.set(p[0], p[1] - 0.4, p[2]);
       ring.raycast = () => {};
@@ -838,7 +875,13 @@ export function GalaxyView({
     );
     if (homeworld) {
       const p = positions.get(homeworld.id);
-      const homeGeo = new THREE.RingGeometry(2.5, 2.68, 48);
+      const homeGeo = new THREE.RingGeometry(
+        2.5,
+        2.68,
+        factionSides(galaxy, playerFactionId) || 48,
+        1,
+        Math.PI / 2,
+      );
       const homeMat = new THREE.MeshBasicMaterial({
         color: ownerColor(playerFactionId),
         transparent: true,
@@ -992,16 +1035,20 @@ export function GalaxyView({
       }
       setLanePair(lanes, baseSegs);
       setLanePair(factionLanes, factionSegs, factionSegColors);
-      setLanePair(frontier, dashSegments(frontierSegs, 1.15, 1.05));
+      setLanePair(frontier, dashSegments(frontierSegs, 1.5, 1.2));
     };
     applyOwnersRef.current = applyOwners;
 
-    /** Reset a ring to its plain ownership style (colour + opacity). */
+    /** Reset a ring to its plain ownership style (shape, colour, opacity). */
     const styleRing = (i: number) => {
       const mat = ownerRingMats[i];
-      if (!mat) return;
+      const ring = ownerRings[i];
+      if (!mat || !ring) return;
       const owner =
         ownersRef.current[galaxy.nodes[i].id] ?? galaxy.nodes[i].owner;
+      ring.geometry = ringGeoFor(
+        owner === NEUTRAL ? 0 : factionSides(galaxy, owner),
+      );
       mat.color.copy(ownerColor(owner));
       mat.opacity =
         owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75;
