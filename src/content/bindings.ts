@@ -478,13 +478,28 @@ export interface MinimapResult {
   /** Tidal power (`water.tidalStrength` from mapinfo.lua). */
   tidalStrength?: number;
   /** Water/sky/sun appearance from mapinfo.lua, for the 3D preview's lighting and
-   * water colour. Colours are `[r, g, b]` in 0..1. */
+   * water colour. Colours are `[r, g, b]` in 0..1. `voidWater`/`voidGround` are the
+   * transparency flags (space maps hide the water plane and everything below it). */
+  voidWater?: boolean;
+  voidGround?: boolean;
+  voidAlphaMin?: number;
   waterColor?: [number, number, number];
   waterAlpha?: number;
+  waterPlaneColor?: [number, number, number];
+  waterAbsorb?: [number, number, number];
+  waterBaseColor?: [number, number, number];
+  waterMinColor?: [number, number, number];
+  forceRendering?: boolean;
   skyColor?: [number, number, number];
   fogColor?: [number, number, number];
+  cloudColor?: [number, number, number];
+  cloudDensity?: number;
   sunDir?: [number, number, number];
   sunColor?: [number, number, number];
+  groundAmbientColor?: [number, number, number];
+  groundDiffuseColor?: [number, number, number];
+  groundSpecularColor?: [number, number, number];
+  groundShadowDensity?: number;
   errors: string[];
 }
 

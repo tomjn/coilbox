@@ -64,13 +64,35 @@ export interface MapAppearance {
   version?: string | null;
   minHeight?: number | null;
   maxHeight?: number | null;
+  /** `voidWater`: no water plane, terrain below the sea plane shows the skybox. */
   voidWater?: boolean | null;
+  /** `voidGround` (engine 92.0+): ground transparent where the diffuse alpha is
+   * below `voidAlphaMin`. Surfaced for display; the preview can't reproduce it. */
+  voidGround?: boolean | null;
+  voidAlphaMin?: number | null;
+  /** Effective water tint (`surfaceColor`, falling back to `planeColor`). */
   waterColor?: [number, number, number] | null;
   waterAlpha?: number | null;
+  /** `water.planeColor` on its own, kept distinct from the merged `waterColor`. */
+  waterPlaneColor?: [number, number, number] | null;
+  /** Depth-based water colouring (`water.absorb`/`baseColor`/`minColor`). */
+  waterAbsorb?: [number, number, number] | null;
+  waterBaseColor?: [number, number, number] | null;
+  waterMinColor?: [number, number, number] | null;
+  /** `water.forceRendering`: when `false`, the map wants no water plane even below
+   * the sea plane (the space-map "no water" signal alongside `voidWater`). */
+  forceRendering?: boolean | null;
   skyColor?: [number, number, number] | null;
   fogColor?: [number, number, number] | null;
+  cloudColor?: [number, number, number] | null;
+  cloudDensity?: number | null;
   sunDir?: [number, number, number] | null;
   sunColor?: [number, number, number] | null;
+  /** `lighting.*` ground shading colours. */
+  groundAmbientColor?: [number, number, number] | null;
+  groundDiffuseColor?: [number, number, number] | null;
+  groundSpecularColor?: [number, number, number] | null;
+  groundShadowDensity?: number | null;
   /** `atmosphere.skyBox` — a DDS cube map (relative to the map root), if any. */
   skyBox?: string | null;
 }

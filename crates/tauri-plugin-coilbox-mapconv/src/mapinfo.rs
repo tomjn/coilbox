@@ -37,13 +37,40 @@ pub struct MapAppearance {
     pub version: Option<String>,
     pub min_height: Option<f64>,
     pub max_height: Option<f64>,
+    /// `voidWater`: no water plane, terrain below the sea plane shows the skybox.
     pub void_water: Option<bool>,
+    /// `voidGround` (engine 92.0+): ground is transparent where the diffuse
+    /// texture's alpha is below `void_alpha_min`. The preview can't reproduce this
+    /// (it needs the diffuse alpha), but the flag is surfaced for display.
+    pub void_ground: Option<bool>,
+    /// `voidAlphaMin`: the alpha threshold that triggers `voidGround` transparency.
+    pub void_alpha_min: Option<f32>,
+    /// Effective water tint: `water.surfaceColor`, falling back to
+    /// `water.planeColor`. Used by the preview's water plane.
     pub water_color: Option<[f32; 3]>,
     pub water_alpha: Option<f32>,
+    /// `water.planeColor` on its own (the ground plane outside the map bounds),
+    /// kept distinct from the merged `water_color`.
+    pub water_plane_color: Option<[f32; 3]>,
+    /// `water.absorb` / `baseColor` / `minColor` — depth-based water colouring.
+    pub water_absorb: Option<[f32; 3]>,
+    pub water_base_color: Option<[f32; 3]>,
+    pub water_min_color: Option<[f32; 3]>,
+    /// `water.forceRendering`: when `false`, the map wants no water plane even where
+    /// terrain dips below the sea plane (the space-map "no water" signal, alongside
+    /// `voidWater`).
+    pub force_rendering: Option<bool>,
     pub sky_color: Option<[f32; 3]>,
     pub fog_color: Option<[f32; 3]>,
+    pub cloud_color: Option<[f32; 3]>,
+    pub cloud_density: Option<f32>,
     pub sun_dir: Option<[f32; 3]>,
     pub sun_color: Option<[f32; 3]>,
+    /// `lighting.*` ground shading colours.
+    pub ground_ambient_color: Option<[f32; 3]>,
+    pub ground_diffuse_color: Option<[f32; 3]>,
+    pub ground_specular_color: Option<[f32; 3]>,
+    pub ground_shadow_density: Option<f32>,
     /// `atmosphere.skyBox` — a DDS cube map (relative to the map root) used as the
     /// sky. Read by `mc_read_skybox` to load the file for the 3D preview.
     pub sky_box: Option<String>,
@@ -142,12 +169,25 @@ pub fn parse_appearance(src: &str) -> MapAppearance {
         min_height: scan_f64(&lower, "minheight"),
         max_height: scan_f64(&lower, "maxheight"),
         void_water: scan_bool(&lower, "voidwater"),
+        void_ground: scan_bool(&lower, "voidground"),
+        void_alpha_min: scan_f64(&lower, "voidalphamin").map(|v| v as f32),
         water_color: scan_vec3(&lower, "surfacecolor").or_else(|| scan_vec3(&lower, "planecolor")),
         water_alpha: scan_f64(&lower, "surfacealpha").map(|v| v as f32),
+        water_plane_color: scan_vec3(&lower, "planecolor"),
+        water_absorb: scan_vec3(&lower, "absorb"),
+        water_base_color: scan_vec3(&lower, "basecolor"),
+        water_min_color: scan_vec3(&lower, "mincolor"),
+        force_rendering: scan_bool(&lower, "forcerendering"),
         sky_color: scan_vec3(&lower, "skycolor"),
         fog_color: scan_vec3(&lower, "fogcolor"),
+        cloud_color: scan_vec3(&lower, "cloudcolor"),
+        cloud_density: scan_f64(&lower, "clouddensity").map(|v| v as f32),
         sun_dir: scan_vec3(&lower, "sundir"),
         sun_color: scan_vec3(&lower, "suncolor"),
+        ground_ambient_color: scan_vec3(&lower, "groundambientcolor"),
+        ground_diffuse_color: scan_vec3(&lower, "grounddiffusecolor"),
+        ground_specular_color: scan_vec3(&lower, "groundspecularcolor"),
+        ground_shadow_density: scan_f64(&lower, "groundshadowdensity").map(|v| v as f32),
         sky_box: scan_str(&stripped, &lower, "skybox"),
     }
 }
@@ -163,6 +203,8 @@ struct MapInfoRaw {
     author: Option<String>,
     version: Option<String>,
     voidwater: Option<bool>,
+    voidground: Option<bool>,
+    voidalphamin: Option<f32>,
     smf: Smf,
     water: Water,
     atmosphere: Atmosphere,
@@ -182,6 +224,10 @@ struct Water {
     surfacecolor: Option<[f32; 3]>,
     planecolor: Option<[f32; 3]>,
     surfacealpha: Option<f32>,
+    absorb: Option<[f32; 3]>,
+    basecolor: Option<[f32; 3]>,
+    mincolor: Option<[f32; 3]>,
+    forcerendering: Option<bool>,
 }
 
 #[derive(Deserialize, Default)]
@@ -189,6 +235,8 @@ struct Water {
 struct Atmosphere {
     skycolor: Option<[f32; 3]>,
     fogcolor: Option<[f32; 3]>,
+    cloudcolor: Option<[f32; 3]>,
+    clouddensity: Option<f32>,
     suncolor: Option<[f32; 3]>,
     skybox: Option<String>,
 }
@@ -197,6 +245,11 @@ struct Atmosphere {
 #[serde(default)]
 struct Lighting {
     sundir: Option<[f32; 3]>,
+    suncolor: Option<[f32; 3]>,
+    groundambientcolor: Option<[f32; 3]>,
+    grounddiffusecolor: Option<[f32; 3]>,
+    groundspecularcolor: Option<[f32; 3]>,
+    groundshadowdensity: Option<f32>,
 }
 
 impl From<MapInfoRaw> for MapAppearance {
@@ -209,13 +262,28 @@ impl From<MapInfoRaw> for MapAppearance {
             min_height: r.smf.minheight,
             max_height: r.smf.maxheight,
             void_water: r.voidwater,
+            void_ground: r.voidground,
+            void_alpha_min: r.voidalphamin,
             // surfaceColor wins over planeColor, matching the scanner.
             water_color: r.water.surfacecolor.or(r.water.planecolor),
             water_alpha: r.water.surfacealpha,
+            water_plane_color: r.water.planecolor,
+            water_absorb: r.water.absorb,
+            water_base_color: r.water.basecolor,
+            water_min_color: r.water.mincolor,
+            force_rendering: r.water.forcerendering,
             sky_color: r.atmosphere.skycolor,
             fog_color: r.atmosphere.fogcolor,
+            cloud_color: r.atmosphere.cloudcolor,
+            cloud_density: r.atmosphere.clouddensity,
             sun_dir: r.lighting.sundir,
-            sun_color: r.atmosphere.suncolor,
+            // Spring's canonical sun colour is `lighting.sunColor`; fall back to
+            // `atmosphere.sunColor` (matches the unitsync reader).
+            sun_color: r.lighting.suncolor.or(r.atmosphere.suncolor),
+            ground_ambient_color: r.lighting.groundambientcolor,
+            ground_diffuse_color: r.lighting.grounddiffusecolor,
+            ground_specular_color: r.lighting.groundspecularcolor,
+            ground_shadow_density: r.lighting.groundshadowdensity,
             sky_box: r.atmosphere.skybox,
         }
     }
@@ -307,10 +375,77 @@ mod tests {
         assert_eq!(a.max_height, Some(1150.0));
     }
 
+    // Exercises the broadened appearance set (void flags, depth-water colours,
+    // clouds, ground lighting). A `local mapinfo = {…} return mapinfo` block so
+    // both the scanner and the eval path can read it.
+    const RICH: &str = r#"
+        local mapinfo = {
+            name = "Rich",
+            voidWater = true,
+            voidGround = true,
+            voidAlphaMin = 0.75,
+            atmosphere = {
+                skyColor = {0.1, 0.15, 0.7},
+                cloudColor = {0.9, 0.9, 1.0},
+                cloudDensity = 0.42,
+            },
+            lighting = {
+                sunColor = {1.0, 0.9, 0.8},
+                sunDir = {0.1, 0.9, 0.2},
+                groundAmbientColor = {0.4, 0.4, 0.4},
+                groundDiffuseColor = {0.6, 0.6, 0.6},
+                groundSpecularColor = {0.1, 0.1, 0.1},
+                groundShadowDensity = 0.7,
+            },
+            water = {
+                planeColor = {0.0, 0.4, 0.0},
+                surfaceColor = {0.75, 0.8, 0.85},
+                surfaceAlpha = 0.5,
+                absorb = {0.003, 0.004, 0.005},
+                baseColor = {0.1, 0.2, 0.3},
+                minColor = {0.02, 0.03, 0.04},
+            },
+        }
+        return mapinfo
+    "#;
+
+    fn assert_rich(a: &MapAppearance) {
+        assert_eq!(a.void_water, Some(true));
+        assert_eq!(a.void_ground, Some(true));
+        assert_eq!(a.void_alpha_min, Some(0.75));
+        // surfaceColor wins for the effective tint; planeColor kept separately.
+        assert_eq!(a.water_color, Some([0.75, 0.8, 0.85]));
+        assert_eq!(a.water_plane_color, Some([0.0, 0.4, 0.0]));
+        assert_eq!(a.water_absorb, Some([0.003, 0.004, 0.005]));
+        assert_eq!(a.water_base_color, Some([0.1, 0.2, 0.3]));
+        assert_eq!(a.water_min_color, Some([0.02, 0.03, 0.04]));
+        assert_eq!(a.cloud_color, Some([0.9, 0.9, 1.0]));
+        assert_eq!(a.cloud_density, Some(0.42));
+        // sunColor is read from `lighting` (canonical), not `atmosphere`.
+        assert_eq!(a.sun_color, Some([1.0, 0.9, 0.8]));
+        assert_eq!(a.ground_ambient_color, Some([0.4, 0.4, 0.4]));
+        assert_eq!(a.ground_diffuse_color, Some([0.6, 0.6, 0.6]));
+        assert_eq!(a.ground_specular_color, Some([0.1, 0.1, 0.1]));
+        assert_eq!(a.ground_shadow_density, Some(0.7));
+    }
+
+    #[test]
+    fn scanner_reads_broadened_appearance() {
+        assert_rich(&parse_appearance(RICH));
+    }
+
+    #[test]
+    fn eval_reads_broadened_appearance() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let a = eval_appearance(root, RICH).expect("RICH evaluates");
+        assert_rich(&a);
+    }
+
     #[test]
     fn parses_appearance_inline() {
         let a = parse_appearance(TMA);
         assert_eq!(a.void_water, Some(true));
+        assert_eq!(a.force_rendering, Some(false));
         assert_eq!(a.water_color, Some([0.75, 0.8, 0.85]));
         assert_eq!(a.water_alpha, Some(0.55));
         assert_eq!(a.sky_color, Some([0.64, 0.55, 0.43]));
