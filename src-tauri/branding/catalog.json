@@ -44,7 +44,7 @@
       "id": "mechcommander-legacy",
       "match": { "regex": "^MechCommander:? *Legacy", "names": ["MCL"] },
       "title": "MechCommander: Legacy",
-      "banner": ["https://i.imgur.com/2VqTu99.jpg"],
+      "banner": ["https://recoilengine.org/showcase/mcl.jpg"],
       "logo": [],
       "screenshots": [],
       "videos": [],
