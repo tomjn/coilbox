@@ -1024,12 +1024,26 @@ export function useUnitsyncMinimap(
         tidalStrength: res.tidalStrength,
       });
       setAppearance({
+        voidWater: res.voidWater,
+        voidGround: res.voidGround,
+        voidAlphaMin: res.voidAlphaMin,
         waterColor: res.waterColor,
         waterAlpha: res.waterAlpha,
+        waterPlaneColor: res.waterPlaneColor,
+        waterAbsorb: res.waterAbsorb,
+        waterBaseColor: res.waterBaseColor,
+        waterMinColor: res.waterMinColor,
+        forceRendering: res.forceRendering,
         skyColor: res.skyColor,
         fogColor: res.fogColor,
+        cloudColor: res.cloudColor,
+        cloudDensity: res.cloudDensity,
         sunDir: res.sunDir,
         sunColor: res.sunColor,
+        groundAmbientColor: res.groundAmbientColor,
+        groundDiffuseColor: res.groundDiffuseColor,
+        groundSpecularColor: res.groundSpecularColor,
+        groundShadowDensity: res.groundShadowDensity,
       });
       if (!res.dataUrl && res.errors?.length) setError(res.errors.join("; "));
     };

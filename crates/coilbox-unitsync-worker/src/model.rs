@@ -121,18 +121,48 @@ pub struct MinimapOutput {
     pub tidal_strength: Option<f32>,
     /// Water/sky/sun appearance from mapinfo.lua, for the 3D preview's lighting and
     /// water colour. Colours are `[r, g, b]` in 0..1; omitted fields stay `None`.
+    /// `voidWater`/`voidGround` are the transparency flags (space maps hide the
+    /// water plane and everything below the sea plane).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub void_water: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub void_ground: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub void_alpha_min: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub water_color: Option<[f32; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub water_alpha: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub water_plane_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub water_absorb: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub water_base_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub water_min_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub force_rendering: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sky_color: Option<[f32; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fog_color: Option<[f32; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub cloud_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cloud_density: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sun_dir: Option<[f32; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sun_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ground_ambient_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ground_diffuse_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ground_specular_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ground_shadow_density: Option<f32>,
     pub errors: Vec<String>,
 }
 

@@ -47,6 +47,36 @@ function makeProceduralDetail(): THREE.Texture {
   return tex;
 }
 
+/** A soft, tiling cloud alpha texture: overlapping white radial blobs on a
+ * transparent field, so a translucent plane tinted with `cloudColor` reads as a
+ * faint high overcast. The RGB stays white (the plane's material colour supplies
+ * the tint); only the alpha varies. Repeat-wrapped so it can drift and tile. */
+function makeProceduralCloud(): THREE.Texture {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.clearRect(0, 0, size, size);
+    for (let i = 0; i < 48; i++) {
+      const cx = Math.random() * size;
+      const cy = Math.random() * size;
+      const r = size * (0.06 + Math.random() * 0.12);
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, "rgba(255,255,255,0.5)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.NoColorSpace;
+  return tex;
+}
+
 /** Shape of `DDSLoader.parse` output (three doesn't export this type). */
 type DdsData = {
   isCubemap: boolean;
@@ -258,6 +288,14 @@ export function MapPreview3D({
     appearance?.skyColor,
     appearance?.sunDir,
     appearance?.sunColor,
+    appearance?.voidWater,
+    appearance?.fogColor,
+    appearance?.cloudColor,
+    appearance?.cloudDensity,
+    appearance?.groundAmbientColor,
+    appearance?.waterAbsorb,
+    appearance?.waterBaseColor,
+    appearance?.waterMinColor,
     skyboxSrc,
   ]);
 
@@ -388,6 +426,16 @@ export function MapPreview3D({
       geo.rotateX(-Math.PI / 2); // lie flat in XZ; displacement then runs along +Y
       disposables.push(geo);
 
+      // `voidWater` maps (asteroid/space) render nothing below the sea plane: the
+      // engine shows the skybox through it. Emulate that by clipping the terrain at
+      // world y = 0 (keep y >= 0), so submerged geometry is discarded rather than
+      // drawn as solid ground. Clipping is opt-in per material via `clippingPlanes`
+      // + `renderer.localClippingEnabled` (set after the renderer is created).
+      const voidWater = appearance?.voidWater === true;
+      const voidClip = voidWater
+        ? [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)]
+        : undefined;
+
       // A wireframe relief drops the diffuse texture entirely and draws the mesh as
       // an unlit uniform-colour grid, so the displaced geometry reads as the terrain
       // shape on its own.
@@ -400,6 +448,7 @@ export function MapPreview3D({
         roughness: 1,
         metalness: 0,
         wireframe: forceWireframe || wantWire.current,
+        clippingPlanes: voidClip,
       });
       // Tiled detail-texture multiply, patched into the standard material: after
       // the base colour is sampled, modulate it by the detail texture sampled at a
@@ -457,13 +506,81 @@ uniform float detailStrength;`,
         metalness: 0,
         envMapIntensity: 0.1,
       });
+      // Depth-based water colouring (`water.absorb`/`baseColor`/`minColor`): sample
+      // the terrain heightmap under each water fragment to get its depth below the
+      // sea plane, then attenuate from `baseColor` (shallow) toward `minColor` (deep)
+      // by `exp(-absorb * depth)` — the engine's Beer-Lambert-style absorption, so
+      // shallows read bright and deeps read murky instead of a flat tinted sheet.
+      // Depth is in engine world units (elmos, unscaled), which is how `absorb` is
+      // calibrated; the surface reflection is layered on top unchanged. Only enabled
+      // when the map specifies `absorb`; otherwise the flat `waterColor` stands.
+      if (appearance?.waterAbsorb) {
+        const ab = appearance.waterAbsorb;
+        const base = colorFrom(
+          appearance.waterBaseColor ?? appearance.waterColor,
+          0x2f6f9f,
+        );
+        const min = appearance.waterMinColor
+          ? colorFrom(appearance.waterMinColor, 0)
+          : base.clone().multiplyScalar(0.2);
+        waterMat.onBeforeCompile = (shader) => {
+          shader.uniforms.wHeightTex = { value: heightTex };
+          shader.uniforms.wAbsorb = {
+            value: new THREE.Vector3(ab[0], ab[1], ab[2]),
+          };
+          shader.uniforms.wBase = { value: base };
+          shader.uniforms.wMin = { value: min };
+          shader.uniforms.wHeightScale = { value: maxHeight - minHeight };
+          shader.uniforms.wHeightBias = { value: minHeight };
+          shader.uniforms.wPlane = { value: new THREE.Vector2(planeW, planeH) };
+          shader.vertexShader = shader.vertexShader
+            .replace(
+              "#include <common>",
+              "#include <common>\nvarying vec3 vWaterPos;",
+            )
+            .replace(
+              "#include <project_vertex>",
+              "#include <project_vertex>\nvWaterPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;",
+            );
+          shader.fragmentShader = shader.fragmentShader
+            .replace(
+              "#include <common>",
+              `#include <common>
+varying vec3 vWaterPos;
+uniform sampler2D wHeightTex;
+uniform vec3 wAbsorb;
+uniform vec3 wBase;
+uniform vec3 wMin;
+uniform float wHeightScale;
+uniform float wHeightBias;
+uniform vec2 wPlane;`,
+            )
+            .replace(
+              "#include <map_fragment>",
+              `#include <map_fragment>
+{
+  vec2 wuv = vec2( 0.5 + vWaterPos.x / wPlane.x, 0.5 - vWaterPos.z / wPlane.y );
+  float nh = texture2D( wHeightTex, wuv ).x;
+  float depth = max( 0.0, -( nh * wHeightScale + wHeightBias ) );
+  diffuseColor.rgb = mix( wMin, wBase, exp( -wAbsorb * depth ) );
+}`,
+            );
+        };
+      }
       disposables.push(waterGeo, waterMat);
       const waterMesh = new THREE.Mesh(waterGeo, waterMat);
       waterMesh.visible = wantWater.current;
       waterRef.current = waterMesh;
       scene.add(waterMesh);
 
-      scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+      // Ambient fill tinted by the map's ground ambient colour (its non-sun-lit
+      // mood); defaults to neutral white when the map doesn't specify one.
+      scene.add(
+        new THREE.AmbientLight(
+          colorFrom(appearance?.groundAmbientColor, 0xffffff),
+          0.8,
+        ),
+      );
       const sun = new THREE.DirectionalLight(
         colorFrom(appearance?.sunColor, 0xffffff),
         2.2,
@@ -478,7 +595,34 @@ uniform float detailStrength;`,
       else sun.position.set(BASE * 0.5, BASE * 0.9, BASE * 0.35);
       scene.add(sun);
 
+      // Optional high overcast from `atmosphere.cloudColor`/`cloudDensity`: a faint
+      // translucent plane well above the terrain, tinted by the cloud colour with
+      // opacity scaled by density (capped so it never obscures the map from above).
+      // It drifts in the animation loop below (static under reduced motion).
+      let cloudTex: THREE.Texture | undefined;
+      const hasClouds = !!appearance?.cloudColor;
+      if (hasClouds) {
+        cloudTex = makeProceduralCloud();
+        cloudTex.repeat.set(2, 2);
+        const cloudMat = new THREE.MeshBasicMaterial({
+          color: colorFrom(appearance?.cloudColor, 0xffffff),
+          map: cloudTex,
+          transparent: true,
+          opacity: Math.min(0.35, (appearance?.cloudDensity ?? 0.5) * 0.5),
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          fog: false,
+        });
+        const cloudGeo = new THREE.PlaneGeometry(planeW * 2, planeH * 2);
+        cloudGeo.rotateX(-Math.PI / 2);
+        const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+        cloudMesh.position.y = Math.max(maxHeight * s, 0) + BASE * 0.6;
+        scene.add(cloudMesh);
+        disposables.push(cloudGeo, cloudMat, cloudTex);
+      }
+
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.localClippingEnabled = voidWater; // honour the terrain clip plane
       renderer.setClearColor(0x000000, 0); // transparent; the card shows through
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       container.appendChild(renderer.domElement);
@@ -505,6 +649,17 @@ uniform float detailStrength;`,
       waterMat.needsUpdate = true;
       pmrem.dispose();
       disposables.push(envRT);
+      // Distance fog for maps that declare `atmosphere.fogColor`. Distances are
+      // approximate — mapinfo expresses fogStart/fogEnd as fractions of the engine's
+      // viewRange, which a standalone preview lacks, so they're derived from the
+      // fixed scene scale. Attached only after the reflection capture above, so it
+      // never tints the water's environment map.
+      if (appearance?.fogColor)
+        scene.fog = new THREE.Fog(
+          colorFrom(appearance.fogColor, 0xb3b3cc),
+          BASE * 0.6,
+          BASE * 2.8,
+        );
 
       const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
       camera.position.set(0, BASE * 0.7, BASE * 1.0);
@@ -631,10 +786,15 @@ uniform float detailStrength;`,
           animationFrame = requestAnimationFrame(animate);
           const spinning = !!controls?.autoRotate;
           const waterVisible = !!waterRef.current?.visible;
-          if (!spinning && !waterVisible) return;
+          if (!spinning && !waterVisible && !cloudTex) return;
           if (waterVisible) rippleWater(performance.now() / 1000);
+          // Drift the overcast slowly across the sky.
+          if (cloudTex) {
+            cloudTex.offset.x += 0.00002;
+            cloudTex.offset.y += 0.00001;
+          }
           // `update()` advances the orbit and fires "change" → render(); a
-          // water-only frame renders directly.
+          // water- or cloud-only frame renders directly.
           if (spinning) controls?.update();
           else render();
         };
@@ -700,7 +860,10 @@ uniform float detailStrength;`,
   // at or above sea level) or one the mapinfo declares `voidWater` — a water plane
   // under entirely-above-water terrain just looks wrong. The user can still switch
   // it back on. Resets on map change (minHeight / voidWater are the deps).
-  const hasWater = appearance?.voidWater !== true && minHeight < 0;
+  const hasWater =
+    appearance?.voidWater !== true &&
+    appearance?.forceRendering !== false &&
+    minHeight < 0;
   // A wireframe render defaults to no water plane (a solid sheet under a bare mesh
   // reads oddly); an explicit `initialWater` still wins.
   const resolvedWater = initialWater ?? (forceWireframe ? false : hasWater);

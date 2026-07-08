@@ -62,12 +62,26 @@ type FindFilesVfsFn = unsafe extern "C" fn(c_int, *mut c_char, c_int) -> c_int; 
 /// Colours are `[r, g, b]` in 0..1. Any field the map omits is `None`.
 #[derive(Default)]
 pub struct MapAppearance {
+    pub void_water: Option<bool>,
+    pub void_ground: Option<bool>,
+    pub void_alpha_min: Option<f32>,
     pub water_color: Option<[f32; 3]>,
     pub water_alpha: Option<f32>,
+    pub water_plane_color: Option<[f32; 3]>,
+    pub water_absorb: Option<[f32; 3]>,
+    pub water_base_color: Option<[f32; 3]>,
+    pub water_min_color: Option<[f32; 3]>,
+    pub force_rendering: Option<bool>,
     pub sky_color: Option<[f32; 3]>,
     pub fog_color: Option<[f32; 3]>,
+    pub cloud_color: Option<[f32; 3]>,
+    pub cloud_density: Option<f32>,
     pub sun_dir: Option<[f32; 3]>,
     pub sun_color: Option<[f32; 3]>,
+    pub ground_ambient_color: Option<[f32; 3]>,
+    pub ground_diffuse_color: Option<[f32; 3]>,
+    pub ground_specular_color: Option<[f32; 3]>,
+    pub ground_shadow_density: Option<f32>,
 }
 
 /// The raw four-field read-back from a REPL wrapper script (see
@@ -178,6 +192,8 @@ pub struct Unitsync {
     lp_int_key_list_entry_fn: Option<IntByIntFn>,
     lp_str_key_float_val_fn: Option<FloatByStrFloatFn>,
     lp_int_key_float_val_fn: Option<FloatByIntFloatFn>,
+    // lpGetStrKeyBoolVal(key, defValue) -> int; absent on some unitsync builds.
+    lp_str_key_bool_val_fn: Option<IntByStrIntFn>,
     lp_open_source_fn: Option<IntByStrStrFn>,
     lp_error_log_fn: Option<StrFn>,
     lp_str_key_str_val_fn: Option<StrByStrStrFn>,
@@ -287,6 +303,7 @@ impl Unitsync {
             lp_int_key_list_entry_fn: opt(&lib, b"lpGetIntKeyListEntry\0"),
             lp_str_key_float_val_fn: opt(&lib, b"lpGetStrKeyFloatVal\0"),
             lp_int_key_float_val_fn: opt(&lib, b"lpGetIntKeyFloatVal\0"),
+            lp_str_key_bool_val_fn: opt(&lib, b"lpGetStrKeyBoolVal\0"),
             lp_open_source_fn: opt(&lib, b"lpOpenSource\0"),
             lp_error_log_fn: opt(&lib, b"lpErrorLog\0"),
             lp_str_key_str_val_fn: opt(&lib, b"lpGetStrKeyStrVal\0"),
@@ -968,9 +985,10 @@ impl Unitsync {
     /// names are queried case-tolerantly since unitsync's parser lowercases keys
     /// only when the map calls `lowerkeys(mapinfo)` (not all maps do).
     ///
-    /// `voidWater` is not read: unitsync's LuaParser exposes no boolean accessor,
-    /// so the frontend instead hides water when no terrain sits below the sea plane
-    /// (`minHeight >= 0`), which covers the common dry-map case.
+    /// `voidWater`/`voidGround` are read via `lpGetStrKeyBoolVal` (the two-call
+    /// present-vs-default trick below); on unitsync builds that don't export it the
+    /// flags stay `None` and the frontend falls back to hiding water only when no
+    /// terrain sits below the sea plane (`minHeight >= 0`).
     pub fn map_appearance(&self) -> MapAppearance {
         let (
             Some(open),
@@ -1030,6 +1048,25 @@ impl Unitsync {
             }
             None
         };
+        // Read a boolean field of the currently-open table via `lpGetStrKeyBoolVal`
+        // (returns `None` when the export is missing). The value is queried with
+        // both defaults; when they agree the key is present with that value, when
+        // they differ the key is absent.
+        let bool_fn = self.lp_str_key_bool_val_fn;
+        let read_bool = |names: &[&str]| -> Option<bool> {
+            let f = bool_fn?;
+            for name in names {
+                let Ok(key) = CString::new(*name) else {
+                    continue;
+                };
+                unsafe {
+                    if f(key.as_ptr(), 0) == f(key.as_ptr(), 1) {
+                        return Some(f(key.as_ptr(), 0) != 0);
+                    }
+                }
+            }
+            None
+        };
 
         let mut app = MapAppearance::default();
         unsafe {
@@ -1046,16 +1083,27 @@ impl Unitsync {
                     close();
                     return app;
                 };
+                // Root-level `void*` flags (queried while the root table is current).
+                app.void_water = read_bool(&["voidWater", "voidwater"]);
+                app.void_ground = read_bool(&["voidGround", "voidground"]);
+                app.void_alpha_min = read_f32(&["voidAlphaMin", "voidalphamin"]);
                 if sub_str(water.as_ptr()) != 0 {
                     // surfaceColor wins over planeColor, matching the mapconv reader.
                     app.water_color =
                         read_vec3(&["surfaceColor", "surfacecolor", "planeColor", "planecolor"]);
                     app.water_alpha = read_f32(&["surfaceAlpha", "surfacealpha"]);
+                    app.water_plane_color = read_vec3(&["planeColor", "planecolor"]);
+                    app.water_absorb = read_vec3(&["absorb"]);
+                    app.water_base_color = read_vec3(&["baseColor", "basecolor"]);
+                    app.water_min_color = read_vec3(&["minColor", "mincolor"]);
+                    app.force_rendering = read_bool(&["forceRendering", "forcerendering"]);
                     pop(); // water
                 }
                 if sub_str(atmosphere.as_ptr()) != 0 {
                     app.sky_color = read_vec3(&["skyColor", "skycolor"]);
                     app.fog_color = read_vec3(&["fogColor", "fogcolor"]);
+                    app.cloud_color = read_vec3(&["cloudColor", "cloudcolor"]);
+                    app.cloud_density = read_f32(&["cloudDensity", "clouddensity"]);
                     app.sun_color = read_vec3(&["sunColor", "suncolor"]);
                     pop(); // atmosphere
                 }
@@ -1066,6 +1114,14 @@ impl Unitsync {
                     if let Some(c) = read_vec3(&["sunColor", "suncolor"]) {
                         app.sun_color = Some(c);
                     }
+                    app.ground_ambient_color =
+                        read_vec3(&["groundAmbientColor", "groundambientcolor"]);
+                    app.ground_diffuse_color =
+                        read_vec3(&["groundDiffuseColor", "grounddiffusecolor"]);
+                    app.ground_specular_color =
+                        read_vec3(&["groundSpecularColor", "groundspecularcolor"]);
+                    app.ground_shadow_density =
+                        read_f32(&["groundShadowDensity", "groundshadowdensity"]);
                     pop(); // lighting
                 }
             }
