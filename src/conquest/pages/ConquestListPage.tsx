@@ -32,6 +32,15 @@ export default function ConquestListPage() {
   const drawer = useDrawer();
   const navigate = useNavigate();
 
+  // unitsync is the source of truth for "is a game available", not a file count:
+  // rapid installs (BAR et al.) live in packages/pool, not games/*.sd7. Until the
+  // scan resolves we keep showing the normal UI so guidance never flashes.
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const scanResolved = scan.data != null;
+  const hasGames = (scan.data?.games.length ?? 0) > 0;
+  const needsGame = !target || (scanResolved && !hasGames);
+
   const runs = galaxies.filter((g) => file.conquests[g.galaxy.id]);
   const unstarted = galaxies.filter((g) => !file.conquests[g.galaxy.id]);
 
@@ -60,14 +69,38 @@ export default function ConquestListPage() {
             enemy capital.
           </p>
         </div>
-        <Button onClick={openGenerate} className="shrink-0">
-          <Dices className="mr-1.5 size-4" aria-hidden /> Generate a galaxy
-        </Button>
+        {!needsGame && (
+          <Button onClick={openGenerate} className="shrink-0">
+            <Dices className="mr-1.5 size-4" aria-hidden /> Generate a galaxy
+          </Button>
+        )}
       </header>
 
       {error && <ErrorBanner message={error} />}
 
-      {loading ? (
+      {needsGame ? (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-10 text-center">
+          <Orbit className="size-6 text-muted-foreground" aria-hidden />
+          <div className="space-y-1">
+            <p className="text-sm font-medium">
+              {target
+                ? "Conquest needs a game installed"
+                : "Conquest needs an engine and a game"}
+            </p>
+            <p className="max-w-md text-sm text-muted-foreground">
+              {target
+                ? "Conquest generates a galaxy for any installed game with skirmish AIs. Download a game to get started — it will appear here automatically."
+                : "Install an engine and at least one game, then return here to generate a galaxy for it."}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/downloads/games")}
+          >
+            Browse games to download
+          </Button>
+        </div>
+      ) : loading ? (
         <SkeletonList />
       ) : galaxies.length === 0 ? (
         <EmptyState label="No galaxies yet. Generate one for any installed game, or import a galaxy file." />

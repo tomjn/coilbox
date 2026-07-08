@@ -371,13 +371,17 @@ export default function MapsPage() {
                   key={it.springName}
                   className="flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-foreground/20 hover:bg-accent/30 [content-visibility:auto] [contain-intrinsic-size:14rem]"
                 >
-                  <div className="flex aspect-video items-center justify-center bg-muted">
+                  {/* Image is absolutely positioned so it stays out of flow and
+                      cannot inflate the box past its aspect-ratio: WebView2
+                      otherwise lets a non-16:9 minimap's intrinsic size drive the
+                      height, giving ragged cards. */}
+                  <div className="relative flex aspect-video items-center justify-center overflow-hidden bg-muted">
                     {it.thumb ? (
                       <img
                         src={it.thumb}
                         alt=""
                         loading="lazy"
-                        className="h-full w-full object-cover"
+                        className="absolute inset-0 h-full w-full object-cover"
                       />
                     ) : (
                       <MapIcon size={28} className="text-muted-foreground/40" />

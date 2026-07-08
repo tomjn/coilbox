@@ -5,6 +5,7 @@ import {
   useContentRootPaths,
   useWriteRootPath,
 } from "../../../downloads/config";
+import { usePreferredTarget } from "../../../play/config";
 import {
   filterUninstalledGames,
   filterUninstalledMaps,
@@ -12,18 +13,17 @@ import {
   useSuggestedGames,
   useSuggestedMaps,
 } from "../../branding";
-import { useSetupStatus } from "../../config";
+import { useSetupStatus, useUnitsyncScan } from "../../config";
 import { SuggestionsList } from "./SuggestionsList";
 
 /**
  * Welcome-screen card offering curated game/map downloads once setup (content
- * folder + engine) is complete but the user still has no content. Gated on the
- * cheap `dlInstalledContent` directory listing — no unitsync scan — so a healthy
- * install pays nothing. Dismissible and self-hiding once content lands.
- *
- * Known limitation: rapid content installs under `packages/`+`pool/`, so a
- * rapid-only install reads as "no games" here and may re-suggest a game the user
- * can already launch. Acceptable — the card is dismissible.
+ * folder + engine) is complete but the user still has no content. Maps use the
+ * cheap `dlInstalledContent` directory listing (maps land as files); games are
+ * resolved against a unitsync scan, since rapid installs live in
+ * `packages/`+`pool/` and never appear as an archive in `games/`, so a file
+ * listing would re-suggest a game the user can already launch. Dismissible and
+ * self-hiding once content lands.
  */
 export function GetStartedCard() {
   const { complete } = useSetupStatus();
@@ -36,6 +36,8 @@ export function GetStartedCard() {
   const entries = useBrandingCatalog();
   const suggestedGames = useSuggestedGames();
   const suggestedMaps = useSuggestedMaps();
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const [installed, setInstalled] = useState<{
     games: Set<string>;
     maps: Set<string>;
@@ -60,9 +62,20 @@ export function GetStartedCard() {
 
   if (!complete || dismissed || !installed) return null;
 
+  // unitsync is the truth for games (it sees rapid content); the file listing
+  // only backs maps. Wait for the scan to settle so a not-yet-run scan can't let
+  // an already-installed rapid game slip back into the suggestions.
+  const scannedGames = scan.data?.games ?? [];
+  const scanSettled = scan.data != null || scan.error != null;
+  const hasGames = installed.games.size > 0 || scannedGames.length > 0;
   const games =
-    installed.games.size === 0
-      ? filterUninstalledGames(suggestedGames, entries, installed.games, [])
+    scanSettled && !hasGames
+      ? filterUninstalledGames(
+          suggestedGames,
+          entries,
+          installed.games,
+          scannedGames,
+        )
       : [];
   const maps =
     installed.maps.size === 0

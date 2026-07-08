@@ -41,9 +41,13 @@ function runDownload(
 ): Promise<{ message: string }> {
   switch (dl.kind) {
     case "rapid":
+      // Default to the standard rapid master when the catalog entry omits one:
+      // a non-empty master pins PRD_RAPID_REPO_MASTER and disables the rapid
+      // streamer in the sidecar, matching every working rapid caller. Left
+      // unset, the streamer path can exit 0 without installing (a silent no-op).
       return dlDownload({
         tag: dl.tag,
-        masterUrl: dl.masterUrl,
+        masterUrl: dl.masterUrl || "https://repos.springrts.com",
         writePath,
         onProgress,
       });

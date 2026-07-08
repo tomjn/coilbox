@@ -1,6 +1,5 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Orbit } from "lucide-react";
-import { useContentState } from "../content/config";
 import { getCachedGalaxy } from "./conquests";
 
 /**
@@ -11,16 +10,12 @@ import { getCachedGalaxy } from "./conquests";
  * schema lives in `model.ts`, the pure rules in `rules.ts`.
  *
  * The Conquest item joins the existing **Play** group (nav groups merge by
- * id). Unlike Campaigns it shows whenever a game is installed — the
- * procedural generator means conquest works for any game with skirmish AIs,
- * so it should be discoverable before any galaxy exists.
+ * id). It is always visible: the procedural generator means conquest works for
+ * any game with skirmish AIs, and whether a game is actually available is a
+ * unitsync question the page answers itself (with guidance when none is found).
+ * A file-count nav gate would wrongly hide it for rapid installs, which land in
+ * `packages/`+`pool/` rather than as an archive in `games/`.
  */
-
-/** Nav gate: visible once the content state reports at least one game. */
-function useConquestVisible(): boolean {
-  const { state } = useContentState();
-  return (state?.roots ?? []).some((r) => r.counts.games > 0);
-}
 
 const conquestPlugin: FramePlugin = {
   id: "conquest",
@@ -37,7 +32,6 @@ const conquestPlugin: FramePlugin = {
           to: "/conquest",
           order: 2,
           icon: Orbit,
-          useVisible: useConquestVisible,
         },
       ],
     },
