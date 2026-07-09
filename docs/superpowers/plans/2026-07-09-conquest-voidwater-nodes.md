@@ -16,9 +16,14 @@
 
 ### Task 1: Map-appearance cache module
 
+Note: `@picoframe/frame`'s dist is not node-importable under vitest, so the pure
+helper (`spaceMapNames`) lives in `src/content/mapAppearance.ts` (type-only
+import) with its test there; the `useSetting`-backed hooks live in
+`src/content/mapAppearanceCache.ts` and are exercised live.
+
 **Files:**
-- Create: `src/content/mapAppearanceCache.ts`
-- Test: `src/content/mapAppearanceCache.test.ts`
+- Create: `src/content/mapAppearance.ts` (pure), `src/content/mapAppearanceCache.ts` (hooks)
+- Test: `src/content/mapAppearance.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
