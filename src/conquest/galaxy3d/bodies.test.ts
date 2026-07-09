@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { bodyLabel, voidBodyFor } from "./bodies";
+import { bodyLabel, voidBodiesFor, voidBodyFor } from "./bodies";
+
+/** All-asteroid ids under voidBodyFor, so voidBodiesFor must promote one. */
+function cometFreeIds(count: number): string[] {
+  const ids: string[] = [];
+  for (let i = 0; ids.length < count; i++) {
+    if (voidBodyFor(`dry-${i}`) === "asteroid") ids.push(`dry-${i}`);
+  }
+  return ids;
+}
 
 describe("voidBodyFor", () => {
   it("is deterministic per node id", () => {
@@ -15,6 +24,35 @@ describe("voidBodyFor", () => {
     expect(comets).toBeGreaterThan(0);
     expect(asteroids).toBeGreaterThan(comets);
     expect(comets + asteroids).toBe(200);
+  });
+});
+
+describe("voidBodiesFor", () => {
+  it("keeps each node's own roll when a comet already occurs", () => {
+    const ids = Array.from({ length: 40 }, (_, i) => `node-${i}`);
+    // Sanity: this set contains a natural comet.
+    expect(ids.some((id) => voidBodyFor(id) === "comet")).toBe(true);
+    const bodies = voidBodiesFor(ids);
+    for (const id of ids) expect(bodies.get(id)).toBe(voidBodyFor(id));
+  });
+
+  it("promotes one node to comet when the set is comet-free", () => {
+    const ids = cometFreeIds(12);
+    expect(ids.some((id) => voidBodyFor(id) === "comet")).toBe(false);
+    const bodies = voidBodiesFor(ids);
+    const comets = ids.filter((id) => bodies.get(id) === "comet");
+    expect(comets).toHaveLength(1);
+  });
+
+  it("promotes the same node regardless of input order", () => {
+    const ids = cometFreeIds(12);
+    const pick = (order: string[]) =>
+      order.find((id) => voidBodiesFor(order).get(id) === "comet");
+    expect(pick(ids)).toBe(pick([...ids].reverse()));
+  });
+
+  it("handles an empty set", () => {
+    expect(voidBodiesFor([]).size).toBe(0);
   });
 });
 

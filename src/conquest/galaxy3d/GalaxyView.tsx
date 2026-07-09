@@ -9,7 +9,7 @@ import { assetUrl } from "../../lib/assetUrl";
 import type { GalaxyDoc, Incursion } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
-import { bodyLabel, voidBodyFor } from "./bodies";
+import { bodyLabel, type VoidBody, voidBodiesFor } from "./bodies";
 import { factionSides } from "./factionShape";
 import { hashString, layoutNodes, playBounds, playExtentFor } from "./layout";
 import { buildStarfield } from "./starfield";
@@ -144,13 +144,16 @@ export function starSystemLabel(system: StarSystem): string {
     : system.primary.name;
 }
 
-/** Selection-panel label for a node, accounting for a voidwater body. */
+/**
+ * Selection-panel label for a node. `voidBody` (from the galaxy-wide
+ * `voidBodiesFor`) is set for space-map nodes and undefined otherwise.
+ */
 export function nodeBodyLabel(
   nodeId: string,
   capital: boolean,
-  isVoid: boolean,
+  voidBody: VoidBody | undefined,
 ): string {
-  if (isVoid) return bodyLabel(voidBodyFor(nodeId));
+  if (voidBody) return bodyLabel(voidBody);
   return starSystemLabel(starSystemFor(nodeId, capital));
 }
 
@@ -957,6 +960,14 @@ export function GalaxyView({
     const discGeo = new THREE.CircleGeometry(1.35, 32);
     disposables.push(discGeo);
 
+    // Voidwater bodies for the whole galaxy at once, so at least one node is a
+    // comet whenever any are space maps (see `voidBodiesFor`).
+    const voidBodies = voidBodiesFor(
+      galaxy.nodes
+        .filter((n) => !!spaceMaps?.has(n.battle.mapName))
+        .map((n) => n.id),
+    );
+
     const WHITE = new THREE.Color(0xffffff);
     galaxy.nodes.forEach((n, i) => {
       const p = positions.get(n.id);
@@ -994,8 +1005,8 @@ export function GalaxyView({
       // binary companion. See `./bodies` for the pure asteroid/comet split.
       const isVoid = !!spaceMaps?.has(n.battle.mapName);
       if (isVoid) {
-        const body = voidBodyFor(n.id);
-        const rockColor = new THREE.Color("#8a8079");
+        const body = voidBodies.get(n.id) ?? "asteroid";
+        const rockColor = new THREE.Color("#c9bdae");
         const starMat = new THREE.SpriteMaterial({
           map: asteroidTex,
           color: rockColor,
@@ -1006,7 +1017,7 @@ export function GalaxyView({
         });
         const star = new THREE.Sprite(starMat);
         star.position.set(p[0], p[1], p[2]);
-        registerIntro(star, starScale(i) * 0.8, n.id);
+        registerIntro(star, starScale(i) * 0.95, n.id);
         star.raycast = () => {};
         // A faint dust halo instead of a stellar corona.
         const coronaMat = new THREE.SpriteMaterial({
