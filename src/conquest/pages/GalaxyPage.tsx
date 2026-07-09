@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
+import { useKnownSpaceMaps } from "../../content/mapAppearanceCache";
 import {
   EmptyState,
   ErrorBanner,
@@ -21,11 +22,7 @@ import { conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { FOG_RANGE, withinJumps } from "../fog";
 import { factionSides } from "../galaxy3d/factionShape";
-import {
-  GalaxyView,
-  starSystemFor,
-  starSystemLabel,
-} from "../galaxy3d/GalaxyView";
+import { GalaxyView, nodeBodyLabel } from "../galaxy3d/GalaxyView";
 import { regenerateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../model";
 import {
@@ -81,6 +78,9 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   const reduceMotion = useReduceMotion();
   const effects = useEffectsEnabled();
   const performanceMode = usePerformanceMode();
+  // Space maps (voidwater) render as asteroid/comet nodes. Best-effort: fills in
+  // as maps' minimaps are resolved anywhere in the app (see mapAppearanceCache).
+  const spaceMaps = useKnownSpaceMaps();
 
   const playerFactionId = state?.playerFactionId ?? setupFaction;
   const owners = useMemo(
@@ -144,6 +144,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
         incursion={state?.incursion}
         onSelect={setSelectedId}
         visibleIds={visibleIds}
+        spaceMaps={spaceMaps}
         focusNodeId={battleNodeId}
         display={{ reduceMotion, effects, performanceMode }}
         className="absolute inset-0"
@@ -193,6 +194,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
           state={state}
           node={selected}
           attackable={attackable.has(selected.id)}
+          isVoid={spaceMaps.has(selected.battle.mapName)}
           onBattle={setBattleNodeId}
           onClose={() => setSelectedId(null)}
         />
@@ -314,6 +316,7 @@ function SelectionPanel({
   state,
   node,
   attackable,
+  isVoid,
   onBattle,
   onClose,
 }: {
@@ -321,6 +324,7 @@ function SelectionPanel({
   state: ConquestState;
   node: GalaxyNode;
   attackable: boolean;
+  isVoid: boolean;
   onBattle: (nodeId: string) => void;
   onClose: () => void;
 }) {
@@ -344,7 +348,7 @@ function SelectionPanel({
           </span>
           {galaxy.theme?.skin !== "theatre" && (
             <span className="text-xs capitalize text-muted-foreground/70">
-              {starSystemLabel(starSystemFor(node.id, node.kind === "capital"))}
+              {nodeBodyLabel(node.id, node.kind === "capital", isVoid)}
             </span>
           )}
         </div>

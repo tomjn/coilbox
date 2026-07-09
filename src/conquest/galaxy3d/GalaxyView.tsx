@@ -9,10 +9,16 @@ import { assetUrl } from "../../lib/assetUrl";
 import type { GalaxyDoc, Incursion } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
+import { bodyLabel, voidBodyFor } from "./bodies";
 import { factionSides } from "./factionShape";
 import { hashString, layoutNodes, playBounds, playExtentFor } from "./layout";
 import { buildStarfield } from "./starfield";
-import { radialTexture, spikesTexture } from "./textures";
+import {
+  asteroidTexture,
+  cometTailTexture,
+  radialTexture,
+  spikesTexture,
+} from "./textures";
 
 /**
  * The 3D strategic map: a tilted look-down over the galactic plane. The
@@ -53,6 +59,8 @@ interface GalaxyViewProps {
    * ghosts; lanes into the fog fade out.
    */
   visibleIds?: Set<string>;
+  /** Map spring-names known to be space maps; their nodes render as asteroids. */
+  spaceMaps?: Set<string>;
   /**
    * Zoom the camera in on a node (e.g. the system being fought over) and lock
    * user controls; `null`/undefined eases back to the framed overview. Driven
@@ -134,6 +142,16 @@ export function starSystemLabel(system: StarSystem): string {
   return system.companion
     ? `binary pair — ${system.primary.name} + ${system.companion.name}`
     : system.primary.name;
+}
+
+/** Selection-panel label for a node, accounting for a voidwater body. */
+export function nodeBodyLabel(
+  nodeId: string,
+  capital: boolean,
+  isVoid: boolean,
+): string {
+  if (isVoid) return bodyLabel(voidBodyFor(nodeId));
+  return starSystemLabel(starSystemFor(nodeId, capital));
 }
 
 /** One lane segment in 3D: [x1, y1, z1, x2, y2, z2]. */
@@ -359,6 +377,7 @@ export function GalaxyView({
   incursion,
   onSelect,
   visibleIds,
+  spaceMaps,
   focusNodeId,
   display,
   className,
@@ -852,7 +871,9 @@ export function GalaxyView({
       [1, "#ffffff00"],
     ]);
     const spikeTex = spikesTexture(256);
-    disposables.push(starTex, coronaTex, spikeTex);
+    const asteroidTex = asteroidTexture(128);
+    const cometTailTex = cometTailTexture(256);
+    disposables.push(starTex, coronaTex, spikeTex, asteroidTex, cometTailTex);
 
     const coronaSprites: (THREE.Sprite | undefined)[] = [];
     const ownerRingMats: THREE.MeshBasicMaterial[] = [];
@@ -967,6 +988,81 @@ export function GalaxyView({
         return;
       }
       discMats.push(undefined);
+      // Space maps (voidwater) read as asteroid fields, not star systems — a
+      // rare comet variant gets a trailing tail. Reuses the star/corona/spike
+      // slots so intro, ownership rings and selection keep working; skips the
+      // binary companion. See `./bodies` for the pure asteroid/comet split.
+      const isVoid = !!spaceMaps?.has(n.battle.mapName);
+      if (isVoid) {
+        const body = voidBodyFor(n.id);
+        const rockColor = new THREE.Color("#8a8079");
+        const starMat = new THREE.SpriteMaterial({
+          map: asteroidTex,
+          color: rockColor,
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+          rotation: ((hashString(`${n.id}-rock`) % 100) / 100) * Math.PI * 2,
+        });
+        const star = new THREE.Sprite(starMat);
+        star.position.set(p[0], p[1], p[2]);
+        registerIntro(star, starScale(i) * 0.8, n.id);
+        star.raycast = () => {};
+        // A faint dust halo instead of a stellar corona.
+        const coronaMat = new THREE.SpriteMaterial({
+          map: coronaTex,
+          color: new THREE.Color("#4a5468"),
+          transparent: true,
+          opacity: 0.28,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const corona = new THREE.Sprite(coronaMat);
+        corona.position.set(p[0], p[1], p[2]);
+        registerIntro(corona, coronaScale(i, false) * 0.6, `${n.id}-corona`);
+        corona.raycast = () => {};
+        // Comet: a tail streaking away from the head at a per-node angle. Kept
+        // in the spike slot so nothing else in the loop needs a new array.
+        let spikes: THREE.Sprite | undefined;
+        if (body === "comet") {
+          const tailMat = new THREE.SpriteMaterial({
+            map: cometTailTex,
+            color: new THREE.Color("#bfe0ff"),
+            transparent: true,
+            opacity: 0.5,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            rotation: ((hashString(`${n.id}-tail`) % 100) / 100) * Math.PI * 2,
+          });
+          spikes = new THREE.Sprite(tailMat);
+          spikes.center.set(0.85, 0.5); // pivot near the head so it trails out
+          spikes.position.set(p[0], p[1], p[2]);
+          registerIntro(spikes, starScale(i) * 2.6, `${n.id}-tail`);
+          spikes.raycast = () => {};
+          disposables.push(tailMat);
+          scene.add(spikes);
+        }
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: ownerColor(ownersRef.current[n.id] ?? n.owner),
+          transparent: true,
+          opacity: 0.7,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        });
+        const ring = new THREE.Mesh(ringGeoFor(0), ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(p[0], p[1] - 0.4, p[2]);
+        ring.raycast = () => {};
+        starSprites.push(star);
+        starMats.push(starMat);
+        spikeSprites.push(spikes);
+        coronaSprites.push(corona);
+        ownerRingMats.push(ringMat);
+        ownerRings.push(ring);
+        disposables.push(starMat, coronaMat, ringMat);
+        scene.add(star, corona, ring);
+        return;
+      }
       const type = nodeType[i];
       const stellar = new THREE.Color(type.color);
       // Normal blending (not additive): the hot core is near-opaque, so the
@@ -1730,7 +1826,14 @@ export function GalaxyView({
       applyVisibilityRef.current = null;
       applyFocusRef.current = null;
     };
-  }, [galaxy, playerFactionId, reduceMotion, effects, performanceMode]);
+  }, [
+    galaxy,
+    playerFactionId,
+    reduceMotion,
+    effects,
+    performanceMode,
+    spaceMaps,
+  ]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is
   // idle under reduce-motion). Fog changes touch both lanes (via applyOwners)
