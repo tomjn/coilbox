@@ -30,16 +30,21 @@ jobs:
       matrix:
         include:
           # `smcng_platform` selects the SpringMapConvNG release asset; `exe` is the
-          # binary suffix on Windows.
+          # binary suffix on Windows. `tauri_args` is passed through to the tauri
+          # build; Windows narrows to NSIS only (no MSI) so there is a single
+          # installer to sign and it is the one the updater tracks.
           - platform: macos-14 # arm64
             smcng_platform: macos-arm64
             exe: ""
+            tauri_args: ""
           - platform: ubuntu-22.04
             smcng_platform: linux-x86_64
             exe: ""
+            tauri_args: ""
           - platform: windows-latest
             smcng_platform: windows-x86_64
             exe: ".exe"
+            tauri_args: "--bundles nsis"
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -119,3 +124,105 @@ jobs:
           releaseName: "Coilbox ${{ github.ref_name }}"
           releaseDraft: true
           prerelease: false
+          args: ${{ matrix.tauri_args }}
+
+  # --- Windows Authenticode signing via SignPath Foundation -----------------
+  # SignPath's free OSS tier signs asynchronously, post-build. This job runs
+  # AFTER the whole build matrix (`needs: build`), so its latest.json patch is
+  # the last write and cannot race the mac/linux legs. SignPath signs remotely
+  # on its HSM and `tauri signer sign` is cross-platform, so this runs on
+  # ubuntu. Gated on the SignPath project variable + a tag: an unconfigured repo
+  # (or a non-release run) skips it entirely and ships unsigned, as before. A
+  # variable set without the matching secret fails loud at the SignPath step.
+  sign-windows:
+    needs: build
+    if: ${{ startsWith(github.ref, 'refs/tags/') && vars.SIGNPATH_PROJECT_SLUG != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # SignPath's action reads the uploaded workflow artifact to submit it.
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      # Provides the `tauri` CLI so `tauri signer sign` can regenerate the
+      # updater signature over the signed installer.
+      - name: Install dependencies
+        run: bun install
+
+      # Pull the unsigned NSIS installer the build job uploaded to the draft.
+      - name: Download unsigned installer from draft release
+        id: fetch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          rm -rf unsigned && mkdir -p unsigned
+          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" \
+            --pattern '*-setup.exe' --dir unsigned
+          installer="$(ls unsigned/*-setup.exe | head -n1)"
+          echo "name=$(basename "$installer")" >> "$GITHUB_OUTPUT"
+          echo "Downloaded unsigned installer: $installer"
+
+      # SignPath requires the artifact as a GitHub workflow artifact so GitHub
+      # vouches for its origin (the API token alone can't forge provenance).
+      - name: Upload unsigned installer as workflow artifact
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-windows-installer
+          path: unsigned/${{ steps.fetch.outputs.name }}
+          if-no-files-found: error
+
+      - name: Submit installer to SignPath for signing
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          # The action unzips the uploaded artifact and writes the signed .exe
+          # here under its original filename.
+          output-artifact-directory: signed
+
+      - name: Replace draft installer and repair updater signature
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          name="${{ steps.fetch.outputs.name }}"
+          signed="signed/$name"
+          test -f "$signed"
+          tag="${{ github.ref_name }}"
+
+          # Swap the unsigned installer on the draft for the signed one (same
+          # filename keeps the updater URL in latest.json valid).
+          gh release upload "$tag" "$signed" --clobber --repo "${{ github.repository }}"
+
+          # Authenticode changed the installer bytes, so the updater signature
+          # tauri-action generated over the UNSIGNED file is stale. Regenerate it
+          # over the SIGNED bytes and refresh the .sig asset.
+          bun tauri signer sign "$signed"
+          gh release upload "$tag" "${signed}.sig" --clobber --repo "${{ github.repository }}"
+
+          # Patch latest.json's Windows entry with the new signature (url is
+          # unchanged; the filename is unchanged). Last write across the run.
+          sig="$(cat "${signed}.sig")"
+          rm -rf latest-json && mkdir -p latest-json
+          gh release download "$tag" --repo "${{ github.repository }}" \
+            --pattern latest.json --dir latest-json
+          jq --arg sig "$sig" \
+            '.platforms."windows-x86_64".signature = $sig' \
+            latest-json/latest.json > latest-json/latest.patched.json
+          mv latest-json/latest.patched.json latest-json/latest.json
+          gh release upload "$tag" latest-json/latest.json --clobber \
+            --repo "${{ github.repository }}"
+          echo "Signed installer and patched latest.json (windows-x86_64)."
