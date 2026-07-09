@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { spaceMapNames } from "./mapAppearanceCache";
+import { spaceMapNames } from "./mapAppearance";
 
 describe("spaceMapNames", () => {
   it("returns only maps whose appearance has voidWater === true", () => {

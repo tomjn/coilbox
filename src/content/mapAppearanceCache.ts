@@ -1,31 +1,23 @@
 import { useSetting } from "@picoframe/frame";
 import { useCallback, useMemo, useRef } from "react";
 import type { MapAppearance } from "../mapconv/bindings";
+import {
+  MAP_APPEARANCE_KEY,
+  type MapAppearanceCache,
+  spaceMapNames,
+} from "./mapAppearance";
 
 /**
- * Opportunistic, persistent cache of per-map `MapAppearance`, keyed by map
- * spring-name. Populated as a side effect of the minimap the app already
- * renders (see `useRecordMapAppearance`, wired into `useUnitsyncMinimap`), so
- * it never mounts an archive of its own. Best-effort: a map whose minimap has
- * never been resolved is simply absent. Stores the whole appearance record so
- * future features (wind, tidal, water colours) reuse it, not just `voidWater`.
+ * React hooks over the opportunistic per-map appearance cache (pure helpers in
+ * `mapAppearance.ts`). Populated as a side effect of the minimap the app
+ * already renders (see `useRecordMapAppearance`, wired into
+ * `useUnitsyncMinimap`), so it never mounts an archive of its own. Best-effort:
+ * a map whose minimap has never been resolved is simply absent.
  */
-const MAP_APPEARANCE_KEY = "content.mapAppearance";
-
-type Cache = Record<string, MapAppearance>;
-
-/** Names in the cache that are space maps (`voidWater === true`). Pure. */
-export function spaceMapNames(cache: Cache): Set<string> {
-  const out = new Set<string>();
-  for (const [name, app] of Object.entries(cache)) {
-    if (app?.voidWater === true) out.add(name);
-  }
-  return out;
-}
 
 /** The raw cache record (reactive). */
-export function useMapAppearanceCache(): Cache {
-  const [cache] = useSetting<Cache>(MAP_APPEARANCE_KEY, {});
+export function useMapAppearanceCache(): MapAppearanceCache {
+  const [cache] = useSetting<MapAppearanceCache>(MAP_APPEARANCE_KEY, {});
   return cache;
 }
 
@@ -45,7 +37,10 @@ export function useRecordMapAppearance(): (
   name: string,
   appearance: MapAppearance,
 ) => void {
-  const [cache, setCache] = useSetting<Cache>(MAP_APPEARANCE_KEY, {});
+  const [cache, setCache] = useSetting<MapAppearanceCache>(
+    MAP_APPEARANCE_KEY,
+    {},
+  );
   const ref = useRef(cache);
   ref.current = cache;
   return useCallback(
