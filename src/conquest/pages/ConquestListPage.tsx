@@ -1,6 +1,6 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { ChevronRight, Dices, Orbit, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Switch } from "@/components/ui/switch";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
@@ -15,10 +15,11 @@ import { getGameMatcher, getProfile } from "../../profile/profile";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import { conquestDelete, conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
-import { generateGalaxy } from "../generate";
+import { type GenerateOptions, generateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc } from "../model";
 import { compareGameVersions } from "../model";
 import { mergeConquestNames } from "../names";
+import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
 
 /**
  * The Conquest hub: in-progress runs first, then galaxies ready to start
@@ -348,7 +349,53 @@ function GenerateGalaxyForm({
     if (!scanData && !scanLoading) runScan();
   }, [scanData, scanLoading, runScan]);
 
-  const maps = scan.data?.maps ?? [];
+  const maps = useMemo(() => scan.data?.maps ?? [], [scan.data]);
+
+  // One options builder shared by the live preview and the create action, so
+  // the galaxy the user saw is exactly the galaxy that gets saved.
+  const genOptions = useCallback(
+    (id: string): GenerateOptions => ({
+      seed: Number(seed) || 1,
+      game: { shortname: effectiveShort },
+      maps,
+      ais: ais.map((a) => ({
+        kind: a.kind,
+        shortName: a.shortName,
+        name: a.name,
+      })),
+      nodeCount: Number(size),
+      factionCount: Number(factions),
+      layout: layout as GenerateOptions["layout"],
+      skin: style === "theatre" ? "theatre" : "galaxy",
+      startingSystems: starting ? Number(starting) : undefined,
+      fogOfWar: fog,
+      names,
+      id,
+      title: `${effectiveShort} Conquest`,
+    }),
+    [
+      seed,
+      effectiveShort,
+      maps,
+      ais,
+      size,
+      factions,
+      layout,
+      style,
+      starting,
+      fog,
+      names,
+    ],
+  );
+
+  const preview = useMemo(() => {
+    if (!selected || maps.length === 0) return null;
+    try {
+      return generateGalaxy(genOptions("preview"));
+    } catch {
+      return null;
+    }
+  }, [genOptions, selected, maps]);
   const blocked = !target
     ? "Install an engine first (Content → Engines)."
     : scan.data && (scan.data.games.length === 0 || gameChoices.length === 0)
@@ -365,25 +412,7 @@ function GenerateGalaxyForm({
     setError(null);
     try {
       const id = `generated-${crypto.randomUUID()}`;
-      const doc = generateGalaxy({
-        seed: Number(seed) || 1,
-        game: { shortname: effectiveShort },
-        maps,
-        ais: ais.map((a) => ({
-          kind: a.kind,
-          shortName: a.shortName,
-          name: a.name,
-        })),
-        nodeCount: Number(size),
-        factionCount: Number(factions),
-        layout: layout as "random" | "scatter" | "spiral" | "clusters" | "ring",
-        skin: style === "theatre" ? "theatre" : "galaxy",
-        startingSystems: starting ? Number(starting) : undefined,
-        fogOfWar: fog,
-        names,
-        id,
-        title: `${effectiveShort} Conquest`,
-      });
+      const doc = generateGalaxy(genOptions(id));
       await conquestSave({ id, json: JSON.stringify(doc) });
       await refreshGalaxies();
       onCreated(id);
@@ -491,6 +520,12 @@ function GenerateGalaxyForm({
               The same seed always builds the same galaxy.
             </span>
           </div>
+          {preview && (
+            <div className="flex flex-col gap-1.5 text-sm">
+              <span className="font-medium">Preview</span>
+              <GalaxyPreview2D galaxy={preview} />
+            </div>
+          )}
           {error && <ErrorBanner message={error} />}
           <Button onClick={create} disabled={busy || !selected}>
             {busy ? "Generating…" : "Create galaxy"}
