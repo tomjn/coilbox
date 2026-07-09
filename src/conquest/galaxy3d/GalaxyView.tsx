@@ -1219,11 +1219,7 @@ export function GalaxyView({
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2500);
     // Start high above the plane (~27° from vertical), pulled back to frame the
     // player's region.
-    camera.position.set(
-      focus.x,
-      extent * 1.05,
-      focus.z + extent * 0.55,
-    );
+    camera.position.set(focus.x, extent * 1.05, focus.z + extent * 0.55);
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(focus);
