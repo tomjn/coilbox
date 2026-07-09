@@ -126,6 +126,29 @@ describe("parseGalaxyJson", () => {
     expect(parsed?.rules?.graceTurns).toBe(10);
   });
 
+  it("round-trips generation knobs and drops invalid ones", () => {
+    const doc = galaxy({
+      generated: {
+        seed: 7,
+        nodeCount: 16,
+        factionCount: 2,
+        layout: "ring",
+        skin: "galaxy",
+        startingSystems: 2,
+        fogOfWar: true,
+      },
+    });
+    expect(parseGalaxyJson(JSON.stringify(doc))).toEqual(doc);
+
+    const raw = JSON.parse(JSON.stringify(doc));
+    raw.generated.layout = "hexagon";
+    raw.generated.nodeCount = 900;
+    const parsed = parseGalaxyJson(JSON.stringify(raw));
+    expect(parsed?.generated?.seed).toBe(7);
+    expect(parsed?.generated?.layout).toBeUndefined();
+    expect(parsed?.generated?.nodeCount).toBe(80);
+  });
+
   it("filters playableFactionIds to known factions", () => {
     const doc = galaxy({ playableFactionIds: ["p", "e", "zz"] });
     expect(parseGalaxyJson(JSON.stringify(doc))?.playableFactionIds).toEqual([

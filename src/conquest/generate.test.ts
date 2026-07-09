@@ -197,6 +197,33 @@ describe("generateGalaxy", () => {
     expect(attackable).toBe(true);
   });
 
+  it("persists the generation knobs for reroll", () => {
+    const doc = generateGalaxy(
+      {
+        ...base,
+        layout: "ring",
+        skin: "theatre",
+        startingSystems: 2,
+        fogOfWar: true,
+      },
+      "t0",
+    );
+    expect(doc.generated).toEqual({
+      seed: 1234,
+      nodeCount: 16,
+      factionCount: 2,
+      layout: "ring",
+      skin: "theatre",
+      startingSystems: 2,
+      fogOfWar: true,
+    });
+    const defaults = generateGalaxy(base, "t0");
+    expect(defaults.generated?.layout).toBe("scatter");
+    expect(defaults.generated?.skin).toBe("galaxy");
+    expect(defaults.generated?.startingSystems).toBeUndefined();
+    expect(defaults.generated?.fogOfWar).toBeUndefined();
+  });
+
   it("applies faction presets in order", () => {
     const doc = generateGalaxy(
       {

@@ -421,6 +421,14 @@ export function generateGalaxy(
     theme: opts.skin === "theatre" ? { skin: "theatre" } : undefined,
     createdAt: now,
     updatedAt: now,
-    generated: { seed: opts.seed },
+    generated: {
+      seed: opts.seed,
+      nodeCount,
+      factionCount: enemyCount,
+      layout: opts.layout ?? "scatter",
+      skin: opts.skin === "theatre" ? "theatre" : "galaxy",
+      startingSystems: startCount,
+      fogOfWar: opts.fogOfWar ? true : undefined,
+    },
   };
 }

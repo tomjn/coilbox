@@ -130,8 +130,21 @@ export interface GalaxyDoc {
   theme?: GalaxyTheme;
   createdAt: string;
   updatedAt: string;
-  /** Present on procedurally generated docs (enables "reroll"). */
-  generated?: { seed: number };
+  /**
+   * Present on procedurally generated docs; carries the generation knobs so
+   * the galaxy can be rerolled in place. Maps, AIs and naming pools are
+   * deliberately not stored — they re-resolve from installed content and the
+   * current profile/branding at reroll time.
+   */
+  generated?: {
+    seed: number;
+    nodeCount?: number;
+    factionCount?: number;
+    layout?: "scatter" | "spiral" | "clusters" | "ring" | "random";
+    skin?: "galaxy" | "theatre";
+    startingSystems?: number;
+    fogOfWar?: boolean;
+  };
 }
 
 /** An enemy attack on a player node, pending until fought or expired. */
@@ -279,6 +292,39 @@ function parseTheme(value: unknown): GalaxyTheme | undefined {
   return Object.values(theme).some((v) => v !== undefined) ? theme : undefined;
 }
 
+/** Parse the reroll knobs of a generated doc; clamps mirror `generateGalaxy`. */
+function parseGenerated(value: unknown): GalaxyDoc["generated"] {
+  if (typeof value !== "object" || value === null) return undefined;
+  const g = value as Record<string, unknown>;
+  if (typeof g.seed !== "number" || !Number.isFinite(g.seed)) return undefined;
+  return {
+    seed: g.seed,
+    nodeCount:
+      typeof g.nodeCount === "number" && Number.isFinite(g.nodeCount)
+        ? clamp(Math.round(g.nodeCount), 8, 80)
+        : undefined,
+    factionCount:
+      typeof g.factionCount === "number" && Number.isFinite(g.factionCount)
+        ? clamp(Math.round(g.factionCount), 1, 3)
+        : undefined,
+    layout:
+      g.layout === "scatter" ||
+      g.layout === "spiral" ||
+      g.layout === "clusters" ||
+      g.layout === "ring" ||
+      g.layout === "random"
+        ? g.layout
+        : undefined,
+    skin: g.skin === "galaxy" || g.skin === "theatre" ? g.skin : undefined,
+    startingSystems:
+      typeof g.startingSystems === "number" &&
+      Number.isFinite(g.startingSystems)
+        ? clamp(Math.round(g.startingSystems), 1, 4)
+        : undefined,
+    fogOfWar: g.fogOfWar === true ? true : undefined,
+  };
+}
+
 /**
  * Parse the raw JSON of a stored or imported galaxy into a validated
  * {@link GalaxyDoc}, or `null` if the shape doesn't match. This is the single
@@ -422,8 +468,6 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
       ? true
       : undefined;
 
-  const generated = d.generated as Record<string, unknown> | null | undefined;
-
   return {
     schemaVersion: 1,
     id: d.id,
@@ -449,13 +493,7 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
     theme: parseTheme(d.theme),
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
-    generated:
-      typeof generated === "object" &&
-      generated !== null &&
-      typeof generated.seed === "number" &&
-      Number.isFinite(generated.seed)
-        ? { seed: generated.seed }
-        : undefined,
+    generated: parseGenerated(d.generated),
   };
 }
 
