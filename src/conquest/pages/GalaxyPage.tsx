@@ -21,6 +21,7 @@ import { getProfile } from "../../profile/profile";
 import { conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { FOG_RANGE, withinJumps } from "../fog";
+import { type VoidBody, voidBodiesFor } from "../galaxy3d/bodies";
 import { factionSides } from "../galaxy3d/factionShape";
 import { GalaxyView, nodeBodyLabel } from "../galaxy3d/GalaxyView";
 import { regenerateGalaxy } from "../generate";
@@ -81,6 +82,17 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   // Space maps (voidwater) render as asteroid/comet nodes. Best-effort: fills in
   // as maps' minimaps are resolved anywhere in the app (see mapAppearanceCache).
   const spaceMaps = useKnownSpaceMaps();
+  // Galaxy-wide void bodies (guarantees a comet when any node is a space map);
+  // used for the selection-panel label so it matches the rendered body.
+  const voidBodies = useMemo(
+    () =>
+      voidBodiesFor(
+        galaxy.nodes
+          .filter((n) => spaceMaps.has(n.battle.mapName))
+          .map((n) => n.id),
+      ),
+    [galaxy, spaceMaps],
+  );
 
   const playerFactionId = state?.playerFactionId ?? setupFaction;
   const owners = useMemo(
@@ -194,7 +206,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
           state={state}
           node={selected}
           attackable={attackable.has(selected.id)}
-          isVoid={spaceMaps.has(selected.battle.mapName)}
+          voidBody={voidBodies.get(selected.id)}
           onBattle={setBattleNodeId}
           onClose={() => setSelectedId(null)}
         />
@@ -316,7 +328,7 @@ function SelectionPanel({
   state,
   node,
   attackable,
-  isVoid,
+  voidBody,
   onBattle,
   onClose,
 }: {
@@ -324,7 +336,7 @@ function SelectionPanel({
   state: ConquestState;
   node: GalaxyNode;
   attackable: boolean;
-  isVoid: boolean;
+  voidBody: VoidBody | undefined;
   onBattle: (nodeId: string) => void;
   onClose: () => void;
 }) {
@@ -348,7 +360,7 @@ function SelectionPanel({
           </span>
           {galaxy.theme?.skin !== "theatre" && (
             <span className="text-xs capitalize text-muted-foreground/70">
-              {nodeBodyLabel(node.id, node.kind === "capital", isVoid)}
+              {nodeBodyLabel(node.id, node.kind === "capital", voidBody)}
             </span>
           )}
         </div>

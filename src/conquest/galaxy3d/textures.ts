@@ -101,10 +101,47 @@ export function spikesTexture(size: number): THREE.Texture {
   return tex;
 }
 
+/** GLSL-style deterministic hash, 0..1 (no RNG — keeps textures reproducible). */
+function noise1(n: number): number {
+  const s = Math.sin(n * 12.9898) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+/** Smooth 2D value noise on an integer lattice, hashed from `seed` (0..1). */
+function valueNoise(x: number, y: number, seed: number): number {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const xf = x - xi;
+  const yf = y - yi;
+  const h = (a: number, b: number) =>
+    noise1(seed * 131.7 + a * 57.3 + b * 131.1);
+  const u = xf * xf * (3 - 2 * xf);
+  const v = yf * yf * (3 - 2 * yf);
+  const a = h(xi, yi) + (h(xi + 1, yi) - h(xi, yi)) * u;
+  const b = h(xi, yi + 1) + (h(xi + 1, yi + 1) - h(xi, yi + 1)) * u;
+  return a + (b - a) * v;
+}
+
+/** Four-octave fbm (~0..1) for rocky surface grain and bump. */
+function fbm(x: number, y: number, seed: number): number {
+  let v = 0;
+  let amp = 0.5;
+  let freq = 1;
+  for (let o = 0; o < 4; o++) {
+    v += amp * valueNoise(x * freq, y * freq, seed + o * 13);
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return v;
+}
+
 /**
- * A rough rocky blob for asteroid-field nodes: an off-centre lumpy mass with a
- * soft edge, computed per-pixel (dither-free like the star textures). Greyscale
- * — the sprite material tints it. First cut; tune the lump field by eye.
+ * A lit asteroid for voidwater nodes: one hero rock with a scatter of debris.
+ * Each rock is a shaded sphere (real surface normal → Lambert), so it reads as
+ * a solid lit body, not a soft blob. Rocks composite front-most (nearest wins)
+ * so overlaps occlude instead of stacking translucent alpha, and the silhouette
+ * gets a hard ~1.5px edge. Greyscale, computed per-pixel (dither-free like the
+ * star textures) — the sprite material supplies the stone colour.
  */
 export function asteroidTexture(size: number): THREE.Texture {
   const canvas = document.createElement("canvas");
@@ -114,31 +151,107 @@ export function asteroidTexture(size: number): THREE.Texture {
   if (ctx) {
     const img = ctx.createImageData(size, size);
     const half = size / 2;
-    // A few fixed lumps (deterministic — no RNG) that union into a cluster.
-    const lumps = [
-      [0.0, 0.0, 0.34],
-      [0.26, -0.14, 0.2],
-      [-0.22, 0.2, 0.17],
-      [0.12, 0.28, 0.13],
+    const px = 1 / half; // one pixel in normalised (-1..1) units
+    // Light from the upper-left, more side-on than head-on (pre-normalised) so
+    // the far side falls into a real terminator instead of an even pale wash.
+    const L = [-0.62, -0.56, 0.55] as const;
+    // Deterministic rock field: a dominant hero plus falling-off debris/specks.
+    // depth breaks overlap ties so the nearer/larger rock occludes.
+    const rocks = [
+      { cx: -0.04, cy: 0.06, r: 0.6, depth: 1.0, seed: 1 },
+      { cx: 0.56, cy: -0.44, r: 0.13, depth: 0.35, seed: 2 },
+      { cx: -0.52, cy: 0.52, r: 0.1, depth: 0.3, seed: 3 },
+      { cx: 0.44, cy: 0.54, r: 0.07, depth: 0.25, seed: 4 },
+      { cx: 0.66, cy: 0.12, r: 0.045, depth: 0.2, seed: 5 },
+      { cx: -0.64, cy: -0.3, r: 0.038, depth: 0.2, seed: 6 },
     ] as const;
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const nx = (x + 0.5 - half) / half;
         const ny = (y + 0.5 - half) / half;
-        let cover = 0;
-        for (const [lx, ly, lr] of lumps) {
-          const d = Math.hypot(nx - lx, ny - ly);
-          cover = Math.max(cover, 1 - d / lr);
+        let front = -Infinity;
+        let value = 0;
+        let alpha = 0;
+        for (const rock of rocks) {
+          const dx = nx - rock.cx;
+          const dy = ny - rock.cy;
+          const d = Math.hypot(dx, dy);
+          // Lumpy (non-circular) silhouette from a few angular harmonics.
+          const ang = Math.atan2(dy, dx);
+          const R =
+            rock.r *
+            (1 +
+              0.16 * Math.sin(3 * ang + noise1(rock.seed) * 6.283) +
+              0.09 * Math.sin(5 * ang + noise1(rock.seed + 1) * 6.283) +
+              0.06 * Math.sin(7 * ang + noise1(rock.seed + 2) * 6.283) +
+              0.03 * Math.sin(11 * ang + noise1(rock.seed + 3) * 6.283));
+          if (d > R) continue;
+          // Sphere height at this pixel → nearer surface wins the pixel.
+          const zc = Math.sqrt(Math.max(0, 1 - (d / R) ** 2));
+          const key = rock.depth + zc * rock.r;
+          if (key <= front) continue;
+          // Unit surface normal (nlx² + nly² + zc² == 1 by construction).
+          const nlx = dx / R;
+          const nly = dy / R;
+          // Bump mapping: perturb the normal by the slope of an fbm height field
+          // so the lighting itself is rough (per-pixel micro-shadowing) — a matte
+          // grainy rock, not a smooth glossy sphere. Finite-difference slope.
+          const F = 7;
+          const h0 = fbm(nlx * F + rock.seed, nly * F - rock.seed, rock.seed);
+          const hx = fbm(
+            (nlx + 0.03) * F + rock.seed,
+            nly * F - rock.seed,
+            rock.seed,
+          );
+          const hy = fbm(
+            nlx * F + rock.seed,
+            (nly + 0.03) * F - rock.seed,
+            rock.seed,
+          );
+          const bump = 2.4;
+          let Nx = nlx - (hx - h0) * bump;
+          let Ny = nly - (hy - h0) * bump;
+          let Nz = zc;
+          const inv = 1 / Math.hypot(Nx, Ny, Nz);
+          Nx *= inv;
+          Ny *= inv;
+          Nz *= inv;
+          const lam = Math.max(0, Nx * L[0] + Ny * L[1] + Nz * L[2]);
+          let v = 0.09 + 0.94 * lam; // low ambient + strong diffuse → dark side
+          v += (1 - zc) ** 3 * 0.04; // whisper of limb, no gloss highlight
+          v *= 0.74 + 0.36 * h0; // albedo grain — patchy stone, not uniform
+          // Craters on the hero only: bowls with a directional inner-wall light —
+          // the wall facing the sun brightens, the opposite wall shadows, which
+          // reads as a depression instead of a printed ring.
+          if (rock.r > 0.3) {
+            for (let k = 0; k < 3; k++) {
+              const cs = rock.seed * 7 + k * 13;
+              const ca = noise1(cs) * 6.283;
+              const cr = 0.15 + 0.5 * noise1(cs + 1);
+              const ccx = Math.cos(ca) * cr;
+              const ccy = Math.sin(ca) * cr;
+              const crad = 0.12 + 0.12 * noise1(cs + 2);
+              const dux = (nlx - ccx) / crad;
+              const duy = (nly - ccy) / crad;
+              const t = Math.hypot(dux, duy); // 0 centre .. 1 rim
+              if (t < 1) {
+                v *= 0.5 + 0.5 * t * t; // dark floor, back to surface at the rim
+                // Inner-wall normal ≈ -(dux, duy); brighten the sun-facing wall.
+                const wall = -(dux * L[0] + duy * L[1]);
+                if (t > 0.55) v += ((t - 0.55) / 0.45) * wall * 0.5;
+              }
+            }
+          }
+          front = key;
+          value = Math.max(0, Math.min(1, v));
+          alpha = Math.max(0, Math.min(1, (R - d) / (1.5 * px)));
         }
-        const a = Math.max(0, Math.min(1, cover));
-        // Soft shaded rock: brighter toward the upper-left "lit" side.
-        const shade = 0.55 + 0.45 * Math.max(0, -nx * 0.6 - ny * 0.6);
-        const v = Math.round(shade * 255);
         const o = (y * size + x) * 4;
-        img.data[o] = v;
-        img.data[o + 1] = v;
-        img.data[o + 2] = v;
-        img.data[o + 3] = Math.round(a ** 0.7 * 255);
+        const g = Math.round(value * 255);
+        img.data[o] = g;
+        img.data[o + 1] = g;
+        img.data[o + 2] = g;
+        img.data[o + 3] = Math.round(alpha * 255);
       }
     }
     ctx.putImageData(img, 0, 0);
@@ -164,11 +277,17 @@ export function cometTailTexture(size: number): THREE.Texture {
       for (let x = 0; x < size; x++) {
         const nx = (x + 0.5 - half) / half; // -1..1 along the tail
         const ny = (y + 0.5 - half) / half;
-        // Head at nx=-1, fading to nothing at nx=1; narrows toward the tip.
+        // Head at nx=-1, tip at nx=+1; narrows toward the tip.
         const along = Math.max(0, Math.min(1, (nx + 1) / 2));
-        const width = 0.5 * (1 - along) + 0.05;
+        // Narrow so the cross-section reaches ~0 at the sprite's vertical edges
+        // (a wide head read as a hard band under additive blending).
+        const width = 0.16 * (1 - along) + 0.025;
         const across = Math.exp(-(ny * ny) / (2 * width * width));
-        const a = across * (1 - along) ** 1.5;
+        // Fade both ENDS to zero: a short ramp-in at the head so the bright end
+        // doesn't hit the texture boundary as a hard terminator, and a gentle
+        // taper to nothing at the tip so the streak stays legible.
+        const headFade = Math.min(1, along / 0.09);
+        const a = across * headFade * (1 - along) ** 1.05;
         const o = (y * size + x) * 4;
         img.data[o] = 255;
         img.data[o + 1] = 255;
