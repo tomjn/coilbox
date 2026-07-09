@@ -876,7 +876,23 @@ export function GalaxyView({
     const spikeTex = spikesTexture(256);
     const asteroidTex = asteroidTexture(128);
     const cometTailTex = cometTailTexture(256);
-    disposables.push(starTex, coronaTex, spikeTex, asteroidTex, cometTailTex);
+    // Comet coma: a bright icy core fading through a soft dusty halo, so it
+    // blends into the tail under additive blending (a comet is dust and ice,
+    // not rock — no lit surface).
+    const cometComaTex = radialTexture(128, [
+      [0, "#eaf6ffcc"],
+      [0.22, "#cfe6ff70"],
+      [0.5, "#a9d4ff20"],
+      [1, "#a9d4ff00"],
+    ]);
+    disposables.push(
+      starTex,
+      coronaTex,
+      spikeTex,
+      asteroidTex,
+      cometTailTex,
+      cometComaTex,
+    );
 
     const coronaSprites: (THREE.Sprite | undefined)[] = [];
     const ownerRingMats: THREE.MeshBasicMaterial[] = [];
@@ -886,7 +902,9 @@ export function GalaxyView({
     // galaxy.nodes).
     const starSprites: (THREE.Sprite | undefined)[] = [];
     const starMats: (THREE.SpriteMaterial | undefined)[] = [];
-    const spikeSprites: (THREE.Sprite | undefined)[] = [];
+    // Sprites for star diffraction spikes; a flat Mesh for comet tails (which
+    // must hold a world direction). Both are Object3D, toggled by fog/intro.
+    const spikeSprites: (THREE.Object3D | undefined)[] = [];
     // Binary companions: a second, smaller star that orbits its primary.
     interface Companion {
       i: number;
@@ -906,14 +924,14 @@ export function GalaxyView({
     prevFactionRef.current = playerFactionId;
     const animateIntro = !reduceMotion && effects && !factionOnlyRebuild;
     interface IntroSprite {
-      sprite: THREE.Sprite;
+      sprite: THREE.Object3D;
       target: number;
       delay: number;
     }
     const introSprites: IntroSprite[] = [];
     const introLaneMats: { mat: THREE.Material; target: number }[] = [];
     const registerIntro = (
-      sprite: THREE.Sprite,
+      sprite: THREE.Object3D,
       target: number,
       id: string,
     ) => {
@@ -1006,52 +1024,85 @@ export function GalaxyView({
       const isVoid = !!spaceMaps?.has(n.battle.mapName);
       if (isVoid) {
         const body = voidBodies.get(n.id) ?? "asteroid";
-        const rockColor = new THREE.Color("#c9bdae");
-        const starMat = new THREE.SpriteMaterial({
-          map: asteroidTex,
-          color: rockColor,
-          transparent: true,
-          opacity: 1,
-          depthWrite: false,
-          rotation: ((hashString(`${n.id}-rock`) % 100) / 100) * Math.PI * 2,
-        });
+        const isComet = body === "comet";
+        // Asteroids come in two flavours (cf. the metallic/carbonic references):
+        // a neutral metallic grey and a darker carbonic stone, by per-node hash.
+        const carbonic = hashString(`${n.id}-carbon`) % 3 === 0;
+        const rockColor = new THREE.Color(carbonic ? "#5d5b58" : "#a9adb2");
+        // Head sprite: a lit rock for asteroids, an additive icy coma for comets
+        // (a comet is dust and ice, so it glows rather than catching light).
+        const starMat = new THREE.SpriteMaterial(
+          isComet
+            ? {
+                map: cometComaTex,
+                color: new THREE.Color("#dff1ff"),
+                transparent: true,
+                opacity: 0.55,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+              }
+            : {
+                map: asteroidTex,
+                color: rockColor,
+                transparent: true,
+                opacity: 1,
+                depthWrite: false,
+                rotation:
+                  ((hashString(`${n.id}-rock`) % 100) / 100) * Math.PI * 2,
+              },
+        );
         const star = new THREE.Sprite(starMat);
         star.position.set(p[0], p[1], p[2]);
-        registerIntro(star, starScale(i) * 0.95, n.id);
+        registerIntro(star, starScale(i) * (isComet ? 1.05 : 0.95), n.id);
         star.raycast = () => {};
-        // A faint dust halo instead of a stellar corona.
+        // Dust: a faint halo around an asteroid; a brighter icy aura around a
+        // comet head that blends into its tail.
         const coronaMat = new THREE.SpriteMaterial({
           map: coronaTex,
-          color: new THREE.Color("#4a5468"),
+          color: new THREE.Color(isComet ? "#a9d8ff" : "#4a5468"),
           transparent: true,
-          opacity: 0.28,
+          opacity: isComet ? 0.5 : 0.28,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
         const corona = new THREE.Sprite(coronaMat);
         corona.position.set(p[0], p[1], p[2]);
-        registerIntro(corona, coronaScale(i, false) * 0.6, `${n.id}-corona`);
+        registerIntro(
+          corona,
+          coronaScale(i, false) * (isComet ? 1.0 : 0.6),
+          `${n.id}-corona`,
+        );
         corona.raycast = () => {};
-        // Comet: a tail streaking away from the head at a per-node angle. Kept
-        // in the spike slot so nothing else in the loop needs a new array.
-        let spikes: THREE.Sprite | undefined;
-        if (body === "comet") {
-          const tailMat = new THREE.SpriteMaterial({
+        // Comet: a long thin tail streaking away from the head at a per-node
+        // angle. Kept in the spike slot so nothing else in the loop needs a new
+        // array.
+        let spikes: THREE.Object3D | undefined;
+        if (isComet) {
+          const tailMat = new THREE.MeshBasicMaterial({
             map: cometTailTex,
-            color: new THREE.Color("#bfe0ff"),
+            color: new THREE.Color("#cfe8ff"),
             transparent: true,
-            opacity: 0.5,
+            opacity: 0.85,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
-            rotation: ((hashString(`${n.id}-tail`) % 100) / 100) * Math.PI * 2,
+            side: THREE.DoubleSide,
           });
-          spikes = new THREE.Sprite(tailMat);
-          spikes.center.set(0.85, 0.5); // pivot near the head so it trails out
-          spikes.position.set(p[0], p[1], p[2]);
-          registerIntro(spikes, starScale(i) * 2.6, `${n.id}-tail`);
-          spikes.raycast = () => {};
-          disposables.push(tailMat);
-          scene.add(spikes);
+          // A flat quad in the galaxy plane (like lanes/rings), not a billboard
+          // sprite — so the tail keeps a fixed world direction as the camera
+          // orbits. Unit length with the head (texture u≈0) at the local origin,
+          // so it grows from the coma under the intro's uniform scale.
+          const tailGeo = new THREE.PlaneGeometry(1, 0.55);
+          tailGeo.translate(0.5, 0, 0); // head at origin, tip toward +x
+          tailGeo.rotateX(-Math.PI / 2); // lie flat in the XZ plane
+          const tail = new THREE.Mesh(tailGeo, tailMat);
+          tail.position.set(p[0], p[1], p[2]);
+          tail.rotation.y =
+            ((hashString(`${n.id}-tail`) % 100) / 100) * Math.PI * 2;
+          tail.raycast = () => {};
+          registerIntro(tail, starScale(i) * 3.8, `${n.id}-tail`);
+          disposables.push(tailMat, tailGeo);
+          scene.add(tail);
+          spikes = tail;
         }
         const ringMat = new THREE.MeshBasicMaterial({
           color: ownerColor(ownersRef.current[n.id] ?? n.owner),

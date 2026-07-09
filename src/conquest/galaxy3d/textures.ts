@@ -277,11 +277,17 @@ export function cometTailTexture(size: number): THREE.Texture {
       for (let x = 0; x < size; x++) {
         const nx = (x + 0.5 - half) / half; // -1..1 along the tail
         const ny = (y + 0.5 - half) / half;
-        // Head at nx=-1, fading to nothing at nx=1; narrows toward the tip.
+        // Head at nx=-1, tip at nx=+1; narrows toward the tip.
         const along = Math.max(0, Math.min(1, (nx + 1) / 2));
-        const width = 0.5 * (1 - along) + 0.05;
+        // Narrow so the cross-section reaches ~0 at the sprite's vertical edges
+        // (a wide head read as a hard band under additive blending).
+        const width = 0.16 * (1 - along) + 0.025;
         const across = Math.exp(-(ny * ny) / (2 * width * width));
-        const a = across * (1 - along) ** 1.5;
+        // Fade both ENDS to zero: a short ramp-in at the head so the bright end
+        // doesn't hit the texture boundary as a hard terminator, and a gentle
+        // taper to nothing at the tip so the streak stays legible.
+        const headFade = Math.min(1, along / 0.09);
+        const a = across * headFade * (1 - along) ** 1.05;
         const o = (y * size + x) * 4;
         img.data[o] = 255;
         img.data[o + 1] = 255;
