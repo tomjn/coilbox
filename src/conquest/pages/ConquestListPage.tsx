@@ -524,6 +524,11 @@ function GenerateGalaxyForm({
             <div className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Preview</span>
               <GalaxyPreview2D galaxy={preview} />
+              {preview.nodes.length < Number(size) && (
+                <span className="text-xs text-muted-foreground">
+                  Capped at {preview.nodes.length} named systems.
+                </span>
+              )}
             </div>
           )}
           {error && <ErrorBanner message={error} />}
