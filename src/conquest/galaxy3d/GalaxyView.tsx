@@ -10,7 +10,7 @@ import type { GalaxyDoc, Incursion } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
 import { factionSides } from "./factionShape";
-import { hashString, layoutNodes, PLAY_EXTENT, playBounds } from "./layout";
+import { hashString, layoutNodes, playBounds, playExtentFor } from "./layout";
 import { buildStarfield } from "./starfield";
 import { radialTexture, spikesTexture } from "./textures";
 
@@ -413,7 +413,10 @@ export function GalaxyView({
     const uTime = { value: 0 };
 
     const skin = galaxy.theme?.skin ?? "galaxy";
-    const positions = layoutNodes(galaxy.nodes);
+    // Bigger galaxies get a proportionally bigger plane (constant density);
+    // the backdrop, nebulae and camera framing all scale with it.
+    const extent = playExtentFor(galaxy.nodes.length);
+    const positions = layoutNodes(galaxy.nodes, extent);
     // A theatre map is a flat chart: drop the galactic Y jitter.
     if (skin === "theatre") {
       for (const p of positions.values()) p[1] = 0;
@@ -487,7 +490,7 @@ export function GalaxyView({
      * games (e.g. Spring 1944) where a starfield makes no sense.
      */
     function buildTheatreBackdrop() {
-      const size = PLAY_EXTENT * 3.4;
+      const size = extent * 3.4;
       const planeGeo = new THREE.PlaneGeometry(size, size);
       const planeMat = new THREE.MeshBasicMaterial({
         map: theatreChartTexture(),
@@ -528,7 +531,7 @@ export function GalaxyView({
       // the bright core but never reach it.
       const coreAngle =
         ((hashString(`${galaxy.id}-core`) % 360) * Math.PI) / 180;
-      const CORE_DIST = PLAY_EXTENT * 5.5;
+      const CORE_DIST = extent * 5.5;
       const core: [number, number, number] = [
         Math.cos(coreAngle) * CORE_DIST,
         -42,
@@ -537,7 +540,7 @@ export function GalaxyView({
       scene.add(
         makeStars(
           performanceMode ? 9000 : 22000,
-          PLAY_EXTENT * 7,
+          extent * 7,
           55,
           0,
           "",
@@ -664,7 +667,7 @@ export function GalaxyView({
       scene.add(
         makeStars(
           performanceMode ? 2000 : 4500,
-          PLAY_EXTENT * 2.4,
+          extent * 2.4,
           60,
           -14,
           "-near",
@@ -697,13 +700,13 @@ export function GalaxyView({
         disposables.push(tex, mat);
         const sprite = new THREE.Sprite(mat);
         const angle = nebulaRng() * Math.PI * 2 + i;
-        const dist = PLAY_EXTENT * (0.7 + nebulaRng() * 1.6);
+        const dist = extent * (0.7 + nebulaRng() * 1.6);
         sprite.position.set(
           Math.cos(angle) * dist,
           -14 - nebulaRng() * 8,
           Math.sin(angle) * dist,
         );
-        const scale = PLAY_EXTENT * (1.2 + nebulaRng() * 1.2);
+        const scale = extent * (1.2 + nebulaRng() * 1.2);
         sprite.scale.set(scale, scale * 0.6, 1);
         sprite.raycast = () => {};
         scene.add(sprite);
@@ -1218,8 +1221,8 @@ export function GalaxyView({
     // player's region.
     camera.position.set(
       focus.x,
-      PLAY_EXTENT * 1.05,
-      focus.z + PLAY_EXTENT * 0.55,
+      extent * 1.05,
+      focus.z + extent * 0.55,
     );
 
     controls = new OrbitControls(camera, renderer.domElement);
