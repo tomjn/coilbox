@@ -101,10 +101,19 @@ export function spikesTexture(size: number): THREE.Texture {
   return tex;
 }
 
+/** GLSL-style deterministic hash, 0..1 (no RNG — keeps textures reproducible). */
+function noise1(n: number): number {
+  const s = Math.sin(n * 12.9898) * 43758.5453;
+  return s - Math.floor(s);
+}
+
 /**
- * A rough rocky blob for asteroid-field nodes: an off-centre lumpy mass with a
- * soft edge, computed per-pixel (dither-free like the star textures). Greyscale
- * — the sprite material tints it. First cut; tune the lump field by eye.
+ * A lit asteroid for voidwater nodes: one hero rock with a scatter of debris.
+ * Each rock is a shaded sphere (real surface normal → Lambert), so it reads as
+ * a solid lit body, not a soft blob. Rocks composite front-most (nearest wins)
+ * so overlaps occlude instead of stacking translucent alpha, and the silhouette
+ * gets a hard ~1.5px edge. Greyscale, computed per-pixel (dither-free like the
+ * star textures) — the sprite material supplies the stone colour.
  */
 export function asteroidTexture(size: number): THREE.Texture {
   const canvas = document.createElement("canvas");
@@ -114,31 +123,76 @@ export function asteroidTexture(size: number): THREE.Texture {
   if (ctx) {
     const img = ctx.createImageData(size, size);
     const half = size / 2;
-    // A few fixed lumps (deterministic — no RNG) that union into a cluster.
-    const lumps = [
-      [0.0, 0.0, 0.34],
-      [0.26, -0.14, 0.2],
-      [-0.22, 0.2, 0.17],
-      [0.12, 0.28, 0.13],
+    const px = 1 / half; // one pixel in normalised (-1..1) units
+    // Light from upper-left-front (pre-normalised) — the classic lit-limb look.
+    const L = [-0.4534, -0.5542, 0.7053] as const;
+    // Deterministic rock field: a dominant hero plus falling-off debris/specks.
+    // depth breaks overlap ties so the nearer/larger rock occludes.
+    const rocks = [
+      { cx: -0.04, cy: 0.06, r: 0.6, depth: 1.0, seed: 1 },
+      { cx: 0.56, cy: -0.44, r: 0.13, depth: 0.35, seed: 2 },
+      { cx: -0.52, cy: 0.52, r: 0.1, depth: 0.3, seed: 3 },
+      { cx: 0.44, cy: 0.54, r: 0.07, depth: 0.25, seed: 4 },
+      { cx: 0.66, cy: 0.12, r: 0.045, depth: 0.2, seed: 5 },
+      { cx: -0.64, cy: -0.3, r: 0.038, depth: 0.2, seed: 6 },
     ] as const;
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const nx = (x + 0.5 - half) / half;
         const ny = (y + 0.5 - half) / half;
-        let cover = 0;
-        for (const [lx, ly, lr] of lumps) {
-          const d = Math.hypot(nx - lx, ny - ly);
-          cover = Math.max(cover, 1 - d / lr);
+        let front = -Infinity;
+        let value = 0;
+        let alpha = 0;
+        for (const rock of rocks) {
+          const dx = nx - rock.cx;
+          const dy = ny - rock.cy;
+          const d = Math.hypot(dx, dy);
+          // Lumpy (non-circular) silhouette from a few angular harmonics.
+          const ang = Math.atan2(dy, dx);
+          const R =
+            rock.r *
+            (1 +
+              0.13 * Math.sin(3 * ang + noise1(rock.seed) * 6.283) +
+              0.07 * Math.sin(5 * ang + noise1(rock.seed + 1) * 6.283) +
+              0.045 * Math.sin(7 * ang + noise1(rock.seed + 2) * 6.283));
+          if (d > R) continue;
+          // Sphere height at this pixel → nearer surface wins the pixel.
+          const zc = Math.sqrt(Math.max(0, 1 - (d / R) ** 2));
+          const key = rock.depth + zc * rock.r;
+          if (key <= front) continue;
+          // Unit surface normal (nlx² + nly² + zc² == 1 by construction).
+          const nlx = dx / R;
+          const nly = dy / R;
+          const lam = Math.max(0, nlx * L[0] + nly * L[1] + zc * L[2]);
+          let v = 0.16 + 0.84 * lam; // ambient + diffuse
+          v += (1 - zc) ** 2 * 0.18; // bright limb to lift the silhouette
+          // Craters on the hero only: shaded bowls with a lit far rim.
+          if (rock.r > 0.3) {
+            for (let k = 0; k < 3; k++) {
+              const cs = rock.seed * 7 + k * 13;
+              const ca = noise1(cs) * 6.283;
+              const cr = 0.15 + 0.5 * noise1(cs + 1);
+              const ccx = Math.cos(ca) * cr;
+              const ccy = Math.sin(ca) * cr;
+              const crad = 0.12 + 0.12 * noise1(cs + 2);
+              const cd = Math.hypot(nlx - ccx, nly - ccy);
+              if (cd < crad) {
+                const t = cd / crad; // 0 centre .. 1 rim
+                v *= 0.6 + 0.4 * t; // darken toward the pit
+                if (t > 0.85) v += 0.2 * (1 - (t - 0.9) / 0.1) ** 2; // rim
+              }
+            }
+          }
+          front = key;
+          value = Math.max(0, Math.min(1, v));
+          alpha = Math.max(0, Math.min(1, (R - d) / (1.5 * px)));
         }
-        const a = Math.max(0, Math.min(1, cover));
-        // Soft shaded rock: brighter toward the upper-left "lit" side.
-        const shade = 0.55 + 0.45 * Math.max(0, -nx * 0.6 - ny * 0.6);
-        const v = Math.round(shade * 255);
         const o = (y * size + x) * 4;
-        img.data[o] = v;
-        img.data[o + 1] = v;
-        img.data[o + 2] = v;
-        img.data[o + 3] = Math.round(a ** 0.7 * 255);
+        const g = Math.round(value * 255);
+        img.data[o] = g;
+        img.data[o + 1] = g;
+        img.data[o + 2] = g;
+        img.data[o + 3] = Math.round(alpha * 255);
       }
     }
     ctx.putImageData(img, 0, 0);
