@@ -9,6 +9,19 @@ import type { GalaxyNode } from "../model";
 /** World-unit span of the play region's longest axis. */
 export const PLAY_EXTENT = 100;
 
+/** Node count whose play extent is exactly {@link PLAY_EXTENT} (the wizard's
+ * Medium size), so pre-existing medium galaxies render unchanged. */
+export const BASE_NODE_COUNT = 18;
+
+/**
+ * World-unit extent for a galaxy of `nodeCount` systems: area grows linearly
+ * with the count, so average star density stays constant instead of packing
+ * more stars into the same plane.
+ */
+export function playExtentFor(nodeCount: number): number {
+  return PLAY_EXTENT * Math.sqrt(Math.max(1, nodeCount) / BASE_NODE_COUNT);
+}
+
 /** Max deterministic vertical jitter applied to each node (world units). */
 export const Y_JITTER = 3;
 
@@ -26,12 +39,14 @@ export type WorldPos = [number, number, number];
 
 /**
  * Map authored `pos: [x, y]` to centred world `[x, y, z]` coordinates: the
- * longest authored span scales to {@link PLAY_EXTENT} (aspect preserved,
- * authored y becomes world z), plus a hash-derived Y jitter. A single node
- * (or zero-span axis) lands at the origin rather than dividing by zero.
+ * longest authored span scales to `extent` (default {@link PLAY_EXTENT};
+ * aspect preserved, authored y becomes world z), plus a hash-derived Y jitter.
+ * A single node (or zero-span axis) lands at the origin rather than dividing
+ * by zero.
  */
 export function layoutNodes(
   nodes: Pick<GalaxyNode, "id" | "pos">[],
+  extent: number = PLAY_EXTENT,
 ): Map<string, WorldPos> {
   const xs = nodes.map((n) => n.pos[0]);
   const ys = nodes.map((n) => n.pos[1]);
@@ -40,7 +55,7 @@ export function layoutNodes(
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
   const span = Math.max(maxX - minX, maxY - minY);
-  const scale = span > 0 ? PLAY_EXTENT / span : 0;
+  const scale = span > 0 ? extent / span : 0;
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
 
