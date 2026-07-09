@@ -5,6 +5,7 @@ import {
   makeStarNamer,
   mergeConquestNames,
   resolveConquestNames,
+  toRoman,
 } from "./names";
 import { mulberry32 } from "./rng";
 
@@ -35,6 +36,20 @@ describe("mergeConquestNames", () => {
     );
     expect(merged?.starNames).toEqual(["Kept"]);
   });
+
+  it("carries limitToNamed profile-over-branding", () => {
+    expect(mergeConquestNames({ limitToNamed: true }, {})?.limitToNamed).toBe(
+      true,
+    );
+    expect(mergeConquestNames({}, { limitToNamed: true })?.limitToNamed).toBe(
+      true,
+    );
+    // Profile explicitly off wins over branding on.
+    expect(
+      mergeConquestNames({ limitToNamed: false }, { limitToNamed: true })
+        ?.limitToNamed,
+    ).toBe(false);
+  });
 });
 
 describe("resolveConquestNames", () => {
@@ -52,6 +67,13 @@ describe("resolveConquestNames", () => {
     // Empty prefixes never blank the synthesis pool.
     expect(r.starPrefixes.length).toBeGreaterThan(0);
   });
+
+  it("surfaces limitToNamed, defaulting to false", () => {
+    expect(resolveConquestNames().limitToNamed).toBe(false);
+    expect(resolveConquestNames({ limitToNamed: true }).limitToNamed).toBe(
+      true,
+    );
+  });
 });
 
 describe("makeStarNamer", () => {
@@ -62,6 +84,48 @@ describe("makeStarNamer", () => {
     const out = Array.from({ length: 6 }, () => namer(used));
     expect(new Set(out).size).toBe(6); // all unique
     expect(out).toEqual(expect.arrayContaining(["Vega", "Altair"]));
+  });
+
+  it("extends an exhausted pool with roman numerals before synthesis", () => {
+    const names = resolveConquestNames({ starNames: ["Vega", "Altair"] });
+    const namer = makeStarNamer(mulberry32(1), names);
+    const used = new Set<string>();
+    const out = Array.from({ length: 6 }, () => namer(used));
+    expect(new Set(out).size).toBe(6);
+    // Two base names, then the same two with II, then III — never invented.
+    expect(out).toEqual(
+      expect.arrayContaining([
+        "Vega",
+        "Altair",
+        "Vega II",
+        "Altair II",
+        "Vega III",
+        "Altair III",
+      ]),
+    );
+  });
+
+  it("falls back to synthesis only when the pool is empty", () => {
+    const names = resolveConquestNames({
+      starNames: [],
+      starPrefixes: ["Xo"],
+      starSuffixes: ["ra"],
+    });
+    // resolveConquestNames refills starNames from the built-ins, so force empty.
+    const namer = makeStarNamer(mulberry32(1), { ...names, starNames: [] });
+    const used = new Set<string>();
+    const out = Array.from({ length: 3 }, () => namer(used));
+    for (const n of out) expect(n.startsWith("Xora")).toBe(true);
+  });
+});
+
+describe("toRoman", () => {
+  it("converts the numerals we actually use", () => {
+    expect(toRoman(2)).toBe("II");
+    expect(toRoman(3)).toBe("III");
+    expect(toRoman(4)).toBe("IV");
+    expect(toRoman(9)).toBe("IX");
+    expect(toRoman(40)).toBe("XL");
   });
 });
 

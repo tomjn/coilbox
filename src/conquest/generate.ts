@@ -292,9 +292,17 @@ export function generateGalaxy(
   now: string = new Date().toISOString(),
 ): GalaxyDoc {
   const rng = mulberry32(opts.seed);
-  const nodeCount = Math.min(80, Math.max(8, Math.round(opts.nodeCount)));
   const enemyCount = Math.min(3, Math.max(1, Math.round(opts.factionCount)));
   const names = resolveConquestNames(opts.names);
+  // limitToNamed caps the galaxy to the named-star pool (no fallback names);
+  // the 8-node floor still applies, so pools smaller than 8 fill the few extra
+  // names via the numeral fallback.
+  const requested = Math.round(opts.nodeCount);
+  const capped =
+    names.limitToNamed && names.starNames.length > 0
+      ? Math.min(requested, names.starNames.length)
+      : requested;
+  const nodeCount = Math.min(80, Math.max(8, capped));
 
   const layout = resolveLayout(opts.layout, rng);
   const pts = scatterFor(layout, rng, nodeCount, 100);
