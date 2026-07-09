@@ -44,6 +44,7 @@ import {
   unitsyncUnitDataset,
 } from "./bindings";
 import { newestEngineId } from "./engineVersion";
+import { useRecordMapAppearance } from "./mapAppearanceCache";
 import { deriveSetup } from "./setup";
 
 export type { SetupStatus } from "./setup";
@@ -1005,6 +1006,7 @@ export function useUnitsyncMinimap(
   const [appearance, setAppearance] = useState<MapAppearance | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const recordAppearance = useRecordMapAppearance();
 
   useEffect(() => {
     if (!enginePath || !dataDir || !mapName) {
@@ -1023,7 +1025,7 @@ export function useUnitsyncMinimap(
         maxWind: res.maxWind,
         tidalStrength: res.tidalStrength,
       });
-      setAppearance({
+      const appearance: MapAppearance = {
         voidWater: res.voidWater,
         voidGround: res.voidGround,
         voidAlphaMin: res.voidAlphaMin,
@@ -1044,7 +1046,11 @@ export function useUnitsyncMinimap(
         groundDiffuseColor: res.groundDiffuseColor,
         groundSpecularColor: res.groundSpecularColor,
         groundShadowDensity: res.groundShadowDensity,
-      });
+      };
+      setAppearance(appearance);
+      // Bank it in the opportunistic cache so conquest (and future features)
+      // can read a map's appearance without mounting its archive themselves.
+      if (mapName) recordAppearance(mapName, appearance);
       if (!res.dataUrl && res.errors?.length) setError(res.errors.join("; "));
     };
     const cached = minimapCache.get(key);
@@ -1072,7 +1078,7 @@ export function useUnitsyncMinimap(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, mapName]);
+  }, [enginePath, dataDir, mapName, recordAppearance]);
 
   return { dataUrl, startPositions, env, appearance, loading, error };
 }
