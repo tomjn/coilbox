@@ -107,6 +107,34 @@ function noise1(n: number): number {
   return s - Math.floor(s);
 }
 
+/** Smooth 2D value noise on an integer lattice, hashed from `seed` (0..1). */
+function valueNoise(x: number, y: number, seed: number): number {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const xf = x - xi;
+  const yf = y - yi;
+  const h = (a: number, b: number) =>
+    noise1(seed * 131.7 + a * 57.3 + b * 131.1);
+  const u = xf * xf * (3 - 2 * xf);
+  const v = yf * yf * (3 - 2 * yf);
+  const a = h(xi, yi) + (h(xi + 1, yi) - h(xi, yi)) * u;
+  const b = h(xi, yi + 1) + (h(xi + 1, yi + 1) - h(xi, yi + 1)) * u;
+  return a + (b - a) * v;
+}
+
+/** Four-octave fbm (~0..1) for rocky surface grain and bump. */
+function fbm(x: number, y: number, seed: number): number {
+  let v = 0;
+  let amp = 0.5;
+  let freq = 1;
+  for (let o = 0; o < 4; o++) {
+    v += amp * valueNoise(x * freq, y * freq, seed + o * 13);
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return v;
+}
+
 /**
  * A lit asteroid for voidwater nodes: one hero rock with a scatter of debris.
  * Each rock is a shaded sphere (real surface normal → Lambert), so it reads as
@@ -124,8 +152,9 @@ export function asteroidTexture(size: number): THREE.Texture {
     const img = ctx.createImageData(size, size);
     const half = size / 2;
     const px = 1 / half; // one pixel in normalised (-1..1) units
-    // Light from upper-left-front (pre-normalised) — the classic lit-limb look.
-    const L = [-0.4534, -0.5542, 0.7053] as const;
+    // Light from the upper-left, more side-on than head-on (pre-normalised) so
+    // the far side falls into a real terminator instead of an even pale wash.
+    const L = [-0.62, -0.56, 0.55] as const;
     // Deterministic rock field: a dominant hero plus falling-off debris/specks.
     // depth breaks overlap ties so the nearer/larger rock occludes.
     const rocks = [
@@ -152,9 +181,10 @@ export function asteroidTexture(size: number): THREE.Texture {
           const R =
             rock.r *
             (1 +
-              0.13 * Math.sin(3 * ang + noise1(rock.seed) * 6.283) +
-              0.07 * Math.sin(5 * ang + noise1(rock.seed + 1) * 6.283) +
-              0.045 * Math.sin(7 * ang + noise1(rock.seed + 2) * 6.283));
+              0.16 * Math.sin(3 * ang + noise1(rock.seed) * 6.283) +
+              0.09 * Math.sin(5 * ang + noise1(rock.seed + 1) * 6.283) +
+              0.06 * Math.sin(7 * ang + noise1(rock.seed + 2) * 6.283) +
+              0.03 * Math.sin(11 * ang + noise1(rock.seed + 3) * 6.283));
           if (d > R) continue;
           // Sphere height at this pixel → nearer surface wins the pixel.
           const zc = Math.sqrt(Math.max(0, 1 - (d / R) ** 2));
@@ -163,10 +193,36 @@ export function asteroidTexture(size: number): THREE.Texture {
           // Unit surface normal (nlx² + nly² + zc² == 1 by construction).
           const nlx = dx / R;
           const nly = dy / R;
-          const lam = Math.max(0, nlx * L[0] + nly * L[1] + zc * L[2]);
-          let v = 0.16 + 0.84 * lam; // ambient + diffuse
-          v += (1 - zc) ** 2 * 0.18; // bright limb to lift the silhouette
-          // Craters on the hero only: shaded bowls with a lit far rim.
+          // Bump mapping: perturb the normal by the slope of an fbm height field
+          // so the lighting itself is rough (per-pixel micro-shadowing) — a matte
+          // grainy rock, not a smooth glossy sphere. Finite-difference slope.
+          const F = 7;
+          const h0 = fbm(nlx * F + rock.seed, nly * F - rock.seed, rock.seed);
+          const hx = fbm(
+            (nlx + 0.03) * F + rock.seed,
+            nly * F - rock.seed,
+            rock.seed,
+          );
+          const hy = fbm(
+            nlx * F + rock.seed,
+            (nly + 0.03) * F - rock.seed,
+            rock.seed,
+          );
+          const bump = 2.4;
+          let Nx = nlx - (hx - h0) * bump;
+          let Ny = nly - (hy - h0) * bump;
+          let Nz = zc;
+          const inv = 1 / Math.hypot(Nx, Ny, Nz);
+          Nx *= inv;
+          Ny *= inv;
+          Nz *= inv;
+          const lam = Math.max(0, Nx * L[0] + Ny * L[1] + Nz * L[2]);
+          let v = 0.09 + 0.94 * lam; // low ambient + strong diffuse → dark side
+          v += (1 - zc) ** 3 * 0.04; // whisper of limb, no gloss highlight
+          v *= 0.74 + 0.36 * h0; // albedo grain — patchy stone, not uniform
+          // Craters on the hero only: bowls with a directional inner-wall light —
+          // the wall facing the sun brightens, the opposite wall shadows, which
+          // reads as a depression instead of a printed ring.
           if (rock.r > 0.3) {
             for (let k = 0; k < 3; k++) {
               const cs = rock.seed * 7 + k * 13;
@@ -175,11 +231,14 @@ export function asteroidTexture(size: number): THREE.Texture {
               const ccx = Math.cos(ca) * cr;
               const ccy = Math.sin(ca) * cr;
               const crad = 0.12 + 0.12 * noise1(cs + 2);
-              const cd = Math.hypot(nlx - ccx, nly - ccy);
-              if (cd < crad) {
-                const t = cd / crad; // 0 centre .. 1 rim
-                v *= 0.6 + 0.4 * t; // darken toward the pit
-                if (t > 0.85) v += 0.2 * (1 - (t - 0.9) / 0.1) ** 2; // rim
+              const dux = (nlx - ccx) / crad;
+              const duy = (nly - ccy) / crad;
+              const t = Math.hypot(dux, duy); // 0 centre .. 1 rim
+              if (t < 1) {
+                v *= 0.5 + 0.5 * t * t; // dark floor, back to surface at the rim
+                // Inner-wall normal ≈ -(dux, duy); brighten the sun-facing wall.
+                const wall = -(dux * L[0] + duy * L[1]);
+                if (t > 0.55) v += ((t - 0.55) / 0.45) * wall * 0.5;
               }
             }
           }
