@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  BASE_NODE_COUNT,
   hashString,
   layoutNodes,
   PLAY_EXTENT,
   playBounds,
+  playExtentFor,
   Y_JITTER,
 } from "./layout";
 import { buildStarfield } from "./starfield";
@@ -35,6 +37,16 @@ describe("layoutNodes", () => {
     }
   });
 
+  it("scales the longest span to a custom extent", () => {
+    const laid = layoutNodes(nodes, 200);
+    const a = laid.get("a");
+    const b = laid.get("b");
+    expect(a).toBeDefined();
+    expect(b).toBeDefined();
+    if (!a || !b) return;
+    expect(b[0] - a[0]).toBeCloseTo(200);
+  });
+
   it("handles a single node without NaN", () => {
     const laid = layoutNodes([{ id: "solo", pos: [7, 7] }]);
     const p = laid.get("solo");
@@ -47,6 +59,21 @@ describe("layoutNodes", () => {
     const b = playBounds(laid.values());
     expect(b.maxX - b.minX).toBeCloseTo(PLAY_EXTENT);
     expect(b.maxZ).toBeGreaterThan(b.minZ);
+  });
+});
+
+describe("playExtentFor", () => {
+  it("returns PLAY_EXTENT at the baseline node count", () => {
+    expect(playExtentFor(BASE_NODE_COUNT)).toBeCloseTo(PLAY_EXTENT);
+  });
+
+  it("scales with the square root of node count (constant density)", () => {
+    expect(playExtentFor(BASE_NODE_COUNT * 4)).toBeCloseTo(PLAY_EXTENT * 2);
+  });
+
+  it("never collapses for tiny galaxies", () => {
+    expect(playExtentFor(0)).toBeGreaterThan(0);
+    expect(playExtentFor(1)).toBeGreaterThan(0);
   });
 });
 

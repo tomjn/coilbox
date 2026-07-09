@@ -70,6 +70,7 @@ function gaussian(rng: Rng): number {
  * layouts so only the candidate distribution differs.
  */
 function packWithSampler(
+  rng: Rng,
   count: number,
   radius: number,
   sample: () => Pt,
@@ -79,7 +80,11 @@ function packWithSampler(
   let relax = 0;
   while (pts.length < count) {
     const p = sample();
-    if (pts.every((q) => dist(p, q) >= minDist - relax)) {
+    // Varied spacing: each candidate rolls its own acceptance distance
+    // (0.65..1.35 of the base, mean 1.0) so the field gets tight pairs and
+    // open gaps instead of a uniform carpet.
+    const need = minDist * (0.65 + rng() * 0.7) - relax;
+    if (pts.every((q) => dist(p, q) >= need)) {
       pts.push(p);
       relax = 0;
     } else {
@@ -91,7 +96,7 @@ function packWithSampler(
 
 /** Even disc scatter — the original galaxy shape. */
 function scatterDisc(rng: Rng, count: number, radius: number): Pt[] {
-  return packWithSampler(count, radius, () => {
+  return packWithSampler(rng, count, radius, () => {
     const r = radius * Math.sqrt(rng());
     const t = rng() * Math.PI * 2;
     return [r * Math.cos(t), r * Math.sin(t)];
@@ -102,7 +107,7 @@ function scatterDisc(rng: Rng, count: number, radius: number): Pt[] {
 function scatterSpiral(rng: Rng, count: number, radius: number): Pt[] {
   const arms = 2 + Math.floor(rng() * 2); // 2 or 3
   const wind = 3.2;
-  return packWithSampler(count, radius, () => {
+  return packWithSampler(rng, count, radius, () => {
     const arm = Math.floor(rng() * arms);
     const r = radius * (0.12 + 0.88 * Math.sqrt(rng()));
     const spread = 0.16 + 0.22 * (r / radius);
@@ -123,7 +128,7 @@ function scatterClusters(rng: Rng, count: number, radius: number): Pt[] {
     return [r * Math.cos(t), r * Math.sin(t)];
   });
   const spread = radius * 0.28;
-  return packWithSampler(count, radius, () => {
+  return packWithSampler(rng, count, radius, () => {
     const c = centres[Math.floor(rng() * k)];
     return [c[0] + gaussian(rng) * spread, c[1] + gaussian(rng) * spread];
   });
@@ -131,7 +136,7 @@ function scatterClusters(rng: Rng, count: number, radius: number): Pt[] {
 
 /** An annulus: an open core with the systems ringing it. */
 function scatterRing(rng: Rng, count: number, radius: number): Pt[] {
-  return packWithSampler(count, radius, () => {
+  return packWithSampler(rng, count, radius, () => {
     const r = radius * (0.55 + 0.45 * rng());
     const t = rng() * Math.PI * 2;
     return [r * Math.cos(t), r * Math.sin(t)];
@@ -416,6 +421,58 @@ export function generateGalaxy(
     theme: opts.skin === "theatre" ? { skin: "theatre" } : undefined,
     createdAt: now,
     updatedAt: now,
-    generated: { seed: opts.seed },
+    generated: {
+      seed: opts.seed,
+      nodeCount,
+      factionCount: enemyCount,
+      layout: opts.layout ?? "scatter",
+      skin: opts.skin === "theatre" ? "theatre" : "galaxy",
+      startingSystems: startCount,
+      fogOfWar: opts.fogOfWar ? true : undefined,
+    },
   };
+}
+
+/** The content environment a reroll resolves at call time (never persisted). */
+export interface RegenerateEnv {
+  maps: GenMap[];
+  ais: GenAi[];
+  names?: ConquestNames;
+}
+
+/**
+ * Reroll a generated galaxy in place: same id, title and generation knobs,
+ * new seed, content environment re-resolved by the caller. Returns null for
+ * docs without persisted knobs (authored galaxies, or generated ones saved
+ * before the knobs existed).
+ */
+export function regenerateGalaxy(
+  galaxy: GalaxyDoc,
+  env: RegenerateEnv,
+  seed: number,
+  now: string = new Date().toISOString(),
+): GalaxyDoc | null {
+  const g = galaxy.generated;
+  if (!g || g.nodeCount === undefined || g.factionCount === undefined) {
+    return null;
+  }
+  const doc = generateGalaxy(
+    {
+      seed,
+      game: { shortname: galaxy.game.shortname },
+      maps: env.maps,
+      ais: env.ais,
+      nodeCount: g.nodeCount,
+      factionCount: g.factionCount,
+      layout: g.layout,
+      skin: g.skin,
+      startingSystems: g.startingSystems,
+      fogOfWar: g.fogOfWar,
+      names: env.names,
+      id: galaxy.id,
+      title: galaxy.title,
+    },
+    now,
+  );
+  return { ...doc, createdAt: galaxy.createdAt };
 }

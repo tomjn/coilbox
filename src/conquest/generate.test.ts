@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { type GenerateOptions, generateGalaxy } from "./generate";
+import {
+  type GenerateOptions,
+  generateGalaxy,
+  regenerateGalaxy,
+} from "./generate";
 import { parseGalaxyJson } from "./model";
 
 const maps = Array.from({ length: 12 }, (_, i) => ({
@@ -102,6 +106,23 @@ describe("generateGalaxy", () => {
     expect(avg(hard)).toBeGreaterThan(avg(easy));
   });
 
+  it("varies spacing between seeds (jittered acceptance distance)", () => {
+    const a = generateGalaxy({ ...base, seed: 1 }, "t0");
+    const b = generateGalaxy({ ...base, seed: 2 }, "t0");
+    expect(a.nodes.map((n) => n.pos)).not.toEqual(b.nodes.map((n) => n.pos));
+    // Nearest-neighbour distances are not uniform: spread should be visible.
+    const nn = (doc: typeof a) =>
+      doc.nodes.map((n) =>
+        Math.min(
+          ...doc.nodes
+            .filter((m) => m.id !== n.id)
+            .map((m) => Math.hypot(m.pos[0] - n.pos[0], m.pos[1] - n.pos[1])),
+        ),
+      );
+    const d = nn(a);
+    expect(Math.max(...d) / Math.min(...d)).toBeGreaterThan(1.5);
+  });
+
   it("clamps node and faction counts (cap raised to 80)", () => {
     const doc = generateGalaxy(
       { ...base, nodeCount: 500, factionCount: 9 },
@@ -180,6 +201,33 @@ describe("generateGalaxy", () => {
     expect(attackable).toBe(true);
   });
 
+  it("persists the generation knobs for reroll", () => {
+    const doc = generateGalaxy(
+      {
+        ...base,
+        layout: "ring",
+        skin: "theatre",
+        startingSystems: 2,
+        fogOfWar: true,
+      },
+      "t0",
+    );
+    expect(doc.generated).toEqual({
+      seed: 1234,
+      nodeCount: 16,
+      factionCount: 2,
+      layout: "ring",
+      skin: "theatre",
+      startingSystems: 2,
+      fogOfWar: true,
+    });
+    const defaults = generateGalaxy(base, "t0");
+    expect(defaults.generated?.layout).toBe("scatter");
+    expect(defaults.generated?.skin).toBe("galaxy");
+    expect(defaults.generated?.startingSystems).toBeUndefined();
+    expect(defaults.generated?.fogOfWar).toBeUndefined();
+  });
+
   it("applies faction presets in order", () => {
     const doc = generateGalaxy(
       {
@@ -199,5 +247,28 @@ describe("generateGalaxy", () => {
     expect(doc.factions[0].side).toBe("Core");
     expect(doc.factions[1].name).toBe("Arm");
     expect(doc.factions[1].side).toBe("Armada");
+  });
+});
+
+describe("regenerateGalaxy", () => {
+  it("rerolls in place: same id/title/createdAt/knobs, new positions", () => {
+    const doc = generateGalaxy({ ...base, id: "keep-id", title: "Keep" }, "t0");
+    const re = regenerateGalaxy(doc, { maps, ais }, 999, "t1");
+    expect(re).not.toBeNull();
+    expect(re?.id).toBe("keep-id");
+    expect(re?.title).toBe("Keep");
+    expect(re?.createdAt).toBe("t0");
+    expect(re?.updatedAt).toBe("t1");
+    expect(re?.generated?.seed).toBe(999);
+    expect(re?.generated?.nodeCount).toBe(16);
+    expect(re?.nodes.map((n) => n.pos)).not.toEqual(
+      doc.nodes.map((n) => n.pos),
+    );
+  });
+
+  it("returns null for docs without persisted knobs", () => {
+    const doc = generateGalaxy(base, "t0");
+    const legacy = { ...doc, generated: { seed: 1 } };
+    expect(regenerateGalaxy(legacy, { maps, ais }, 5, "t1")).toBeNull();
   });
 });
