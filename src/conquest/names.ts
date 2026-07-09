@@ -279,11 +279,40 @@ export function resolveConquestNames(names?: ConquestNames): ResolvedNames {
   };
 }
 
+/** Roman numeral for n (n >= 1); used to extend a name pool on-theme. */
+export function toRoman(n: number): string {
+  const table: [number, string][] = [
+    [1000, "M"],
+    [900, "CM"],
+    [500, "D"],
+    [400, "CD"],
+    [100, "C"],
+    [90, "XC"],
+    [50, "L"],
+    [40, "XL"],
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
+  ];
+  let out = "";
+  let rem = Math.max(1, Math.floor(n));
+  for (const [value, sym] of table) {
+    while (rem >= value) {
+      out += sym;
+      rem -= value;
+    }
+  }
+  return out;
+}
+
 /**
  * A star namer for one generation run: hands out unique names, drawing from
  * the explicit {@link ResolvedNames.starNames} pool first (shuffled), then
- * synthesizing pronounceable names from the prefix/suffix pools, appending a
- * number as a last resort so it always terminates.
+ * extending the pool with roman numerals (on-theme), then synthesizing
+ * pronounceable names from the prefix/suffix pools as a last resort so it
+ * always terminates.
  */
 export function makeStarNamer(
   rng: Rng,
@@ -297,6 +326,21 @@ export function makeStarNamer(
       if (!used.has(name)) {
         used.add(name);
         return name;
+      }
+    }
+    // On-theme overflow: reuse the pool with roman numerals (Vega II, ...),
+    // in pool order per numeral. Never runs out, so synthesis below is reached
+    // only when there is no pool at all.
+    if (pool.length > 0) {
+      for (let numeral = 2; ; numeral++) {
+        const suffix = toRoman(numeral);
+        for (const base of pool) {
+          const name = `${base} ${suffix}`;
+          if (!used.has(name)) {
+            used.add(name);
+            return name;
+          }
+        }
       }
     }
     for (let attempt = 0; ; attempt++) {
