@@ -102,6 +102,23 @@ describe("generateGalaxy", () => {
     expect(avg(hard)).toBeGreaterThan(avg(easy));
   });
 
+  it("varies spacing between seeds (jittered acceptance distance)", () => {
+    const a = generateGalaxy({ ...base, seed: 1 }, "t0");
+    const b = generateGalaxy({ ...base, seed: 2 }, "t0");
+    expect(a.nodes.map((n) => n.pos)).not.toEqual(b.nodes.map((n) => n.pos));
+    // Nearest-neighbour distances are not uniform: spread should be visible.
+    const nn = (doc: typeof a) =>
+      doc.nodes.map((n) =>
+        Math.min(
+          ...doc.nodes
+            .filter((m) => m.id !== n.id)
+            .map((m) => Math.hypot(m.pos[0] - n.pos[0], m.pos[1] - n.pos[1])),
+        ),
+      );
+    const d = nn(a);
+    expect(Math.max(...d) / Math.min(...d)).toBeGreaterThan(1.5);
+  });
+
   it("clamps node and faction counts (cap raised to 80)", () => {
     const doc = generateGalaxy(
       { ...base, nodeCount: 500, factionCount: 9 },
