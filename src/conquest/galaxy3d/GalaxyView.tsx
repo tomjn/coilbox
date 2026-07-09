@@ -1315,6 +1315,15 @@ export function GalaxyView({
 
     /* ------------------------------- labels -------------------------------- */
 
+    // Owner-tinted uppercase labels: colour carries territory at a glance, kept
+    // legible by lerping the faction colour toward white. Recoloured on capture
+    // by applyOwners.
+    const labelCss = (owner: string | undefined): string =>
+      `#${ownerColor(owner)
+        .clone()
+        .lerp(new THREE.Color(0xffffff), 0.3)
+        .getHexString()}`;
+
     const labelObjects: CSS2DObject[] = [];
     if (!performanceMode) {
       galaxy.nodes.forEach((n) => {
@@ -1323,9 +1332,10 @@ export function GalaxyView({
         const el = document.createElement("div");
         el.textContent = n.name;
         el.style.cssText =
-          "pointer-events:none;font-size:11px;letter-spacing:0.04em;" +
-          "color:rgba(226,232,240,0.85);text-shadow:0 1px 3px rgba(0,0,0,0.9);" +
-          "transform:translateY(14px);";
+          "pointer-events:none;font-size:10px;font-weight:600;" +
+          "letter-spacing:0.14em;text-transform:uppercase;" +
+          `color:${labelCss(ownersRef.current[n.id] ?? n.owner)};` +
+          "text-shadow:0 1px 4px rgba(0,0,0,0.95);transform:translateY(14px);";
         const label = new CSS2DObject(el);
         label.position.set(p[0], p[1] - 3.6, p[2]);
         labelObjects.push(label);
@@ -1462,8 +1472,13 @@ export function GalaxyView({
 
     const applyOwners = () => {
       const current = ownersRef.current;
-      galaxy.nodes.forEach((_n, i) => {
+      galaxy.nodes.forEach((n, i) => {
         if (i !== sel.idx) styleRing(i);
+        const label = labelObjects[i];
+        if (label)
+          (label.element as HTMLElement).style.color = labelCss(
+            current[n.id] ?? n.owner,
+          );
       });
       // Re-categorise every lane: contested (exactly one player end, drawn
       // dashed), same-owner (both ends one faction, drawn in its colour),
