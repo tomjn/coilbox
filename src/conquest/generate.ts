@@ -432,3 +432,47 @@ export function generateGalaxy(
     },
   };
 }
+
+/** The content environment a reroll resolves at call time (never persisted). */
+export interface RegenerateEnv {
+  maps: GenMap[];
+  ais: GenAi[];
+  names?: ConquestNames;
+}
+
+/**
+ * Reroll a generated galaxy in place: same id, title and generation knobs,
+ * new seed, content environment re-resolved by the caller. Returns null for
+ * docs without persisted knobs (authored galaxies, or generated ones saved
+ * before the knobs existed).
+ */
+export function regenerateGalaxy(
+  galaxy: GalaxyDoc,
+  env: RegenerateEnv,
+  seed: number,
+  now: string = new Date().toISOString(),
+): GalaxyDoc | null {
+  const g = galaxy.generated;
+  if (!g || g.nodeCount === undefined || g.factionCount === undefined) {
+    return null;
+  }
+  const doc = generateGalaxy(
+    {
+      seed,
+      game: { shortname: galaxy.game.shortname },
+      maps: env.maps,
+      ais: env.ais,
+      nodeCount: g.nodeCount,
+      factionCount: g.factionCount,
+      layout: g.layout,
+      skin: g.skin,
+      startingSystems: g.startingSystems,
+      fogOfWar: g.fogOfWar,
+      names: env.names,
+      id: galaxy.id,
+      title: galaxy.title,
+    },
+    now,
+  );
+  return { ...doc, createdAt: galaxy.createdAt };
+}

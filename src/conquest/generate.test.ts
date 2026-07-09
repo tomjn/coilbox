@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { type GenerateOptions, generateGalaxy } from "./generate";
+import {
+  type GenerateOptions,
+  generateGalaxy,
+  regenerateGalaxy,
+} from "./generate";
 import { parseGalaxyJson } from "./model";
 
 const maps = Array.from({ length: 12 }, (_, i) => ({
@@ -243,5 +247,28 @@ describe("generateGalaxy", () => {
     expect(doc.factions[0].side).toBe("Core");
     expect(doc.factions[1].name).toBe("Arm");
     expect(doc.factions[1].side).toBe("Armada");
+  });
+});
+
+describe("regenerateGalaxy", () => {
+  it("rerolls in place: same id/title/createdAt/knobs, new positions", () => {
+    const doc = generateGalaxy({ ...base, id: "keep-id", title: "Keep" }, "t0");
+    const re = regenerateGalaxy(doc, { maps, ais }, 999, "t1");
+    expect(re).not.toBeNull();
+    expect(re?.id).toBe("keep-id");
+    expect(re?.title).toBe("Keep");
+    expect(re?.createdAt).toBe("t0");
+    expect(re?.updatedAt).toBe("t1");
+    expect(re?.generated?.seed).toBe(999);
+    expect(re?.generated?.nodeCount).toBe(16);
+    expect(re?.nodes.map((n) => n.pos)).not.toEqual(
+      doc.nodes.map((n) => n.pos),
+    );
+  });
+
+  it("returns null for docs without persisted knobs", () => {
+    const doc = generateGalaxy(base, "t0");
+    const legacy = { ...doc, generated: { seed: 1 } };
+    expect(regenerateGalaxy(legacy, { maps, ais }, 5, "t1")).toBeNull();
   });
 });
