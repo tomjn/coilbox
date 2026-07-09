@@ -123,6 +123,50 @@ describe("generateGalaxy", () => {
     expect(Math.max(...d) / Math.min(...d)).toBeGreaterThan(1.5);
   });
 
+  it("caps node count to the named pool when limitToNamed is set", () => {
+    const starNames = Array.from({ length: 20 }, (_, i) => `Star ${i}`);
+    const doc = generateGalaxy(
+      { ...base, nodeCount: 60, names: { starNames, limitToNamed: true } },
+      "t0",
+    );
+    expect(doc.nodes).toHaveLength(20);
+    expect(doc.generated?.nodeCount).toBe(20);
+    // Every star has a unique base name — no numeral/synthesized fallback.
+    const namesOut = doc.nodes.map((n) => n.name);
+    expect(new Set(namesOut).size).toBe(20);
+    for (const n of namesOut) expect(starNames.includes(n)).toBe(true);
+  });
+
+  it("leaves node count alone when the pool is larger than the request", () => {
+    const starNames = Array.from({ length: 40 }, (_, i) => `Star ${i}`);
+    const doc = generateGalaxy(
+      { ...base, nodeCount: 16, names: { starNames, limitToNamed: true } },
+      "t0",
+    );
+    expect(doc.nodes).toHaveLength(16);
+  });
+
+  it("floors a tiny capped pool at the generator minimum", () => {
+    const doc = generateGalaxy(
+      {
+        ...base,
+        nodeCount: 40,
+        names: { starNames: ["Solo"], limitToNamed: true },
+      },
+      "t0",
+    );
+    expect(doc.nodes).toHaveLength(8);
+  });
+
+  it("ignores limitToNamed when unset (default overflow)", () => {
+    const starNames = Array.from({ length: 12 }, (_, i) => `Star ${i}`);
+    const doc = generateGalaxy(
+      { ...base, nodeCount: 30, names: { starNames } },
+      "t0",
+    );
+    expect(doc.nodes).toHaveLength(30);
+  });
+
   it("clamps node and faction counts (cap raised to 80)", () => {
     const doc = generateGalaxy(
       { ...base, nodeCount: 500, factionCount: 9 },
