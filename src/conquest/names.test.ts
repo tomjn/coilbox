@@ -36,6 +36,20 @@ describe("mergeConquestNames", () => {
     );
     expect(merged?.starNames).toEqual(["Kept"]);
   });
+
+  it("carries limitToNamed profile-over-branding", () => {
+    expect(mergeConquestNames({ limitToNamed: true }, {})?.limitToNamed).toBe(
+      true,
+    );
+    expect(mergeConquestNames({}, { limitToNamed: true })?.limitToNamed).toBe(
+      true,
+    );
+    // Profile explicitly off wins over branding on.
+    expect(
+      mergeConquestNames({ limitToNamed: false }, { limitToNamed: true })
+        ?.limitToNamed,
+    ).toBe(false);
+  });
 });
 
 describe("resolveConquestNames", () => {
@@ -52,6 +66,13 @@ describe("resolveConquestNames", () => {
     expect(r.starNames).toEqual(["Only"]);
     // Empty prefixes never blank the synthesis pool.
     expect(r.starPrefixes.length).toBeGreaterThan(0);
+  });
+
+  it("surfaces limitToNamed, defaulting to false", () => {
+    expect(resolveConquestNames().limitToNamed).toBe(false);
+    expect(resolveConquestNames({ limitToNamed: true }).limitToNamed).toBe(
+      true,
+    );
   });
 });
 

@@ -35,6 +35,8 @@ export interface ConquestNames {
   factionNames?: string[];
   /** Lore factions with colour/side/aggression, assigned in order. */
   factions?: FactionPreset[];
+  /** Cap the galaxy to the named-star count and disable name fallback. */
+  limitToNamed?: boolean;
 }
 
 /** Naming pools with all fallbacks resolved (synthesis pools never empty). */
@@ -44,6 +46,7 @@ export interface ResolvedNames {
   starSuffixes: string[];
   factionNames?: string[];
   factions?: FactionPreset[];
+  limitToNamed: boolean;
 }
 
 /**
@@ -258,6 +261,7 @@ export function mergeConquestNames(
     starSuffixes: firstNonEmpty(profile?.starSuffixes, branding?.starSuffixes),
     factionNames: firstNonEmpty(profile?.factionNames, branding?.factionNames),
     factions: profile?.factions ?? branding?.factions,
+    limitToNamed: profile?.limitToNamed ?? branding?.limitToNamed,
   };
   return Object.values(merged).some((v) => v !== undefined)
     ? merged
@@ -276,6 +280,7 @@ export function resolveConquestNames(names?: ConquestNames): ResolvedNames {
     starSuffixes: firstNonEmpty(names?.starSuffixes, STAR_LAST) ?? STAR_LAST,
     factionNames: firstNonEmpty(names?.factionNames),
     factions: names?.factions,
+    limitToNamed: names?.limitToNamed ?? false,
   };
 }
 
