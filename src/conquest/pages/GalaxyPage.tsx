@@ -132,6 +132,18 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   const battleMode: "attack" | "defend" =
     state?.incursion?.nodeId === battleNodeId ? "defend" : "attack";
 
+  // Space skins get a soft two-tone nebula wash behind the (transparent) GL
+  // canvas; a theatre map keeps the flat backdrop.
+  const backdrop =
+    galaxy.theme?.skin === "theatre"
+      ? undefined
+      : {
+          background:
+            "radial-gradient(60% 55% at 22% 18%, rgba(24,48,90,0.55) 0%, transparent 60%)," +
+            "radial-gradient(55% 55% at 82% 88%, rgba(58,20,52,0.5) 0%, transparent 62%)," +
+            "#05070f",
+        };
+
   // Wait for the saved run to load before building the map: otherwise the first
   // build frames the *default* faction (state not yet known) and recentres with
   // a jump once the played faction resolves.
@@ -147,7 +159,10 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   }
 
   return (
-    <div className="relative h-full overflow-hidden bg-[#05070f]">
+    <div
+      className="relative h-full overflow-hidden bg-[#05070f]"
+      style={backdrop}
+    >
       <GalaxyView
         galaxy={galaxy}
         owners={owners}
@@ -163,18 +178,26 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
       />
       {effects && <AmbienceAudio galaxy={galaxy} />}
 
+      {/* Legibility scrim so the transparent top bar reads over a bright field */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 z-[9] h-28 bg-gradient-to-b from-background/85 via-background/25 to-transparent"
+      />
+
       {/* Top status bar */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-3">
-        <div className="pointer-events-auto flex items-center gap-3 rounded-lg border border-border/50 bg-card/80 px-3 py-2 backdrop-blur-sm">
+        <div className="pointer-events-auto flex items-center gap-3 px-1">
           <Link
             to="/conquest"
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" aria-hidden /> Conquest
           </Link>
-          <span className="text-sm font-medium">{galaxy.title}</span>
+          <span className="text-sm font-semibold uppercase tracking-wider">
+            {galaxy.title}
+          </span>
           {state && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">
               Turn {state.turn}
             </span>
           )}
@@ -251,6 +274,8 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
         />
       )}
 
+      {galaxy.theme?.skin !== "theatre" && <MapLegend />}
+
       <p className="pointer-events-none absolute bottom-2 left-3 z-10 text-[11px] text-muted-foreground/70">
         drag to pan · scroll to zoom · right-drag to tilt
       </p>
@@ -301,6 +326,56 @@ function TerritoryTally({
         </span>
       )}
     </span>
+  );
+}
+
+/** Compact key for the map symbols the territory tally doesn't cover. */
+function MapLegend() {
+  const rows = [
+    {
+      key: "capital",
+      glyph: (
+        <span className="size-2 rounded-full bg-foreground/70 shadow-[0_0_0_1.5px_rgba(226,232,240,0.35)]" />
+      ),
+      label: "Capital",
+    },
+    {
+      key: "contested",
+      glyph: (
+        <span className="w-4 border-t-2 border-dashed border-amber-400/80" />
+      ),
+      label: "Contested lane",
+    },
+    {
+      key: "incursion",
+      glyph: <span className="size-2 rounded-full bg-amber-400" />,
+      label: "Incursion",
+    },
+    {
+      key: "neutral",
+      glyph: (
+        <span
+          className="size-2 rounded-full"
+          style={{ backgroundColor: "#6b7280" }}
+        />
+      ),
+      label: "Neutral",
+    },
+  ];
+  return (
+    <div className="pointer-events-none absolute bottom-2 right-3 z-10 flex flex-col gap-1.5 rounded-md bg-background/35 px-2.5 py-2 backdrop-blur-sm">
+      {rows.map((r) => (
+        <span
+          key={r.key}
+          className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground"
+        >
+          <span className="flex h-2 w-4 items-center justify-center">
+            {r.glyph}
+          </span>
+          {r.label}
+        </span>
+      ))}
+    </div>
   );
 }
 
