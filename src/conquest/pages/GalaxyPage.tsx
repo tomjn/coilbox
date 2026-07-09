@@ -1,7 +1,8 @@
 import { Button } from "@picoframe/frame";
-import { ArrowLeft, Loader2, ShieldAlert, Swords } from "lucide-react";
+import { ArrowLeft, Dices, Loader2, ShieldAlert, Swords } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
+import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
 import {
   EmptyState,
@@ -14,8 +15,10 @@ import {
   useReduceMotion,
 } from "../../general/display";
 import { assetUrl } from "../../lib/assetUrl";
-import { usePreferredTarget } from "../../play/config";
-import { useConquestState, useGalaxies } from "../conquests";
+import { usePreferredTarget, useSkirmishAis } from "../../play/config";
+import { getProfile } from "../../profile/profile";
+import { conquestSave } from "../bindings";
+import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { FOG_RANGE, withinJumps } from "../fog";
 import { factionSides } from "../galaxy3d/factionShape";
 import {
@@ -23,6 +26,7 @@ import {
   starSystemFor,
   starSystemLabel,
 } from "../galaxy3d/GalaxyView";
+import { regenerateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../model";
 import {
   NEUTRAL,
@@ -30,6 +34,7 @@ import {
   playableFactions,
   resolveGameByShortname,
 } from "../model";
+import { mergeConquestNames } from "../names";
 import { attackableNodes } from "../rules";
 import { BattleOverlay } from "./components/BattleOverlay";
 import { FactionDot, SidePicker } from "./components/RunSetup";
@@ -410,6 +415,50 @@ function RunSetupPanel({
     scan.data?.games ?? [],
   );
 
+  // Reroll in place: same knobs (persisted on the doc), fresh seed, content
+  // environment (maps/AIs/names) re-resolved from what's installed right now.
+  const { ais } = useSkirmishAis(
+    target?.enginePath,
+    target?.dataDir,
+    installedGame?.primaryArchive.name,
+  );
+  const brandingEntries = useBrandingCatalog();
+  const brandingEntry = installedGame
+    ? resolveBranding(brandingEntries, installedGame)
+    : null;
+  const canRegenerate =
+    galaxy.generated?.nodeCount !== undefined &&
+    galaxy.generated?.factionCount !== undefined;
+  const [regenBusy, setRegenBusy] = useState(false);
+  const regenerate = async () => {
+    const maps = scan.data?.maps ?? [];
+    if (maps.length === 0) return;
+    setRegenBusy(true);
+    try {
+      const doc = regenerateGalaxy(
+        galaxy,
+        {
+          maps,
+          ais: ais.map((a) => ({
+            kind: a.kind,
+            shortName: a.shortName,
+            name: a.name,
+          })),
+          names: mergeConquestNames(
+            getProfile().conquest,
+            brandingEntry?.conquest,
+          ),
+        },
+        Math.floor(Math.random() * 100000),
+      );
+      if (!doc) return;
+      await conquestSave({ id: doc.id, json: JSON.stringify(doc) });
+      await refreshGalaxies();
+    } finally {
+      setRegenBusy(false);
+    }
+  };
+
   return (
     <div className="absolute right-3 top-16 z-10 flex max-h-[calc(100%-5rem)] w-[22rem] max-w-[90%] flex-col gap-3 overflow-auto rounded-lg border border-border/50 bg-card/90 p-4 backdrop-blur-sm">
       <h2 className="text-sm font-semibold">Begin conquest</h2>
@@ -446,8 +495,18 @@ function RunSetupPanel({
         value={side}
         onChange={setSide}
       />
+      {canRegenerate && (
+        <Button
+          variant="outline"
+          disabled={regenBusy || busy || !scan.data}
+          onClick={regenerate}
+        >
+          <Dices className="mr-1.5 size-4" aria-hidden />
+          {regenBusy ? "Regenerating…" : "Regenerate galaxy"}
+        </Button>
+      )}
       <Button
-        disabled={busy}
+        disabled={busy || regenBusy}
         onClick={async () => {
           setBusy(true);
           try {
