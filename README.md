@@ -32,6 +32,13 @@ bun run tauri dev
 Requires [Bun](https://bun.sh), a Rust toolchain, and the Tauri system
 dependencies for your OS.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the plugin layout, the lint/test
+suite CI runs, and PR conventions. Branding a game is a single-file edit that needs
+no build — see [Branding catalog](#branding-catalog). All participation is under our
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Architecture
 
 - `src/` — the React frontend. `app.plugins.ts` lists the picoframe plugins.
