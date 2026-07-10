@@ -253,7 +253,8 @@ fn mp_reattach(
             *lock_or_recover(&conn.sink) = on_event.clone();
             let _ = on_event.send(LobbyEvent::Connected);
             let phase = *lock_or_recover(&conn.phase);
-            let _ = on_event.send(LobbyEvent::Phase { phase });
+            let agreement = lock_or_recover(&conn.agreement).clone();
+            let _ = on_event.send(LobbyEvent::Phase { phase, agreement });
             CliResult::ok(json!({ "reattached": true }))
         }
         None => CliResult::err(format!("not connected: {server_key}")),
