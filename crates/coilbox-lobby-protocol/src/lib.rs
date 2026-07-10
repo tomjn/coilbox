@@ -21,6 +21,7 @@ mod message;
 mod reduce;
 mod state;
 mod status;
+mod vote;
 
 pub use hash::password_hash;
 pub use login::{LoginConfig, LoginMachine, LoginMode, LoginPhase};
@@ -28,7 +29,7 @@ pub use message::{parse_line, ServerMessage};
 pub use reduce::{begin_channel_list, record_outgoing_private, reduce, reduce_at, Delta};
 pub use state::{
     Battle, Bot, ChannelState, ChatKind, ChatMsg, DirChannel, LobbyState, MemberStatus, StartRect,
-    User,
+    User, Vote,
 };
 pub use status::{
     default_battle_status, team_color_from_rgb, team_color_rgb, BattleStatus, ClientStatus,

@@ -12,7 +12,7 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "@/play/config";
-import type { Battle, MemberStatus } from "../bindings";
+import type { Battle, MemberStatus, Vote } from "../bindings";
 import {
   mpAddBot,
   mpForceAlly,
@@ -93,6 +93,12 @@ export interface BattleRoomView {
   actionError: string | null;
   /** Whether the battle host (autohost) is in-game — i.e. the match has started. */
   hostIngame: boolean;
+  /**
+   * The live SPADS autohost vote in this battle, or null. Only ever set for
+   * autohost battles (a bot host posts the vote lines we parse); drives the
+   * one-click vote panel. Vote with `autohostSend("!vote y|n|b")`.
+   */
+  currentVote: Vote | null;
   /** Whether every non-spectator human player has readied up. */
   allReady: boolean;
   serverKey: string | null;
@@ -492,6 +498,9 @@ export function useBattleRoom(): BattleRoomView {
     sync,
     actionError,
     hostIngame,
+    // Votes only exist in autohost battles; when we self-host there's no bot to run
+    // them, so never surface a (stale) panel there.
+    currentVote: selfHost ? null : (state?.currentVote ?? null),
     allReady,
     serverKey: activeKey,
     contentNonce,
