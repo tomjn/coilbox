@@ -8,6 +8,7 @@ import { ChatPane } from "../chat/ChatPane";
 import { ConversationSidebar } from "../chat/ConversationSidebar";
 import { type ConversationDescriptor, convId } from "../chat/conversation";
 import { MemberList } from "../chat/MemberList";
+import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
 import { useMpRevealed, useMultiplayer } from "../store";
 
@@ -46,22 +47,25 @@ function ChatPage() {
     },
     [battle],
   );
-  const users = mirror.state?.users;
+  const state = mirror.state;
+  const users = state?.users;
   const isBot = useCallback(
     (from: string): boolean => users?.[from]?.status.bot ?? false,
     [users],
   );
 
-  // For a DM header, mark the peer as a bot and show their online presence
-  // (a user is present in the global roster only while connected).
+  // Coarse presence for a username: offline when absent from the roster, else
+  // in-game/in-battle/away/online (see `userPresence`). Used by the DM header
+  // and the member panel so both speak the same vocabulary.
+  const presenceFor = useCallback(
+    (name: string) => (state ? userPresence(state, name) : "offline"),
+    [state],
+  );
+
+  // For a DM header, mark the peer as a bot and show their richer presence.
   const dmPeer = active?.kind === "dm" ? active.peer : null;
   const titleIsBot = dmPeer != null && isBot(dmPeer);
-  const titlePresence =
-    dmPeer == null
-      ? undefined
-      : users?.[dmPeer]
-        ? ("online" as const)
-        : ("offline" as const);
+  const titlePresence = dmPeer == null ? undefined : presenceFor(dmPeer);
 
   // Mark the open conversation read as its message count changes.
   useEffect(() => {
@@ -180,6 +184,7 @@ function ChatPage() {
             members={conv.members}
             onSelect={(username) => setActive({ kind: "dm", peer: username })}
             colorFor={senderColor}
+            presenceFor={presenceFor}
           />
         )}
 
