@@ -10,6 +10,7 @@ import generalPlugin from "./general";
 import lobbyServersPlugin from "./lobby-servers";
 import mapconvPlugin from "./mapconv";
 import multiplayerPlugin from "./multiplayer";
+import notifyPlugin from "./notify";
 import playPlugin from "./play";
 import profilePlugin from "./profile";
 import uberstressPlugin from "./uberstress";
@@ -35,4 +36,5 @@ export const plugins: FramePlugin[] = [
   profilePlugin,
   updaterPlugin,
   gameUpdatesPlugin,
+  notifyPlugin,
 ];
