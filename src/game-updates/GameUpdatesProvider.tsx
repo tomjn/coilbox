@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { primeScan, useScanTargetSelection } from "../content/config";
@@ -16,6 +17,7 @@ import {
   dlInstalledContent,
 } from "../downloads/bindings";
 import { useContentRootPaths, useWriteRootPath } from "../downloads/config";
+import { notify } from "../notify/notify";
 import { getProfile, getProfileRoot } from "../profile/profile";
 import { dlGithubLatestRelease, type ReleaseInfo } from "./bindings";
 
@@ -119,6 +121,19 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
     if (archives.length === 0) return false;
     return !archives.some((a) => installedGames.has(a.name.toLowerCase()));
   }, [release, installedGames]);
+
+  const notifiedRef = useRef(false);
+  useEffect(() => {
+    if (updateAvailable && !notifiedRef.current) {
+      notifiedRef.current = true;
+      void notify({
+        title: "Game update available",
+        body: "A newer game version is available to download.",
+        level: "info",
+      });
+    }
+    if (!updateAvailable) notifiedRef.current = false;
+  }, [updateAvailable]);
 
   const install = useCallback(async () => {
     if (!release || !writePath) return;
