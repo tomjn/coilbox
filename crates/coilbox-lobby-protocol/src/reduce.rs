@@ -8,9 +8,10 @@
 use crate::message::ServerMessage;
 use crate::state::{
     Battle, Bot, ChannelState, ChatKind, ChatMsg, DirChannel, LobbyState, MemberStatus, StartRect,
-    User,
+    User, Vote,
 };
 use crate::status::{BattleStatus, ClientStatus};
+use crate::vote::{parse_vote_line, VoteLine};
 use serde::Serialize;
 
 /// A frontend-facing change produced by [`reduce`].
@@ -424,6 +425,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             if state.current_battle == Some(id) {
                 state.current_battle = None;
                 state.my_intended_battle_status = None;
+                state.current_vote = None;
             }
             vec![Delta::BattleClosed { id }]
         }
@@ -453,6 +455,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             {
                 state.current_battle = None;
                 state.my_intended_battle_status = None;
+                state.current_vote = None;
             }
             vec![Delta::MemberLeft {
                 battle_id: id,
@@ -464,10 +467,12 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             hashcode: _,
             channel: _,
         } => {
-            // Own-join acknowledgement.
+            // Own-join acknowledgement: signal the UI to switch into the battle view
+            // off this delta rather than waiting for an incidental follow-up message.
             state.current_battle = Some(id);
             state.last_battle = Some(id);
-            vec![] // RED-check: temporarily reverted
+            state.current_vote = None;
+            vec![Delta::EnteredBattle { id, own: false }]
         }
         ServerMessage::JoinBattleFailed { reason } => {
             vec![Delta::JoinBattleFailed { reason }]
@@ -592,10 +597,11 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         ServerMessage::OpenBattle { id } => {
             state.current_battle = Some(id);
             state.last_battle = Some(id);
+            state.current_vote = None;
             // A fresh host port arrives via HOSTPORT right after this ack; drop any
             // stale one from a previous host session.
             state.host_port = None;
-            vec![] // RED-check: temporarily reverted
+            vec![Delta::EnteredBattle { id, own: true }]
         }
         ServerMessage::OpenBattleFailed { reason } => {
             vec![Delta::OpenBattleFailed { reason }]
@@ -745,6 +751,17 @@ fn reduce_battle_chat(
     kind: ChatKind,
     now_ms: u64,
 ) -> Vec<Delta> {
+    // SPADS runs `!`-command votes as battle chat from the autohost. Recognise
+    // those lines (only from a bot sender, only while we're in a battle) and fold
+    // them into `current_vote` so the room can show a one-click vote panel. Gating
+    // on the bot flag stops a human parroting the line from spoofing a panel;
+    // unrecognised lines leave the vote untouched, so chat is never disturbed.
+    let from_bot = state.users.get(&username).is_some_and(|u| u.status.bot);
+    if from_bot && state.current_battle.is_some() {
+        if let Some(line) = parse_vote_line(&message) {
+            apply_vote_line(state, line, now_ms);
+        }
+    }
     let channel = state
         .current_battle
         .and_then(|id| state.battles.get(&id))
@@ -765,6 +782,75 @@ fn reduce_battle_chat(
             channel: None,
             index: 0,
         }],
+    }
+}
+
+/// Fold one recognised SPADS vote line into `state.current_vote`. A start line
+/// opens a fresh vote (SPADS seeds the caller's own yes, so yes starts at 1); a
+/// progress line updates the tally and deadline (synthesising a vote if we joined
+/// mid-vote and missed the start); a terminal line clears it.
+fn apply_vote_line(state: &mut LobbyState, line: VoteLine, now_ms: u64) {
+    match line {
+        VoteLine::Start {
+            caller,
+            subject,
+            allow_abstain,
+        } => {
+            state.current_vote = Some(Vote {
+                subject,
+                caller,
+                allow_abstain,
+                yes: 1,
+                no: 0,
+                yes_needed: 0,
+                no_needed: 0,
+                ends_at: 0,
+            });
+        }
+        VoteLine::Progress {
+            subject,
+            yes,
+            yes_needed,
+            no,
+            no_needed,
+            remaining_secs,
+        } => {
+            // now_ms is 0 when the reducer runs without a clock (tests via `reduce`);
+            // leave the deadline unset then rather than inventing one from epoch 0.
+            let ends_at = if now_ms > 0 {
+                now_ms + remaining_secs * 1000
+            } else {
+                0
+            };
+            match state.current_vote.as_mut() {
+                Some(v) => {
+                    v.subject = subject;
+                    v.yes = yes;
+                    v.yes_needed = yes_needed;
+                    v.no = no;
+                    v.no_needed = no_needed;
+                    v.ends_at = ends_at;
+                }
+                None => {
+                    state.current_vote = Some(Vote {
+                        subject,
+                        caller: String::new(),
+                        // We missed the start line, so we can't know if abstain was
+                        // advertised; assume it was (the SPADS default) rather than
+                        // hide a valid option.
+                        allow_abstain: true,
+                        yes,
+                        no,
+                        yes_needed,
+                        no_needed,
+                        ends_at,
+                    });
+                }
+            }
+        }
+        VoteLine::End { .. } => {
+            state.current_vote = None;
+        }
     }
 }
 
@@ -1151,5 +1237,129 @@ mod tests {
         assert!(s.channels.contains_key("main"));
         assert!(!s.channels["main"].users.contains("bob"));
         assert!(matches!(d.as_slice(), [Delta::ChatMessage { .. }]));
+    }
+
+    /// A battle we've joined whose host `bot` is a SPADS autohost, so its battle
+    /// chat is recognised as vote traffic.
+    fn autohost_battle(bot: &str) -> LobbyState {
+        let mut s = LobbyState::new();
+        s.my_username = Some("me".into());
+        let mut u = User {
+            name: bot.into(),
+            ..Default::default()
+        };
+        u.status.bot = true;
+        s.users.insert(bot.into(), u);
+        s.battles.insert(
+            1,
+            Battle {
+                id: 1,
+                host: bot.into(),
+                ..Default::default()
+            },
+        );
+        s.current_battle = Some(1);
+        s
+    }
+
+    #[test]
+    fn autohost_vote_start_opens_vote() {
+        let mut s = autohost_battle("AutoHost");
+        reduce(
+            &mut s,
+            parse_line(
+                "SAIDBATTLE AutoHost Bob called a vote for command \"set map Red Comet\" [!vote y, !vote n, !vote b]",
+            ),
+        );
+        let v = s.current_vote.expect("vote opened");
+        assert_eq!(v.subject, "set map Red Comet");
+        assert_eq!(v.caller, "Bob");
+        assert!(v.allow_abstain);
+        assert_eq!(v.yes, 1);
+        assert_eq!(v.no, 0);
+    }
+
+    #[test]
+    fn autohost_vote_progress_updates_tally_and_deadline() {
+        let mut s = autohost_battle("AutoHost");
+        reduce(
+            &mut s,
+            parse_line(
+                "SAIDBATTLE AutoHost Bob called a vote for command \"set map Red Comet\" [!vote y, !vote n, !vote b]",
+            ),
+        );
+        reduce_at(
+            &mut s,
+            parse_line(
+                "SAIDBATTLE AutoHost Vote in progress: \"set map Red Comet\" [y:2/3, n:1/3] (30s remaining)",
+            ),
+            10_000,
+        );
+        let v = s.current_vote.expect("vote still open");
+        assert_eq!((v.yes, v.yes_needed, v.no, v.no_needed), (2, 3, 1, 3));
+        assert_eq!(v.ends_at, 10_000 + 30_000);
+    }
+
+    #[test]
+    fn autohost_vote_end_clears_vote() {
+        let mut s = autohost_battle("AutoHost");
+        reduce(
+            &mut s,
+            parse_line(
+                "SAIDBATTLE AutoHost Bob called a vote for command \"set map Red Comet\" [!vote y, !vote n, !vote b]",
+            ),
+        );
+        assert!(s.current_vote.is_some());
+        reduce(
+            &mut s,
+            parse_line("SAIDBATTLE AutoHost Vote for command \"set map Red Comet\" passed."),
+        );
+        assert!(s.current_vote.is_none());
+    }
+
+    #[test]
+    fn non_bot_vote_line_is_ignored() {
+        let mut s = autohost_battle("AutoHost");
+        // A human parroting the exact line must not spoof a vote panel.
+        reduce(
+            &mut s,
+            parse_line(
+                "SAIDBATTLE me Bob called a vote for command \"set map Red Comet\" [!vote y, !vote n, !vote b]",
+            ),
+        );
+        assert!(s.current_vote.is_none());
+    }
+
+    #[test]
+    fn progress_synthesises_vote_when_joined_mid_vote() {
+        let mut s = autohost_battle("AutoHost");
+        reduce_at(
+            &mut s,
+            parse_line(
+                "SAIDBATTLE AutoHost Vote in progress: \"set map Red Comet\" [y:2/3, n:1/3] (30s remaining)",
+            ),
+            10_000,
+        );
+        let v = s.current_vote.expect("vote synthesised from progress");
+        assert_eq!(v.subject, "set map Red Comet");
+        assert_eq!(v.yes, 2);
+        assert!(
+            v.allow_abstain,
+            "abstain assumed when start line was missed"
+        );
+    }
+
+    #[test]
+    fn leaving_battle_clears_active_vote() {
+        let mut s = autohost_battle("AutoHost");
+        reduce(
+            &mut s,
+            parse_line(
+                "SAIDBATTLE AutoHost Bob called a vote for command \"set map Red Comet\" [!vote y, !vote n, !vote b]",
+            ),
+        );
+        assert!(s.current_vote.is_some());
+        reduce(&mut s, parse_line("LEFTBATTLE 1 me"));
+        assert!(s.current_vote.is_none());
     }
 }

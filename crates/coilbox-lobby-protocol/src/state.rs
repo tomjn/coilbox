@@ -112,6 +112,29 @@ pub struct Battle {
     pub start_rects: HashMap<u8, StartRect>,
 }
 
+/// A transient SPADS autohost vote in the current battle, surfaced so the UI can
+/// show a one-click Yes/No/Abstain panel instead of making the user read chat and
+/// type `!vote`. Present only while a vote is open; cleared when it passes, fails,
+/// is cancelled, or we leave the battle.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Vote {
+    /// The command being voted on, e.g. `set map Red Comet`.
+    pub subject: String,
+    /// Who called the vote (empty when we joined mid-vote and only saw progress).
+    pub caller: String,
+    pub yes: u32,
+    pub no: u32,
+    /// Yes votes needed to pass, from the latest progress line (0 until one arrives).
+    pub yes_needed: u32,
+    /// No votes needed to fail, from the latest progress line.
+    pub no_needed: u32,
+    /// Whether the bot advertised abstain (`!vote b`); the panel hides Abstain if not.
+    pub allow_abstain: bool,
+    /// Unix-millis deadline derived from the progress "Ns remaining" (0 if unknown).
+    pub ends_at: u64,
+}
+
 /// A public channel as advertised by the server's `CHANNELS` directory.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -140,6 +163,9 @@ pub struct LobbyState {
     pub host_port: Option<u16>,
     /// The last-fetched public channel directory (from `CHANNELS`).
     pub channel_directory: Vec<DirChannel>,
+    /// A live SPADS autohost vote in the current battle, or `None` when none is
+    /// open. Parsed from the bot's battle chat; drives the vote panel.
+    pub current_vote: Option<Vote>,
     /// Our intended per-battle status + team colour, authoritative for answering
     /// `REQUESTBATTLESTATUS`. Set when we open a battle (host defaults to player)
     /// and updated on every status push (spectate/ready/sync/colour), so a server
