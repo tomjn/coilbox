@@ -28,6 +28,7 @@ import {
 } from "./bindings";
 import { conversationCounts } from "./chat/conversation";
 import { triggerRing } from "./ringEffect";
+import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
 import { VerificationCodeDialog } from "./VerificationCodeDialog";
 
 /**
@@ -226,6 +227,12 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     text: string;
   } | null>(null);
 
+  // FIFO queue of `SERVERMSGBOX` texts awaiting acknowledgement. Boxed server
+  // messages are important enough that the server asked for a modal, so they're
+  // queued (never dropped) rather than overwriting each other; the dialog shows the
+  // front and dismissing pops it.
+  const [serverMsgBoxes, setServerMsgBoxes] = useState<string[]>([]);
+
   // One-way "has ever connected this session" latch driving Chat/Battles sidebar
   // visibility. Set on any transition to connected (fresh connect or reload
   // reattach) and never reset, so those views stick across a logout until quit.
@@ -349,6 +356,18 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             body: d.reason || undefined,
             level: "error",
           });
+        // A server announcement is a transient event too. Plain SERVERMSG is an
+        // unobtrusive info toast; a SERVERMSGBOX was flagged important by the
+        // server, so it's queued into a blocking dialog. Empty payloads are
+        // ignored so a malformed line can't pop a contentless toast/modal. The raw
+        // line is already in the protocol console for history.
+        else if (d.kind === "serverMessage") {
+          const text = d.text.trim();
+          if (text) {
+            if (d.boxed) setServerMsgBoxes((q) => [...q, d.text]);
+            else void notify({ title: "Server message", body: d.text });
+          }
+        }
         mpSnapshot({ serverKey })
           .then((r) => dispatch({ type: "snapshot", state: r.state }))
           .catch(() => {});
@@ -566,6 +585,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     >
       {children}
       <VerificationCodeDialog />
+      <ServerMessageBoxDialog
+        text={serverMsgBoxes[0] ?? null}
+        onDismiss={() => setServerMsgBoxes((q) => q.slice(1))}
+      />
     </MultiplayerContext.Provider>
   );
 }
