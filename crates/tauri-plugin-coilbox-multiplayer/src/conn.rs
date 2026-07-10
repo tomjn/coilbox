@@ -68,6 +68,9 @@ pub struct ServerConn {
     pub state: Arc<Mutex<LobbyState>>,
     pub sink: EventSink,
     pub phase: Arc<Mutex<LoginPhase>>,
+    /// The agreement text sent by the server while parked on `AwaitAgreement`, so
+    /// `mp_reattach` can replay it alongside the phase after a webview reload.
+    pub agreement: Arc<Mutex<Option<String>>>,
 }
 
 /// The registry of live connections, keyed by a frontend-supplied `serverKey`
@@ -81,10 +84,22 @@ pub type Registry = Arc<Mutex<HashMap<String, ServerConn>>>;
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum LobbyEvent {
     Connected,
-    Phase { phase: LoginPhase },
-    Delta { delta: Delta },
-    Console { direction: String, line: String },
-    Disconnected { reason: Option<String> },
+    Phase {
+        phase: LoginPhase,
+        /// The server's agreement text when `phase` is `AwaitAgreement`, else null,
+        /// so the confirmation dialog can show what the user is accepting.
+        agreement: Option<String>,
+    },
+    Delta {
+        delta: Delta,
+    },
+    Console {
+        direction: String,
+        line: String,
+    },
+    Disconnected {
+        reason: Option<String>,
+    },
 }
 
 /// Spawn the connection task for an already-connected (and, if requested, already
@@ -105,6 +120,7 @@ pub fn spawn_connection(
     let state = Arc::new(Mutex::new(initial));
     let sink: EventSink = Arc::new(Mutex::new(on_event));
     let phase = Arc::new(Mutex::new(LoginPhase::AwaitGreeting));
+    let agreement = Arc::new(Mutex::new(None));
 
     tokio::spawn(run_loop(
         registry.clone(),
@@ -113,6 +129,7 @@ pub fn spawn_connection(
         login_cfg,
         sink.clone(),
         phase.clone(),
+        agreement.clone(),
         rx,
         state.clone(),
         dm_log,
@@ -128,6 +145,7 @@ pub fn spawn_connection(
             state,
             sink,
             phase,
+            agreement,
         },
     );
 }
@@ -143,6 +161,7 @@ async fn run_loop(
     login_cfg: LoginConfig,
     sink: EventSink,
     phase_slot: Arc<Mutex<LoginPhase>>,
+    agreement_slot: Arc<Mutex<Option<String>>>,
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
     dm_log: DmLog,
@@ -174,8 +193,17 @@ async fn run_loop(
                     let before = login.phase();
                     outbound.extend(login.on_message(&msg));
                     if login.phase() != before {
+                        let agreement = (login.phase() == LoginPhase::AwaitAgreement)
+                            .then(|| login.agreement_text());
                         *lock_or_recover(&phase_slot) = login.phase();
-                        emit(&sink, LobbyEvent::Phase { phase: login.phase() });
+                        *lock_or_recover(&agreement_slot) = agreement.clone();
+                        emit(
+                            &sink,
+                            LobbyEvent::Phase {
+                                phase: login.phase(),
+                                agreement,
+                            },
+                        );
                     }
 
                     // A rejected login (e.g. wrong password) leaves the socket open
@@ -236,8 +264,17 @@ async fn run_loop(
                     let before = login.phase();
                     outbound.extend(login.submit_agreement_code(code.as_deref()));
                     if login.phase() != before {
+                        let agreement = (login.phase() == LoginPhase::AwaitAgreement)
+                            .then(|| login.agreement_text());
                         *lock_or_recover(&phase_slot) = login.phase();
-                        emit(&sink, LobbyEvent::Phase { phase: login.phase() });
+                        *lock_or_recover(&agreement_slot) = agreement.clone();
+                        emit(
+                            &sink,
+                            LobbyEvent::Phase {
+                                phase: login.phase(),
+                                agreement,
+                            },
+                        );
                     }
                 }
                 Outbound::Shutdown => {

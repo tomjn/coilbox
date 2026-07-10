@@ -181,7 +181,7 @@ export type Delta =
 /** An event streamed over the connect `Channel` (mirrors `LobbyEvent`). */
 export type LobbyEvent =
   | { kind: "connected" }
-  | { kind: "phase"; phase: LoginPhase }
+  | { kind: "phase"; phase: LoginPhase; agreement: string | null }
   | { kind: "delta"; delta: Delta }
   | { kind: "console"; direction: "in" | "out"; line: string }
   | { kind: "disconnected"; reason: string | null };

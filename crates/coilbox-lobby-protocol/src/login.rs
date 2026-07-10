@@ -284,12 +284,19 @@ mod tests {
         // The server streams the agreement then ends it — the machine parks
         // instead of auto-confirming, so a verification code can be collected.
         assert!(m
-            .on_message(&parse_line("AGREEMENT Please enter the code"))
+            .on_message(&parse_line("AGREEMENT Please accept the terms."))
+            .is_empty());
+        assert!(m
+            .on_message(&parse_line("AGREEMENT Then enter the code"))
             .is_empty());
         let out = m.on_message(&parse_line("AGREEMENTEND"));
         assert!(out.is_empty());
         assert_eq!(m.phase(), LoginPhase::AwaitAgreement);
-        assert_eq!(m.agreement_text(), "Please enter the code");
+        // The lines join into one block, newline-separated, for display.
+        assert_eq!(
+            m.agreement_text(),
+            "Please accept the terms.\nThen enter the code"
+        );
 
         // Supplying the code confirms and re-sends LOGIN.
         let out = m.submit_agreement_code(Some("1234"));
