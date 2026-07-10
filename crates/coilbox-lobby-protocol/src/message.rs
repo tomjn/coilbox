@@ -83,8 +83,8 @@ pub enum ServerMessage {
     },
     /// `ENDOFCHANNELS`
     EndOfChannels,
-    /// `JOINFAILED <reason>`
-    JoinFailed { reason: String },
+    /// `JOINFAILED <channel> <reason>`
+    JoinFailed { channel: String, reason: String },
     /// `SAID <channel> <username> <msg>`
     Said {
         channel: String,
@@ -378,9 +378,15 @@ pub fn parse_line(line: &str) -> ServerMessage {
             },
         },
         "ENDOFCHANNELS" => ServerMessage::EndOfChannels,
-        "JOINFAILED" => ServerMessage::JoinFailed {
-            reason: rest.to_string(),
-        },
+        "JOINFAILED" => {
+            // `JOINFAILED <channel> <reason>`: the channel is the first token, the
+            // reason is the remaining sentence (empty if the server omitted it).
+            let (channel, reason) = rest.split_once(' ').unwrap_or((rest, ""));
+            ServerMessage::JoinFailed {
+                channel: channel.to_string(),
+                reason: reason.to_string(),
+            }
+        }
         "SAID" => said(rest, raw, |channel, username, message| {
             ServerMessage::Said {
                 channel,
