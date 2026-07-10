@@ -82,6 +82,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Serve local media (images/audio/video/fonts) from the portable `.coilbox`
         // folder and per-campaign app-data over `coilbox://`, with HTTP range support

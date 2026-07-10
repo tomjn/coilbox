@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { notify } from "../notify/notify";
 import {
   checkForUpdate,
   currentVersion,
@@ -56,6 +57,13 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
     try {
       const found = await checkForUpdate();
       setUpdate(found);
+      if (found) {
+        void notify({
+          title: "Update available",
+          body: `Coilbox ${found.version} is ready to install.`,
+          level: "info",
+        });
+      }
       setLastChecked(Date.now());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
