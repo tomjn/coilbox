@@ -53,6 +53,14 @@ export interface LobbyMirror {
   /** Reason from the last failed JOINBATTLE/OPENBATTLE, cleared on next attempt. */
   lastJoinError: string | null;
   /**
+   * Reason from the last rejected LOGIN (`DENIED`), for a precise inline error on
+   * the login form ("Login failed: …"). Set from the `loginDenied` delta, which
+   * arrives just before the connection's `disconnected` teardown, and deliberately
+   * preserved across that `disconnected` so the inline message survives it. Cleared
+   * on the next connect attempt (`connecting` resets the whole mirror).
+   */
+  loginError: string | null;
+  /**
    * Monotonic count of `ENDOFCHANNELS` completions (the `channelListReceived`
    * delta). The channel-list stream emits no per-row delta, so this is the only
    * observable "directory finished loading" signal — the browser drawer watches
@@ -70,6 +78,7 @@ export const initialMirror: LobbyMirror = {
   consoleLines: [],
   error: null,
   lastJoinError: null,
+  loginError: null,
   channelListReceivedSeq: 0,
 };
 
@@ -120,6 +129,9 @@ export function mirrorReducer(
           const d = ev.delta;
           if (d.kind === "joinBattleFailed" || d.kind === "openBattleFailed") {
             return { ...m, lastJoinError: d.reason };
+          }
+          if (d.kind === "loginDenied") {
+            return { ...m, loginError: d.reason };
           }
           if (d.kind === "channelListReceived") {
             return {
@@ -412,6 +424,15 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
                   "Server asked for verification during registration. Try logging in to enter your code.",
                 ),
               );
+            } else if (
+              ev.kind === "delta" &&
+              ev.delta.kind === "registrationDenied"
+            ) {
+              // The purpose-built denial delta carries the server's reason and
+              // arrives just before the `disconnected` teardown — reject on it so
+              // the form shows a precise reason rather than the generic close.
+              settled = true;
+              reject(new Error(ev.delta.reason));
             } else if (ev.kind === "disconnected") {
               settled = true;
               reject(new Error(ev.reason ?? "Registration failed"));

@@ -69,6 +69,51 @@ describe("mirrorReducer join-failure handling", () => {
   });
 });
 
+describe("mirrorReducer login-denial handling", () => {
+  it("sets loginError from a loginDenied delta", () => {
+    const m = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: {
+        kind: "delta",
+        delta: { kind: "loginDenied", reason: "wrong password" },
+      },
+    });
+    expect(m.loginError).toBe("wrong password");
+  });
+
+  it("preserves loginError across the following disconnected event", () => {
+    // The delta arrives just before teardown; the inline "Login failed" must
+    // survive the disconnected handler so it isn't replaced by "Disconnected: …".
+    const denied = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: {
+        kind: "delta",
+        delta: { kind: "loginDenied", reason: "wrong password" },
+      },
+    });
+    const closed = mirrorReducer(denied, {
+      type: "event",
+      ev: { kind: "disconnected", reason: "wrong password" },
+    });
+    expect(closed.loginError).toBe("wrong password");
+  });
+
+  it("clears loginError when a new connect attempt starts", () => {
+    const withErr = { ...initialMirror, loginError: "wrong password" };
+    expect(
+      mirrorReducer(withErr, { type: "connecting" }).loginError,
+    ).toBeNull();
+  });
+
+  it("leaves loginError untouched for unrelated deltas", () => {
+    const m = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: { kind: "delta", delta: { kind: "battleOpened", id: 4 } },
+    });
+    expect(m.loginError).toBeNull();
+  });
+});
+
 describe("mirrorReducer channel-list completion", () => {
   it("starts the completion counter at zero", () => {
     expect(initialMirror.channelListReceivedSeq).toBe(0);
