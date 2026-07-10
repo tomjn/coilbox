@@ -10,6 +10,7 @@ import {
 } from "../display";
 import { isFullscreenLocked, useFullscreenSetting } from "../fullscreen";
 import { hasProfileSplash, useSplashSetting } from "../splash";
+import { AboutCoilbox } from "./AboutCoilbox";
 
 /**
  * The General settings section (frame settings page at `/settings/general`).
@@ -169,6 +170,8 @@ export default function GeneralSettings() {
           </span>
         </label>
       </section>
+
+      <AboutCoilbox />
     </div>
   );
 }
