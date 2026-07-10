@@ -102,6 +102,18 @@ pub enum Delta {
     OpenBattleFailed {
         reason: String,
     },
+    /// A `JOINFAILED` for a chat channel: the server refused a `JOIN`, naming the
+    /// channel and why (registered/locked, banned, bad name, …).
+    JoinChannelFailed {
+        channel: String,
+        reason: String,
+    },
+    /// A generic `FAILED`: a command the server rejected, carrying the failed
+    /// command name (empty if the server omitted it) and a human-readable reason.
+    CommandFailed {
+        command: String,
+        reason: String,
+    },
     ChannelListReceived,
 }
 
@@ -601,15 +613,20 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         ServerMessage::RegistrationDenied { reason } => {
             vec![Delta::RegistrationDenied { reason }]
         }
+        ServerMessage::JoinFailed { channel, reason } => {
+            vec![Delta::JoinChannelFailed { channel, reason }]
+        }
+        ServerMessage::Failed { text } => {
+            let (command, reason) = parse_failed(&text);
+            vec![Delta::CommandFailed { command, reason }]
+        }
         // Messages carrying no state change / handled by the login machine.
         ServerMessage::TasServer { .. }
         | ServerMessage::Motd { .. }
         | ServerMessage::LoginInfoEnd
-        | ServerMessage::JoinFailed { .. }
         | ServerMessage::RequestBattleStatus
         | ServerMessage::Ping { .. }
         | ServerMessage::Pong { .. }
-        | ServerMessage::Failed { .. }
         | ServerMessage::Ok { .. }
         | ServerMessage::Agreement { .. }
         | ServerMessage::AgreementEnd
@@ -628,6 +645,29 @@ pub fn reduce(state: &mut LobbyState, msg: ServerMessage) -> Vec<Delta> {
 /// entries don't linger while the new list streams in.
 pub fn begin_channel_list(state: &mut LobbyState) {
     state.channel_directory.clear();
+}
+
+/// Parse a `FAILED` payload (`cmd=<command>\tmsg=<message>`, tab-delimited
+/// key/values) into its command name and human-readable reason. Servers that
+/// send a bare reason (no `cmd=`/`msg=` fields) fall back to the whole payload as
+/// the reason with an empty command.
+fn parse_failed(text: &str) -> (String, String) {
+    let mut command = String::new();
+    let mut reason = String::new();
+    let mut matched = false;
+    for field in text.split('\t') {
+        if let Some(v) = field.strip_prefix("cmd=") {
+            command = v.to_string();
+            matched = true;
+        } else if let Some(v) = field.strip_prefix("msg=") {
+            reason = v.to_string();
+            matched = true;
+        }
+    }
+    if !matched {
+        reason = text.to_string();
+    }
+    (command, reason)
 }
 
 /// Append a chat message to a channel (creating it if needed) and emit a delta
@@ -767,6 +807,48 @@ mod tests {
             d,
             vec![Delta::RegistrationDenied {
                 reason: "username taken".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn join_failed_emits_channel_and_reason() {
+        let mut s = LobbyState::new();
+        let d = reduce(
+            &mut s,
+            parse_line("JOINFAILED #moderators You do not have access"),
+        );
+        assert_eq!(
+            d,
+            vec![Delta::JoinChannelFailed {
+                channel: "#moderators".into(),
+                reason: "You do not have access".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn failed_parses_cmd_and_msg_fields() {
+        let mut s = LobbyState::new();
+        let d = reduce(&mut s, parse_line("FAILED cmd=JOIN\tmsg=Channel is locked"));
+        assert_eq!(
+            d,
+            vec![Delta::CommandFailed {
+                command: "JOIN".into(),
+                reason: "Channel is locked".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn failed_without_fields_falls_back_to_reason() {
+        let mut s = LobbyState::new();
+        let d = reduce(&mut s, parse_line("FAILED something went wrong"));
+        assert_eq!(
+            d,
+            vec![Delta::CommandFailed {
+                command: String::new(),
+                reason: "something went wrong".into()
             }]
         );
     }

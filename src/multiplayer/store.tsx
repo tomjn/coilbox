@@ -12,6 +12,7 @@ import {
 } from "react";
 import { lsGetCredential } from "../lobby-servers/bindings";
 import type { LobbyServer } from "../lobby-servers/config";
+import { notify } from "../notify/notify";
 import {
   type LobbyEvent,
   type LobbyState,
@@ -326,9 +327,28 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     onEvent.onmessage = (ev) => {
       dispatch({ type: "event", ev });
       if (ev.kind === "delta") {
+        const d = ev.delta;
         // An autohost `!ring` is a transient event, not state - react to it directly
         // (gong + reverberation + taskbar flash) rather than through the snapshot.
-        if (ev.delta.kind === "ring") triggerRing(ev.delta.from);
+        if (d.kind === "ring") triggerRing(d.from);
+        // Server refusals are one-off error events with nothing to re-render, so
+        // surface them as non-blocking error toasts (routed to an OS banner when
+        // unfocused). The raw FAILED/JOINFAILED line is already in the lobby
+        // console for history.
+        else if (d.kind === "joinChannelFailed")
+          void notify({
+            title: `Couldn't join ${d.channel}`,
+            body: d.reason || undefined,
+            level: "error",
+          });
+        else if (d.kind === "commandFailed")
+          void notify({
+            title: d.command
+              ? `Command failed: ${d.command}`
+              : "Command failed",
+            body: d.reason || undefined,
+            level: "error",
+          });
         mpSnapshot({ serverKey })
           .then((r) => dispatch({ type: "snapshot", state: r.state }))
           .catch(() => {});
