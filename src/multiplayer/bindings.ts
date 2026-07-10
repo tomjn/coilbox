@@ -172,6 +172,7 @@ export type Delta =
   | { kind: "hostPort"; port: number }
   | { kind: "loggedIn"; username: string }
   | { kind: "loginDenied"; reason: string }
+  | { kind: "registrationDenied"; reason: string }
   | { kind: "serverMessage"; text: string }
   | { kind: "ring"; from: string }
   | { kind: "joinBattleFailed"; reason: string }

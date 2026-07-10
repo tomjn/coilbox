@@ -87,6 +87,9 @@ pub enum Delta {
     LoginDenied {
         reason: String,
     },
+    RegistrationDenied {
+        reason: String,
+    },
     ServerMessage {
         text: String,
     },
@@ -595,6 +598,9 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             vec![]
         }
         ServerMessage::EndOfChannels => vec![Delta::ChannelListReceived],
+        ServerMessage::RegistrationDenied { reason } => {
+            vec![Delta::RegistrationDenied { reason }]
+        }
         // Messages carrying no state change / handled by the login machine.
         ServerMessage::TasServer { .. }
         | ServerMessage::Motd { .. }
@@ -609,7 +615,6 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         | ServerMessage::AgreementEnd
         | ServerMessage::Json { .. }
         | ServerMessage::RegistrationAccepted
-        | ServerMessage::RegistrationDenied { .. }
         | ServerMessage::Unknown { .. } => vec![],
     }
 }
@@ -738,6 +743,30 @@ mod tests {
             d,
             vec![Delta::LoggedIn {
                 username: "alice".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn denied_emits_login_denied_delta() {
+        let mut s = LobbyState::new();
+        let d = reduce(&mut s, parse_line("DENIED wrong password"));
+        assert_eq!(
+            d,
+            vec![Delta::LoginDenied {
+                reason: "wrong password".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn registration_denied_emits_delta() {
+        let mut s = LobbyState::new();
+        let d = reduce(&mut s, parse_line("REGISTRATIONDENIED username taken"));
+        assert_eq!(
+            d,
+            vec![Delta::RegistrationDenied {
+                reason: "username taken".into()
             }]
         );
     }

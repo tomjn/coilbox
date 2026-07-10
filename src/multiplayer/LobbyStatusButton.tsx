@@ -224,10 +224,16 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         Register a new account
       </button>
       {error && <p className="px-2 pt-1 text-xs text-destructive">{error}</p>}
-      {mirror.error && (
+      {mirror.loginError ? (
         <p className="px-2 pt-1 text-xs text-destructive">
-          Disconnected: {mirror.error}
+          Login failed: {mirror.loginError}
         </p>
+      ) : (
+        mirror.error && (
+          <p className="px-2 pt-1 text-xs text-destructive">
+            Disconnected: {mirror.error}
+          </p>
+        )
       )}
     </div>
   );

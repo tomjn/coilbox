@@ -207,16 +207,18 @@ async fn run_loop(
                     }
 
                     // A rejected login (e.g. wrong password) leaves the socket open
-                    // but useless — tear it down so the frontend returns to the
-                    // connect screen and the registry slot frees for a retry. Capture
-                    // the server's reason before `msg` is moved into `reduce`.
-                    if login.phase() == LoginPhase::Denied {
-                        break 'conn match &msg {
-                            ServerMessage::Denied { reason } => Some(reason.clone()),
-                            ServerMessage::RegistrationDenied { reason } => Some(reason.clone()),
-                            _ => Some("login denied".into()),
-                        };
-                    }
+                    // but useless — we tear it down (below) so the frontend returns to
+                    // the connect screen and the registry slot frees for a retry.
+                    // Capture the server's reason before `msg` is moved into `reduce`,
+                    // but defer the teardown until AFTER the reducer runs so its
+                    // LoginDenied/RegistrationDenied delta reaches the login/
+                    // registration form ahead of the Disconnected event — otherwise
+                    // breaking here would skip `reduce` and the delta would never emit.
+                    let denied_reason = (login.phase() == LoginPhase::Denied).then(|| match &msg {
+                        ServerMessage::Denied { reason } => reason.clone(),
+                        ServerMessage::RegistrationDenied { reason } => reason.clone(),
+                        _ => "login denied".to_string(),
+                    });
 
                     // The server's PING must be answered promptly or it drops us.
                     if let ServerMessage::Ping { token } = &msg {
@@ -253,6 +255,12 @@ async fn run_loop(
                             }
                         }
                         emit(&sink, LobbyEvent::Delta { delta });
+                    }
+
+                    // Now that the denial delta has been emitted, tear the
+                    // connection down (the socket is open but useless).
+                    if let Some(reason) = denied_reason {
+                        break 'conn Some(reason);
                     }
                 }
                 Some(Err(e)) => break 'conn Some(e.to_string()),
