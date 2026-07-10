@@ -12,6 +12,11 @@ vi.mock("@picoframe/frame", () => ({
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
 }));
+// ringEffect touches `window` at module top-level for its audio-unlock listeners,
+// which the `node` test environment lacks; the reducer tests never ring, so stub it.
+vi.mock("./ringEffect", () => ({
+  triggerRing: () => {},
+}));
 
 import { initialMirror, mirrorReducer } from "./store";
 
@@ -61,5 +66,40 @@ describe("mirrorReducer join-failure handling", () => {
       mirrorReducer(withErr, { type: "snapshot", state: emptyState })
         .lastJoinError,
     ).toBe("x");
+  });
+});
+
+describe("mirrorReducer channel-list completion", () => {
+  it("starts the completion counter at zero", () => {
+    expect(initialMirror.channelListReceivedSeq).toBe(0);
+  });
+
+  it("advances the counter on each channelListReceived delta", () => {
+    const once = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: { kind: "delta", delta: { kind: "channelListReceived" } },
+    });
+    expect(once.channelListReceivedSeq).toBe(1);
+    const twice = mirrorReducer(once, {
+      type: "event",
+      ev: { kind: "delta", delta: { kind: "channelListReceived" } },
+    });
+    expect(twice.channelListReceivedSeq).toBe(2);
+  });
+
+  it("leaves the counter untouched for unrelated deltas", () => {
+    const m = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: { kind: "delta", delta: { kind: "battleOpened", id: 4 } },
+    });
+    expect(m.channelListReceivedSeq).toBe(0);
+  });
+
+  it("snapshot preserves the counter", () => {
+    const withSeq = { ...initialMirror, channelListReceivedSeq: 3 };
+    expect(
+      mirrorReducer(withSeq, { type: "snapshot", state: emptyState })
+        .channelListReceivedSeq,
+    ).toBe(3);
   });
 });

@@ -52,6 +52,13 @@ export interface LobbyMirror {
   error: string | null;
   /** Reason from the last failed JOINBATTLE/OPENBATTLE, cleared on next attempt. */
   lastJoinError: string | null;
+  /**
+   * Monotonic count of `ENDOFCHANNELS` completions (the `channelListReceived`
+   * delta). The channel-list stream emits no per-row delta, so this is the only
+   * observable "directory finished loading" signal — the browser drawer watches
+   * it advance to end its loading state, honestly, even for an empty directory.
+   */
+  channelListReceivedSeq: number;
 }
 
 const CONSOLE_CAP = 500;
@@ -63,6 +70,7 @@ export const initialMirror: LobbyMirror = {
   consoleLines: [],
   error: null,
   lastJoinError: null,
+  channelListReceivedSeq: 0,
 };
 
 export type MirrorAction =
@@ -112,6 +120,12 @@ export function mirrorReducer(
           const d = ev.delta;
           if (d.kind === "joinBattleFailed" || d.kind === "openBattleFailed") {
             return { ...m, lastJoinError: d.reason };
+          }
+          if (d.kind === "channelListReceived") {
+            return {
+              ...m,
+              channelListReceivedSeq: m.channelListReceivedSeq + 1,
+            };
           }
           return m;
         }
