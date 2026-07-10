@@ -26,6 +26,7 @@ import {
   mpSnapshot,
 } from "./bindings";
 import { conversationCounts } from "./chat/conversation";
+import { triggerRing } from "./ringEffect";
 import { VerificationCodeDialog } from "./VerificationCodeDialog";
 
 /**
@@ -297,6 +298,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     onEvent.onmessage = (ev) => {
       dispatch({ type: "event", ev });
       if (ev.kind === "delta") {
+        // An autohost `!ring` is a transient event, not state - react to it directly
+        // (gong + reverberation + taskbar flash) rather than through the snapshot.
+        if (ev.delta.kind === "ring") triggerRing(ev.delta.from);
         mpSnapshot({ serverKey })
           .then((r) => dispatch({ type: "snapshot", state: r.state }))
           .catch(() => {});

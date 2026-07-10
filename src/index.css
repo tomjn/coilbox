@@ -100,6 +100,63 @@ body,
   }
 }
 
+/* Autohost `!ring` reaction (see ringEffect.ts): the whole app (#root) reverberates -
+   a slight vibration plus a touch of blur that both decay to zero, like a struck object
+   settling. Deliberately gentle (small offsets, sub-degree rotation) so it reads as a
+   vibration, not a violent shake. Paired with a synthesized gong on the same ~1.8s clock. */
+@keyframes ring-reverb {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0);
+    filter: blur(0);
+  }
+  6% {
+    transform: translate3d(-4px, 2px, 0) rotate(-0.4deg);
+    filter: blur(3px);
+  }
+  14% {
+    transform: translate3d(4px, -2px, 0) rotate(0.4deg);
+    filter: blur(2.4px);
+  }
+  24% {
+    transform: translate3d(-3px, 2px, 0) rotate(-0.3deg);
+    filter: blur(2px);
+  }
+  36% {
+    transform: translate3d(3px, -1px, 0) rotate(0.25deg);
+    filter: blur(1.5px);
+  }
+  50% {
+    transform: translate3d(-2px, 1px, 0) rotate(-0.18deg);
+    filter: blur(1px);
+  }
+  64% {
+    transform: translate3d(2px, -1px, 0) rotate(0.12deg);
+    filter: blur(0.6px);
+  }
+  78% {
+    transform: translate3d(-1px, 1px, 0) rotate(-0.06deg);
+    filter: blur(0.3px);
+  }
+  90% {
+    transform: translate3d(1px, 0, 0) rotate(0.03deg);
+    filter: blur(0.1px);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0);
+    filter: blur(0);
+  }
+}
+.ring-reverb {
+  animation: ring-reverb 1.6s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Skip the shake/blur for reduced-motion users; the gong + taskbar flash (not motion)
+     still fire from ringEffect.ts. */
+  .ring-reverb {
+    animation: none;
+  }
+}
+
 /* Native colour input: make the colour fill the (square) box with no inset,
    so the swatch matches the control's shape instead of showing a small rectangle. */
 .color-swatch::-webkit-color-swatch-wrapper {
