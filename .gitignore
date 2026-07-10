@@ -21,3 +21,7 @@ src-tauri/prdownloader/
 # (scripts/build-unitsync-worker.sh locally, release.yml per-platform in CI).
 # It's a build artifact, not a committed prebuilt like pr-downloader/uberstress.
 src-tauri/binaries/coilbox-unitsync-worker-*
+
+# Design mockups are throwaway prototypes; not shipped and not linted (biome
+# honours this ignore file via useIgnoreFile).
+docs/mockups/
