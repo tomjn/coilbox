@@ -6,6 +6,16 @@ function isCancellation(e: unknown): boolean {
   return /cancel/i.test(msg);
 }
 
+/** Compute the label without ever throwing — a bad label must not misroute the
+ * download's success/failure or replace its error. */
+function safeLabel<A>(label: (args: A) => string, args: A): string {
+  try {
+    return label(args);
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Wrap a download-start binding so it fires a notification when the download
  * settles: a success toast/banner on resolve, a failure one on reject (except
@@ -23,7 +33,7 @@ export function withDownloadNotify<A, D>(
       const result = await fn(args);
       void notify({
         title: "Download complete",
-        body: label(args),
+        body: safeLabel(label, args),
         level: "success",
       });
       return result;
@@ -31,7 +41,7 @@ export function withDownloadNotify<A, D>(
       if (!isCancellation(e)) {
         void notify({
           title: "Download failed",
-          body: label(args),
+          body: safeLabel(label, args),
           level: "error",
         });
       }

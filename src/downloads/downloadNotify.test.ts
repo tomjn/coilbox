@@ -33,4 +33,13 @@ describe("withDownloadNotify", () => {
     await expect(wrapped({ tag: "byar:test" })).rejects.toThrow();
     expect(notify).not.toHaveBeenCalled();
   });
+
+  it("treats a non-Error cancellation value as a cancellation", async () => {
+    const inner = vi.fn().mockRejectedValue("operation cancelled");
+    const wrapped = withDownloadNotify(inner, (a: { tag: string }) => a.tag);
+    await expect(wrapped({ tag: "byar:test" })).rejects.toBe(
+      "operation cancelled",
+    );
+    expect(notify).not.toHaveBeenCalled();
+  });
 });
