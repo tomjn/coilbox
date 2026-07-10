@@ -59,20 +59,21 @@ export const dlVersions = defineCommand<
   { versions: Version[] }
 >("coilbox-downloads", "dl_versions");
 
-export const dlDownload = withDownloadNotify(
-  defineCommand<
-    {
-      tag: string;
-      masterUrl?: string;
-      writePath?: string;
-      /** Pass a stable id to make the download cancellable via `dlCancel`. */
-      opId?: string;
-      onProgress: Channel<DownloadProgress>;
-    },
-    { message: string; tag: string }
-  >("coilbox-downloads", "dl_download"),
-  (a) => a.tag,
-);
+/** Raw start command WITHOUT the completion notification — for internal callers
+ * that compose several attempts into one logical download (fallback chains),
+ * which notify once themselves. Prefer the wrapped `dlDownload` elsewhere. */
+export const dlDownloadRaw = defineCommand<
+  {
+    tag: string;
+    masterUrl?: string;
+    writePath?: string;
+    /** Pass a stable id to make the download cancellable via `dlCancel`. */
+    opId?: string;
+    onProgress: Channel<DownloadProgress>;
+  },
+  { message: string; tag: string }
+>("coilbox-downloads", "dl_download");
+export const dlDownload = withDownloadNotify(dlDownloadRaw, (a) => a.tag);
 
 /** A springfiles catalog entry (maps or games). Field names mirror the API. */
 export interface SpringFile {
@@ -150,34 +151,42 @@ export const dlHakoraMaps = defineCommand<undefined, { maps: HakoraMap[] }>(
  * Download a map by spring name via the sidecar. `searchUrl` overrides
  * `PRD_HTTP_SEARCH_URL` (springrts default; BAR's files-cdn for BAR maps).
  */
+/** Raw start command WITHOUT the completion notification — for internal callers
+ * that compose several attempts into one logical download (fallback chains),
+ * which notify once themselves. Prefer the wrapped `dlDownloadMap` elsewhere. */
+export const dlDownloadMapRaw = defineCommand<
+  {
+    springName: string;
+    searchUrl?: string;
+    writePath?: string;
+    /** Pass a stable id to make the download cancellable via `dlCancel`. */
+    opId?: string;
+    onProgress: Channel<DownloadProgress>;
+  },
+  { message: string; springName: string }
+>("coilbox-downloads", "dl_download_map");
 export const dlDownloadMap = withDownloadNotify(
-  defineCommand<
-    {
-      springName: string;
-      searchUrl?: string;
-      writePath?: string;
-      /** Pass a stable id to make the download cancellable via `dlCancel`. */
-      opId?: string;
-      onProgress: Channel<DownloadProgress>;
-    },
-    { message: string; springName: string }
-  >("coilbox-downloads", "dl_download_map"),
+  dlDownloadMapRaw,
   (a) => a.springName,
 );
 
 /** Direct-download a file (e.g. a springfiles game mirror) into `destDir`. */
+/** Raw start command WITHOUT the completion notification — for internal callers
+ * that compose several attempts into one logical download (fallback chains),
+ * which notify once themselves. Prefer the wrapped `dlDownloadFile` elsewhere. */
+export const dlDownloadFileRaw = defineCommand<
+  {
+    url: string;
+    destDir: string;
+    filename: string;
+    /** Pass a stable id to make the download cancellable via `dlCancel`. */
+    opId?: string;
+    onProgress: Channel<DownloadProgress>;
+  },
+  { message: string; path: string }
+>("coilbox-downloads", "dl_download_file");
 export const dlDownloadFile = withDownloadNotify(
-  defineCommand<
-    {
-      url: string;
-      destDir: string;
-      filename: string;
-      /** Pass a stable id to make the download cancellable via `dlCancel`. */
-      opId?: string;
-      onProgress: Channel<DownloadProgress>;
-    },
-    { message: string; path: string }
-  >("coilbox-downloads", "dl_download_file"),
+  dlDownloadFileRaw,
   (a) => a.filename,
 );
 

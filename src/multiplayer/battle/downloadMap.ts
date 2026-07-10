@@ -1,11 +1,12 @@
 import type { Channel } from "@tauri-apps/api/core";
 import {
   type DownloadProgress,
-  dlDownloadFile,
-  dlDownloadMap,
+  dlDownloadFileRaw,
+  dlDownloadMapRaw,
   dlHakoraMaps,
   dlSpringfilesList,
 } from "@/downloads/bindings";
+import { withDownloadNotify } from "@/downloads/downloadNotify";
 
 /** BAR's map search endpoint for pr-downloader (`PRD_HTTP_SEARCH_URL`). */
 const BAR_SEARCH_URL = "https://files-cdn.beyondallreason.dev/find";
@@ -31,7 +32,7 @@ const norm = (s: string) =>
  * Steps 3-4 need a write root; if none is configured they're skipped. Throws with
  * every source's error when all fail.
  */
-export async function downloadMapAnySource(opts: {
+async function downloadMapAnySourceImpl(opts: {
   mapName: string;
   writePath?: string;
   onProgress: Channel<DownloadProgress>;
@@ -44,7 +45,7 @@ export async function downloadMapAnySource(opts: {
   for (const searchUrl of [undefined, BAR_SEARCH_URL]) {
     const label = searchUrl ? "BAR" : "springfiles";
     try {
-      await dlDownloadMap({
+      await dlDownloadMapRaw({
         springName: mapName,
         searchUrl,
         writePath,
@@ -68,7 +69,7 @@ export async function downloadMapAnySource(opts: {
       );
       const url = hit?.mirrors?.[0];
       if (hit && url) {
-        await dlDownloadFile({
+        await dlDownloadFileRaw({
           url,
           destDir,
           filename: hit.filename,
@@ -85,7 +86,7 @@ export async function downloadMapAnySource(opts: {
       const { maps } = await dlHakoraMaps(undefined);
       const hit = maps.find((m) => norm(m.filename) === target);
       if (hit) {
-        await dlDownloadFile({
+        await dlDownloadFileRaw({
           url: hit.url,
           destDir,
           filename: hit.filename,
@@ -100,3 +101,8 @@ export async function downloadMapAnySource(opts: {
 
   throw new Error(`No source could provide "${mapName}". ${errors.join("; ")}`);
 }
+
+export const downloadMapAnySource = withDownloadNotify(
+  downloadMapAnySourceImpl,
+  (o) => o.mapName,
+);

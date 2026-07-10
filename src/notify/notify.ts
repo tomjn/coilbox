@@ -49,7 +49,3 @@ export async function notify(input: NotifyInput): Promise<void> {
     showToast(input);
   }
 }
-
-// Re-export sonner's imperative toast for foreground-only callers (e.g. the
-// settings "test" button, or success/error feedback that never needs a banner).
-export { toast };

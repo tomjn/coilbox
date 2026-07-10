@@ -1,10 +1,11 @@
 import type { Channel } from "@tauri-apps/api/core";
 import {
   type DownloadProgress,
-  dlDownload,
-  dlDownloadFile,
+  dlDownloadFileRaw,
+  dlDownloadRaw,
   dlSpringfilesList,
 } from "@/downloads/bindings";
+import { withDownloadNotify } from "@/downloads/downloadNotify";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -26,7 +27,7 @@ const norm = (s: string) =>
  * Step 2 needs a write root; if none is configured it's skipped. Throws with
  * every source's error when all fail.
  */
-export async function downloadGameAnySource(opts: {
+async function downloadGameAnySourceImpl(opts: {
   gameName: string;
   writePath?: string;
   onProgress: Channel<DownloadProgress>;
@@ -36,7 +37,7 @@ export async function downloadGameAnySource(opts: {
 
   // 1) rapid: pr-downloader resolves the long name to a tag via the master index.
   try {
-    await dlDownload({ tag: gameName, writePath, onProgress });
+    await dlDownloadRaw({ tag: gameName, writePath, onProgress });
     return "rapid";
   } catch (e) {
     errors.push(`rapid: ${msg(e)}`);
@@ -52,7 +53,7 @@ export async function downloadGameAnySource(opts: {
       );
       const url = hit?.mirrors?.[0];
       if (hit && url) {
-        await dlDownloadFile({
+        await dlDownloadFileRaw({
           url,
           destDir: `${writePath}/games`,
           filename: hit.filename,
@@ -69,3 +70,8 @@ export async function downloadGameAnySource(opts: {
     `No source could provide "${gameName}". ${errors.join("; ")}`,
   );
 }
+
+export const downloadGameAnySource = withDownloadNotify(
+  downloadGameAnySourceImpl,
+  (o) => o.gameName,
+);
