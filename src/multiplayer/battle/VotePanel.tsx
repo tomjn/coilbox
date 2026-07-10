@@ -53,15 +53,15 @@ export function VotePanel({
           <span className="truncate text-sm text-muted-foreground">
             {vote.subject}
             {vote.caller && (
-              <span className="text-muted-foreground/70"> · by {vote.caller}</span>
+              <span className="text-muted-foreground/70">
+                {" "}
+                · by {vote.caller}
+              </span>
             )}
           </span>
         </div>
         {secondsLeft !== null && (
-          <span
-            className="shrink-0 text-xs tabular-nums text-muted-foreground"
-            aria-label={`${secondsLeft} seconds remaining`}
-          >
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
             {secondsLeft}s left
           </span>
         )}
