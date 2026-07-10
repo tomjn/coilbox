@@ -1,4 +1,6 @@
+import { cn } from "@picoframe/frame";
 import type { User } from "../bindings";
+import { PRESENCE_META, type Presence } from "./presence";
 
 /**
  * A reusable member panel: the users in the active conversation, with a coarse
@@ -8,12 +10,16 @@ export function MemberList({
   members,
   onSelect,
   colorFor,
+  presenceFor,
 }: {
   members: User[];
   onSelect?: (username: string) => void;
   /** Optional per-member accent colour (`#rrggbb`), e.g. a battle player's team
    * colour, shown as a swatch. Returns undefined when there's no colour. */
   colorFor?: (username: string) => string | undefined;
+  /** Optional per-member presence (in-game/in-battle/away/online/offline),
+   * shown as a coloured dot plus a label for any non-online state. */
+  presenceFor?: (username: string) => Presence;
 }) {
   // Reserve the swatch column only when at least one member has a colour, so
   // colour-less members (e.g. the host) still line up, while plain channel/DM
@@ -26,11 +32,8 @@ export function MemberList({
       </div>
       <ul className="flex flex-col gap-0.5 overflow-auto p-2">
         {members.map((u) => {
-          const label = u.status.ingame
-            ? "in-game"
-            : u.status.away
-              ? "away"
-              : null;
+          const presence = presenceFor?.(u.name);
+          const meta = presence ? PRESENCE_META[presence] : null;
           const color = colorFor?.(u.name);
           const row = (
             <span className="flex items-center gap-2">
@@ -45,9 +48,16 @@ export function MemberList({
                   <span aria-hidden className="size-2.5 shrink-0" />
                 ))}
               <span className="truncate">{u.name}</span>
-              {label && (
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {label}
+              {meta && (
+                <span
+                  className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
+                  title={meta.label}
+                >
+                  <span
+                    aria-hidden
+                    className={cn("size-2 rounded-full", meta.dotClass)}
+                  />
+                  {presence !== "online" && meta.label}
                 </span>
               )}
             </span>

@@ -1,4 +1,4 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, cn, Input } from "@picoframe/frame";
 import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -7,6 +7,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useMultiplayer } from "../store";
+import { PRESENCE_META, userPresence } from "./presence";
 
 /**
  * The "+" next to Direct messages: a popover that searches the users currently
@@ -66,11 +67,10 @@ export function DmPicker({ onPick }: { onPick: (username: string) => void }) {
         />
         <ul className="flex max-h-64 flex-col gap-0.5 overflow-auto">
           {matches.map((u) => {
-            const label = u.status.ingame
-              ? "in-game"
-              : u.status.away
-                ? "away"
-                : null;
+            const presence = mirror.state
+              ? userPresence(mirror.state, u.name)
+              : "online";
+            const meta = PRESENCE_META[presence];
             return (
               <li key={u.name}>
                 <button
@@ -79,11 +79,16 @@ export function DmPicker({ onPick }: { onPick: (username: string) => void }) {
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
                 >
                   <span className="truncate">{u.name}</span>
-                  {label && (
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {label}
-                    </span>
-                  )}
+                  <span
+                    className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
+                    title={meta.label}
+                  >
+                    <span
+                      aria-hidden
+                      className={cn("size-2 rounded-full", meta.dotClass)}
+                    />
+                    {presence !== "online" && meta.label}
+                  </span>
                 </button>
               </li>
             );

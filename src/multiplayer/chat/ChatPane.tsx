@@ -3,6 +3,7 @@ import { ArrowUp, Bot } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ChatMsg } from "../bindings";
 import { FormattedText } from "./FormattedText";
+import { PRESENCE_META, type Presence } from "./presence";
 
 /** Format a unix-millis timestamp as a short local time (blank when absent). */
 function formatTime(at: number): string {
@@ -36,8 +37,9 @@ export interface ChatPaneProps {
   subtitle?: string;
   /** Show a bot glyph before the title (e.g. a DM with an autohost). */
   titleIsBot?: boolean;
-  /** Presence dot for a single-subject conversation (DMs); omit otherwise. */
-  titlePresence?: "online" | "offline";
+  /** Presence dot + label for a single-subject conversation (DMs); omit
+   * otherwise. Richer than online/offline: away/in-battle/in-game too. */
+  titlePresence?: Presence;
   messages: ChatMsg[];
   /** The logged-in username, used to right-align our own messages. */
   currentUser?: string | null;
@@ -115,20 +117,22 @@ export function ChatPane({
                 role="img"
                 className={cn(
                   "size-2 shrink-0 rounded-full",
-                  titlePresence === "online"
-                    ? "bg-green-500"
-                    : "bg-muted-foreground/50",
+                  PRESENCE_META[titlePresence].dotClass,
                 )}
-                aria-label={titlePresence === "online" ? "Online" : "Offline"}
-                title={titlePresence === "online" ? "Online" : "Offline"}
+                aria-label={PRESENCE_META[titlePresence].label}
+                title={PRESENCE_META[titlePresence].label}
               />
             )}
             {titleIsBot && <Bot className="size-4 shrink-0" aria-label="Bot" />}
             <span className="truncate">{title}</span>
           </h2>
-          {subtitle && (
+          {subtitle ? (
             <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
-          )}
+          ) : titlePresence ? (
+            <p className="truncate text-xs text-muted-foreground">
+              {PRESENCE_META[titlePresence].label}
+            </p>
+          ) : null}
         </div>
         {headerActions && (
           <div className="flex shrink-0 items-center gap-1">

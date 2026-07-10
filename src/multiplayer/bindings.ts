@@ -156,6 +156,7 @@ export type Delta =
   | { kind: "battleOpened"; id: number }
   | { kind: "battleClosed"; id: number }
   | { kind: "battleInfoChanged"; id: number }
+  | { kind: "enteredBattle"; id: number; own: boolean }
   | { kind: "memberJoined"; battleId: number; name: string }
   | { kind: "memberLeft"; battleId: number; name: string }
   | { kind: "memberStatusChanged"; battleId: number; name: string }
@@ -173,7 +174,7 @@ export type Delta =
   | { kind: "loggedIn"; username: string }
   | { kind: "loginDenied"; reason: string }
   | { kind: "registrationDenied"; reason: string }
-  | { kind: "serverMessage"; text: string }
+  | { kind: "serverMessage"; text: string; boxed: boolean }
   | { kind: "ring"; from: string }
   | { kind: "joinBattleFailed"; reason: string }
   | { kind: "openBattleFailed"; reason: string }
