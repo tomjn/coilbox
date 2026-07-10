@@ -69,13 +69,23 @@ function playGong() {
   ];
 
   const master = ctx.createGain();
-  master.gain.value = 0.35; // an alarm, not a jump-scare
+  master.gain.value = 1.4; // driven hard so the ring carries across a room
   const lowpass = ctx.createBiquadFilter();
   lowpass.type = "lowpass";
   lowpass.frequency.setValueAtTime(4200, now);
   lowpass.frequency.exponentialRampToValueAtTime(700, now + GONG_DURATION_S);
+  // Limiter: the six partials sum near full scale on the strike, so pushing the master
+  // for loudness would hard-clip. A compressor tames that transient while letting the
+  // sustained body get genuinely louder without harsh distortion.
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -8;
+  limiter.knee.value = 6;
+  limiter.ratio.value = 12;
+  limiter.attack.value = 0.003;
+  limiter.release.value = 0.25;
   lowpass.connect(master);
-  master.connect(ctx.destination);
+  master.connect(limiter);
+  limiter.connect(ctx.destination);
 
   for (const [ratio, level, decayScale] of partials) {
     const osc = ctx.createOscillator();
