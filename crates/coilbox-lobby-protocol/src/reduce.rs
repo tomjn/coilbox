@@ -99,8 +99,12 @@ pub enum Delta {
     RegistrationDenied {
         reason: String,
     },
+    /// A `SERVERMSG` (plain announcement) or `SERVERMSGBOX` (the server asked the
+    /// client to show it prominently). `boxed` distinguishes the two so the
+    /// frontend can render a toast vs. a dismissible dialog.
     ServerMessage {
         text: String,
+        boxed: bool,
     },
     Ring {
         from: String,
@@ -603,8 +607,11 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         ServerMessage::Ring { username } => {
             vec![Delta::Ring { from: username }]
         }
-        ServerMessage::ServerMsg { text } | ServerMessage::ServerMsgBox { text } => {
-            vec![Delta::ServerMessage { text }]
+        ServerMessage::ServerMsg { text } => {
+            vec![Delta::ServerMessage { text, boxed: false }]
+        }
+        ServerMessage::ServerMsgBox { text } => {
+            vec![Delta::ServerMessage { text, boxed: true }]
         }
         ServerMessage::ChannelInfo {
             name,
@@ -858,6 +865,30 @@ mod tests {
             vec![Delta::CommandFailed {
                 command: String::new(),
                 reason: "something went wrong".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn server_message_variants_carry_boxed_flag() {
+        let mut s = LobbyState::new();
+        let plain = reduce(&mut s, parse_line("SERVERMSG Maintenance in 5 minutes"));
+        assert_eq!(
+            plain,
+            vec![Delta::ServerMessage {
+                text: "Maintenance in 5 minutes".into(),
+                boxed: false,
+            }]
+        );
+        let boxed = reduce(
+            &mut s,
+            parse_line("SERVERMSGBOX Read this: https://example.com"),
+        );
+        assert_eq!(
+            boxed,
+            vec![Delta::ServerMessage {
+                text: "Read this: https://example.com".into(),
+                boxed: true,
             }]
         );
     }
