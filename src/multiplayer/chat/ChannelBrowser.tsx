@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { mpJoinChannel, mpListChannels } from "../bindings";
 import { useMultiplayer } from "../store";
 
@@ -22,9 +22,15 @@ export function ChannelBrowser({
   const { mirror, activeKey, rememberChannel } = useMultiplayer();
   const [loading, setLoading] = useState(false);
   const directory = mirror.state?.channelDirectory ?? [];
+  // The server's `ENDOFCHANNELS` bumps this counter. We record its value when a
+  // request goes out and end loading once it advances past that — the honest
+  // completion signal, which fires whether the directory is full or empty.
+  const receivedSeq = mirror.channelListReceivedSeq;
+  const requestedSeqRef = useRef(receivedSeq);
 
   function refresh() {
     if (!activeKey) return;
+    requestedSeqRef.current = receivedSeq;
     setLoading(true);
     mpListChannels({ serverKey: activeKey }).catch(() => setLoading(false));
   }
@@ -33,16 +39,18 @@ export function ChannelBrowser({
   useEffect(() => {
     if (!open || !activeKey) return;
     refresh();
-    // Fallback so an empty or failed directory resolves to the empty state
-    // instead of spinning forever (the length>0 effect clears it sooner on success).
+    // Failsafe: if the server never sends ENDOFCHANNELS, resolve to the empty
+    // state rather than spinning forever. The completion counter clears it first
+    // in the normal case.
     const t = setTimeout(() => setLoading(false), 4000);
     return () => clearTimeout(t);
   }, [open, activeKey]);
 
-  // The directory arriving (channelListReceived -> snapshot) clears loading.
+  // Completion (channelListReceived advances the counter) ends loading, so an
+  // empty directory reaches its "no channels" state at once instead of on timeout.
   useEffect(() => {
-    if (directory.length > 0) setLoading(false);
-  }, [directory.length]);
+    if (receivedSeq !== requestedSeqRef.current) setLoading(false);
+  }, [receivedSeq]);
 
   async function join(name: string) {
     if (!activeKey) return;
