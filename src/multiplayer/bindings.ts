@@ -177,6 +177,8 @@ export type Delta =
   | { kind: "ring"; from: string }
   | { kind: "joinBattleFailed"; reason: string }
   | { kind: "openBattleFailed"; reason: string }
+  | { kind: "joinChannelFailed"; channel: string; reason: string }
+  | { kind: "commandFailed"; command: string; reason: string }
   | { kind: "channelListReceived" };
 
 /** An event streamed over the connect `Channel` (mirrors `LobbyEvent`). */
