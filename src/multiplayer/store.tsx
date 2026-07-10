@@ -152,10 +152,11 @@ interface MultiplayerContextValue {
   ) => Promise<void>;
   disconnect: () => Promise<void>;
   /**
-   * The connection currently parked awaiting an emailed verification code (its
-   * `serverKey`), or null. Drives the verification-code dialog.
+   * The connection currently parked awaiting agreement acceptance / an emailed
+   * verification code (its `serverKey` and the server's agreement `text`, which
+   * may be empty), or null. Drives the verification-code dialog.
    */
-  pendingAgreement: { serverKey: string } | null;
+  pendingAgreement: { serverKey: string; text: string } | null;
   /** Submit the verification code for the parked connection and resume login. */
   submitAgreementCode: (code: string) => Promise<void>;
   /** Abandon the verification prompt by disconnecting the parked connection. */
@@ -194,6 +195,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [pendingAgreement, setPendingAgreement] = useState<{
     serverKey: string;
+    text: string;
   } | null>(null);
 
   // One-way "has ever connected this session" latch driving Chat/Battles sidebar
@@ -307,7 +309,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       if (ev.kind === "phase") {
         setPendingAgreement((p) =>
           ev.phase === "awaitAgreement"
-            ? { serverKey }
+            ? { serverKey, text: ev.agreement ?? "" }
             : p?.serverKey === serverKey
               ? null
               : p,

@@ -60,7 +60,7 @@ export function VerificationCodeDialog() {
         showCloseButton={false}
         onEscapeKeyDown={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
-        className="sm:max-w-sm"
+        className="sm:max-w-lg"
       >
         <DialogHeader>
           <DialogTitle>Enter verification code</DialogTitle>
@@ -69,6 +69,13 @@ export function VerificationCodeDialog() {
             below to continue.
           </DialogDescription>
         </DialogHeader>
+        {pendingAgreement?.text ? (
+          <div className="max-h-64 overflow-y-auto rounded-md border border-border bg-muted/40 p-3">
+            <pre className="whitespace-pre-wrap break-words text-xs">
+              {pendingAgreement.text}
+            </pre>
+          </div>
+        ) : null}
         <form
           onSubmit={(e) => {
             e.preventDefault();
