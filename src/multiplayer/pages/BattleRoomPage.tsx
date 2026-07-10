@@ -13,6 +13,7 @@ import { MissingContentCard } from "../battle/MissingContentCard";
 import { StartPosOptions } from "../battle/StartPosOptions";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
 import { useBattleRoom } from "../battle/useBattleRoom";
+import { VotePanel } from "../battle/VotePanel";
 import { useMpRevealed } from "../store";
 
 /**
@@ -103,6 +104,13 @@ function BattleRoomPage() {
         locked={battle.locked}
         onToggleLock={room.setLocked}
       />
+
+      {room.currentVote && (
+        <VotePanel
+          vote={room.currentVote}
+          onVote={(choice) => room.autohostSend(`!vote ${choice}`)}
+        />
+      )}
 
       {launch.error && (
         <p className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">

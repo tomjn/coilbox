@@ -117,6 +117,22 @@ export interface Battle {
   startRects: Record<string, StartRect>;
 }
 
+/**
+ * A live SPADS autohost vote in the current battle (mirrors `Vote`). Present only
+ * while a vote is open; drives the one-click vote panel.
+ */
+export interface Vote {
+  subject: string;
+  caller: string;
+  yes: number;
+  no: number;
+  yesNeeded: number;
+  noNeeded: number;
+  allowAbstain: boolean;
+  /** Unix-millis deadline from the progress line's "Ns remaining" (0 if unknown). */
+  endsAt: number;
+}
+
 export interface LobbyState {
   myUsername: string | null;
   compflags: string[];
@@ -129,6 +145,8 @@ export interface LobbyState {
   /** The UDP port the server assigned for a battle we host (`HOSTPORT`). */
   hostPort: number | null;
   channelDirectory: DirChannel[];
+  /** A live SPADS autohost vote in the current battle, or null when none is open. */
+  currentVote: Vote | null;
 }
 
 /** The phases of the login handshake (mirrors `LoginPhase`). */
