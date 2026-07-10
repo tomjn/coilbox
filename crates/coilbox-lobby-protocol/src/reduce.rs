@@ -35,6 +35,15 @@ pub enum Delta {
     BattleInfoChanged {
         id: u32,
     },
+    /// We just entered a battle: our own `JOINBATTLE`/`OPENBATTLE` ack landed.
+    /// `own` is `true` when we opened it (host), `false` when we joined someone
+    /// else's. Carries no new payload beyond the trigger - the snapshot already
+    /// reflects `current_battle` - so the frontend switches into the battle view
+    /// off this signal instead of waiting for an incidental follow-up delta.
+    EnteredBattle {
+        id: u32,
+        own: bool,
+    },
     MemberJoined {
         battle_id: u32,
         name: String,
@@ -454,7 +463,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             // Own-join acknowledgement.
             state.current_battle = Some(id);
             state.last_battle = Some(id);
-            vec![]
+            vec![] // RED-check: temporarily reverted
         }
         ServerMessage::JoinBattleFailed { reason } => {
             vec![Delta::JoinBattleFailed { reason }]
@@ -582,7 +591,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             // A fresh host port arrives via HOSTPORT right after this ack; drop any
             // stale one from a previous host session.
             state.host_port = None;
-            vec![]
+            vec![] // RED-check: temporarily reverted
         }
         ServerMessage::OpenBattleFailed { reason } => {
             vec![Delta::OpenBattleFailed { reason }]
@@ -914,9 +923,20 @@ mod tests {
                 "BATTLEOPENED 4 0 0 alice 1.2.3.4 8452 12 0 0 -1 spring\t105\tMap\tTitle\tBAR",
             ),
         );
-        reduce(&mut s, parse_line("JOINBATTLE 4 hash"));
+        let d = reduce(&mut s, parse_line("JOINBATTLE 4 hash"));
         assert_eq!(s.current_battle, Some(4));
         assert_eq!(s.last_battle, Some(4));
+        // The ack must emit its own delta so the UI switches into the battle view
+        // without depending on an incidental follow-up message.
+        assert_eq!(d, vec![Delta::EnteredBattle { id: 4, own: false }]);
+    }
+
+    #[test]
+    fn own_open_emits_entered_battle_own() {
+        let mut s = LobbyState::new();
+        let d = reduce(&mut s, parse_line("OPENBATTLE 3"));
+        assert_eq!(s.current_battle, Some(3));
+        assert_eq!(d, vec![Delta::EnteredBattle { id: 3, own: true }]);
     }
 
     #[test]
