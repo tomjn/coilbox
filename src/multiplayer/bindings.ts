@@ -174,7 +174,7 @@ export type Delta =
   | { kind: "loggedIn"; username: string }
   | { kind: "loginDenied"; reason: string }
   | { kind: "registrationDenied"; reason: string }
-  | { kind: "serverMessage"; text: string }
+  | { kind: "serverMessage"; text: string; boxed: boolean }
   | { kind: "ring"; from: string }
   | { kind: "joinBattleFailed"; reason: string }
   | { kind: "openBattleFailed"; reason: string }
