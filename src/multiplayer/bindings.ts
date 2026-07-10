@@ -156,6 +156,7 @@ export type Delta =
   | { kind: "battleOpened"; id: number }
   | { kind: "battleClosed"; id: number }
   | { kind: "battleInfoChanged"; id: number }
+  | { kind: "enteredBattle"; id: number; own: boolean }
   | { kind: "memberJoined"; battleId: number; name: string }
   | { kind: "memberLeft"; battleId: number; name: string }
   | { kind: "memberStatusChanged"; battleId: number; name: string }
