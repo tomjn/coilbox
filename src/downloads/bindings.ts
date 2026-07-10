@@ -1,5 +1,6 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { Channel } from "@tauri-apps/api/core";
+import { withDownloadNotify } from "./downloadNotify";
 
 /**
  * A live progress sample streamed during a download (mirrors the Rust
@@ -58,17 +59,20 @@ export const dlVersions = defineCommand<
   { versions: Version[] }
 >("coilbox-downloads", "dl_versions");
 
-export const dlDownload = defineCommand<
-  {
-    tag: string;
-    masterUrl?: string;
-    writePath?: string;
-    /** Pass a stable id to make the download cancellable via `dlCancel`. */
-    opId?: string;
-    onProgress: Channel<DownloadProgress>;
-  },
-  { message: string; tag: string }
->("coilbox-downloads", "dl_download");
+export const dlDownload = withDownloadNotify(
+  defineCommand<
+    {
+      tag: string;
+      masterUrl?: string;
+      writePath?: string;
+      /** Pass a stable id to make the download cancellable via `dlCancel`. */
+      opId?: string;
+      onProgress: Channel<DownloadProgress>;
+    },
+    { message: string; tag: string }
+  >("coilbox-downloads", "dl_download"),
+  (a) => a.tag,
+);
 
 /** A springfiles catalog entry (maps or games). Field names mirror the API. */
 export interface SpringFile {
@@ -146,30 +150,36 @@ export const dlHakoraMaps = defineCommand<undefined, { maps: HakoraMap[] }>(
  * Download a map by spring name via the sidecar. `searchUrl` overrides
  * `PRD_HTTP_SEARCH_URL` (springrts default; BAR's files-cdn for BAR maps).
  */
-export const dlDownloadMap = defineCommand<
-  {
-    springName: string;
-    searchUrl?: string;
-    writePath?: string;
-    /** Pass a stable id to make the download cancellable via `dlCancel`. */
-    opId?: string;
-    onProgress: Channel<DownloadProgress>;
-  },
-  { message: string; springName: string }
->("coilbox-downloads", "dl_download_map");
+export const dlDownloadMap = withDownloadNotify(
+  defineCommand<
+    {
+      springName: string;
+      searchUrl?: string;
+      writePath?: string;
+      /** Pass a stable id to make the download cancellable via `dlCancel`. */
+      opId?: string;
+      onProgress: Channel<DownloadProgress>;
+    },
+    { message: string; springName: string }
+  >("coilbox-downloads", "dl_download_map"),
+  (a) => a.springName,
+);
 
 /** Direct-download a file (e.g. a springfiles game mirror) into `destDir`. */
-export const dlDownloadFile = defineCommand<
-  {
-    url: string;
-    destDir: string;
-    filename: string;
-    /** Pass a stable id to make the download cancellable via `dlCancel`. */
-    opId?: string;
-    onProgress: Channel<DownloadProgress>;
-  },
-  { message: string; path: string }
->("coilbox-downloads", "dl_download_file");
+export const dlDownloadFile = withDownloadNotify(
+  defineCommand<
+    {
+      url: string;
+      destDir: string;
+      filename: string;
+      /** Pass a stable id to make the download cancellable via `dlCancel`. */
+      opId?: string;
+      onProgress: Channel<DownloadProgress>;
+    },
+    { message: string; path: string }
+  >("coilbox-downloads", "dl_download_file"),
+  (a) => a.filename,
+);
 
 /**
  * Lowercased filenames already present in `<path>/maps` and `/games` across every
@@ -213,26 +223,32 @@ export const dlRecoilEngines = defineCommand<
 >("coilbox-downloads", "dl_recoil_engines");
 
 /** Install a Recoil engine release into `<writePath>/engine/<version>/`. */
-export const dlDownloadEngineRecoil = defineCommand<
-  {
-    version: string;
-    assetUrl: string;
-    writePath: string;
-    /** Pass a stable id to make the download phase cancellable via `dlCancel`. */
-    opId?: string;
-    onProgress: Channel<DownloadProgress>;
-  },
-  { message: string; path: string }
->("coilbox-downloads", "dl_download_engine_recoil");
+export const dlDownloadEngineRecoil = withDownloadNotify(
+  defineCommand<
+    {
+      version: string;
+      assetUrl: string;
+      writePath: string;
+      /** Pass a stable id to make the download phase cancellable via `dlCancel`. */
+      opId?: string;
+      onProgress: Channel<DownloadProgress>;
+    },
+    { message: string; path: string }
+  >("coilbox-downloads", "dl_download_engine_recoil"),
+  (a) => `Engine ${a.version}`,
+);
 
 /** Download a classic Spring engine via the sidecar's `--download-engine`. */
-export const dlDownloadEngineSpring = defineCommand<
-  {
-    version: string;
-    writePath?: string;
-    /** Pass a stable id to make the download cancellable via `dlCancel`. */
-    opId?: string;
-    onProgress: Channel<DownloadProgress>;
-  },
-  { message: string; version: string }
->("coilbox-downloads", "dl_download_engine_spring");
+export const dlDownloadEngineSpring = withDownloadNotify(
+  defineCommand<
+    {
+      version: string;
+      writePath?: string;
+      /** Pass a stable id to make the download cancellable via `dlCancel`. */
+      opId?: string;
+      onProgress: Channel<DownloadProgress>;
+    },
+    { message: string; version: string }
+  >("coilbox-downloads", "dl_download_engine_spring"),
+  (a) => `Engine ${a.version}`,
+);
