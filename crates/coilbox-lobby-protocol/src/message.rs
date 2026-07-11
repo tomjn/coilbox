@@ -99,6 +99,8 @@ pub enum ServerMessage {
     },
     /// `SAIDPRIVATE <fromuser> <msg>`
     SaidPrivate { username: String, message: String },
+    /// `SAIDPRIVATEEX <fromuser> <msg>` — a private action / `/me` message.
+    SaidPrivateEx { username: String, message: String },
     /// `SAIDBATTLE <username> <msg>`
     SaidBattle { username: String, message: String },
     /// `SAIDBATTLEEX <username> <msg>`
@@ -408,6 +410,13 @@ pub fn parse_line(line: &str) -> ServerMessage {
             },
             None => ServerMessage::Unknown { raw: raw() },
         },
+        "SAIDPRIVATEEX" => match fields::<2>(rest) {
+            Some([username, message]) => ServerMessage::SaidPrivateEx {
+                username: username.to_string(),
+                message: message.to_string(),
+            },
+            None => ServerMessage::Unknown { raw: raw() },
+        },
         "SAIDBATTLE" => match fields::<2>(rest) {
             Some([username, message]) => ServerMessage::SaidBattle {
                 username: username.to_string(),
@@ -695,6 +704,18 @@ mod tests {
                 channel: "main".into(),
                 username: "alice".into(),
                 message: "hello   world  with spaces".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn parses_saidprivateex_action() {
+        let m = parse_line("SAIDPRIVATEEX alice waves at you");
+        assert_eq!(
+            m,
+            ServerMessage::SaidPrivateEx {
+                username: "alice".into(),
+                message: "waves at you".into(),
             }
         );
     }

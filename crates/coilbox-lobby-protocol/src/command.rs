@@ -97,9 +97,20 @@ pub fn say_private(user: &str, msg: &str) -> String {
     format!("SAYPRIVATE {user} {msg}")
 }
 
+/// `SAYPRIVATEEX <user> <msg>` — a private action / `/me` message. The server does
+/// not echo this to us in a form we parse, so the caller records its own copy.
+pub fn say_private_ex(user: &str, msg: &str) -> String {
+    format!("SAYPRIVATEEX {user} {msg}")
+}
+
 /// `SAYBATTLE <msg>`.
 pub fn say_battle(msg: &str) -> String {
     format!("SAYBATTLE {msg}")
+}
+
+/// `SAYBATTLEEX <msg>` — a battle-chat action / `/me` message.
+pub fn say_battle_ex(msg: &str) -> String {
+    format!("SAYBATTLEEX {msg}")
 }
 
 /// `JOINBATTLE <id> [key] [scriptPassword]`.
@@ -372,5 +383,12 @@ mod tests {
         assert_eq!(exit(Some("bye")), "EXIT bye");
         assert_eq!(say("main", "hi there"), "SAY main hi there");
         assert_eq!(force_team_color("bob", 255), "FORCETEAMCOLOR bob 255");
+    }
+
+    #[test]
+    fn action_builders() {
+        assert_eq!(say_ex("main", "waves"), "SAYEX main waves");
+        assert_eq!(say_private_ex("bob", "waves"), "SAYPRIVATEEX bob waves");
+        assert_eq!(say_battle_ex("waves"), "SAYBATTLEEX waves");
     }
 }
