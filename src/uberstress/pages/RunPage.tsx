@@ -3,7 +3,6 @@ import { Channel } from "@tauri-apps/api/core";
 import {
   AlertCircle,
   BarChart3,
-  ChevronDown,
   ChevronRight,
   Database,
   Loader2,
@@ -14,6 +13,11 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -204,7 +208,6 @@ export default function RunPage() {
   const [runError, setRunError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [progress, setProgress] = useState<RunProgressData | null>(null);
-  const [showLog, setShowLog] = useState(true);
 
   const runIdRef = useRef<string | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
@@ -538,20 +541,15 @@ export default function RunPage() {
           />
 
           {/* Advanced */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((v) => !v)}
-              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              {showAdvanced ? (
-                <ChevronDown size={15} />
-              ) : (
-                <ChevronRight size={15} />
-              )}{" "}
+          <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+            <CollapsibleTrigger className="group flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <ChevronRight
+                size={15}
+                className="transition-transform group-data-[state=open]:rotate-90"
+              />{" "}
               Advanced options
-            </button>
-            {showAdvanced && (
+            </CollapsibleTrigger>
+            <CollapsibleContent>
               <div className="mt-3 grid grid-cols-2 gap-4">
                 <Field label="User prefix">
                   <Input
@@ -630,8 +628,8 @@ export default function RunPage() {
                   </Field>
                 )}
               </div>
-            )}
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Actions */}
           <div className="flex items-center gap-2 pt-1">
@@ -689,46 +687,47 @@ export default function RunPage() {
               </AlertDescription>
             </Alert>
           )}
-          <button
-            type="button"
-            onClick={() => setShowLog((v) => !v)}
-            className="flex shrink-0 items-center gap-1 border-b border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
-          >
-            {showLog ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            Output
-            {logLines.length > 0 && (
-              <span className="font-normal normal-case">
-                ({logLines.length} lines)
-              </span>
-            )}
-          </button>
-          {showLog && (
-            <div className="min-h-0 flex-1 overflow-auto bg-card/20 p-4">
-              {logLines.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-                  <Zap size={26} className="opacity-30" />
-                  <p>Run output streams here.</p>
-                </div>
-              ) : (
-                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
-                  {logLines.map((l, i) => (
-                    <div
-                      // biome-ignore lint/suspicious/noArrayIndexKey: log lines are append-only; index is a stable key
-                      key={i}
-                      className={
-                        l.stream === "err"
-                          ? "text-amber-600 dark:text-amber-400"
-                          : "text-foreground/90"
-                      }
-                    >
-                      {l.line}
-                    </div>
-                  ))}
-                  <div ref={logEndRef} />
-                </pre>
+          <Collapsible defaultOpen className="flex min-h-0 flex-1 flex-col">
+            <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 border-b border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground">
+              <ChevronRight
+                size={14}
+                className="transition-transform group-data-[state=open]:rotate-90"
+              />
+              Output
+              {logLines.length > 0 && (
+                <span className="font-normal normal-case">
+                  ({logLines.length} lines)
+                </span>
               )}
-            </div>
-          )}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-auto bg-card/20 p-4">
+                {logLines.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                    <Zap size={26} className="opacity-30" />
+                    <p>Run output streams here.</p>
+                  </div>
+                ) : (
+                  <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
+                    {logLines.map((l, i) => (
+                      <div
+                        // biome-ignore lint/suspicious/noArrayIndexKey: log lines are append-only; index is a stable key
+                        key={i}
+                        className={
+                          l.stream === "err"
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-foreground/90"
+                        }
+                      >
+                        {l.line}
+                      </div>
+                    ))}
+                    <div ref={logEndRef} />
+                  </pre>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </div>
     </div>

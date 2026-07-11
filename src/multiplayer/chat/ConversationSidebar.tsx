@@ -1,13 +1,11 @@
 import { Button } from "@picoframe/frame";
+import { ChevronRight, Hash, MessageSquare, Plus, Swords } from "lucide-react";
+import type { ReactNode } from "react";
 import {
-  ChevronDown,
-  ChevronRight,
-  Hash,
-  MessageSquare,
-  Plus,
-  Swords,
-} from "lucide-react";
-import { type ReactNode, useState } from "react";
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { ChatMsg } from "../bindings";
 import { useMultiplayer } from "../store";
 import {
@@ -29,37 +27,26 @@ function Badge({ n }: { n: number }) {
 /** A collapsible sidebar section with a chevron toggle and an optional header action. */
 function Section({
   title,
-  open,
-  onToggle,
+  defaultOpen = true,
   action,
   children,
 }: {
   title: string;
-  open: boolean;
-  onToggle: () => void;
+  defaultOpen?: boolean;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div>
+    <Collapsible defaultOpen={defaultOpen}>
       <div className="flex items-center gap-1 px-3 py-2">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          className="flex flex-1 items-center gap-1 text-left text-sm font-semibold hover:text-foreground/80"
-        >
-          {open ? (
-            <ChevronDown className="size-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="size-4 text-muted-foreground" />
-          )}
+        <CollapsibleTrigger className="group flex flex-1 items-center gap-1 text-left text-sm font-semibold hover:text-foreground/80">
+          <ChevronRight className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
           {title}
-        </button>
+        </CollapsibleTrigger>
         {action}
       </div>
-      {open && children}
-    </div>
+      <CollapsibleContent>{children}</CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -108,9 +95,6 @@ export function ConversationSidebar({
       ? state.battles[String(state.currentBattle)]
       : undefined;
   const battleChannel = currentBattle?.channel ?? null;
-  const [channelsOpen, setChannelsOpen] = useState(true);
-  const [dmsOpen, setDmsOpen] = useState(true);
-  const [battleOpen, setBattleOpen] = useState(true);
 
   const activeId = active ? convId(active) : null;
 
@@ -123,11 +107,7 @@ export function ConversationSidebar({
   return (
     <nav className="flex w-60 shrink-0 flex-col overflow-auto border-r border-border">
       {currentBattle && battleChannel && (
-        <Section
-          title="Battle"
-          open={battleOpen}
-          onToggle={() => setBattleOpen((v) => !v)}
-        >
+        <Section title="Battle">
           <ul className="flex flex-col gap-0.5 px-2">
             {(() => {
               const desc: ConversationDescriptor = {
@@ -159,8 +139,6 @@ export function ConversationSidebar({
 
       <Section
         title="Channels"
-        open={channelsOpen}
-        onToggle={() => setChannelsOpen((v) => !v)}
         action={
           <Button
             variant="secondary"
@@ -200,8 +178,6 @@ export function ConversationSidebar({
 
       <Section
         title="Direct messages"
-        open={dmsOpen}
-        onToggle={() => setDmsOpen((v) => !v)}
         action={<DmPicker onPick={(peer) => onSelect({ kind: "dm", peer })} />}
       >
         <ul className="flex flex-col gap-0.5 px-2">

@@ -1,7 +1,12 @@
 import { Button } from "@picoframe/frame";
-import { ExternalLink, Play, RotateCcw } from "lucide-react";
+import { ChevronRight, ExternalLink, Play, RotateCcw } from "lucide-react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   evalChunk,
   loadHistory,
@@ -199,17 +204,20 @@ function ReplCellView({ cell }: { cell: ReplCell }) {
         )
       )}
       {cell.diagnostics.length > 0 && (
-        <details className="text-zinc-500">
-          <summary className="cursor-pointer">
+        <Collapsible className="text-zinc-500">
+          <CollapsibleTrigger className="group flex cursor-pointer items-center gap-1 text-left">
+            <ChevronRight className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
             Diagnostics ({cell.diagnostics.length})
-          </summary>
-          <ul className="mt-1 flex flex-col gap-1">
-            {cell.diagnostics.map((d, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: diagnostics are append-only and never reordered
-              <li key={i}>{d}</li>
-            ))}
-          </ul>
-        </details>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <ul className="mt-1 flex flex-col gap-1">
+              {cell.diagnostics.map((d, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: diagnostics are append-only and never reordered
+                <li key={i}>{d}</li>
+              ))}
+            </ul>
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </li>
   );

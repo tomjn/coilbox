@@ -1,9 +1,12 @@
 import { Input } from "@picoframe/frame";
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { ConfigOption, GameItem } from "@/content/bindings";
-import { cn } from "@/lib/utils";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 
 /** Start-position modes we expose (a subset of the engine's `StartPosType`). */
@@ -46,7 +49,6 @@ export function GameOptionsPanel({
   onOptionChange: (key: string, value: string) => void;
   disabled?: boolean;
 }) {
-  const [open, setOpen] = useState(true);
   const changed = options.filter((o) =>
     isChanged(o, optionValues[o.key]),
   ).length;
@@ -57,28 +59,21 @@ export function GameOptionsPanel({
   ].join(" · ");
 
   return (
-    <div className="rounded-lg border border-border/50 bg-card">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-left hover:bg-muted/30"
-      >
+    <Collapsible
+      defaultOpen
+      className="rounded-lg border border-border/50 bg-card"
+    >
+      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-left hover:bg-muted/30">
         <span className="flex min-w-0 items-baseline gap-3">
           <span className="text-sm font-semibold">Game options</span>
           <span className="truncate text-xs text-muted-foreground">
             {summary}
           </span>
         </span>
-        <ChevronDown
-          className={cn(
-            "size-4 shrink-0 text-muted-foreground transition-transform",
-            open && "rotate-180",
-          )}
-        />
-      </button>
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+      </CollapsibleTrigger>
 
-      {open && (
+      <CollapsibleContent>
         <div className="border-t border-border/40 px-4 pb-4 pt-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
@@ -113,8 +108,8 @@ export function GameOptionsPanel({
             </>
           )}
         </div>
-      )}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

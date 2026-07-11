@@ -3,7 +3,6 @@ import { Channel } from "@tauri-apps/api/core";
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   FolderOpen,
   Hammer,
@@ -14,6 +13,11 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   type CompileOpts,
   type CompressionType,
@@ -458,21 +462,16 @@ export default function CompilePage() {
           </Field>
 
           {/* Advanced options: optional maps, height range, compression tuning. */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((v) => !v)}
-              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              {showAdvanced ? (
-                <ChevronDown size={15} />
-              ) : (
-                <ChevronRight size={15} />
-              )}{" "}
+          <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+            <CollapsibleTrigger className="group flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <ChevronRight
+                size={15}
+                className="transition-transform group-data-[state=open]:rotate-90"
+              />{" "}
               Advanced options
               {advancedCount > 0 ? ` (${advancedCount})` : ""}
-            </button>
-            {showAdvanced && (
+            </CollapsibleTrigger>
+            <CollapsibleContent>
               <div className="mt-4">
                 <AdvancedOptions
                   value={advanced}
@@ -481,8 +480,8 @@ export default function CompilePage() {
                   disabled={running}
                 />
               </div>
-            )}
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {heightRangeBad && (
             <Alert variant="warning" className="p-2.5">

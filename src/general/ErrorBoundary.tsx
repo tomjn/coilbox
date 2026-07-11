@@ -1,7 +1,12 @@
 import { Button } from "@picoframe/frame";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ChevronRight } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface Props {
   children: ReactNode;
@@ -47,15 +52,18 @@ export class ErrorBoundary extends Component<Props, State> {
               clears it. If this keeps happening, note what you were doing and
               report it.
             </p>
-            <details className="rounded-md border border-border/50 bg-card p-2">
-              <summary className="cursor-pointer text-xs text-muted-foreground">
+            <Collapsible className="rounded-md border border-border/50 bg-card p-2">
+              <CollapsibleTrigger className="group flex cursor-pointer items-center gap-1 text-left text-xs text-muted-foreground">
+                <ChevronRight className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
                 Error details
-              </summary>
-              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
-                {error.message}
-                {error.stack ? `\n\n${error.stack}` : ""}
-              </pre>
-            </details>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
+                  {error.message}
+                  {error.stack ? `\n\n${error.stack}` : ""}
+                </pre>
+              </CollapsibleContent>
+            </Collapsible>
           </AlertDescription>
         </Alert>
         <Button onClick={() => location.reload()}>Reload</Button>
