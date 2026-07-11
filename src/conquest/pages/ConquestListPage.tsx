@@ -2,6 +2,7 @@ import { Button, Input, useDrawer } from "@picoframe/frame";
 import { ChevronRight, Dices, Orbit, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
@@ -179,7 +180,7 @@ function GalaxyCard({
           : "Not started";
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-border hover:bg-accent/50">
+    <Card className="flex-row items-center gap-3 rounded-lg border-border/50 p-3 shadow-none transition-colors hover:border-border hover:bg-accent/50">
       <Link
         to={`/conquest/${encodeURIComponent(galaxy.id)}`}
         className="flex min-w-0 flex-1 items-center gap-3"
@@ -231,7 +232,7 @@ function GalaxyCard({
           <Trash2 className="size-4 text-muted-foreground" aria-hidden />
         </Button>
       )}
-    </div>
+    </Card>
   );
 }
 

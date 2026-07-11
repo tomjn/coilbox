@@ -1,5 +1,6 @@
 import { useSetting } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
+import { Card } from "@/components/ui/card";
 import { dlInstalledContent } from "../../../downloads/bindings";
 import {
   useContentRootPaths,
@@ -84,7 +85,7 @@ export function GetStartedCard() {
   if (games.length === 0 && maps.length === 0) return null;
 
   return (
-    <section className="space-y-4 rounded-lg border border-border bg-card p-4">
+    <Card className="gap-4 rounded-lg border-border p-4 shadow-none">
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1">
           <h2 className="text-sm font-semibold">Get started</h2>
@@ -119,6 +120,6 @@ export function GetStartedCard() {
           onComplete={refreshInstalled}
         />
       )}
-    </section>
+    </Card>
   );
 }

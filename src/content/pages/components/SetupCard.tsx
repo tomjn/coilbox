@@ -3,6 +3,7 @@ import { Channel } from "@tauri-apps/api/core";
 import { Download, FolderPlus, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { Card } from "@/components/ui/card";
 import type { DownloadProgress } from "../../../downloads/bindings";
 import {
   useDefaultWriteRoot,
@@ -118,7 +119,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
   }
 
   return (
-    <section className="space-y-3 rounded-lg border border-border bg-card p-4">
+    <Card className="gap-3 rounded-lg border-border p-4 shadow-none">
       <div className="space-y-1">
         <h2 className="text-sm font-semibold">Set up Coilbox</h2>
         <p className="text-xs text-muted-foreground">
@@ -206,7 +207,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
           Dismiss
         </button>
       )}
-    </section>
+    </Card>
   );
 }
 

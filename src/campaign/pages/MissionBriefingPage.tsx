@@ -15,6 +15,7 @@ import type { CSSProperties } from "react";
 import { type ReactNode, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card } from "@/components/ui/card";
 import { invalidateMapPreview, invalidateScans } from "../../content/config";
 import { type DownloadProgress, dlDownloadMap } from "../../downloads/bindings";
 import { useWriteRootPath } from "../../downloads/config";
@@ -538,15 +539,15 @@ function PhaseCard({
   // className); dropped entirely when the user prefers a still UI.
   const still = useStillUi();
   return (
-    <div
+    <Card
       className={cn(
-        "flex w-full max-w-md flex-col gap-4 rounded-xl border border-border/50 bg-card/85 p-5 backdrop-blur-sm",
+        "w-full max-w-md gap-4 border-border/50 bg-card/85 p-5 shadow-none backdrop-blur-sm",
         !still && "phase-fade",
         !still && className,
       )}
     >
       {children}
-    </div>
+    </Card>
   );
 }
 
