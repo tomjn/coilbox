@@ -1,5 +1,4 @@
-import { Button, cn, Input } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
+import { Button, Input } from "@picoframe/frame";
 import {
   AlertCircle,
   CheckCircle2,
@@ -7,25 +6,24 @@ import {
   Loader2,
   Map as MapIcon,
   Search,
-  X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { invalidateScans } from "../../content/config";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type BarMap,
-  type DownloadProgress,
   dlBarMaps,
-  dlCancel,
-  dlDownloadFile,
-  dlDownloadMap,
   dlHakoraMaps,
   dlInstalledContent,
   dlSpringfilesList,
   type SpringFile,
 } from "../bindings";
 import { useContentRootPaths, useWriteRootPath } from "../config";
+import {
+  type EnqueueInput,
+  identityOf,
+  useDownloadComplete,
+  useDownloadQueue,
+} from "../DownloadQueueProvider";
 import { OptionSelect } from "./components/OptionSelect";
-import { ProgressBar } from "./components/ProgressBar";
 import { EmptyState, errMessage } from "./components/states";
 
 /** pr-downloader HTTP search endpoint for BAR map files. */
@@ -94,6 +92,7 @@ function springSubtitle(f: SpringFile): string {
 
 export default function MapsPage() {
   const writePath = useWriteRootPath();
+  const { enqueue, statusFor } = useDownloadQueue();
   const [source, setSource] = useState<Source>("bar");
   const [items, setItems] = useState<MapItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -101,17 +100,11 @@ export default function MapsPage() {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name-asc");
   const [limit, setLimit] = useState(PAGE);
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
-    null,
-  );
 
   const load = useCallback(async (src: Source) => {
     setLoading(true);
     setError(null);
     setItems(null);
-    setResult(null);
     try {
       if (src === "bar") {
         const { maps } = await dlBarMaps(undefined);
@@ -184,56 +177,43 @@ export default function MapsPage() {
     refreshInstalled();
   }, [refreshInstalled]);
 
-  // Id of the in-flight download so the Cancel button can stop it. One download
-  // runs at a time (the button is gated on `downloading`), so a single ref holds.
-  const opIdRef = useRef<string | null>(null);
+  // Re-scan installed content once the queue finishes a download so a freshly
+  // fetched map flips to "Already downloaded" without a manual reload. (The queue
+  // runner drops the stale unitsync scan cache itself.)
+  useDownloadComplete(() => {
+    refreshInstalled();
+  });
 
-  async function download(item: MapItem) {
-    // hakora has no springname, so it's fetched directly into `<root>/maps`,
-    // which (unlike pr-downloader) has no default destination.
-    if (item.url && !writePath) return;
-    const opId = crypto.randomUUID();
-    opIdRef.current = opId;
-    setDownloading(item.springName);
-    setProgress(null);
-    setResult(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = (p) => setProgress(p);
-    try {
-      const { message } = item.url
-        ? await dlDownloadFile({
+  // The queue request for a map. hakora rows carry a direct `url` and are fetched
+  // into `<root>/maps` (no default destination, so a write root is required);
+  // everything else goes through pr-downloader by springname. Returns null when a
+  // direct fetch has no destination.
+  const mapInput = useCallback(
+    (item: MapItem): EnqueueInput | null => {
+      if (item.url) {
+        if (!writePath) return null;
+        return {
+          kind: "file",
+          label: item.title,
+          args: {
             url: item.url,
             destDir: `${writePath}/maps`,
             filename: item.filename,
-            opId,
-            onProgress,
-          })
-        : await dlDownloadMap({
-            springName: item.springName,
-            searchUrl: source === "bar" ? BAR_SEARCH_URL : undefined,
-            writePath,
-            opId,
-            onProgress,
-          });
-      setResult({ ok: true, message });
-      await refreshInstalled();
-      // Surface the new map in the singleplayer/battle pickers without a manual
-      // rescan by dropping the stale unitsync scan cache.
-      invalidateScans();
-    } catch (e) {
-      setResult({ ok: false, message: errMessage(e) });
-    } finally {
-      opIdRef.current = null;
-      setDownloading(null);
-      setProgress(null);
-    }
-  }
-
-  // Best-effort: signal the backend to stop the running download. The awaited
-  // `download()` promise then rejects with the "cancelled" message via its catch.
-  function cancelDownload() {
-    if (opIdRef.current) dlCancel({ opId: opIdRef.current }).catch(() => {});
-  }
+          },
+        };
+      }
+      return {
+        kind: "map",
+        label: item.title,
+        args: {
+          springName: item.springName,
+          searchUrl: source === "bar" ? BAR_SEARCH_URL : undefined,
+          writePath,
+        },
+      };
+    },
+    [writePath, source],
+  );
 
   const filtered = useMemo(() => {
     if (!items) return null;
@@ -366,6 +346,8 @@ export default function MapsPage() {
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
             {visible?.map((it) => {
               const isInstalled = installed.has(it.filename.toLowerCase());
+              const input = mapInput(it);
+              const status = input ? statusFor(identityOf(input)) : null;
               return (
                 <li
                   key={it.springName}
@@ -405,11 +387,13 @@ export default function MapsPage() {
                       variant="outline"
                       size="sm"
                       className="mt-auto w-full"
-                      onClick={() => download(it)}
+                      onClick={() => input && enqueue(input)}
                       disabled={
-                        downloading !== null ||
+                        !input ||
                         isInstalled ||
-                        (!!it.url && !writePath)
+                        status === "queued" ||
+                        status === "active" ||
+                        status === "done"
                       }
                       aria-label={
                         isInstalled
@@ -417,34 +401,23 @@ export default function MapsPage() {
                           : `Download ${it.title}`
                       }
                     >
-                      {downloading === it.springName ? (
+                      {status === "active" ? (
                         <Loader2 className="animate-spin" />
-                      ) : isInstalled ? (
+                      ) : isInstalled || status === "done" ? (
                         <CheckCircle2 className="text-emerald-500" />
                       ) : (
                         <Download />
                       )}
-                      {downloading === it.springName
-                        ? "Downloading…"
-                        : isInstalled
-                          ? "Already downloaded"
-                          : "Download"}
+                      {isInstalled
+                        ? "Already downloaded"
+                        : status === "active"
+                          ? "Downloading…"
+                          : status === "queued"
+                            ? "Queued"
+                            : status === "done"
+                              ? "Done"
+                              : "Add to queue"}
                     </Button>
-                    {downloading === it.springName && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full"
-                        onClick={cancelDownload}
-                        aria-label={`Cancel downloading ${it.title}`}
-                      >
-                        <X />
-                        Cancel
-                      </Button>
-                    )}
-                    {downloading === it.springName && progress && (
-                      <ProgressBar progress={progress} className="mt-2" />
-                    )}
                   </div>
                 </li>
               );
@@ -463,27 +436,6 @@ export default function MapsPage() {
           </div>
         )}
       </div>
-
-      {result && (
-        <div
-          className={cn(
-            "flex items-start gap-2 border-t px-6 py-3 text-sm",
-            result.ok
-              ? "border-border bg-card text-card-foreground"
-              : "border-destructive/40 bg-destructive/10 text-destructive",
-          )}
-        >
-          {result.ok ? (
-            <CheckCircle2
-              size={16}
-              className="mt-px shrink-0 text-emerald-500"
-            />
-          ) : (
-            <AlertCircle size={16} className="mt-px shrink-0" />
-          )}
-          <span className="min-w-0 break-words">{result.message}</span>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,18 +1,14 @@
-import { Button, cn } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
+import { Button } from "@picoframe/frame";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { contentRescan } from "../../../content/bindings";
-import {
-  type DownloadProgress,
-  dlDownloadEngineSpring,
-  dlRecoilEngines,
-  dlSpringfilesEngines,
-} from "../../bindings";
+import { dlRecoilEngines, dlSpringfilesEngines } from "../../bindings";
 import { useWriteRootPath } from "../../config";
-import { installRecoil } from "../../engineInstall";
+import {
+  type EnqueueInput,
+  identityOf,
+  useDownloadQueue,
+} from "../../DownloadQueueProvider";
 import { OptionSelect } from "./OptionSelect";
-import { ProgressBar } from "./ProgressBar";
 import { errMessage } from "./states";
 
 /** Human-readable byte size for engine archives. */
@@ -47,22 +43,17 @@ interface EngineItem {
  */
 export function EngineInstaller() {
   const writePath = useWriteRootPath();
+  const { enqueue, statusFor } = useDownloadQueue();
   const [source, setSource] = useState<Source>("recoil");
   const [items, setItems] = useState<EngineItem[] | null>(null);
   const [platform, setPlatform] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
-    null,
-  );
 
   const load = useCallback(async (src: Source) => {
     setLoading(true);
     setError(null);
     setItems(null);
-    setResult(null);
     try {
       if (src === "recoil") {
         const res = await dlRecoilEngines(undefined);
@@ -98,47 +89,31 @@ export function EngineInstaller() {
     load(source);
   }, [source, load]);
 
-  async function download(item: EngineItem) {
-    if (!writePath) return;
-    setDownloading(item.key);
-    setProgress(null);
-    setResult(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = (p) => setProgress(p);
-    try {
+  // The queue request for an engine. Recoil builds carry a 7z asset URL; both
+  // land in `<root>/engine/` and trigger a content rescan on completion (run by
+  // the queue runner). Returns null when no destination is configured.
+  const engineInput = useCallback(
+    (item: EngineItem): EnqueueInput | null => {
+      if (!writePath) return null;
       if (source === "recoil") {
-        const message = await installRecoil(
-          {
+        return {
+          kind: "engineRecoil",
+          label: `Engine ${item.title}`,
+          args: {
             version: item.key,
             assetUrl: item.assetUrl ?? "",
-            size: 0,
-            prerelease: !!item.prerelease,
+            writePath,
           },
-          writePath,
-          onProgress,
-        );
-        setResult({ ok: true, message });
-      } else {
-        const { message } = await dlDownloadEngineSpring({
-          version: item.key,
-          writePath,
-          onProgress,
-        });
-        setResult({ ok: true, message });
-        // Rescan content so the freshly-installed engine appears in the list above.
-        try {
-          await contentRescan(undefined);
-        } catch {
-          // non-fatal: the engine is installed, the list just won't auto-refresh
-        }
+        };
       }
-    } catch (e) {
-      setResult({ ok: false, message: errMessage(e) });
-    } finally {
-      setDownloading(null);
-      setProgress(null);
-    }
-  }
+      return {
+        kind: "engineSpring",
+        label: `Engine ${item.title}`,
+        args: { version: item.key, writePath },
+      };
+    },
+    [writePath, source],
+  );
 
   return (
     <section className="space-y-3 border-t border-border pt-5">
@@ -184,74 +159,67 @@ export function EngineInstaller() {
       )}
       {items && items.length > 0 && (
         <ul className="max-h-80 divide-y divide-border overflow-auto rounded-md border border-border">
-          {items.map((item) => (
-            <li key={item.key} className="flex flex-col gap-2 px-4 py-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {item.title}
-                    {item.prerelease && (
-                      <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-                        pre-release
-                      </span>
+          {items.map((item) => {
+            const input = engineInput(item);
+            const status = input ? statusFor(identityOf(input)) : null;
+            return (
+              <li key={item.key} className="flex flex-col gap-2 px-4 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {item.title}
+                      {item.prerelease && (
+                        <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
+                          pre-release
+                        </span>
+                      )}
+                    </p>
+                    {item.detail && (
+                      <p
+                        className="truncate font-mono text-xs text-muted-foreground"
+                        title={item.detail}
+                      >
+                        {item.detail}
+                      </p>
                     )}
-                  </p>
-                  {item.detail && (
-                    <p
-                      className="truncate font-mono text-xs text-muted-foreground"
-                      title={item.detail}
-                    >
-                      {item.detail}
-                    </p>
-                  )}
-                  {item.subtitle && (
-                    <p className="text-xs text-muted-foreground">
-                      {item.subtitle}
-                    </p>
-                  )}
+                    {item.subtitle && (
+                      <p className="text-xs text-muted-foreground">
+                        {item.subtitle}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => input && enqueue(input)}
+                    disabled={
+                      !input ||
+                      status === "queued" ||
+                      status === "active" ||
+                      status === "done"
+                    }
+                    aria-label={`Download engine ${item.title}`}
+                  >
+                    {status === "active" ? (
+                      <Loader2 className="animate-spin" />
+                    ) : status === "done" ? (
+                      <CheckCircle2 className="text-emerald-500" />
+                    ) : (
+                      <Download />
+                    )}
+                    {status === "active"
+                      ? "Installing…"
+                      : status === "queued"
+                        ? "Queued"
+                        : status === "done"
+                          ? "Done"
+                          : "Add to queue"}
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => download(item)}
-                  disabled={downloading !== null || !writePath}
-                  aria-label={`Download engine ${item.title}`}
-                >
-                  {downloading === item.key ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Download />
-                  )}
-                  {downloading === item.key ? "Installing…" : "Download"}
-                </Button>
-              </div>
-              {downloading === item.key && progress && (
-                <ProgressBar progress={progress} />
-              )}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
-      )}
-
-      {result && (
-        <div
-          className={cn(
-            "flex items-start gap-2 rounded-md border px-3 py-2 text-sm",
-            result.ok
-              ? "border-border bg-card text-card-foreground"
-              : "border-destructive/40 bg-destructive/10 text-destructive",
-          )}
-        >
-          {result.ok ? (
-            <CheckCircle2
-              size={16}
-              className="mt-px shrink-0 text-emerald-500"
-            />
-          ) : (
-            <AlertCircle size={16} className="mt-px shrink-0" />
-          )}
-          <span className="min-w-0 break-words">{result.message}</span>
-        </div>
       )}
     </section>
   );
