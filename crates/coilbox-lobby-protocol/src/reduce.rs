@@ -323,11 +323,29 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                 },
             )
         }
+        ServerMessage::SaidPrivateEx { username, message } => {
+            // Private action / `/me`. Same self-echo guard as SaidPrivate: our own
+            // outbound action is recorded locally on send.
+            if state.my_username.as_deref() == Some(username.as_str()) {
+                return vec![];
+            }
+            push_dm(
+                state,
+                &username,
+                ChatMsg {
+                    channel: None,
+                    from: username.clone(),
+                    text: message,
+                    kind: ChatKind::SaidEx,
+                    at: now_ms,
+                },
+            )
+        }
         ServerMessage::SaidBattle { username, message } => {
             reduce_battle_chat(state, username, message, ChatKind::SaidBattle, now_ms)
         }
         ServerMessage::SaidBattleEx { username, message } => {
-            reduce_battle_chat(state, username, message, ChatKind::SaidBattle, now_ms)
+            reduce_battle_chat(state, username, message, ChatKind::SaidEx, now_ms)
         }
         ServerMessage::BattleOpened {
             id,
@@ -728,12 +746,15 @@ fn push_dm(state: &mut LobbyState, peer: &str, msg: ChatMsg) -> Vec<Delta> {
 }
 
 /// Record a private message WE sent to `peer`. The server does not echo
-/// `SAYPRIVATE`, so the plugin calls this so the sent line appears in the thread.
-/// `from` is our own username (falls back to empty if not yet logged in).
+/// `SAYPRIVATE`/`SAYPRIVATEEX` back to us in a form we parse, so the plugin calls
+/// this so the sent line appears in the thread. `kind` is `Private` for a normal
+/// message or `SaidEx` for a `/me` action. `from` is our own username (falls back
+/// to empty if not yet logged in).
 pub fn record_outgoing_private(
     state: &mut LobbyState,
     peer: &str,
     text: &str,
+    kind: ChatKind,
     now_ms: u64,
 ) -> Vec<Delta> {
     let me = state.my_username.clone().unwrap_or_default();
@@ -744,7 +765,7 @@ pub fn record_outgoing_private(
             channel: None,
             from: me,
             text: text.to_string(),
-            kind: ChatKind::Private,
+            kind,
             at: now_ms,
         },
     )
@@ -1231,13 +1252,60 @@ mod tests {
     fn outgoing_private_recorded_under_peer_from_me() {
         let mut s = LobbyState::new();
         s.my_username = Some("me".into());
-        let d = record_outgoing_private(&mut s, "bob", "yo bob", 777);
+        let d = record_outgoing_private(&mut s, "bob", "yo bob", ChatKind::Private, 777);
         assert_eq!(d, vec![Delta::PrivateMessage { from: "bob".into() }]);
         let thread = &s.dms["bob"];
         assert_eq!(thread.len(), 1);
         assert_eq!(thread[0].from, "me");
         assert_eq!(thread[0].text, "yo bob");
+        assert_eq!(thread[0].kind, ChatKind::Private);
         assert_eq!(thread[0].at, 777);
+    }
+
+    #[test]
+    fn outgoing_private_action_recorded_as_emote() {
+        let mut s = LobbyState::new();
+        s.my_username = Some("me".into());
+        let d = record_outgoing_private(&mut s, "bob", "waves", ChatKind::SaidEx, 777);
+        assert_eq!(d, vec![Delta::PrivateMessage { from: "bob".into() }]);
+        let thread = &s.dms["bob"];
+        assert_eq!(thread[0].from, "me");
+        assert_eq!(thread[0].text, "waves");
+        assert_eq!(thread[0].kind, ChatKind::SaidEx);
+    }
+
+    #[test]
+    fn incoming_private_action_stored_as_emote() {
+        let mut s = LobbyState::new();
+        s.my_username = Some("me".into());
+        let d = reduce_at(&mut s, parse_line("SAIDPRIVATEEX bob waves at you"), 500);
+        assert_eq!(d, vec![Delta::PrivateMessage { from: "bob".into() }]);
+        let thread = &s.dms["bob"];
+        assert_eq!(thread.len(), 1);
+        assert_eq!(thread[0].from, "bob");
+        assert_eq!(thread[0].text, "waves at you");
+        assert_eq!(thread[0].kind, ChatKind::SaidEx);
+    }
+
+    #[test]
+    fn battle_action_stored_as_emote() {
+        let mut s = LobbyState::new();
+        s.my_username = Some("me".into());
+        s.battles.insert(
+            1,
+            Battle {
+                id: 1,
+                channel: Some("battlechan".into()),
+                ..Default::default()
+            },
+        );
+        s.current_battle = Some(1);
+        reduce_at(&mut s, parse_line("SAIDBATTLEEX bob waves"), 500);
+        let msgs = &s.channels["battlechan"].messages;
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0].from, "bob");
+        assert_eq!(msgs[0].text, "waves");
+        assert_eq!(msgs[0].kind, ChatKind::SaidEx);
     }
 
     #[test]

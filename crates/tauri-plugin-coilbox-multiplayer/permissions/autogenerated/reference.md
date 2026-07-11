@@ -15,6 +15,9 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-say`
 - `allow-mp-say-private`
 - `allow-mp-say-battle`
+- `allow-mp-say-ex`
+- `allow-mp-say-battle-ex`
+- `allow-mp-say-private-ex`
 - `allow-mp-join-channel`
 - `allow-mp-leave-channel`
 - `allow-mp-list-channels`
@@ -728,6 +731,58 @@ Denies the mp_say_battle command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-multiplayer:allow-mp-say-battle-ex`
+
+</td>
+<td>
+
+Enables the mp_say_battle_ex command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-say-battle-ex`
+
+</td>
+<td>
+
+Denies the mp_say_battle_ex command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-say-ex`
+
+</td>
+<td>
+
+Enables the mp_say_ex command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-say-ex`
+
+</td>
+<td>
+
+Denies the mp_say_ex command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-multiplayer:allow-mp-say-private`
 
 </td>
@@ -747,6 +802,32 @@ Enables the mp_say_private command without any pre-configured scope.
 <td>
 
 Denies the mp_say_private command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-say-private-ex`
+
+</td>
+<td>
+
+Enables the mp_say_private_ex command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-say-private-ex`
+
+</td>
+<td>
+
+Denies the mp_say_private_ex command without any pre-configured scope.
 
 </td>
 </tr>

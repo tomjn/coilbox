@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-say-battle-ex"
+description = "Enables the mp_say_battle_ex command without any pre-configured scope."
+commands.allow = ["mp_say_battle_ex"]
+
+[[permission]]
+identifier = "deny-mp-say-battle-ex"
+description = "Denies the mp_say_battle_ex command without any pre-configured scope."
+commands.deny = ["mp_say_battle_ex"]

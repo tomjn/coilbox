@@ -1,6 +1,13 @@
 import { useCallback, useMemo } from "react";
 import type { ChatMsg, User } from "../bindings";
-import { mpSay, mpSayBattle, mpSayPrivate } from "../bindings";
+import {
+  mpSay,
+  mpSayBattle,
+  mpSayBattleEx,
+  mpSayEx,
+  mpSayPrivate,
+  mpSayPrivateEx,
+} from "../bindings";
 import { useMultiplayer } from "../store";
 import {
   type ConversationDescriptor,
@@ -42,6 +49,28 @@ export function useConversation(
     async (text: string) => {
       const trimmed = text.trim();
       if (!activeKey || !desc || !trimmed) return;
+      // `/me <text>` is an IRC-style action: strip the prefix and route to the
+      // EX (action) wire command. Bare `/me` with no body is a no-op.
+      const action = trimmed.match(/^\/me\s+(.+)$/s);
+      if (action) {
+        const body = action[1];
+        if (desc.kind === "channel") {
+          await mpSayEx({
+            serverKey: activeKey,
+            channel: desc.name,
+            message: body,
+          });
+        } else if (desc.kind === "battle") {
+          await mpSayBattleEx({ serverKey: activeKey, message: body });
+        } else {
+          await mpSayPrivateEx({
+            serverKey: activeKey,
+            username: desc.peer,
+            message: body,
+          });
+        }
+        return;
+      }
       if (desc.kind === "channel") {
         await mpSay({
           serverKey: activeKey,
