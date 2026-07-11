@@ -72,7 +72,7 @@ function SidecarWarning() {
  * Shared by the Browse Rapid page and the Games page's rapid source.
  */
 export function RapidBrowser({ writePath }: { writePath?: string }) {
-  const { enqueue, statusFor } = useDownloadQueue();
+  const { enqueue, statusFor, active } = useDownloadQueue();
   const [cfg] = useDownloadsConfig();
   const [masterUrl, setMasterUrl] = useState(
     () => cfg.rapidRepos[0]?.url ?? DEFAULT_MASTER,
@@ -361,7 +361,9 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                                 ? "Queued"
                                 : status === "done"
                                   ? "Done"
-                                  : "Add to queue"}
+                                  : active
+                                    ? "Add to queue"
+                                    : "Download"}
                           </Button>
                         </div>
                       </li>
