@@ -38,3 +38,13 @@ serde_json = "1"
 # yet merged to the fork's default branch. Capture targets Coilbox's own window
 # (by PID/window id) rather than whatever is frontmost.
 tauri-plugin-mcp = { git = "https://github.com/tomjn/tauri-plugin-mcp", branch = "fix/screenshot-by-window-id" }
+
+# Job Object API: confine spawned sidecars so they die with us and can't hold
+# their .exe locked during a Windows NSIS update (see src/win_job.rs).
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+] }
