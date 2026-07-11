@@ -86,6 +86,25 @@ export function StartBoxEditor({
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
 
+  // Optimistic hold: keep showing a just-committed rect until the server echoes it
+  // back into `rects`, so the box doesn't flash to its previous size for one
+  // round-trip between pointer-up and the ADDSTARTRECT / `!addbox` echo. Any
+  // incoming `rects` update is the server's latest word, so it clears the hold
+  // (covering edits, clears and rejections alike); the timer is a backstop for an
+  // edit the server never echoes.
+  const [optimistic, setOptimistic] = useState<Record<string, StartRect>>({});
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally keyed on `rects` changing (the server's latest word) to drop the hold; the body reads none of it.
+  useEffect(() => {
+    setOptimistic((o) => (Object.keys(o).length ? {} : o));
+  }, [rects]);
+  useEffect(
+    () => () => {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+    },
+    [],
+  );
+
   // Pointer client px → grid point, relative to the aspect-correct surface.
   const gridPoint = useCallback(
     (e: { clientX: number; clientY: number }): Point => {
@@ -113,7 +132,12 @@ export function StartBoxEditor({
       setDrag((d) => {
         if (d) {
           const rect = finaliseBox(boxOf(d));
-          if (rect) onCommit(d.ally, rect);
+          if (rect) {
+            setOptimistic((o) => ({ ...o, [String(d.ally)]: rect }));
+            if (holdTimer.current) clearTimeout(holdTimer.current);
+            holdTimer.current = setTimeout(() => setOptimistic({}), 6000);
+            onCommit(d.ally, rect);
+          }
         }
         return null;
       });
@@ -155,8 +179,11 @@ export function StartBoxEditor({
   const dragAlly = drag?.ally ?? null;
   const preview = drag ? normaliseBox(boxOf(drag)) : null;
 
+  // Confirmed rects, with any optimistic (just-committed, echo-pending) rect layered
+  // on top so a fresh edit shows immediately without the round-trip flash.
+  const merged: Record<string, StartRect> = { ...rects, ...optimistic };
   const boxes: { ally: number; rect: StartRect }[] = [];
-  for (const [ally, r] of Object.entries(rects)) {
+  for (const [ally, r] of Object.entries(merged)) {
     const i = Number(ally);
     if (i === dragAlly) continue; // shown as the live preview instead
     boxes.push({ ally: i, rect: r });
