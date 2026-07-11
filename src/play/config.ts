@@ -21,6 +21,7 @@ export {
   PALETTE,
   resolveAi,
   rgbToHex,
+  sanitizeColors,
   toBattleConfig,
 } from "./participants";
 

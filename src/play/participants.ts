@@ -1,3 +1,4 @@
+import { isBlackHex, pickTeamColorHex } from "@/lib/teamColor";
 import type { SkirmishAi } from "../content/bindings";
 import type { BattleConfig } from "./bindings";
 
@@ -112,10 +113,50 @@ export function makeAiParticipant(
     name: `AI ${aiCount + 1}`,
     ai,
     side: defaultSide,
-    color: PALETTE[existing.length % PALETTE.length],
+    // Prefer the palette, but skip colours already taken (and never black), then
+    // bridge hex -> play's float RGB (never the lobby's 0xBBGGRR int).
+    color: hexToRgb(
+      pickTeamColorHex({
+        used: existing.map((p) => rgbToHex(p.color)),
+        palette: PALETTE.map(rgbToHex),
+      }),
+    ),
     allyTeam: 1,
     spectator: false,
   };
+}
+
+/**
+ * Replace any black/invalid participant colour with a distinct, non-black pick,
+ * so a stale persisted draft (or older seeding) never shows a player as black.
+ * The "you" row is seeded from the `remembered` colour when its own colour is
+ * black/invalid; a valid draft colour is kept untouched. Colours already valid on
+ * other rows are preserved and count as taken so heals stay distinct. Returns the
+ * same array reference when nothing needed healing. Hex core -> play float RGB.
+ */
+export function sanitizeColors(
+  participants: Participant[],
+  remembered?: string,
+): Participant[] {
+  const palette = PALETTE.map(rgbToHex);
+  const used: string[] = [];
+  let changed = false;
+  const next = participants.map((p) => {
+    const hex = rgbToHex(p.color);
+    if (!isBlackHex(hex)) {
+      used.push(hex);
+      return p;
+    }
+    const pick = pickTeamColorHex({
+      remembered: p.kind === "you" ? remembered : undefined,
+      used,
+      palette,
+    });
+    used.push(pick);
+    changed = true;
+    return { ...p, color: hexToRgb(pick) };
+  });
+  return changed ? next : participants;
 }
 
 /** `#rrggbb` -> RGB in 0..1. */
