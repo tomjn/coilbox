@@ -56,6 +56,7 @@ export function MemberRow({
   editable,
   control,
   showActions,
+  flashIngame,
   sideOptions,
   teamOptions,
   allyOptions,
@@ -68,6 +69,8 @@ export function MemberRow({
   editable: boolean;
   control?: MemberControls | null;
   showActions: boolean;
+  /** Briefly highlight this row because the player just launched the game. */
+  flashIngame?: boolean;
   sideOptions: { value: string; label: string }[];
   teamOptions: { value: string; label: string }[];
   allyOptions: { value: string; label: string }[];
@@ -98,7 +101,9 @@ export function MemberRow({
     editable ? onColor(hex) : control?.onForceColor(hex);
 
   return (
-    <tr className="border-t border-border/40">
+    <tr
+      className={cn("border-t border-border/40", flashIngame && "ingame-flash")}
+    >
       <td className="px-3 py-2">
         <div className="flex items-center justify-center gap-1.5">
           <ReadyIcon row={row} />

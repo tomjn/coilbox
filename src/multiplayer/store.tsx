@@ -27,6 +27,7 @@ import {
   mpSnapshot,
 } from "./bindings";
 import { conversationCounts } from "./chat/conversation";
+import { triggerIngameCue } from "./ingameCue";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
 import { VerificationCodeDialog } from "./VerificationCodeDialog";
@@ -220,6 +221,13 @@ interface MultiplayerContextValue {
   openLoginPopover: () => void;
   /** Close the topbar login/status popover. */
   closeLoginPopover: () => void;
+  /**
+   * Names of players who *just* transitioned to in-game, held transiently (~2.5s)
+   * off each `playerWentIngame` delta so a battle/player row can briefly flash as
+   * someone launches. This is a fleeting cue, not persisted status (the steady
+   * in-game bit lives in `mirror.state.users[name].status.ingame`).
+   */
+  justWentIngame: ReadonlySet<string>;
 }
 
 const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
@@ -244,6 +252,19 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // queued (never dropped) rather than overwriting each other; the dialog shows the
   // front and dismissing pops it.
   const [serverMsgBoxes, setServerMsgBoxes] = useState<string[]>([]);
+
+  // Transient "just launched the game" set, populated off `playerWentIngame`
+  // deltas and drained per-name after a short delay, so battle rows can flash as a
+  // player goes in-game. `stateRef` mirrors the latest snapshot so the frozen
+  // event handler (openChannel is `useCallback(..., [])`) can read current battle /
+  // founder to decide whether the launcher is our battle's host.
+  const [ingameFlash, setIngameFlash] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const stateRef = useRef<LobbyState | null>(null);
+  useEffect(() => {
+    stateRef.current = mirror.state;
+  }, [mirror.state]);
 
   // One-way "has ever connected this session" latch driving Chat/Battles sidebar
   // visibility. Set on any transition to connected (fresh connect or reload
@@ -350,6 +371,31 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // An autohost `!ring` is a transient event, not state - react to it directly
         // (gong + reverberation + taskbar flash) rather than through the snapshot.
         if (d.kind === "ring") triggerRing(d.from);
+        // A player transitioning to in-game is a transient moment, not just the
+        // resulting status (which the snapshot already carries). Flash the launcher's
+        // row briefly for everyone; when it's the founder of the battle we're in (and
+        // not ourselves), also fire the softer "it's starting, get in" cue - the host
+        // launching is the actionable "everyone's waiting on one person" case.
+        else if (d.kind === "playerWentIngame") {
+          const name = d.name;
+          setIngameFlash((prev) => new Set(prev).add(name));
+          window.setTimeout(() => {
+            setIngameFlash((prev) => {
+              if (!prev.has(name)) return prev;
+              const next = new Set(prev);
+              next.delete(name);
+              return next;
+            });
+          }, 2500);
+          const st = stateRef.current;
+          const battle =
+            st?.currentBattle != null
+              ? st.battles[String(st.currentBattle)]
+              : undefined;
+          if (battle && battle.host === name && st?.myUsername !== name) {
+            triggerIngameCue(name);
+          }
+        }
         // Server refusals are one-off error events with nothing to re-render, so
         // surface them as non-blocking error toasts (routed to an OS banner when
         // unfocused). The raw FAILED/JOINFAILED line is already in the lobby
@@ -593,6 +639,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         loginPopoverOpen,
         openLoginPopover,
         closeLoginPopover,
+        justWentIngame: ingameFlash,
       }}
     >
       {children}
