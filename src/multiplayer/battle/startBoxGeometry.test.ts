@@ -4,6 +4,7 @@ import {
   clampGrid,
   finaliseBox,
   GRID,
+  MIN_BOX,
   moveBox,
   normaliseBox,
   pxToGrid,
@@ -68,6 +69,24 @@ describe("startBoxGeometry", () => {
     expect(resizeBox(b, ["left"], { x: 5, y: 999 })).toEqual({
       left: 5,
       top: 20,
+      right: 80,
+      bottom: 80,
+    });
+  });
+
+  it("clamps a dragged edge against its opposite so the box can't invert", () => {
+    const b = { left: 20, top: 20, right: 80, bottom: 80 };
+    // Right edge dragged left past the left edge stops MIN_BOX short of it.
+    expect(resizeBox(b, ["right"], { x: 0, y: 50 })).toEqual({
+      left: 20,
+      top: 20,
+      right: 20 + MIN_BOX,
+      bottom: 80,
+    });
+    // Top edge dragged below the bottom edge stops MIN_BOX short of it.
+    expect(resizeBox(b, ["top"], { x: 50, y: 200 })).toEqual({
+      left: 20,
+      top: 80 - MIN_BOX,
       right: 80,
       bottom: 80,
     });

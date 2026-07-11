@@ -93,7 +93,7 @@ function springSubtitle(f: SpringFile): string {
 
 export default function MapsPage() {
   const writePath = useWriteRootPath();
-  const { enqueue, statusFor } = useDownloadQueue();
+  const { enqueue, statusFor, active } = useDownloadQueue();
   const [source, setSource] = useState<Source>("bar");
   const [items, setItems] = useState<MapItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -419,7 +419,9 @@ export default function MapsPage() {
                             ? "Queued"
                             : status === "done"
                               ? "Done"
-                              : "Add to queue"}
+                              : active
+                                ? "Add to queue"
+                                : "Download"}
                     </Button>
                   </div>
                 </li>

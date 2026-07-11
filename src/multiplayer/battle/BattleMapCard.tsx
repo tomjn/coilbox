@@ -1,6 +1,5 @@
 import { Button } from "@picoframe/frame";
 import { useEffect, useState } from "react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { MapItem } from "@/content/bindings";
 import {
   useUnitsyncMapInfo,
@@ -33,7 +32,6 @@ export function BattleMapCard({
   startPosType,
   selfHost,
   canEditBoxes,
-  hostCanEdit,
   onSetBox,
   onClearBox,
   onSuggestMap,
@@ -52,8 +50,6 @@ export function BattleMapCard({
   selfHost: boolean;
   /** Host may draw/clear boxes (host privilege AND choose-in-game mode). */
   canEditBoxes: boolean;
-  /** Host may edit options at all — drives the "enable box mode" hint below. */
-  hostCanEdit: boolean;
   /** Commit one ally's box (0-based) on drag release. */
   onSetBox: (ally: number, rect: StartRect) => void;
   /** Clear one ally's box (0-based). */
@@ -148,6 +144,7 @@ export function BattleMapCard({
               : "Change map"
             : "Suggest map"
         }
+        overlayInteractive={canEditBoxes}
         overlay={
           canEditBoxes ? (
             <StartBoxEditor
@@ -215,15 +212,6 @@ export function BattleMapCard({
             Clear ally {allyLetter(activeAlly)}
           </Button>
         </div>
-      )}
-
-      {!canEditBoxes && hostCanEdit && (
-        <Alert variant="warning" className="px-3 py-2">
-          <AlertDescription className="text-xs">
-            Start boxes need the "Choose in-game" start-position mode — set it
-            in Battle options to draw them.
-          </AlertDescription>
-        </Alert>
       )}
     </div>
   );

@@ -63,13 +63,19 @@ export function moveBox(b: StartRect, dx: number, dy: number): StartRect {
   return { left, top, right: left + w, bottom: top + h };
 }
 
-/** Move the given `edges` of a box to a grid point (resize gesture, unordered). */
+/**
+ * Move the given `edges` of a box to a grid point (resize gesture). Each dragged
+ * edge is clamped against its (fixed) opposite edge, keeping a `MIN_BOX` gap, so a
+ * handle can't cross to the far side and invert/mirror the box.
+ */
 export function resizeBox(b: StartRect, edges: Edge[], p: Point): StartRect {
   return {
-    left: edges.includes("left") ? p.x : b.left,
-    right: edges.includes("right") ? p.x : b.right,
-    top: edges.includes("top") ? p.y : b.top,
-    bottom: edges.includes("bottom") ? p.y : b.bottom,
+    left: edges.includes("left") ? Math.min(p.x, b.right - MIN_BOX) : b.left,
+    right: edges.includes("right") ? Math.max(p.x, b.left + MIN_BOX) : b.right,
+    top: edges.includes("top") ? Math.min(p.y, b.bottom - MIN_BOX) : b.top,
+    bottom: edges.includes("bottom")
+      ? Math.max(p.y, b.top + MIN_BOX)
+      : b.bottom,
   };
 }
 

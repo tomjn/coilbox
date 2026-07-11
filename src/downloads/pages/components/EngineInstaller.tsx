@@ -44,7 +44,7 @@ interface EngineItem {
  */
 export function EngineInstaller() {
   const writePath = useWriteRootPath();
-  const { enqueue, statusFor } = useDownloadQueue();
+  const { enqueue, statusFor, active } = useDownloadQueue();
   const [source, setSource] = useState<Source>("recoil");
   const [items, setItems] = useState<EngineItem[] | null>(null);
   const [platform, setPlatform] = useState("");
@@ -216,7 +216,9 @@ export function EngineInstaller() {
                         ? "Queued"
                         : status === "done"
                           ? "Done"
-                          : "Add to queue"}
+                          : active
+                            ? "Add to queue"
+                            : "Install"}
                   </Button>
                 </div>
               </li>

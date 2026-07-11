@@ -160,7 +160,6 @@ function BattleRoomPage() {
             startPosType={room.startPosType}
             selfHost={room.selfHost}
             canEditBoxes={room.canEditBoxes}
-            hostCanEdit={room.canEditOptions}
             onSetBox={room.setStartBox}
             onClearBox={room.clearStartBox}
             onSuggestMap={room.suggestMap}
@@ -174,7 +173,9 @@ function BattleRoomPage() {
             gameName={battle.modname}
           />
           <StartPosOptions
-            value={room.startPosType}
+            battle={battle}
+            canEdit={room.canEditOptions}
+            sendOption={room.sendOption}
             note={
               room.startPosType === 2 &&
               Object.keys(battle.startRects).length === 0

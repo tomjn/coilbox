@@ -38,6 +38,7 @@ export function MissionMapBackground({
           chrome={false}
           interactive={false}
           showSky
+          showClouds={false}
           forceWireframe={wireframe}
           autoSpin={clampSpin(config.spinSpeed)}
           initialWater={config.water}
@@ -87,6 +88,7 @@ export function MissionMapSideGraphic({
       enableZoom={false}
       enablePan={false}
       showSky={false}
+      showClouds={false}
       skyboxSrc={null}
       forceWireframe={wireframe}
       autoSpin={clampSpin(config.spinSpeed)}
