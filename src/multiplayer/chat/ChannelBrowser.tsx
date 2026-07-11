@@ -83,10 +83,15 @@ export function ChannelBrowser({
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold">Browse channels</h2>
           <div className="flex items-center gap-1">
-            <Button className="h-7 px-2" onClick={refresh}>
+            <Button variant="secondary" className="h-7 px-2" onClick={refresh}>
               Refresh
             </Button>
-            <Button className="h-7 px-2" onClick={onClose} aria-label="Close">
+            <Button
+              variant="secondary"
+              className="h-7 px-2"
+              onClick={onClose}
+              aria-label="Close"
+            >
               <X className="size-4" />
             </Button>
           </div>

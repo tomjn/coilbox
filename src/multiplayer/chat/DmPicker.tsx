@@ -83,11 +83,11 @@ export function DmPicker({ onPick }: { onPick: (username: string) => void }) {
                     className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
                     title={meta.label}
                   >
+                    {presence !== "online" && meta.label}
                     <span
                       aria-hidden
                       className={cn("size-2 rounded-full", meta.dotClass)}
                     />
-                    {presence !== "online" && meta.label}
                   </span>
                 </button>
               </li>
