@@ -159,6 +159,10 @@ function BattleRoomPage() {
             mapMissing={room.mapMissing}
             startPosType={room.startPosType}
             selfHost={room.selfHost}
+            canEditBoxes={room.canEditBoxes}
+            hostCanEdit={room.canEditOptions}
+            onSetBox={room.setStartBox}
+            onClearBox={room.clearStartBox}
             onSuggestMap={room.suggestMap}
             onChangeMap={room.setMap}
             onRescan={room.rescan}
