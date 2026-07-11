@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { AlertCircle, FolderPlus, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDefaultWriteRoot } from "../../downloads/config";
 import {
   type ContentState,
@@ -228,8 +229,8 @@ export default function FoldersSection() {
 
         {loading && !state ? (
           <div className="flex flex-col gap-3">
-            <div className="h-32 animate-pulse rounded-lg border border-border/50 bg-card" />
-            <div className="h-32 animate-pulse rounded-lg border border-border/50 bg-card" />
+            <Skeleton className="h-32 rounded-lg border border-border/50 bg-card" />
+            <Skeleton className="h-32 rounded-lg border border-border/50 bg-card" />
           </div>
         ) : roots.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-10 text-center">

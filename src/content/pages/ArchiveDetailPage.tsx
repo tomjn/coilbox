@@ -3,6 +3,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { ArrowLeft, FolderOpen, Terminal } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   type Archive,
   contentOpenPath,
@@ -216,7 +217,7 @@ export default function ArchiveDetailPage() {
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(14rem,20rem)_1fr] gap-3">
           <div className="min-h-0 overflow-auto rounded-lg border border-border/50 bg-card">
             {treeLoading ? (
-              <div className="h-40 animate-pulse" />
+              <Skeleton className="h-40 rounded-none bg-transparent" />
             ) : tree ? (
               <ArchiveTree
                 files={tree.files}

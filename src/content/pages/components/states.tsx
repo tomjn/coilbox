@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { AlertCircle, ArrowLeft, Inbox, TriangleAlert } from "lucide-react";
 import { Link } from "react-router";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /** Inline error banner (matches the content settings pages). */
 export function ErrorBanner({ message }: { message: string }) {
@@ -84,9 +85,9 @@ export function SkeletonList() {
   return (
     <div className="flex flex-col gap-2">
       {["a", "b", "c", "d"].map((k) => (
-        <div
+        <Skeleton
           key={k}
-          className="h-14 animate-pulse rounded-lg border border-border/50 bg-card"
+          className="h-14 rounded-lg border border-border/50 bg-card"
         />
       ))}
     </div>
