@@ -49,3 +49,7 @@ The release version comes from the git tag, not from source. CI
 placeholder. To cut a release, push a `N.N` or `N.N.N` tag at the release commit
 — no manual version bump is needed. (`package.json` / Cargo versions are not
 used for the artifact version.)
+
+## Disk Space
+
+Be mindful that work trees can contain large amounts of data that can fill up the disk with build artefacts. Make sure that when work is done and a PR is created that you offer to clean up the build artefacts, and that the build folder does not inflate out of control to multiple tens of GB.
