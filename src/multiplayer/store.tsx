@@ -141,6 +141,18 @@ export function mirrorReducer(
               channelListReceivedSeq: m.channelListReceivedSeq + 1,
             };
           }
+          // The server's message-of-the-day arrives as a run of MOTD lines at
+          // login. Log each as a clean `MOTD |` entry so the welcome/news reads
+          // as a contiguous block in the console, distinct from the raw `<<`
+          // wire echo of the same lines.
+          if (d.kind === "motd") {
+            const next = [...m.consoleLines, `MOTD | ${d.line}`];
+            return {
+              ...m,
+              consoleLines:
+                next.length > CONSOLE_CAP ? next.slice(-CONSOLE_CAP) : next,
+            };
+          }
           return m;
         }
         // `delta` is otherwise handled by the provider via a snapshot refresh.

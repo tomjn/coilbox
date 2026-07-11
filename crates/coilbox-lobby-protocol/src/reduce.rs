@@ -107,6 +107,12 @@ pub enum Delta {
         text: String,
         boxed: bool,
     },
+    /// One line of the server's message-of-the-day, sent as a run of `MOTD`
+    /// lines right after login. Carries the line verbatim so the frontend can
+    /// log the welcome/news the server greets every client with.
+    Motd {
+        line: String,
+    },
     Ring {
         from: String,
     },
@@ -642,9 +648,11 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             let (command, reason) = parse_failed(&text);
             vec![Delta::CommandFailed { command, reason }]
         }
+        ServerMessage::Motd { line } => {
+            vec![Delta::Motd { line }]
+        }
         // Messages carrying no state change / handled by the login machine.
         ServerMessage::TasServer { .. }
-        | ServerMessage::Motd { .. }
         | ServerMessage::LoginInfoEnd
         | ServerMessage::RequestBattleStatus
         | ServerMessage::Ping { .. }
@@ -975,6 +983,27 @@ mod tests {
             vec![Delta::ServerMessage {
                 text: "Read this: https://example.com".into(),
                 boxed: true,
+            }]
+        );
+    }
+
+    #[test]
+    fn motd_line_emits_delta() {
+        let mut s = LobbyState::new();
+        let d = reduce(&mut s, parse_line("MOTD Welcome to the server"));
+        assert_eq!(
+            d,
+            vec![Delta::Motd {
+                line: "Welcome to the server".into(),
+            }]
+        );
+        // A blank MOTD line (servers pad the block with empties) still round-trips
+        // so the frontend can preserve the spacing.
+        let blank = reduce(&mut s, parse_line("MOTD"));
+        assert_eq!(
+            blank,
+            vec![Delta::Motd {
+                line: String::new()
             }]
         );
     }

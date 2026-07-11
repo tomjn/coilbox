@@ -193,6 +193,7 @@ export type Delta =
   | { kind: "loginDenied"; reason: string }
   | { kind: "registrationDenied"; reason: string }
   | { kind: "serverMessage"; text: string; boxed: boolean }
+  | { kind: "motd"; line: string }
   | { kind: "ring"; from: string }
   | { kind: "joinBattleFailed"; reason: string }
   | { kind: "openBattleFailed"; reason: string }
