@@ -15,25 +15,28 @@ import {
 
 const pct = (v: number) => (v / GRID) * 100;
 
-/** Resize handles: eight grips around the box edge, each moving one/two edges. */
+/** Resize handles: eight grips around the box edge, each moving one/two edges.
+ * Every grip is anchored by `left`/`top` only (far edges use `-full` = 100%) so the
+ * `-translate-*-1/2` centring pulls each one onto its edge; `right-0`/`bottom-0`
+ * would translate the wrong way and sink the grip a full width into the box. */
 const HANDLES: { edges: Edge[]; className: string; cursor: string }[] = [
   { edges: ["top", "left"], className: "left-0 top-0", cursor: "nwse-resize" },
   { edges: ["top"], className: "left-1/2 top-0", cursor: "ns-resize" },
   {
     edges: ["top", "right"],
-    className: "right-0 top-0",
+    className: "left-full top-0",
     cursor: "nesw-resize",
   },
-  { edges: ["right"], className: "right-0 top-1/2", cursor: "ew-resize" },
+  { edges: ["right"], className: "left-full top-1/2", cursor: "ew-resize" },
   {
     edges: ["bottom", "right"],
-    className: "bottom-0 right-0",
+    className: "left-full top-full",
     cursor: "nwse-resize",
   },
-  { edges: ["bottom"], className: "bottom-0 left-1/2", cursor: "ns-resize" },
+  { edges: ["bottom"], className: "left-1/2 top-full", cursor: "ns-resize" },
   {
     edges: ["bottom", "left"],
-    className: "bottom-0 left-0",
+    className: "left-0 top-full",
     cursor: "nesw-resize",
   },
   { edges: ["left"], className: "left-0 top-1/2", cursor: "ew-resize" },
