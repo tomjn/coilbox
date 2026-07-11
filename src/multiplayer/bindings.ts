@@ -312,6 +312,24 @@ export const mpSayBattle = defineCommand<
   { sent: boolean }
 >("coilbox-multiplayer", "mp_say_battle");
 
+/** `/me` action to a channel (SAYEX). */
+export const mpSayEx = defineCommand<
+  { serverKey: string; channel: string; message: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_say_ex");
+
+/** `/me` action to the current battle (SAYBATTLEEX). */
+export const mpSayBattleEx = defineCommand<
+  { serverKey: string; message: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_say_battle_ex");
+
+/** `/me` action in a private message (SAYPRIVATEEX). */
+export const mpSayPrivateEx = defineCommand<
+  { serverKey: string; username: string; message: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_say_private_ex");
+
 export const mpJoinChannel = defineCommand<
   { serverKey: string; channel: string; key?: string | null },
   { sent: boolean }

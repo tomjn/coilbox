@@ -21,13 +21,18 @@ const GROUP_WINDOW_MS = 5 * 60_000;
 const isNotice = (k: ChatMsg["kind"]) =>
   k === "join" || k === "leave" || k === "system";
 
+/** `/me` action / emote messages render as a distinct `* user text` line. */
+const isAction = (k: ChatMsg["kind"]) => k === "saidEx";
+
 /**
  * Whether `b` should be grouped under `a`: same sender, close in time, neither a
- * notice. SPADS dumps command lists / stats tables as a burst of separate
- * messages, so grouping collapses the per-message name + timestamp into one.
+ * notice nor an action. SPADS dumps command lists / stats tables as a burst of
+ * separate messages, so grouping collapses the per-message name + timestamp into
+ * one.
  */
 function grouped(a: ChatMsg, b: ChatMsg): boolean {
   if (isNotice(a.kind) || isNotice(b.kind)) return false;
+  if (isAction(a.kind) || isAction(b.kind)) return false;
   if (a.from !== b.from) return false;
   return Math.abs(b.at - a.at) <= GROUP_WINDOW_MS;
 }
@@ -170,6 +175,26 @@ export function ChatPane({
                           : ` left${m.text ? `: ${m.text}` : ""}`}
                       </>
                     )}
+                  </div>
+                );
+              }
+              if (isAction(m.kind)) {
+                // IRC-style emote: `* alice waves`, full-width and italic, sender
+                // tinted. Reads the same whoever sent it (no own/other bubble).
+                const color = senderColor?.(m.from);
+                return (
+                  <div
+                    key={key}
+                    className="mt-2 px-1 text-sm italic text-muted-foreground first:mt-0 [overflow-wrap:anywhere]"
+                  >
+                    {"* "}
+                    <span
+                      className="font-medium not-italic"
+                      style={color ? { color } : undefined}
+                    >
+                      {m.from}
+                    </span>{" "}
+                    <FormattedText text={m.text} />
                   </div>
                 );
               }
