@@ -157,6 +157,28 @@ body,
   }
 }
 
+/* Brief highlight on a battle/player row the moment that player launches the game
+   (a `playerWentIngame` delta). A soft green wash that fades over ~2.4s, matching the
+   ~2.5s the transient flash name is held in the store. */
+@keyframes ingame-flash {
+  0% {
+    background-color: hsl(142 71% 45% / 0.32);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.ingame-flash {
+  animation: ingame-flash 2.4s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Reduced-motion users get a steady, non-animated tint for the same duration. */
+  .ingame-flash {
+    animation: none;
+    background-color: hsl(142 71% 45% / 0.16);
+  }
+}
+
 /* Native colour input: make the colour fill the (square) box with no inset,
    so the swatch matches the control's shape instead of showing a small rectangle. */
 .color-swatch::-webkit-color-swatch-wrapper {

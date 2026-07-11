@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 import type { Side } from "@/content/bindings";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { useMultiplayer } from "../store";
 import { allyLetter, type MemberRow as Row } from "./config";
 import { type MemberControls, MemberRow } from "./MemberRow";
 
@@ -48,6 +49,7 @@ export function BattleMembersTable({
   onAlly: (ally: number) => void;
   onColor: (hex: string) => void;
 }) {
+  const { justWentIngame } = useMultiplayer();
   // The native AI the host will add next; defaults to the first available.
   const [chosenAi, setChosenAi] = useState("");
   useEffect(() => {
@@ -124,6 +126,7 @@ export function BattleMembersTable({
                   editable={row.self}
                   control={control}
                   showActions={selfHost}
+                  flashIngame={justWentIngame.has(row.name)}
                   sideOptions={sideOptions}
                   teamOptions={teamOptions}
                   allyOptions={allyOptions}
