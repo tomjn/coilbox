@@ -28,6 +28,7 @@ export function MapCard({
   disabled,
   selectLabel = "Choose map",
   overlay,
+  overlayInteractive,
   placeholder,
 }: {
   map: MapItem | null;
@@ -47,6 +48,9 @@ export function MapCard({
   selectLabel?: string;
   /** Extra overlay in the minimap box (e.g. ally start boxes). */
   overlay?: ReactNode;
+  /** The overlay handles pointer interaction itself (e.g. the start-box editor), so
+   * the minimap must not be a click-to-open-picker button. Picker stays on its button. */
+  overlayInteractive?: boolean;
   /** Replaces the empty-state inside the minimap box (e.g. a download panel). */
   placeholder?: ReactNode;
 }) {
@@ -84,6 +88,7 @@ export function MapCard({
         onClick={
           disabled || mapsLoading ? undefined : () => setPickerOpen(true)
         }
+        overlayInteractive={overlayInteractive}
         placeholder={placeholder}
       >
         {overlay}

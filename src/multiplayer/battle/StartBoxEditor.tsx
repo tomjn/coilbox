@@ -172,16 +172,23 @@ export function StartBoxEditor({
         return (
           <div
             key={ally}
-            className="absolute border-2"
+            className="absolute"
             style={{
               left: `${pct(rect.left)}%`,
               top: `${pct(rect.top)}%`,
               width: `${pct(rect.right - rect.left)}%`,
               height: `${pct(rect.bottom - rect.top)}%`,
-              borderColor: color,
-              boxShadow: "0 0 0 1px rgba(0,0,0,0.6)",
             }}
           >
+            {/* Border drawn on an inset overlay (not the box itself) so the resize
+                handles below can anchor to the rect edge and stay centred on it. */}
+            <div
+              className="pointer-events-none absolute inset-0 border-2"
+              style={{
+                borderColor: color,
+                boxShadow: "0 0 0 1px rgba(0,0,0,0.6)",
+              }}
+            />
             <div
               className="absolute inset-0 cursor-move motion-safe:animate-pulse"
               style={{ background: `${color}33` }}

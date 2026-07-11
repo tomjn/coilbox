@@ -25,6 +25,7 @@ export function MinimapPreview({
   loading,
   alt,
   onClick,
+  overlayInteractive,
   children,
   placeholder,
 }: {
@@ -38,6 +39,10 @@ export function MinimapPreview({
   alt: string;
   /** When set, the preview is clickable (used to open the map picker). */
   onClick?: () => void;
+  /** The overlay owns pointer interaction (e.g. the start-box editor), so the box
+   * must not also be a button — its clicks would open the picker, and nesting the
+   * editor inside a button is invalid. The picker stays reachable via its own button. */
+  overlayInteractive?: boolean;
   /** Extra overlay content in the aspect-correct image box (e.g. start boxes). */
   children?: ReactNode;
   /** Replaces the "No minimap" empty state (e.g. an inline download panel). When
@@ -109,10 +114,11 @@ export function MinimapPreview({
     </div>
   );
 
-  // A shown placeholder owns its own controls, so the box mustn't also be a button.
+  // A shown placeholder — or an interactive overlay — owns its own controls, so the
+  // box mustn't also be a button.
   const showingPlaceholder = !loading && !dataUrl && !!placeholder;
 
-  return onClick && !showingPlaceholder ? (
+  return onClick && !showingPlaceholder && !overlayInteractive ? (
     <button
       type="button"
       onClick={onClick}
