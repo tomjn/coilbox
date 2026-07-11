@@ -13,6 +13,14 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   type Report,
   type ReportSummary,
   usExportReport,
@@ -51,41 +59,70 @@ function provenance(s: ReportSummary): string {
 /** Per-command latency table for a selected run. */
 function CommandTable({ report }: { report: Report }) {
   return (
-    <table className="w-full border-collapse text-sm">
-      <thead>
-        <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-          <th className="py-2 pr-4 font-medium">Command</th>
-          <th className="py-2 pr-4 text-right font-medium">Count</th>
-          <th className="py-2 pr-4 text-right font-medium">Err</th>
-          <th className="py-2 pr-4 text-right font-medium">p50</th>
-          <th className="py-2 pr-4 text-right font-medium">p95</th>
-          <th className="py-2 pr-4 text-right font-medium">p99</th>
-          <th className="py-2 pr-4 text-right font-medium">max</th>
-          <th className="py-2 text-right font-medium">/s</th>
-        </tr>
-      </thead>
-      <tbody className="font-mono text-xs">
+    <Table className="border-collapse">
+      <TableHeader>
+        <TableRow className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground hover:bg-transparent">
+          <TableHead className="py-2 pr-4 font-medium text-muted-foreground">
+            Command
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            Count
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            Err
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            p50
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            p95
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            p99
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            max
+          </TableHead>
+          <TableHead className="py-2 text-right font-medium text-muted-foreground">
+            /s
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody className="font-mono text-xs">
         {report.commands.map((c) => (
-          <tr key={c.command} className="border-b border-border/50">
-            <td className="py-1.5 pr-4 font-sans">{c.command}</td>
-            <td className="py-1.5 pr-4 text-right">{c.count}</td>
-            <td
+          <TableRow
+            key={c.command}
+            className="border-b border-border/50 hover:bg-transparent"
+          >
+            <TableCell className="py-1.5 pr-4 font-sans">{c.command}</TableCell>
+            <TableCell className="py-1.5 pr-4 text-right">{c.count}</TableCell>
+            <TableCell
               className={cn(
                 "py-1.5 pr-4 text-right",
                 (c.error_count ?? 0) > 0 && "text-destructive",
               )}
             >
               {c.error_count ?? 0}
-            </td>
-            <td className="py-1.5 pr-4 text-right">{c.p50_ms.toFixed(2)}</td>
-            <td className="py-1.5 pr-4 text-right">{c.p95_ms.toFixed(2)}</td>
-            <td className="py-1.5 pr-4 text-right">{c.p99_ms.toFixed(2)}</td>
-            <td className="py-1.5 pr-4 text-right">{c.max_ms.toFixed(2)}</td>
-            <td className="py-1.5 text-right">{c.per_second.toFixed(1)}</td>
-          </tr>
+            </TableCell>
+            <TableCell className="py-1.5 pr-4 text-right">
+              {c.p50_ms.toFixed(2)}
+            </TableCell>
+            <TableCell className="py-1.5 pr-4 text-right">
+              {c.p95_ms.toFixed(2)}
+            </TableCell>
+            <TableCell className="py-1.5 pr-4 text-right">
+              {c.p99_ms.toFixed(2)}
+            </TableCell>
+            <TableCell className="py-1.5 pr-4 text-right">
+              {c.max_ms.toFixed(2)}
+            </TableCell>
+            <TableCell className="py-1.5 text-right">
+              {c.per_second.toFixed(1)}
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
