@@ -205,12 +205,19 @@ export function useBattleRoom(): BattleRoomView {
   const selfHost = isFounder && !hostIsBot;
 
   // Native engine AIs the host can add as bots (Lua AIs aren't addable over the
-  // lobby — they attach to a team via the start script, not ADDBOT).
+  // lobby — they attach to a team via the start script, not ADDBOT). Prefer the
+  // game's own natives, but a game whose `validais.lua` whitelists only Lua AIs
+  // (e.g. SplinterFaction) returns an empty native list — fall back to the
+  // engine's native AIs (a no-game query skips the whitelist) so "Add AI" is
+  // never uselessly empty.
   const { ais } = useSkirmishAis(enginePath, dataDir, gameArchive);
-  const nativeAis = useMemo(
-    () => ais.filter((a) => a.kind === "native"),
-    [ais],
-  );
+  const { ais: engineAis } = useSkirmishAis(enginePath, dataDir, undefined);
+  const nativeAis = useMemo(() => {
+    const gameNative = ais.filter((a) => a.kind === "native");
+    return gameNative.length > 0
+      ? gameNative
+      : engineAis.filter((a) => a.kind === "native");
+  }, [ais, engineAis]);
 
   const [contentNonce, setContentNonce] = useState(0);
 
