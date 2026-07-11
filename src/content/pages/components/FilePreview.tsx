@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Check, Copy, Download, FileQuestion } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ArchiveFileResult } from "../../bindings";
 import { formatBytes } from "../../format";
 
@@ -92,7 +93,7 @@ function PreviewBody({
 }) {
   if (loading) {
     return (
-      <div className="h-full min-h-40 animate-pulse rounded-lg border border-border/50 bg-card" />
+      <Skeleton className="h-full min-h-40 rounded-lg border border-border/50 bg-card" />
     );
   }
   if (!result) {

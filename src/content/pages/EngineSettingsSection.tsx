@@ -1,5 +1,6 @@
 import { Input } from "@picoframe/frame";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import type { EngineConfigSetting } from "../bindings";
 import { useScanTargetSelection, useUnitsyncEngineConfig } from "../config";
 import { BrowserToolbar } from "./components/BrowserToolbar";
@@ -115,9 +116,13 @@ function EngineSettingField({ setting: s }: { setting: EngineConfigSetting }) {
   if (s.type === "bool") {
     return (
       <div className="contents">
-        <label htmlFor={id} className="text-muted-foreground" title={s.key}>
+        <Label
+          htmlFor={id}
+          className="font-normal text-muted-foreground"
+          title={s.key}
+        >
           {s.label}
-        </label>
+        </Label>
         <Checkbox id={id} checked={s.value === "1"} disabled />
       </div>
     );
@@ -125,9 +130,13 @@ function EngineSettingField({ setting: s }: { setting: EngineConfigSetting }) {
 
   return (
     <div className="contents">
-      <label htmlFor={id} className="text-muted-foreground" title={s.key}>
+      <Label
+        htmlFor={id}
+        className="font-normal text-muted-foreground"
+        title={s.key}
+      >
         {s.label}
-      </label>
+      </Label>
       <Input
         id={id}
         type={s.type === "number" ? "number" : "text"}

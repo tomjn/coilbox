@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn, versionLabel } from "@/lib/utils";
 import { GameArt } from "./GameArt";
 import { SddBadge } from "./SddBadge";
@@ -70,7 +71,7 @@ export function GameCardShell({
       >
         {art ?? <GameArt name={name} artUrl={artUrl} alt={alt} />}
         {loading && (
-          <div className="absolute inset-0 animate-pulse bg-muted-foreground/10" />
+          <Skeleton className="absolute inset-0 rounded-none bg-muted-foreground/10" />
         )}
         {selected && (
           <div

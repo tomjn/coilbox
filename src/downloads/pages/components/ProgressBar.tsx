@@ -1,5 +1,6 @@
 import { cn } from "@picoframe/frame";
 import { useId } from "react";
+import { Progress } from "@/components/ui/progress";
 import type { DownloadProgress } from "../../bindings";
 
 /** Human-readable bytes, e.g. `6.9 MB`. */
@@ -56,24 +57,23 @@ export function ProgressBar({
   const captionId = useId();
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <div
-        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-        role="progressbar"
-        aria-valuenow={value}
-        aria-valuemin={determinate ? 0 : undefined}
-        aria-valuemax={determinate ? 100 : undefined}
-        aria-label="Download progress"
-        aria-describedby={label ? captionId : undefined}
-      >
-        {determinate ? (
-          <div
-            className="h-full rounded-full bg-primary transition-[width] duration-150 motion-reduce:transition-none"
-            style={{ width: `${value}%` }}
-          />
-        ) : (
+      {determinate ? (
+        <Progress
+          value={value}
+          className="h-1.5 bg-muted"
+          aria-label="Download progress"
+          aria-describedby={label ? captionId : undefined}
+        />
+      ) : (
+        <div
+          className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+          role="progressbar"
+          aria-label="Download progress"
+          aria-describedby={label ? captionId : undefined}
+        >
           <div className="h-full w-1/3 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
-        )}
-      </div>
+        </div>
+      )}
       {label && (
         <span
           id={captionId}

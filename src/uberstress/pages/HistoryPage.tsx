@@ -12,6 +12,15 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   type Report,
   type ReportSummary,
@@ -51,41 +60,70 @@ function provenance(s: ReportSummary): string {
 /** Per-command latency table for a selected run. */
 function CommandTable({ report }: { report: Report }) {
   return (
-    <table className="w-full border-collapse text-sm">
-      <thead>
-        <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-          <th className="py-2 pr-4 font-medium">Command</th>
-          <th className="py-2 pr-4 text-right font-medium">Count</th>
-          <th className="py-2 pr-4 text-right font-medium">Err</th>
-          <th className="py-2 pr-4 text-right font-medium">p50</th>
-          <th className="py-2 pr-4 text-right font-medium">p95</th>
-          <th className="py-2 pr-4 text-right font-medium">p99</th>
-          <th className="py-2 pr-4 text-right font-medium">max</th>
-          <th className="py-2 text-right font-medium">/s</th>
-        </tr>
-      </thead>
-      <tbody className="font-mono text-xs">
+    <Table className="border-collapse">
+      <TableHeader>
+        <TableRow className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground hover:bg-transparent">
+          <TableHead className="py-2 pr-4 font-medium text-muted-foreground">
+            Command
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            Count
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            Err
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            p50
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            p95
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            p99
+          </TableHead>
+          <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
+            max
+          </TableHead>
+          <TableHead className="py-2 text-right font-medium text-muted-foreground">
+            /s
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody className="font-mono text-xs">
         {report.commands.map((c) => (
-          <tr key={c.command} className="border-b border-border/50">
-            <td className="py-1.5 pr-4 font-sans">{c.command}</td>
-            <td className="py-1.5 pr-4 text-right">{c.count}</td>
-            <td
+          <TableRow
+            key={c.command}
+            className="border-b border-border/50 hover:bg-transparent"
+          >
+            <TableCell className="py-1.5 pr-4 font-sans">{c.command}</TableCell>
+            <TableCell className="py-1.5 pr-4 text-right">{c.count}</TableCell>
+            <TableCell
               className={cn(
                 "py-1.5 pr-4 text-right",
                 (c.error_count ?? 0) > 0 && "text-destructive",
               )}
             >
               {c.error_count ?? 0}
-            </td>
-            <td className="py-1.5 pr-4 text-right">{c.p50_ms.toFixed(2)}</td>
-            <td className="py-1.5 pr-4 text-right">{c.p95_ms.toFixed(2)}</td>
-            <td className="py-1.5 pr-4 text-right">{c.p99_ms.toFixed(2)}</td>
-            <td className="py-1.5 pr-4 text-right">{c.max_ms.toFixed(2)}</td>
-            <td className="py-1.5 text-right">{c.per_second.toFixed(1)}</td>
-          </tr>
+            </TableCell>
+            <TableCell className="py-1.5 pr-4 text-right">
+              {c.p50_ms.toFixed(2)}
+            </TableCell>
+            <TableCell className="py-1.5 pr-4 text-right">
+              {c.p95_ms.toFixed(2)}
+            </TableCell>
+            <TableCell className="py-1.5 pr-4 text-right">
+              {c.p99_ms.toFixed(2)}
+            </TableCell>
+            <TableCell className="py-1.5 pr-4 text-right">
+              {c.max_ms.toFixed(2)}
+            </TableCell>
+            <TableCell className="py-1.5 text-right">
+              {c.per_second.toFixed(1)}
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -288,10 +326,12 @@ export default function HistoryPage() {
           )}
           <div className="min-h-0 flex-1 overflow-auto">
             {listError && (
-              <p className="m-3 flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
-                <AlertCircle size={14} className="mt-px shrink-0" />
-                {listError}
-              </p>
+              <Alert variant="destructive" className="m-3">
+                <AlertCircle size={14} />
+                <AlertDescription className="text-xs text-destructive">
+                  {listError}
+                </AlertDescription>
+              </Alert>
             )}
             {runs?.length === 0 && !listError && (
               <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
@@ -354,10 +394,12 @@ export default function HistoryPage() {
               <Loader2 size={15} className="animate-spin" /> loading report…
             </p>
           ) : reportError ? (
-            <p className="m-6 flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-              <AlertCircle size={15} className="mt-px shrink-0" />
-              {reportError}
-            </p>
+            <Alert variant="destructive" className="m-6">
+              <AlertCircle size={15} />
+              <AlertDescription className="text-destructive">
+                {reportError}
+              </AlertDescription>
+            </Alert>
           ) : report ? (
             <div className="space-y-6 p-6">
               <div className="flex items-start justify-between gap-4">

@@ -9,6 +9,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   dlRepos,
   dlVersion,
@@ -48,8 +49,11 @@ function SidecarWarning() {
   if (!error) return null;
 
   return (
-    <div className="flex items-start gap-2 border-b border-destructive/40 bg-destructive/10 px-6 py-3 text-sm text-destructive">
-      <AlertCircle size={16} className="mt-px shrink-0" />
+    <Alert
+      variant="destructive"
+      className="flex items-start gap-2 rounded-none border-x-0 border-t-0 px-6"
+    >
+      <AlertCircle size={16} />
       <div className="min-w-0 flex-1">
         <p className="font-medium">pr-downloader sidecar unavailable</p>
         <p className="break-words text-destructive/90">{error}</p>
@@ -57,7 +61,7 @@ function SidecarWarning() {
       <Button variant="outline" size="sm" onClick={check}>
         Retry
       </Button>
-    </div>
+    </Alert>
   );
 }
 
@@ -209,10 +213,12 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
           )}
           <div className="min-h-0 flex-1 overflow-auto">
             {reposError && (
-              <p className="m-3 flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
-                <AlertCircle size={14} className="mt-px shrink-0" />
-                {reposError}
-              </p>
+              <Alert variant="destructive" className="m-3">
+                <AlertCircle size={14} />
+                <AlertDescription className="text-xs text-destructive">
+                  {reposError}
+                </AlertDescription>
+              </Alert>
             )}
             {!repos && !reposError && (
               <EmptyState icon={Package}>
@@ -290,10 +296,12 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                   </p>
                 )}
                 {versionsError && (
-                  <p className="m-6 flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-                    <AlertCircle size={15} className="mt-px shrink-0" />
-                    {versionsError}
-                  </p>
+                  <Alert variant="destructive" className="m-6">
+                    <AlertCircle size={15} />
+                    <AlertDescription className="text-destructive">
+                      {versionsError}
+                    </AlertDescription>
+                  </Alert>
                 )}
                 {versions?.length === 0 && (
                   <EmptyState icon={Package}>

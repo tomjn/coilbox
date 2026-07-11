@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { useEffect, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { MapItem } from "@/content/bindings";
 import {
   useUnitsyncMapInfo,
@@ -217,10 +218,12 @@ export function BattleMapCard({
       )}
 
       {!canEditBoxes && hostCanEdit && (
-        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-          Start boxes need the "Choose in-game" start-position mode — set it in
-          Battle options to draw them.
-        </p>
+        <Alert variant="warning" className="px-3 py-2">
+          <AlertDescription className="text-xs">
+            Start boxes need the "Choose in-game" start-position mode — set it
+            in Battle options to draw them.
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );

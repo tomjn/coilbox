@@ -3,7 +3,6 @@ import { Channel } from "@tauri-apps/api/core";
 import {
   AlertCircle,
   BarChart3,
-  ChevronDown,
   ChevronRight,
   Database,
   Loader2,
@@ -13,6 +12,14 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   type LogLine,
   type Report,
@@ -127,16 +134,16 @@ function RunProgress({
           {elapsed.toFixed(0)}s{windowSec ? ` / ~${windowSec.toFixed(0)}s` : ""}
         </span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
-        {pct === null ? (
+      {pct === null ? (
+        <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
           <div className="h-full w-1/3 animate-pulse rounded bg-accent" />
-        ) : (
-          <div
-            className="h-full rounded bg-accent transition-all duration-300"
-            style={{ width: `${pct}%` }}
-          />
-        )}
-      </div>
+        </div>
+      ) : (
+        <Progress
+          value={pct}
+          className="h-1.5 rounded bg-muted [&>[data-slot=progress-indicator]]:bg-accent"
+        />
+      )}
       {live ? (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <LiveStat label="Sent" value={live.sent.toLocaleString()} />
@@ -201,7 +208,6 @@ export default function RunPage() {
   const [runError, setRunError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [progress, setProgress] = useState<RunProgressData | null>(null);
-  const [showLog, setShowLog] = useState(true);
 
   const runIdRef = useRef<string | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
@@ -430,24 +436,22 @@ export default function RunPage() {
         {/* Left: form */}
         <div className="min-h-0 space-y-5 overflow-auto border-r border-border px-6 py-5">
           {/* Mode toggle */}
-          <div className="inline-flex rounded-md border border-border p-0.5 text-sm">
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={mode}
+            onValueChange={(v) => {
+              if (v) setMode(v as "load" | "bench");
+            }}
+            disabled={running}
+          >
             {(["load", "bench"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                disabled={running}
-                onClick={() => setMode(m)}
-                className={cn(
-                  "rounded px-3 py-1 capitalize transition-colors",
-                  mode === m
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
+              <ToggleGroupItem key={m} value={m} className="px-3 capitalize">
                 {m}
-              </button>
+              </ToggleGroupItem>
             ))}
-          </div>
+          </ToggleGroup>
 
           {/* Target */}
           {mode === "bench" && (
@@ -537,20 +541,15 @@ export default function RunPage() {
           />
 
           {/* Advanced */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((v) => !v)}
-              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              {showAdvanced ? (
-                <ChevronDown size={15} />
-              ) : (
-                <ChevronRight size={15} />
-              )}{" "}
+          <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+            <CollapsibleTrigger className="group flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <ChevronRight
+                size={15}
+                className="transition-transform group-data-[state=open]:rotate-90"
+              />{" "}
               Advanced options
-            </button>
-            {showAdvanced && (
+            </CollapsibleTrigger>
+            <CollapsibleContent>
               <div className="mt-3 grid grid-cols-2 gap-4">
                 <Field label="User prefix">
                   <Input
@@ -629,8 +628,8 @@ export default function RunPage() {
                   </Field>
                 )}
               </div>
-            )}
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Actions */}
           <div className="flex items-center gap-2 pt-1">
@@ -678,51 +677,57 @@ export default function RunPage() {
             </div>
           )}
           {runError && (
-            <p className="flex items-start gap-2 border-b border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              <AlertCircle size={15} className="mt-px shrink-0" />
-              {runError}
-            </p>
+            <Alert
+              variant="destructive"
+              className="rounded-none border-x-0 border-t-0"
+            >
+              <AlertCircle size={15} />
+              <AlertDescription className="text-destructive">
+                {runError}
+              </AlertDescription>
+            </Alert>
           )}
-          <button
-            type="button"
-            onClick={() => setShowLog((v) => !v)}
-            className="flex shrink-0 items-center gap-1 border-b border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
-          >
-            {showLog ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            Output
-            {logLines.length > 0 && (
-              <span className="font-normal normal-case">
-                ({logLines.length} lines)
-              </span>
-            )}
-          </button>
-          {showLog && (
-            <div className="min-h-0 flex-1 overflow-auto bg-card/20 p-4">
-              {logLines.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-                  <Zap size={26} className="opacity-30" />
-                  <p>Run output streams here.</p>
-                </div>
-              ) : (
-                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
-                  {logLines.map((l, i) => (
-                    <div
-                      // biome-ignore lint/suspicious/noArrayIndexKey: log lines are append-only; index is a stable key
-                      key={i}
-                      className={
-                        l.stream === "err"
-                          ? "text-amber-600 dark:text-amber-400"
-                          : "text-foreground/90"
-                      }
-                    >
-                      {l.line}
-                    </div>
-                  ))}
-                  <div ref={logEndRef} />
-                </pre>
+          <Collapsible defaultOpen className="flex min-h-0 flex-1 flex-col">
+            <CollapsibleTrigger className="group flex shrink-0 items-center gap-1 border-b border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground">
+              <ChevronRight
+                size={14}
+                className="transition-transform group-data-[state=open]:rotate-90"
+              />
+              Output
+              {logLines.length > 0 && (
+                <span className="font-normal normal-case">
+                  ({logLines.length} lines)
+                </span>
               )}
-            </div>
-          )}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-auto bg-card/20 p-4">
+                {logLines.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                    <Zap size={26} className="opacity-30" />
+                    <p>Run output streams here.</p>
+                  </div>
+                ) : (
+                  <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
+                    {logLines.map((l, i) => (
+                      <div
+                        // biome-ignore lint/suspicious/noArrayIndexKey: log lines are append-only; index is a stable key
+                        key={i}
+                        className={
+                          l.stream === "err"
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-foreground/90"
+                        }
+                      >
+                        {l.line}
+                      </div>
+                    ))}
+                    <div ref={logEndRef} />
+                  </pre>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </div>
     </div>

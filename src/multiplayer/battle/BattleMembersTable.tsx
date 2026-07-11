@@ -1,5 +1,13 @@
 import { Button } from "@picoframe/frame";
 import { useEffect, useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { Side } from "@/content/bindings";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { useMultiplayer } from "../store";
@@ -78,24 +86,32 @@ export function BattleMembersTable({
       {/* Cap at half the viewport so a crowded lobby scrolls instead of pushing
           the chat off-screen; the header stays pinned. */}
       <div className="max-h-[50vh] overflow-auto">
-        <table className="w-full border-collapse text-sm">
-          <thead className="sticky top-0 z-10 bg-card">
-            <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              <th className="px-3 pb-2 pt-3 text-center font-medium">Ready</th>
-              <th className="w-full px-3 pb-2 pt-3 text-left font-medium">
+        <Table className="border-collapse">
+          <TableHeader className="sticky top-0 z-10 bg-card">
+            <TableRow className="text-[11px] uppercase tracking-wide text-muted-foreground border-border/40 hover:bg-transparent">
+              <TableHead className="px-3 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                Ready
+              </TableHead>
+              <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
                 Player
-              </th>
-              <th className="px-3 pb-2 pt-3 text-left font-medium">Faction</th>
-              <th className="px-3 pb-2 pt-3 text-left font-medium">Team</th>
-              <th className="px-3 pb-2 pt-3 text-left font-medium">Ally</th>
+              </TableHead>
+              <TableHead className="px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                Faction
+              </TableHead>
+              <TableHead className="px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                Team
+              </TableHead>
+              <TableHead className="px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                Ally
+              </TableHead>
               {selfHost && (
-                <th className="px-2 pb-2 pt-3">
+                <TableHead className="px-2 pb-2 pt-3">
                   <span className="sr-only">Actions</span>
-                </th>
+                </TableHead>
               )}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((row) => {
               // The host controls other members: humans get force/kick, bots get
               // removal only (MemberRow ignores the force handlers for bots). Our
@@ -138,17 +154,17 @@ export function BattleMembersTable({
               );
             })}
             {rows.length === 0 && (
-              <tr className="border-t border-border/40">
-                <td
+              <TableRow className="border-border/40 hover:bg-transparent">
+                <TableCell
                   colSpan={selfHost ? 6 : 5}
                   className="px-3 py-6 text-center text-sm text-muted-foreground"
                 >
                   Waiting for players…
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       {selfHost && (

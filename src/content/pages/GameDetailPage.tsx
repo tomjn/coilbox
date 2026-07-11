@@ -2,6 +2,7 @@ import { Button, useDrawer } from "@picoframe/frame";
 import { FolderOpen } from "lucide-react";
 import { useMemo } from "react";
 import { useParams } from "react-router";
+import { Skeleton } from "@/components/ui/skeleton";
 import { type Archive, contentOpenPath } from "../bindings";
 import { useBrandingEntry } from "../branding";
 import { buildEdgeMap, reachableCounts } from "../buildTree";
@@ -188,7 +189,7 @@ export default function GameDetailPage() {
               : ""}
           </h2>
           {gameInfoLoading ? (
-            <div className="h-12 animate-pulse rounded-lg border border-border/50 bg-card" />
+            <Skeleton className="h-12 rounded-lg border border-border/50 bg-card" />
           ) : (
             <ul className="flex flex-col gap-2">
               {gameInfo?.sides.map((s) => {

@@ -14,6 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { allyLetter, type MemberRow as Row } from "./config";
@@ -101,10 +102,13 @@ export function MemberRow({
     editable ? onColor(hex) : control?.onForceColor(hex);
 
   return (
-    <tr
-      className={cn("border-t border-border/40", flashIngame && "ingame-flash")}
+    <TableRow
+      className={cn(
+        "border-border/40 hover:bg-transparent",
+        flashIngame && "ingame-flash",
+      )}
     >
-      <td className="px-3 py-2">
+      <TableCell className="px-3 py-2">
         <div className="flex items-center justify-center gap-1.5">
           <ReadyIcon row={row} />
           {!row.spectator && row.sync === 2 && (
@@ -114,9 +118,9 @@ export function MemberRow({
             </span>
           )}
         </div>
-      </td>
+      </TableCell>
 
-      <td className="px-3 py-2">
+      <TableCell className="px-3 py-2">
         <div className="flex items-center gap-2.5">
           {canEditStatus ? (
             <input
@@ -148,9 +152,9 @@ export function MemberRow({
             </span>
           </div>
         </div>
-      </td>
+      </TableCell>
 
-      <td className="px-3 py-2">
+      <TableCell className="px-3 py-2">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
         ) : editable ? (
@@ -168,9 +172,9 @@ export function MemberRow({
               "–"}
           </span>
         )}
-      </td>
+      </TableCell>
 
-      <td className="px-3 py-2">
+      <TableCell className="px-3 py-2">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
         ) : canEditStatus ? (
@@ -186,9 +190,9 @@ export function MemberRow({
             {row.teamId + 1}
           </span>
         )}
-      </td>
+      </TableCell>
 
-      <td className="px-3 py-2">
+      <TableCell className="px-3 py-2">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
         ) : canEditStatus ? (
@@ -202,10 +206,10 @@ export function MemberRow({
         ) : (
           <span className="text-sm">Ally {allyLetter(row.ally)}</span>
         )}
-      </td>
+      </TableCell>
 
       {showActions && (
-        <td className="px-2 py-2 text-right">
+        <TableCell className="px-2 py-2 text-right">
           {control && (
             <Popover open={menuOpen} onOpenChange={setMenuOpen}>
               <PopoverTrigger asChild>
@@ -245,8 +249,8 @@ export function MemberRow({
               </PopoverContent>
             </Popover>
           )}
-        </td>
+        </TableCell>
       )}
-    </tr>
+    </TableRow>
   );
 }

@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { AlertCircle, Check, Copy, Database, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { usSeedSql } from "../../bindings";
 import { Field } from "./Field";
@@ -97,10 +98,12 @@ export default function SeedSqlForm({
       </form>
 
       {error && (
-        <p className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle size={15} className="mt-px shrink-0" />
-          {error}
-        </p>
+        <Alert variant="destructive">
+          <AlertCircle size={15} />
+          <AlertDescription className="text-destructive">
+            {error}
+          </AlertDescription>
+        </Alert>
       )}
 
       {sql && (

@@ -6,7 +6,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { BattleFilters, BattleSortKey } from "./battleFilters";
+
+/** Shared styling so the sort + hide groups keep the original segmented look. */
+const GROUP_CLASS =
+  "w-full divide-x divide-border overflow-hidden border border-border";
+const ITEM_CLASS =
+  "h-auto flex-1 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground data-[state=on]:bg-muted data-[state=on]:text-foreground";
 
 const SORTS: { key: BattleSortKey; label: string }[] = [
   { key: "players", label: "Players" },
@@ -79,65 +86,65 @@ export function BattleFilterPopover({
           <legend className="mb-1 text-xs font-medium text-muted-foreground">
             Sort by
           </legend>
-          <div className="flex divide-x divide-border overflow-hidden rounded-md border border-border">
+          <ToggleGroup
+            type="single"
+            value={filters.sortKey}
+            onValueChange={(v) =>
+              setFilters((f) =>
+                !v || v === f.sortKey
+                  ? { ...f, sortDir: f.sortDir === "desc" ? "asc" : "desc" }
+                  : { ...f, sortKey: v as BattleSortKey, sortDir: "desc" },
+              )
+            }
+            className={GROUP_CLASS}
+          >
             {SORTS.map((s) => {
               const active = s.key === filters.sortKey;
               return (
-                <Segment
+                <ToggleGroupItem
                   key={s.key}
-                  active={active}
-                  onClick={() =>
-                    setFilters((f) =>
-                      f.sortKey === s.key
-                        ? {
-                            ...f,
-                            sortDir: f.sortDir === "desc" ? "asc" : "desc",
-                          }
-                        : { ...f, sortKey: s.key, sortDir: "desc" },
-                    )
-                  }
+                  value={s.key}
+                  className={ITEM_CLASS}
                 >
                   {s.label}
                   {active && (filters.sortDir === "desc" ? " ↓" : " ↑")}
-                </Segment>
+                </ToggleGroupItem>
               );
             })}
-          </div>
+          </ToggleGroup>
         </fieldset>
 
         <fieldset className="space-y-2">
           <legend className="mb-1 text-xs font-medium text-muted-foreground">
             Hide
           </legend>
-          <div className="flex divide-x divide-border overflow-hidden rounded-md border border-border">
-            <Segment
-              active={filters.hideEmpty}
-              onClick={() =>
-                setFilters((f) => ({ ...f, hideEmpty: !f.hideEmpty }))
-              }
-            >
+          <ToggleGroup
+            type="multiple"
+            value={[
+              ...(filters.hideEmpty ? ["empty"] : []),
+              ...(filters.hideLockedPassworded ? ["locked"] : []),
+              ...(filters.hideFull ? ["full"] : []),
+            ]}
+            onValueChange={(vals) =>
+              setFilters((f) => ({
+                ...f,
+                hideEmpty: vals.includes("empty"),
+                hideLockedPassworded: vals.includes("locked"),
+                hideFull: vals.includes("full"),
+              }))
+            }
+            className={GROUP_CLASS}
+          >
+            <ToggleGroupItem value="empty" className={ITEM_CLASS}>
               Empty
-            </Segment>
-            <Segment
-              active={filters.hideLockedPassworded}
-              onClick={() =>
-                setFilters((f) => ({
-                  ...f,
-                  hideLockedPassworded: !f.hideLockedPassworded,
-                }))
-              }
-            >
+            </ToggleGroupItem>
+            <ToggleGroupItem value="locked" className={ITEM_CLASS}>
               Locked
-            </Segment>
-            <Segment
-              active={filters.hideFull}
-              onClick={() =>
-                setFilters((f) => ({ ...f, hideFull: !f.hideFull }))
-              }
-            >
+            </ToggleGroupItem>
+            <ToggleGroupItem value="full" className={ITEM_CLASS}>
               Full
-            </Segment>
-          </div>
+            </ToggleGroupItem>
+          </ToggleGroup>
         </fieldset>
 
         {nonDefault && (
@@ -153,31 +160,5 @@ export function BattleFilterPopover({
         )}
       </PopoverContent>
     </Popover>
-  );
-}
-
-/** One cell of a segmented button group. */
-function Segment({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`flex-1 px-2 py-1.5 text-xs font-medium outline-none transition-colors focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
-        active
-          ? "bg-muted text-foreground"
-          : "text-muted-foreground hover:bg-muted/50"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

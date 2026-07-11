@@ -3,6 +3,7 @@ import { Channel } from "@tauri-apps/api/core";
 import { ArrowLeft, Download, ImageOff, Loader2, Trophy } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
+import { Badge } from "@/components/ui/badge";
 import {
   type DownloadProgress,
   dlDownload,
@@ -136,9 +137,12 @@ function Players({ info }: { info: DemoInfo }) {
                   {id === -1 ? "Unassigned" : `Ally team ${id}`}
                 </h3>
                 {won && (
-                  <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                  <Badge
+                    variant="ghost"
+                    className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                  >
                     <Trophy className="size-3" /> Winner
-                  </span>
+                  </Badge>
                 )}
               </div>
               <ul className="flex flex-col divide-y divide-border/40">

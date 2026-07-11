@@ -2,6 +2,8 @@ import { Button, Input, useDrawer } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Image, Plus, Trash2, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -258,15 +260,17 @@ export function MissionEditorDrawer({
   return (
     <div className="flex flex-col gap-5">
       {error && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
-          {error}
-        </p>
+        <Alert variant="destructive" className="p-2">
+          <AlertDescription className="text-destructive">
+            {error}
+          </AlertDescription>
+        </Alert>
       )}
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="mission-title" className="text-sm font-medium">
+        <Label htmlFor="mission-title" className="text-sm font-medium">
           Title
-        </label>
+        </Label>
         <Input
           id="mission-title"
           value={mission.title}
@@ -275,9 +279,9 @@ export function MissionEditorDrawer({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="mission-subtitle" className="text-sm font-medium">
+        <Label htmlFor="mission-subtitle" className="text-sm font-medium">
           Subtitle
-        </label>
+        </Label>
         <Input
           id="mission-subtitle"
           value={mission.subtitle ?? ""}
@@ -287,9 +291,9 @@ export function MissionEditorDrawer({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="mission-briefing" className="text-sm font-medium">
+        <Label htmlFor="mission-briefing" className="text-sm font-medium">
           Briefing
-        </label>
+        </Label>
         <p className="text-xs text-muted-foreground">
           Markdown supported. Embed bundled media with{" "}
           <code className="font-mono">![](images/art.jpg)</code> — image, audio

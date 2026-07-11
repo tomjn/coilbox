@@ -3,7 +3,6 @@ import { Channel } from "@tauri-apps/api/core";
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   FolderOpen,
   Hammer,
@@ -13,6 +12,12 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   type CompileOpts,
   type CompressionType,
@@ -367,11 +372,16 @@ export default function CompilePage() {
       </header>
 
       {probe && !probe.compile && (
-        <p className="flex items-start gap-2 border-b border-amber-500/40 bg-amber-500/10 px-6 py-3 text-sm text-amber-700 dark:text-amber-400">
-          <AlertCircle size={15} className="mt-px shrink-0" />
-          The <code>mapcompile</code> sidecar was not found. Bundle
-          SpringMapConvNG or set <code>MAPCONV_MAPCOMPILE_SIDECAR</code>.
-        </p>
+        <Alert
+          variant="warning"
+          className="rounded-none border-x-0 border-t-0 px-6"
+        >
+          <AlertCircle size={15} />
+          <AlertDescription>
+            The <code>mapcompile</code> sidecar was not found. Bundle
+            SpringMapConvNG or set <code>MAPCONV_MAPCOMPILE_SIDECAR</code>.
+          </AlertDescription>
+        </Alert>
       )}
 
       <div className="grid min-h-0 flex-1 grid-cols-[28rem_minmax(0,1fr)]">
@@ -400,14 +410,14 @@ export default function CompilePage() {
             onInfo={setTextureInfo}
           />
           {textureSizeBad && textureInfo && (
-            <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-300">
-              <AlertCircle size={14} className="mt-px shrink-0" />
-              <span>
+            <Alert variant="warning" className="p-2.5">
+              <AlertCircle size={14} />
+              <AlertDescription className="text-xs">
                 Texture is {textureInfo.width} × {textureInfo.height}px — each
                 side must be a multiple of 1024. mapcompile will likely reject
                 it. <LearnMore href={WIKI.sizes} label="Map sizes" />
-              </span>
-            </p>
+              </AlertDescription>
+            </Alert>
           )}
           <PathField
             label="Output folder"
@@ -452,21 +462,16 @@ export default function CompilePage() {
           </Field>
 
           {/* Advanced options: optional maps, height range, compression tuning. */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((v) => !v)}
-              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              {showAdvanced ? (
-                <ChevronDown size={15} />
-              ) : (
-                <ChevronRight size={15} />
-              )}{" "}
+          <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+            <CollapsibleTrigger className="group flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <ChevronRight
+                size={15}
+                className="transition-transform group-data-[state=open]:rotate-90"
+              />{" "}
               Advanced options
               {advancedCount > 0 ? ` (${advancedCount})` : ""}
-            </button>
-            {showAdvanced && (
+            </CollapsibleTrigger>
+            <CollapsibleContent>
               <div className="mt-4">
                 <AdvancedOptions
                   value={advanced}
@@ -475,18 +480,18 @@ export default function CompilePage() {
                   disabled={running}
                 />
               </div>
-            )}
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {heightRangeBad && (
-            <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-300">
-              <AlertCircle size={14} className="mt-px shrink-0" />
-              <span>
+            <Alert variant="warning" className="p-2.5">
+              <AlertCircle size={14} />
+              <AlertDescription className="text-xs">
                 Min height ({advanced.minh}) is at or above max height (
                 {advanced.maxh}) — the terrain will be flat or inverted. Set min
                 below max.
-              </span>
-            </p>
+              </AlertDescription>
+            </Alert>
           )}
 
           <div className="flex items-center gap-2 pt-1">
@@ -548,10 +553,15 @@ export default function CompilePage() {
             </div>
           )}
           {runError && (
-            <p className="flex items-start gap-2 border-b border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              <AlertCircle size={15} className="mt-px shrink-0" />
-              {runError}
-            </p>
+            <Alert
+              variant="destructive"
+              className="rounded-none border-x-0 border-t-0"
+            >
+              <AlertCircle size={15} />
+              <AlertDescription className="text-destructive">
+                {runError}
+              </AlertDescription>
+            </Alert>
           )}
           <div className="min-h-0 flex-1 overflow-auto bg-card/20 p-4">
             {logLines.length === 0 ? (

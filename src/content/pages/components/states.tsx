@@ -1,33 +1,49 @@
 import { Button } from "@picoframe/frame";
-import { AlertCircle, ArrowLeft, Inbox, TriangleAlert } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ChevronRight,
+  Inbox,
+  TriangleAlert,
+} from "lucide-react";
 import { Link } from "react-router";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /** Inline error banner (matches the content settings pages). */
 export function ErrorBanner({ message }: { message: string }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-      <AlertCircle className="mt-0.5 size-4 shrink-0" />
-      <span className="break-words">{message}</span>
-    </div>
+    <Alert variant="destructive">
+      <AlertCircle />
+      <AlertDescription className="break-words">{message}</AlertDescription>
+    </Alert>
   );
 }
 
 /** Collapsible list of non-fatal unitsync diagnostics from a scan. */
 export function Diagnostics({ errors }: { errors: string[] }) {
   return (
-    <details className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-      <summary className="cursor-pointer text-amber-700 dark:text-amber-400">
+    <Collapsible className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+      <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-1 text-left text-amber-700 dark:text-amber-400">
+        <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
         unitsync reported {errors.length} diagnostic
         {errors.length === 1 ? "" : "s"}
-      </summary>
-      <ul className="mt-2 flex flex-col gap-1 font-mono text-xs text-muted-foreground">
-        {errors.map((e) => (
-          <li key={e} className="break-words">
-            {e}
-          </li>
-        ))}
-      </ul>
-    </details>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <ul className="mt-2 flex flex-col gap-1 font-mono text-xs text-muted-foreground">
+          {errors.map((e) => (
+            <li key={e} className="break-words">
+              {e}
+            </li>
+          ))}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -60,13 +76,13 @@ export function WarningBanner({
   noun: string;
 }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-      <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-      <div className="flex min-w-0 flex-col gap-1">
-        <span className="font-medium text-amber-700 dark:text-amber-400">
-          unitsync reported {warnings.length} warning
-          {warnings.length === 1 ? "" : "s"} for this {noun}
-        </span>
+    <Alert variant="warning">
+      <TriangleAlert />
+      <AlertTitle>
+        unitsync reported {warnings.length} warning
+        {warnings.length === 1 ? "" : "s"} for this {noun}
+      </AlertTitle>
+      <AlertDescription>
         <ul className="flex flex-col gap-1 font-mono text-xs text-muted-foreground">
           {warnings.map((w) => (
             <li key={w} className="break-words">
@@ -74,8 +90,8 @@ export function WarningBanner({
             </li>
           ))}
         </ul>
-      </div>
-    </div>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -84,9 +100,9 @@ export function SkeletonList() {
   return (
     <div className="flex flex-col gap-2">
       {["a", "b", "c", "d"].map((k) => (
-        <div
+        <Skeleton
           key={k}
-          className="h-14 animate-pulse rounded-lg border border-border/50 bg-card"
+          className="h-14 rounded-lg border border-border/50 bg-card"
         />
       ))}
     </div>
@@ -136,12 +152,15 @@ export function DetailError({
       >
         <ArrowLeft className="size-3.5" /> Back
       </Link>
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
+      <Alert
+        variant="destructive"
+        className="flex items-center justify-between gap-3"
+      >
         <span className="break-words text-destructive">{message}</span>
         <Button variant="outline" size="sm" onClick={onRetry}>
           Retry
         </Button>
-      </div>
+      </Alert>
     </div>
   );
 }

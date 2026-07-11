@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { FolderOpen, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import type { ContentRoot } from "../../bindings";
 import { StatusBadge } from "./StatusBadge";
 
@@ -34,7 +35,7 @@ export function RootCard({
 }) {
   const isManual = root.source === "manual";
   return (
-    <article className="flex flex-col gap-4 rounded-lg border border-border/50 bg-card p-4">
+    <Card className="gap-4 rounded-lg border-border/50 p-4 shadow-none">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-1.5">
           <p className="break-all font-mono text-sm" title={root.path}>
@@ -117,6 +118,6 @@ export function RootCard({
           )}
         </div>
       </div>
-    </article>
+    </Card>
   );
 }

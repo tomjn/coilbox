@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Bookmark, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   useUnitsyncGameHeaders,
@@ -369,9 +370,11 @@ export default function SkirmishPage() {
       )}
 
       {error && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </p>
+        <Alert variant="destructive" className="p-3">
+          <AlertDescription className="text-destructive">
+            {error}
+          </AlertDescription>
+        </Alert>
       )}
 
       {running && (

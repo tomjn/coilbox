@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   invalidateGameInfo,
@@ -119,20 +120,24 @@ export function UnitRestrictions({
         ) : (
           <ul className="flex flex-wrap gap-1.5">
             {disabledUnits.map((name) => (
-              <li
+              <Badge
                 key={name}
-                className="inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-xs"
+                asChild
+                variant="ghost"
+                className="rounded bg-muted px-2 py-1 text-xs"
               >
-                <span className="font-mono">{name}</span>
-                <button
-                  type="button"
-                  aria-label={`Remove ${name}`}
-                  onClick={() => toggle(name, false)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <X className="size-3" />
-                </button>
-              </li>
+                <li>
+                  <span className="font-mono">{name}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${name}`}
+                    onClick={() => toggle(name, false)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </li>
+              </Badge>
             ))}
           </ul>
         )}

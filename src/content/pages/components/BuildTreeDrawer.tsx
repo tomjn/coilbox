@@ -1,4 +1,4 @@
-import { Button, cn } from "@picoframe/frame";
+import { cn } from "@picoframe/frame";
 import {
   Background,
   Controls,
@@ -13,6 +13,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { type CSSProperties, useMemo, useState } from "react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Side, UnitDatasetEntry } from "../../bindings";
 import { buildBuildGraph, buildEdgeMap } from "../../buildTree";
 import { useUnitsyncUnitBuildpics } from "../../config";
@@ -334,21 +335,15 @@ export function BuildTreeDrawer({
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, non-user CSS to animate React Flow edge paths (inline edge transition doesn't take) */}
       <style dangerouslySetInnerHTML={{ __html: EDGE_TRANSITION_CSS }} />
       {sides.length > 1 && (
-        <div role="tablist" className="flex flex-wrap gap-1.5">
-          {sides.map((s) => (
-            <Button
-              key={s.name}
-              type="button"
-              role="tab"
-              aria-selected={s.name === active?.name}
-              size="sm"
-              variant={s.name === active?.name ? "default" : "outline"}
-              onClick={() => setActiveName(s.name)}
-            >
-              {s.name}
-            </Button>
-          ))}
-        </div>
+        <Tabs value={active?.name ?? activeName} onValueChange={setActiveName}>
+          <TabsList className="h-auto flex-wrap gap-1.5">
+            {sides.map((s) => (
+              <TabsTrigger key={s.name} value={s.name} className="flex-none">
+                {s.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       )}
 
       {reachableCount === 0 ? (

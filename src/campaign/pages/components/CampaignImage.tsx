@@ -2,6 +2,7 @@ import { Button, cn } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ImageIcon, Milestone, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { IMAGE_EXTS, mediaKind, VIDEO_EXTS } from "../../../lib/assetUrl";
 import {
   type CampaignImageKind,
@@ -186,9 +187,11 @@ export function CampaignImageField({
       <span className="text-sm font-medium">{label}</span>
       {help && <p className="text-xs text-muted-foreground">{help}</p>}
       {error && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
-          {error}
-        </p>
+        <Alert variant="destructive" className="p-2">
+          <AlertDescription className="text-xs text-destructive">
+            {error}
+          </AlertDescription>
+        </Alert>
       )}
       {value && preview}
       <div className="flex gap-2">

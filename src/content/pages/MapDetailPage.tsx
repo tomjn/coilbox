@@ -1,5 +1,6 @@
 import { ArrowLeft, ImageOff } from "lucide-react";
 import { Link, useParams } from "react-router";
+import { Skeleton } from "@/components/ui/skeleton";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import {
   classifyArchive,
@@ -127,7 +128,7 @@ export default function MapDetailPage() {
           <div className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
             {minimap.loading ? (
               <div className="flex size-64 max-w-full items-center justify-center">
-                <div className="size-32 animate-pulse rounded bg-muted" />
+                <Skeleton className="size-32 rounded bg-muted" />
               </div>
             ) : minimap.dataUrl ? (
               // Give the box a definite width derived from the 32rem height cap
