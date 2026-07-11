@@ -22,9 +22,11 @@ import {
   mpKick,
   mpLeaveBattle,
   mpRemoveBot,
+  mpRemoveStartRect,
   mpSayBattle,
   mpSetBattleStatus,
   mpSetScriptTags,
+  mpSetStartRect,
   mpSetStatus,
   mpUpdateBattleInfo,
 } from "../bindings";
@@ -79,6 +81,24 @@ export interface BattleRoomView {
   canEditOptions: boolean;
   /** Dispatch one option edit: founder → SETSCRIPTTAGS, autohost → `!bSet`. */
   sendOption: (tagKey: string, spadsName: string, value: string) => void;
+  /**
+   * Whether the local user may draw/clear start boxes: they can edit options AND
+   * the battle is in "choose in-game" mode (startPosType 2) — SPADS rejects box
+   * commands otherwise, and boxes are only meaningful then.
+   */
+  canEditBoxes: boolean;
+  /**
+   * Set (create/move/resize) one ally's start box; `ally` is 0-based. Founder →
+   * ADDSTARTRECT; autohost → `!addbox <l> <t> <r> <b> <ally+1>` (SPADS teamNb is
+   * 1-based and replaces the ally's box). Coords are 0..200 ints, left<=right,
+   * top<=bottom.
+   */
+  setStartBox: (
+    ally: number,
+    rect: { left: number; top: number; right: number; bottom: number },
+  ) => void;
+  /** Clear one ally's start box (0-based). Founder → REMOVESTARTRECT; autohost → `!clearbox <ally+1>`. */
+  clearStartBox: (ally: number) => void;
   startPosType: number;
   mapMissing: boolean;
   gameMissing: boolean;
@@ -464,6 +484,45 @@ export function useBattleRoom(): BattleRoomView {
     [activeKey, isFounder, autohostSend, setErr, clearErr],
   );
 
+  // Start-box edits follow the same founder/autohost fork as options. Founder
+  // drives the rects over the protocol (ADDSTARTRECT/REMOVESTARTRECT); an autohost
+  // battle goes through SPADS `!addbox`/`!clearbox`, whose teamNb is 1-based (so we
+  // send `ally + 1`) and which requires startPosType 2 (gated by `canEditBoxes`).
+  const setStartBox = useCallback(
+    (
+      ally: number,
+      rect: { left: number; top: number; right: number; bottom: number },
+    ) => {
+      if (!activeKey) return;
+      if (isFounder) {
+        mpSetStartRect({ serverKey: activeKey, ally, ...rect }).then(
+          clearErr,
+          setErr,
+        );
+      } else {
+        autohostSend(
+          `!addbox ${rect.left} ${rect.top} ${rect.right} ${rect.bottom} ${ally + 1}`,
+        );
+      }
+    },
+    [activeKey, isFounder, autohostSend, clearErr, setErr],
+  );
+
+  const clearStartBox = useCallback(
+    (ally: number) => {
+      if (!activeKey) return;
+      if (isFounder) {
+        mpRemoveStartRect({ serverKey: activeKey, ally }).then(
+          clearErr,
+          setErr,
+        );
+      } else {
+        autohostSend(`!clearbox ${ally + 1}`);
+      }
+    },
+    [activeKey, isFounder, autohostSend, clearErr, setErr],
+  );
+
   const rescan = useCallback(async () => {
     if (enginePath && dataDir && battle?.map) {
       invalidateMapPreview(enginePath, dataDir, battle.map);
@@ -491,6 +550,9 @@ export function useBattleRoom(): BattleRoomView {
     mapOptionsSchema,
     canEditOptions,
     sendOption,
+    canEditBoxes: canEditOptions && startPosType === 2,
+    setStartBox,
+    clearStartBox,
     startPosType,
     mapMissing,
     gameMissing,
