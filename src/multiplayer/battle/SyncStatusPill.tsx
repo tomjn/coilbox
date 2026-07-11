@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { SyncState } from "./config";
 
@@ -35,15 +36,13 @@ export function SyncStatusPill({
 }) {
   const cfg = CONFIG[state];
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
-        cfg.pill,
-      )}
+    <Badge
+      variant="ghost"
+      className={cn("gap-1.5", cfg.pill)}
       title={detail ?? cfg.label}
     >
       <span className={cn("size-2 rounded-full", cfg.dot)} />
       {detail ?? cfg.label}
-    </span>
+    </Badge>
   );
 }

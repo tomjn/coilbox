@@ -1,5 +1,6 @@
 import { cn } from "@picoframe/frame";
 import type { ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
 
 type Tone = "neutral" | "good" | "warn" | "info";
 
@@ -21,14 +22,8 @@ export function StatusBadge({
   className?: string;
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-        TONES[tone],
-        className,
-      )}
-    >
+    <Badge variant="ghost" className={cn(TONES[tone], className)}>
       {children}
-    </span>
+    </Badge>
   );
 }
