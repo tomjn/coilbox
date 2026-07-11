@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { versionLabel } from "@/lib/utils";
 import {
   type LogLine,
@@ -229,11 +230,16 @@ export default function DecompilePage() {
       </header>
 
       {probe && !probe.decompile && (
-        <p className="flex items-start gap-2 border-b border-amber-500/40 bg-amber-500/10 px-6 py-3 text-sm text-amber-700 dark:text-amber-400">
-          <AlertCircle size={15} className="mt-px shrink-0" />
-          The <code>mapdecompile</code> sidecar was not found. Bundle
-          SpringMapConvNG or set <code>MAPCONV_MAPDECOMPILE_SIDECAR</code>.
-        </p>
+        <Alert
+          variant="warning"
+          className="rounded-none border-x-0 border-t-0 px-6"
+        >
+          <AlertCircle size={15} />
+          <AlertDescription>
+            The <code>mapdecompile</code> sidecar was not found. Bundle
+            SpringMapConvNG or set <code>MAPCONV_MAPDECOMPILE_SIDECAR</code>.
+          </AlertDescription>
+        </Alert>
       )}
 
       <div className="grid min-h-0 flex-1 grid-cols-[28rem_minmax(0,1fr)]">
@@ -374,10 +380,15 @@ export default function DecompilePage() {
             </div>
           )}
           {runError && (
-            <p className="flex items-start gap-2 border-b border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              <AlertCircle size={15} className="mt-px shrink-0" />
-              {runError}
-            </p>
+            <Alert
+              variant="destructive"
+              className="rounded-none border-x-0 border-t-0"
+            >
+              <AlertCircle size={15} />
+              <AlertDescription className="text-destructive">
+                {runError}
+              </AlertDescription>
+            </Alert>
           )}
           <div className="min-h-0 flex-1 overflow-auto bg-card/20 p-4">
             {logLines.length === 0 ? (

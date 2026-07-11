@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { AlertCircle, FolderPlus, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDefaultWriteRoot } from "../../downloads/config";
@@ -194,14 +195,16 @@ export default function FoldersSection() {
         </div>
 
         {(error || actionError) && (
-          <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span className="break-words">{error ?? actionError}</span>
-          </div>
+          <Alert variant="destructive">
+            <AlertCircle />
+            <AlertDescription className="break-words">
+              {error ?? actionError}
+            </AlertDescription>
+          </Alert>
         )}
 
         {addError && (
-          <div className="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          <Alert variant="warning" className="flex flex-col gap-2">
             <span className="break-words">{addError.message}</span>
             <span className="break-all font-mono text-xs text-muted-foreground">
               {addError.path}
@@ -224,7 +227,7 @@ export default function FoldersSection() {
                 Cancel
               </Button>
             </div>
-          </div>
+          </Alert>
         )}
 
         {loading && !state ? (

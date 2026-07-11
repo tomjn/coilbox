@@ -14,6 +14,7 @@ import {
 import type { CSSProperties } from "react";
 import { type ReactNode, useState } from "react";
 import { Link, useParams } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { invalidateMapPreview, invalidateScans } from "../../content/config";
 import { type DownloadProgress, dlDownloadMap } from "../../downloads/bindings";
 import { useWriteRootPath } from "../../downloads/config";
@@ -233,9 +234,11 @@ function Briefing({
         )}
 
         {run.error && (
-          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-            {run.error}
-          </p>
+          <Alert variant="destructive" className="p-3">
+            <AlertDescription className="text-destructive">
+              {run.error}
+            </AlertDescription>
+          </Alert>
         )}
 
         <StartArea run={run} />
@@ -363,9 +366,11 @@ function MissionRequiredGate({
       </p>
 
       {error && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </p>
+        <Alert variant="destructive" className="p-3">
+          <AlertDescription className="text-destructive">
+            {error}
+          </AlertDescription>
+        </Alert>
       )}
 
       {isMap ? (
@@ -421,9 +426,11 @@ function ResultPrompt({ run }: { run: ReturnType<typeof useMissionRun> }) {
         Report the outcome to record your progress.
       </p>
       {run.error && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {run.error}
-        </p>
+        <Alert variant="destructive" className="p-3">
+          <AlertDescription className="text-destructive">
+            {run.error}
+          </AlertDescription>
+        </Alert>
       )}
       <div className="flex flex-wrap gap-3">
         <Button onClick={run.recordVictory} disabled={run.saving}>

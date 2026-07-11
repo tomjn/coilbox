@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -678,10 +679,15 @@ export default function RunPage() {
             </div>
           )}
           {runError && (
-            <p className="flex items-start gap-2 border-b border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              <AlertCircle size={15} className="mt-px shrink-0" />
-              {runError}
-            </p>
+            <Alert
+              variant="destructive"
+              className="rounded-none border-x-0 border-t-0"
+            >
+              <AlertCircle size={15} />
+              <AlertDescription className="text-destructive">
+                {runError}
+              </AlertDescription>
+            </Alert>
           )}
           <button
             type="button"

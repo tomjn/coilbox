@@ -1,6 +1,7 @@
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EngineInstaller } from "../../downloads/pages/components/EngineInstaller";
 import {
@@ -73,10 +74,12 @@ export default function EnginesSection() {
       </p>
 
       {actionError && (
-        <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <span className="break-words">{actionError}</span>
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertDescription className="break-words">
+            {actionError}
+          </AlertDescription>
+        </Alert>
       )}
 
       {loading && !state ? (

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
   TableBody,
@@ -325,10 +326,12 @@ export default function HistoryPage() {
           )}
           <div className="min-h-0 flex-1 overflow-auto">
             {listError && (
-              <p className="m-3 flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
-                <AlertCircle size={14} className="mt-px shrink-0" />
-                {listError}
-              </p>
+              <Alert variant="destructive" className="m-3">
+                <AlertCircle size={14} />
+                <AlertDescription className="text-xs text-destructive">
+                  {listError}
+                </AlertDescription>
+              </Alert>
             )}
             {runs?.length === 0 && !listError && (
               <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
@@ -391,10 +394,12 @@ export default function HistoryPage() {
               <Loader2 size={15} className="animate-spin" /> loading report…
             </p>
           ) : reportError ? (
-            <p className="m-6 flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-              <AlertCircle size={15} className="mt-px shrink-0" />
-              {reportError}
-            </p>
+            <Alert variant="destructive" className="m-6">
+              <AlertCircle size={15} />
+              <AlertDescription className="text-destructive">
+                {reportError}
+              </AlertDescription>
+            </Alert>
           ) : report ? (
             <div className="space-y-6 p-6">
               <div className="flex items-start justify-between gap-4">

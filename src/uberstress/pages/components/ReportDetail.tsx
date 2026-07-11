@@ -1,5 +1,6 @@
 import { cn } from "@picoframe/frame";
 import { AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { Report } from "../../bindings";
 import {
   detectEarlyTermination,
@@ -127,20 +128,18 @@ export function EarlyTerminationNotice({ report }: { report: Report }) {
   if (!early) return null;
   const top = early.failedCommands[0];
   return (
-    <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
-      <AlertTriangle size={15} className="mt-px shrink-0" />
-      <div className="space-y-0.5">
-        <p className="font-medium">
-          Run ended early — {early.actualSec.toFixed(1)}s of the requested ~
-          {early.expectedSec.toFixed(0)}s window.
-        </p>
-        <p className="text-amber-700/90 dark:text-amber-300/90">
-          {top
-            ? `${top.errors} ${top.command} attempt${top.errors === 1 ? "" : "s"} failed, so connections didn't stay open to sustain the hold.`
-            : "Connections didn't stay open to sustain the hold."}
-        </p>
-      </div>
-    </div>
+    <Alert variant="warning">
+      <AlertTriangle size={15} />
+      <AlertTitle className="line-clamp-none">
+        Run ended early — {early.actualSec.toFixed(1)}s of the requested ~
+        {early.expectedSec.toFixed(0)}s window.
+      </AlertTitle>
+      <AlertDescription>
+        {top
+          ? `${top.errors} ${top.command} attempt${top.errors === 1 ? "" : "s"} failed, so connections didn't stay open to sustain the hold.`
+          : "Connections didn't stay open to sustain the hold."}
+      </AlertDescription>
+    </Alert>
   );
 }
 

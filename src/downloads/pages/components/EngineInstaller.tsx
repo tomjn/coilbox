@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { dlRecoilEngines, dlSpringfilesEngines } from "../../bindings";
 import { useWriteRootPath } from "../../config";
 import {
@@ -145,10 +146,12 @@ export function EngineInstaller() {
         </p>
       )}
       {error && (
-        <p className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle size={15} className="mt-px shrink-0" />
-          {error}
-        </p>
+        <Alert variant="destructive">
+          <AlertCircle size={15} />
+          <AlertDescription className="text-destructive">
+            {error}
+          </AlertDescription>
+        </Alert>
       )}
       {items && items.length === 0 && (
         <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">

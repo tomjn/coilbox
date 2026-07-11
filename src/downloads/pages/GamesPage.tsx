@@ -8,6 +8,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   dlInstalledContent,
   dlSpringfilesList,
@@ -193,10 +194,12 @@ export default function GamesPage() {
           </p>
         )}
         {error && (
-          <p className="m-4 flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-            <AlertCircle size={15} className="mt-px shrink-0" />
-            {error}
-          </p>
+          <Alert variant="destructive" className="m-4">
+            <AlertCircle size={15} />
+            <AlertDescription className="text-destructive">
+              {error}
+            </AlertDescription>
+          </Alert>
         )}
         {sorted && sorted.length === 0 && (
           <EmptyState icon={Gamepad2}>

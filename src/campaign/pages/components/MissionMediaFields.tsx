@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Music, Trash2, Video } from "lucide-react";
 import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AUDIO_EXTS, VIDEO_EXTS } from "../../../lib/assetUrl";
 import { campaignMediaImport } from "../../bindings";
 import type { MediaPlayback, MediaRef } from "../../model";
@@ -110,9 +111,11 @@ export function MissionAvField({
       <span className="text-sm font-medium">{label}</span>
       {help && <p className="text-xs text-muted-foreground">{help}</p>}
       {error && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
-          {error}
-        </p>
+        <Alert variant="destructive" className="p-2">
+          <AlertDescription className="text-xs text-destructive">
+            {error}
+          </AlertDescription>
+        </Alert>
       )}
       {src &&
         (kind === "audio" ? (
