@@ -43,7 +43,7 @@ const gameName = (g: SpringFile) => g.name || g.springname;
  */
 export default function GamesPage() {
   const writePath = useWriteRootPath();
-  const { enqueue, statusFor } = useDownloadQueue();
+  const { enqueue, statusFor, active } = useDownloadQueue();
   const [games, setGames] = useState<SpringFile[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -271,7 +271,9 @@ export default function GamesPage() {
                             ? "Queued"
                             : status === "done"
                               ? "Done"
-                              : "Add to queue"}
+                              : active
+                                ? "Add to queue"
+                                : "Download"}
                     </Button>
                   </div>
                 </li>
