@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { Progress } from "@/components/ui/progress";
 import {
   type LogLine,
   type Report,
@@ -127,16 +128,16 @@ function RunProgress({
           {elapsed.toFixed(0)}s{windowSec ? ` / ~${windowSec.toFixed(0)}s` : ""}
         </span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
-        {pct === null ? (
+      {pct === null ? (
+        <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
           <div className="h-full w-1/3 animate-pulse rounded bg-accent" />
-        ) : (
-          <div
-            className="h-full rounded bg-accent transition-all duration-300"
-            style={{ width: `${pct}%` }}
-          />
-        )}
-      </div>
+        </div>
+      ) : (
+        <Progress
+          value={pct}
+          className="h-1.5 rounded bg-muted [&>[data-slot=progress-indicator]]:bg-accent"
+        />
+      )}
       {live ? (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <LiveStat label="Sent" value={live.sent.toLocaleString()} />
