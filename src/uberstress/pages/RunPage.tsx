@@ -14,6 +14,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Progress } from "@/components/ui/progress";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   type LogLine,
   type Report,
@@ -431,24 +432,22 @@ export default function RunPage() {
         {/* Left: form */}
         <div className="min-h-0 space-y-5 overflow-auto border-r border-border px-6 py-5">
           {/* Mode toggle */}
-          <div className="inline-flex rounded-md border border-border p-0.5 text-sm">
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={mode}
+            onValueChange={(v) => {
+              if (v) setMode(v as "load" | "bench");
+            }}
+            disabled={running}
+          >
             {(["load", "bench"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                disabled={running}
-                onClick={() => setMode(m)}
-                className={cn(
-                  "rounded px-3 py-1 capitalize transition-colors",
-                  mode === m
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
+              <ToggleGroupItem key={m} value={m} className="px-3 capitalize">
                 {m}
-              </button>
+              </ToggleGroupItem>
             ))}
-          </div>
+          </ToggleGroup>
 
           {/* Target */}
           {mode === "bench" && (
