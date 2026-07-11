@@ -12,10 +12,14 @@ vi.mock("@picoframe/frame", () => ({
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
 }));
-// ringEffect touches `window` at module top-level for its audio-unlock listeners,
-// which the `node` test environment lacks; the reducer tests never ring, so stub it.
+// ringEffect and ingameCue both touch `window` at module top-level for their
+// audio-unlock listeners, which the `node` test environment lacks; the reducer
+// tests never ring or cue, so stub both.
 vi.mock("./ringEffect", () => ({
   triggerRing: () => {},
+}));
+vi.mock("./ingameCue", () => ({
+  triggerIngameCue: () => {},
 }));
 
 import { initialMirror, mirrorReducer } from "./store";
