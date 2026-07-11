@@ -1,5 +1,6 @@
 import { cn } from "@picoframe/frame";
 import type { ReactNode } from "react";
+import { Label } from "@/components/ui/label";
 
 /** A labelled form field. Wrapping the control in the <label> associates them. */
 export function Field({
@@ -14,8 +15,12 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: control is the wrapped {children} (implicit label association)
-    <label className={cn("flex flex-col gap-1.5 text-sm", className)}>
+    <Label
+      className={cn(
+        "flex flex-col items-stretch gap-1.5 text-sm font-normal",
+        className,
+      )}
+    >
       <span className="font-medium leading-none">{label}</span>
       {children}
       {hint && (
@@ -23,6 +28,6 @@ export function Field({
           {hint}
         </span>
       )}
-    </label>
+    </Label>
   );
 }

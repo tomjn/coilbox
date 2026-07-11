@@ -1,4 +1,5 @@
 import { Maximize2, Sparkles, Wrench } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import { useAdvancedModeSetting } from "../advanced";
@@ -36,9 +37,9 @@ export default function GeneralSettings() {
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           <Wrench size={15} /> Advanced tools
         </h2>
-        <label
+        <Label
           htmlFor="advanced-mode"
-          className="flex cursor-pointer items-start gap-3"
+          className="flex cursor-pointer items-start gap-3 font-normal"
         >
           <Switch
             id="advanced-mode"
@@ -54,7 +55,7 @@ export default function GeneralSettings() {
               screen. Off by default for a player-focused layout.
             </span>
           </span>
-        </label>
+        </Label>
       </section>
 
       {(!fullscreenLocked || showSplashToggle) && (
@@ -63,9 +64,9 @@ export default function GeneralSettings() {
             <Maximize2 size={15} /> Display
           </h2>
           {!fullscreenLocked && (
-            <label
+            <Label
               htmlFor="fullscreen-mode"
-              className="flex cursor-pointer items-start gap-3"
+              className="flex cursor-pointer items-start gap-3 font-normal"
             >
               <Switch
                 id="fullscreen-mode"
@@ -80,12 +81,12 @@ export default function GeneralSettings() {
                   top-bar button; the choice is remembered across restarts.
                 </span>
               </span>
-            </label>
+            </Label>
           )}
           {showSplashToggle && (
-            <label
+            <Label
               htmlFor="startup-splash"
-              className="flex cursor-pointer items-start gap-3"
+              className="flex cursor-pointer items-start gap-3 font-normal"
             >
               <Switch
                 id="startup-splash"
@@ -102,7 +103,7 @@ export default function GeneralSettings() {
                   Escape to dismiss it early.
                 </span>
               </span>
-            </label>
+            </Label>
           )}
         </section>
       )}
@@ -133,9 +134,9 @@ export default function GeneralSettings() {
             </span>
           </span>
         </div>
-        <label
+        <Label
           htmlFor="display-effects"
-          className="flex cursor-pointer items-start gap-3"
+          className="flex cursor-pointer items-start gap-3 font-normal"
         >
           <Switch
             id="display-effects"
@@ -150,10 +151,10 @@ export default function GeneralSettings() {
               touches. Turn off for a plainer, quieter interface.
             </span>
           </span>
-        </label>
-        <label
+        </Label>
+        <Label
           htmlFor="display-performance"
-          className="flex cursor-pointer items-start gap-3"
+          className="flex cursor-pointer items-start gap-3 font-normal"
         >
           <Switch
             id="display-performance"
@@ -168,7 +169,7 @@ export default function GeneralSettings() {
               laptops and older GPUs.
             </span>
           </span>
-        </label>
+        </Label>
       </section>
 
       <AboutCoilbox />

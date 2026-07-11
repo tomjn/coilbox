@@ -6,6 +6,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Label } from "@/components/ui/label";
 import type { ConfigOption, GameItem } from "@/content/bindings";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 
@@ -166,7 +167,7 @@ export function ModOptionField({
 
   const isNumber = o.type === "number";
   return (
-    <label htmlFor={id} className="block">
+    <Label htmlFor={id} className="block font-normal">
       <span
         className="mb-1.5 block truncate text-xs text-muted-foreground"
         title={o.description ?? o.name}
@@ -184,6 +185,6 @@ export function ModOptionField({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
       />
-    </label>
+    </Label>
   );
 }

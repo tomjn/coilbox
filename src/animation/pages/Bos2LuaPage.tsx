@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Check, Copy, FileCode2, Upload } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { bos2lua } from "../bos2lua";
 
@@ -80,7 +81,10 @@ export default function Bos2LuaPage() {
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-4 p-6">
-        <label htmlFor="bos-input" className="flex min-h-0 flex-col gap-2">
+        <Label
+          htmlFor="bos-input"
+          className="flex min-h-0 flex-col items-stretch gap-2 font-normal"
+        >
           <span className="text-sm font-medium text-muted-foreground">BOS</span>
           <Textarea
             id="bos-input"
@@ -97,8 +101,11 @@ export default function Bos2LuaPage() {
             spellCheck={false}
             className="min-h-0 flex-1 resize-none font-mono text-xs leading-relaxed"
           />
-        </label>
-        <label htmlFor="lua-output" className="flex min-h-0 flex-col gap-2">
+        </Label>
+        <Label
+          htmlFor="lua-output"
+          className="flex min-h-0 flex-col items-stretch gap-2 font-normal"
+        >
           <span className="text-sm font-medium text-muted-foreground">Lua</span>
           <Textarea
             id="lua-output"
@@ -108,7 +115,7 @@ export default function Bos2LuaPage() {
             spellCheck={false}
             className="min-h-0 flex-1 resize-none bg-card/30 font-mono text-xs leading-relaxed"
           />
-        </label>
+        </Label>
       </div>
     </div>
   );
