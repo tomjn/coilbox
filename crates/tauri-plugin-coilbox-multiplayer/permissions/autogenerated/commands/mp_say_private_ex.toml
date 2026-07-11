@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-say-private-ex"
+description = "Enables the mp_say_private_ex command without any pre-configured scope."
+commands.allow = ["mp_say_private_ex"]
+
+[[permission]]
+identifier = "deny-mp-say-private-ex"
+description = "Denies the mp_say_private_ex command without any pre-configured scope."
+commands.deny = ["mp_say_private_ex"]

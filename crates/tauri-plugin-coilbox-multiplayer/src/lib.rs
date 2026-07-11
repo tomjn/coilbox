@@ -335,6 +335,60 @@ fn mp_say_battle(registry: State<'_, Registry>, server_key: String, message: Str
     enqueue(registry.inner(), &server_key, command::say_battle(&message))
 }
 
+/// `mp_say_ex` — a channel action / `/me` via `SAYEX`. The server echoes `SAIDEX`,
+/// so (like `mp_say`) we just enqueue the wire line and let the echo render it.
+#[tauri::command]
+fn mp_say_ex(
+    registry: State<'_, Registry>,
+    server_key: String,
+    channel: String,
+    message: String,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::say_ex(&channel, &message),
+    )
+}
+
+/// `mp_say_battle_ex` — a battle-chat action / `/me` via `SAYBATTLEEX`. Echoed back
+/// as `SAIDBATTLEEX`, like `mp_say_battle`.
+#[tauri::command]
+fn mp_say_battle_ex(
+    registry: State<'_, Registry>,
+    server_key: String,
+    message: String,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::say_battle_ex(&message),
+    )
+}
+
+/// `mp_say_private_ex` — a private action / `/me` via `SAYPRIVATEEX`. Posts a typed
+/// `SayPrivateEx` so the connection task records the local emote copy and emits a
+/// delta before sending (the server does not echo it back to us in a parsed form).
+#[tauri::command]
+fn mp_say_private_ex(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+    message: String,
+) -> CliResult {
+    let map = lock_or_recover(&registry);
+    match map.get(&server_key) {
+        Some(conn) => match conn.tx.send(Outbound::SayPrivateEx {
+            peer: username,
+            text: message,
+        }) {
+            Ok(()) => CliResult::ok(json!({ "sent": true })),
+            Err(_) => CliResult::err("connection is closed"),
+        },
+        None => CliResult::err(format!("not connected: {server_key}")),
+    }
+}
+
 /// `mp_join_channel` — join a chat channel (optional key).
 #[tauri::command]
 fn mp_join_channel(
@@ -1024,6 +1078,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_say,
             mp_say_private,
             mp_say_battle,
+            mp_say_ex,
+            mp_say_battle_ex,
+            mp_say_private_ex,
             mp_join_channel,
             mp_leave_channel,
             mp_list_channels,

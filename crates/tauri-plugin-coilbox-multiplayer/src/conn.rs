@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use coilbox_lobby_protocol::{
-    command, parse_line, record_outgoing_private, reduce_at, Delta, LobbyState, LoginConfig,
-    LoginMachine, LoginPhase, ServerMessage,
+    command, parse_line, record_outgoing_private, reduce_at, ChatKind, Delta, LobbyState,
+    LoginConfig, LoginMachine, LoginPhase, ServerMessage,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
@@ -46,6 +46,7 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 pub enum Outbound {
     Line(String),
     SayPrivate { peer: String, text: String },
+    SayPrivateEx { peer: String, text: String },
     ConfirmAgreement { code: Option<String> },
     Shutdown,
 }
@@ -291,8 +292,13 @@ async fn run_loop(
                 }
                 Outbound::SayPrivate { peer, text } => {
                     let now = now_ms();
-                    let deltas =
-                        record_outgoing_private(&mut lock_or_recover(&state), &peer, &text, now);
+                    let deltas = record_outgoing_private(
+                        &mut lock_or_recover(&state),
+                        &peer,
+                        &text,
+                        ChatKind::Private,
+                        now,
+                    );
                     let last = lock_or_recover(&state)
                         .dms
                         .get(&peer)
@@ -305,6 +311,30 @@ async fn run_loop(
                         emit(&sink, LobbyEvent::Delta { delta });
                     }
                     outbound.push(command::say_private(&peer, &text));
+                }
+                Outbound::SayPrivateEx { peer, text } => {
+                    // A private `/me` action. Mirrors SayPrivate but records the local
+                    // copy as an emote and sends the SAYPRIVATEEX verb.
+                    let now = now_ms();
+                    let deltas = record_outgoing_private(
+                        &mut lock_or_recover(&state),
+                        &peer,
+                        &text,
+                        ChatKind::SaidEx,
+                        now,
+                    );
+                    let last = lock_or_recover(&state)
+                        .dms
+                        .get(&peer)
+                        .and_then(|t| t.last())
+                        .cloned();
+                    if let Some(m) = last {
+                        dm_log.append(&peer, &m);
+                    }
+                    for delta in deltas {
+                        emit(&sink, LobbyEvent::Delta { delta });
+                    }
+                    outbound.push(command::say_private_ex(&peer, &text));
                 }
             },
             _ = ping.tick() => outbound.push(command::ping(None)),
