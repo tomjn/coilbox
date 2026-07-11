@@ -1,5 +1,4 @@
-import { Button, cn, Input } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
+import { Button, Input } from "@picoframe/frame";
 import {
   AlertCircle,
   CheckCircle2,
@@ -7,21 +6,20 @@ import {
   Gamepad2,
   Loader2,
   Search,
-  X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { invalidateScans } from "../../content/config";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  type DownloadProgress,
-  dlCancel,
-  dlDownloadFile,
   dlInstalledContent,
   dlSpringfilesList,
   type SpringFile,
 } from "../bindings";
 import { useContentRootPaths, useWriteRootPath } from "../config";
+import {
+  identityOf,
+  useDownloadComplete,
+  useDownloadQueue,
+} from "../DownloadQueueProvider";
 import { OptionSelect } from "./components/OptionSelect";
-import { ProgressBar } from "./components/ProgressBar";
 import { EmptyState, errMessage } from "./components/states";
 
 type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
@@ -44,22 +42,17 @@ const gameName = (g: SpringFile) => g.name || g.springname;
  */
 export default function GamesPage() {
   const writePath = useWriteRootPath();
+  const { enqueue, statusFor } = useDownloadQueue();
   const [games, setGames] = useState<SpringFile[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name-asc");
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
-    null,
-  );
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     setGames(null);
-    setResult(null);
     try {
       const { results } = await dlSpringfilesList({ category: "game" });
       setGames(results);
@@ -94,45 +87,26 @@ export default function GamesPage() {
     refreshInstalled();
   }, [refreshInstalled]);
 
-  // Id of the in-flight download so the Cancel button can stop it. One download
-  // runs at a time (the button is gated on `downloading`), so a single ref holds.
-  const opIdRef = useRef<string | null>(null);
+  // Re-scan installed content once the queue finishes a download so a freshly
+  // fetched game flips to "Already downloaded" without a manual reload. (The
+  // queue runner drops the stale unitsync scan cache itself.)
+  useDownloadComplete(() => {
+    refreshInstalled();
+  });
 
-  async function download(game: SpringFile) {
+  // Add a game to the app-wide download queue. The game is fetched by a direct
+  // mirror download into `<root>/games/`.
+  function enqueueGame(game: SpringFile) {
     if (!writePath || !game.mirrors[0]) return;
-    const opId = crypto.randomUUID();
-    opIdRef.current = opId;
-    setDownloading(game.springname);
-    setProgress(null);
-    setResult(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = (p) => setProgress(p);
-    try {
-      const { message } = await dlDownloadFile({
+    enqueue({
+      kind: "file",
+      label: game.name || game.springname,
+      args: {
         url: game.mirrors[0],
         destDir: `${writePath}/games`,
         filename: game.filename,
-        opId,
-        onProgress,
-      });
-      setResult({ ok: true, message });
-      await refreshInstalled();
-      // A newly-downloaded game must show up in the singleplayer picker without a
-      // manual rescan, so drop the stale unitsync scan cache.
-      invalidateScans();
-    } catch (e) {
-      setResult({ ok: false, message: errMessage(e) });
-    } finally {
-      opIdRef.current = null;
-      setDownloading(null);
-      setProgress(null);
-    }
-  }
-
-  // Best-effort: signal the backend to stop the running download. The awaited
-  // `download()` promise then rejects with the "cancelled" message via its catch.
-  function cancelDownload() {
-    if (opIdRef.current) dlCancel({ opId: opIdRef.current }).catch(() => {});
+      },
+    });
   }
 
   const filtered = useMemo(() => {
@@ -235,6 +209,20 @@ export default function GamesPage() {
           <ul className="divide-y divide-border">
             {sorted.map((g) => {
               const isInstalled = installed.has(g.filename.toLowerCase());
+              const name = g.name || g.springname;
+              const status = g.mirrors[0]
+                ? statusFor(
+                    identityOf({
+                      kind: "file",
+                      label: name,
+                      args: {
+                        url: g.mirrors[0],
+                        destDir: `${writePath}/games`,
+                        filename: g.filename,
+                      },
+                    }),
+                  )
+                : null;
               return (
                 <li
                   key={g.springname}
@@ -242,9 +230,7 @@ export default function GamesPage() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {g.name || g.springname}
-                      </p>
+                      <p className="truncate text-sm font-medium">{name}</p>
                       <p className="truncate font-mono text-xs text-muted-foreground">
                         {g.filename}
                       </p>
@@ -252,74 +238,45 @@ export default function GamesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => download(g)}
+                      onClick={() => enqueueGame(g)}
                       disabled={
-                        downloading !== null ||
                         !writePath ||
                         !g.mirrors[0] ||
-                        isInstalled
+                        isInstalled ||
+                        status === "queued" ||
+                        status === "active" ||
+                        status === "done"
                       }
                       aria-label={
                         isInstalled
-                          ? `${g.name || g.springname} already downloaded`
-                          : `Download ${g.name || g.springname}`
+                          ? `${name} already downloaded`
+                          : `Download ${name}`
                       }
                     >
-                      {downloading === g.springname ? (
+                      {status === "active" ? (
                         <Loader2 className="animate-spin" />
-                      ) : isInstalled ? (
+                      ) : isInstalled || status === "done" ? (
                         <CheckCircle2 className="text-emerald-500" />
                       ) : (
                         <Download />
                       )}
-                      {downloading === g.springname
-                        ? "Downloading…"
-                        : isInstalled
-                          ? "Already downloaded"
-                          : "Download"}
+                      {isInstalled
+                        ? "Already downloaded"
+                        : status === "active"
+                          ? "Downloading…"
+                          : status === "queued"
+                            ? "Queued"
+                            : status === "done"
+                              ? "Done"
+                              : "Add to queue"}
                     </Button>
-                    {downloading === g.springname && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={cancelDownload}
-                        aria-label={`Cancel downloading ${g.name || g.springname}`}
-                      >
-                        <X />
-                        Cancel
-                      </Button>
-                    )}
                   </div>
-                  {downloading === g.springname && progress && (
-                    <ProgressBar progress={progress} />
-                  )}
                 </li>
               );
             })}
           </ul>
         )}
       </div>
-
-      {result && (
-        <div
-          className={cn(
-            "flex items-start gap-2 border-t px-6 py-3 text-sm",
-            result.ok
-              ? "border-border bg-card text-card-foreground"
-              : "border-destructive/40 bg-destructive/10 text-destructive",
-          )}
-        >
-          {result.ok ? (
-            <CheckCircle2
-              size={16}
-              className="mt-px shrink-0 text-emerald-500"
-            />
-          ) : (
-            <AlertCircle size={16} className="mt-px shrink-0" />
-          )}
-          <span className="min-w-0 break-words">{result.message}</span>
-        </div>
-      )}
     </div>
   );
 }

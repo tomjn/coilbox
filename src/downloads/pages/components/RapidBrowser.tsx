@@ -1,5 +1,4 @@
 import { Button, cn, Input } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
 import {
   AlertCircle,
   CheckCircle2,
@@ -11,8 +10,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  type DownloadProgress,
-  dlDownload,
   dlRepos,
   dlVersion,
   dlVersions,
@@ -20,8 +17,8 @@ import {
   type Version,
 } from "../../bindings";
 import { useDownloadsConfig } from "../../config";
+import { identityOf, useDownloadQueue } from "../../DownloadQueueProvider";
 import { OptionSelect } from "./OptionSelect";
-import { ProgressBar } from "./ProgressBar";
 import { EmptyState, errMessage } from "./states";
 
 const DEFAULT_MASTER = "https://repos.springrts.com";
@@ -71,6 +68,7 @@ function SidecarWarning() {
  * Shared by the Browse Rapid page and the Games page's rapid source.
  */
 export function RapidBrowser({ writePath }: { writePath?: string }) {
+  const { enqueue, statusFor } = useDownloadQueue();
   const [cfg] = useDownloadsConfig();
   const [masterUrl, setMasterUrl] = useState(
     () => cfg.rapidRepos[0]?.url ?? DEFAULT_MASTER,
@@ -86,19 +84,11 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
   const [versionsError, setVersionsError] = useState<string | null>(null);
   const [versionFilter, setVersionFilter] = useState("");
 
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [downloadResult, setDownloadResult] = useState<{
-    ok: boolean;
-    message: string;
-  } | null>(null);
-
   const loadRepos = useCallback(async (url: string) => {
     setReposLoading(true);
     setReposError(null);
     setSelected(null);
     setVersions(null);
-    setDownloadResult(null);
     try {
       const { repos } = await dlRepos({
         masterUrl: url.trim() || DEFAULT_MASTER,
@@ -126,7 +116,6 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     setVersionsError(null);
     setVersionsLoading(true);
     setVersionFilter("");
-    setDownloadResult(null);
     try {
       const { versions } = await dlVersions({ repoUrl: repo.url });
       setVersions(versions);
@@ -134,28 +123,6 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
       setVersionsError(errMessage(e));
     } finally {
       setVersionsLoading(false);
-    }
-  }
-
-  async function download(tag: string) {
-    setDownloading(tag);
-    setProgress(null);
-    setDownloadResult(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = (p) => setProgress(p);
-    try {
-      const { message } = await dlDownload({
-        tag,
-        masterUrl,
-        writePath,
-        onProgress,
-      });
-      setDownloadResult({ ok: true, message });
-    } catch (e) {
-      setDownloadResult({ ok: false, message: errMessage(e) });
-    } finally {
-      setDownloading(null);
-      setProgress(null);
     }
   }
 
@@ -341,63 +308,60 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                     </EmptyState>
                   )}
                 <ul className="divide-y divide-border">
-                  {filteredVersions?.map((v) => (
-                    <li key={v.tag} className="flex flex-col gap-2 px-6 py-2.5">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {v.name}
-                          </p>
-                          <p className="truncate font-mono text-xs text-muted-foreground">
-                            {v.tag}
-                          </p>
+                  {filteredVersions?.map((v) => {
+                    const input = {
+                      kind: "rapid" as const,
+                      label: v.name || v.tag,
+                      args: { tag: v.tag, masterUrl, writePath },
+                    };
+                    const status = statusFor(identityOf(input));
+                    return (
+                      <li
+                        key={v.tag}
+                        className="flex flex-col gap-2 px-6 py-2.5"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">
+                              {v.name}
+                            </p>
+                            <p className="truncate font-mono text-xs text-muted-foreground">
+                              {v.tag}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => enqueue(input)}
+                            disabled={
+                              status === "queued" ||
+                              status === "active" ||
+                              status === "done"
+                            }
+                            aria-label={`Download ${v.tag}`}
+                          >
+                            {status === "active" ? (
+                              <Loader2 className="animate-spin" />
+                            ) : status === "done" ? (
+                              <CheckCircle2 className="text-emerald-500" />
+                            ) : (
+                              <Download />
+                            )}
+                            {status === "active"
+                              ? "Downloading…"
+                              : status === "queued"
+                                ? "Queued"
+                                : status === "done"
+                                  ? "Done"
+                                  : "Add to queue"}
+                          </Button>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => download(v.tag)}
-                          disabled={downloading !== null}
-                          aria-label={`Download ${v.tag}`}
-                        >
-                          {downloading === v.tag ? (
-                            <Loader2 className="animate-spin" />
-                          ) : (
-                            <Download />
-                          )}
-                          {downloading === v.tag ? "Downloading…" : "Download"}
-                        </Button>
-                      </div>
-                      {downloading === v.tag && progress && (
-                        <ProgressBar progress={progress} />
-                      )}
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             </>
-          )}
-
-          {downloadResult && (
-            <div
-              className={cn(
-                "flex items-start gap-2 border-t px-6 py-3 text-sm",
-                downloadResult.ok
-                  ? "border-border bg-card text-card-foreground"
-                  : "border-destructive/40 bg-destructive/10 text-destructive",
-              )}
-            >
-              {downloadResult.ok ? (
-                <CheckCircle2
-                  size={16}
-                  className="mt-px shrink-0 text-emerald-500"
-                />
-              ) : (
-                <AlertCircle size={16} className="mt-px shrink-0" />
-              )}
-              <span className="min-w-0 break-words">
-                {downloadResult.message}
-              </span>
-            </div>
           )}
         </section>
       </div>
