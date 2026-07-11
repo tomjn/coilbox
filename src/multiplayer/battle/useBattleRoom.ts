@@ -7,6 +7,7 @@ import {
   useUnitsyncMapInfo,
   useUnitsyncScan,
 } from "@/content/config";
+import { isBlackHex, pickTeamColorHex } from "@/lib/teamColor";
 import {
   type PlayTarget,
   usePreferredTarget,
@@ -37,9 +38,9 @@ import {
   hexToColorInt,
   type MemberRow,
   membersToRows,
-  randomTeamColorHex,
   type SyncState,
   startPosTypeOf,
+  usedColorsFromBattle,
 } from "./config";
 
 /** Format a rejected command for the action-error banner (matches useBattleLaunch). */
@@ -255,6 +256,11 @@ export function useBattleRoom(): BattleRoomView {
     humansPlaying.length > 0 && humansPlaying.every((r) => r.ready);
   const startPosType = battle ? startPosTypeOf(battle) : 0;
 
+  // The colour we last intended (as the `0xBBGGRR` int), so a status push that
+  // omits `color` never reverts to 0 while our colour echo is still in flight —
+  // the bug behind "always black". Seeded by the assign-on-join effect below.
+  const intendedColorRef = useRef(0);
+
   // Merge a patch over our current battle status and push it (MYBATTLESTATUS).
   // `color` is the `0xBBGGRR` int; `??` preserves current values for anything the
   // patch omits (safe for booleans since it only fills null/undefined).
@@ -280,7 +286,10 @@ export function useBattleRoom(): BattleRoomView {
         handicap: patch.handicap ?? bs.handicap,
         sync: patch.sync ?? bs.sync,
         side: patch.side ?? bs.side,
-        color: patch.color ?? myStatus.teamColor,
+        // Prefer the echoed colour, but fall back to our intended colour while
+        // the echo is in flight — never re-send 0 and clobber the just-assigned
+        // colour back to black.
+        color: patch.color ?? (myStatus.teamColor || intendedColorRef.current),
       }).then(clearErr, setErr);
     },
     [activeKey, myStatus, setErr, clearErr],
@@ -295,25 +304,37 @@ export function useBattleRoom(): BattleRoomView {
     if (myStatus.battleStatus.sync !== desired) pushStatus({ sync: desired });
   }, [activeKey, myStatus, contentKnown, mapMissing, gameMissing, pushStatus]);
 
-  // We join a battle showing as black (teamColor 0 is the protocol's "unset").
-  // Announce our remembered colour instead — or, the first time, a fresh random
-  // one we then persist — so we never sit in the lobby as black. Gated to run once
-  // per join: teamColor 0 is indistinguishable from a deliberate black, so we
-  // can't rely on the server echo flipping it to know we're done, or we'd re-push
-  // forever if the user actually chose black.
-  const coloredBattle = useRef<number | null>(null);
+  // Assign our team colour on join. The seat opens at teamColor 0 (the protocol's
+  // "unset", rendered black) both when we join someone else's battle and when the
+  // Rust self-host founder opens its own seat. In the lobby there is no such thing
+  // as a deliberately-chosen black, so we always replace a 0 with a real colour:
+  // our remembered colour when it's free, else a random one that avoids the
+  // colours already in the battle. Once teamColor echoes back non-zero we treat it
+  // (or a host force-recolour) as authoritative and just track it.
+  const assignedBattleRef = useRef<number | null>(null);
   useEffect(() => {
     if (!activeKey || !battle || !myStatus) return;
-    if (coloredBattle.current === battle.id) return;
-    coloredBattle.current = battle.id;
-    if (myStatus.teamColor !== 0) return; // already coloured (rejoin/echo)
-    let hex = savedColor;
-    if (!hex) {
-      hex = randomTeamColorHex();
-      setSavedColor(hex);
+    if (myStatus.teamColor !== 0) {
+      // Authoritative echoed/forced colour — keep intendedColorRef in sync so the
+      // pushStatus fill-in never reverts it.
+      intendedColorRef.current = myStatus.teamColor;
+      assignedBattleRef.current = battle.id;
+      return;
     }
-    pushStatus({ color: hexToColorInt(hex) });
-  }, [activeKey, battle, myStatus, savedColor, setSavedColor, pushStatus]);
+    if (assignedBattleRef.current === battle.id) return; // assign pushed; echo pending
+    assignedBattleRef.current = battle.id;
+    // Pick in hex space, then bridge to the lobby's 0xBBGGRR int (never play's
+    // float RGB — the two colour spaces must not be crossed).
+    const hex = pickTeamColorHex({
+      remembered: savedColor,
+      used: usedColorsFromBattle(battle, me),
+    });
+    intendedColorRef.current = hexToColorInt(hex);
+    pushStatus({ color: intendedColorRef.current });
+    // Persist only when there was no usable remembered colour; a per-battle
+    // collision adjustment must not overwrite the user's remembered choice.
+    if (!savedColor || isBlackHex(savedColor)) setSavedColor(hex);
+  }, [activeKey, battle, myStatus, me, savedColor, setSavedColor, pushStatus]);
 
   const leave = useCallback(async () => {
     if (!activeKey) return;
@@ -453,7 +474,11 @@ export function useBattleRoom(): BattleRoomView {
         handicap: 0,
         sync: 1,
         side: 0,
-        color: hexToColorInt(randomTeamColorHex()),
+        // Avoid colours already in the battle (no self to exclude for a bot). hex
+        // core -> lobby 0xBBGGRR int only.
+        color: hexToColorInt(
+          pickTeamColorHex({ used: usedColorsFromBattle(battle, null) }),
+        ),
         aiDll: aiShortName,
       }).then(clearErr, setErr);
     },
@@ -580,7 +605,11 @@ export function useBattleRoom(): BattleRoomView {
     setAlly: (ally) => pushStatus({ ally }),
     setColor: (hex) => {
       setSavedColor(hex);
-      pushStatus({ color: hexToColorInt(hex) });
+      // Track the deliberate pick so a manual black survives the assign-on-join
+      // effect and the pushStatus fill-in (a user-chosen black is real; a 0 default
+      // isn't). hex -> lobby 0xBBGGRR int only.
+      intendedColorRef.current = hexToColorInt(hex);
+      pushStatus({ color: intendedColorRef.current });
     },
     setIngame,
     hostControls,

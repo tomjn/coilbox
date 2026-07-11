@@ -11,6 +11,7 @@ import {
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import type { BattleConfig } from "../bindings";
 import { playExportPreset, playImportPreset } from "../bindings";
 import {
@@ -20,6 +21,7 @@ import {
   makeAiParticipant,
   type Participant,
   rgbToHex,
+  sanitizeColors,
   toBattleConfig,
   useLastAi,
   usePreferredTarget,
@@ -67,6 +69,20 @@ export default function SkirmishPage() {
   const [presetsOpen, setPresetsOpen] = useState(false);
   const { presets, savePreset, touchPreset, removePreset } =
     useSkirmishPresets();
+
+  // The team colour remembered across surfaces (shared with the MP lobby via the
+  // same setting key). Empty = never picked.
+  const [myColor, setMyColor] = useMyTeamColor();
+
+  // One-shot heal on mount: a stale persisted draft (or older seeding) can leave
+  // a participant — usually "you" — as black. Replace any black/invalid colour
+  // with the remembered/non-black pick so the setup never opens showing black.
+  const sanitized = useRef(false);
+  useEffect(() => {
+    if (sanitized.current) return;
+    sanitized.current = true;
+    setParticipants((ps) => sanitizeColors(ps, myColor));
+  }, [myColor]);
 
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
@@ -196,6 +212,10 @@ export default function SkirmishPage() {
   const updateParticipant = (id: string, patch: Partial<Participant>) => {
     // Remember an explicit AI pick so later opponents default to it.
     if (patch.ai) setLastAi(aiKey(patch.ai));
+    // Mirror MP's setColor: when "you" recolours, remember it so the colour stays
+    // in sync across both surfaces. patch.color is play float RGB -> hex core.
+    if (patch.color && participants.find((p) => p.id === id)?.kind === "you")
+      setMyColor(rgbToHex(patch.color));
     setParticipants((ps) =>
       ps.map((p) => (p.id === id ? { ...p, ...patch } : p)),
     );

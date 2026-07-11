@@ -9,6 +9,7 @@ import {
   randomTeamColorHex,
   readableText,
   startPosTypeOf,
+  usedColorsFromBattle,
 } from "./config";
 
 const status = (p: Partial<BattleStatus> = {}): BattleStatus => ({
@@ -179,6 +180,39 @@ describe("membersToRows", () => {
     expect(row.spectator).toBe(true);
     expect(row.sync).toBe(2);
     expect(row.colorHex).toBe("#ff0000");
+  });
+});
+
+describe("usedColorsFromBattle", () => {
+  it("collects member + bot colours as hex, excluding self and dropping 0", () => {
+    const battle = mkBattle({
+      members: {
+        me: member({ teamColor: 0x0000ff }), // self — excluded
+        alice: member({ teamColor: 0x00ff00 }), // green
+        bob: member({ teamColor: 0 }), // unset — dropped
+      },
+      bots: {
+        BARb: {
+          name: "BARb",
+          owner: "me",
+          aiDll: "BARb",
+          battleStatus: status(),
+          teamColor: 0xff0000, // blue in 0xBBGGRR
+        },
+      },
+    });
+    const used = usedColorsFromBattle(battle, "me");
+    expect(used).toEqual(expect.arrayContaining(["#00ff00", "#0000ff"]));
+    expect(used).not.toContain("#ff0000"); // that was self (0x0000ff -> #ff0000)
+    expect(used).toHaveLength(2);
+  });
+
+  it("includes every member when self is null (host adding bots)", () => {
+    const battle = mkBattle({
+      members: { alice: member({ teamColor: 0x0000ff }) },
+      bots: {},
+    });
+    expect(usedColorsFromBattle(battle, null)).toEqual(["#ff0000"]);
   });
 });
 
