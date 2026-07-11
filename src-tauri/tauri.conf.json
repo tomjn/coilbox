@@ -50,6 +50,11 @@
         "appPosition": { "x": 200, "y": 195 },
         "applicationFolderPosition": { "x": 500, "y": 195 }
       }
+    },
+    "windows": {
+      "nsis": {
+        "installerHooks": "./nsis-hooks.nsh"
+      }
     }
   },
   "plugins": {

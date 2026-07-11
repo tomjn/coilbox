@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod asset_protocol;
+mod win_job;
 
 // Work around a WebKitGTK + AppImage failure on Linux: the AppImage bundles its
 // own (Ubuntu-built) libwayland-client and GPU stack, which shadow the host's
@@ -76,6 +77,11 @@ fn linux_appimage_webview_workaround() {
 fn main() {
     #[cfg(target_os = "linux")]
     linux_appimage_webview_workaround();
+
+    // Windows: tie spawned sidecars to our lifetime so an NSIS update can overwrite
+    // their .exe files instead of failing on a locked, orphaned process. No-op
+    // elsewhere.
+    win_job::confine_children_to_job();
 
     let mut builder = tauri::Builder::default()
         .plugin(picoframe_core::init())
