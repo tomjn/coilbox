@@ -59,12 +59,18 @@ function makeProceduralCloud(): THREE.Texture {
   const ctx = canvas.getContext("2d");
   if (ctx) {
     ctx.clearRect(0, 0, size, size);
-    for (let i = 0; i < 48; i++) {
+    // A faint continuous base so the gaps between blobs read as thinner overcast
+    // rather than clear holes (which looked like confetti on glass).
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.fillRect(0, 0, size, size);
+    // Large, soft, heavily overlapping blobs (with a plateaued core) build up a
+    // lumpy but continuous cloud field rather than scattered specks.
+    for (let i = 0; i < 22; i++) {
       const cx = Math.random() * size;
       const cy = Math.random() * size;
-      const r = size * (0.06 + Math.random() * 0.12);
-      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      g.addColorStop(0, "rgba(255,255,255,0.5)");
+      const r = size * (0.22 + Math.random() * 0.28);
+      const g = ctx.createRadialGradient(cx, cy, r * 0.15, cx, cy, r);
+      g.addColorStop(0, "rgba(255,255,255,0.45)");
       g.addColorStop(1, "rgba(255,255,255,0)");
       ctx.fillStyle = g;
       ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
@@ -203,6 +209,7 @@ export function MapPreview3D({
   chrome = true,
   framed = true,
   showSky = true,
+  showClouds = true,
   forceWireframe = false,
   enableZoom = true,
   enablePan = true,
@@ -245,6 +252,10 @@ export function MapPreview3D({
   /** Draw the sky (skybox / `skyColor`) as the background. When false the canvas
    * stays transparent so it layers over whatever is behind it. Default true. */
   showSky?: boolean;
+  /** Draw the high-overcast cloud plane (only when the map defines `cloudColor`).
+   * Default true; pass false for the mission previews, which never want clouds.
+   * Wireframe renders never draw clouds regardless. */
+  showClouds?: boolean;
   /** Wireframe relief render — the displaced mesh is drawn as an unlit uniform-colour
    * grid with no diffuse texture, so it needs only the heightmap. Default false. */
   forceWireframe?: boolean;
@@ -596,11 +607,14 @@ uniform vec2 wPlane;`,
       scene.add(sun);
 
       // Optional high overcast from `atmosphere.cloudColor`/`cloudDensity`: a faint
-      // translucent plane well above the terrain, tinted by the cloud colour with
-      // opacity scaled by density (capped so it never obscures the map from above).
+      // translucent plane above the terrain, tinted by the cloud colour with
+      // opacity scaled by density. Held above the camera's reach so it never comes
+      // between the eye and the map (see the height below). Suppressed for wireframe
+      // relief and wherever the caller opts out (`showClouds`, e.g. mission previews).
       // It drifts in the animation loop below (static under reduced motion).
       let cloudTex: THREE.Texture | undefined;
-      const hasClouds = !!appearance?.cloudColor;
+      const hasClouds =
+        !!appearance?.cloudColor && showClouds && !forceWireframe;
       if (hasClouds) {
         cloudTex = makeProceduralCloud();
         cloudTex.repeat.set(2, 2);
@@ -616,7 +630,10 @@ uniform vec2 wPlane;`,
         const cloudGeo = new THREE.PlaneGeometry(planeW * 2, planeH * 2);
         cloudGeo.rotateX(-Math.PI / 2);
         const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
-        cloudMesh.position.y = Math.max(maxHeight * s, 0) + BASE * 0.6;
+        // Above the camera's max orbit distance (`maxDistance` is BASE * 3) so a
+        // top-down / zoomed-out view stays under the clouds — they read as a high
+        // ceiling, never a sheet drawn over the map.
+        cloudMesh.position.y = Math.max(maxHeight * s, 0) + BASE * 3.5;
         scene.add(cloudMesh);
         disposables.push(cloudGeo, cloudMat, cloudTex);
       }
