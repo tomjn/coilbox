@@ -243,6 +243,52 @@ export const contentDemoInfo = defineCommand<
 >("coilbox-content", "content_demo_info");
 
 /* -------------------------------------------------------------------------- *
+ * Engine-config profiles — named backup/restore of a content root's
+ * `springsettings.cfg`, `LuaUI/Config/` and `uikeys.txt`, so users can snapshot
+ * and swap settings sets. Snapshots live under the app data dir, keyed per root.
+ * -------------------------------------------------------------------------- */
+
+/** One saved engine-config snapshot for a content root. */
+export interface ConfigProfile {
+  /** Display name as the user typed it. */
+  name: string;
+  /** Filesystem slug (its id for restore/delete). */
+  slug: string;
+  /** Creation time, epoch-millis (format with `new Date(ms)`). */
+  createdAtMs: number;
+  /** Which artifacts were captured: `springsettings.cfg`, `uikeys.txt`, `LuaUI/Config`. */
+  artifacts: string[];
+}
+
+/** List saved engine-config profiles for a content root (newest first). */
+export const contentConfigProfiles = defineCommand<
+  { rootPath: string },
+  { profiles: ConfigProfile[] }
+>("coilbox-content", "content_config_profiles");
+
+/** Snapshot the root's present config artifacts into a named profile. */
+export const contentConfigBackup = defineCommand<
+  { rootPath: string; name: string },
+  { profile: ConfigProfile }
+>("coilbox-content", "content_config_backup");
+
+/**
+ * Restore a profile's artifacts into the root. Without `overwrite`, refuses when
+ * live files would be clobbered, returning `needsOverwrite: true` (nothing written)
+ * so the UI can confirm and re-call with `overwrite: true`.
+ */
+export const contentConfigRestore = defineCommand<
+  { rootPath: string; slug: string; overwrite?: boolean },
+  { needsOverwrite: boolean; restored: number }
+>("coilbox-content", "content_config_restore");
+
+/** Delete a saved engine-config profile. */
+export const contentConfigDeleteProfile = defineCommand<
+  { rootPath: string; slug: string },
+  { ok: boolean }
+>("coilbox-content", "content_config_delete_profile");
+
+/* -------------------------------------------------------------------------- *
  * unitsync content scan (plugin `tauri-plugin-coilbox-unitsync`, ACL id
  * `coilbox-unitsync`). The Content browser pages call this alongside the
  * content-state bindings above: this plugin's frontend talks to two backends.
