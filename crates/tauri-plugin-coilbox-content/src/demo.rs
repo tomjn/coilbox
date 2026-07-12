@@ -321,6 +321,18 @@ fn read_until(bytes: &[u8], i: &mut usize, stops: &[u8]) -> String {
 
 /// The top-level start-script wraps everything in `[game]{...}`; return it (or a
 /// degenerate empty section if the script is unparseable).
+/// Extract `(mapName, gameType)` from a start-script's `[GAME]` block — shared by
+/// the replay decode and the savegame reader (saves embed the same start-script).
+/// Empty fields become `None`.
+pub(crate) fn script_map_and_game(script: &str) -> (Option<String>, Option<String>) {
+    let game = find_game(&parse_tdf(script));
+    let non_empty = |s: &str| (!s.is_empty()).then(|| s.to_string());
+    (
+        game.get("mapname").and_then(non_empty),
+        game.get("gametype").and_then(non_empty),
+    )
+}
+
 fn find_game(root: &Section) -> Section {
     // Reparse path is awkward with borrows; just clone the child's contents we
     // need by returning the root when no [game] wrapper is present (some scripts
