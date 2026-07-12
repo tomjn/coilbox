@@ -191,6 +191,8 @@ function BattleRoomPage() {
             gameMissing={room.gameMissing}
             mapMissing={room.mapMissing}
             sendOption={room.sendOption}
+            canEditRestrictions={room.canEditRestrictions}
+            onRestrictChange={room.setRestrictions}
           />
           {room.gameMissing && (
             <MissingContentCard
