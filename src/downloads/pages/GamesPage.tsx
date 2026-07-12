@@ -11,9 +11,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import {
+  dlGithubReleaseArchives,
   dlInstalledContent,
   dlSpringfilesList,
-  type SpringFile,
 } from "../bindings";
 import { useContentRootPaths, useWriteRootPath } from "../config";
 import {
@@ -34,7 +34,34 @@ const SORT_OPTIONS = [
   { value: "size-asc", label: "Smallest" },
 ];
 
-const gameName = (g: SpringFile) => g.name || g.springname;
+type Source =
+  | "springfiles"
+  | "metal-factions"
+  | "evolution-rts"
+  | "tap"
+  | "balanced-annihilation";
+
+/** Curated GitHub game repos (from skylobby's shipped source list), fetched via
+ * their release assets. springfiles stays the default. */
+const GAME_REPOS: Record<string, string> = {
+  "metal-factions": "springraaar/metal_factions",
+  "evolution-rts": "EvolutionRTS/Evolution-RTS",
+  tap: "FluidPlay/TAP",
+  "balanced-annihilation": "Balanced-Annihilation/Balanced-Annihilation",
+};
+
+/** Normalised game row rendered by the list, regardless of source. Every source
+ * resolves to a direct archive download into `<root>/games/`. */
+interface GameItem {
+  /** Unique identity + React key: springname for springfiles, filename for GitHub. */
+  id: string;
+  name: string;
+  /** On-disk archive name, lowercased for installed-detection matching. */
+  filename: string;
+  size: number;
+  /** Direct download URL (springfiles mirror or GitHub asset); missing = not downloadable. */
+  url?: string;
+}
 
 /**
  * Games: download games from springfiles into the configured content root.
@@ -46,7 +73,8 @@ const gameName = (g: SpringFile) => g.name || g.springname;
 export default function GamesPage() {
   const writePath = useWriteRootPath();
   const { enqueue, statusFor, active } = useDownloadQueue();
-  const [games, setGames] = useState<SpringFile[] | null>(null);
+  const [source, setSource] = useState<Source>("springfiles");
+  const [games, setGames] = useState<GameItem[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
@@ -56,13 +84,36 @@ export default function GamesPage() {
     false,
   );
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (src: Source) => {
     setLoading(true);
     setError(null);
     setGames(null);
     try {
-      const { results } = await dlSpringfilesList({ category: "game" });
-      setGames(results);
+      if (src in GAME_REPOS) {
+        const { archives } = await dlGithubReleaseArchives({
+          repo: GAME_REPOS[src],
+        });
+        setGames(
+          archives.map((a) => ({
+            id: a.filename,
+            name: a.filename.replace(/\.(sd7|sdz)$/i, ""),
+            filename: a.filename,
+            size: a.size,
+            url: a.url,
+          })),
+        );
+      } else {
+        const { results } = await dlSpringfilesList({ category: "game" });
+        setGames(
+          results.map((g) => ({
+            id: g.springname,
+            name: g.name || g.springname,
+            filename: g.filename,
+            size: g.size,
+            url: g.mirrors[0],
+          })),
+        );
+      }
     } catch (e) {
       setError(errMessage(e));
     } finally {
@@ -71,8 +122,8 @@ export default function GamesPage() {
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    load(source);
+  }, [source, load]);
 
   // Lowercased game filenames already present in any detected content root.
   const rootPaths = useContentRootPaths();
@@ -101,15 +152,15 @@ export default function GamesPage() {
     refreshInstalled();
   });
 
-  // Add a game to the app-wide download queue. The game is fetched by a direct
-  // mirror download into `<root>/games/`.
-  function enqueueGame(game: SpringFile) {
-    if (!writePath || !game.mirrors[0]) return;
+  // Add a game to the app-wide download queue. Every source resolves to a direct
+  // archive download into `<root>/games/`.
+  function enqueueGame(game: GameItem) {
+    if (!writePath || !game.url) return;
     enqueue({
       kind: "file",
-      label: game.name || game.springname,
+      label: game.name,
       args: {
-        url: game.mirrors[0],
+        url: game.url,
         destDir: `${writePath}/games`,
         filename: game.filename,
       },
@@ -120,11 +171,7 @@ export default function GamesPage() {
     if (!games) return null;
     const q = filter.trim().toLowerCase();
     if (!q) return games;
-    return games.filter(
-      (g) =>
-        g.name.toLowerCase().includes(q) ||
-        g.springname.toLowerCase().includes(q),
-    );
+    return games.filter((g) => g.name.toLowerCase().includes(q));
   }, [games, filter]);
 
   const sorted = useMemo(() => {
@@ -135,13 +182,13 @@ export default function GamesPage() {
     arr.sort((a, b) => {
       switch (sort) {
         case "name-desc":
-          return gameName(b).localeCompare(gameName(a));
+          return b.name.localeCompare(a.name);
         case "size-desc":
           return (b.size ?? 0) - (a.size ?? 0);
         case "size-asc":
           return (a.size ?? 0) - (b.size ?? 0);
         default:
-          return gameName(a).localeCompare(gameName(b));
+          return a.name.localeCompare(b.name);
       }
     });
     return arr;
@@ -153,11 +200,27 @@ export default function GamesPage() {
         <div className="space-y-1">
           <h1 className="text-lg font-semibold leading-none">Games</h1>
           <p className="max-w-prose text-sm text-muted-foreground">
-            Download games from springfiles into the configured content folder.
-            For rapid games (and AIs) use Browse Rapid.
+            Download games from springfiles or a curated GitHub release repo
+            into the configured content folder. For rapid games (and AIs) use
+            Browse Rapid.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <OptionSelect
+            value={source}
+            onValueChange={(v) => setSource(v as Source)}
+            className="w-48"
+            options={[
+              { value: "springfiles", label: "springfiles" },
+              { value: "metal-factions", label: "Metal Factions" },
+              { value: "evolution-rts", label: "Evolution RTS" },
+              { value: "tap", label: "TAP" },
+              {
+                value: "balanced-annihilation",
+                label: "Balanced Annihilation",
+              },
+            ]}
+          />
           <div className="relative max-w-xs flex-1">
             <Search
               size={14}
@@ -231,14 +294,13 @@ export default function GamesPage() {
           <ul className="divide-y divide-border">
             {sorted.map((g) => {
               const isInstalled = installed.has(g.filename.toLowerCase());
-              const name = g.name || g.springname;
-              const status = g.mirrors[0]
+              const status = g.url
                 ? statusFor(
                     identityOf({
                       kind: "file",
-                      label: name,
+                      label: g.name,
                       args: {
-                        url: g.mirrors[0],
+                        url: g.url,
                         destDir: `${writePath}/games`,
                         filename: g.filename,
                       },
@@ -246,13 +308,10 @@ export default function GamesPage() {
                   )
                 : null;
               return (
-                <li
-                  key={g.springname}
-                  className="flex flex-col gap-2 px-6 py-2.5"
-                >
+                <li key={g.id} className="flex flex-col gap-2 px-6 py-2.5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{name}</p>
+                      <p className="truncate text-sm font-medium">{g.name}</p>
                       <p className="truncate font-mono text-xs text-muted-foreground">
                         {g.filename}
                       </p>
@@ -263,7 +322,7 @@ export default function GamesPage() {
                       onClick={() => enqueueGame(g)}
                       disabled={
                         !writePath ||
-                        !g.mirrors[0] ||
+                        !g.url ||
                         isInstalled ||
                         status === "queued" ||
                         status === "active" ||
@@ -271,8 +330,8 @@ export default function GamesPage() {
                       }
                       aria-label={
                         isInstalled
-                          ? `${name} already downloaded`
-                          : `Download ${name}`
+                          ? `${g.name} already downloaded`
+                          : `Download ${g.name}`
                       }
                     >
                       {status === "active" ? (
