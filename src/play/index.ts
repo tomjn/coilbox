@@ -28,9 +28,11 @@ const playPlugin: FramePlugin = {
         },
         {
           id: "play.savegames",
-          label: "Savegames",
+          label: "Save Games",
           to: "/play/savegames",
-          order: 1,
+          // Last in the aggregated Play section (Campaigns=1, Conquest=2 arrive
+          // from sibling plugins), so keep this clearly above them.
+          order: 10,
           icon: Save,
         },
       ],
@@ -45,7 +47,7 @@ const playPlugin: FramePlugin = {
     {
       path: "play/savegames",
       lazy: () => import("./pages/SavegamesPage"),
-      crumb: "Savegames",
+      crumb: "Save Games",
     },
   ],
   Provider: PlayProvider,

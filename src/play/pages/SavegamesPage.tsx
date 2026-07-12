@@ -128,7 +128,7 @@ export default function SavegamesPage() {
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Savegames</h1>
+        <h1 className="text-lg font-semibold">Save Games</h1>
         <p className="text-sm text-muted-foreground">
           Singleplayer saves in your content folder. Resume one to launch the
           engine into it.
