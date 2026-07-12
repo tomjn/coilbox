@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-decline-friend-request"
+description = "Enables the mp_decline_friend_request command without any pre-configured scope."
+commands.allow = ["mp_decline_friend_request"]
+
+[[permission]]
+identifier = "deny-mp-decline-friend-request"
+description = "Denies the mp_decline_friend_request command without any pre-configured scope."
+commands.deny = ["mp_decline_friend_request"]

@@ -224,6 +224,30 @@ pub enum ServerMessage {
     RegistrationAccepted,
     /// `REGISTRATIONDENIED <reason>`
     RegistrationDenied { reason: String },
+    /// `FRIEND userName=<name>` — a friendship was established (sent to both parties).
+    Friend { username: String },
+    /// `UNFRIEND userName=<name>` — a friendship was removed (sent to both parties).
+    Unfriend { username: String },
+    /// `FRIENDREQUEST userName=<name>[\tmsg=<msg>]` — an incoming friend request.
+    FriendRequest {
+        username: String,
+        msg: Option<String>,
+    },
+    /// `FRIENDLISTBEGIN` — start of the mutual-friend list.
+    FriendListBegin,
+    /// `FRIENDLIST userName=<name>` — one mutual friend in the list stream.
+    FriendListEntry { username: String },
+    /// `FRIENDLISTEND` — end of the mutual-friend list.
+    FriendListEnd,
+    /// `FRIENDREQUESTLISTBEGIN` — start of the pending-request list.
+    FriendRequestListBegin,
+    /// `FRIENDREQUESTLIST userName=<name>[\tmsg=<msg>]` — one pending incoming request.
+    FriendRequestListEntry {
+        username: String,
+        msg: Option<String>,
+    },
+    /// `FRIENDREQUESTLISTEND` — end of the pending-request list.
+    FriendRequestListEnd,
     /// Any command not recognized above.
     Unknown { raw: String },
 }
@@ -270,6 +294,15 @@ fn fields<const N: usize>(rest: &str) -> Option<[&str; N]> {
 
 fn parse_bool01(s: &str) -> bool {
     s.trim() != "0" && !s.trim().is_empty()
+}
+
+/// Look up a `key=value` tag in a tab-separated tag block, returning its value.
+/// Used by the friend messages, whose payload is `userName=<name>[\tmsg=<msg>]`.
+fn tag<'a>(rest: &'a str, key: &str) -> Option<&'a str> {
+    rest.split('\t').find_map(|kv| {
+        let (k, v) = kv.split_once('=')?;
+        (k == key).then_some(v)
+    })
 }
 
 /// Parse a single server line into a [`ServerMessage`].
@@ -598,6 +631,42 @@ pub fn parse_line(line: &str) -> ServerMessage {
         "REGISTRATIONDENIED" => ServerMessage::RegistrationDenied {
             reason: rest.to_string(),
         },
+        "FRIEND" => match tag(rest, "userName") {
+            Some(u) => ServerMessage::Friend {
+                username: u.to_string(),
+            },
+            None => ServerMessage::Unknown { raw: raw() },
+        },
+        "UNFRIEND" => match tag(rest, "userName") {
+            Some(u) => ServerMessage::Unfriend {
+                username: u.to_string(),
+            },
+            None => ServerMessage::Unknown { raw: raw() },
+        },
+        "FRIENDREQUEST" => match tag(rest, "userName") {
+            Some(u) => ServerMessage::FriendRequest {
+                username: u.to_string(),
+                msg: tag(rest, "msg").map(str::to_string),
+            },
+            None => ServerMessage::Unknown { raw: raw() },
+        },
+        "FRIENDLISTBEGIN" => ServerMessage::FriendListBegin,
+        "FRIENDLIST" => match tag(rest, "userName") {
+            Some(u) => ServerMessage::FriendListEntry {
+                username: u.to_string(),
+            },
+            None => ServerMessage::Unknown { raw: raw() },
+        },
+        "FRIENDLISTEND" => ServerMessage::FriendListEnd,
+        "FRIENDREQUESTLISTBEGIN" => ServerMessage::FriendRequestListBegin,
+        "FRIENDREQUESTLIST" => match tag(rest, "userName") {
+            Some(u) => ServerMessage::FriendRequestListEntry {
+                username: u.to_string(),
+                msg: tag(rest, "msg").map(str::to_string),
+            },
+            None => ServerMessage::Unknown { raw: raw() },
+        },
+        "FRIENDREQUESTLISTEND" => ServerMessage::FriendRequestListEnd,
         _ => ServerMessage::Unknown { raw: raw() },
     }
 }
@@ -831,6 +900,66 @@ mod tests {
             ServerMessage::Unknown {
                 raw: "FROBNICATE whatever".into()
             }
+        );
+    }
+
+    #[test]
+    fn parses_friend_messages() {
+        assert_eq!(
+            parse_line("FRIEND userName=bob"),
+            ServerMessage::Friend {
+                username: "bob".into()
+            }
+        );
+        assert_eq!(
+            parse_line("UNFRIEND userName=bob"),
+            ServerMessage::Unfriend {
+                username: "bob".into()
+            }
+        );
+        assert_eq!(
+            parse_line("FRIENDREQUEST userName=bob"),
+            ServerMessage::FriendRequest {
+                username: "bob".into(),
+                msg: None,
+            }
+        );
+        assert_eq!(
+            parse_line("FRIENDREQUEST userName=bob\tmsg=hi there"),
+            ServerMessage::FriendRequest {
+                username: "bob".into(),
+                msg: Some("hi there".into()),
+            }
+        );
+    }
+
+    #[test]
+    fn parses_friend_list_framing() {
+        assert_eq!(
+            parse_line("FRIENDLISTBEGIN"),
+            ServerMessage::FriendListBegin
+        );
+        assert_eq!(
+            parse_line("FRIENDLIST userName=alice"),
+            ServerMessage::FriendListEntry {
+                username: "alice".into()
+            }
+        );
+        assert_eq!(parse_line("FRIENDLISTEND"), ServerMessage::FriendListEnd);
+        assert_eq!(
+            parse_line("FRIENDREQUESTLISTBEGIN"),
+            ServerMessage::FriendRequestListBegin
+        );
+        assert_eq!(
+            parse_line("FRIENDREQUESTLIST userName=carol\tmsg=add me"),
+            ServerMessage::FriendRequestListEntry {
+                username: "carol".into(),
+                msg: Some("add me".into()),
+            }
+        );
+        assert_eq!(
+            parse_line("FRIENDREQUESTLISTEND"),
+            ServerMessage::FriendRequestListEnd
         );
     }
 
