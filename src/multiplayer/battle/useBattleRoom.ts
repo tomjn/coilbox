@@ -33,7 +33,7 @@ import {
   mpUpdateBattleInfo,
 } from "../bindings";
 import { useMultiplayer } from "../store";
-import { canEditBattleOptions } from "./battleOptions";
+import { battleOptionTags, canEditBattleOptions } from "./battleOptions";
 import {
   deriveSync,
   hexToColorInt,
@@ -84,6 +84,9 @@ export interface BattleRoomView {
   canEditOptions: boolean;
   /** Dispatch one option edit: founder → SETSCRIPTTAGS, autohost → `!bSet`. */
   sendOption: (tagKey: string, spadsName: string, value: string) => void;
+  /** Apply a whole preset's option tags at once (founder batch-set + prune omitted;
+   * autohost `!bSet` per value). */
+  applyOptionTags: (tags: Record<string, string>) => void;
   /**
    * Whether the local user may edit unit restrictions: only the actual battle
    * founder (we own the `game/restrict/*` script tags — there's no autohost path).
@@ -525,6 +528,42 @@ export function useBattleRoom(): BattleRoomView {
     [activeKey, isFounder, autohostSend, setErr, clearErr],
   );
 
+  // Apply a whole set of option tags at once (loading a hosting preset). Founder:
+  // batch-set the preset's tags and remove any option tags currently set that the
+  // preset omits, so a load reflects exactly the saved options (same diff shape as
+  // `setRestrictions`). Autohost battle: `!bSet` each value (removal isn't possible
+  // there — an omitted option simply keeps its current value).
+  const applyOptionTags = useCallback(
+    (tags: Record<string, string>) => {
+      if (!activeKey || !battle) return;
+      if (isFounder) {
+        if (Object.keys(tags).length > 0) {
+          mpSetScriptTags({ serverKey: activeKey, tags }).then(
+            clearErr,
+            setErr,
+          );
+        }
+        const current = battleOptionTags(battle.scriptTags);
+        const wanted = new Set(Object.keys(tags).map((k) => k.toLowerCase()));
+        const remove = Object.keys(current).filter(
+          (k) => !wanted.has(k.toLowerCase()),
+        );
+        if (remove.length > 0) {
+          mpRemoveScriptTags({ serverKey: activeKey, tags: remove }).then(
+            clearErr,
+            setErr,
+          );
+        }
+      } else {
+        for (const [k, v] of Object.entries(tags)) {
+          const spadsName = k.slice(k.lastIndexOf("/") + 1);
+          autohostSend(`!bSet ${spadsName} ${v}`);
+        }
+      }
+    },
+    [activeKey, battle, isFounder, autohostSend, clearErr, setErr],
+  );
+
   // Apply a unit-restriction change (founder only). The engine-native
   // `game/restrict/*` tags are host-authoritative script tags we own directly, so
   // unlike mod options there's no autohost `!bSet` fork — only the actual founder
@@ -616,6 +655,7 @@ export function useBattleRoom(): BattleRoomView {
     mapOptionsSchema,
     canEditOptions,
     sendOption,
+    applyOptionTags,
     canEditRestrictions: isFounder,
     setRestrictions,
     canEditBoxes: canEditOptions && startPosType === 2,

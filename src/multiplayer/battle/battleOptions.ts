@@ -47,6 +47,29 @@ export function rawOptionEntries(
     .map(([k, value]) => ({ key: k.slice(prefix.length), value }));
 }
 
+/**
+ * Keep only the option script tags (mod/map options + start-pos type) from a
+ * battle's full script-tag map. Presets and option snapshots must never carry the
+ * other tags a battle holds — unit restrictions, sync hashes, start rects — so
+ * those are filtered out here.
+ */
+export function battleOptionTags(
+  scriptTags: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(scriptTags)) {
+    const low = k.toLowerCase();
+    if (
+      low.startsWith(MODOPT_PREFIX) ||
+      low.startsWith(MAPOPT_PREFIX) ||
+      low === STARTPOSTYPE_KEY
+    ) {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 /** How many of `options` are set away from their default. */
 export function changedCount(
   options: ConfigOption[],
