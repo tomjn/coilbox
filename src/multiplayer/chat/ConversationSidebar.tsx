@@ -1,11 +1,16 @@
 import { Button, cn } from "@picoframe/frame";
 import {
+  Check,
   ChevronRight,
   Hash,
   MessageSquare,
   Plus,
   Star,
   Swords,
+  UserCheck,
+  UserPlus,
+  UserX,
+  X,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import {
@@ -13,7 +18,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import type { ChatMsg } from "../bindings";
+import {
+  type ChatMsg,
+  mpAcceptFriendRequest,
+  mpDeclineFriendRequest,
+  mpFriendRequest,
+  mpUnfriend,
+} from "../bindings";
 import {
   addFavourite,
   favouritesFor,
@@ -74,6 +85,33 @@ function FavStar({
   );
 }
 
+/**
+ * A hover-revealed row action sitting just left of the {@link FavStar} (so the two
+ * don't overlap; friend rows carry extra right padding for both). Used to send a
+ * server friend request (local-only favourites) or to unfriend (server friends).
+ */
+function FriendAction({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="absolute right-8 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground opacity-0 hover:bg-muted-foreground/10 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+    >
+      {icon}
+    </button>
+  );
+}
+
 /** A collapsible sidebar section with a chevron toggle and an optional header action. */
 function Section({
   title,
@@ -130,6 +168,36 @@ export function ConversationSidebar({
         ? removeFavourite(favourites, activeKey, name)
         : addFavourite(favourites, activeKey, name),
     );
+  }
+
+  // Server-side friends (#187) merged with the local favourites above: the Friends
+  // section shows their UNION, with server friends distinguished by a check badge
+  // and offering unfriend, while local-only favourites offer "add friend" (send a
+  // request). Incoming requests get Accept/Decline. All friend commands no-op on
+  // servers without support, so failures are swallowed and never disrupt the UI.
+  const serverFriends = state?.friends ?? [];
+  const serverFriendSet = new Set(serverFriends);
+  const friendRequests = state?.friendRequests ?? [];
+  const friendNames = [...new Set([...favPeers, ...serverFriends])].sort();
+  function sendFriendRequest(name: string) {
+    if (activeKey)
+      mpFriendRequest({ serverKey: activeKey, username: name }).catch(() => {});
+  }
+  function unfriend(name: string) {
+    if (activeKey)
+      mpUnfriend({ serverKey: activeKey, username: name }).catch(() => {});
+  }
+  function acceptRequest(name: string) {
+    if (activeKey)
+      mpAcceptFriendRequest({ serverKey: activeKey, username: name }).catch(
+        () => {},
+      );
+  }
+  function declineRequest(name: string) {
+    if (activeKey)
+      mpDeclineFriendRequest({ serverKey: activeKey, username: name }).catch(
+        () => {},
+      );
   }
 
   // Unread count worth badging: messages arrived since last seen, minus the
@@ -240,19 +308,56 @@ export function ConversationSidebar({
         </ul>
       </Section>
 
-      {favPeers.length > 0 && (
+      {(friendNames.length > 0 || friendRequests.length > 0) && (
         <Section title="Friends">
+          {friendRequests.length > 0 && (
+            <ul className="flex flex-col gap-1 px-2 pb-1">
+              {friendRequests.map((name) => (
+                <li
+                  key={`req:${name}`}
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+                >
+                  <UserPlus className="size-4 shrink-0 text-muted-foreground" />
+                  <span
+                    className="truncate"
+                    title={`${name} wants to be friends`}
+                  >
+                    {name}
+                  </span>
+                  <div className="ml-auto flex gap-1">
+                    <Button
+                      variant="secondary"
+                      onClick={() => acceptRequest(name)}
+                      aria-label={`Accept friend request from ${name}`}
+                      className="h-6 px-2"
+                    >
+                      <Check className="size-4" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => declineRequest(name)}
+                      aria-label={`Decline friend request from ${name}`}
+                      className="h-6 px-2"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
           <ul className="flex flex-col gap-0.5 px-2">
-            {favPeers.map((peer) => {
+            {friendNames.map((peer) => {
               const id = `dm:${peer}`;
               const msgs = state?.dms?.[peer] ?? [];
               const presence = state ? userPresence(state, peer) : "offline";
               const meta = PRESENCE_META[presence];
+              const isServerFriend = serverFriendSet.has(peer);
               return (
                 <li key={id} className="group relative">
                   <button
                     type="button"
-                    className={cn(rowClass(id), "pr-9")}
+                    className={cn(rowClass(id), "pr-16")}
                     onClick={() => onSelect({ kind: "dm", peer })}
                   >
                     <span
@@ -271,11 +376,34 @@ export function ConversationSidebar({
                     >
                       {peer}
                     </span>
+                    {isServerFriend && (
+                      <UserCheck
+                        className="size-3.5 shrink-0 text-sky-500"
+                        aria-label="Server friend"
+                      />
+                    )}
                     <Badge n={unreadBadge(id, msgs)} />
                   </button>
+                  {isServerFriend ? (
+                    <FriendAction
+                      icon={<UserX className="size-4" />}
+                      label={`Remove ${peer} from friends`}
+                      onClick={() => unfriend(peer)}
+                    />
+                  ) : (
+                    <FriendAction
+                      icon={<UserPlus className="size-4" />}
+                      label={`Send ${peer} a friend request`}
+                      onClick={() => sendFriendRequest(peer)}
+                    />
+                  )}
                   <FavStar
                     name={peer}
-                    active
+                    active={
+                      activeKey
+                        ? isFavourite(favourites, activeKey, peer)
+                        : false
+                    }
                     onToggle={() => toggleFavourite(peer)}
                   />
                 </li>
