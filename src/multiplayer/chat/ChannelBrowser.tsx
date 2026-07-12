@@ -1,7 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { mpJoinChannel, mpListChannels } from "../bindings";
+import { mpListChannels } from "../bindings";
 import { useMultiplayer } from "../store";
 
 /**
@@ -19,7 +19,7 @@ export function ChannelBrowser({
   onClose: () => void;
   onJoined: (name: string) => void;
 }) {
-  const { mirror, activeKey, rememberChannel } = useMultiplayer();
+  const { mirror, activeKey, requestJoinChannel } = useMultiplayer();
   const [loading, setLoading] = useState(false);
   const [newName, setNewName] = useState("");
   const directory = mirror.state?.channelDirectory ?? [];
@@ -56,8 +56,11 @@ export function ChannelBrowser({
   async function join(name: string) {
     if (!activeKey) return;
     try {
-      await mpJoinChannel({ serverKey: activeKey, channel: name });
-      rememberChannel(name);
+      // `requestJoinChannel` marks this as a user-chosen join; the store persists it
+      // to the autojoin list only when the server confirms (the `channelJoined`
+      // delta), so a channel the server refuses (JOINFAILED) is never remembered.
+      // We still select it optimistically for responsiveness.
+      await requestJoinChannel(name);
       onJoined(name);
       onClose();
     } catch {

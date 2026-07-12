@@ -285,6 +285,12 @@ interface MultiplayerContextValue {
   rememberChannel: (name: string, key?: string) => void;
   /** Forget a channel so it's no longer auto-joined. */
   forgetChannel: (name: string) => void;
+  /**
+   * Send a `JOIN` for a channel the user chose, marking it as user-requested so the
+   * server's join confirm persists it to the autojoin list (server-forced joins are
+   * not). Prefer this over calling `mpJoinChannel` directly from the UI.
+   */
+  requestJoinChannel: (channel: string, key?: string) => Promise<unknown>;
   /** Reason from the last failed battle join, or null. */
   lastJoinError: string | null;
   /** Clear the last join-failure reason (call at the start of a join attempt). */
@@ -302,6 +308,12 @@ interface MultiplayerContextValue {
    * in-game bit lives in `mirror.state.users[name].status.ingame`).
    */
   justWentIngame: ReadonlySet<string>;
+  /**
+   * Channels whose auto-rejoin the server refused this session (name -> reason),
+   * for the active connection. Transient — the entry stays on the autojoin list,
+   * but the auto-join settings flag it. Empty for other accounts / when offline.
+   */
+  channelJoinFailures: Record<string, string>;
 }
 
 const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
@@ -423,13 +435,46 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     [activeKey, joinedChannels, setJoinedChannels],
   );
 
-  // The frozen event handler (openChannel) can't close over `forgetChannel`
+  // The frozen event handler (openChannel) can't close over `rememberChannel`
   // directly — it would capture a stale `joinedChannels`. Route through a ref so a
-  // JOINFAILED can drop the channel using the latest list.
-  const forgetChannelRef = useRef(forgetChannel);
+  // `channelJoined` confirm can persist the channel using the latest list.
+  const rememberChannelRef = useRef(rememberChannel);
   useEffect(() => {
-    forgetChannelRef.current = forgetChannel;
-  }, [forgetChannel]);
+    rememberChannelRef.current = rememberChannel;
+  }, [rememberChannel]);
+
+  // Channels WE asked to join, awaiting the server's confirm. The `channelJoined`
+  // delta fires for any self-join — including channels a server auto-joins us to on
+  // login — so we only persist a confirm whose channel is in this set, i.e. one the
+  // user actually chose. Keyed by name; consumed on confirm or failure.
+  const pendingJoinsRef = useRef<Set<string>>(new Set());
+  const requestJoinChannel = useCallback(
+    (channel: string, key?: string): Promise<unknown> => {
+      if (!activeKey) return Promise.resolve();
+      pendingJoinsRef.current.add(channel);
+      return mpJoinChannel({ serverKey: activeKey, channel, key });
+    },
+    [activeKey],
+  );
+
+  // Channels whose auto-rejoin the server refused this session (name -> reason).
+  // Transient by design: a refused channel stays on the remembered/autojoin list
+  // (its restriction may be temporary), but is recorded here so the auto-join
+  // settings can flag it and the user can remove it deliberately.
+  const [channelJoinFailures, setChannelJoinFailures] = useState<
+    Record<string, string>
+  >({});
+  // One-shot guard so a channel that keeps failing is toasted only once per session
+  // — the badge persists, the notification doesn't nag on every reconnect.
+  const notifiedJoinFailuresRef = useRef<Set<string>>(new Set());
+  // A new connection is a fresh session: clear both so a recovered channel is
+  // re-notified next time and no stale failure badge lingers.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeKey is the reset trigger (a session change), not read in the body
+  useEffect(() => {
+    setChannelJoinFailures({});
+    notifiedJoinFailuresRef.current = new Set();
+    pendingJoinsRef.current = new Set();
+  }, [activeKey]);
 
   // Auto-join the configured channels once per connection, after login reaches the
   // `ready` phase (JOIN before ACCEPTED would be rejected). The ref guards against
@@ -447,7 +492,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       )) {
         // A settings row can be added before it's named; don't JOIN "".
         if (!name.trim()) continue;
-        mpJoinChannel({ serverKey: activeKey, channel: name, key }).catch((e) =>
+        requestJoinChannel(name, key).catch((e) =>
           console.warn("multiplayer: auto-join channel failed", name, e),
         );
       }
@@ -456,7 +501,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       // send a list, and local hiding still applies.
       mpIgnoreList({ serverKey: activeKey }).catch(() => {});
     }
-  }, [activeKey, mirror.phase, joinedChannels]);
+  }, [activeKey, mirror.phase, joinedChannels, requestJoinChannel]);
 
   // Reconcile the local ignore list with the server's once its IGNORELIST arrives:
   // fold any server-confirmed ignores we lack into the local store, and push any
@@ -635,20 +680,44 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             triggerIngameCue(name);
           }
         }
-        // Server refusals are one-off error events with nothing to re-render, so
-        // surface them as non-blocking error toasts (routed to an OS banner when
-        // unfocused). The raw FAILED/JOINFAILED line is already in the lobby
-        // console for history.
-        else if (d.kind === "joinChannelFailed") {
-          // A refused channel (e.g. a restricted #moderators) must not linger on
-          // the remembered/autojoin list, or every reconnect re-attempts it and
-          // re-notifies. Drop it so the failure is a one-off, not a recurring nag.
-          forgetChannelRef.current(d.channel);
-          void notify({
-            title: `Couldn't join ${d.channel}`,
-            body: d.reason || undefined,
-            level: "error",
+        // The server confirmed we joined a channel (a bare JOIN echo, sent only to
+        // the joining client): persist it to the autojoin list now, on confirm —
+        // NOT on the optimistic send — so a channel the server refuses is never
+        // remembered. Clear any prior failure record for it (it recovered).
+        else if (d.kind === "channelJoined") {
+          // Only persist channels the user asked to join (in the pending set), so a
+          // channel the server auto-joins us to isn't silently added to the list.
+          if (pendingJoinsRef.current.delete(d.channel)) {
+            rememberChannelRef.current(d.channel);
+          }
+          notifiedJoinFailuresRef.current.delete(d.channel);
+          setChannelJoinFailures((prev) => {
+            if (prev[d.channel] === undefined) return prev;
+            const next = { ...prev };
+            delete next[d.channel];
+            return next;
           });
+        }
+        // A refused JOIN (e.g. a restricted #moderators, or a channel that became
+        // passworded after we'd joined it). Keep the entry on the autojoin list —
+        // the restriction may lift — but record it so the settings can flag it, and
+        // toast only once per session so a permanently-restricted channel doesn't
+        // nag on every reconnect. The raw JOINFAILED line stays in the console.
+        else if (d.kind === "joinChannelFailed") {
+          pendingJoinsRef.current.delete(d.channel);
+          setChannelJoinFailures((prev) =>
+            prev[d.channel] === d.reason
+              ? prev
+              : { ...prev, [d.channel]: d.reason },
+          );
+          if (!notifiedJoinFailuresRef.current.has(d.channel)) {
+            notifiedJoinFailuresRef.current.add(d.channel);
+            void notify({
+              title: `Couldn't join ${d.channel}`,
+              body: d.reason || undefined,
+              level: "error",
+            });
+          }
         } else if (d.kind === "commandFailed") {
           // Ignore-sync commands are best-effort: a server without IGNORE support
           // may reject them, but local hiding still applies, so degrade silently
@@ -1018,12 +1087,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         markSeen,
         rememberChannel,
         forgetChannel,
+        requestJoinChannel,
         lastJoinError: mirror.lastJoinError,
         clearJoinError,
         loginPopoverOpen,
         openLoginPopover,
         closeLoginPopover,
         justWentIngame: ingameFlash,
+        channelJoinFailures,
       }}
     >
       {children}
