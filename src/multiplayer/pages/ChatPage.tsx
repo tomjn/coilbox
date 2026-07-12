@@ -1,9 +1,15 @@
 import { Button, cn, NavGate, useSetting } from "@picoframe/frame";
 import { Gamepad2, LogOut, Star, UserCheck, Users, UserX } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { type ChatMsg, mpLeaveBattle, mpLeaveChannel } from "../bindings";
+import {
+  type ChatMsg,
+  mpLeaveBattle,
+  mpLeaveChannel,
+  mpSend,
+} from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
+import { ChannelTopicMenu } from "../chat/ChannelTopicMenu";
 import { ChatPane } from "../chat/ChatPane";
 import { ConversationSidebar } from "../chat/ConversationSidebar";
 import {
@@ -16,6 +22,7 @@ import {
   HIGHLIGHT_WORDS_KEY,
   matchesHighlight,
 } from "../chat/highlight";
+import { MemberActionsMenu } from "../chat/MemberActionsMenu";
 import { MemberList } from "../chat/MemberList";
 import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
@@ -26,6 +33,7 @@ import {
   useFavourites,
 } from "../friends";
 import { useIgnoreActions } from "../ignore";
+import { canChannelModerate, chanServInfo } from "../moderation";
 import { useMpRevealed, useMultiplayer } from "../store";
 
 /**
@@ -74,6 +82,51 @@ function ChatPage() {
   const isBot = useCallback(
     (from: string): boolean => users?.[from]?.status.bot ?? false,
     [users],
+  );
+
+  // Moderation privileges. The server `access` bit marks a server moderator (may
+  // run moderator verbs and ChanServ channel-ops anywhere). For a plain user, the
+  // channel-op controls appear only when we're that channel's founder/operator,
+  // learned from ChanServ `:info` (auto-queried on open below).
+  const iAmServerMod = !!(me && state?.users[me]?.status.access);
+  const activeChannel =
+    active?.kind === "channel" ? state?.channels[active.name] : undefined;
+  const iAmChannelOp = canChannelModerate(activeChannel, me, iAmServerMod);
+
+  // Auto-query ChanServ `:info` once per channel per session when opened, to learn
+  // its founder/operators (used to gate the controls). The reply is parsed and
+  // suppressed in the protocol reducer, so this adds no visible chat noise; sent as
+  // a raw line via mpSend so our own query isn't recorded as a ChanServ DM.
+  const infoAsked = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeKey || active?.kind !== "channel") return;
+    const name = active.name;
+    if (infoAsked.current.has(name)) return;
+    infoAsked.current.add(name);
+    mpSend({ serverKey: activeKey, line: chanServInfo(name) }).catch(() => {});
+  }, [activeKey, active]);
+
+  // A per-member `⋮` moderation menu, shown only in a channel where we hold
+  // privileges (server mod, or this channel's founder/op) and never on our own row.
+  const renderMemberActions = useCallback(
+    (username: string) => {
+      if (active?.kind !== "channel" || !activeKey) return null;
+      if (!iAmChannelOp && !iAmServerMod) return null;
+      if (username === me) return null;
+      return (
+        <MemberActionsMenu
+          nick={username}
+          channel={active.name}
+          channelOps={iAmChannelOp}
+          serverMod={iAmServerMod}
+          targetIsOp={activeChannel?.operators.includes(username) ?? false}
+          send={(line) => {
+            void mpSend({ serverKey: activeKey, line }).catch(() => {});
+          }}
+        />
+      );
+    },
+    [active, activeKey, iAmChannelOp, iAmServerMod, me, activeChannel],
   );
 
   // Flag messages that mention a highlight word or our own username (issue #193).
@@ -255,13 +308,27 @@ function ChatPage() {
                   <Users className="size-4" />
                 </Button>
                 {active.kind === "channel" ? (
-                  <Button
-                    className="h-7 px-2"
-                    onClick={() => leaveChannel(active.name)}
-                    aria-label="Leave channel"
-                  >
-                    <LogOut className="size-4" />
-                  </Button>
+                  <>
+                    {iAmChannelOp && (
+                      <ChannelTopicMenu
+                        channel={active.name}
+                        currentTopic={conv.subtitle}
+                        send={(line) => {
+                          if (activeKey)
+                            void mpSend({ serverKey: activeKey, line }).catch(
+                              () => {},
+                            );
+                        }}
+                      />
+                    )}
+                    <Button
+                      className="h-7 px-2"
+                      onClick={() => leaveChannel(active.name)}
+                      aria-label="Leave channel"
+                    >
+                      <LogOut className="size-4" />
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Button
@@ -297,6 +364,7 @@ function ChatPage() {
             presenceFor={presenceFor}
             isIgnored={ignoredNow}
             onToggleIgnore={toggleIgnore}
+            renderActions={renderMemberActions}
           />
         )}
 
