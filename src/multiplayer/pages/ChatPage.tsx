@@ -1,7 +1,20 @@
 import { Button, cn, NavGate, useSetting } from "@picoframe/frame";
 import { Gamepad2, LogOut, Star, UserCheck, Users, UserX } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   type ChatMsg,
   mpLeaveBattle,
@@ -35,6 +48,20 @@ import {
 import { useIgnoreActions } from "../ignore";
 import { canChannelModerate, chanServInfo } from "../moderation";
 import { useMpRevealed, useMultiplayer } from "../store";
+
+/**
+ * Wrap an icon-only header button with a hover/focus tooltip so its purpose is
+ * discoverable without clicking. `label` duplicates the button's `aria-label`;
+ * radix renders it from the trigger, so screen readers aren't double-announced.
+ */
+function IconTip({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 /**
  * The chat hub: sidebar of channels + DMs, a reusable ChatPane for the active
@@ -81,6 +108,10 @@ function ChatPage() {
   const users = state?.users;
   const isBot = useCallback(
     (from: string): boolean => users?.[from]?.status.bot ?? false,
+    [users],
+  );
+  const countryFor = useCallback(
+    (from: string): string | undefined => users?.[from]?.country,
     [users],
   );
 
@@ -254,59 +285,78 @@ function ChatPage() {
           currentUser={me}
           senderColor={senderColor}
           isBot={isBot}
+          countryFor={countryFor}
           isHighlighted={isHighlighted}
           completions={completions}
           onSend={conv.send}
           headerActions={
             active.kind === "dm" ? (
-              <>
-                <Button
-                  variant="secondary"
-                  className="h-7 px-2"
-                  onClick={toggleDmFavourite}
-                  aria-label={
+              <TooltipProvider delayDuration={150}>
+                <IconTip
+                  label={
                     dmIsFavourite
                       ? `Remove ${active.peer} from friends`
                       : `Add ${active.peer} to friends`
                   }
-                  aria-pressed={dmIsFavourite}
                 >
-                  <Star
-                    className={cn(
-                      "size-4",
-                      dmIsFavourite && "fill-current text-amber-400",
-                    )}
-                  />
-                </Button>
-                <Button
-                  variant="secondary"
-                  className="h-7 px-2"
-                  onClick={() => toggleIgnore(active.peer)}
-                  aria-label={
+                  <Button
+                    variant="secondary"
+                    className="h-7 px-2"
+                    onClick={toggleDmFavourite}
+                    aria-label={
+                      dmIsFavourite
+                        ? `Remove ${active.peer} from friends`
+                        : `Add ${active.peer} to friends`
+                    }
+                    aria-pressed={dmIsFavourite}
+                  >
+                    <Star
+                      className={cn(
+                        "size-4",
+                        dmIsFavourite && "fill-current text-amber-400",
+                      )}
+                    />
+                  </Button>
+                </IconTip>
+                <IconTip
+                  label={
                     ignoredNow(active.peer)
                       ? `Unignore ${active.peer}`
                       : `Ignore ${active.peer}`
                   }
-                  aria-pressed={ignoredNow(active.peer)}
                 >
-                  {ignoredNow(active.peer) ? (
-                    <UserCheck className="size-4" />
-                  ) : (
-                    <UserX className="size-4" />
-                  )}
-                </Button>
-              </>
+                  <Button
+                    variant="secondary"
+                    className="h-7 px-2"
+                    onClick={() => toggleIgnore(active.peer)}
+                    aria-label={
+                      ignoredNow(active.peer)
+                        ? `Unignore ${active.peer}`
+                        : `Ignore ${active.peer}`
+                    }
+                    aria-pressed={ignoredNow(active.peer)}
+                  >
+                    {ignoredNow(active.peer) ? (
+                      <UserCheck className="size-4" />
+                    ) : (
+                      <UserX className="size-4" />
+                    )}
+                  </Button>
+                </IconTip>
+              </TooltipProvider>
             ) : active.kind === "channel" || active.kind === "battle" ? (
-              <>
-                <Button
-                  variant="secondary"
-                  className="h-7 px-2"
-                  onClick={() => setShowMembers((v) => !v)}
-                  aria-label="Toggle members"
-                  aria-pressed={showMembers}
-                >
-                  <Users className="size-4" />
-                </Button>
+              <TooltipProvider delayDuration={150}>
+                <IconTip label="Toggle members">
+                  <Button
+                    variant="secondary"
+                    className="h-7 px-2"
+                    onClick={() => setShowMembers((v) => !v)}
+                    aria-label="Toggle members"
+                    aria-pressed={showMembers}
+                  >
+                    <Users className="size-4" />
+                  </Button>
+                </IconTip>
                 {active.kind === "channel" ? (
                   <>
                     {iAmChannelOp && (
@@ -321,13 +371,15 @@ function ChatPage() {
                         }}
                       />
                     )}
-                    <Button
-                      className="h-7 px-2"
-                      onClick={() => leaveChannel(active.name)}
-                      aria-label="Leave channel"
-                    >
-                      <LogOut className="size-4" />
-                    </Button>
+                    <IconTip label="Leave channel">
+                      <Button
+                        className="h-7 px-2"
+                        onClick={() => leaveChannel(active.name)}
+                        aria-label="Leave channel"
+                      >
+                        <LogOut className="size-4" />
+                      </Button>
+                    </IconTip>
                   </>
                 ) : (
                   <>
@@ -345,7 +397,7 @@ function ChatPage() {
                     </Button>
                   </>
                 )}
-              </>
+              </TooltipProvider>
             ) : undefined
           }
         />
