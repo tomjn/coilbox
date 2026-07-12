@@ -1,7 +1,8 @@
 import { Button } from "@picoframe/frame";
 import { Settings2, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { UnitRestrictions } from "@/campaign/pages/components/UnitRestrictions";
 import type { ConfigOption } from "@/content/bindings";
 import {
   ModOptionField,
@@ -18,6 +19,7 @@ import {
   STARTPOSTYPE_KEY,
   scriptTagKey,
 } from "./battleOptions";
+import { disabledFromTags } from "./restrictTags";
 import { useBattleOptions } from "./useBattleOptions";
 
 /**
@@ -36,6 +38,8 @@ export function BattleOptionsDrawer({
   gameMissing,
   mapMissing,
   sendOption,
+  canEditRestrictions,
+  onRestrictChange,
 }: {
   battle: Battle;
   modOptionsSchema: ConfigOption[];
@@ -44,6 +48,10 @@ export function BattleOptionsDrawer({
   gameMissing: boolean;
   mapMissing: boolean;
   sendOption: (tagKey: string, spadsName: string, value: string) => void;
+  /** Whether the local user may edit unit restrictions (founder only). */
+  canEditRestrictions: boolean;
+  /** Apply the full disabled-unit set (writes `game/restrict/*` script tags). */
+  onRestrictChange: (disabled: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
   const { pending, setOption } = useBattleOptions(
@@ -136,6 +144,12 @@ export function BattleOptionsDrawer({
                 canEdit={canEdit}
                 setOption={setOption}
               />
+              <RestrictSection
+                gameName={battle.modname}
+                scriptTags={battle.scriptTags}
+                canEdit={canEditRestrictions}
+                onChange={onRestrictChange}
+              />
             </div>
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
@@ -203,6 +217,68 @@ function OptionSection({
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">No options.</p>
+      )}
+    </section>
+  );
+}
+
+/** Order-independent equality of two unit-name sets. */
+function sameSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const s = new Set(a);
+  return b.every((x) => s.has(x));
+}
+
+/**
+ * Unit-restriction editor block. The founder gets the shared `UnitRestrictions`
+ * editor; everyone else sees the current disabled set read-only. Edits are
+ * optimistic: we hold a local set until the founder's `game/restrict/*` write
+ * echoes back into `scriptTags`, so rapid toggles don't race the round-trip (the
+ * editor reports the whole next set each change, so a stale base would clobber).
+ */
+function RestrictSection({
+  gameName,
+  scriptTags,
+  canEdit,
+  onChange,
+}: {
+  gameName: string;
+  scriptTags: Record<string, string>;
+  canEdit: boolean;
+  onChange: (disabled: string[]) => void;
+}) {
+  const confirmed = useMemo(() => disabledFromTags(scriptTags), [scriptTags]);
+  // Optimistic override, cleared once the server confirms it matches.
+  const [local, setLocal] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (local && sameSet(local, confirmed)) setLocal(null);
+  }, [local, confirmed]);
+  const disabled = local ?? confirmed;
+
+  return (
+    <section>
+      <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+        Unit restrictions
+      </div>
+      {canEdit ? (
+        <UnitRestrictions
+          gameName={gameName}
+          disabledUnits={disabled}
+          onChange={(next) => {
+            setLocal(next);
+            onChange(next);
+          }}
+        />
+      ) : disabled.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No restrictions.</p>
+      ) : (
+        <ul className="space-y-1 text-sm">
+          {disabled.map((name) => (
+            <li key={name} className="font-mono text-muted-foreground">
+              {name}
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

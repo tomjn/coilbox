@@ -1,4 +1,4 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, Input, useSetting } from "@picoframe/frame";
 import {
   AlertCircle,
   CheckCircle2,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
 import {
   dlInstalledContent,
   dlSpringfilesList,
@@ -22,6 +23,7 @@ import {
 } from "../DownloadQueueProvider";
 import { OptionSelect } from "./components/OptionSelect";
 import { EmptyState, errMessage } from "./components/states";
+import { HIDE_INSTALLED_KEY } from "./hideInstalled";
 
 type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
 
@@ -49,6 +51,10 @@ export default function GamesPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name-asc");
+  const [hideInstalled, setHideInstalled] = useSetting<boolean>(
+    HIDE_INSTALLED_KEY,
+    false,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -123,7 +129,9 @@ export default function GamesPage() {
 
   const sorted = useMemo(() => {
     if (!filtered) return null;
-    const arr = [...filtered];
+    const arr = hideInstalled
+      ? filtered.filter((g) => !installed.has(g.filename.toLowerCase()))
+      : [...filtered];
     arr.sort((a, b) => {
       switch (sort) {
         case "name-desc":
@@ -137,7 +145,7 @@ export default function GamesPage() {
       }
     });
     return arr;
-  }, [filtered, sort]);
+  }, [filtered, sort, hideInstalled, installed]);
 
   return (
     <div className="flex h-full flex-col">
@@ -170,6 +178,17 @@ export default function GamesPage() {
             className="w-36"
             options={SORT_OPTIONS}
           />
+          <label
+            htmlFor="games-hide-installed"
+            className="flex items-center gap-2 text-sm text-muted-foreground"
+          >
+            <Switch
+              id="games-hide-installed"
+              checked={hideInstalled}
+              onCheckedChange={setHideInstalled}
+            />
+            Hide downloaded
+          </label>
           {games && (
             <span className="text-sm text-muted-foreground">
               {filter.trim() && filtered

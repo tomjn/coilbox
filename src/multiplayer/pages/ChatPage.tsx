@@ -1,8 +1,8 @@
-import { Button, cn, NavGate } from "@picoframe/frame";
+import { Button, cn, NavGate, useSetting } from "@picoframe/frame";
 import { Gamepad2, LogOut, Star, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { mpLeaveBattle, mpLeaveChannel } from "../bindings";
+import { type ChatMsg, mpLeaveBattle, mpLeaveChannel } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
 import { ChatPane } from "../chat/ChatPane";
 import { ConversationSidebar } from "../chat/ConversationSidebar";
@@ -11,6 +11,11 @@ import {
   convId,
   isBattleChannel,
 } from "../chat/conversation";
+import {
+  HIGHLIGHT_OWN_KEY,
+  HIGHLIGHT_WORDS_KEY,
+  matchesHighlight,
+} from "../chat/highlight";
 import { MemberList } from "../chat/MemberList";
 import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
@@ -65,6 +70,16 @@ function ChatPage() {
     [users],
   );
 
+  // Flag messages that mention a highlight word or our own username (issue #193).
+  // Our own messages never flag us, even if we type our own name.
+  const [hlWords] = useSetting<string[]>(HIGHLIGHT_WORDS_KEY, []);
+  const [hlOwn] = useSetting<boolean>(HIGHLIGHT_OWN_KEY, true);
+  const isHighlighted = useCallback(
+    (m: ChatMsg): boolean =>
+      m.from !== me && matchesHighlight(m.text, hlWords, me, hlOwn),
+    [me, hlWords, hlOwn],
+  );
+
   // Coarse presence for a username: offline when absent from the roster, else
   // in-game/in-battle/away/online (see `userPresence`). Used by the DM header
   // and the member panel so both speak the same vocabulary.
@@ -72,6 +87,14 @@ function ChatPage() {
     (name: string) => (state ? userPresence(state, name) : "offline"),
     [state],
   );
+
+  // Tab-completion candidates for the composer: channel/battle member nicks, or
+  // the peer in a DM. Our own nick is excluded (you don't ping yourself).
+  const completions = useMemo(() => {
+    const names = conv.members.map((u) => u.name);
+    if (active?.kind === "dm") names.push(active.peer);
+    return me ? names.filter((n) => n !== me) : names;
+  }, [conv.members, active, me]);
 
   // For a DM header, mark the peer as a bot and show their richer presence.
   const dmPeer = active?.kind === "dm" ? active.peer : null;
@@ -172,6 +195,8 @@ function ChatPage() {
           currentUser={me}
           senderColor={senderColor}
           isBot={isBot}
+          isHighlighted={isHighlighted}
+          completions={completions}
           onSend={conv.send}
           headerActions={
             active.kind === "dm" ? (
