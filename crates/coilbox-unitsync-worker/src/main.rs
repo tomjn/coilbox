@@ -22,6 +22,7 @@ mod game;
 mod heightmap;
 mod infocache;
 mod lua;
+mod metalmap;
 mod minimap;
 mod model;
 mod skirmishai;
@@ -46,6 +47,8 @@ struct Args {
     extract: Option<String>,
     thumbnails: bool,
     heightmap: bool,
+    /// `--metalmap`: render one map's metal infomap as an RGBA overlay PNG.
+    metalmap: bool,
     /// `--map-info`: lazily read one map's options (combined with `--map`).
     map_info: bool,
     /// `--map-skybox`: read one map's `atmosphere.skyBox` DDS (combined with `--map`).
@@ -382,6 +385,26 @@ fn run() -> i32 {
         return 1;
     }
 
+    // Metalmap: render one map's metal infomap to a green-on-transparent RGBA PNG.
+    if args.metalmap {
+        if let Some(map) = args.map.clone() {
+            return match std::panic::catch_unwind(|| {
+                metalmap::render(&args.lib, &map, args.max_side, cache_dir)
+            }) {
+                Ok(out) => {
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    0
+                }
+                Err(_) => {
+                    metalmap::emit_error("worker panicked while rendering metalmap".into());
+                    1
+                }
+            };
+        }
+        emit_error("missing --map <name> for --metalmap".into());
+        return 1;
+    }
+
     // Single minimap renders one map; default mode scans everything.
     if let Some(map) = args.map.clone() {
         return match std::panic::catch_unwind(|| {
@@ -424,6 +447,7 @@ fn parse_args() -> Result<Args, String> {
     let mut extract = None;
     let mut thumbnails = false;
     let mut heightmap = false;
+    let mut metalmap = false;
     let mut map_info = false;
     let mut map_skybox = false;
     let mut config = false;
@@ -450,6 +474,7 @@ fn parse_args() -> Result<Args, String> {
             "--extract" => extract = it.next(),
             "--thumbnails" => thumbnails = true,
             "--heightmap" => heightmap = true,
+            "--metalmap" => metalmap = true,
             "--map-info" => map_info = true,
             "--map-skybox" => map_skybox = true,
             "--max-side" => {
@@ -498,6 +523,7 @@ fn parse_args() -> Result<Args, String> {
         extract,
         thumbnails,
         heightmap,
+        metalmap,
         map_info,
         map_skybox,
         config,

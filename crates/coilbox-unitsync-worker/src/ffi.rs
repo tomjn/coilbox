@@ -221,6 +221,10 @@ unsafe fn opt<T: Copy>(lib: &Library, name: &[u8]) -> Option<T> {
 /// infomap so `GetInfoMap` copies raw values rather than down-converting to 8-bit.
 const BM_GRAYSCALE_16: c_int = 2;
 
+/// unitsync `BitmapType::bm_grayscale_8` — the metal infomap is one byte per pixel
+/// (metal density 0..255), so it's read at 8-bit.
+const BM_GRAYSCALE_8: c_int = 1;
+
 impl Unitsync {
     /// `dlopen` the library at `libpath` and resolve every entry point. Loading
     /// by absolute path lets the dynamic loader resolve the library's own
@@ -476,6 +480,25 @@ impl Unitsync {
                 which.as_ptr(),
                 buf.as_mut_ptr() as *mut u8,
                 BM_GRAYSCALE_16,
+            )
+        };
+        (got != 0).then_some(buf)
+    }
+
+    /// The map's metal infomap as raw 8-bit density values (`w*h` long, row major,
+    /// 0..255). `w`/`h` must come from `map_dimensions` (which reads `GetInfoMapSize
+    /// "metal"`). `None` if the build lacks `GetInfoMap` or the read fails.
+    pub fn metalmap_data(&self, map_name: &str, w: u32, h: u32) -> Option<Vec<u8>> {
+        let f = self.info_map_fn?;
+        let name = CString::new(map_name).ok()?;
+        let which = CString::new("metal").ok()?;
+        let mut buf = vec![0u8; (w as usize) * (h as usize)];
+        let got = unsafe {
+            f(
+                name.as_ptr(),
+                which.as_ptr(),
+                buf.as_mut_ptr(),
+                BM_GRAYSCALE_8,
             )
         };
         (got != 0).then_some(buf)

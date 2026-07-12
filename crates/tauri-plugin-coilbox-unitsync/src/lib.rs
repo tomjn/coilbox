@@ -15,8 +15,8 @@ use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
     build_config_args, build_game_args, build_game_headers_args, build_heightmap_args,
     build_lua_args, build_lua_repl_args, build_map_info_args, build_map_skybox_args,
-    build_minimap_args, build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
-    build_unit_dataset_args, find_unitsync, resolve_sidecar,
+    build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
+    build_unit_buildpics_args, build_unit_dataset_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -357,6 +357,33 @@ async fn unitsync_heightmap<R: Runtime>(
     );
     let envs = loader_envs(&engine_dir, &data_dir);
     Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "heightmap", None).await)
+}
+
+/// `unitsync_metalmap` — render one map's metal infomap as a downscaled green-on-
+/// transparent RGBA PNG data URL, for overlaying mex spots on a minimap.
+/// `max_side` caps the PNG's longest side (defaults to 1024).
+#[tauri::command]
+async fn unitsync_metalmap<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    map_name: String,
+    max_side: Option<i32>,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let cache_dir = thumb_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_metalmap_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &map_name,
+        max_side.unwrap_or(1024),
+        cache_dir.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "metalmap", None).await)
 }
 
 /// `unitsync_thumbnails` — render a small minimap for every map in one session,
@@ -712,6 +739,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_scan,
             unitsync_minimap,
             unitsync_heightmap,
+            unitsync_metalmap,
             unitsync_thumbnails,
             unitsync_game_info,
             unitsync_unit_buildpics,

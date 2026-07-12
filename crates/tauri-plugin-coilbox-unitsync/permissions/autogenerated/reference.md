@@ -7,6 +7,7 @@ Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-i
 - `allow-unitsync-scan`
 - `allow-unitsync-minimap`
 - `allow-unitsync-heightmap`
+- `allow-unitsync-metalmap`
 - `allow-unitsync-thumbnails`
 - `allow-unitsync-game-info`
 - `allow-unitsync-unit-buildpics`
@@ -340,6 +341,32 @@ Enables the unitsync_map_skybox command without any pre-configured scope.
 <td>
 
 Denies the unitsync_map_skybox command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-metalmap`
+
+</td>
+<td>
+
+Enables the unitsync_metalmap command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-metalmap`
+
+</td>
+<td>
+
+Denies the unitsync_metalmap command without any pre-configured scope.
 
 </td>
 </tr>
