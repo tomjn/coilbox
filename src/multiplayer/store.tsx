@@ -1,4 +1,3 @@
-import { useSetting } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
   createContext,
@@ -26,6 +25,12 @@ import {
   mpRegister,
   mpSnapshot,
 } from "./bindings";
+import {
+  addChannel,
+  normalizeChannelList,
+  removeChannel,
+  useJoinedChannels,
+} from "./channels";
 import { conversationCounts } from "./chat/conversation";
 import { triggerIngameCue } from "./ingameCue";
 import { triggerRing } from "./ringEffect";
@@ -207,9 +212,12 @@ interface MultiplayerContextValue {
   unreadFor: (id: string, count: number) => number;
   /** Mark a conversation read up to its current message count. */
   markSeen: (id: string, count: number) => void;
-  /** Remember a joined channel so it's auto-rejoined on the next connect. */
-  rememberChannel: (name: string) => void;
-  /** Forget a channel so it's no longer auto-rejoined. */
+  /**
+   * Remember a joined channel (with an optional key) so it's auto-joined on the
+   * next connect. Adding an already-remembered channel with a key updates its key.
+   */
+  rememberChannel: (name: string, key?: string) => void;
+  /** Forget a channel so it's no longer auto-joined. */
   forgetChannel: (name: string) => void;
   /** Reason from the last failed battle join, or null. */
   lastJoinError: string | null;
@@ -311,17 +319,17 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // Channels the user has chosen to be in, persisted per `serverKey` so they can be
   // auto-rejoined on the next connect. This is a preference list (re-derivable by
   // rejoining), so it lives in the frame settings store rather than backend state.
-  const [joinedChannels, setJoinedChannels] = useSetting<
-    Record<string, string[]>
-  >("multiplayer.joinedChannels", {});
+  const [joinedChannels, setJoinedChannels] = useJoinedChannels();
   const rejoinedForRef = useRef<string | null>(null);
 
   const rememberChannel = useCallback(
-    (name: string) => {
+    (name: string, key?: string) => {
       if (!activeKey) return;
-      const cur = joinedChannels[activeKey] ?? [];
-      if (cur.includes(name)) return;
-      setJoinedChannels({ ...joinedChannels, [activeKey]: [...cur, name] });
+      const cur = normalizeChannelList(joinedChannels[activeKey]);
+      setJoinedChannels({
+        ...joinedChannels,
+        [activeKey]: addChannel(cur, name, key),
+      });
     },
     [activeKey, joinedChannels, setJoinedChannels],
   );
@@ -329,19 +337,19 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const forgetChannel = useCallback(
     (name: string) => {
       if (!activeKey) return;
-      const cur = joinedChannels[activeKey] ?? [];
-      if (!cur.includes(name)) return;
+      const cur = normalizeChannelList(joinedChannels[activeKey]);
       setJoinedChannels({
         ...joinedChannels,
-        [activeKey]: cur.filter((c) => c !== name),
+        [activeKey]: removeChannel(cur, name),
       });
     },
     [activeKey, joinedChannels, setJoinedChannels],
   );
 
-  // Auto-rejoin remembered channels once per connection, after login reaches the
+  // Auto-join the configured channels once per connection, after login reaches the
   // `ready` phase (JOIN before ACCEPTED would be rejected). The ref guards against
   // re-firing when `joinedChannels` changes mid-session (e.g. the user joins one).
+  // Each entry may carry a key/password, passed straight through to JOIN.
   useEffect(() => {
     if (activeKey == null) {
       rejoinedForRef.current = null;
@@ -349,9 +357,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     }
     if (mirror.phase === "ready" && rejoinedForRef.current !== activeKey) {
       rejoinedForRef.current = activeKey;
-      for (const name of joinedChannels[activeKey] ?? []) {
-        mpJoinChannel({ serverKey: activeKey, channel: name }).catch((e) =>
-          console.warn("multiplayer: auto-rejoin channel failed", name, e),
+      for (const { name, key } of normalizeChannelList(
+        joinedChannels[activeKey],
+      )) {
+        // A settings row can be added before it's named; don't JOIN "".
+        if (!name.trim()) continue;
+        mpJoinChannel({ serverKey: activeKey, channel: name, key }).catch((e) =>
+          console.warn("multiplayer: auto-join channel failed", name, e),
         );
       }
     }
