@@ -1,4 +1,6 @@
 import { useSetting } from "@picoframe/frame";
+import { useCallback } from "react";
+import { mpIgnore, mpUnignore } from "./bindings";
 
 /**
  * The local ignore list: usernames whose channel and private messages are hidden
@@ -63,4 +65,55 @@ export function removeIgnore(
  */
 export function useIgnored() {
   return useSetting<Record<string, string[]>>("multiplayer.ignored", {});
+}
+
+/**
+ * Ignore actions bound to a connection's `serverKey` (or null when disconnected).
+ * Wraps the local settings-store mutation so it ALSO syncs with the server's
+ * IGNORE/UNIGNORE commands (issue #188): the local change is authoritative for
+ * client-side hiding and always applied, while the server call is best-effort —
+ * failures (e.g. a server without ignore support) are swallowed so hiding still
+ * works locally. `serverKey` is passed in rather than read from the store to keep
+ * this module free of a `store` import cycle.
+ */
+export function useIgnoreActions(serverKey: string | null) {
+  const [map, setMap] = useIgnored();
+
+  const list = serverKey ? ignoredFor(map, serverKey) : [];
+
+  const has = useCallback(
+    (name: string) => (serverKey ? isIgnored(map, serverKey, name) : false),
+    [map, serverKey],
+  );
+
+  const ignore = useCallback(
+    (name: string) => {
+      const trimmed = name.trim();
+      if (!serverKey || !trimmed) return;
+      setMap(addIgnore(map, serverKey, trimmed));
+      // Best-effort server sync; local hiding above works regardless of support.
+      mpIgnore({ serverKey, username: trimmed }).catch(() => {});
+    },
+    [map, serverKey, setMap],
+  );
+
+  const unignore = useCallback(
+    (name: string) => {
+      if (!serverKey) return;
+      setMap(removeIgnore(map, serverKey, name));
+      mpUnignore({ serverKey, username: name }).catch(() => {});
+    },
+    [map, serverKey, setMap],
+  );
+
+  const toggle = useCallback(
+    (name: string) => {
+      if (!serverKey) return;
+      if (isIgnored(map, serverKey, name)) unignore(name);
+      else ignore(name);
+    },
+    [map, serverKey, ignore, unignore],
+  );
+
+  return { list, has, ignore, unignore, toggle };
 }

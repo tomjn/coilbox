@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
-// ignore.ts imports `useSetting` from @picoframe/frame, whose published dist uses
-// extensionless relative imports Vitest's node resolver won't load. These pure-
-// helper tests never call the hook, so stubbing the leaf package is enough to let
-// the module import (same pattern as channels.test.ts).
+// ignore.ts imports `useSetting` from @picoframe/frame and (for the server-sync
+// actions) the command bindings, which pull in @picoframe/plugin-sdk. Both published
+// dists use extensionless relative imports Vitest's node resolver won't load. These
+// pure-helper tests never call the hook or a command, so stubbing the leaf packages
+// is enough to let the module import (same pattern as store.test.ts).
 vi.mock("@picoframe/frame", () => ({
   useSetting: () => [{}, () => {}],
+}));
+vi.mock("@picoframe/plugin-sdk", () => ({
+  defineCommand: () => async () => ({}),
 }));
 
 import { addIgnore, ignoredFor, isIgnored, removeIgnore } from "./ignore";

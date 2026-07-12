@@ -1,18 +1,19 @@
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Trash2, UserX } from "lucide-react";
 import { useState } from "react";
-import { addIgnore, ignoredFor, removeIgnore, useIgnored } from "../ignore";
+import { useIgnoreActions } from "../ignore";
 import { useMultiplayer } from "../store";
 
 /**
- * Settings section for the local ignore list. Ignores are per-account, keyed by the
- * live `serverKey` (`username@host:port`), so the editor targets the connected
- * account; when disconnected it explains that a connection is required. Ignored
- * users' channel and private messages are hidden client-side (see `useConversation`).
+ * Settings section for the ignore list. Ignores are per-account, keyed by the live
+ * `serverKey` (`username@host:port`), so the editor targets the connected account;
+ * when disconnected it explains that a connection is required. Ignored users'
+ * channel and private messages are hidden client-side (see `useConversation`), and
+ * the change is synced to the server's ignore list where supported.
  */
 export default function IgnoreSettings() {
   const { activeKey } = useMultiplayer();
-  const [map, setMap] = useIgnored();
+  const { list, ignore, unignore } = useIgnoreActions(activeKey);
   const [draft, setDraft] = useState("");
 
   if (!activeKey) {
@@ -24,12 +25,10 @@ export default function IgnoreSettings() {
     );
   }
 
-  const list = ignoredFor(map, activeKey);
-
   const add = () => {
     const name = draft.trim();
     if (!name) return;
-    setMap(addIgnore(map, activeKey, name));
+    ignore(name);
     setDraft("");
   };
 
@@ -75,7 +74,7 @@ export default function IgnoreSettings() {
                 variant="outline"
                 size="sm"
                 className="ml-auto"
-                onClick={() => setMap(removeIgnore(map, activeKey, name))}
+                onClick={() => unignore(name)}
                 aria-label={`Stop ignoring ${name}`}
               >
                 <Trash2 className="size-4" />
