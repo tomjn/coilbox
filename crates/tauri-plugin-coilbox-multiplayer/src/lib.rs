@@ -40,6 +40,15 @@ pub(crate) fn lock_or_recover<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+/// The two lobby chat-log directories under the app data dir: DM history and
+/// channel history. Both hold one `<sanitized serverKey>.jsonl` per account.
+fn log_dirs<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
+    let base = coilbox_portable::data_dir(app)?.join("coilbox");
+    Ok((base.join("lobby-dms"), base.join("lobby-channels")))
+}
+
 /// Enqueue one raw wire line on a live connection. The shared body behind every
 /// typed action command: look the connection up, push the line onto its writer
 /// channel, and translate the two failure modes (unknown key / closed socket) into
@@ -95,11 +104,12 @@ async fn open_and_spawn<R: Runtime>(
         return CliResult::err(format!("already connected: {server_key}"));
     }
 
-    let dm_dir = match coilbox_portable::data_dir(app) {
-        Ok(d) => d.join("coilbox").join("lobby-dms"),
+    let (dm_dir, chan_dir) = match log_dirs(app) {
+        Ok(dirs) => dirs,
         Err(e) => return CliResult::err(format!("no app data dir: {e}")),
     };
     let dm_log = dmlog::DmLog::new(&dm_dir, &server_key);
+    let chan_log = dmlog::DmLog::new(&chan_dir, &server_key);
 
     let stream = match tls::connect_stream(&host, port, tls, allow_self_signed).await {
         Ok(s) => s,
@@ -128,6 +138,7 @@ async fn open_and_spawn<R: Runtime>(
         login_cfg,
         on_event,
         dm_log,
+        chan_log,
     );
     CliResult::ok(json!({ "connected": true }))
 }
@@ -1196,6 +1207,57 @@ fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> 
     }
 }
 
+/// `mp_chat_logs` — enumerate saved chat logs (DM + channel threads) across every
+/// account, for the log viewer. Reads the log dirs directly, so it works with no
+/// active connection. Each account's threads are newest-activity first.
+#[tauri::command]
+fn mp_chat_logs<R: Runtime>(app: tauri::AppHandle<R>) -> CliResult {
+    let (dm_dir, chan_dir) = match log_dirs(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let mut accounts: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+    for (dir, kind) in [(&dm_dir, "dm"), (&chan_dir, "channel")] {
+        for stem in dmlog::account_stems(dir) {
+            let log = dmlog::DmLog::new(dir, &stem);
+            for (name, count, last_at) in log.summaries() {
+                accounts.entry(stem.clone()).or_default().push(json!({
+                    "kind": kind,
+                    "name": name,
+                    "messageCount": count,
+                    "lastAt": last_at,
+                }));
+            }
+        }
+    }
+    let out: Vec<Value> = accounts
+        .into_iter()
+        .map(|(account, mut threads)| {
+            threads.sort_by(|a, b| b["lastAt"].as_u64().cmp(&a["lastAt"].as_u64()));
+            json!({ "account": account, "threads": threads })
+        })
+        .collect();
+    CliResult::ok(json!({ "accounts": out }))
+}
+
+/// `mp_chat_log_open` — load one saved thread's messages (a DM peer or a channel)
+/// for `account` (a log file stem from `mp_chat_logs`). `kind` selects the store.
+#[tauri::command]
+fn mp_chat_log_open<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    account: String,
+    kind: String,
+    name: String,
+) -> CliResult {
+    let (dm_dir, chan_dir) = match log_dirs(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let dir = if kind == "channel" { chan_dir } else { dm_dir };
+    let log = dmlog::DmLog::new(&dir, &account);
+    CliResult::ok(json!({ "messages": log.thread(&name) }))
+}
+
 /// Build the plugin. Registered as `"coilbox-multiplayer"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-multiplayer")
@@ -1251,6 +1313,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_remove_script_tags,
             mp_build_battle_config,
             mp_build_host_config,
+            mp_chat_logs,
+            mp_chat_log_open,
         ])
         .build()
 }
