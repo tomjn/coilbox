@@ -28,6 +28,7 @@ export function MinimapPreview({
   overlayInteractive,
   children,
   placeholder,
+  dim,
 }: {
   dataUrl?: string | null;
   width?: number;
@@ -48,6 +49,9 @@ export function MinimapPreview({
   /** Replaces the "No minimap" empty state (e.g. an inline download panel). When
    * shown, the box is not clickable so its own controls stay interactive. */
   placeholder?: ReactNode;
+  /** Dim the base minimap image so a terrain overlay on top reads more clearly.
+   * Only affects this component's own image, not overlays passed as children. */
+  dim?: boolean;
 }) {
   const worldW = (width ?? 0) * 16;
   const worldH = (height ?? 0) * 16;
@@ -85,7 +89,9 @@ export function MinimapPreview({
       <img
         src={dataUrl}
         alt={alt}
-        className="absolute inset-0 size-full object-fill"
+        className={`absolute inset-0 size-full object-fill${
+          dim ? " brightness-[0.55]" : ""
+        }`}
       />
       {markers.map((m, i) => (
         <span

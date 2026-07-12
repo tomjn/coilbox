@@ -30,6 +30,7 @@ export function MapCard({
   overlay,
   overlayInteractive,
   placeholder,
+  dimBase,
 }: {
   map: MapItem | null;
   maps: MapItem[];
@@ -53,6 +54,8 @@ export function MapCard({
   overlayInteractive?: boolean;
   /** Replaces the empty-state inside the minimap box (e.g. a download panel). */
   placeholder?: ReactNode;
+  /** Dim the base minimap image (e.g. while a terrain overlay is shown on top). */
+  dimBase?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const size = map ? mapSizeLabel(map.width, map.height) : null;
@@ -90,6 +93,7 @@ export function MapCard({
         }
         overlayInteractive={overlayInteractive}
         placeholder={placeholder}
+        dim={dimBase}
       >
         {overlay}
       </MinimapPreview>
