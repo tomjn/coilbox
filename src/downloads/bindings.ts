@@ -148,6 +148,25 @@ export const dlHakoraMaps = defineCommand<undefined, { maps: HakoraMap[] }>(
 );
 
 /**
+ * A Spring content archive (`.sd7`/`.sdz`) from a curated GitHub release repo. Like
+ * `HakoraMap` it has no springname — `url` is fetched directly via `dlDownloadFile`.
+ * `tag` is the release it came from.
+ */
+export interface ReleaseArchive {
+  filename: string;
+  url: string;
+  size: number;
+  tag: string;
+}
+
+/** Content archives from an `owner/name` repo's recent GitHub releases, for the
+ * curated map/game sources. */
+export const dlGithubReleaseArchives = defineCommand<
+  { repo: string },
+  { archives: ReleaseArchive[] }
+>("coilbox-downloads", "dl_github_release_archives");
+
+/**
  * Download a map by spring name via the sidecar. `searchUrl` overrides
  * `PRD_HTTP_SEARCH_URL` (springrts default; BAR's files-cdn for BAR maps).
  */

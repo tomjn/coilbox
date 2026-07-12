@@ -13,9 +13,11 @@ import { Switch } from "@/components/ui/switch";
 import {
   type BarMap,
   dlBarMaps,
+  dlGithubReleaseArchives,
   dlHakoraMaps,
   dlInstalledContent,
   dlSpringfilesList,
+  type ReleaseArchive,
   type SpringFile,
 } from "../bindings";
 import { useContentRootPaths, useWriteRootPath } from "../config";
@@ -32,7 +34,14 @@ import { HIDE_INSTALLED_KEY } from "./hideInstalled";
 /** pr-downloader HTTP search endpoint for BAR map files. */
 const BAR_SEARCH_URL = "https://files-cdn.beyondallreason.dev/find";
 
-type Source = "bar" | "springfiles" | "hakora";
+type Source = "bar" | "springfiles" | "hakora" | "bar-maps-gh" | "tap-maps";
+
+/** Curated GitHub map repos (from skylobby's shipped source list), fetched via
+ * their release assets. */
+const MAP_REPOS: Record<string, string> = {
+  "bar-maps-gh": "beyond-all-reason/Maps",
+  "tap-maps": "FluidPlay/TAP-maps",
+};
 
 /** Normalised row rendered by the grid, regardless of source. */
 interface MapItem {
@@ -81,6 +90,13 @@ function barSubtitle(m: BarMap): string {
   if (m.mapWidth && m.mapHeight) parts.push(`${m.mapWidth}×${m.mapHeight}`);
   if (m.playerCountMax)
     parts.push(`${m.playerCountMin ?? 2}–${m.playerCountMax}p`);
+  return parts.join(" · ");
+}
+
+function archiveSubtitle(a: ReleaseArchive): string {
+  const parts: string[] = [];
+  if (a.size) parts.push(`${(a.size / 1_048_576).toFixed(1)} MB`);
+  if (a.tag) parts.push(a.tag);
   return parts.join(" · ");
 }
 
@@ -136,6 +152,19 @@ export default function MapsPage() {
             subtitle: m.size || undefined,
             filename: m.filename,
             url: m.url, // marks the direct-fetch path
+          })),
+        );
+      } else if (src in MAP_REPOS) {
+        const { archives } = await dlGithubReleaseArchives({
+          repo: MAP_REPOS[src],
+        });
+        setItems(
+          archives.map((a) => ({
+            springName: a.filename, // no springname; filename is unique
+            title: a.filename.replace(/\.(sd7|sdz)$/i, ""),
+            subtitle: archiveSubtitle(a),
+            filename: a.filename,
+            url: a.url, // marks the direct-fetch path
           })),
         );
       } else {
@@ -271,8 +300,9 @@ export default function MapsPage() {
         <div className="space-y-1">
           <h1 className="text-lg font-semibold leading-none">Maps</h1>
           <p className="max-w-prose text-sm text-muted-foreground">
-            Browse and download maps from Beyond All Reason, springfiles, or the
-            hakora mirror into the configured content folder.
+            Browse and download maps from Beyond All Reason, springfiles, the
+            hakora mirror, or curated GitHub map repos into the configured
+            content folder.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -287,6 +317,8 @@ export default function MapsPage() {
               { value: "bar", label: "Beyond All Reason" },
               { value: "springfiles", label: "springfiles" },
               { value: "hakora", label: "hakora" },
+              { value: "bar-maps-gh", label: "BAR Maps (GitHub)" },
+              { value: "tap-maps", label: "TAP Maps (GitHub)" },
             ]}
           />
           <div className="relative max-w-xs flex-1">
