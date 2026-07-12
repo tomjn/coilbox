@@ -13,6 +13,7 @@ import {
   playFocus,
   playLaunch,
   playLaunchReplay,
+  playLaunchSave,
 } from "./bindings";
 
 /** Which kind of run is live, for labelling. A campaign mission launches through
@@ -21,6 +22,7 @@ export type RunKind =
   | "skirmish"
   | "battle"
   | "replay"
+  | "save"
   | "campaign"
   | "conquest";
 
@@ -32,6 +34,12 @@ interface LaunchOpts {
 
 interface ReplayOpts {
   demoPath: string;
+  executable: string;
+  dataDir: string;
+}
+
+interface SaveOpts {
+  savePath: string;
   executable: string;
   dataDir: string;
 }
@@ -49,6 +57,8 @@ interface PlayContextValue {
   ) => Promise<{ exitCode: number | null }>;
   /** Launch a replay; resolves when the engine exits. */
   launchReplay: (opts: ReplayOpts) => Promise<{ exitCode: number | null }>;
+  /** Resume a savegame; resolves when the engine exits. */
+  launchSave: (opts: SaveOpts) => Promise<{ exitCode: number | null }>;
   /** Bring the running game's window to the foreground (best-effort). */
   focusGame: () => void;
 }
@@ -119,6 +129,14 @@ export function PlayProvider({ children }: { children: ReactNode }) {
     [start],
   );
 
+  const launchSave = useCallback(
+    (opts: SaveOpts) =>
+      start("save", (runId, onEvent) =>
+        playLaunchSave({ ...opts, runId, onEvent }),
+      ),
+    [start],
+  );
+
   const focusGame = useCallback(() => {
     if (!activeRunId) return;
     void playFocus({ runId: activeRunId }).catch(() => {});
@@ -126,7 +144,15 @@ export function PlayProvider({ children }: { children: ReactNode }) {
 
   return (
     <PlayContext.Provider
-      value={{ running, activeRunId, kind, launch, launchReplay, focusGame }}
+      value={{
+        running,
+        activeRunId,
+        kind,
+        launch,
+        launchReplay,
+        launchSave,
+        focusGame,
+      }}
     >
       {children}
     </PlayContext.Provider>
