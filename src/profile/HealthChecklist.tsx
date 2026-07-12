@@ -51,6 +51,11 @@ function Row({ check }: { check: HealthCheck }) {
       <div className="min-w-0">
         <p className="font-medium">{check.label}</p>
         {check.hint && <p className="text-muted-foreground">{check.hint}</p>}
+        {check.detail && (
+          <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-muted/50 p-2 font-mono text-xs leading-relaxed text-foreground">
+            {check.detail}
+          </pre>
+        )}
       </div>
     </li>
   );

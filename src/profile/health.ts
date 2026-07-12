@@ -6,7 +6,19 @@ export interface HealthCheck {
   id: string;
   label: string;
   status: HealthStatus;
+  /** Short human explanation / next step, rendered as prose. */
   hint?: string;
+  /** Verbatim technical detail (e.g. a JSON source excerpt), rendered monospace. */
+  detail?: string;
+}
+
+/** One campaign that failed to load, with enough to find and fix it. */
+export interface CampaignFailure {
+  source: "bundled" | "local";
+  /** The campaign's own `name`, or a placeholder when the JSON won't parse. */
+  name: string;
+  /** The parse or schema error explaining why it was rejected. */
+  error: string;
 }
 
 /** A writability probe result for one folder (from `dlPathWritable`). */
@@ -28,11 +40,13 @@ export interface HealthInputs {
   portableRoot: string;
   profileSource: ProfileSource;
   profileError: string | null;
+  /** Monospace source excerpt pinpointing the parse error, when locatable. */
+  profileErrorSnippet: string | null;
   gameFilter: GameFilter | undefined;
   roots: RootInput[];
   installedGames: string[];
   writeRootPath: string | undefined;
-  campaignFailures: { bundled: number; local: number };
+  campaignFailures: CampaignFailure[];
   writable: { writeRoot?: WritableResult; dataDir?: WritableResult };
 }
 
@@ -90,6 +104,7 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       status: "error",
       label: "profile.json failed to parse",
       hint: i.profileError,
+      detail: i.profileErrorSnippet ?? undefined,
     });
   } else if (i.profileError) {
     checks.push({
@@ -152,13 +167,21 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
         hint: `Invalid regex: ${regexError}`,
       });
     } else {
+      const installed = i.installedGames;
+      const filterDesc = i.gameFilter.regex
+        ? `regex /${i.gameFilter.regex}/i`
+        : `names [${i.gameFilter.names?.join(", ")}]`;
+      const sample = installed.slice(0, 8).join(", ");
+      const more = installed.length > 8 ? ", …" : "";
       checks.push({
         id: "gameFilter",
         status: count === 0 ? "warn" : "ok",
         label: `Game filter matches ${count} installed game(s)`,
         hint:
           count === 0
-            ? "Check the regex/names, or install the game."
+            ? installed.length
+              ? `Filter (${filterDesc}) matched none of the ${installed.length} installed game(s): ${sample}${more}. Adjust it to match one of these.`
+              : `Filter (${filterDesc}) has nothing to match yet — no games are installed. Install the game, or check the filter.`
             : undefined,
       });
     }
@@ -194,22 +217,25 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
             id: "writeRoot",
             status: "warn",
             label: "Download write root is outside the package",
-            hint: "Downloads and release updates would land outside the package. Point the write root at a bundled folder.",
+            hint: `Write root "${i.writeRootPath}" is outside the package ("${appDir}"). Downloads and release updates would land there, not with the package. Point the write root at a folder under the package.`,
           },
     );
   }
 
   // 6. Bundled campaign load errors
   {
-    const total = i.campaignFailures.bundled + i.campaignFailures.local;
+    const failures = i.campaignFailures;
     checks.push(
-      total === 0
+      failures.length === 0
         ? { id: "campaigns", status: "ok", label: "All campaigns loaded" }
         : {
             id: "campaigns",
             status: "warn",
-            label: `${total} campaign(s) failed to load`,
-            hint: "Check the JSON in .coilbox/campaigns/.",
+            label: `${failures.length} campaign(s) failed to load`,
+            hint: "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):",
+            detail: failures
+              .map((f) => `${f.name} [${f.source}]: ${f.error}`)
+              .join("\n"),
           },
     );
   }
@@ -218,19 +244,22 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
   {
     const engines = i.roots.reduce((n, r) => n + r.engineCount, 0);
     const games = i.installedGames.length;
+    const scanned = i.roots.length
+      ? `Scanned ${i.roots.length} content folder(s): ${i.roots.map((r) => r.path).join(", ")}.`
+      : "No content folders are configured to scan.";
     if (engines === 0) {
       checks.push({
         id: "content",
         status: "warn",
         label: "No engine found",
-        hint: "Install or bundle an engine — the game can't launch without one.",
+        hint: `Install or bundle an engine — the game can't launch without one. ${scanned}`,
       });
     } else if (games === 0) {
       checks.push({
         id: "content",
         status: "warn",
         label: "No games found",
-        hint: "Bundle or download the game archive (.sdz/.sd7).",
+        hint: `Bundle or download the game archive (.sdz/.sd7). ${scanned}`,
       });
     } else {
       checks.push({
