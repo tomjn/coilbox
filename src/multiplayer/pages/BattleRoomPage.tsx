@@ -1,6 +1,6 @@
 import { Button, NavGate } from "@picoframe/frame";
-import { Gamepad2 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Bookmark, Gamepad2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { AutohostControls } from "../battle/AutohostControls";
 import { BattleChatCard } from "../battle/BattleChatCard";
@@ -8,7 +8,10 @@ import { BattleGameCard } from "../battle/BattleGameCard";
 import { BattleMapCard } from "../battle/BattleMapCard";
 import { BattleMembersTable } from "../battle/BattleMembersTable";
 import { BattleOptionsDrawer } from "../battle/BattleOptionsDrawer";
+import { BattlePresetsDrawer } from "../battle/BattlePresetsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
+import { battleOptionTags } from "../battle/battleOptions";
+import { useBattlePresets } from "../battle/battlePresets";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import { StartPosOptions } from "../battle/StartPosOptions";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
@@ -27,6 +30,26 @@ function BattleRoomPage() {
   const room = useBattleRoom();
   const launch = useBattleLaunch(room.serverKey, room.target, room.selfHost);
   const navigate = useNavigate();
+  const presets = useBattlePresets();
+  const [presetsOpen, setPresetsOpen] = useState(false);
+
+  // Per-game default preset: when we host a game that has a default preset set,
+  // apply its options once. Guarded by a ref keyed on the battle + game so it seeds
+  // the room a single time and never re-clobbers options the host then tweaks.
+  const appliedDefaultRef = useRef<string | null>(null);
+  useEffect(() => {
+    const b = room.battle;
+    if (!b || !room.selfHost || !room.canEditOptions) return;
+    const key = `${room.serverKey}::${b.modname}`;
+    if (appliedDefaultRef.current === key) return;
+    const defId = presets.defaultForGame(b.modname);
+    if (!defId) return;
+    const preset = presets.presets.find((p) => p.id === defId);
+    if (!preset) return;
+    appliedDefaultRef.current = key;
+    room.applyOptionTags(preset.scriptTags);
+    presets.touchPreset(preset.id);
+  }, [room, presets]);
 
   // Auto-launch: for a battle we JOIN, match start is driven by the protocol, not a
   // button — when the host goes in-game, launch the engine as a client. Guard against
@@ -194,6 +217,40 @@ function BattleRoomPage() {
             canEditRestrictions={room.canEditRestrictions}
             onRestrictChange={room.setRestrictions}
           />
+          {room.canEditOptions && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setPresetsOpen(true)}
+              >
+                <Bookmark className="size-4" /> Option presets
+              </Button>
+              <BattlePresetsDrawer
+                open={presetsOpen}
+                onOpenChange={setPresetsOpen}
+                gameName={battle.modname}
+                presets={presets.presetsForGame(battle.modname)}
+                defaultId={presets.defaultForGame(battle.modname)}
+                optionCount={
+                  Object.keys(battleOptionTags(battle.scriptTags)).length
+                }
+                onSave={(name) =>
+                  presets.savePreset(name, battle.modname, battle.scriptTags)
+                }
+                onLoad={(p) => {
+                  room.applyOptionTags(p.scriptTags);
+                  presets.touchPreset(p.id);
+                }}
+                onDelete={(id) => presets.removePreset(id)}
+                onSetDefault={(id) =>
+                  presets.setDefaultForGame(battle.modname, id)
+                }
+                disabled={!room.canEditOptions}
+              />
+            </>
+          )}
           {room.gameMissing && (
             <MissingContentCard
               gameName={battle.modname}
