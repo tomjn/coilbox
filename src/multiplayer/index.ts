@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Gamepad2, LogIn, MessagesSquare, Swords } from "lucide-react";
+import { AtSign, Gamepad2, LogIn, MessagesSquare, Swords } from "lucide-react";
 import LobbyStatusButton from "./LobbyStatusButton";
+import HighlightsSettings from "./pages/HighlightsSettings";
 import {
   MultiplayerProvider,
   useBattleRoomLabel,
@@ -89,6 +90,14 @@ const multiplayerPlugin: FramePlugin = {
       path: "battle",
       lazy: () => import("./pages/BattleRoomPage"),
       crumb: "Battle Room",
+    },
+  ],
+  settings: [
+    {
+      id: "chat-highlights",
+      title: "Chat highlights",
+      icon: AtSign,
+      Component: HighlightsSettings,
     },
   ],
   slots: [{ slot: "topbar.right", order: 100, Component: LobbyStatusButton }],

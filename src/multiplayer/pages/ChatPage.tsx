@@ -1,8 +1,8 @@
-import { Button, NavGate } from "@picoframe/frame";
+import { Button, NavGate, useSetting } from "@picoframe/frame";
 import { Gamepad2, LogOut, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { mpLeaveBattle, mpLeaveChannel } from "../bindings";
+import { type ChatMsg, mpLeaveBattle, mpLeaveChannel } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
 import { ChatPane } from "../chat/ChatPane";
 import { ConversationSidebar } from "../chat/ConversationSidebar";
@@ -11,6 +11,11 @@ import {
   convId,
   isBattleChannel,
 } from "../chat/conversation";
+import {
+  HIGHLIGHT_OWN_KEY,
+  HIGHLIGHT_WORDS_KEY,
+  matchesHighlight,
+} from "../chat/highlight";
 import { MemberList } from "../chat/MemberList";
 import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
@@ -56,6 +61,16 @@ function ChatPage() {
   const isBot = useCallback(
     (from: string): boolean => users?.[from]?.status.bot ?? false,
     [users],
+  );
+
+  // Flag messages that mention a highlight word or our own username (issue #193).
+  // Our own messages never flag us, even if we type our own name.
+  const [hlWords] = useSetting<string[]>(HIGHLIGHT_WORDS_KEY, []);
+  const [hlOwn] = useSetting<boolean>(HIGHLIGHT_OWN_KEY, true);
+  const isHighlighted = useCallback(
+    (m: ChatMsg): boolean =>
+      m.from !== me && matchesHighlight(m.text, hlWords, me, hlOwn),
+    [me, hlWords, hlOwn],
   );
 
   // Coarse presence for a username: offline when absent from the roster, else
@@ -159,6 +174,7 @@ function ChatPage() {
           currentUser={me}
           senderColor={senderColor}
           isBot={isBot}
+          isHighlighted={isHighlighted}
           completions={completions}
           onSend={conv.send}
           headerActions={
