@@ -423,6 +423,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     [activeKey, joinedChannels, setJoinedChannels],
   );
 
+  // The frozen event handler (openChannel) can't close over `forgetChannel`
+  // directly — it would capture a stale `joinedChannels`. Route through a ref so a
+  // JOINFAILED can drop the channel using the latest list.
+  const forgetChannelRef = useRef(forgetChannel);
+  useEffect(() => {
+    forgetChannelRef.current = forgetChannel;
+  }, [forgetChannel]);
+
   // Auto-join the configured channels once per connection, after login reaches the
   // `ready` phase (JOIN before ACCEPTED would be rejected). The ref guards against
   // re-firing when `joinedChannels` changes mid-session (e.g. the user joins one).
@@ -631,13 +639,17 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // surface them as non-blocking error toasts (routed to an OS banner when
         // unfocused). The raw FAILED/JOINFAILED line is already in the lobby
         // console for history.
-        else if (d.kind === "joinChannelFailed")
+        else if (d.kind === "joinChannelFailed") {
+          // A refused channel (e.g. a restricted #moderators) must not linger on
+          // the remembered/autojoin list, or every reconnect re-attempts it and
+          // re-notifies. Drop it so the failure is a one-off, not a recurring nag.
+          forgetChannelRef.current(d.channel);
           void notify({
             title: `Couldn't join ${d.channel}`,
             body: d.reason || undefined,
             level: "error",
           });
-        else if (d.kind === "commandFailed") {
+        } else if (d.kind === "commandFailed") {
           // Ignore-sync commands are best-effort: a server without IGNORE support
           // may reject them, but local hiding still applies, so degrade silently
           // rather than nag the user (the raw FAILED line is still in the console).
