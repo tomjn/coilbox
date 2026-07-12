@@ -25,7 +25,16 @@ pub fn resolve_sidecar(resource_dir: Option<&Path>, name: &str) -> Option<PathBu
         }
     }
     let exe_name = format!("{name}{}", std::env::consts::EXE_SUFFIX);
-    let candidate = resource_dir?.join("mapconv").join(exe_name);
+    let dir = resource_dir?;
+    // The Windows installer tucks the resource folder into `.coilbox` to keep the
+    // install root clean; fall back to the plain resource layout (macOS/Linux, and
+    // if the move didn't run). The whole `mapconv/` folder moves together, so the
+    // binary keeps its sibling `libs/`.
+    let tucked = dir.join(".coilbox").join("mapconv").join(&exe_name);
+    if tucked.exists() {
+        return Some(tucked);
+    }
+    let candidate = dir.join("mapconv").join(exe_name);
     candidate.exists().then_some(candidate)
 }
 

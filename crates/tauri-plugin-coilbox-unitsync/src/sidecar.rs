@@ -13,8 +13,10 @@ use std::path::{Path, PathBuf};
 const UNITSYNC_NAMES: &[&str] = &["libunitsync.dylib", "unitsync.dll", "libunitsync.so"];
 
 /// Resolve the worker path. `UNITSYNC_WORKER` overrides everything (handy for
-/// `tauri dev` and tests); otherwise look next to the current executable for
-/// `coilbox-unitsync-worker` (`.exe` on Windows), as `externalBin` arranges.
+/// `tauri dev` and tests); otherwise look for `coilbox-unitsync-worker` (`.exe` on
+/// Windows) in the `.coilbox` subfolder next to the executable (where the Windows
+/// installer tucks sidecars to keep the install root clean), then next to the
+/// executable itself as `externalBin` arranges (dev, and if the move didn't run).
 pub fn resolve_sidecar() -> Option<PathBuf> {
     if let Ok(p) = std::env::var("UNITSYNC_WORKER") {
         if !p.is_empty() {
@@ -23,10 +25,12 @@ pub fn resolve_sidecar() -> Option<PathBuf> {
     }
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?;
-    let candidate = dir.join(format!(
-        "coilbox-unitsync-worker{}",
-        std::env::consts::EXE_SUFFIX
-    ));
+    let name = format!("coilbox-unitsync-worker{}", std::env::consts::EXE_SUFFIX);
+    let tucked = dir.join(".coilbox").join(&name);
+    if tucked.exists() {
+        return Some(tucked);
+    }
+    let candidate = dir.join(&name);
     candidate.exists().then_some(candidate)
 }
 

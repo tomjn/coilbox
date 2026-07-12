@@ -17,7 +17,9 @@ If no profile is present, Coilbox behaves exactly as normal.
 ## Where the file goes
 
 Profiles ride on **[portable mode](portable-mode.md)**. Put a `.coilbox` folder
-next to the Coilbox executable and place `profile.json` inside it:
+next to the Coilbox executable and place `profile.json` inside it. The presence of
+that `profile.json` is exactly what turns portable mode on (a bare `.coilbox`
+folder is no longer enough, since the Windows installer keeps sidecars there too):
 
 ```
 <YourGameFolder>/

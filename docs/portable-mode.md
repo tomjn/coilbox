@@ -9,13 +9,16 @@ There are two audiences for this, and it's worth knowing which one you are:
 
 ## The one rule that turns it on
 
-Coilbox is in portable mode **if, and only if, there is a folder named `.coilbox` next to the executable.** Nothing else — no setting, no flag, no command-line switch. Create that folder and Coilbox uses it; delete it and Coilbox goes back to being a normal per-user install.
+Coilbox is in portable mode **if, and only if, there is a folder named `.coilbox` next to the executable that contains a `profile.json` file.** Nothing else — no setting, no flag, no command-line switch. Add that file and Coilbox uses the folder for all its own storage; remove it and Coilbox goes back to being a normal per-user install.
 
 ```
 <a folder you control>/
   coilbox            (Linux)   coilbox.exe (Windows)   Coilbox.app (macOS)
-  .coilbox/          <- create this empty folder to enable portable mode
+  .coilbox/
+    profile.json     <- this file is what enables portable mode
 ```
+
+> **Why a `profile.json`, not just the folder?** On Windows the installer now tucks Coilbox's own sidecar binaries into `.coilbox` to keep the install folder tidy, so a bare `.coilbox` folder exists for *ordinary* installs too. The `profile.json` is the specific marker that says "this is a portable/distribution package". If you only want portability (no branding), an empty `{}` in `profile.json` is enough — see [distribution-profile.md](distribution-profile.md).
 
 On **macOS** the `.coilbox` folder sits **beside `Coilbox.app`**, not inside it. (Coilbox looks up from the executable buried in `Coilbox.app/Contents/MacOS/` and anchors on the folder the `.app` lives in.)
 
@@ -29,14 +32,16 @@ Once portable mode is on, Coilbox writes **its own** data and caches inside `.co
 
 ```
 .coilbox/
+  profile.json       # you add this — REQUIRED to enable portable mode ({} is fine)
   data/              # created by Coilbox: its settings, state, downloads
   cache/             # created by Coilbox: thumbnails, unitsync caches, etc.
-  profile.json       # you add this (optional) — see distribution-profile.md
   campaigns/         # you add these (optional) — bundled campaigns
     my-campaign.json
   images/            # you add these (optional) — media referenced by profile/campaigns
   briefings/
   fonts/
+  # On Windows the installer also places Coilbox's sidecar binaries
+  # (coilbox-unitsync-worker.exe, uberstress.exe, prdownloader/, mapconv/) here.
 ```
 
 - **`data/` and `cache/`** are Coilbox's business. It creates and manages them on first run. You never edit them by hand. Deleting `cache/` is always safe (it's rebuilt); deleting `data/` resets Coilbox's settings for that package.
@@ -51,7 +56,7 @@ Once portable mode is on, Coilbox writes **its own** data and caches inside `.co
 This is the common starting point: you already play via skylobby and you want to try Coilbox without disturbing anything.
 
 1. Put the Coilbox binary in a folder of its own (anywhere — Desktop, a games folder, wherever).
-2. Create an empty `.coilbox` folder next to it. That's portable mode on.
+2. Create a `.coilbox` folder next to it containing a `profile.json` file. An empty `{}` is enough if you don't want any branding — the file's presence is what turns portable mode on. That's it.
 3. Launch Coilbox. On first run it offers to find your existing Spring/Recoil data. Point it at the **same data folder skylobby uses** (where your engine, games and maps already are) via **Settings > Content Folders > Add folder**.
 
 Now both tools read the same games and maps, but Coilbox's own settings and caches stay inside `.coilbox` — it can't overwrite skylobby's configuration or a normal Coilbox install. You can run them side by side, and when you're happy you can stop using skylobby without having migrated anything: Coilbox was reading your real content the whole time.
