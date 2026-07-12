@@ -8,6 +8,7 @@ import {
   mpSayPrivate,
   mpSayPrivateEx,
 } from "../bindings";
+import { isIgnored, useIgnored } from "../ignore";
 import { useMultiplayer } from "../store";
 import {
   type ConversationDescriptor,
@@ -35,11 +36,15 @@ export function useConversation(
 ): ConversationView {
   const { mirror, activeKey } = useMultiplayer();
   const state = mirror.state;
+  const [ignored] = useIgnored();
 
-  const messages = useMemo(
-    () => (state && desc ? conversationMessages(state, desc) : []),
-    [state, desc],
-  );
+  // Hide ignored senders client-side (channels, battles, and DMs alike). Purely
+  // local; server-side IGNORE sync is issue #188.
+  const messages = useMemo(() => {
+    const all = state && desc ? conversationMessages(state, desc) : [];
+    if (!activeKey) return all;
+    return all.filter((m) => !isIgnored(ignored, activeKey, m.from));
+  }, [state, desc, ignored, activeKey]);
   const members = useMemo(
     () => (state && desc ? conversationMembers(state, desc) : []),
     [state, desc],
