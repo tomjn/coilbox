@@ -147,6 +147,9 @@ export interface LobbyState {
   channelDirectory: DirChannel[];
   /** A live SPADS autohost vote in the current battle, or null when none is open. */
   currentVote: Vote | null;
+  /** Server-confirmed ignores (from `IGNORELIST` and IGNORE/UNIGNORE acks). The
+   * local ignore list drives client-side hiding; this mirrors the server's set. */
+  serverIgnores: string[];
   /** Mutual server-side friends, synced from `FRIENDLIST` (empty on unsupported servers). */
   friends: string[];
   /** Incoming pending friend requests awaiting accept/decline. */
@@ -204,6 +207,9 @@ export type Delta =
   | { kind: "joinChannelFailed"; channel: string; reason: string }
   | { kind: "commandFailed"; command: string; reason: string }
   | { kind: "channelListReceived" }
+  | { kind: "ignored"; name: string }
+  | { kind: "unignored"; name: string }
+  | { kind: "serverIgnoreList"; ignores: string[] }
   | { kind: "friendsChanged" }
   | { kind: "friendRequestsChanged" };
 
@@ -350,6 +356,29 @@ export const mpListChannels = defineCommand<
   { serverKey: string },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_list_channels");
+
+/**
+ * Ask the server to ignore a user (`IGNORE`), so it stops relaying their chat and
+ * rings. Best-effort — servers without ignore support drop it and the client's
+ * local hiding still applies.
+ */
+export const mpIgnore = defineCommand<
+  { serverKey: string; username: string; reason?: string | null },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_ignore");
+
+/** Ask the server to stop ignoring a user (`UNIGNORE`). */
+export const mpUnignore = defineCommand<
+  { serverKey: string; username: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_unignore");
+
+/** Request the server's stored ignore list (`IGNORELIST`); arrives as a
+ * `serverIgnoreList` delta once it finishes streaming. */
+export const mpIgnoreList = defineCommand<
+  { serverKey: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_ignore_list");
 
 /** Send a friend request to `username` (optional message). */
 export const mpFriendRequest = defineCommand<

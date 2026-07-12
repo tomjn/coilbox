@@ -163,6 +163,11 @@ pub struct LobbyState {
     pub host_port: Option<u16>,
     /// The last-fetched public channel directory (from `CHANNELS`).
     pub channel_directory: Vec<DirChannel>,
+    /// Server-confirmed ignores for this account, reconciled from the server's
+    /// `IGNORELIST` and its `IGNORE`/`UNIGNORE` acks. The client-side ignore list
+    /// (a frontend preference) is the source of truth for hiding; this mirrors what
+    /// the server has stored so both can be converged on login.
+    pub server_ignores: BTreeSet<String>,
     /// Mutual (established) server-side friends, synced from `FRIENDLIST` on login
     /// and kept live by `FRIEND`/`UNFRIEND`. Sorted; merged with client-local
     /// favourites in the Friends UI. Empty on servers without friend support.

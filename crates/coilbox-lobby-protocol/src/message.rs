@@ -224,6 +224,22 @@ pub enum ServerMessage {
     RegistrationAccepted,
     /// `REGISTRATIONDENIED <reason>`
     RegistrationDenied { reason: String },
+    /// `IGNORE userName=<name>[\treason=<reason>]` — ack that an ignore was stored.
+    Ignore {
+        username: String,
+        reason: Option<String>,
+    },
+    /// `UNIGNORE userName=<name>` — ack that an ignore was removed.
+    Unignore { username: String },
+    /// `IGNORELISTBEGIN` — start of the streamed ignore list.
+    IgnoreListBegin,
+    /// `IGNORELIST userName=<name>[\treason=<reason>]` — one ignore-list entry.
+    IgnoreListEntry {
+        username: String,
+        reason: Option<String>,
+    },
+    /// `IGNORELISTEND` — end of the streamed ignore list.
+    IgnoreListEnd,
     /// `FRIEND userName=<name>` — a friendship was established (sent to both parties).
     Friend { username: String },
     /// `UNFRIEND userName=<name>` — a friendship was removed (sent to both parties).
@@ -631,6 +647,20 @@ pub fn parse_line(line: &str) -> ServerMessage {
         "REGISTRATIONDENIED" => ServerMessage::RegistrationDenied {
             reason: rest.to_string(),
         },
+        "IGNORE" => {
+            let (username, reason) = parse_ignore_tags(rest);
+            ServerMessage::Ignore { username, reason }
+        }
+        "UNIGNORE" => {
+            let (username, _) = parse_ignore_tags(rest);
+            ServerMessage::Unignore { username }
+        }
+        "IGNORELISTBEGIN" => ServerMessage::IgnoreListBegin,
+        "IGNORELIST" => {
+            let (username, reason) = parse_ignore_tags(rest);
+            ServerMessage::IgnoreListEntry { username, reason }
+        }
+        "IGNORELISTEND" => ServerMessage::IgnoreListEnd,
         "FRIEND" => match tag(rest, "userName") {
             Some(u) => ServerMessage::Friend {
                 username: u.to_string(),
@@ -684,6 +714,21 @@ fn said(
         ),
         None => ServerMessage::Unknown { raw: raw() },
     }
+}
+
+/// Parse an ignore payload's tab-separated `userName=<name>[\treason=<reason>]`
+/// tags into `(username, reason)`. Shared by `IGNORE`/`UNIGNORE`/`IGNORELIST`.
+fn parse_ignore_tags(rest: &str) -> (String, Option<String>) {
+    let mut username = String::new();
+    let mut reason = None;
+    for field in rest.split('\t') {
+        if let Some(v) = field.strip_prefix("userName=") {
+            username = v.to_string();
+        } else if let Some(v) = field.strip_prefix("reason=") {
+            reason = Some(v.to_string());
+        }
+    }
+    (username, reason)
 }
 
 fn parse_battle_opened(rest: &str, raw: impl Fn() -> String) -> ServerMessage {
@@ -901,6 +946,57 @@ mod tests {
                 raw: "FROBNICATE whatever".into()
             }
         );
+    }
+
+    #[test]
+    fn parses_ignore_ack_with_and_without_reason() {
+        assert_eq!(
+            parse_line("IGNORE userName=bob"),
+            ServerMessage::Ignore {
+                username: "bob".into(),
+                reason: None,
+            }
+        );
+        assert_eq!(
+            parse_line("IGNORE userName=bob\treason=spammer"),
+            ServerMessage::Ignore {
+                username: "bob".into(),
+                reason: Some("spammer".into()),
+            }
+        );
+    }
+
+    #[test]
+    fn parses_unignore_ack() {
+        assert_eq!(
+            parse_line("UNIGNORE userName=bob"),
+            ServerMessage::Unignore {
+                username: "bob".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parses_ignorelist_framing() {
+        assert_eq!(
+            parse_line("IGNORELISTBEGIN"),
+            ServerMessage::IgnoreListBegin
+        );
+        assert_eq!(
+            parse_line("IGNORELIST userName=bob\treason=rude"),
+            ServerMessage::IgnoreListEntry {
+                username: "bob".into(),
+                reason: Some("rude".into()),
+            }
+        );
+        assert_eq!(
+            parse_line("IGNORELIST userName=alice"),
+            ServerMessage::IgnoreListEntry {
+                username: "alice".into(),
+                reason: None,
+            }
+        );
+        assert_eq!(parse_line("IGNORELISTEND"), ServerMessage::IgnoreListEnd);
     }
 
     #[test]

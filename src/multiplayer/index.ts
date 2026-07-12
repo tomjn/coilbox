@@ -1,7 +1,15 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { AtSign, Gamepad2, LogIn, MessagesSquare, Swords } from "lucide-react";
+import {
+  AtSign,
+  Gamepad2,
+  LogIn,
+  MessagesSquare,
+  Swords,
+  UserX,
+} from "lucide-react";
 import LobbyStatusButton from "./LobbyStatusButton";
 import HighlightsSettings from "./pages/HighlightsSettings";
+import IgnoreSettings from "./pages/IgnoreSettings";
 import {
   MultiplayerProvider,
   useBattleRoomLabel,
@@ -98,6 +106,12 @@ const multiplayerPlugin: FramePlugin = {
       title: "Chat highlights",
       icon: AtSign,
       Component: HighlightsSettings,
+    },
+    {
+      id: "ignored-users",
+      title: "Ignored users",
+      icon: UserX,
+      Component: IgnoreSettings,
     },
   ],
   slots: [{ slot: "topbar.right", order: 100, Component: LobbyStatusButton }],

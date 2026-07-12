@@ -135,6 +135,19 @@ pub enum Delta {
         reason: String,
     },
     ChannelListReceived,
+    /// The server confirmed a user is now ignored (its `IGNORE` ack).
+    Ignored {
+        name: String,
+    },
+    /// The server confirmed a user is no longer ignored (its `UNIGNORE` ack).
+    Unignored {
+        name: String,
+    },
+    /// The server's `IGNORELIST` finished streaming; carries the full confirmed set
+    /// so the frontend can reconcile it against the local ignore list in one shot.
+    ServerIgnoreList {
+        ignores: Vec<String>,
+    },
     /// The mutual-friend set changed (`FRIEND`/`UNFRIEND`, or a `FRIENDLIST` rebuild).
     FriendsChanged,
     /// The incoming friend-request set changed (`FRIENDREQUEST`, an accept clearing
@@ -673,6 +686,28 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         }
         ServerMessage::Motd { line } => {
             vec![Delta::Motd { line }]
+        }
+        ServerMessage::Ignore { username, .. } => {
+            state.server_ignores.insert(username.clone());
+            vec![Delta::Ignored { name: username }]
+        }
+        ServerMessage::Unignore { username } => {
+            state.server_ignores.remove(&username);
+            vec![Delta::Unignored { name: username }]
+        }
+        ServerMessage::IgnoreListBegin => {
+            // The server is about to (re)send the whole list; clear so removed
+            // entries don't linger while the fresh set streams in.
+            state.server_ignores.clear();
+            vec![]
+        }
+        ServerMessage::IgnoreListEntry { username, .. } => {
+            state.server_ignores.insert(username);
+            vec![]
+        }
+        ServerMessage::IgnoreListEnd => {
+            let ignores = state.server_ignores.iter().cloned().collect();
+            vec![Delta::ServerIgnoreList { ignores }]
         }
         ServerMessage::Friend { username } => {
             // A friendship established: promote out of any pending request.
@@ -1539,6 +1574,45 @@ mod tests {
             v.allow_abstain,
             "abstain assumed when start line was missed"
         );
+    }
+
+    #[test]
+    fn ignore_ack_adds_to_server_ignores() {
+        let mut s = LobbyState::new();
+        let d = reduce(&mut s, parse_line("IGNORE userName=bob"));
+        assert!(s.server_ignores.contains("bob"));
+        assert_eq!(d, vec![Delta::Ignored { name: "bob".into() }]);
+    }
+
+    #[test]
+    fn unignore_ack_removes_from_server_ignores() {
+        let mut s = LobbyState::new();
+        reduce(&mut s, parse_line("IGNORE userName=bob"));
+        let d = reduce(&mut s, parse_line("UNIGNORE userName=bob"));
+        assert!(!s.server_ignores.contains("bob"));
+        assert_eq!(d, vec![Delta::Unignored { name: "bob".into() }]);
+    }
+
+    #[test]
+    fn ignorelist_rebuilds_server_ignores_and_reports_full_set() {
+        let mut s = LobbyState::new();
+        // A stale entry present before the list arrives must be cleared by BEGIN.
+        s.server_ignores.insert("stale".into());
+        reduce(&mut s, parse_line("IGNORELISTBEGIN"));
+        assert!(s.server_ignores.is_empty());
+        reduce(&mut s, parse_line("IGNORELIST userName=bob\treason=rude"));
+        reduce(&mut s, parse_line("IGNORELIST userName=alice"));
+        let d = reduce(&mut s, parse_line("IGNORELISTEND"));
+        // BTreeSet iterates sorted, so the reported list is deterministic.
+        assert_eq!(
+            d,
+            vec![Delta::ServerIgnoreList {
+                ignores: vec!["alice".into(), "bob".into()],
+            }]
+        );
+        assert!(s.server_ignores.contains("bob"));
+        assert!(s.server_ignores.contains("alice"));
+        assert!(!s.server_ignores.contains("stale"));
     }
 
     #[test]

@@ -25,6 +25,8 @@ import {
   mpDisconnect,
   mpFriendList,
   mpFriendRequestList,
+  mpIgnore,
+  mpIgnoreList,
   mpJoinBattle,
   mpJoinChannel,
   mpReattach,
@@ -46,6 +48,7 @@ import {
 } from "./chat/highlight";
 import { triggerMentionCue } from "./chat/mentionCue";
 import { favouritesFor, useFavourites } from "./friends";
+import { addIgnore, ignoredFor, useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
@@ -119,6 +122,14 @@ export interface LobbyMirror {
    * it advance to end its loading state, honestly, even for an empty directory.
    */
   channelListReceivedSeq: number;
+  /**
+   * The server's confirmed ignore list from the last `IGNORELIST` (the
+   * `serverIgnoreList` delta), plus a monotonic count of how many have arrived.
+   * The reconcile effect watches the seq advance and reads this payload directly
+   * (rather than the async snapshot) so it can't race an in-flight snapshot fetch.
+   */
+  serverIgnoreList: string[];
+  serverIgnoreListSeq: number;
 }
 
 const CONSOLE_CAP = 500;
@@ -132,6 +143,8 @@ export const initialMirror: LobbyMirror = {
   lastJoinError: null,
   loginError: null,
   channelListReceivedSeq: 0,
+  serverIgnoreList: [],
+  serverIgnoreListSeq: 0,
 };
 
 export type MirrorAction =
@@ -189,6 +202,15 @@ export function mirrorReducer(
             return {
               ...m,
               channelListReceivedSeq: m.channelListReceivedSeq + 1,
+            };
+          }
+          // The full server ignore list finished streaming: record it and tick the
+          // seq so the reconcile effect runs exactly once against this payload.
+          if (d.kind === "serverIgnoreList") {
+            return {
+              ...m,
+              serverIgnoreList: d.ignores,
+              serverIgnoreListSeq: m.serverIgnoreListSeq + 1,
             };
           }
           // The server's message-of-the-day arrives as a run of MOTD lines at
@@ -421,8 +443,55 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           console.warn("multiplayer: auto-join channel failed", name, e),
         );
       }
+      // Pull the server's ignore list so it can be reconciled with the local one
+      // (see the reconcile effect). Best-effort: unsupported servers just never
+      // send a list, and local hiding still applies.
+      mpIgnoreList({ serverKey: activeKey }).catch(() => {});
     }
   }, [activeKey, mirror.phase, joinedChannels]);
+
+  // Reconcile the local ignore list with the server's once its IGNORELIST arrives:
+  // fold any server-confirmed ignores we lack into the local store, and push any
+  // local-only ignores up so the server suppresses them too. Driven off the
+  // received-list seq (not the map) so setting the map here can't re-trigger it,
+  // and reading the delta payload (`serverIgnoreList`) avoids racing the snapshot.
+  const [ignored, setIgnored] = useIgnored();
+  const ignoredRef = useRef(ignored);
+  useEffect(() => {
+    ignoredRef.current = ignored;
+  }, [ignored]);
+  const ignoreReconciledRef = useRef(0);
+  useEffect(() => {
+    if (activeKey == null) {
+      ignoreReconciledRef.current = 0;
+      return;
+    }
+    const seq = mirror.serverIgnoreListSeq;
+    if (seq === 0 || seq === ignoreReconciledRef.current) return;
+    ignoreReconciledRef.current = seq;
+
+    const server = mirror.serverIgnoreList;
+    const local = ignoredFor(ignoredRef.current, activeKey);
+
+    // Add server-confirmed ignores we don't have locally (addIgnore dedupes).
+    let next = ignoredRef.current;
+    for (const name of server) next = addIgnore(next, activeKey, name);
+    if (next !== ignoredRef.current) setIgnored(next);
+
+    // Push local-only ignores up so both sides converge. Best-effort; a server
+    // that just replied with an empty list may still not support IGNORE.
+    const known = new Set(server.map((n) => n.toLowerCase()));
+    for (const name of local) {
+      if (name.trim() && !known.has(name.toLowerCase())) {
+        mpIgnore({ serverKey: activeKey, username: name }).catch(() => {});
+      }
+    }
+  }, [
+    activeKey,
+    mirror.serverIgnoreListSeq,
+    mirror.serverIgnoreList,
+    setIgnored,
+  ]);
 
   // Sync the server-side friend list + pending requests once per connection, after
   // login reaches `ready`. These commands are a no-op on servers without friend
@@ -568,14 +637,21 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             body: d.reason || undefined,
             level: "error",
           });
-        else if (d.kind === "commandFailed")
-          void notify({
-            title: d.command
-              ? `Command failed: ${d.command}`
-              : "Command failed",
-            body: d.reason || undefined,
-            level: "error",
-          });
+        else if (d.kind === "commandFailed") {
+          // Ignore-sync commands are best-effort: a server without IGNORE support
+          // may reject them, but local hiding still applies, so degrade silently
+          // rather than nag the user (the raw FAILED line is still in the console).
+          const cmd = d.command.toUpperCase();
+          if (cmd !== "IGNORE" && cmd !== "UNIGNORE" && cmd !== "IGNORELIST") {
+            void notify({
+              title: d.command
+                ? `Command failed: ${d.command}`
+                : "Command failed",
+              body: d.reason || undefined,
+              level: "error",
+            });
+          }
+        }
         // A server announcement is a transient event too. Plain SERVERMSG is an
         // unobtrusive info toast; a SERVERMSGBOX was flagged important by the
         // server, so it's queued into a blocking dialog. Empty payloads are

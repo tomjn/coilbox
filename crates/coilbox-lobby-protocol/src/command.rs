@@ -298,6 +298,26 @@ pub fn exit(reason: Option<&str>) -> String {
     }
 }
 
+/// `IGNORE userName=<name>[\treason=<reason>]` — ask the server to stop relaying a
+/// user's chat/rings to us. Tags are tab-separated `key=value`.
+pub fn ignore(user: &str, reason: Option<&str>) -> String {
+    match reason {
+        Some(r) => format!("IGNORE userName={user}\treason={r}"),
+        None => format!("IGNORE userName={user}"),
+    }
+}
+
+/// `UNIGNORE userName=<name>` — undo a server-side ignore.
+pub fn unignore(user: &str) -> String {
+    format!("UNIGNORE userName={user}")
+}
+
+/// `IGNORELIST` — request the server's stored ignore list (streams as
+/// `IGNORELISTBEGIN` / `IGNORELIST ...` / `IGNORELISTEND`).
+pub fn ignore_list() -> String {
+    "IGNORELIST".to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -443,5 +463,16 @@ mod tests {
         assert_eq!(say_ex("main", "waves"), "SAYEX main waves");
         assert_eq!(say_private_ex("bob", "waves"), "SAYPRIVATEEX bob waves");
         assert_eq!(say_battle_ex("waves"), "SAYBATTLEEX waves");
+    }
+
+    #[test]
+    fn ignore_builders() {
+        assert_eq!(ignore("bob", None), "IGNORE userName=bob");
+        assert_eq!(
+            ignore("bob", Some("spammer")),
+            "IGNORE userName=bob\treason=spammer"
+        );
+        assert_eq!(unignore("bob"), "UNIGNORE userName=bob");
+        assert_eq!(ignore_list(), "IGNORELIST");
     }
 }

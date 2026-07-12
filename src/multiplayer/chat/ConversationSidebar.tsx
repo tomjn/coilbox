@@ -32,6 +32,7 @@ import {
   removeFavourite,
   useFavourites,
 } from "../friends";
+import { isIgnored, useIgnored } from "../ignore";
 import { useMultiplayer } from "../store";
 import {
   type ConversationDescriptor,
@@ -153,6 +154,7 @@ export function ConversationSidebar({
   onBrowse: () => void;
 }) {
   const { mirror, unreadFor, activeKey } = useMultiplayer();
+  const [ignored] = useIgnored();
   const [favourites, setFavourites] = useFavourites();
   const state = mirror.state;
   const me = state?.myUsername ?? null;
@@ -221,7 +223,13 @@ export function ConversationSidebar({
         .filter((n) => !isBattleChannel(n))
         .sort()
     : [];
-  const peers = state ? Object.keys(state.dms ?? {}).sort() : [];
+  // Ignored peers are dropped from the DM list so they don't clutter it; their
+  // messages are already hidden in the conversation.
+  const peers = state
+    ? Object.keys(state.dms ?? {})
+        .filter((p) => !activeKey || !isIgnored(ignored, activeKey, p))
+        .sort()
+    : [];
   const currentBattle =
     state?.currentBattle != null
       ? state.battles[String(state.currentBattle)]
