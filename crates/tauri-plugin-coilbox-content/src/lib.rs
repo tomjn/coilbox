@@ -15,6 +15,7 @@ mod engine;
 mod model;
 mod paths;
 mod scan;
+mod settings_backup;
 
 use model::{
     load_store, save_store, ContentRoot, ContentState, RootCounts, RootKind, RootSource, StoreFile,
@@ -816,6 +817,102 @@ async fn branding_image<R: Runtime>(
     Ok(CliResult::ok(json!({ "dataUrl": data_url })))
 }
 
+/// Directory holding engine-config profile snapshots, under the app data dir.
+fn profiles_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(coilbox_portable::data_dir(app)?.join("engine-config-profiles"))
+}
+
+/// `content_config_profiles` — list saved engine-config snapshots for a content
+/// root (its `springsettings.cfg` / `LuaUI/Config` / `uikeys.txt`). `rootPath` is a
+/// `ContentRoot.path`.
+#[tauri::command]
+async fn content_config_profiles<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+) -> Result<CliResult, ()> {
+    let dir = match profiles_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let profiles =
+        tauri::async_runtime::spawn_blocking(move || settings_backup::list(&dir, &root_path)).await;
+    match profiles {
+        Ok(profiles) => Ok(CliResult::ok(json!({ "profiles": profiles }))),
+        Err(e) => Ok(CliResult::err(format!("list profiles task failed: {e}"))),
+    }
+}
+
+/// `content_config_backup` — snapshot a root's present engine-config artifacts into
+/// a named profile (re-saving the name replaces it).
+#[tauri::command]
+async fn content_config_backup<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+    name: String,
+) -> Result<CliResult, ()> {
+    let dir = match profiles_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        settings_backup::backup(&dir, &root_path, &name)
+    })
+    .await;
+    match res {
+        Ok(Ok(profile)) => Ok(CliResult::ok(json!({ "profile": profile }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("backup task failed: {e}"))),
+    }
+}
+
+/// `content_config_restore` — restore a named profile's artifacts into the root.
+/// With `overwrite` unset, refuses (returning `needsOverwrite`) when live files
+/// would be clobbered, so the UI can confirm first. `slug` is `ProfileInfo.slug`.
+#[tauri::command]
+async fn content_config_restore<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+    slug: String,
+    overwrite: Option<bool>,
+) -> Result<CliResult, ()> {
+    let dir = match profiles_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let overwrite = overwrite.unwrap_or(false);
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        settings_backup::restore(&dir, &root_path, &slug, overwrite)
+    })
+    .await;
+    match res {
+        Ok(Ok(outcome)) => Ok(CliResult::ok(json!(outcome))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("restore task failed: {e}"))),
+    }
+}
+
+/// `content_config_delete_profile` — delete a named engine-config snapshot.
+#[tauri::command]
+async fn content_config_delete_profile<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+    slug: String,
+) -> Result<CliResult, ()> {
+    let dir = match profiles_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        settings_backup::delete(&dir, &root_path, &slug)
+    })
+    .await;
+    match res {
+        Ok(Ok(())) => Ok(CliResult::ok(json!({ "ok": true }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("delete profile task failed: {e}"))),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -834,6 +931,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_open_path,
             content_list_replays,
             content_demo_info,
+            content_config_profiles,
+            content_config_backup,
+            content_config_restore,
+            content_config_delete_profile,
             branding_catalog,
             branding_image
         ])

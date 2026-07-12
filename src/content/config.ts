@@ -58,11 +58,14 @@ export interface ContentPrefs {
   autoScanOnStartup: boolean;
   /** Also probe Steam/Zero-K install locations during detection. */
   probeZeroK: boolean;
+  /** Snapshot the current engine config to an "Auto-backup" profile before a restore. */
+  autoBackupEngineConfig: boolean;
 }
 
 export const defaultPrefs: ContentPrefs = {
   autoScanOnStartup: true,
   probeZeroK: false,
+  autoBackupEngineConfig: false,
 };
 
 export function useContentPrefs() {

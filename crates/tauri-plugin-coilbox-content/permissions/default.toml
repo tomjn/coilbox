@@ -16,6 +16,10 @@ permissions = [
   "allow-content-open-path",
   "allow-content-list-replays",
   "allow-content-demo-info",
+  "allow-content-config-profiles",
+  "allow-content-config-backup",
+  "allow-content-config-restore",
+  "allow-content-config-delete-profile",
   "allow-branding-catalog",
   "allow-branding-image",
 ]

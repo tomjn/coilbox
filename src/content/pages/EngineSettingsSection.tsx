@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import type { EngineConfigSetting } from "../bindings";
 import { useScanTargetSelection, useUnitsyncEngineConfig } from "../config";
 import { BrowserToolbar } from "./components/BrowserToolbar";
+import { ConfigProfilesPanel } from "./components/ConfigProfilesPanel";
 import {
   Diagnostics,
   EmptyState,
@@ -100,6 +101,10 @@ export default function EngineSettingsSection() {
           Config file: {data.configPath}
         </p>
       ) : null}
+
+      {selected?.rootPath && (
+        <ConfigProfilesPanel rootPath={selected.rootPath} />
+      )}
     </div>
   );
 }

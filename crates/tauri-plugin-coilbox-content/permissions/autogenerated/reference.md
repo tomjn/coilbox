@@ -17,6 +17,10 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-open-path`
 - `allow-content-list-replays`
 - `allow-content-demo-info`
+- `allow-content-config-profiles`
+- `allow-content-config-backup`
+- `allow-content-config-restore`
+- `allow-content-config-delete-profile`
 - `allow-branding-catalog`
 - `allow-branding-image`
 
@@ -129,6 +133,110 @@ Enables the content_candidates command without any pre-configured scope.
 <td>
 
 Denies the content_candidates command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-config-backup`
+
+</td>
+<td>
+
+Enables the content_config_backup command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-config-backup`
+
+</td>
+<td>
+
+Denies the content_config_backup command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-config-delete-profile`
+
+</td>
+<td>
+
+Enables the content_config_delete_profile command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-config-delete-profile`
+
+</td>
+<td>
+
+Denies the content_config_delete_profile command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-config-profiles`
+
+</td>
+<td>
+
+Enables the content_config_profiles command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-config-profiles`
+
+</td>
+<td>
+
+Denies the content_config_profiles command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-config-restore`
+
+</td>
+<td>
+
+Enables the content_config_restore command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-config-restore`
+
+</td>
+<td>
+
+Denies the content_config_restore command without any pre-configured scope.
 
 </td>
 </tr>
