@@ -4716,6 +4716,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-plugin",
+ "zip 8.6.0",
 ]
 
 [[package]]
