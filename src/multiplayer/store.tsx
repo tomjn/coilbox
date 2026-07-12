@@ -1,3 +1,4 @@
+import { useSetting } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
   createContext,
@@ -13,6 +14,8 @@ import { lsGetCredential } from "../lobby-servers/bindings";
 import type { LobbyServer } from "../lobby-servers/config";
 import { notify } from "../notify/notify";
 import {
+  type ChatMsg,
+  type Delta,
   type LobbyEvent,
   type LobbyState,
   type LoginPhase,
@@ -32,6 +35,13 @@ import {
   useJoinedChannels,
 } from "./channels";
 import { conversationCounts } from "./chat/conversation";
+import {
+  HIGHLIGHT_OWN_KEY,
+  HIGHLIGHT_SOUND_KEY,
+  HIGHLIGHT_WORDS_KEY,
+  matchesHighlight,
+} from "./chat/highlight";
+import { triggerMentionCue } from "./chat/mentionCue";
 import { triggerIngameCue } from "./ingameCue";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
@@ -44,6 +54,23 @@ import { VerificationCodeDialog } from "./VerificationCodeDialog";
  */
 export function serverKeyFor(server: LobbyServer, username: string): string {
   return `${username}@${server.host}:${server.port}`;
+}
+
+/**
+ * The just-arrived chat message referenced by a `chatMessage` / `privateMessage`
+ * delta, resolved against the fresh snapshot (deltas carry only a location, not the
+ * text). Returns null for any other delta or when it can't be resolved. Used to
+ * decide whether an incoming message should fire the highlight mention cue.
+ */
+function incomingChatMsg(d: Delta, state: LobbyState): ChatMsg | null {
+  if (d.kind === "chatMessage" && d.channel) {
+    return state.channels[d.channel]?.messages[d.index] ?? null;
+  }
+  if (d.kind === "privateMessage") {
+    const arr = state.dms[d.from];
+    return arr?.[arr.length - 1] ?? null;
+  }
+  return null;
 }
 
 /**
@@ -274,6 +301,17 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     stateRef.current = mirror.state;
   }, [mirror.state]);
 
+  // Highlight-word preferences (issue #193), mirrored into a ref so the frozen
+  // event handler (openChannel is `useCallback(..., [])`) can read the current
+  // values when an incoming message arrives, without re-creating the handler.
+  const [hlWords] = useSetting<string[]>(HIGHLIGHT_WORDS_KEY, []);
+  const [hlOwn] = useSetting<boolean>(HIGHLIGHT_OWN_KEY, true);
+  const [hlSound] = useSetting<boolean>(HIGHLIGHT_SOUND_KEY, true);
+  const highlightRef = useRef({ words: hlWords, own: hlOwn, sound: hlSound });
+  useEffect(() => {
+    highlightRef.current = { words: hlWords, own: hlOwn, sound: hlSound };
+  }, [hlWords, hlOwn, hlSound]);
+
   // One-way "has ever connected this session" latch driving Chat/Battles sidebar
   // visibility. Set on any transition to connected (fresh connect or reload
   // reattach) and never reset, so those views stick across a logout until quit.
@@ -439,7 +477,27 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           }
         }
         mpSnapshot({ serverKey })
-          .then((r) => dispatch({ type: "snapshot", state: r.state }))
+          .then((r) => {
+            dispatch({ type: "snapshot", state: r.state });
+            // A chat/private message that mentions a highlight word or our own
+            // username fires the mention cue (a soft ping + taskbar flash), gated
+            // behind the sound setting. Skip our own messages and non-chat lines
+            // (join/leave/system). The text lives in the snapshot, not the delta.
+            const msg = incomingChatMsg(d, r.state);
+            const hl = highlightRef.current;
+            if (
+              hl.sound &&
+              msg &&
+              msg.from !== r.state.myUsername &&
+              (msg.kind === "said" ||
+                msg.kind === "saidEx" ||
+                msg.kind === "saidBattle" ||
+                msg.kind === "private") &&
+              matchesHighlight(msg.text, hl.words, r.state.myUsername, hl.own)
+            ) {
+              triggerMentionCue(msg.from);
+            }
+          })
           .catch(() => {});
       }
       // The server can pause a new account's first login on the agreement/

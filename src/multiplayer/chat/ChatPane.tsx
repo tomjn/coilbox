@@ -57,6 +57,9 @@ export interface ChatPaneProps {
   /** Whether a sender is a bot account (SPADS autohosts included), marked with a
    * bot glyph before the name. Returns false for humans / unknown senders. */
   isBot?: (from: string) => boolean;
+  /** Whether a message matches the user's highlight words / own-username (issue
+   * #193). Matched bubbles get an accent ring. Defaults to never when omitted. */
+  isHighlighted?: (m: ChatMsg) => boolean;
   /** `full` fills the viewport column; `embedded` fits a smaller host box. */
   variant?: "full" | "embedded";
   emptyState?: ReactNode;
@@ -79,6 +82,7 @@ export function ChatPane({
   headerActions,
   senderColor,
   isBot,
+  isHighlighted,
   variant = "full",
   emptyState,
   disabled = false,
@@ -201,6 +205,7 @@ export function ChatPane({
               const own = currentUser != null && m.from === currentUser;
               const color = senderColor?.(m.from);
               const bot = isBot?.(m.from) ?? false;
+              const highlighted = isHighlighted?.(m) ?? false;
               // Group a run of messages from one sender: name on the first only,
               // timestamp on the last only, tight spacing between.
               const prev = messages[i - 1];
@@ -233,11 +238,13 @@ export function ChatPane({
                     </span>
                   )}
                   <div
-                    className={
+                    className={cn(
                       own
                         ? "max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-                        : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm"
-                    }
+                        : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm",
+                      // Mention: accent ring so a flagged message stands out in the log.
+                      highlighted && "ring-2 ring-amber-400/60",
+                    )}
                     // Wash the non-own bubble with the sender's team colour (low
                     // alpha keeps the foreground text readable in both themes).
                     style={
