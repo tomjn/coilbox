@@ -102,6 +102,9 @@ function BattlesPage() {
   // `key` is supplied by the row's password popover for passworded battles.
   async function onJoin(b: Battle, key?: string) {
     if (!activeKey) return;
+    // A battle already in progress can't be joined (the row disables its Join,
+    // but guard here too so the minimap/title click path is covered).
+    if (inProgressIds.has(b.id)) return;
     clearJoinError();
     joiningRef.current = true;
     try {

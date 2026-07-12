@@ -83,6 +83,7 @@ export function BattleList({
         collapsed={collapsed.running}
         onToggle={() => setCollapsed((c) => ({ ...c, running: !c.running }))}
         rowProps={rowProps}
+        inProgress
       />
     </div>
   );
@@ -95,12 +96,15 @@ function BattleGroup({
   collapsed,
   onToggle,
   rowProps,
+  inProgress = false,
 }: {
   label: string;
   battles: Battle[];
   collapsed: boolean;
   onToggle: () => void;
   rowProps: RowProps;
+  /** Every battle in this group is running (host in-game); block joining. */
+  inProgress?: boolean;
 }) {
   if (battles.length === 0) return null;
   return (
@@ -123,7 +127,13 @@ function BattleGroup({
       {!collapsed && (
         <ul className="flex flex-col gap-2 px-4 pb-2">
           {battles.map((b) => (
-            <BattleRow key={b.id} battle={b} joined={false} {...rowProps} />
+            <BattleRow
+              key={b.id}
+              battle={b}
+              joined={false}
+              inProgress={inProgress}
+              {...rowProps}
+            />
           ))}
         </ul>
       )}
