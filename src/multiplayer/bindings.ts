@@ -150,6 +150,10 @@ export interface LobbyState {
   /** Server-confirmed ignores (from `IGNORELIST` and IGNORE/UNIGNORE acks). The
    * local ignore list drives client-side hiding; this mirrors the server's set. */
   serverIgnores: string[];
+  /** Mutual server-side friends, synced from `FRIENDLIST` (empty on unsupported servers). */
+  friends: string[];
+  /** Incoming pending friend requests awaiting accept/decline. */
+  friendRequests: string[];
 }
 
 /** The phases of the login handshake (mirrors `LoginPhase`). */
@@ -205,7 +209,9 @@ export type Delta =
   | { kind: "channelListReceived" }
   | { kind: "ignored"; name: string }
   | { kind: "unignored"; name: string }
-  | { kind: "serverIgnoreList"; ignores: string[] };
+  | { kind: "serverIgnoreList"; ignores: string[] }
+  | { kind: "friendsChanged" }
+  | { kind: "friendRequestsChanged" };
 
 /** An event streamed over the connect `Channel` (mirrors `LobbyEvent`). */
 export type LobbyEvent =
@@ -373,6 +379,42 @@ export const mpIgnoreList = defineCommand<
   { serverKey: string },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_ignore_list");
+
+/** Send a friend request to `username` (optional message). */
+export const mpFriendRequest = defineCommand<
+  { serverKey: string; username: string; message?: string | null },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_friend_request");
+
+/** Accept an incoming friend request from `username`. */
+export const mpAcceptFriendRequest = defineCommand<
+  { serverKey: string; username: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_accept_friend_request");
+
+/** Decline an incoming friend request from `username`. */
+export const mpDeclineFriendRequest = defineCommand<
+  { serverKey: string; username: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_decline_friend_request");
+
+/** Remove an existing friendship with `username`. */
+export const mpUnfriend = defineCommand<
+  { serverKey: string; username: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_unfriend");
+
+/** Request the mutual-friend list (syncs `state.friends`); no-ops if unsupported. */
+export const mpFriendList = defineCommand<
+  { serverKey: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_friend_list");
+
+/** Request pending incoming friend requests (syncs `state.friendRequests`). */
+export const mpFriendRequestList = defineCommand<
+  { serverKey: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_friend_request_list");
 
 export const mpJoinBattle = defineCommand<
   {

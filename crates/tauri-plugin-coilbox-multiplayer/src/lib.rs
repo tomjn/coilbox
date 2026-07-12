@@ -458,6 +458,73 @@ fn mp_ignore_list(registry: State<'_, Registry>, server_key: String) -> CliResul
     enqueue(registry.inner(), &server_key, command::ignore_list())
 }
 
+/// `mp_friend_request` — send a friend request (optional message).
+#[tauri::command]
+fn mp_friend_request(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+    message: Option<String>,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::friend_request(&username, message.as_deref()),
+    )
+}
+
+/// `mp_accept_friend_request` — accept an incoming friend request.
+#[tauri::command]
+fn mp_accept_friend_request(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::accept_friend_request(&username),
+    )
+}
+
+/// `mp_decline_friend_request` — decline an incoming friend request.
+#[tauri::command]
+fn mp_decline_friend_request(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::decline_friend_request(&username),
+    )
+}
+
+/// `mp_unfriend` — remove an existing friendship.
+#[tauri::command]
+fn mp_unfriend(registry: State<'_, Registry>, server_key: String, username: String) -> CliResult {
+    enqueue(registry.inner(), &server_key, command::unfriend(&username))
+}
+
+/// `mp_friend_list` — request the mutual-friend list (streams
+/// `FRIENDLISTBEGIN..FRIENDLISTEND`). No-ops on servers without friend support.
+#[tauri::command]
+fn mp_friend_list(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    enqueue(registry.inner(), &server_key, command::friend_list())
+}
+
+/// `mp_friend_request_list` — request pending incoming friend requests (streams
+/// `FRIENDREQUESTLISTBEGIN..FRIENDREQUESTLISTEND`).
+#[tauri::command]
+fn mp_friend_request_list(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::friend_request_list(),
+    )
+}
+
 /// `mp_join_battle` — join an open battle (optional battle key and script password).
 #[tauri::command]
 fn mp_join_battle(
@@ -823,18 +890,34 @@ fn mp_remove_script_tags(
 /// are only a best-effort approximation and are not consumed on the join path. A
 /// hosting-side mapping would need to renumber teams into a contiguous 0..N index
 /// space.
+/// The engine option maps parsed out of a battle's script tags: start-pos type,
+/// mod options, map options, and unit restrictions (unit name -> limit).
+type SplitTags = (
+    u8,
+    BTreeMap<String, String>,
+    BTreeMap<String, String>,
+    BTreeMap<String, u32>,
+);
+
 /// Split a battle's opaque `script_tags` into the engine option maps the `play`
 /// `BattleConfig` consumes. Keys are matched case-insensitively (SPADS lowercases
 /// tag paths, but the engine is case-insensitive): `game/startpostype`,
-/// `game/modoptions/<k>`, `game/mapoptions/<k>`. Anything else is ignored.
-fn split_script_tags(
-    tags: &BTreeMap<String, String>,
-) -> (u8, BTreeMap<String, String>, BTreeMap<String, String>) {
+/// `game/modoptions/<k>`, `game/mapoptions/<k>`, and the engine-native unit
+/// restrictions `game/restrict/unit<N>` + `game/restrict/limit<N>` (paired by
+/// index into a unit-name -> limit map; `numrestrictions` is advisory and
+/// ignored — we key off the actual `unit<N>` tags). Anything else is ignored.
+fn split_script_tags(tags: &BTreeMap<String, String>) -> SplitTags {
     const MOD: &str = "game/modoptions/";
     const MAP: &str = "game/mapoptions/";
+    const RESTRICT: &str = "game/restrict/";
     let mut start_pos_type = 0u8;
     let mut mod_opts = BTreeMap::new();
     let mut map_opts = BTreeMap::new();
+    // Restrictions arrive as parallel `unit<N>`/`limit<N>` tags; collect each by
+    // index, then pair them (a limit missing its unit is dropped; a unit missing
+    // its limit disables fully, limit 0).
+    let mut units: BTreeMap<u32, String> = BTreeMap::new();
+    let mut limits: BTreeMap<u32, u32> = BTreeMap::new();
     for (k, v) in tags {
         let lk = k.to_ascii_lowercase();
         if lk == "game/startpostype" {
@@ -843,9 +926,28 @@ fn split_script_tags(
             mod_opts.insert(name.to_string(), v.clone());
         } else if let Some(name) = lk.strip_prefix(MAP) {
             map_opts.insert(name.to_string(), v.clone());
+        } else if let Some(rest) = lk.strip_prefix(RESTRICT) {
+            if let Some(idx) = rest
+                .strip_prefix("unit")
+                .and_then(|n| n.parse::<u32>().ok())
+            {
+                units.insert(idx, v.clone());
+            } else if let Some(idx) = rest
+                .strip_prefix("limit")
+                .and_then(|n| n.parse::<u32>().ok())
+            {
+                limits.insert(idx, v.trim().parse().unwrap_or(0));
+            }
         }
     }
-    (start_pos_type, mod_opts, map_opts)
+    let mut restricted_units = BTreeMap::new();
+    for (idx, name) in units {
+        if name.is_empty() {
+            continue;
+        }
+        restricted_units.insert(name, limits.get(&idx).copied().unwrap_or(0));
+    }
+    (start_pos_type, mod_opts, map_opts, restricted_units)
 }
 
 fn battle_to_config(state: &LobbyState) -> Result<Value, String> {
@@ -898,7 +1000,10 @@ fn battle_to_config(state: &LobbyState) -> Result<Value, String> {
         allies.insert(bs.ally);
     }
 
-    let (start_pos_type, mod_options, map_options) = split_script_tags(&battle.script_tags);
+    // Joiners get a minimal client script from the host engine and RESTRICT is
+    // host-authoritative (engine-level), so the join config drops restrictions.
+    let (start_pos_type, mod_options, map_options, _restricted_units) =
+        split_script_tags(&battle.script_tags);
 
     let ally_teams: Vec<Value> = allies.iter().map(|_| json!({ "numAllies": 0 })).collect();
     let my_passwd = battle
@@ -1008,7 +1113,8 @@ fn battle_to_host_config(state: &LobbyState) -> Result<Value, String> {
             .or_insert_with(|| host_team_value(ally_index[&bs.ally], bot.team_color));
     }
 
-    let (start_pos_type, mod_options, map_options) = split_script_tags(&battle.script_tags);
+    let (start_pos_type, mod_options, map_options, restricted_units) =
+        split_script_tags(&battle.script_tags);
 
     // One [ALLYTEAM] per distinct ally, in contiguous order, carrying its start box
     // (converted from the 0..200 wire grid to the engine's 0..1
@@ -1036,6 +1142,7 @@ fn battle_to_host_config(state: &LobbyState) -> Result<Value, String> {
         "startPosType": start_pos_type,
         "modOptions": mod_options,
         "mapOptions": map_options,
+        "restrictedUnits": restricted_units,
         "players": players,
         "ais": ais,
         "teams": teams.into_values().collect::<Vec<_>>(),
@@ -1117,6 +1224,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_ignore,
             mp_unignore,
             mp_ignore_list,
+            mp_friend_request,
+            mp_accept_friend_request,
+            mp_decline_friend_request,
+            mp_unfriend,
+            mp_friend_list,
+            mp_friend_request_list,
             mp_join_battle,
             mp_join_battle_deny,
             mp_leave_battle,
@@ -1349,6 +1462,23 @@ mod tests {
             },
         );
 
+        // Two engine-native unit restrictions (both fully disabled, limit 0).
+        battle
+            .script_tags
+            .insert("game/restrict/numrestrictions".into(), "2".into());
+        battle
+            .script_tags
+            .insert("game/restrict/unit0".into(), "armcom".into());
+        battle
+            .script_tags
+            .insert("game/restrict/limit0".into(), "0".into());
+        battle
+            .script_tags
+            .insert("game/restrict/unit1".into(), "armflash".into());
+        battle
+            .script_tags
+            .insert("game/restrict/limit1".into(), "0".into());
+
         state.battles.insert(9, battle);
         state.current_battle = Some(9);
         state
@@ -1408,5 +1538,32 @@ mod tests {
     fn host_config_errors_when_not_the_host() {
         // The join fixture is founded by "hoster", not us.
         assert!(battle_to_host_config(&joined_state()).is_err());
+    }
+
+    #[test]
+    fn host_config_includes_unit_restrictions() {
+        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        // Both restricted units surface as a name -> limit map the play crate
+        // renders into the [RESTRICT] block.
+        assert_eq!(cfg["restrictedUnits"]["armcom"], 0);
+        assert_eq!(cfg["restrictedUnits"]["armflash"], 0);
+        assert_eq!(cfg["restrictedUnits"].as_object().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn split_script_tags_pairs_restrict_indices() {
+        let mut tags = BTreeMap::new();
+        tags.insert("game/restrict/numrestrictions".into(), "2".into());
+        tags.insert("game/restrict/unit0".into(), "armcom".into());
+        tags.insert("game/restrict/limit0".into(), "0".into());
+        tags.insert("game/restrict/unit1".into(), "corak".into());
+        tags.insert("game/restrict/limit1".into(), "5".into());
+        // A limit with no matching unit is ignored; numrestrictions is advisory.
+        tags.insert("game/restrict/limit9".into(), "0".into());
+
+        let (_, _, _, restricted) = split_script_tags(&tags);
+        assert_eq!(restricted.len(), 2);
+        assert_eq!(restricted["armcom"], 0);
+        assert_eq!(restricted["corak"], 5);
     }
 }

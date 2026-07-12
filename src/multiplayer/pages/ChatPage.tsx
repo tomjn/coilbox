@@ -1,8 +1,8 @@
-import { Button, NavGate } from "@picoframe/frame";
-import { Gamepad2, LogOut, UserCheck, Users, UserX } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Button, cn, NavGate, useSetting } from "@picoframe/frame";
+import { Gamepad2, LogOut, Star, UserCheck, Users, UserX } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { mpLeaveBattle, mpLeaveChannel } from "../bindings";
+import { type ChatMsg, mpLeaveBattle, mpLeaveChannel } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
 import { ChatPane } from "../chat/ChatPane";
 import { ConversationSidebar } from "../chat/ConversationSidebar";
@@ -11,9 +11,20 @@ import {
   convId,
   isBattleChannel,
 } from "../chat/conversation";
+import {
+  HIGHLIGHT_OWN_KEY,
+  HIGHLIGHT_WORDS_KEY,
+  matchesHighlight,
+} from "../chat/highlight";
 import { MemberList } from "../chat/MemberList";
 import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
+import {
+  addFavourite,
+  isFavourite,
+  removeFavourite,
+  useFavourites,
+} from "../friends";
 import { useIgnoreActions } from "../ignore";
 import { useMpRevealed, useMultiplayer } from "../store";
 
@@ -27,6 +38,7 @@ import { useMpRevealed, useMultiplayer } from "../store";
 function ChatPage() {
   const { mirror, activeKey, markSeen, forgetChannel, openLoginPopover } =
     useMultiplayer();
+  const [favourites, setFavourites] = useFavourites();
   const navigate = useNavigate();
   const [active, setActive] = useState<ConversationDescriptor | null>(null);
   const [showMembers, setShowMembers] = useState(false);
@@ -64,6 +76,16 @@ function ChatPage() {
     [users],
   );
 
+  // Flag messages that mention a highlight word or our own username (issue #193).
+  // Our own messages never flag us, even if we type our own name.
+  const [hlWords] = useSetting<string[]>(HIGHLIGHT_WORDS_KEY, []);
+  const [hlOwn] = useSetting<boolean>(HIGHLIGHT_OWN_KEY, true);
+  const isHighlighted = useCallback(
+    (m: ChatMsg): boolean =>
+      m.from !== me && matchesHighlight(m.text, hlWords, me, hlOwn),
+    [me, hlWords, hlOwn],
+  );
+
   // Coarse presence for a username: offline when absent from the roster, else
   // in-game/in-battle/away/online (see `userPresence`). Used by the DM header
   // and the member panel so both speak the same vocabulary.
@@ -72,10 +94,32 @@ function ChatPage() {
     [state],
   );
 
+  // Tab-completion candidates for the composer: channel/battle member nicks, or
+  // the peer in a DM. Our own nick is excluded (you don't ping yourself).
+  const completions = useMemo(() => {
+    const names = conv.members.map((u) => u.name);
+    if (active?.kind === "dm") names.push(active.peer);
+    return me ? names.filter((n) => n !== me) : names;
+  }, [conv.members, active, me]);
+
   // For a DM header, mark the peer as a bot and show their richer presence.
   const dmPeer = active?.kind === "dm" ? active.peer : null;
   const titleIsBot = dmPeer != null && isBot(dmPeer);
   const titlePresence = dmPeer == null ? undefined : presenceFor(dmPeer);
+
+  // Client-local favourite toggle for the open DM peer (see friends.ts / #185).
+  const dmIsFavourite =
+    dmPeer != null && activeKey != null
+      ? isFavourite(favourites, activeKey, dmPeer)
+      : false;
+  function toggleDmFavourite() {
+    if (dmPeer == null || activeKey == null) return;
+    setFavourites(
+      isFavourite(favourites, activeKey, dmPeer)
+        ? removeFavourite(favourites, activeKey, dmPeer)
+        : addFavourite(favourites, activeKey, dmPeer),
+    );
+  }
 
   // Mark the open conversation read as its message count changes.
   useEffect(() => {
@@ -157,31 +201,48 @@ function ChatPage() {
           currentUser={me}
           senderColor={senderColor}
           isBot={isBot}
+          isHighlighted={isHighlighted}
+          completions={completions}
           onSend={conv.send}
           headerActions={
             active.kind === "dm" ? (
-              <Button
-                variant="secondary"
-                className="h-7 gap-1.5 px-2"
-                onClick={() => toggleIgnore(active.peer)}
-                aria-label={
-                  ignoredNow(active.peer)
-                    ? `Unignore ${active.peer}`
-                    : `Ignore ${active.peer}`
-                }
-              >
-                {ignoredNow(active.peer) ? (
-                  <>
+              <>
+                <Button
+                  variant="secondary"
+                  className="h-7 px-2"
+                  onClick={toggleDmFavourite}
+                  aria-label={
+                    dmIsFavourite
+                      ? `Remove ${active.peer} from friends`
+                      : `Add ${active.peer} to friends`
+                  }
+                  aria-pressed={dmIsFavourite}
+                >
+                  <Star
+                    className={cn(
+                      "size-4",
+                      dmIsFavourite && "fill-current text-amber-400",
+                    )}
+                  />
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="h-7 px-2"
+                  onClick={() => toggleIgnore(active.peer)}
+                  aria-label={
+                    ignoredNow(active.peer)
+                      ? `Unignore ${active.peer}`
+                      : `Ignore ${active.peer}`
+                  }
+                  aria-pressed={ignoredNow(active.peer)}
+                >
+                  {ignoredNow(active.peer) ? (
                     <UserCheck className="size-4" />
-                    Unignore
-                  </>
-                ) : (
-                  <>
+                  ) : (
                     <UserX className="size-4" />
-                    Ignore
-                  </>
-                )}
-              </Button>
+                  )}
+                </Button>
+              </>
             ) : active.kind === "channel" || active.kind === "battle" ? (
               <>
                 <Button

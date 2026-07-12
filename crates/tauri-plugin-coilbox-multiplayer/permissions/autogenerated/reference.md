@@ -24,6 +24,12 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-ignore`
 - `allow-mp-unignore`
 - `allow-mp-ignore-list`
+- `allow-mp-friend-request`
+- `allow-mp-accept-friend-request`
+- `allow-mp-decline-friend-request`
+- `allow-mp-unfriend`
+- `allow-mp-friend-list`
+- `allow-mp-friend-request-list`
 - `allow-mp-join-battle`
 - `allow-mp-join-battle-deny`
 - `allow-mp-leave-battle`
@@ -54,6 +60,32 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-accept-friend-request`
+
+</td>
+<td>
+
+Enables the mp_accept_friend_request command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-accept-friend-request`
+
+</td>
+<td>
+
+Denies the mp_accept_friend_request command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
@@ -214,6 +246,32 @@ Denies the mp_connect command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-multiplayer:allow-mp-decline-friend-request`
+
+</td>
+<td>
+
+Enables the mp_decline_friend_request command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-decline-friend-request`
+
+</td>
+<td>
+
+Denies the mp_decline_friend_request command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-multiplayer:allow-mp-disconnect`
 
 </td>
@@ -337,6 +395,84 @@ Enables the mp_force_team command without any pre-configured scope.
 <td>
 
 Denies the mp_force_team command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-friend-list`
+
+</td>
+<td>
+
+Enables the mp_friend_list command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-friend-list`
+
+</td>
+<td>
+
+Denies the mp_friend_list command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-friend-request`
+
+</td>
+<td>
+
+Enables the mp_friend_request command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-friend-request`
+
+</td>
+<td>
+
+Denies the mp_friend_request command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-friend-request-list`
+
+</td>
+<td>
+
+Enables the mp_friend_request_list command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-friend-request-list`
+
+</td>
+<td>
+
+Denies the mp_friend_request_list command without any pre-configured scope.
 
 </td>
 </tr>
@@ -1039,6 +1175,32 @@ Enables the mp_snapshot command without any pre-configured scope.
 <td>
 
 Denies the mp_snapshot command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-unfriend`
+
+</td>
+<td>
+
+Enables the mp_unfriend command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-unfriend`
+
+</td>
+<td>
+
+Denies the mp_unfriend command without any pre-configured scope.
 
 </td>
 </tr>

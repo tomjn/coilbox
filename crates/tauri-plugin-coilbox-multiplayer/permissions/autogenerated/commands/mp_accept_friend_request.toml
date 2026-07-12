@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-accept-friend-request"
+description = "Enables the mp_accept_friend_request command without any pre-configured scope."
+commands.allow = ["mp_accept_friend_request"]
+
+[[permission]]
+identifier = "deny-mp-accept-friend-request"
+description = "Denies the mp_accept_friend_request command without any pre-configured scope."
+commands.deny = ["mp_accept_friend_request"]

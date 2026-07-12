@@ -252,6 +252,39 @@ pub fn remove_script_tags(tags: &[&str]) -> String {
     format!("REMOVESCRIPTTAGS {}", tags.join(" "))
 }
 
+/// `FRIENDREQUEST userName=<user>[\tmsg=<msg>]` — send a friend request.
+pub fn friend_request(user: &str, msg: Option<&str>) -> String {
+    match msg {
+        Some(m) => format!("FRIENDREQUEST userName={user}\tmsg={m}"),
+        None => format!("FRIENDREQUEST userName={user}"),
+    }
+}
+
+/// `ACCEPTFRIENDREQUEST userName=<user>` — accept an incoming friend request.
+pub fn accept_friend_request(user: &str) -> String {
+    format!("ACCEPTFRIENDREQUEST userName={user}")
+}
+
+/// `DECLINEFRIENDREQUEST userName=<user>` — decline an incoming friend request.
+pub fn decline_friend_request(user: &str) -> String {
+    format!("DECLINEFRIENDREQUEST userName={user}")
+}
+
+/// `UNFRIEND userName=<user>` — remove an existing friendship.
+pub fn unfriend(user: &str) -> String {
+    format!("UNFRIEND userName={user}")
+}
+
+/// `FRIENDLIST` — request the mutual-friend list.
+pub fn friend_list() -> String {
+    "FRIENDLIST".to_string()
+}
+
+/// `FRIENDREQUESTLIST` — request the pending incoming friend requests.
+pub fn friend_request_list() -> String {
+    "FRIENDREQUESTLIST".to_string()
+}
+
 /// `STLS` — request the TLS upgrade. The actual upgrade is done by the plugin.
 pub fn stls() -> String {
     "STLS".to_string()
@@ -390,6 +423,26 @@ mod tests {
     #[test]
     fn list_channels_line() {
         assert_eq!(list_channels(), "CHANNELS");
+    }
+
+    #[test]
+    fn friend_command_lines() {
+        assert_eq!(friend_request("bob", None), "FRIENDREQUEST userName=bob");
+        assert_eq!(
+            friend_request("bob", Some("hi there")),
+            "FRIENDREQUEST userName=bob\tmsg=hi there"
+        );
+        assert_eq!(
+            accept_friend_request("bob"),
+            "ACCEPTFRIENDREQUEST userName=bob"
+        );
+        assert_eq!(
+            decline_friend_request("bob"),
+            "DECLINEFRIENDREQUEST userName=bob"
+        );
+        assert_eq!(unfriend("bob"), "UNFRIEND userName=bob");
+        assert_eq!(friend_list(), "FRIENDLIST");
+        assert_eq!(friend_request_list(), "FRIENDREQUESTLIST");
     }
 
     #[test]

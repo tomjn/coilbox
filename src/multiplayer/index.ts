@@ -1,6 +1,14 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Gamepad2, LogIn, MessagesSquare, Swords, UserX } from "lucide-react";
+import {
+  AtSign,
+  Gamepad2,
+  LogIn,
+  MessagesSquare,
+  Swords,
+  UserX,
+} from "lucide-react";
 import LobbyStatusButton from "./LobbyStatusButton";
+import HighlightsSettings from "./pages/HighlightsSettings";
 import IgnoreSettings from "./pages/IgnoreSettings";
 import {
   MultiplayerProvider,
@@ -93,6 +101,12 @@ const multiplayerPlugin: FramePlugin = {
     },
   ],
   settings: [
+    {
+      id: "chat-highlights",
+      title: "Chat highlights",
+      icon: AtSign,
+      Component: HighlightsSettings,
+    },
     {
       id: "ignored-users",
       title: "Ignored users",

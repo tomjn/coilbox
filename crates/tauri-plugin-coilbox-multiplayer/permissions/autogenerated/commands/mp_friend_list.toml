@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-friend-list"
+description = "Enables the mp_friend_list command without any pre-configured scope."
+commands.allow = ["mp_friend_list"]
+
+[[permission]]
+identifier = "deny-mp-friend-list"
+description = "Denies the mp_friend_list command without any pre-configured scope."
+commands.deny = ["mp_friend_list"]

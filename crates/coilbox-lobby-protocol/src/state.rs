@@ -168,6 +168,13 @@ pub struct LobbyState {
     /// (a frontend preference) is the source of truth for hiding; this mirrors what
     /// the server has stored so both can be converged on login.
     pub server_ignores: BTreeSet<String>,
+    /// Mutual (established) server-side friends, synced from `FRIENDLIST` on login
+    /// and kept live by `FRIEND`/`UNFRIEND`. Sorted; merged with client-local
+    /// favourites in the Friends UI. Empty on servers without friend support.
+    pub friends: BTreeSet<String>,
+    /// Incoming pending friend requests (`FRIENDREQUEST` / `FRIENDREQUESTLIST`),
+    /// awaiting our accept/decline. Sorted; empty on unsupported servers.
+    pub friend_requests: BTreeSet<String>,
     /// A live SPADS autohost vote in the current battle, or `None` when none is
     /// open. Parsed from the bot's battle chat; drives the vote panel.
     pub current_vote: Option<Vote>,
