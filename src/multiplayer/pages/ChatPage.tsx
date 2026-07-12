@@ -110,10 +110,6 @@ function ChatPage() {
     (from: string): boolean => users?.[from]?.status.bot ?? false,
     [users],
   );
-  const countryFor = useCallback(
-    (from: string): string | undefined => users?.[from]?.country,
-    [users],
-  );
 
   // Moderation privileges. The server `access` bit marks a server moderator (may
   // run moderator verbs and ChanServ channel-ops anywhere). For a plain user, the
@@ -285,7 +281,6 @@ function ChatPage() {
           currentUser={me}
           senderColor={senderColor}
           isBot={isBot}
-          countryFor={countryFor}
           isHighlighted={isHighlighted}
           completions={completions}
           onSend={conv.send}

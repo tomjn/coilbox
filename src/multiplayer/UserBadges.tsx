@@ -27,7 +27,7 @@ export function CountryFlag({
     <span
       className={cn(
         `fi fi-${code}`,
-        "shrink-0 rounded-[2px] ring-1 ring-inset ring-foreground/15",
+        "shrink-0 rounded ring-1 ring-inset ring-foreground/15",
         className,
       )}
       // flag-icons keys size off font-size; pin it so the flag stays a mini
