@@ -9,6 +9,7 @@ permissions = [
   "allow-play-import-preset",
   "allow-play-launch",
   "allow-play-launch-replay",
+  "allow-play-launch-save",
   "allow-play-cancel",
   "allow-play-focus",
 ]
