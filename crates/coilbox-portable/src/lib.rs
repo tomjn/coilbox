@@ -6,11 +6,17 @@
 //! inside its package, and two installs sharing the same bundle id would share the
 //! same per-user storage and stomp on each other.
 //!
-//! Portable mode fixes that: if a `.coilbox` folder sits next to the executable,
-//! coilbox uses it for *all* of its own storage ([`data_dir`] → `.coilbox/data`,
-//! [`cache_dir`] → `.coilbox/cache`) instead of the global per-user dirs. The whole
-//! package is then self-contained and can't touch a player's normal install.
-//! Absent that folder, everything behaves exactly as before.
+//! Portable mode fixes that: when a `.coilbox` folder holding a `profile.json`
+//! sits next to the executable, coilbox uses it for *all* of its own storage
+//! ([`data_dir`] → `.coilbox/data`, [`cache_dir`] → `.coilbox/cache`) instead of
+//! the global per-user dirs. The whole package is then self-contained and can't
+//! touch a player's normal install.
+//!
+//! The `profile.json` requirement (not just the folder) matters because the
+//! Windows installer now tucks its sidecars into `.coilbox`, so the folder alone
+//! exists for ordinary installs too. A distribution's `.coilbox/profile.json` is
+//! what marks a package as portable. Absent that file, everything behaves exactly
+//! as before.
 //!
 //! Detection is lazy + memoized, so there's nothing to wire up in `main()`.
 
@@ -51,17 +57,29 @@ pub fn app_dir() -> Option<PathBuf> {
     .clone()
 }
 
-/// Pure core of [`portable_root`]: `<app_dir>/.coilbox` when it exists as a dir.
-fn portable_root_in(app_dir: &Path, is_dir: impl Fn(&Path) -> bool) -> Option<PathBuf> {
+/// Pure core of [`portable_root`]: `<app_dir>/.coilbox` when it exists as a dir AND
+/// contains a `profile.json` file. The folder alone is no longer sufficient — the
+/// Windows installer puts sidecars in `.coilbox` on every install, so `profile.json`
+/// is the specific portable-mode marker.
+fn portable_root_in(
+    app_dir: &Path,
+    is_dir: impl Fn(&Path) -> bool,
+    is_file: impl Fn(&Path) -> bool,
+) -> Option<PathBuf> {
     let candidate = app_dir.join(".coilbox");
-    is_dir(&candidate).then_some(candidate)
+    if is_dir(&candidate) && is_file(&candidate.join("profile.json")) {
+        Some(candidate)
+    } else {
+        None
+    }
 }
 
-/// `Some(<app_dir>/.coilbox)` when that folder exists next to the app — i.e. we're
-/// running in portable mode. Memoized (resolved once at first use).
+/// `Some(<app_dir>/.coilbox)` when that folder exists next to the app and holds a
+/// `profile.json` — i.e. we're running in portable mode. Memoized (resolved once at
+/// first use).
 pub fn portable_root() -> Option<PathBuf> {
     static ROOT: OnceLock<Option<PathBuf>> = OnceLock::new();
-    ROOT.get_or_init(|| portable_root_in(app_dir().as_deref()?, |p| p.is_dir()))
+    ROOT.get_or_init(|| portable_root_in(app_dir().as_deref()?, |p| p.is_dir(), |p| p.is_file()))
         .clone()
 }
 
@@ -195,15 +213,28 @@ mod tests {
     }
 
     #[test]
-    fn portable_root_present_when_dir_exists() {
+    fn portable_root_present_when_dir_and_profile_exist() {
         let base = Path::new("/pkg");
-        let root = portable_root_in(base, |p| p == Path::new("/pkg/.coilbox"));
+        let root = portable_root_in(
+            base,
+            |p| p == Path::new("/pkg/.coilbox"),
+            |p| p == Path::new("/pkg/.coilbox/profile.json"),
+        );
         assert_eq!(root, Some(PathBuf::from("/pkg/.coilbox")));
     }
 
     #[test]
-    fn portable_root_absent_when_missing() {
+    fn portable_root_absent_when_dir_missing() {
         let base = Path::new("/pkg");
-        assert_eq!(portable_root_in(base, |_| false), None);
+        assert_eq!(portable_root_in(base, |_| false, |_| true), None);
+    }
+
+    #[test]
+    fn portable_root_absent_when_profile_missing() {
+        // A `.coilbox` folder without `profile.json` (e.g. a normal Windows install
+        // whose sidecars live there) is NOT portable.
+        let base = Path::new("/pkg");
+        let root = portable_root_in(base, |p| p == Path::new("/pkg/.coilbox"), |_| false);
+        assert_eq!(root, None);
     }
 }

@@ -62,6 +62,14 @@ pub fn resolve_sidecar() -> Option<PathBuf> {
         return Some(p);
     }
     if let Some(Some(dir)) = RESOURCE_DIR.get() {
+        // The Windows installer tucks the resource folder into `.coilbox` to keep
+        // the install root clean; fall back to the plain resource layout (macOS/
+        // Linux, and if the move didn't run). The whole `prdownloader/` folder
+        // moves together, so its sibling DLLs stay beside the binary.
+        let tucked = dir.join(".coilbox").join("prdownloader").join(&name);
+        if tucked.exists() {
+            return Some(tucked);
+        }
         let candidate = dir.join("prdownloader").join(&name);
         if candidate.exists() {
             return Some(candidate);

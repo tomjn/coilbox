@@ -39,8 +39,10 @@ impl Default for DbConfig {
 }
 
 /// Resolve the sidecar path. `UBERSTRESS_SIDECAR` overrides everything (handy for
-/// `tauri dev` and tests); otherwise look next to the current executable for
-/// `uberstress` (`.exe` on Windows), as Tauri's `externalBin` bundling arranges.
+/// `tauri dev` and tests); otherwise look for `uberstress` (`.exe` on Windows) in
+/// the `.coilbox` subfolder next to the executable (where the Windows installer
+/// tucks sidecars to keep the install root clean), then next to the executable
+/// itself as `externalBin` arranges (dev, and if the move didn't run).
 pub fn resolve_sidecar() -> Option<PathBuf> {
     if let Ok(p) = std::env::var("UBERSTRESS_SIDECAR") {
         if !p.is_empty() {
@@ -49,7 +51,12 @@ pub fn resolve_sidecar() -> Option<PathBuf> {
     }
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?;
-    let candidate = dir.join(format!("uberstress{}", std::env::consts::EXE_SUFFIX));
+    let name = format!("uberstress{}", std::env::consts::EXE_SUFFIX);
+    let tucked = dir.join(".coilbox").join(&name);
+    if tucked.exists() {
+        return Some(tucked);
+    }
+    let candidate = dir.join(&name);
     candidate.exists().then_some(candidate)
 }
 
