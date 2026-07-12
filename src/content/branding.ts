@@ -79,12 +79,29 @@ export interface SuggestedMap {
   blurb?: string;
 }
 
+/**
+ * A named pack of maps offered for bulk download (e.g. "Space maps", "Popular
+ * maps"). The maps are the same {@link SuggestedMap} shape used everywhere else,
+ * so a pack's "Download all" reuses the standard download queue. Sourced from the
+ * branding catalog and/or the distribution profile.
+ */
+export interface SuggestedMapList {
+  id: string;
+  title: string;
+  blurb?: string;
+  maps: SuggestedMap[];
+}
+
 export interface BrandingCatalog {
   version: number;
   updated?: string;
   entries: BrandingEntry[];
   /** Pre-curated content offered when the user has none yet. */
-  suggested?: { games?: SuggestedGame[]; maps?: SuggestedMap[] };
+  suggested?: {
+    games?: SuggestedGame[];
+    maps?: SuggestedMap[];
+    mapLists?: SuggestedMapList[];
+  };
 }
 
 interface CatalogResult {
@@ -161,9 +178,15 @@ interface LoadedCatalog {
   entries: CompiledEntry[];
   games: SuggestedGame[];
   maps: SuggestedMap[];
+  mapLists: SuggestedMapList[];
 }
 
-const EMPTY_CATALOG: LoadedCatalog = { entries: [], games: [], maps: [] };
+const EMPTY_CATALOG: LoadedCatalog = {
+  entries: [],
+  games: [],
+  maps: [],
+  mapLists: [],
+};
 
 let catalogPromise: Promise<LoadedCatalog> | null = null;
 
@@ -177,6 +200,7 @@ function loadCatalog(): Promise<LoadedCatalog> {
           entries: compile(parsed.entries ?? []),
           games: parsed.suggested?.games ?? [],
           maps: parsed.suggested?.maps ?? [],
+          mapLists: parsed.suggested?.mapLists ?? [],
         };
       })
       .catch((e) => {
@@ -235,6 +259,21 @@ export function useSuggestedMaps(): SuggestedMap[] {
     };
   }, []);
   return maps;
+}
+
+/** The curated map packs from the catalog (empty on load failure). */
+export function useSuggestedMapLists(): SuggestedMapList[] {
+  const [lists, setLists] = useState<SuggestedMapList[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    loadCatalog().then((c) => {
+      if (!cancelled) setLists(c.mapLists);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return lists;
 }
 
 /**
