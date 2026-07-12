@@ -1,5 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { mpListChannels } from "../bindings";
 import { useMultiplayer } from "../store";
@@ -23,6 +23,9 @@ export function ChannelBrowser({
   const [loading, setLoading] = useState(false);
   const [newName, setNewName] = useState("");
   const directory = mirror.state?.channelDirectory ?? [];
+  // Channels we're already in (keyed by bare name), so the directory can show
+  // "Joined" instead of an active Join button for them.
+  const joinedChannels = mirror.state?.channels ?? {};
   // The server's `ENDOFCHANNELS` bumps this counter. We record its value when a
   // request goes out and end loading once it advances past that — the honest
   // completion signal, which fires whether the directory is full or empty.
@@ -141,29 +144,39 @@ export function ChannelBrowser({
               No channels found.
             </li>
           )}
-          {directory.map((c) => (
-            <li
-              key={c.name}
-              className="flex items-center justify-between gap-2 rounded-md border border-border p-2"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {c.name}{" "}
-                  <span className="text-xs text-muted-foreground">
-                    ({c.userCount})
-                  </span>
-                </p>
-                {c.topic && (
-                  <p className="truncate text-xs text-muted-foreground">
-                    {c.topic}
+          {directory.map((c) => {
+            const isJoined = joinedChannels[c.name] != null;
+            return (
+              <li
+                key={c.name}
+                className="flex items-center justify-between gap-2 rounded-md border border-border p-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {c.name}{" "}
+                    <span className="text-xs text-muted-foreground">
+                      ({c.userCount})
+                    </span>
                   </p>
+                  {c.topic && (
+                    <p className="truncate text-xs text-muted-foreground">
+                      {c.topic}
+                    </p>
+                  )}
+                </div>
+                {isJoined ? (
+                  <span className="flex shrink-0 items-center gap-1 px-2 text-xs text-muted-foreground">
+                    <Check className="size-3.5" />
+                    Joined
+                  </span>
+                ) : (
+                  <Button className="h-7 px-2" onClick={() => join(c.name)}>
+                    Join
+                  </Button>
                 )}
-              </div>
-              <Button className="h-7 px-2" onClick={() => join(c.name)}>
-                Join
-              </Button>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </aside>
     </>
