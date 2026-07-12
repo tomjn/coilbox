@@ -21,6 +21,9 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-join-channel`
 - `allow-mp-leave-channel`
 - `allow-mp-list-channels`
+- `allow-mp-ignore`
+- `allow-mp-unignore`
+- `allow-mp-ignore-list`
 - `allow-mp-join-battle`
 - `allow-mp-join-battle-deny`
 - `allow-mp-leave-battle`
@@ -334,6 +337,58 @@ Enables the mp_force_team command without any pre-configured scope.
 <td>
 
 Denies the mp_force_team command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-ignore`
+
+</td>
+<td>
+
+Enables the mp_ignore command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-ignore`
+
+</td>
+<td>
+
+Denies the mp_ignore command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-ignore-list`
+
+</td>
+<td>
+
+Enables the mp_ignore_list command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-ignore-list`
+
+</td>
+<td>
+
+Denies the mp_ignore_list command without any pre-configured scope.
 
 </td>
 </tr>
@@ -984,6 +1039,32 @@ Enables the mp_snapshot command without any pre-configured scope.
 <td>
 
 Denies the mp_snapshot command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-unignore`
+
+</td>
+<td>
+
+Enables the mp_unignore command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-unignore`
+
+</td>
+<td>
+
+Denies the mp_unignore command without any pre-configured scope.
 
 </td>
 </tr>

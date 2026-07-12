@@ -38,8 +38,9 @@ export function useConversation(
   const state = mirror.state;
   const [ignored] = useIgnored();
 
-  // Hide ignored senders client-side (channels, battles, and DMs alike). Purely
-  // local; server-side IGNORE sync is issue #188.
+  // Hide ignored senders client-side (channels, battles, and DMs alike). This local
+  // filter is belt-and-braces: once #188's server-side IGNORE is set the server also
+  // stops relaying them, but this still hides anything the server does relay.
   const messages = useMemo(() => {
     const all = state && desc ? conversationMessages(state, desc) : [];
     if (!activeKey) return all;

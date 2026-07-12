@@ -428,6 +428,36 @@ fn mp_list_channels(registry: State<'_, Registry>, server_key: String) -> CliRes
     enqueue(registry.inner(), &server_key, command::list_channels())
 }
 
+/// `mp_ignore` — ask the server to ignore a user (`IGNORE`), so it stops relaying
+/// their chat/rings to us. Best-effort: servers without ignore support drop it and
+/// the client's local hiding still applies.
+#[tauri::command]
+fn mp_ignore(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+    reason: Option<String>,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::ignore(&username, reason.as_deref()),
+    )
+}
+
+/// `mp_unignore` — ask the server to stop ignoring a user (`UNIGNORE`).
+#[tauri::command]
+fn mp_unignore(registry: State<'_, Registry>, server_key: String, username: String) -> CliResult {
+    enqueue(registry.inner(), &server_key, command::unignore(&username))
+}
+
+/// `mp_ignore_list` — request the server's stored ignore list (`IGNORELIST`); the
+/// reply streams as `IGNORELISTBEGIN...IGNORELISTEND` and rebuilds `server_ignores`.
+#[tauri::command]
+fn mp_ignore_list(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    enqueue(registry.inner(), &server_key, command::ignore_list())
+}
+
 /// `mp_join_battle` — join an open battle (optional battle key and script password).
 #[tauri::command]
 fn mp_join_battle(
@@ -1084,6 +1114,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_join_channel,
             mp_leave_channel,
             mp_list_channels,
+            mp_ignore,
+            mp_unignore,
+            mp_ignore_list,
             mp_join_battle,
             mp_join_battle_deny,
             mp_leave_battle,
