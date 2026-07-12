@@ -11,6 +11,8 @@ Conquests live under **Conquest** in the sidebar. You can generate one for any
 installed game, or play a galaxy a distribution ships (see
 [Bundling a galaxy](#bundling-a-galaxy)).
 
+![The strategic map: named star systems joined by lanes over a 3D starfield, with attackable systems marked.](/screenshots/conquest-starfield.png)
+
 ## Generating a galaxy
 
 **Conquest > Generate a galaxy** opens a wizard. Every option below is
@@ -74,10 +76,10 @@ The strategic model is theme-agnostic — it speaks of *systems* and *lanes*, an
 lore factions can be supplied so a generated galaxy reads as *your* game rather
 than generic space. Two sources, one schema:
 
-1. the game's **[branding catalog](https://raw.githubusercontent.com/tomjn/coilbox/main/src-tauri/branding/catalog.json)**
-   entry provides per-game defaults, and
+1. the game's **[branding catalog](branding-catalog.md)** entry provides per-game
+   defaults (a `conquest` field on the entry — reaches every user, no app release), and
 2. a **[distribution profile](distribution-profile.md#conquest-object)**'s
-   `conquest` field overrides those on top.
+   `conquest` field overrides those on top (for a copy you packaged).
 
 With neither, built-in pools apply (real star names, then pronounceable
 invented ones; procedurally-named factions).
@@ -137,3 +139,27 @@ galaxy, ready to play, alongside anything the player generates. Run state is
 stored separately, so bundled (read-only) galaxies still track progress. See
 [Distribution profiles](distribution-profile.md) and
 [Portable mode](portable-mode.md) for how the `.coilbox` folder works.
+
+## Customising conquest for your game
+
+If you author or maintain a game, there are four ways to make conquest feel like
+*yours* rather than generic space — from lightest to most involved:
+
+- **Names and factions** — supply star/faction name pools and lore factions so a
+  generated galaxy reads as your setting. Set them on your
+  [branding-catalog](branding-catalog.md) entry's `conquest` field to reach every
+  user with no app release, or in a [distribution profile](distribution-profile.md#conquest-object)'s
+  `conquest` for a copy you package. See [Names and factions](#names-and-factions)
+  for the schema and merge order.
+- **Theatre skin** — render the strategic layer as a flat tactical chart instead of
+  a starfield, for a terrestrial game where stars make no sense. See
+  [Theatre skin](#theatre-skin).
+- **Ship a hand-made galaxy** — export a specific galaxy and bundle it so players
+  get a curated campaign out of the box, alongside anything they generate. See
+  [Bundling a galaxy](#bundling-a-galaxy).
+- **Faction AI sides / colours** — each lore faction's `side` and `color` control
+  which in-game side its AI plays and how it's drawn on the map (see the schema in
+  [Names and factions](#names-and-factions)).
+
+The strategic model itself is theme-agnostic (it speaks of *systems* and *lanes*),
+so all of the above is presentation layered on identical rules.

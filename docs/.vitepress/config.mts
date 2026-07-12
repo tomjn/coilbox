@@ -20,6 +20,9 @@ export default defineConfig({
   srcExclude: ["**/superpowers/**", "mockups/**", "ideas-*.md", "README.md"],
   themeConfig: {
     logo: "/app-icon.png",
+    // Long guides are hard to scan; surface a per-page table of contents in the
+    // right rail that includes both h2 and h3 headings (default is h2 only).
+    outline: { level: [2, 3], label: "On this page" },
     nav: [
       { text: "Guides", link: "/portable-mode" },
       {
@@ -37,6 +40,8 @@ export default defineConfig({
         items: [
           { text: "Portable mode", link: "/portable-mode" },
           { text: "Distribution profile", link: "/distribution-profile" },
+          { text: "Branding catalog", link: "/branding-catalog" },
+          { text: "Map packs", link: "/map-packs" },
           { text: "Routes", link: "/routes" },
         ],
       },

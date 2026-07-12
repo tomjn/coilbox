@@ -44,6 +44,8 @@ Once portable mode is on, Coilbox writes **its own** data and caches inside `.co
 
 **Important distinction:** this covers Coilbox's *own* files. It does **not** automatically include the game itself — the engine, the `.sdz`/`.sd7` game archive, and maps. Those are **content**, and where they live is a separate choice covered in [Bundling the game content](#bundling-the-game-content) below.
 
+> **Put the game *beside* `.coilbox/`, not inside it.** `.coilbox/` is Coilbox's private data/config folder. Your engine, game archive and maps go in a **sibling** folder next to the Coilbox binary (e.g. `game/`), at the same level as `.coilbox/` — **not** in `.coilbox/game/`. Coilbox scans content roots you register, and a portable root must live inside the *app* folder (the folder holding the binary and `.coilbox/`), not inside `.coilbox/` itself. Nesting the game under `.coilbox/` mixes your read-only content in with Coilbox's managed `data/`/`cache/` and won't be picked up as a content root — resetting Coilbox's data could even take your game with it.
+
 ## Running Coilbox alongside skylobby
 
 This is the common starting point: you already play via skylobby and you want to try Coilbox without disturbing anything.
@@ -69,20 +71,24 @@ Content (engine + game archive + maps) is tracked as **content roots** — folde
 
 To bundle content portably:
 
-1. Put the engine and game files **inside** the app folder (the folder that contains the binary and `.coilbox`). For example a `game/` subfolder holding your engine and `.sdz`.
+1. Put the engine and game files at the **top level of the app folder** (the folder that contains the binary and `.coilbox`) — i.e. in a folder **beside** `.coilbox/`, such as a `game/` subfolder holding your engine and `.sdz`. **Do not put them inside `.coilbox/`** (see the warning above).
 2. In **Settings > Content Folders**, add that folder as a root and tick **Portable** (the checkbox is only meaningful in portable mode). Coilbox stores it as a relative path and shows a **Portable** badge on the root.
 
 ```
 SplinterFaction/                 <- the folder you zip and distribute
   coilbox.exe
-  .coilbox/
+  .coilbox/                      <- Coilbox's private data (NOT your game)
     profile.json
     data/  cache/                (created on first run)
-  game/                          <- bundled content, added as a Portable root
-    engine/
+  game/                          <- bundled content, a SIBLING of .coilbox/,
+    engine/                         added as a Portable root
     splinterfaction.sdz
     maps/
 ```
+
+`game/` sits **next to** `.coilbox/`, not inside it. A layout like
+`.coilbox/game/…` is wrong — Coilbox won't scan content nested inside its own data
+folder, and the game would be tangled up with files Coilbox manages and may reset.
 
 Rules to know:
 

@@ -93,14 +93,22 @@ leave the colour scheme entirely under the user's control.
 
 ### `accent` (string)
 
-Forces a built-in accent colour: `"zinc"` (default), `"blue"`, `"green"`, `"rose"`,
-`"violet"`, or `"orange"`. This recolours the whole shell cohesively (primary, ring,
-sidebar, in both light and dark) using picoframe's vetted palette. Same
-force-each-launch / session-override behaviour as `mode`.
+Forces a built-in accent colour — the `--primary` brand hue. This recolours the
+whole shell cohesively (primary, ring, sidebar, in both light and dark) using
+picoframe's vetted palette. Same force-each-launch / session-override behaviour as
+`mode`. The full set of accents:
+
+`neutral` (the default — no hue, the plain grey shell), `blue`, `green`, `rose`,
+`violet`, `orange`, `red`, `amber`, `yellow`, `teal`, `cyan`, `sky`, `indigo`,
+`purple`, `pink`, plus two animated/gradient accents `rainbow` and `opal`.
 
 ```json
 { "version": 1, "accent": "orange" }
 ```
+
+> These are picoframe's accent axis. The neutral **base** tint (zinc, slate, gray,
+> stone, …) is a separate control and isn't set from a profile — reach for `theme`
+> (below) if you need to touch base tokens.
 
 > Prefer `accent` over hand-rolling `theme` colours for the brand accent — it's one
 > line and stays consistent across light/dark. Use `theme` (below) only for tokens
@@ -322,9 +330,9 @@ Common tokens: `--primary`, `--primary-foreground`, `--ring`, `--accent`,
 `node_modules/@picoframe/frame/src/theme.css` for the full list and the light/dark
 defaults.
 
-> Coilbox also ships built-in named accents (zinc, blue, green, rose, violet,
-> orange) selectable under Settings > Appearance. A `theme` override takes
-> precedence over the user's accent choice.
+> Coilbox also ships built-in named [`accent`](#accent-string)s (neutral, blue,
+> green, rose, orange, … — the full axis) selectable under Settings > Appearance.
+> A `theme` override takes precedence over the user's accent choice.
 
 ### `release` (object)
 
