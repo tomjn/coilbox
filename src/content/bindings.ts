@@ -536,6 +536,25 @@ export const unitsyncHeightmap = defineCommand<
   HeightmapResult
 >("coilbox-unitsync", "unitsync_heightmap");
 
+export interface MetalmapResult {
+  /** Green-on-transparent RGBA PNG `data:` URL of the (downscaled) metal infomap. */
+  dataUrl?: string;
+  /** Metal infomap dimensions; the ratio is the map's aspect ratio. */
+  width?: number;
+  height?: number;
+  errors: string[];
+}
+
+/**
+ * Render one map's metal infomap as a green-on-transparent RGBA PNG data URL, for
+ * overlaying mex spots on a minimap. Lazy — a separate unitsync session, cached on
+ * disk. `maxSide` caps the PNG's longest side (default 1024).
+ */
+export const unitsyncMetalmap = defineCommand<
+  { enginePath: string; dataDir: string; mapName: string; maxSide?: number },
+  MetalmapResult
+>("coilbox-unitsync", "unitsync_metalmap");
+
 export interface MapSkyboxResult {
   /** `data:` URL of the raw skybox DDS bytes (parsed by three.js `DDSLoader`),
    * when the map declares `atmosphere.skyBox`. */

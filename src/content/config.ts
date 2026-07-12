@@ -22,6 +22,7 @@ import {
   type HeightmapResult,
   type MapInfoResult,
   type MapSkyboxResult,
+  type MetalmapResult,
   type MinimapResult,
   type ReplayFile,
   type ScanResult,
@@ -37,6 +38,7 @@ import {
   unitsyncHeightmap,
   unitsyncMapInfo,
   unitsyncMapSkybox,
+  unitsyncMetalmap,
   unitsyncMinimap,
   unitsyncScan,
   unitsyncThumbnails,
@@ -1086,6 +1088,9 @@ export function useUnitsyncMinimap(
 /** Session cache of heightmap results, keyed by `dataDir::enginePath::mapName`. */
 const heightmapCache = new Map<string, HeightmapResult>();
 
+/** Session cache of metalmap results, keyed by `dataDir::enginePath::mapName`. */
+const metalmapCache = new Map<string, MetalmapResult>();
+
 /**
  * Drop the cached minimap + heightmap for one map, so the next render of the
  * preview hooks refetches it. Used after a missing map is downloaded (remount the
@@ -1099,6 +1104,7 @@ export function invalidateMapPreview(
   const key = `${dataDir}::${enginePath}::${mapName}`;
   minimapCache.delete(key);
   heightmapCache.delete(key);
+  metalmapCache.delete(key);
 }
 
 /** Lazily render and cache a map's heightmap (PNG data URL + world-height bounds). */
@@ -1133,6 +1139,54 @@ export function useUnitsyncHeightmap(
       .then((res) => {
         if (cancelled) return;
         heightmapCache.set(key, res);
+        apply(res);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, mapName]);
+
+  return { data, loading, error };
+}
+
+/** Lazily render and cache a map's metal infomap (green-on-transparent PNG overlay). */
+export function useUnitsyncMetalmap(
+  enginePath?: string,
+  dataDir?: string,
+  mapName?: string,
+) {
+  const [data, setData] = useState<MetalmapResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !mapName) {
+      setData(null);
+      return;
+    }
+    const key = `${dataDir}::${enginePath}::${mapName}`;
+    const apply = (res: MetalmapResult) => {
+      setData(res);
+      if (!res.dataUrl && res.errors?.length) setError(res.errors.join("; "));
+    };
+    const cached = metalmapCache.get(key);
+    if (cached) {
+      apply(cached);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    unitsyncMetalmap({ enginePath, dataDir, mapName })
+      .then((res) => {
+        if (cancelled) return;
+        metalmapCache.set(key, res);
         apply(res);
       })
       .catch((e) => {
