@@ -1,5 +1,13 @@
-import { Button, cn, Input } from "@picoframe/frame";
-import { Plus, Server, Terminal, Trash2, UserPlus, Users } from "lucide-react";
+import { Button, cn, Input, useSetting } from "@picoframe/frame";
+import {
+  Plus,
+  RefreshCw,
+  Server,
+  Terminal,
+  Trash2,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { ConsoleDrawer } from "../../multiplayer/ConsoleDrawer";
 import { serverKeyFor, useMultiplayer } from "../../multiplayer/store";
@@ -36,6 +44,10 @@ export default function LobbyServersSettings() {
   const [customCfg, setCustomCfg] = useCustomServers();
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [autoRejoin, setAutoRejoin] = useSetting<boolean>(
+    "multiplayer.autoRejoin",
+    true,
+  );
 
   const servers = allServers(customCfg.servers);
 
@@ -106,6 +118,20 @@ export default function LobbyServersSettings() {
 
   return (
     <div className="space-y-8">
+      <section className="space-y-3">
+        <h2 className={H2_CLASS}>
+          <RefreshCw size={15} /> Connection
+        </h2>
+        <div className="rounded-md border border-border p-3">
+          <CheckField
+            label="Reconnect automatically"
+            hint="If the server drops the connection, rejoin your channels and last battle automatically."
+            checked={autoRejoin}
+            onChange={setAutoRejoin}
+          />
+        </div>
+      </section>
+
       <section className="space-y-3">
         <h2 className={H2_CLASS}>
           <Users size={15} /> Accounts

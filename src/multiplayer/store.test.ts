@@ -22,9 +22,31 @@ vi.mock("./ingameCue", () => ({
   triggerIngameCue: () => {},
 }));
 
-import { initialMirror, mirrorReducer } from "./store";
+import {
+  initialMirror,
+  mirrorReducer,
+  RECONNECT_DELAYS_MS,
+  reconnectDelay,
+} from "./store";
 
 const emptyState = {} as LobbyState;
+
+describe("reconnectDelay backoff", () => {
+  it("returns the scheduled delay per attempt", () => {
+    expect(reconnectDelay(0)).toBe(RECONNECT_DELAYS_MS[0]);
+    expect(reconnectDelay(1)).toBe(RECONNECT_DELAYS_MS[1]);
+  });
+
+  it("clamps beyond the budget to the final (capped) delay", () => {
+    const last = RECONNECT_DELAYS_MS[RECONNECT_DELAYS_MS.length - 1];
+    expect(reconnectDelay(RECONNECT_DELAYS_MS.length)).toBe(last);
+    expect(reconnectDelay(999)).toBe(last);
+  });
+
+  it("clamps a negative attempt to the first delay", () => {
+    expect(reconnectDelay(-1)).toBe(RECONNECT_DELAYS_MS[0]);
+  });
+});
 
 describe("mirrorReducer join-failure handling", () => {
   it("sets lastJoinError from a joinBattleFailed delta", () => {
