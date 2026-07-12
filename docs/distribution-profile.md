@@ -345,6 +345,41 @@ an asset named exactly `profile.json`, Coilbox installs it into `.coilbox/` alon
 the game archive; because the profile is read once at startup, the app then prompts for
 a restart to apply the updated profile.
 
+### `mapLists` (object[])
+
+Curated **map packs** offered for bulk download on the Maps download page — a
+tournament set, a galactic-conquest galaxy, "space maps", etc. Each pack has an
+`id`, a `title`, an optional `blurb`, and a `maps[]` array; **Download all** queues
+every not-yet-present map in the pack through the normal download queue.
+
+```json
+{
+  "version": 1,
+  "mapLists": [
+    {
+      "id": "tournament-2026",
+      "title": "Tournament 2026 map set",
+      "blurb": "The official pool for this season.",
+      "maps": [
+        {
+          "id": "supreme-isthmus",
+          "title": "Supreme Isthmus v2.1",
+          "filename": "supreme_isthmus_v2.1.sd7",
+          "download": { "kind": "map", "springName": "Supreme Isthmus v2.1" }
+        }
+      ]
+    }
+  ]
+}
+```
+
+Each map's `download` is `{ "kind": "map", "springName", "searchUrl"? }` (fetched
+by springname via pr-downloader) or `{ "kind": "url", "url", "filename", "subdir"? }`
+(a direct mirror file); `filename` enables "already downloaded" detection. This is
+the same shape and mechanism the branding catalog's `suggested.mapLists` uses — see
+[Branding catalog](../README.md#branding-catalog); catalog packs are listed first,
+then a profile's, deduped by `id`.
+
 ### `quit` (boolean)
 
 Adds a **Quit** button to the bottom of the sidebar that closes Coilbox. Off by

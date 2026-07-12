@@ -81,7 +81,7 @@ loading-screen art when an entry matches. Games increasingly ship a Lua-rendered
 loading screen (or dead `modinfo` links), so the catalog is how you supply
 current art/links without touching already-published game archives.
 
-**The catalog is a single file:** `src-tauri/branding/catalog.json`. That one
+**The catalog is a single file:** `catalog.json` at the repo root. That one
 file is both the source the app fetches at runtime (from the `main`-branch raw
 URL) and the copy bundled into the app as an offline/first-run seed. Because it's
 fetched at runtime, catalog edits merged to `main` reach users **without an app
@@ -91,9 +91,8 @@ this repo's `main` copy (`DEFAULT_BRANDING_CATALOG_URL` in
 
 ### Editing it
 
-Edit `src-tauri/branding/catalog.json` and open a PR against `main`. Validate the
-JSON before pushing (`jq . src-tauri/branding/catalog.json`). Each `entries[]`
-item brands exactly one game:
+Edit `catalog.json` and open a PR against `main`. Validate the JSON before
+pushing (`jq . catalog.json`). Each `entries[]` item brands exactly one game:
 
 ```jsonc
 {
@@ -140,6 +139,48 @@ Resolved catalog and images are cached under the app cache dir
 (`coilbox-branding/catalog.json` and `coilbox-branding-images/`). On network
 failure the app falls back to that disk cache, then the bundled seed, so branding
 degrades gracefully rather than hard-failing.
+
+### Suggested content and map packs
+
+Besides `entries[]`, the catalog carries a `suggested` block of curated content
+offered to users who have none yet (or from the Maps download page):
+
+```jsonc
+{
+  "suggested": {
+    "games": [
+      { "id": "metal-factions", "title": "Metal Factions",
+        "download": { "kind": "rapid", "tag": "metalfactions:stable" } }
+    ],
+    "maps": [
+      { "id": "supreme-isthmus", "title": "Supreme Isthmus v2.1",
+        "filename": "supreme_isthmus_v2.1.sd7",
+        "download": { "kind": "map", "springName": "Supreme Isthmus v2.1" } }
+    ],
+    "mapLists": [
+      { "id": "starter-pack", "title": "Starter pack",
+        "blurb": "A handful of well-rounded maps to get a first game going.",
+        "maps": [
+          { "id": "supreme-isthmus", "title": "Supreme Isthmus v2.1",
+            "filename": "supreme_isthmus_v2.1.sd7",
+            "download": { "kind": "map", "springName": "Supreme Isthmus v2.1" } }
+        ] }
+    ]
+  }
+}
+```
+
+- A `download` is one of `{ "kind": "rapid", "tag", "masterUrl"? }`,
+  `{ "kind": "map", "springName", "searchUrl"? }`, or
+  `{ "kind": "url", "url", "filename", "subdir"? }`.
+- **`mapLists[]`** are curated **map packs** shown on the Maps download page. Each
+  has an `id`, `title`, optional `blurb`, and a `maps[]` array of the same map
+  shape used in `suggested.maps`. "Download all" queues the whole pack through the
+  normal download queue (already-present maps are skipped).
+- A distribution profile can ship its own packs too, via `mapLists` in
+  `.coilbox/profile.json` — see
+  [Distribution profile](docs/distribution-profile.md). Catalog packs are listed
+  first, then profile packs, deduped by `id`.
 
 ## Licensing
 
