@@ -782,6 +782,21 @@ async fn content_demo_info(engine_path: String, replay_path: String) -> Result<C
     }
 }
 
+/// `content_demo_chat` — extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG`
+/// lines) by running `demotool --dump`. `enginePath` holds `demotool`; `replayPath`
+/// is an absolute demo path. Read on demand (it walks the whole demo stream), not
+/// during listing.
+#[tauri::command]
+async fn content_demo_chat(engine_path: String, replay_path: String) -> Result<CliResult, ()> {
+    let engine = PathBuf::from(&engine_path);
+    let demo_path = PathBuf::from(&replay_path);
+    match tauri::async_runtime::spawn_blocking(move || demo::demo_chat(&engine, &demo_path)).await {
+        Ok(Ok(chat)) => Ok(CliResult::ok(json!(chat))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("demo chat task failed: {e}"))),
+    }
+}
+
 /// `branding_catalog` — fetch the remote branding catalog JSON, disk-cache it, and
 /// fall back to the cache then the bundled seed on network failure. Returns the
 /// raw JSON text; the frontend parses/matches it (Rust stays schema-agnostic).
@@ -931,6 +946,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_open_path,
             content_list_replays,
             content_demo_info,
+            content_demo_chat,
             content_config_profiles,
             content_config_backup,
             content_config_restore,

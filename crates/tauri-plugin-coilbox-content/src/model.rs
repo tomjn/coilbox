@@ -127,6 +127,36 @@ pub struct ReplayFile {
     /// Battle start (epoch-millis) from the demo header — more accurate than mtime.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start_time_ms: Option<u64>,
+    /// Min/avg/max of the non-spectator players' skill (parsed from the start-script
+    /// `skill=[..]` field), when any player has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skill_min: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skill_avg: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skill_max: Option<f32>,
+}
+
+/// One chat/system line from a demo's network stream (via `demotool --dump`).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatLine {
+    /// The speaking player's number, when the line names one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub player: Option<u32>,
+    /// The player's name resolved from the start-script, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub player_name: Option<String>,
+    pub text: String,
+    /// True for engine `SYSTEMMSG` lines (vs a player `CHAT` line).
+    pub system: bool,
+}
+
+/// A demo's chat log (its `NETMSG_CHAT`/`NETMSG_SYSTEMMSG` lines).
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoChat {
+    pub messages: Vec<ChatLine>,
 }
 
 /// One player (or spectator) from a demo's start-script, with the side/ally-team

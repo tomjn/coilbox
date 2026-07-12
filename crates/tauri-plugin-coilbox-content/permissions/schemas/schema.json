@@ -403,6 +403,18 @@
           "markdownDescription": "Denies the content_create_standard_root command without any pre-configured scope."
         },
         {
+          "description": "Enables the content_demo_chat command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-demo-chat",
+          "markdownDescription": "Enables the content_demo_chat command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_demo_chat command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-demo-chat",
+          "markdownDescription": "Denies the content_demo_chat command without any pre-configured scope."
+        },
+        {
           "description": "Enables the content_demo_info command without any pre-configured scope.",
           "type": "string",
           "const": "allow-content-demo-info",
@@ -523,10 +535,10 @@
           "markdownDescription": "Denies the content_verify_engine command without any pre-configured scope."
         },
         {
-          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`",
+          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`"
+          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`"
         }
       ]
     }
