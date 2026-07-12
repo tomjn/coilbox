@@ -2,7 +2,6 @@ import { Button, cn, Input } from "@picoframe/frame";
 import { ArrowUp, Bot } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ChatMsg } from "../bindings";
-import { CountryFlag } from "../UserBadges";
 import { FormattedText } from "./FormattedText";
 import { PRESENCE_META, type Presence } from "./presence";
 import { completeNick, type TabCycle } from "./tabComplete";
@@ -59,9 +58,6 @@ export interface ChatPaneProps {
   /** Whether a sender is a bot account (SPADS autohosts included), marked with a
    * bot glyph before the name. Returns false for humans / unknown senders. */
   isBot?: (from: string) => boolean;
-  /** A sender's ISO alpha-2 country code (from ADDUSER), rendered as a flag next
-   * to their name. Returns undefined for bots / unknown / placeholder senders. */
-  countryFor?: (from: string) => string | undefined;
   /** Whether a message matches the user's highlight words / own-username (issue
    * #193). Matched bubbles get an accent ring. Defaults to never when omitted. */
   isHighlighted?: (m: ChatMsg) => boolean;
@@ -90,7 +86,6 @@ export function ChatPane({
   headerActions,
   senderColor,
   isBot,
-  countryFor,
   isHighlighted,
   variant = "full",
   emptyState,
@@ -198,7 +193,6 @@ export function ChatPane({
               const key = `${m.from}-${m.at}-${i}`;
               if (isNotice(m.kind)) {
                 const color = senderColor?.(m.from);
-                const country = countryFor?.(m.from);
                 return (
                   <div
                     key={key}
@@ -209,10 +203,9 @@ export function ChatPane({
                     ) : (
                       <>
                         <span
-                          className="inline-flex items-center gap-1 align-middle font-medium"
+                          className="font-medium"
                           style={color ? { color } : undefined}
                         >
-                          {country && <CountryFlag country={country} />}
                           {m.from}
                         </span>
                         {m.kind === "join"
@@ -230,7 +223,6 @@ export function ChatPane({
                 // emit `/me` lines), so the special treatment isn't bypassed.
                 const color = senderColor?.(m.from);
                 const bot = isBot?.(m.from) ?? false;
-                const country = countryFor?.(m.from);
                 return (
                   <div
                     key={key}
@@ -244,7 +236,6 @@ export function ChatPane({
                       {bot && (
                         <Bot className="size-4 shrink-0" aria-label="Bot" />
                       )}
-                      {country && <CountryFlag country={country} />}
                       {m.from}
                     </span>{" "}
                     <span className={cn(bot && "font-mono")}>
@@ -256,7 +247,6 @@ export function ChatPane({
               const own = currentUser != null && m.from === currentUser;
               const color = senderColor?.(m.from);
               const bot = isBot?.(m.from) ?? false;
-              const country = countryFor?.(m.from);
               const highlighted = isHighlighted?.(m) ?? false;
               // Group a run of messages from one sender: name on the first only,
               // timestamp on the last only, tight spacing between.
@@ -286,7 +276,6 @@ export function ChatPane({
                       {bot && (
                         <Bot className="size-4 shrink-0" aria-label="Bot" />
                       )}
-                      {country && <CountryFlag country={country} />}
                       {m.from}
                     </span>
                   )}
