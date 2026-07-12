@@ -81,6 +81,12 @@ pub enum Delta {
     ChannelTopicChanged {
         channel: String,
     },
+    /// A channel's founder/operators were (re)learned from a ChanServ `:info`
+    /// reply. The snapshot carries the new `founder`/`operators`; this just
+    /// signals the UI to re-read them (e.g. to gate moderation controls).
+    ChannelOpsChanged {
+        channel: String,
+    },
     StartRectChanged {
         ally: u8,
     },
@@ -328,6 +334,20 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             // copy locally when sending, so drop the echo.
             if state.my_username.as_deref() == Some(username.as_str()) {
                 return vec![];
+            }
+            // ChanServ answers our `:info <chan>` query with a one-line channel report.
+            // Fold it into the channel's founder/operators (used to gate the moderation
+            // controls) and suppress the line — it's machine-directed, not chat.
+            if username == "ChanServ" {
+                if let Some((channel, founder, operators)) = parse_chanserv_info(&message) {
+                    if let Some(ch) = state.channels.get_mut(&channel) {
+                        ch.founder = founder;
+                        ch.operators = operators;
+                        return vec![Delta::ChannelOpsChanged { channel }];
+                    }
+                    // Reply for a channel we're not tracking — still swallow the noise.
+                    return vec![];
+                }
             }
             push_dm(
                 state,
@@ -798,6 +818,53 @@ fn parse_failed(text: &str) -> (String, String) {
 
 /// Append a chat message to a channel (creating it if needed) and emit a delta
 /// pointing at its index.
+/// Parse a ChanServ `:info` reply into `(channel-without-#, founder, operators)`.
+///
+/// The reply is one human-readable line in a fixed field order, e.g.
+///   `#lobby info: Founder is <alice>. Operator list is [bob carol]. Currently
+///    contains 3 users and 0 bridged users. Anti-spam ... . Channel history ... .`
+/// Founder may read `No founder is registered`; the operator list `empty`. The
+/// server's bracket formatting is buggy for multiple operators (it can emit
+/// `[bob] carol]`), so we take the whole clause up to the users count, strip all
+/// brackets, and split on whitespace — robust to both the clean and buggy forms.
+/// Returns `None` when the text isn't a recognizable info reply.
+fn parse_chanserv_info(
+    message: &str,
+) -> Option<(String, Option<String>, std::collections::HashSet<String>)> {
+    let rest = message.strip_prefix('#')?;
+    let idx = rest.find(" info:")?;
+    let channel = rest[..idx].to_string();
+    if channel.is_empty() {
+        return None;
+    }
+    let body = &rest[idx + " info:".len()..];
+    // `Founder is <name>` -> Some(name); "No founder is registered" (or anything
+    // without the marker) -> None.
+    let founder = body.find("Founder is <").and_then(|p| {
+        let after = &body[p + "Founder is <".len()..];
+        after.find('>').map(|e| after[..e].to_string())
+    });
+    // The operator clause runs from "Operator list is " to the users count that
+    // always follows it. Strip brackets, split, and drop the literal `empty`.
+    let operators = body
+        .find("Operator list is ")
+        .map(|p| {
+            let s = &body[p + "Operator list is ".len()..];
+            let clause = match s.find(". Currently contains") {
+                Some(e) => &s[..e],
+                None => s,
+            };
+            clause
+                .replace(['[', ']'], " ")
+                .split_whitespace()
+                .filter(|t| *t != "empty")
+                .map(str::to_string)
+                .collect::<std::collections::HashSet<String>>()
+        })
+        .unwrap_or_default();
+    Some((channel, founder, operators))
+}
+
 fn push_chat(state: &mut LobbyState, channel: &str, msg: ChatMsg) -> Vec<Delta> {
     let ch = state
         .channels
@@ -1018,6 +1085,95 @@ mod tests {
                 reason: "username taken".into()
             }]
         );
+    }
+
+    #[test]
+    fn parses_clean_chanserv_info() {
+        let (chan, founder, ops) = parse_chanserv_info(
+            "#lobby info: Founder is <alice>. Operator list is [bob carol]. \
+             Currently contains 3 users and 0 bridged users. Anti-spam protection is off. \
+             Channel history is off. Last used on Jul 12, 2026.",
+        )
+        .expect("should parse");
+        assert_eq!(chan, "lobby");
+        assert_eq!(founder.as_deref(), Some("alice"));
+        assert_eq!(
+            ops,
+            ["bob", "carol"].into_iter().map(String::from).collect()
+        );
+    }
+
+    #[test]
+    fn parses_buggy_multi_operator_bracket() {
+        // The reference server mis-closes the bracket after the first operator:
+        // `[bob] carol]`. We must still recover both names.
+        let (_, _, ops) = parse_chanserv_info(
+            "#lobby info: Founder is <alice>. Operator list is [bob] carol]. \
+             Currently contains 1 users and 0 bridged users. Anti-spam protection is on. \
+             Channel history is on. Last used on Jul 12, 2026.",
+        )
+        .expect("should parse");
+        assert_eq!(
+            ops,
+            ["bob", "carol"].into_iter().map(String::from).collect()
+        );
+    }
+
+    #[test]
+    fn parses_chanserv_info_without_founder_or_ops() {
+        let (chan, founder, ops) = parse_chanserv_info(
+            "#games info: No founder is registered. Operator list is empty. \
+             Currently contains 0 users and 0 bridged users.",
+        )
+        .expect("should parse");
+        assert_eq!(chan, "games");
+        assert_eq!(founder, None);
+        assert!(ops.is_empty());
+    }
+
+    #[test]
+    fn ignores_non_info_chanserv_text() {
+        assert!(parse_chanserv_info("Channel #foo is not registered").is_none());
+        assert!(parse_chanserv_info("hello there").is_none());
+    }
+
+    #[test]
+    fn chanserv_info_updates_channel_ops_and_is_suppressed() {
+        let mut s = LobbyState::new();
+        reduce(&mut s, parse_line("ACCEPTED me"));
+        reduce(&mut s, parse_line("JOIN lobby"));
+        let before = s.channels["lobby"].messages.len();
+        let d = reduce(
+            &mut s,
+            parse_line(
+                "SAIDPRIVATE ChanServ #lobby info: Founder is <alice>. \
+                 Operator list is [bob]. Currently contains 2 users and 0 bridged users.",
+            ),
+        );
+        assert_eq!(
+            d,
+            vec![Delta::ChannelOpsChanged {
+                channel: "lobby".into()
+            }]
+        );
+        let ch = &s.channels["lobby"];
+        assert_eq!(ch.founder.as_deref(), Some("alice"));
+        assert!(ch.operators.contains("bob"));
+        // The info line must NOT appear as a ChanServ DM.
+        assert_eq!(ch.messages.len(), before);
+        assert!(!s.dms.contains_key("ChanServ"));
+    }
+
+    #[test]
+    fn ordinary_chanserv_dm_is_still_recorded() {
+        let mut s = LobbyState::new();
+        reduce(&mut s, parse_line("ACCEPTED me"));
+        let d = reduce(
+            &mut s,
+            parse_line("SAIDPRIVATE ChanServ Opped bob in #lobby"),
+        );
+        assert!(matches!(d.as_slice(), [Delta::PrivateMessage { .. }]));
+        assert!(s.dms.contains_key("ChanServ"));
     }
 
     #[test]

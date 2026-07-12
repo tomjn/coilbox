@@ -48,6 +48,11 @@ pub struct ChatMsg {
 }
 
 /// The state of a joined channel.
+///
+/// `founder`/`operators` are not part of the base protocol — they're learned by
+/// parsing a ChanServ `:info` reply (see `reduce`), and drive who sees the
+/// channel-moderation controls. They stay empty for channels ChanServ doesn't
+/// manage or that we've not queried.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelState {
@@ -55,6 +60,10 @@ pub struct ChannelState {
     pub topic: Option<String>,
     pub users: HashSet<String>,
     pub messages: Vec<ChatMsg>,
+    /// The channel's registered founder (from ChanServ `:info`), if any.
+    pub founder: Option<String>,
+    /// The channel's operators (from ChanServ `:info`).
+    pub operators: HashSet<String>,
 }
 
 /// A member's status inside a battle.

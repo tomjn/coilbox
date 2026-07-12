@@ -65,6 +65,10 @@ export interface ChannelState {
   topic: string | null;
   users: string[];
   messages: ChatMsg[];
+  /** Registered founder (from ChanServ `:info`), or null. */
+  founder: string | null;
+  /** Channel operators (from ChanServ `:info`); empty until queried. */
+  operators: string[];
 }
 
 export interface DirChannel {
@@ -192,6 +196,7 @@ export type Delta =
   | { kind: "channelJoined"; channel: string }
   | { kind: "channelLeft"; channel: string }
   | { kind: "channelTopicChanged"; channel: string }
+  | { kind: "channelOpsChanged"; channel: string }
   | { kind: "startRectChanged"; ally: number }
   | { kind: "scriptTagsChanged" }
   | { kind: "playerWentIngame"; name: string }
