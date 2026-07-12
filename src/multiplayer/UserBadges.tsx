@@ -11,7 +11,8 @@ import { ChevronUp, Globe } from "lucide-react";
 /** Shared flag-slot dimensions (a mini rectangle, sized independent of surrounding
  * text) and rounded frame, used by both the real flag and the placeholder. */
 const FLAG_SIZE = { width: 18, height: 13 } as const;
-const FLAG_FRAME = "shrink-0 rounded-[4px] ring-1 ring-inset ring-foreground/15";
+const FLAG_FRAME =
+  "shrink-0 rounded-[4px] ring-1 ring-inset ring-foreground/15";
 
 /**
  * A country flag from an ISO 3166-1 alpha-2 code (the wire form, e.g. `GB`). For the
