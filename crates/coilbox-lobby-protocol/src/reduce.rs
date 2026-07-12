@@ -135,6 +135,11 @@ pub enum Delta {
         reason: String,
     },
     ChannelListReceived,
+    /// The mutual-friend set changed (`FRIEND`/`UNFRIEND`, or a `FRIENDLIST` rebuild).
+    FriendsChanged,
+    /// The incoming friend-request set changed (`FRIENDREQUEST`, an accept clearing
+    /// one, or a `FRIENDREQUESTLIST` rebuild).
+    FriendRequestsChanged,
 }
 
 /// Apply a server message to the lobby state, returning the deltas produced.
@@ -669,6 +674,44 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         ServerMessage::Motd { line } => {
             vec![Delta::Motd { line }]
         }
+        ServerMessage::Friend { username } => {
+            // A friendship established: promote out of any pending request.
+            let had_request = state.friend_requests.remove(&username);
+            state.friends.insert(username);
+            let mut deltas = vec![Delta::FriendsChanged];
+            if had_request {
+                deltas.push(Delta::FriendRequestsChanged);
+            }
+            deltas
+        }
+        ServerMessage::Unfriend { username } => {
+            state.friends.remove(&username);
+            vec![Delta::FriendsChanged]
+        }
+        ServerMessage::FriendRequest { username, msg: _ } => {
+            state.friend_requests.insert(username);
+            vec![Delta::FriendRequestsChanged]
+        }
+        // FRIENDLIST framing rebuilds the friend set: clear on begin, add each
+        // entry live (mirrors the CHANNELS directory rebuild), signal on end.
+        ServerMessage::FriendListBegin => {
+            state.friends.clear();
+            vec![]
+        }
+        ServerMessage::FriendListEntry { username } => {
+            state.friends.insert(username);
+            vec![]
+        }
+        ServerMessage::FriendListEnd => vec![Delta::FriendsChanged],
+        ServerMessage::FriendRequestListBegin => {
+            state.friend_requests.clear();
+            vec![]
+        }
+        ServerMessage::FriendRequestListEntry { username, msg: _ } => {
+            state.friend_requests.insert(username);
+            vec![]
+        }
+        ServerMessage::FriendRequestListEnd => vec![Delta::FriendRequestsChanged],
         // Messages carrying no state change / handled by the login machine.
         ServerMessage::TasServer { .. }
         | ServerMessage::LoginInfoEnd
@@ -1237,6 +1280,58 @@ mod tests {
         assert_eq!(s.channel_directory[1].name, "newbies");
         assert_eq!(s.channel_directory[1].user_count, 7);
         assert_eq!(s.channel_directory[1].topic, None);
+    }
+
+    #[test]
+    fn friend_request_then_accept_moves_to_friends() {
+        let mut s = LobbyState::new();
+        let d = reduce(&mut s, parse_line("FRIENDREQUEST userName=bob"));
+        assert_eq!(d, vec![Delta::FriendRequestsChanged]);
+        assert!(s.friend_requests.contains("bob"));
+        // FRIEND establishes the friendship and clears the pending request.
+        let d = reduce(&mut s, parse_line("FRIEND userName=bob"));
+        assert_eq!(d, vec![Delta::FriendsChanged, Delta::FriendRequestsChanged]);
+        assert!(s.friends.contains("bob"));
+        assert!(!s.friend_requests.contains("bob"));
+    }
+
+    #[test]
+    fn unfriend_removes_friend() {
+        let mut s = LobbyState::new();
+        reduce(&mut s, parse_line("FRIEND userName=bob"));
+        assert!(s.friends.contains("bob"));
+        let d = reduce(&mut s, parse_line("UNFRIEND userName=bob"));
+        assert_eq!(d, vec![Delta::FriendsChanged]);
+        assert!(!s.friends.contains("bob"));
+    }
+
+    #[test]
+    fn friend_list_framing_rebuilds_friends() {
+        let mut s = LobbyState::new();
+        // A stale friend must be dropped by the rebuild.
+        s.friends.insert("stale".into());
+        reduce(&mut s, parse_line("FRIENDLISTBEGIN"));
+        assert!(s.friends.is_empty());
+        reduce(&mut s, parse_line("FRIENDLIST userName=alice"));
+        reduce(&mut s, parse_line("FRIENDLIST userName=bob"));
+        let d = reduce(&mut s, parse_line("FRIENDLISTEND"));
+        assert_eq!(d, vec![Delta::FriendsChanged]);
+        assert!(s.friends.contains("alice"));
+        assert!(s.friends.contains("bob"));
+        assert!(!s.friends.contains("stale"));
+    }
+
+    #[test]
+    fn friend_request_list_framing_rebuilds_requests() {
+        let mut s = LobbyState::new();
+        s.friend_requests.insert("stale".into());
+        reduce(&mut s, parse_line("FRIENDREQUESTLISTBEGIN"));
+        assert!(s.friend_requests.is_empty());
+        reduce(&mut s, parse_line("FRIENDREQUESTLIST userName=carol"));
+        let d = reduce(&mut s, parse_line("FRIENDREQUESTLISTEND"));
+        assert_eq!(d, vec![Delta::FriendRequestsChanged]);
+        assert!(s.friend_requests.contains("carol"));
+        assert!(!s.friend_requests.contains("stale"));
     }
 
     #[test]

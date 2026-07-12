@@ -4,7 +4,7 @@
 //! concern — it keeps a map of these. Every type here crosses to the frontend,
 //! so all derive `Serialize` with camelCase field names.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -163,6 +163,13 @@ pub struct LobbyState {
     pub host_port: Option<u16>,
     /// The last-fetched public channel directory (from `CHANNELS`).
     pub channel_directory: Vec<DirChannel>,
+    /// Mutual (established) server-side friends, synced from `FRIENDLIST` on login
+    /// and kept live by `FRIEND`/`UNFRIEND`. Sorted; merged with client-local
+    /// favourites in the Friends UI. Empty on servers without friend support.
+    pub friends: BTreeSet<String>,
+    /// Incoming pending friend requests (`FRIENDREQUEST` / `FRIENDREQUESTLIST`),
+    /// awaiting our accept/decline. Sorted; empty on unsupported servers.
+    pub friend_requests: BTreeSet<String>,
     /// A live SPADS autohost vote in the current battle, or `None` when none is
     /// open. Parsed from the bot's battle chat; drives the vote panel.
     pub current_vote: Option<Vote>,
