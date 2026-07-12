@@ -7,6 +7,7 @@ import {
   dlDownload,
   dlDownloadFile,
   dlDownloadMap,
+  dlGithubReleaseArchives,
 } from "../../../downloads/bindings";
 import { ProgressBar } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
@@ -33,7 +34,7 @@ interface SuggestionsListProps {
 }
 
 /** Dispatch a suggestion to the matching downloads-plugin command. */
-function runDownload(
+async function runDownload(
   dl: SuggestedDownload,
   kind: "game" | "map",
   writePath: string,
@@ -65,6 +66,23 @@ function runDownload(
         destDir: `${writePath}/${dl.subdir ?? (kind === "game" ? "games" : "maps")}`,
         onProgress,
       });
+    case "github": {
+      // Resolve the repo's release archives, then stream the matching (or newest)
+      // one directly — games like SplinterFaction ship only via GitHub releases.
+      const { archives } = await dlGithubReleaseArchives({ repo: dl.repo });
+      const pick = dl.asset
+        ? archives.find((a) =>
+            a.filename.toLowerCase().includes(dl.asset?.toLowerCase() ?? ""),
+          )
+        : archives[0];
+      if (!pick) throw new Error(`No release archive found for ${dl.repo}.`);
+      return dlDownloadFile({
+        url: pick.url,
+        filename: pick.filename,
+        destDir: `${writePath}/${dl.subdir ?? (kind === "game" ? "games" : "maps")}`,
+        onProgress,
+      });
+    }
   }
 }
 

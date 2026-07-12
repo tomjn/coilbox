@@ -21,6 +21,7 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../DownloadQueueProvider";
+import { GAME_REPOS, repoForKey } from "../gameRepos";
 import { OptionSelect } from "./components/OptionSelect";
 import { EmptyState, errMessage } from "./components/states";
 import { HIDE_INSTALLED_KEY } from "./hideInstalled";
@@ -34,21 +35,7 @@ const SORT_OPTIONS = [
   { value: "size-asc", label: "Smallest" },
 ];
 
-type Source =
-  | "springfiles"
-  | "metal-factions"
-  | "evolution-rts"
-  | "tap"
-  | "balanced-annihilation";
-
-/** Curated GitHub game repos (from skylobby's shipped source list), fetched via
- * their release assets. springfiles stays the default. */
-const GAME_REPOS: Record<string, string> = {
-  "metal-factions": "springraaar/metal_factions",
-  "evolution-rts": "EvolutionRTS/Evolution-RTS",
-  tap: "FluidPlay/TAP",
-  "balanced-annihilation": "Balanced-Annihilation/Balanced-Annihilation",
-};
+type Source = "springfiles" | (typeof GAME_REPOS)[number]["key"];
 
 /** Normalised game row rendered by the list, regardless of source. Every source
  * resolves to a direct archive download into `<root>/games/`. */
@@ -89,10 +76,9 @@ export default function GamesPage() {
     setError(null);
     setGames(null);
     try {
-      if (src in GAME_REPOS) {
-        const { archives } = await dlGithubReleaseArchives({
-          repo: GAME_REPOS[src],
-        });
+      const repo = src === "springfiles" ? undefined : repoForKey(src);
+      if (repo) {
+        const { archives } = await dlGithubReleaseArchives({ repo });
         setGames(
           archives.map((a) => ({
             id: a.filename,
@@ -212,13 +198,7 @@ export default function GamesPage() {
             className="w-48"
             options={[
               { value: "springfiles", label: "springfiles" },
-              { value: "metal-factions", label: "Metal Factions" },
-              { value: "evolution-rts", label: "Evolution RTS" },
-              { value: "tap", label: "TAP" },
-              {
-                value: "balanced-annihilation",
-                label: "Balanced Annihilation",
-              },
+              ...GAME_REPOS.map((g) => ({ value: g.key, label: g.label })),
             ]}
           />
           <div className="relative max-w-xs flex-1">

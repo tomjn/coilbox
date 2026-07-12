@@ -3,18 +3,13 @@ import {
   type DownloadProgress,
   dlDownloadFileRaw,
   dlDownloadRaw,
+  dlGithubReleaseArchives,
   dlSpringfilesList,
 } from "@/downloads/bindings";
 import { withDownloadNotify } from "@/downloads/downloadNotify";
+import { githubRepoForGame, norm } from "@/downloads/gameRepos";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-/** Loose key for matching a catalog entry to a battle's game name. */
-const norm = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/\.(sd7|sdz)$/, "")
-    .replace(/[\s_]+/g, "");
 
 /**
  * Download a battle's game, trying each source in turn and resolving with the
@@ -63,6 +58,32 @@ async function downloadGameAnySourceImpl(opts: {
       }
     } catch (e) {
       errors.push(`springfiles catalog: ${msg(e)}`);
+    }
+  }
+
+  // 3) curated GitHub releases: some games (e.g. SplinterFaction) ship only via
+  // GitHub release archives, not rapid or springfiles. Resolve a known repo from
+  // the game name and fetch its matching (or newest) release archive.
+  if (writePath) {
+    try {
+      const repo = githubRepoForGame(gameName);
+      if (repo) {
+        const { archives } = await dlGithubReleaseArchives({ repo });
+        const target = norm(gameName);
+        const hit =
+          archives.find((a) => norm(a.filename) === target) ?? archives[0];
+        if (hit) {
+          await dlDownloadFileRaw({
+            url: hit.url,
+            destDir: `${writePath}/games`,
+            filename: hit.filename,
+            onProgress,
+          });
+          return "github release";
+        }
+      }
+    } catch (e) {
+      errors.push(`github releases: ${msg(e)}`);
     }
   }
 

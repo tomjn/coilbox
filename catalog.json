@@ -16,6 +16,16 @@
         "entryId": "mechcommander-legacy",
         "blurb": "BattleTech-inspired mech combat.",
         "download": { "kind": "rapid", "tag": "mcl:test" }
+      },
+      {
+        "id": "splinter-faction",
+        "title": "SplinterFaction",
+        "entryId": "splinter-faction",
+        "blurb": "Asymmetric sci-fi RTS, distributed via GitHub releases.",
+        "download": {
+          "kind": "github",
+          "repo": "SplinterFaction/SplinterFaction"
+        }
       }
     ],
     "maps": [

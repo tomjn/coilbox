@@ -44,14 +44,23 @@ export interface BrandingEntry {
   conquest?: ConquestNames;
 }
 /**
- * How a suggested item is fetched. Mirrors the three downloads-plugin commands:
- * `rapid` -> dlDownload (a rapid tag), `map` -> dlDownloadMap (a springname), and
- * `url` -> dlDownloadFile (a direct mirror URL streamed into `<root>/<subdir>`).
+ * How a suggested item is fetched. Mirrors the downloads-plugin commands:
+ * `rapid` -> dlDownload (a rapid tag), `map` -> dlDownloadMap (a springname),
+ * `url` -> dlDownloadFile (a direct mirror URL streamed into `<root>/<subdir>`),
+ * and `github` -> resolve a repo's release archives then dlDownloadFile the one
+ * whose filename contains `asset` (or the newest), for games shipped only via
+ * GitHub releases (e.g. SplinterFaction).
  */
 export type SuggestedDownload =
   | { kind: "rapid"; tag: string; masterUrl?: string }
   | { kind: "map"; springName: string; searchUrl?: string }
-  | { kind: "url"; url: string; filename: string; subdir?: "games" | "maps" };
+  | { kind: "url"; url: string; filename: string; subdir?: "games" | "maps" }
+  | {
+      kind: "github";
+      repo: string;
+      asset?: string;
+      subdir?: "games" | "maps";
+    };
 
 /**
  * A curated game offered on the first-run/empty screens. `entryId` borrows a
