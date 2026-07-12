@@ -1,6 +1,7 @@
 import { Button, cn } from "@picoframe/frame";
 import { UserCheck, UserX } from "lucide-react";
 import type { User } from "../bindings";
+import { CountryFlag, RankBadge } from "../UserBadges";
 import { PRESENCE_META, type Presence } from "./presence";
 
 /**
@@ -58,7 +59,9 @@ export function MemberList({
                 ) : (
                   <span aria-hidden className="size-2.5 shrink-0" />
                 ))}
+              <CountryFlag country={u.country} />
               <span className="truncate">{u.name}</span>
+              <RankBadge rank={u.status.rank} />
               {meta && (
                 <span
                   className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground"

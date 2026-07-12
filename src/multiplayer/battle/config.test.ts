@@ -181,6 +181,51 @@ describe("membersToRows", () => {
     expect(row.sync).toBe(2);
     expect(row.colorHex).toBe("#ff0000");
   });
+
+  it("enriches human rows with country + rank from the users map", () => {
+    const battle = mkBattle({
+      members: { alice: member() },
+      bots: {
+        BARb: {
+          name: "BARb",
+          owner: "alice",
+          aiDll: "BARb",
+          battleStatus: status(),
+          teamColor: 0x00ff00,
+        },
+      },
+    });
+    const users = {
+      alice: {
+        name: "alice",
+        country: "GB",
+        userId: "1",
+        agent: "coilbox",
+        status: {
+          ingame: false,
+          away: false,
+          rank: 4,
+          access: false,
+          bot: false,
+        },
+      },
+    };
+    const rows = membersToRows(battle, "alice", users);
+    const alice = rows.find((r) => r.name === "alice");
+    expect(alice?.country).toBe("GB");
+    expect(alice?.rank).toBe(4);
+    // Bots carry no country/rank.
+    const bot = rows.find((r) => r.kind === "bot");
+    expect(bot?.country).toBeUndefined();
+    expect(bot?.rank).toBeUndefined();
+  });
+
+  it("leaves country/rank undefined when no users map is given", () => {
+    const battle = mkBattle({ members: { alice: member() } });
+    const [row] = membersToRows(battle, "alice");
+    expect(row.country).toBeUndefined();
+    expect(row.rank).toBeUndefined();
+  });
 });
 
 describe("usedColorsFromBattle", () => {
