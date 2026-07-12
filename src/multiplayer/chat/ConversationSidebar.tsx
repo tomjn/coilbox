@@ -3,6 +3,7 @@ import {
   Check,
   ChevronRight,
   Hash,
+  History,
   MessageSquare,
   Plus,
   Star,
@@ -13,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { useNavigate } from "react-router";
 import {
   Collapsible,
   CollapsibleContent,
@@ -154,6 +156,7 @@ export function ConversationSidebar({
   onBrowse: () => void;
 }) {
   const { mirror, unreadFor, activeKey } = useMultiplayer();
+  const navigate = useNavigate();
   const [ignored] = useIgnored();
   const [favourites, setFavourites] = useFavourites();
   const state = mirror.state;
@@ -245,166 +248,212 @@ export function ConversationSidebar({
   }
 
   return (
-    <nav className="flex w-60 shrink-0 flex-col overflow-auto border-r border-border">
-      {currentBattle && battleChannel && (
-        <Section title="Battle">
+    <nav className="flex w-60 shrink-0 flex-col border-r border-border">
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+        {currentBattle && battleChannel && (
+          <Section title="Battle">
+            <ul className="flex flex-col gap-0.5 px-2">
+              {(() => {
+                const desc: ConversationDescriptor = {
+                  kind: "battle",
+                  id: currentBattle.id,
+                  channel: battleChannel,
+                };
+                const id = convId(desc);
+                const msgs = state?.channels[battleChannel]?.messages ?? [];
+                return (
+                  <li key={id}>
+                    <button
+                      type="button"
+                      className={rowClass(id)}
+                      onClick={() => onSelect(desc)}
+                    >
+                      <Swords className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate">
+                        {currentBattle.title || `Battle ${currentBattle.id}`}
+                      </span>
+                      <Badge n={unreadBadge(id, msgs)} />
+                    </button>
+                  </li>
+                );
+              })()}
+            </ul>
+          </Section>
+        )}
+
+        <Section
+          title="Channels"
+          action={
+            <Button
+              variant="secondary"
+              onClick={onBrowse}
+              aria-label="Browse channels"
+              className="h-7 px-2"
+            >
+              <Plus className="size-4" />
+            </Button>
+          }
+        >
           <ul className="flex flex-col gap-0.5 px-2">
-            {(() => {
-              const desc: ConversationDescriptor = {
-                kind: "battle",
-                id: currentBattle.id,
-                channel: battleChannel,
-              };
-              const id = convId(desc);
-              const msgs = state?.channels[battleChannel]?.messages ?? [];
+            {channels.map((name) => {
+              const id = `channel:${name}`;
+              const msgs = state?.channels[name].messages ?? [];
+              const topic = state?.channels[name].topic;
               return (
                 <li key={id}>
                   <button
                     type="button"
                     className={rowClass(id)}
-                    onClick={() => onSelect(desc)}
+                    onClick={() => onSelect({ kind: "channel", name })}
                   >
-                    <Swords className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="truncate">
-                      {currentBattle.title || `Battle ${currentBattle.id}`}
+                    <Hash className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate">{name}</span>
+                      {topic && (
+                        <span className="truncate text-xs font-normal text-muted-foreground">
+                          {topic}
+                        </span>
+                      )}
                     </span>
                     <Badge n={unreadBadge(id, msgs)} />
                   </button>
                 </li>
               );
-            })()}
+            })}
+            {channels.length === 0 && (
+              <li className="px-2 py-1.5 text-xs text-muted-foreground">
+                No channels joined. Browse to join one.
+              </li>
+            )}
           </ul>
         </Section>
-      )}
 
-      <Section
-        title="Channels"
-        action={
-          <Button
-            variant="secondary"
-            onClick={onBrowse}
-            aria-label="Browse channels"
-            className="h-7 px-2"
-          >
-            <Plus className="size-4" />
-          </Button>
-        }
-      >
-        <ul className="flex flex-col gap-0.5 px-2">
-          {channels.map((name) => {
-            const id = `channel:${name}`;
-            const msgs = state?.channels[name].messages ?? [];
-            return (
-              <li key={id}>
-                <button
-                  type="button"
-                  className={rowClass(id)}
-                  onClick={() => onSelect({ kind: "channel", name })}
-                >
-                  <Hash className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{name}</span>
-                  <Badge n={unreadBadge(id, msgs)} />
-                </button>
-              </li>
-            );
-          })}
-          {channels.length === 0 && (
-            <li className="px-2 py-1.5 text-xs text-muted-foreground">
-              No channels joined. Browse to join one.
-            </li>
-          )}
-        </ul>
-      </Section>
-
-      {(friendNames.length > 0 || friendRequests.length > 0) && (
-        <Section title="Friends">
-          {friendRequests.length > 0 && (
-            <ul className="flex flex-col gap-1 px-2 pb-1">
-              {friendRequests.map((name) => (
-                <li
-                  key={`req:${name}`}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-                >
-                  <UserPlus className="size-4 shrink-0 text-muted-foreground" />
-                  <span
-                    className="truncate"
-                    title={`${name} wants to be friends`}
+        {(friendNames.length > 0 || friendRequests.length > 0) && (
+          <Section title="Friends">
+            {friendRequests.length > 0 && (
+              <ul className="flex flex-col gap-1 px-2 pb-1">
+                {friendRequests.map((name) => (
+                  <li
+                    key={`req:${name}`}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
                   >
-                    {name}
-                  </span>
-                  <div className="ml-auto flex gap-1">
-                    <Button
-                      variant="secondary"
-                      onClick={() => acceptRequest(name)}
-                      aria-label={`Accept friend request from ${name}`}
-                      className="h-6 px-2"
+                    <UserPlus className="size-4 shrink-0 text-muted-foreground" />
+                    <span
+                      className="truncate"
+                      title={`${name} wants to be friends`}
                     >
-                      <Check className="size-4" />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => declineRequest(name)}
-                      aria-label={`Decline friend request from ${name}`}
-                      className="h-6 px-2"
+                      {name}
+                    </span>
+                    <div className="ml-auto flex gap-1">
+                      <Button
+                        variant="secondary"
+                        onClick={() => acceptRequest(name)}
+                        aria-label={`Accept friend request from ${name}`}
+                        className="h-6 px-2"
+                      >
+                        <Check className="size-4" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => declineRequest(name)}
+                        aria-label={`Decline friend request from ${name}`}
+                        className="h-6 px-2"
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <ul className="flex flex-col gap-0.5 px-2">
+              {friendNames.map((peer) => {
+                const id = `dm:${peer}`;
+                const msgs = state?.dms?.[peer] ?? [];
+                const presence = state ? userPresence(state, peer) : "offline";
+                const meta = PRESENCE_META[presence];
+                const isServerFriend = serverFriendSet.has(peer);
+                return (
+                  <li key={id} className="group relative">
+                    <button
+                      type="button"
+                      className={cn(rowClass(id), "pr-16")}
+                      onClick={() => onSelect({ kind: "dm", peer })}
                     >
-                      <X className="size-4" />
-                    </Button>
-                  </div>
-                </li>
-              ))}
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "size-2 shrink-0 rounded-full",
+                          meta.dotClass,
+                        )}
+                        title={meta.label}
+                      />
+                      <span
+                        className={cn(
+                          "truncate",
+                          presence === "offline" && "text-muted-foreground",
+                        )}
+                      >
+                        {peer}
+                      </span>
+                      {isServerFriend && (
+                        <UserCheck
+                          className="size-3.5 shrink-0 text-sky-500"
+                          aria-label="Server friend"
+                        />
+                      )}
+                      <Badge n={unreadBadge(id, msgs)} />
+                    </button>
+                    {isServerFriend ? (
+                      <FriendAction
+                        icon={<UserX className="size-4" />}
+                        label={`Remove ${peer} from friends`}
+                        onClick={() => unfriend(peer)}
+                      />
+                    ) : (
+                      <FriendAction
+                        icon={<UserPlus className="size-4" />}
+                        label={`Send ${peer} a friend request`}
+                        onClick={() => sendFriendRequest(peer)}
+                      />
+                    )}
+                    <FavStar
+                      name={peer}
+                      active={
+                        activeKey
+                          ? isFavourite(favourites, activeKey, peer)
+                          : false
+                      }
+                      onToggle={() => toggleFavourite(peer)}
+                    />
+                  </li>
+                );
+              })}
             </ul>
-          )}
+          </Section>
+        )}
+
+        <Section
+          title="Direct messages"
+          action={
+            <DmPicker onPick={(peer) => onSelect({ kind: "dm", peer })} />
+          }
+        >
           <ul className="flex flex-col gap-0.5 px-2">
-            {friendNames.map((peer) => {
+            {peers.map((peer) => {
               const id = `dm:${peer}`;
-              const msgs = state?.dms?.[peer] ?? [];
-              const presence = state ? userPresence(state, peer) : "offline";
-              const meta = PRESENCE_META[presence];
-              const isServerFriend = serverFriendSet.has(peer);
+              const msgs = state?.dms[peer] ?? [];
               return (
                 <li key={id} className="group relative">
                   <button
                     type="button"
-                    className={cn(rowClass(id), "pr-16")}
+                    className={cn(rowClass(id), "pr-9")}
                     onClick={() => onSelect({ kind: "dm", peer })}
                   >
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "size-2 shrink-0 rounded-full",
-                        meta.dotClass,
-                      )}
-                      title={meta.label}
-                    />
-                    <span
-                      className={cn(
-                        "truncate",
-                        presence === "offline" && "text-muted-foreground",
-                      )}
-                    >
-                      {peer}
-                    </span>
-                    {isServerFriend && (
-                      <UserCheck
-                        className="size-3.5 shrink-0 text-sky-500"
-                        aria-label="Server friend"
-                      />
-                    )}
+                    <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{peer}</span>
                     <Badge n={unreadBadge(id, msgs)} />
                   </button>
-                  {isServerFriend ? (
-                    <FriendAction
-                      icon={<UserX className="size-4" />}
-                      label={`Remove ${peer} from friends`}
-                      onClick={() => unfriend(peer)}
-                    />
-                  ) : (
-                    <FriendAction
-                      icon={<UserPlus className="size-4" />}
-                      label={`Send ${peer} a friend request`}
-                      onClick={() => sendFriendRequest(peer)}
-                    />
-                  )}
                   <FavStar
                     name={peer}
                     active={
@@ -417,46 +466,25 @@ export function ConversationSidebar({
                 </li>
               );
             })}
+            {peers.length === 0 && (
+              <li className="px-2 py-1.5 text-xs text-muted-foreground">
+                No direct messages. Use + to message an online user.
+              </li>
+            )}
           </ul>
         </Section>
-      )}
+      </div>
 
-      <Section
-        title="Direct messages"
-        action={<DmPicker onPick={(peer) => onSelect({ kind: "dm", peer })} />}
-      >
-        <ul className="flex flex-col gap-0.5 px-2">
-          {peers.map((peer) => {
-            const id = `dm:${peer}`;
-            const msgs = state?.dms[peer] ?? [];
-            return (
-              <li key={id} className="group relative">
-                <button
-                  type="button"
-                  className={cn(rowClass(id), "pr-9")}
-                  onClick={() => onSelect({ kind: "dm", peer })}
-                >
-                  <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{peer}</span>
-                  <Badge n={unreadBadge(id, msgs)} />
-                </button>
-                <FavStar
-                  name={peer}
-                  active={
-                    activeKey ? isFavourite(favourites, activeKey, peer) : false
-                  }
-                  onToggle={() => toggleFavourite(peer)}
-                />
-              </li>
-            );
-          })}
-          {peers.length === 0 && (
-            <li className="px-2 py-1.5 text-xs text-muted-foreground">
-              No direct messages. Use + to message an online user.
-            </li>
-          )}
-        </ul>
-      </Section>
+      <div className="border-t border-border p-2">
+        <Button
+          variant="secondary"
+          className="h-8 w-full justify-start gap-2"
+          onClick={() => navigate("/chatlogs")}
+        >
+          <History className="size-4" />
+          Chat logs
+        </Button>
+      </div>
     </nav>
   );
 }
