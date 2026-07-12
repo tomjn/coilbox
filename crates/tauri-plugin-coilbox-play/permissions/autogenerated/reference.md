@@ -10,6 +10,7 @@ Allows the play plugin's start-script generation, engine launch and cancel comma
 - `allow-play-import-preset`
 - `allow-play-launch`
 - `allow-play-launch-replay`
+- `allow-play-launch-save`
 - `allow-play-cancel`
 - `allow-play-focus`
 
@@ -226,6 +227,32 @@ Enables the play_launch_replay command without any pre-configured scope.
 <td>
 
 Denies the play_launch_replay command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:allow-play-launch-save`
+
+</td>
+<td>
+
+Enables the play_launch_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-play:deny-play-launch-save`
+
+</td>
+<td>
+
+Denies the play_launch_save command without any pre-configured scope.
 
 </td>
 </tr>

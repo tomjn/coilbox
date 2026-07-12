@@ -14,6 +14,7 @@ mod demo;
 mod engine;
 mod model;
 mod paths;
+mod savegame;
 mod scan;
 mod settings_backup;
 
@@ -797,6 +798,36 @@ async fn content_demo_chat(engine_path: String, replay_path: String) -> Result<C
     }
 }
 
+/// `content_list_saves` — list singleplayer savegames under `<root>/Saves` (fast
+/// fs metadata + a best-effort map/game read). `root` is a `ContentRoot.path`.
+#[tauri::command]
+async fn content_list_saves(root: String) -> Result<CliResult, ()> {
+    let p = PathBuf::from(&root);
+    match tauri::async_runtime::spawn_blocking(move || savegame::list_saves(&p)).await {
+        Ok(saves) => Ok(CliResult::ok(json!({ "saves": saves }))),
+        Err(e) => Ok(CliResult::err(format!("list saves task failed: {e}"))),
+    }
+}
+
+/// `content_delete_save` — delete one savegame file. `path` must be a `.ssf`/`.slsf`
+/// path from `content_list_saves` (guarded against deleting anything else).
+#[tauri::command]
+async fn content_delete_save(path: String) -> Result<CliResult, ()> {
+    let p = PathBuf::from(&path);
+    let ok_ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("ssf") || e.eq_ignore_ascii_case("slsf"))
+        .unwrap_or(false);
+    if !ok_ext {
+        return Ok(CliResult::err("not a savegame file".to_string()));
+    }
+    match std::fs::remove_file(&p) {
+        Ok(()) => Ok(CliResult::ok(json!({ "ok": true }))),
+        Err(e) => Ok(CliResult::err(format!("delete failed: {e}"))),
+    }
+}
+
 /// `branding_catalog` — fetch the remote branding catalog JSON, disk-cache it, and
 /// fall back to the cache then the bundled seed on network failure. Returns the
 /// raw JSON text; the frontend parses/matches it (Rust stays schema-agnostic).
@@ -947,6 +978,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_list_replays,
             content_demo_info,
             content_demo_chat,
+            content_list_saves,
+            content_delete_save,
             content_config_profiles,
             content_config_backup,
             content_config_restore,

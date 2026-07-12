@@ -267,6 +267,33 @@ export const contentDemoChat = defineCommand<
 >("coilbox-content", "content_demo_chat");
 
 /* -------------------------------------------------------------------------- *
+ * Savegames — singleplayer saves in a root's `Saves/` folder. Listing is cheap fs
+ * metadata plus a best-effort map/game read from the save's embedded start-script.
+ * -------------------------------------------------------------------------- */
+
+/** A savegame on disk (`.ssf`/`.slsf`). `modifiedMs` (file mtime) is the save date. */
+export interface SaveFile {
+  filename: string;
+  path: string;
+  sizeBytes: number;
+  modifiedMs: number;
+  mapName?: string;
+  gameType?: string;
+}
+
+/** List savegames under a content root's `Saves/` folder (newest first). */
+export const contentListSaves = defineCommand<
+  { root: string },
+  { saves: SaveFile[] }
+>("coilbox-content", "content_list_saves");
+
+/** Delete one savegame file (guarded to `.ssf`/`.slsf` paths). */
+export const contentDeleteSave = defineCommand<
+  { path: string },
+  { ok: boolean }
+>("coilbox-content", "content_delete_save");
+
+/* -------------------------------------------------------------------------- *
  * Engine-config profiles — named backup/restore of a content root's
  * `springsettings.cfg`, `LuaUI/Config/` and `uikeys.txt`, so users can snapshot
  * and swap settings sets. Snapshots live under the app data dir, keyed per root.

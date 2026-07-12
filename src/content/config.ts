@@ -15,6 +15,7 @@ import {
   contentCandidates,
   contentDemoInfo,
   contentListReplays,
+  contentListSaves,
   contentStateLoad,
   type DemoInfo,
   type EngineConfigResult,
@@ -25,6 +26,7 @@ import {
   type MetalmapResult,
   type MinimapResult,
   type ReplayFile,
+  type SaveFile,
   type ScanResult,
   type StartPos,
   type UnitBuildpicsResult,
@@ -1288,6 +1290,39 @@ export function useReplays(rootPath?: string) {
   }, [refresh]);
 
   return { replays, loading, error, refresh, ready: loadedFor === rootPath };
+}
+
+/** List the savegames in a content root (re-runs on `rootPath` change / refresh). */
+export function useSaves(rootPath?: string) {
+  const [saves, setSaves] = useState<SaveFile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loadedFor, setLoadedFor] = useState<string | undefined>(undefined);
+
+  const refresh = useCallback(async () => {
+    if (!rootPath) {
+      setSaves([]);
+      setLoadedFor(undefined);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await contentListSaves({ root: rootPath });
+      setSaves(res.saves);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadedFor(rootPath);
+      setLoading(false);
+    }
+  }, [rootPath]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { saves, loading, error, refresh, ready: loadedFor === rootPath };
 }
 
 /** Session cache of decoded demos, keyed by `enginePath::replayPath`. */
