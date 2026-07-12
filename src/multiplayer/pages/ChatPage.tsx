@@ -1,5 +1,5 @@
-import { Button, NavGate, useSetting } from "@picoframe/frame";
-import { Gamepad2, LogOut, Users } from "lucide-react";
+import { Button, cn, NavGate, useSetting } from "@picoframe/frame";
+import { Gamepad2, LogOut, Star, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { type ChatMsg, mpLeaveBattle, mpLeaveChannel } from "../bindings";
@@ -19,6 +19,12 @@ import {
 import { MemberList } from "../chat/MemberList";
 import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
+import {
+  addFavourite,
+  isFavourite,
+  removeFavourite,
+  useFavourites,
+} from "../friends";
 import { useMpRevealed, useMultiplayer } from "../store";
 
 /**
@@ -31,6 +37,7 @@ import { useMpRevealed, useMultiplayer } from "../store";
 function ChatPage() {
   const { mirror, activeKey, markSeen, forgetChannel, openLoginPopover } =
     useMultiplayer();
+  const [favourites, setFavourites] = useFavourites();
   const navigate = useNavigate();
   const [active, setActive] = useState<ConversationDescriptor | null>(null);
   const [showMembers, setShowMembers] = useState(false);
@@ -93,6 +100,20 @@ function ChatPage() {
   const dmPeer = active?.kind === "dm" ? active.peer : null;
   const titleIsBot = dmPeer != null && isBot(dmPeer);
   const titlePresence = dmPeer == null ? undefined : presenceFor(dmPeer);
+
+  // Client-local favourite toggle for the open DM peer (see friends.ts / #185).
+  const dmIsFavourite =
+    dmPeer != null && activeKey != null
+      ? isFavourite(favourites, activeKey, dmPeer)
+      : false;
+  function toggleDmFavourite() {
+    if (dmPeer == null || activeKey == null) return;
+    setFavourites(
+      isFavourite(favourites, activeKey, dmPeer)
+        ? removeFavourite(favourites, activeKey, dmPeer)
+        : addFavourite(favourites, activeKey, dmPeer),
+    );
+  }
 
   // Mark the open conversation read as its message count changes.
   useEffect(() => {
@@ -178,7 +199,26 @@ function ChatPage() {
           completions={completions}
           onSend={conv.send}
           headerActions={
-            active.kind === "channel" || active.kind === "battle" ? (
+            active.kind === "dm" ? (
+              <Button
+                variant="secondary"
+                className="h-7 px-2"
+                onClick={toggleDmFavourite}
+                aria-label={
+                  dmIsFavourite
+                    ? `Remove ${active.peer} from friends`
+                    : `Add ${active.peer} to friends`
+                }
+                aria-pressed={dmIsFavourite}
+              >
+                <Star
+                  className={cn(
+                    "size-4",
+                    dmIsFavourite && "fill-current text-amber-400",
+                  )}
+                />
+              </Button>
+            ) : active.kind === "channel" || active.kind === "battle" ? (
               <>
                 <Button
                   variant="secondary"

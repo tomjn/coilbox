@@ -23,6 +23,8 @@ import {
   mpConfirmAgreement,
   mpConnect,
   mpDisconnect,
+  mpFriendList,
+  mpFriendRequestList,
   mpJoinBattle,
   mpJoinChannel,
   mpReattach,
@@ -43,6 +45,7 @@ import {
   matchesHighlight,
 } from "./chat/highlight";
 import { triggerMentionCue } from "./chat/mentionCue";
+import { favouritesFor, useFavourites } from "./friends";
 import { triggerIngameCue } from "./ingameCue";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
@@ -420,6 +423,54 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [activeKey, mirror.phase, joinedChannels]);
+
+  // Sync the server-side friend list + pending requests once per connection, after
+  // login reaches `ready`. These commands are a no-op on servers without friend
+  // support (they just ignore the line), so failure is swallowed and never blocks
+  // the UI — local favourites keep working regardless.
+  const friendsSyncedForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeKey == null) {
+      friendsSyncedForRef.current = null;
+      return;
+    }
+    if (mirror.phase === "ready" && friendsSyncedForRef.current !== activeKey) {
+      friendsSyncedForRef.current = activeKey;
+      mpFriendList({ serverKey: activeKey }).catch(() => {});
+      mpFriendRequestList({ serverKey: activeKey }).catch(() => {});
+    }
+  }, [activeKey, mirror.phase]);
+
+  // Notify when a friend (server-side or a client-local favourite) comes online or
+  // goes offline. The lobby has no friend presence event, so this is derived from
+  // the roster: diff the online set between snapshots. Gated on `ready` (the
+  // initial ADDUSER dump completes before then) and baselined on the first ready
+  // snapshot so the login roster flood never fires a burst of notifications.
+  const [favourites] = useFavourites();
+  const prevRosterRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const st = mirror.state;
+    if (activeKey == null || mirror.phase !== "ready" || !st) {
+      prevRosterRef.current = null;
+      return;
+    }
+    const roster = new Set(Object.keys(st.users));
+    const prev = prevRosterRef.current;
+    prevRosterRef.current = roster;
+    if (prev == null) return; // baseline the first ready snapshot, don't notify
+    const watched = new Set<string>([
+      ...(st.friends ?? []),
+      ...favouritesFor(favourites, activeKey),
+    ]);
+    for (const name of watched) {
+      if (name === st.myUsername) continue;
+      const online = roster.has(name);
+      if (online && !prev.has(name))
+        void notify({ title: `${name} is online` });
+      else if (!online && prev.has(name))
+        void notify({ title: `${name} went offline` });
+    }
+  }, [activeKey, mirror.phase, mirror.state, favourites]);
 
   // --- Auto-rejoin on unexpected server drop (issue #192) --------------------
   // Distinct from the reload-reattach path above: this handles a genuine server-
