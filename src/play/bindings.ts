@@ -147,6 +147,22 @@ export const playLaunchReplay = defineCommand<
   { exitCode: number | null }
 >("coilbox-play", "play_launch_replay");
 
+/**
+ * Resume a savegame (`.ssf`/`.slsf`). No start script is written — the engine
+ * reads everything from the save when it's passed as the positional argument.
+ * Resolves when the engine exits. Shares the single-game guard with `playLaunch`.
+ */
+export const playLaunchSave = defineCommand<
+  {
+    savePath: string;
+    executable: string;
+    dataDir: string;
+    runId: string;
+    onEvent: Channel<LaunchEvent>;
+  },
+  { exitCode: number | null }
+>("coilbox-play", "play_launch_save");
+
 /** Kill an in-flight game by run id. */
 export const playCancel = defineCommand<
   { runId: string },

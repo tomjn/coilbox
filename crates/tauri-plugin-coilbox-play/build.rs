@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "play_import_preset",
     "play_launch",
     "play_launch_replay",
+    "play_launch_save",
     "play_cancel",
     "play_focus",
 ];

@@ -17,6 +17,8 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-open-path`
 - `allow-content-list-replays`
 - `allow-content-demo-info`
+- `allow-content-list-saves`
+- `allow-content-delete-save`
 - `allow-content-config-profiles`
 - `allow-content-config-backup`
 - `allow-content-config-restore`
@@ -270,6 +272,32 @@ Denies the content_create_standard_root command without any pre-configured scope
 <tr>
 <td>
 
+`coilbox-content:allow-content-delete-save`
+
+</td>
+<td>
+
+Enables the content_delete_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-delete-save`
+
+</td>
+<td>
+
+Denies the content_delete_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-content:allow-content-demo-info`
 
 </td>
@@ -341,6 +369,32 @@ Enables the content_list_replays command without any pre-configured scope.
 <td>
 
 Denies the content_list_replays command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-list-saves`
+
+</td>
+<td>
+
+Enables the content_list_saves command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-list-saves`
+
+</td>
+<td>
+
+Denies the content_list_saves command without any pre-configured scope.
 
 </td>
 </tr>

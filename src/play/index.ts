@@ -1,5 +1,5 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Swords } from "lucide-react";
+import { Save, Swords } from "lucide-react";
 import InGameBadge from "./InGameBadge";
 import { PlayProvider } from "./PlayProvider";
 
@@ -26,6 +26,13 @@ const playPlugin: FramePlugin = {
           order: 0,
           icon: Swords,
         },
+        {
+          id: "play.savegames",
+          label: "Savegames",
+          to: "/play/savegames",
+          order: 1,
+          icon: Save,
+        },
       ],
     },
   ],
@@ -34,6 +41,11 @@ const playPlugin: FramePlugin = {
       path: "play/skirmish",
       lazy: () => import("./pages/SkirmishPage"),
       crumb: "Singleplayer",
+    },
+    {
+      path: "play/savegames",
+      lazy: () => import("./pages/SavegamesPage"),
+      crumb: "Savegames",
     },
   ],
   Provider: PlayProvider,
