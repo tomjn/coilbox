@@ -293,6 +293,55 @@ pub fn latest_release_url(repo: &str) -> String {
     format!("https://api.github.com/repos/{repo}/releases/latest")
 }
 
+/// Build the GitHub "recent releases" API URL for an `owner/name` repo. The
+/// curated map/game repos ship their content as a release asset; we scan recent
+/// releases (not `/latest`, which skips the prereleases some of these repos use)
+/// and collect every content archive across them.
+pub fn releases_url(repo: &str) -> String {
+    format!("https://api.github.com/repos/{repo}/releases?per_page=30")
+}
+
+/// A Spring content archive (`.sd7`/`.sdz`) pulled from a GitHub release, for the
+/// curated map/game browse sources. Like the hakora mirror it has no springname —
+/// `url` is fetched directly via `dl_download_file`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseArchive {
+    /// On-disk archive name (also used for installed-detection and the React key).
+    pub filename: String,
+    /// Full download URL (the asset's `browser_download_url`).
+    pub url: String,
+    pub size: u64,
+    /// The release tag the archive came from (shown as a subtitle).
+    pub tag: String,
+}
+
+/// Collect the `.sd7`/`.sdz` assets across `releases` (GitHub returns them newest
+/// first), deduped by filename so an archive re-uploaded across versions appears
+/// once (keeping the newest release's copy).
+pub fn release_archives(releases: Vec<GithubRelease>) -> Vec<ReleaseArchive> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for rel in releases {
+        for a in rel.assets {
+            let lower = a.name.to_ascii_lowercase();
+            if !(lower.ends_with(".sd7") || lower.ends_with(".sdz")) {
+                continue;
+            }
+            if !seen.insert(lower) {
+                continue;
+            }
+            out.push(ReleaseArchive {
+                filename: a.name,
+                url: a.browser_download_url,
+                size: a.size,
+                tag: rel.tag_name.clone(),
+            });
+        }
+    }
+    out
+}
+
 /// Validate an `owner/name` GitHub repo slug: exactly one `/`, both segments
 /// non-empty, no whitespace or `..` path-traversal. Returns the trimmed slug so
 /// it can be interpolated straight into the API URL.
@@ -472,6 +521,41 @@ mod tests {
             latest_release_url("owner/name"),
             "https://api.github.com/repos/owner/name/releases/latest"
         );
+    }
+
+    #[test]
+    fn releases_url_targets_recent_releases() {
+        assert_eq!(
+            releases_url("owner/name"),
+            "https://api.github.com/repos/owner/name/releases?per_page=30"
+        );
+    }
+
+    #[test]
+    fn release_archives_keeps_content_archives_and_dedupes() {
+        // Two releases, newest first. Non-archive assets are dropped; the archive
+        // re-uploaded in both releases collapses to the newest copy.
+        let json = r#"[
+            {"tag_name":"v2","prerelease":false,"assets":[
+                {"name":"game_v2.sdz","browser_download_url":"http://x/2","size":20},
+                {"name":"changelog.txt","browser_download_url":"http://x/c","size":1}
+            ]},
+            {"tag_name":"v1","prerelease":true,"assets":[
+                {"name":"game_v2.sdz","browser_download_url":"http://x/2old","size":19},
+                {"name":"game_v1.sd7","browser_download_url":"http://x/1","size":10}
+            ]}
+        ]"#;
+        let rels: Vec<GithubRelease> = serde_json::from_str(json).unwrap();
+        let archives = release_archives(rels);
+        assert_eq!(archives.len(), 2); // .txt excluded, sdz deduped, sd7 kept
+        assert_eq!(archives[0].filename, "game_v2.sdz");
+        assert_eq!(archives[0].url, "http://x/2"); // newest copy wins
+        assert_eq!(archives[0].tag, "v2");
+        assert_eq!(archives[1].filename, "game_v1.sd7");
+        assert_eq!(archives[1].tag, "v1");
+        // camelCase for the frontend.
+        let out = serde_json::to_string(&archives[0]).unwrap();
+        assert!(out.contains("\"url\":\"http://x/2\""));
     }
 
     #[test]

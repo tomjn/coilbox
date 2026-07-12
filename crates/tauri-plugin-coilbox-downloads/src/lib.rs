@@ -696,6 +696,26 @@ async fn dl_github_latest_release(repo: String) -> CliResult {
     }
 }
 
+/// `dl_github_release_archives` — Spring content archives (`.sd7`/`.sdz`) from an
+/// `owner/name` repo's recent GitHub releases, for the curated map/game sources.
+/// Each archive is fetched directly via `dl_download_file` (no springname, so no
+/// sidecar), the same path as the hakora mirror.
+#[tauri::command]
+async fn dl_github_release_archives(repo: String) -> CliResult {
+    let repo = match sources::validate_repo(&repo) {
+        Ok(r) => r,
+        Err(e) => return CliResult::err(e),
+    };
+    let url = sources::releases_url(&repo);
+    match fetch_github(&url).await {
+        Ok(body) => match serde_json::from_str::<Vec<sources::GithubRelease>>(&body) {
+            Ok(rels) => CliResult::ok(json!({ "archives": sources::release_archives(rels) })),
+            Err(e) => CliResult::err(format!("could not parse GitHub releases: {e}")),
+        },
+        Err(e) => CliResult::err(format!("failed to fetch releases: {e}")),
+    }
+}
+
 /// Download a Recoil `.7z` release and extract it into `<write_path>/engine/<version>/`,
 /// emitting download progress then an indeterminate `extracting` phase. `cancel`
 /// (polled each chunk) and the idle read-timeout stop a stalled/cancelled fetch;
@@ -954,6 +974,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_download_file,
             dl_recoil_engines,
             dl_github_latest_release,
+            dl_github_release_archives,
             dl_download_engine_recoil,
             dl_download_engine_spring,
             dl_installed_content,

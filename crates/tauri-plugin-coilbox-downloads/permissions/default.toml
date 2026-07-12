@@ -16,6 +16,7 @@ permissions = [
   "allow-dl-download-file",
   "allow-dl-recoil-engines",
   "allow-dl-github-latest-release",
+  "allow-dl-github-release-archives",
   "allow-dl-download-engine-recoil",
   "allow-dl-download-engine-spring",
   "allow-dl-installed-content",
