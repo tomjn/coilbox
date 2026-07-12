@@ -1,6 +1,7 @@
 import type { Accent, ThemeMode } from "@picoframe/frame";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { ConquestNames } from "../conquest/names";
+import type { SuggestedMapList } from "../content/branding";
 
 /**
  * Distribution profile: a `profile.json` a bundler drops into the portable
@@ -112,6 +113,12 @@ export interface Profile {
   advanced?: boolean;
   /** GitHub repo ("owner/name") whose latest release ships this game's archive. */
   release?: { repo: string };
+  /**
+   * Curated map packs offered for bulk download on the maps download page.
+   * Same shape as the branding catalog's; a distribution can ship its own
+   * (e.g. a tournament map set) alongside — or instead of — the catalog's.
+   */
+  mapLists?: SuggestedMapList[];
   /**
    * Galactic-conquest naming: star/faction name pools and lore faction presets
    * for generated galaxies. Overrides the branding catalog's per-game defaults
@@ -262,6 +269,11 @@ export function getProfile(): Profile {
 /** Where the loaded profile came from. */
 export function getProfileSource(): ProfileSource {
   return loadedSource;
+}
+
+/** Curated map packs this profile ships (empty when it defines none). */
+export function getProfileMapLists(): SuggestedMapList[] {
+  return loaded.mapLists ?? [];
 }
 
 /**

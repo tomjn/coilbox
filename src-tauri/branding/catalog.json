@@ -37,6 +37,36 @@
         "filename": "crystallized_plains_1.1.sd7",
         "download": { "kind": "map", "springName": "Crystallized Plains" }
       }
+    ],
+    "mapLists": [
+      {
+        "id": "starter-pack",
+        "title": "Starter pack",
+        "blurb": "A handful of well-rounded maps to get a first game going.",
+        "maps": [
+          {
+            "id": "all-that-glitters",
+            "title": "All That Glitters",
+            "filename": "all_that_glitters_v2.2.3.sd7",
+            "download": {
+              "kind": "map",
+              "springName": "All That Glitters v2.2.3"
+            }
+          },
+          {
+            "id": "supreme-isthmus",
+            "title": "Supreme Isthmus v2.1",
+            "filename": "supreme_isthmus_v2.1.sd7",
+            "download": { "kind": "map", "springName": "Supreme Isthmus v2.1" }
+          },
+          {
+            "id": "crystallized-plains",
+            "title": "Crystallized Plains",
+            "filename": "crystallized_plains_1.1.sd7",
+            "download": { "kind": "map", "springName": "Crystallized Plains" }
+          }
+        ]
+      }
     ]
   },
   "entries": [

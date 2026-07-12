@@ -3,6 +3,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Download,
+  Layers,
   Loader2,
   Map as MapIcon,
   Search,
@@ -10,6 +11,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
+import { useSuggestedMapLists } from "@/content/branding";
+import { getProfileMapLists } from "@/profile/profile";
 import {
   type BarMap,
   dlBarMaps,
@@ -27,6 +30,7 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../DownloadQueueProvider";
+import { mergeMapLists, suggestedMapToInput } from "../mapLists";
 import { OptionSelect } from "./components/OptionSelect";
 import { EmptyState, errMessage } from "./components/states";
 import { HIDE_INSTALLED_KEY } from "./hideInstalled";
@@ -107,6 +111,97 @@ function springSubtitle(f: SpringFile): string {
     parts.push(`${f.metadata.width}×${f.metadata.height}`);
   if (f.size) parts.push(`${(f.size / 1_048_576).toFixed(1)} MB`);
   return parts.join(" · ");
+}
+
+/**
+ * Curated map packs (from the branding catalog and/or the distribution profile)
+ * shown above the browsable map grid. "Download all" queues every not-yet-present
+ * map in the pack through the shared download queue, which dedupes and runs them
+ * serially — so a whole pack (a tournament set, a galactic-conquest galaxy) lands
+ * with one click. Renders nothing when no packs are defined.
+ */
+function MapPacks({
+  writePath,
+  installed,
+}: {
+  writePath?: string;
+  installed: Set<string>;
+}) {
+  const { enqueue, statusFor } = useDownloadQueue();
+  const catalogLists = useSuggestedMapLists();
+  const packs = mergeMapLists(catalogLists, getProfileMapLists());
+  if (packs.length === 0) return null;
+
+  return (
+    <section className="mb-5 flex flex-col gap-2">
+      <h2 className="flex items-center gap-2 text-sm font-semibold">
+        <Layers size={15} className="text-muted-foreground" />
+        Map packs
+      </h2>
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3">
+        {packs.map((pack) => {
+          const entries = pack.maps.map((map) => ({
+            map,
+            input: suggestedMapToInput(map, writePath),
+          }));
+          const statusOf = (e: (typeof entries)[number]) =>
+            e.input ? statusFor(identityOf(e.input)) : null;
+          const present = (e: (typeof entries)[number]) =>
+            (!!e.map.filename && installed.has(e.map.filename.toLowerCase())) ||
+            statusOf(e) === "done";
+          const inFlight = (e: (typeof entries)[number]) =>
+            statusOf(e) === "queued" || statusOf(e) === "active";
+          const pending = entries.filter(
+            (e) => e.input && !present(e) && !inFlight(e),
+          );
+          const total = entries.length;
+          const doneCount = entries.filter(present).length;
+          const queueAll = () => {
+            for (const e of pending) if (e.input) enqueue(e.input);
+          };
+          return (
+            <li
+              key={pack.id}
+              className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium" title={pack.title}>
+                  {pack.title}
+                </p>
+                {pack.blurb && (
+                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                    {pack.blurb}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {doneCount} / {total} downloaded
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-auto w-full"
+                onClick={queueAll}
+                disabled={!writePath || pending.length === 0}
+                aria-label={`Download all maps in ${pack.title}`}
+              >
+                {doneCount === total ? (
+                  <CheckCircle2 className="text-emerald-500" />
+                ) : (
+                  <Download />
+                )}
+                {doneCount === total
+                  ? "All downloaded"
+                  : pending.length === 0
+                    ? "Queued"
+                    : `Download all (${pending.length})`}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }
 
 export default function MapsPage() {
@@ -379,6 +474,7 @@ export default function MapsPage() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-auto p-4">
+        <MapPacks writePath={writePath} installed={installed} />
         {loading && (
           <p className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
             <Loader2 size={15} className="animate-spin" /> loading maps…
