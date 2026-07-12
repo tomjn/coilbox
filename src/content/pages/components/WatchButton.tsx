@@ -3,6 +3,7 @@ import { Play } from "lucide-react";
 import { useState } from "react";
 import { useReplayTarget } from "../../../play/config";
 import { usePlay } from "../../../play/PlayProvider";
+import { useReplayUserState } from "../../replayUserState";
 
 /**
  * Launch the engine to watch a replay. Resolves the best-matching installed engine
@@ -19,6 +20,7 @@ export function WatchButton({
 }) {
   const { resolved } = useReplayTarget(engineVersion);
   const { running, launchReplay } = usePlay();
+  const userState = useReplayUserState();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +29,9 @@ export function WatchButton({
     setPending(true);
     setError(null);
     try {
+      // Watching a replay marks it watched (keyed by filename, as the list is).
+      const filename = replayPath.split(/[\\/]/).pop();
+      if (filename) userState.setWatched(filename, true);
       const res = await launchReplay({
         demoPath: replayPath,
         executable: resolved.target.executable,

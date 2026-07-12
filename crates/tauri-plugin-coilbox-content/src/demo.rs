@@ -18,7 +18,7 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use flate2::read::GzDecoder;
 
-use crate::model::{AllyTeamInfo, DemoInfo, PlayerInfo, ReplayFile, StartBox};
+use crate::model::{AllyTeamInfo, ChatLine, DemoChat, DemoInfo, PlayerInfo, ReplayFile, StartBox};
 
 /// Folders under a data root that hold client demos. The engine writes to
 /// `demos/` (`DemoRecorder.cpp`); some lobbies/users use `replays/`.
@@ -76,6 +76,10 @@ pub fn list_replays(root: &Path) -> Vec<ReplayFile> {
             // Cheap native decode (header + start-script only, no demotool) so the
             // list can show map/players/duration; best-effort, ignored on failure.
             let summary = decode_native(&path).ok();
+            let (skill_min, skill_avg, skill_max) = summary
+                .as_ref()
+                .map(|i| skill_stats(&i.players))
+                .unwrap_or((None, None, None));
             out.push(ReplayFile {
                 filename: name,
                 path: path.to_string_lossy().into_owned(),
@@ -94,6 +98,9 @@ pub fn list_replays(root: &Path) -> Vec<ReplayFile> {
                     .as_ref()
                     .map(|i| i.players.iter().filter(|p| !p.spectator).count() as u32),
                 start_time_ms: summary.as_ref().map(|i| i.start_time_ms),
+                skill_min,
+                skill_avg,
+                skill_max,
             });
         }
     }
@@ -491,20 +498,110 @@ fn resolve_demotool(engine_dir: &Path) -> Option<PathBuf> {
     candidate.exists().then_some(candidate)
 }
 
+/// Parse a start-script `skill` value (e.g. `[25.0]`, `(30.5)`, `[µ=25.0, σ=8.3]`)
+/// to its leading number. The various lobby encodings all lead with the rating, so
+/// the first numeric run is taken.
+fn parse_skill(s: &str) -> Option<f32> {
+    let mut num = String::new();
+    let mut started = false;
+    for c in s.chars() {
+        if c.is_ascii_digit() || c == '.' || (c == '-' && num.is_empty()) {
+            num.push(c);
+            started = true;
+        } else if started {
+            break;
+        }
+    }
+    num.parse().ok()
+}
+
+/// Min/avg/max of the non-spectator players' parsed skill, or all-`None` when none
+/// has a parseable skill.
+fn skill_stats(players: &[PlayerInfo]) -> (Option<f32>, Option<f32>, Option<f32>) {
+    let skills: Vec<f32> = players
+        .iter()
+        .filter(|p| !p.spectator)
+        .filter_map(|p| p.skill.as_deref().and_then(parse_skill))
+        .collect();
+    if skills.is_empty() {
+        return (None, None, None);
+    }
+    let min = skills.iter().copied().fold(f32::INFINITY, f32::min);
+    let max = skills.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let avg = skills.iter().sum::<f32>() / skills.len() as f32;
+    (Some(min), Some(avg), Some(max))
+}
+
+/// Extract a demo's chat log: run `demotool --dump` and parse its `CHAT`/`SYSTEMMSG`
+/// lines, resolving player numbers to names via the start-script.
+pub fn demo_chat(engine_dir: &Path, demo: &Path) -> Result<DemoChat, String> {
+    let raw = read_header_and_script(demo)?;
+    let game = find_game(&parse_tdf(&raw.script));
+    let names = player_names(&game);
+    let bin = resolve_demotool(engine_dir).ok_or("demotool not found in engine folder")?;
+    let out = run_demotool(&bin, demo, "--dump", DEMOTOOL_TIMEOUT)?;
+    Ok(DemoChat {
+        messages: parse_chat(&out, &names),
+    })
+}
+
+/// Map player number -> name from the start-script's `[playerN]` sections.
+fn player_names(game: &Section) -> HashMap<u32, String> {
+    let mut out = HashMap::new();
+    for (name, sec) in &game.children {
+        if let Some(num) = name
+            .strip_prefix("player")
+            .and_then(|n| n.parse::<u32>().ok())
+        {
+            if let Some(pname) = sec.get("name") {
+                out.insert(num, pname.to_string());
+            }
+        }
+    }
+    out
+}
+
+/// Parse demotool `--dump` output for chat + system lines. Each is one line:
+/// `CHAT: Player: N Msg: <text>` / `SYSTEMMSG: Player: N Msg: <text>`.
+fn parse_chat(out: &str, names: &HashMap<u32, String>) -> Vec<ChatLine> {
+    let mut msgs = Vec::new();
+    for line in out.lines() {
+        let (system, rest) = if let Some(r) = line.strip_prefix("CHAT: Player: ") {
+            (false, r)
+        } else if let Some(r) = line.strip_prefix("SYSTEMMSG: Player: ") {
+            (true, r)
+        } else {
+            continue;
+        };
+        let Some((num_str, text)) = rest.split_once(" Msg: ") else {
+            continue;
+        };
+        let player = num_str.trim().parse::<u32>().ok();
+        let player_name = player.and_then(|n| names.get(&n).cloned());
+        msgs.push(ChatLine {
+            player,
+            player_name,
+            text: text.to_string(),
+            system,
+        });
+    }
+    msgs
+}
+
 /// Run `demotool --teamstats <demo>` and parse its trailing `Winning Allyteams:`
 /// line. Returns `None` when demotool is absent or fails — the caller treats
 /// that as "winner unknown" rather than an error (everything else is native).
 fn demotool_winners(engine_dir: &Path, demo: &Path) -> Option<Vec<u32>> {
     let bin = resolve_demotool(engine_dir)?;
-    let out = run_demotool(&bin, demo, DEMOTOOL_TIMEOUT).ok()?;
+    let out = run_demotool(&bin, demo, "--teamstats", DEMOTOOL_TIMEOUT).ok()?;
     parse_winners(&out)
 }
 
-/// Spawn demotool with a bounded timeout (kills the child on overrun), modeled on
-/// `engine::read_version`. Returns captured stdout.
-fn run_demotool(bin: &Path, demo: &Path, timeout: Duration) -> Result<String, String> {
+/// Spawn demotool with `flag` and a bounded timeout (kills the child on overrun),
+/// modeled on `engine::read_version`. Returns captured stdout.
+fn run_demotool(bin: &Path, demo: &Path, flag: &str, timeout: Duration) -> Result<String, String> {
     let mut cmd = Command::new(bin);
-    cmd.arg("--teamstats")
+    cmd.arg(flag)
         .arg(demo)
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
@@ -742,5 +839,55 @@ mod tests {
         assert_eq!(list.len(), 2);
         assert!(list.iter().any(|r| r.filename == "a.sdfz"));
         assert!(list.iter().any(|r| r.filename == "b.sdf"));
+    }
+
+    #[test]
+    fn parse_skill_reads_leading_number() {
+        assert_eq!(parse_skill("[25.0]"), Some(25.0));
+        assert_eq!(parse_skill("(30.5)"), Some(30.5));
+        assert_eq!(parse_skill("[µ=12.3, σ=8.3]"), Some(12.3));
+        assert_eq!(parse_skill(""), None);
+        assert_eq!(parse_skill("n/a"), None);
+    }
+
+    #[test]
+    fn skill_stats_over_nonspectators() {
+        let game = find_game(&parse_tdf(SCRIPT));
+        let info = build_demo_info(
+            RawDemo {
+                engine_version: String::new(),
+                game_id: String::new(),
+                unix_time: 0,
+                game_time: 0,
+                wallclock: 0,
+                script: SCRIPT.to_string(),
+            },
+            &game,
+            None,
+        );
+        // Only Alice has a skill ([25.0]); Bob has none, Specs is a spectator.
+        let (min, avg, max) = skill_stats(&info.players);
+        assert_eq!(min, Some(25.0));
+        assert_eq!(avg, Some(25.0));
+        assert_eq!(max, Some(25.0));
+    }
+
+    #[test]
+    fn parse_chat_reads_chat_and_system_lines() {
+        let mut names = HashMap::new();
+        names.insert(0u32, "Alice".to_string());
+        let out = "HEADER\n\
+            CHAT: Player: 0 Msg: gg wp\n\
+            SYSTEMMSG: Player: 1 Msg: Bob paused\n\
+            KEYFRAME: 1\n\
+            CHAT: Player: 9 Msg: unknown speaker\n";
+        let msgs = parse_chat(out, &names);
+        assert_eq!(msgs.len(), 3);
+        assert_eq!(msgs[0].player, Some(0));
+        assert_eq!(msgs[0].player_name.as_deref(), Some("Alice"));
+        assert_eq!(msgs[0].text, "gg wp");
+        assert!(!msgs[0].system);
+        assert!(msgs[1].system);
+        assert_eq!(msgs[2].player_name, None);
     }
 }

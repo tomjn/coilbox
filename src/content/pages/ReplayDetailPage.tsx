@@ -1,6 +1,15 @@
-import { Button } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
-import { ArrowLeft, Download, ImageOff, Loader2, Trophy } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  Eye,
+  ImageOff,
+  Loader2,
+  MessageSquare,
+  Trophy,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +30,7 @@ import type {
   ReplayPlayer,
   StartBox,
 } from "../bindings";
+import { type ChatLine, contentDemoChat } from "../bindings";
 import {
   invalidateMapPreview,
   useDemoInfo,
@@ -30,6 +40,7 @@ import {
   useUnitsyncMapSkybox,
   useUnitsyncMinimap,
 } from "../config";
+import { useReplayUserState } from "../replayUserState";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
 import { WatchButton } from "./components/WatchButton";
 
@@ -400,6 +411,150 @@ function GameDownload({ gameType }: { gameType: string }) {
   );
 }
 
+/** Watched flag + free-form tags for this replay (persisted locally by filename). */
+function ReplayNotes({ filename }: { filename: string }) {
+  const userState = useReplayUserState();
+  const us = userState.get(filename);
+  const tags = us.tags ?? [];
+  const [draft, setDraft] = useState("");
+
+  const addTag = () => {
+    const t = draft.trim();
+    if (!t || tags.includes(t)) {
+      setDraft("");
+      return;
+    }
+    userState.setTags(filename, [...tags, t]);
+    setDraft("");
+  };
+  const removeTag = (t: string) =>
+    userState.setTags(
+      filename,
+      tags.filter((x) => x !== t),
+    );
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-medium">Your notes</h2>
+      <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
+        <Button
+          variant={us.watched ? "default" : "outline"}
+          size="sm"
+          onClick={() => userState.setWatched(filename, !us.watched)}
+          aria-pressed={!!us.watched}
+          className="w-fit gap-1.5"
+        >
+          <Eye className="size-4" /> {us.watched ? "Watched" : "Mark watched"}
+        </Button>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {tags.map((t) => (
+            <span
+              key={t}
+              className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+            >
+              {t}
+              <button
+                type="button"
+                onClick={() => removeTag(t)}
+                aria-label={`Remove tag ${t}`}
+                className="hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
+          <Input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addTag();
+            }}
+            onBlur={addTag}
+            placeholder="Add tag…"
+            className="h-7 w-28"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** The replay's in-demo chat log, loaded on demand (runs `demotool --dump`). */
+function ReplayChat({
+  enginePath,
+  replayPath,
+}: {
+  enginePath: string;
+  replayPath: string;
+}) {
+  const [messages, setMessages] = useState<ChatLine[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await contentDemoChat({ enginePath, replayPath });
+      setMessages(res.messages);
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-medium">Chat log</h2>
+      {messages === null ? (
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={load}
+            disabled={loading}
+            className="gap-1.5"
+          >
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <MessageSquare className="size-4" />
+            )}
+            {loading ? "Reading chat…" : "Show chat log"}
+          </Button>
+          {error && <ErrorBanner message={error} />}
+        </div>
+      ) : messages.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No chat was recorded in this replay.
+        </p>
+      ) : (
+        <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto rounded-lg border border-border/50 bg-card p-3 text-sm">
+          {messages.map((m, i) => {
+            const key = `${i}-${m.text}`;
+            return (
+              <li key={key} className="break-words">
+                <span
+                  className={`mr-1.5 font-semibold ${m.system ? "text-muted-foreground" : ""}`}
+                >
+                  {m.system
+                    ? "*"
+                    : (m.playerName ??
+                      (m.player != null ? `Player ${m.player}` : "?"))}
+                </span>
+                <span className={m.system ? "text-muted-foreground" : ""}>
+                  {m.text}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 /** One replay: decoded metadata, players, and a preview of the map it was on. */
 export default function ReplayDetailPage() {
   const { name } = useParams();
@@ -484,6 +639,15 @@ export default function ReplayDetailPage() {
           </section>
 
           <Players info={info} />
+
+          <ReplayNotes filename={filename} />
+
+          {selected && replay && (
+            <ReplayChat
+              enginePath={selected.enginePath}
+              replayPath={replay.path}
+            />
+          )}
 
           <section className="flex flex-col gap-2">
             <h2 className="text-sm font-medium">Map · {info.mapName}</h2>

@@ -17,6 +17,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-open-path`
 - `allow-content-list-replays`
 - `allow-content-demo-info`
+- `allow-content-demo-chat`
 - `allow-content-list-saves`
 - `allow-content-delete-save`
 - `allow-content-config-profiles`
@@ -291,6 +292,32 @@ Enables the content_delete_save command without any pre-configured scope.
 <td>
 
 Denies the content_delete_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-demo-chat`
+
+</td>
+<td>
+
+Enables the content_demo_chat command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-demo-chat`
+
+</td>
+<td>
+
+Denies the content_demo_chat command without any pre-configured scope.
 
 </td>
 </tr>

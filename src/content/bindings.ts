@@ -171,6 +171,10 @@ export interface ReplayFile {
   /** Non-spectator player count. */
   playerCount?: number;
   startTimeMs?: number;
+  /** Min/avg/max non-spectator player skill (from the start-script), when present. */
+  skillMin?: number;
+  skillAvg?: number;
+  skillMax?: number;
 }
 
 /** One player/spectator from a demo, with side + ally-team resolved from their team. */
@@ -241,6 +245,26 @@ export const contentDemoInfo = defineCommand<
   { enginePath: string; replayPath: string },
   { info: DemoInfo }
 >("coilbox-content", "content_demo_info");
+
+/** One chat/system line from a replay's network stream. */
+export interface ChatLine {
+  /** The speaking player's number, when the line names one. */
+  player?: number;
+  /** Player name resolved from the start-script, when known. */
+  playerName?: string;
+  text: string;
+  /** True for engine system messages (vs a player chat line). */
+  system: boolean;
+}
+
+/**
+ * Extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG` lines) via
+ * `demotool --dump`. Read on demand — it walks the whole demo stream.
+ */
+export const contentDemoChat = defineCommand<
+  { enginePath: string; replayPath: string },
+  { messages: ChatLine[] }
+>("coilbox-content", "content_demo_chat");
 
 /* -------------------------------------------------------------------------- *
  * Savegames — singleplayer saves in a root's `Saves/` folder. Listing is cheap fs

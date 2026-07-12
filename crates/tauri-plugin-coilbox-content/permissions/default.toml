@@ -16,6 +16,7 @@ permissions = [
   "allow-content-open-path",
   "allow-content-list-replays",
   "allow-content-demo-info",
+  "allow-content-demo-chat",
   "allow-content-list-saves",
   "allow-content-delete-save",
   "allow-content-config-profiles",
