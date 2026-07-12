@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: Coilbox
-  text: Desktop tooling for Recoil & Beyond All Reason
+  text: Desktop tooling for Recoil RTS & Spring RTS games
   tagline: Browse and download games, maps and engines, host and join battles, run campaigns and galactic conquest — in one Tauri desktop app.
   image:
     src: /app-icon.png
@@ -30,11 +30,41 @@ features:
 
 ## Screenshots
 
-> Placeholder captures — a curated set is on the way.
+Click any shot to enlarge.
 
-![Coilbox lobby](/screenshots/lobby.png)
+<div class="screenshot-gallery">
+  <figure>
+    <label for="lb-lobby"><img src="/screenshots/lobby.png" alt="Coilbox lobby and battle rooms"></label>
+    <figcaption>Lobby &amp; battle rooms</figcaption>
+  </figure>
+  <figure>
+    <label for="lb-content"><img src="/screenshots/content.png" alt="Coilbox content browser"></label>
+    <figcaption>Content browser</figcaption>
+  </figure>
+  <figure>
+    <label for="lb-branding"><img src="/screenshots/game-branding.png" alt="A branded game detail view with a unit build tree"></label>
+    <figcaption>Branded game detail &amp; build tree</figcaption>
+  </figure>
+  <figure>
+    <label for="lb-mission"><img src="/screenshots/mission-briefing.png" alt="A campaign mission briefing screen"></label>
+    <figcaption>Campaign mission briefing</figcaption>
+  </figure>
+  <figure>
+    <label for="lb-conquest"><img src="/screenshots/conquest-starfield.png" alt="The galactic conquest strategic starfield map"></label>
+    <figcaption>Galactic conquest map</figcaption>
+  </figure>
+</div>
 
-![Coilbox content](/screenshots/content.png)
+<input type="checkbox" id="lb-lobby" class="lb-toggle" aria-hidden="true">
+<label class="lb-overlay" for="lb-lobby"><img src="/screenshots/lobby.png" alt="Coilbox lobby and battle rooms, enlarged"></label>
+<input type="checkbox" id="lb-content" class="lb-toggle" aria-hidden="true">
+<label class="lb-overlay" for="lb-content"><img src="/screenshots/content.png" alt="Coilbox content browser, enlarged"></label>
+<input type="checkbox" id="lb-branding" class="lb-toggle" aria-hidden="true">
+<label class="lb-overlay" for="lb-branding"><img src="/screenshots/game-branding.png" alt="A branded game detail view with a unit build tree, enlarged"></label>
+<input type="checkbox" id="lb-mission" class="lb-toggle" aria-hidden="true">
+<label class="lb-overlay" for="lb-mission"><img src="/screenshots/mission-briefing.png" alt="A campaign mission briefing screen, enlarged"></label>
+<input type="checkbox" id="lb-conquest" class="lb-toggle" aria-hidden="true">
+<label class="lb-overlay" for="lb-conquest"><img src="/screenshots/conquest-starfield.png" alt="The galactic conquest strategic starfield map, enlarged"></label>
 
 ## Install
 

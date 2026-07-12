@@ -1,0 +1,72 @@
+/* Homepage screenshot gallery: responsive thumbnail grid. */
+.screenshot-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.screenshot-gallery figure {
+  margin: 0;
+}
+
+.screenshot-gallery label {
+  display: block;
+  cursor: zoom-in;
+}
+
+.screenshot-gallery img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--vp-c-divider);
+  transition: border-color 0.2s ease;
+}
+
+.screenshot-gallery label:hover img {
+  border-color: var(--vp-c-brand-1);
+}
+
+.screenshot-gallery figcaption {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--vp-c-text-2);
+}
+
+/*
+ * Dependency-free lightbox via the CSS checkbox toggle: a visually hidden
+ * checkbox (toggled by clicking a thumbnail's <label for>) reveals the adjacent
+ * full-screen overlay. Clicking the overlay (itself a <label for>) unchecks it.
+ * No JS, and no :target/hash so it doesn't fight VitePress's SPA router.
+ */
+.lb-toggle {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(0, 0, 0, 0.85);
+  cursor: zoom-out;
+}
+
+.lb-toggle:checked + .lb-overlay {
+  display: flex;
+}
+
+.lb-overlay img {
+  max-width: min(1200px, 95vw);
+  max-height: 90vh;
+  border-radius: 8px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
