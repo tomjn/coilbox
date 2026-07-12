@@ -23,6 +23,7 @@ import {
   mpKick,
   mpLeaveBattle,
   mpRemoveBot,
+  mpRemoveScriptTags,
   mpRemoveStartRect,
   mpSayBattle,
   mpSetBattleStatus,
@@ -42,6 +43,7 @@ import {
   startPosTypeOf,
   usedColorsFromBattle,
 } from "./config";
+import { diffRestrictTags } from "./restrictTags";
 
 /** Format a rejected command for the action-error banner (matches useBattleLaunch). */
 const mpErr = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -82,6 +84,13 @@ export interface BattleRoomView {
   canEditOptions: boolean;
   /** Dispatch one option edit: founder → SETSCRIPTTAGS, autohost → `!bSet`. */
   sendOption: (tagKey: string, spadsName: string, value: string) => void;
+  /**
+   * Whether the local user may edit unit restrictions: only the actual battle
+   * founder (we own the `game/restrict/*` script tags — there's no autohost path).
+   */
+  canEditRestrictions: boolean;
+  /** Set the full disabled-unit set as engine-native `game/restrict/*` script tags. */
+  setRestrictions: (disabled: string[]) => void;
   /**
    * Whether the local user may draw/clear start boxes: they can edit options AND
    * the battle is in "choose in-game" mode (startPosType 2) — SPADS rejects box
@@ -516,6 +525,31 @@ export function useBattleRoom(): BattleRoomView {
     [activeKey, isFounder, autohostSend, setErr, clearErr],
   );
 
+  // Apply a unit-restriction change (founder only). The engine-native
+  // `game/restrict/*` tags are host-authoritative script tags we own directly, so
+  // unlike mod options there's no autohost `!bSet` fork — only the actual founder
+  // can set them. We diff the desired disabled set against the current restrict
+  // tags: write added/changed keys and remove now-unused (reindexed) ones.
+  const setRestrictions = useCallback(
+    (disabled: string[]) => {
+      if (!activeKey || !isFounder || !battle) return;
+      const { set, remove } = diffRestrictTags(disabled, battle.scriptTags);
+      if (Object.keys(set).length > 0) {
+        mpSetScriptTags({ serverKey: activeKey, tags: set }).then(
+          clearErr,
+          setErr,
+        );
+      }
+      if (remove.length > 0) {
+        mpRemoveScriptTags({ serverKey: activeKey, tags: remove }).then(
+          clearErr,
+          setErr,
+        );
+      }
+    },
+    [activeKey, isFounder, battle, clearErr, setErr],
+  );
+
   // Start-box edits follow the same founder/autohost fork as options. Founder
   // drives the rects over the protocol (ADDSTARTRECT/REMOVESTARTRECT); an autohost
   // battle goes through SPADS `!addbox`/`!clearbox`, whose teamNb is 1-based (so we
@@ -582,6 +616,8 @@ export function useBattleRoom(): BattleRoomView {
     mapOptionsSchema,
     canEditOptions,
     sendOption,
+    canEditRestrictions: isFounder,
+    setRestrictions,
     canEditBoxes: canEditOptions && startPosType === 2,
     setStartBox,
     clearStartBox,
