@@ -1,11 +1,15 @@
+import { Button } from "@picoframe/frame";
+import { Eye, Tag } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { formatBytes } from "../../downloads/pages/components/ProgressBar";
+import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import {
   useReplays,
   useScanTargetSelection,
   useUnitsyncThumbnails,
 } from "../config";
+import { useReplayUserState } from "../replayUserState";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
 import { MapThumb } from "./components/MapThumb";
@@ -41,6 +45,9 @@ function playedAt(ms: number): string {
 const dateOf = (r: { startTimeMs?: number; modifiedMs: number }) =>
   r.startTimeMs || r.modifiedMs;
 
+/** A skill value for a column, rounded to one decimal (or `—`). */
+const fmtSkill = (v?: number) => (v == null ? "—" : v.toFixed(1));
+
 /** Seconds → `mm:ss` (or `h:mm:ss`). */
 function formatDuration(sec: number): string {
   const h = Math.floor(sec / 3600);
@@ -70,12 +77,27 @@ export default function ReplaysPage() {
 
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("date-desc");
+  const [watchedOnly, setWatchedOnly] = useState(false);
+  const [tagFilter, setTagFilter] = useState("");
+  const userState = useReplayUserState();
+  const tagOptions = useMemo(
+    () => [
+      { value: "", label: "All tags" },
+      ...userState.allTags().map((t) => ({ value: t, label: t })),
+    ],
+    [userState],
+  );
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return replays;
-    return replays.filter((r) => r.filename.toLowerCase().includes(q));
-  }, [replays, filter]);
+    return replays.filter((r) => {
+      if (q && !r.filename.toLowerCase().includes(q)) return false;
+      const us = userState.get(r.filename);
+      if (watchedOnly && !us.watched) return false;
+      if (tagFilter && !(us.tags ?? []).includes(tagFilter)) return false;
+      return true;
+    });
+  }, [replays, filter, watchedOnly, tagFilter, userState]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -121,18 +143,43 @@ export default function ReplaysPage() {
       />
 
       {!busy && replays.length > 0 && (
-        <FilterBar
-          search={filter}
-          onSearch={setFilter}
-          searchPlaceholder="Filter replays…"
-          searchLabel="Filter replays"
-          sort={sort}
-          onSort={(v) => setSort(v as SortKey)}
-          sortOptions={SORT_OPTIONS}
-          total={replays.length}
-          shown={sorted.length}
-          noun="replays"
-        />
+        <>
+          <FilterBar
+            search={filter}
+            onSearch={setFilter}
+            searchPlaceholder="Filter replays…"
+            searchLabel="Filter replays"
+            sort={sort}
+            onSort={(v) => setSort(v as SortKey)}
+            sortOptions={SORT_OPTIONS}
+            total={replays.length}
+            shown={sorted.length}
+            noun="replays"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant={watchedOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => setWatchedOnly((v) => !v)}
+              aria-pressed={watchedOnly}
+              className="gap-1.5"
+            >
+              <Eye className="size-4" /> Watched
+            </Button>
+            {tagOptions.length > 1 && (
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Tag className="size-4" />
+                <OptionSelect
+                  value={tagFilter}
+                  onValueChange={setTagFilter}
+                  options={tagOptions}
+                  size="sm"
+                  className="w-40"
+                />
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {error && <ErrorBanner message={error} />}
@@ -155,14 +202,16 @@ export default function ReplaysPage() {
                 : null,
               formatBytes(r.sizeBytes),
             ].filter(Boolean);
+            const us = userState.get(r.filename);
+            const hasSkill = r.skillAvg != null;
             return (
               <li
                 key={r.path}
-                className="overflow-hidden rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40"
+                className="flex items-stretch overflow-hidden rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40"
               >
                 <Link
                   to={`/content/replays/${encodeURIComponent(r.filename)}`}
-                  className="flex items-stretch gap-3 p-2"
+                  className="flex min-w-0 flex-1 items-stretch gap-3 p-2"
                 >
                   <div className="size-16 shrink-0 overflow-hidden rounded-md">
                     <MapThumb
@@ -188,8 +237,51 @@ export default function ReplaysPage() {
                         {r.gameType}
                       </span>
                     )}
+                    {(us.tags?.length ?? 0) > 0 && (
+                      <div className="mt-0.5 flex flex-wrap gap-1">
+                        {us.tags?.map((t) => (
+                          <span
+                            key={t}
+                            className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </Link>
+                {/* Skill columns + watched toggle live outside the Link so they
+                    stay their own controls. */}
+                <div className="flex shrink-0 items-center gap-3 border-l border-border/40 px-3">
+                  {hasSkill && (
+                    <div
+                      className="text-right text-xs text-muted-foreground"
+                      title="Skill min / avg / max"
+                    >
+                      <div className="font-mono text-sm text-foreground">
+                        {fmtSkill(r.skillAvg)}
+                      </div>
+                      <div className="font-mono">
+                        {fmtSkill(r.skillMin)}–{fmtSkill(r.skillMax)}
+                      </div>
+                    </div>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      userState.setWatched(r.filename, !us.watched)
+                    }
+                    aria-pressed={!!us.watched}
+                    aria-label={us.watched ? "Mark unwatched" : "Mark watched"}
+                    title={us.watched ? "Watched" : "Mark watched"}
+                  >
+                    <Eye
+                      className={`size-4 ${us.watched ? "text-primary" : "text-muted-foreground/50"}`}
+                    />
+                  </Button>
+                </div>
               </li>
             );
           })}
