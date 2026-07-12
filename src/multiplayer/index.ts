@@ -2,7 +2,6 @@ import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   AtSign,
   Gamepad2,
-  History,
   LogIn,
   MessagesSquare,
   Swords,
@@ -62,15 +61,6 @@ const multiplayerPlugin: FramePlugin = {
           end: true,
           order: 2,
           icon: Swords,
-          useVisible: useMpRevealed,
-        },
-        {
-          id: "multiplayer.chatlogs",
-          label: "Chat logs",
-          to: "/chatlogs",
-          end: true,
-          order: 4,
-          icon: History,
           useVisible: useMpRevealed,
         },
         {

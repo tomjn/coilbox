@@ -1,4 +1,4 @@
-import { Button } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { mpJoinChannel, mpListChannels } from "../bindings";
@@ -21,6 +21,7 @@ export function ChannelBrowser({
 }) {
   const { mirror, activeKey, rememberChannel } = useMultiplayer();
   const [loading, setLoading] = useState(false);
+  const [newName, setNewName] = useState("");
   const directory = mirror.state?.channelDirectory ?? [];
   // The server's `ENDOFCHANNELS` bumps this counter. We record its value when a
   // request goes out and end loading once it advances past that — the honest
@@ -64,6 +65,16 @@ export function ChannelBrowser({
     }
   }
 
+  // Join a channel typed by name. TASServer creates the channel on JOIN if it
+  // doesn't exist, so this doubles as "create". The leading `#` some users type
+  // isn't part of the wire name, so strip it.
+  function joinTyped() {
+    const name = newName.trim().replace(/^#+/, "");
+    if (!name) return;
+    setNewName("");
+    void join(name);
+  }
+
   return (
     <>
       {open && (
@@ -96,6 +107,28 @@ export function ChannelBrowser({
             </Button>
           </div>
         </header>
+        <form
+          className="flex gap-1 border-b border-border px-3 py-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            joinTyped();
+          }}
+        >
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Join or create a channel…"
+            aria-label="Channel name to join or create"
+            className="h-7"
+          />
+          <Button
+            type="submit"
+            className="h-7 px-2"
+            disabled={newName.trim() === ""}
+          >
+            Join
+          </Button>
+        </form>
         <ul className="flex flex-col gap-1 overflow-auto p-3">
           {loading && directory.length === 0 && (
             <li className="text-sm text-muted-foreground">Loading channels…</li>
