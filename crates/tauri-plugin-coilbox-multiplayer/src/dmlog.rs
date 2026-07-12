@@ -37,6 +37,24 @@ pub fn sanitize_key(server_key: &str) -> String {
         .collect()
 }
 
+/// The log file stems (already-sanitized server keys) present in `dir`. The stem
+/// is a valid `server_key` for [`DmLog::new`] (sanitizing it again is a no-op), so
+/// the viewer can reopen a log without knowing the original `user@host:port`.
+pub fn account_stems(dir: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Ok(rd) = fs::read_dir(dir) {
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
+                    out.push(stem.to_string());
+                }
+            }
+        }
+    }
+    out
+}
+
 impl DmLog {
     /// A log at `<dir>/<sanitized key>.jsonl`. Does not touch disk yet.
     pub fn new(dir: &Path, server_key: &str) -> Self {
@@ -60,6 +78,23 @@ impl DmLog {
             }
         }
         out
+    }
+
+    /// Per-thread summary: `(thread key, message count, latest timestamp)`, so the
+    /// log viewer can list conversations without shipping every message.
+    pub fn summaries(&self) -> Vec<(String, u32, u64)> {
+        self.load()
+            .into_iter()
+            .map(|(k, v)| {
+                let last = v.iter().map(|m| m.at).max().unwrap_or(0);
+                (k, v.len() as u32, last)
+            })
+            .collect()
+    }
+
+    /// One thread's messages in order (empty if the thread/file is absent).
+    pub fn thread(&self, name: &str) -> Vec<ChatMsg> {
+        self.load().remove(name).unwrap_or_default()
     }
 
     /// Append one message to `peer`'s thread. Best-effort; logs on failure.

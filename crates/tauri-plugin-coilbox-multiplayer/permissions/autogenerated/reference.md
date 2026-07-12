@@ -51,6 +51,8 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-remove-script-tags`
 - `allow-mp-build-battle-config`
 - `allow-mp-build-host-config`
+- `allow-mp-chat-logs`
+- `allow-mp-chat-log-open`
 
 ## Permission Table
 
@@ -187,6 +189,58 @@ Enables the mp_build_host_config command without any pre-configured scope.
 <td>
 
 Denies the mp_build_host_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-chat-log-open`
+
+</td>
+<td>
+
+Enables the mp_chat_log_open command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-chat-log-open`
+
+</td>
+<td>
+
+Denies the mp_chat_log_open command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-chat-logs`
+
+</td>
+<td>
+
+Enables the mp_chat_logs command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-chat-logs`
+
+</td>
+<td>
+
+Denies the mp_chat_logs command without any pre-configured scope.
 
 </td>
 </tr>

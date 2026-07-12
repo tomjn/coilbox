@@ -303,6 +303,34 @@ export const mpSnapshot = defineCommand<
   { state: LobbyState }
 >("coilbox-multiplayer", "mp_snapshot");
 
+/** A DM peer or channel thread in a saved chat log. `name` is the peer/channel. */
+export interface ChatLogThread {
+  kind: "dm" | "channel";
+  name: string;
+  messageCount: number;
+  /** Latest message time, epoch-millis. */
+  lastAt: number;
+}
+
+/** One account's saved chat logs. `account` is the (sanitized) log-file key. */
+export interface ChatLogAccount {
+  account: string;
+  threads: ChatLogThread[];
+}
+
+/** List every saved chat log (DM + channel threads) across accounts. Reads disk,
+ * so it works with no active connection. */
+export const mpChatLogs = defineCommand<
+  Record<string, never>,
+  { accounts: ChatLogAccount[] }
+>("coilbox-multiplayer", "mp_chat_logs");
+
+/** Load one saved thread's messages (a DM peer or a channel). */
+export const mpChatLogOpen = defineCommand<
+  { account: string; kind: "dm" | "channel"; name: string },
+  { messages: ChatMsg[] }
+>("coilbox-multiplayer", "mp_chat_log_open");
+
 /** Raw escape hatch: send an arbitrary wire line. */
 export const mpSend = defineCommand<
   { serverKey: string; line: string },

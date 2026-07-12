@@ -114,6 +114,7 @@ pub fn spawn_connection(
     login_cfg: LoginConfig,
     on_event: Channel<LobbyEvent>,
     dm_log: DmLog,
+    chan_log: DmLog,
 ) {
     let (tx, rx) = mpsc::unbounded_channel::<Outbound>();
     let mut initial = LobbyState::new();
@@ -134,6 +135,7 @@ pub fn spawn_connection(
         rx,
         state.clone(),
         dm_log,
+        chan_log,
     ));
 
     // Register after spawning. The task's first action is a network read (the
@@ -166,6 +168,7 @@ async fn run_loop(
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
     dm_log: DmLog,
+    chan_log: DmLog,
 ) {
     emit(&sink, LobbyEvent::Connected);
 
@@ -253,6 +256,23 @@ async fn run_loop(
                                 .cloned();
                             if let Some(m) = last {
                                 dm_log.append(from, &m);
+                            }
+                        }
+                        // Named-channel chat: log to the channel store (the server
+                        // echoes our own SAID too, so this covers both directions).
+                        // A `None` channel is transient battle chat — not logged.
+                        if let Delta::ChatMessage {
+                            channel: Some(ch),
+                            index,
+                        } = &delta
+                        {
+                            let m = lock_or_recover(&state)
+                                .channels
+                                .get(ch)
+                                .and_then(|c| c.messages.get(*index))
+                                .cloned();
+                            if let Some(m) = m {
+                                chan_log.append(ch, &m);
                             }
                         }
                         emit(&sink, LobbyEvent::Delta { delta });

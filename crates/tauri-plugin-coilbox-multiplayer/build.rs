@@ -50,6 +50,8 @@ const COMMANDS: &[&str] = &[
     "mp_remove_script_tags",
     "mp_build_battle_config",
     "mp_build_host_config",
+    "mp_chat_logs",
+    "mp_chat_log_open",
 ];
 
 fn main() {
