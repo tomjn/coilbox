@@ -1,17 +1,22 @@
 import { cn } from "@picoframe/frame";
-import { ChevronUp } from "lucide-react";
+import { ChevronUp, Globe } from "lucide-react";
 
 /**
  * Small per-user adornments for the lobby user list and battle roster: a country
- * flag (from ADDUSER) and a rank insignia (from ClientStatus). Both render nothing
- * when the data is absent/placeholder, so bots and not-yet-known users just show
- * their name — callers can drop them in unconditionally.
+ * flag (from ADDUSER) and a rank insignia (from ClientStatus). `CountryFlag` always
+ * renders (a neutral placeholder when the country is unknown) so names in a list
+ * stay aligned; `RankBadge` renders nothing for rank 0.
  */
 
+/** Shared flag-slot dimensions (a mini rectangle, sized independent of surrounding
+ * text) and rounded frame, used by both the real flag and the placeholder. */
+const FLAG_SIZE = { width: 18, height: 13 } as const;
+const FLAG_FRAME = "shrink-0 rounded-md ring-1 ring-inset ring-foreground/15";
+
 /**
- * A country flag from an ISO 3166-1 alpha-2 code (the wire form, e.g. `GB`).
- * Returns null for the server's `??` placeholder, empty strings, and any value
- * that isn't two letters, so we never leave an empty flag box.
+ * A country flag from an ISO 3166-1 alpha-2 code (the wire form, e.g. `GB`). For the
+ * server's `??` placeholder, empty strings, or anything that isn't two letters, a
+ * neutral globe placeholder is shown instead of an empty gap.
  */
 export function CountryFlag({
   country,
@@ -21,18 +26,28 @@ export function CountryFlag({
   className?: string;
 }) {
   const code = country.trim().toLowerCase();
-  if (!/^[a-z]{2}$/.test(code)) return null;
+  if (!/^[a-z]{2}$/.test(code)) {
+    return (
+      <span
+        className={cn(
+          FLAG_FRAME,
+          "inline-flex items-center justify-center bg-muted text-muted-foreground",
+          className,
+        )}
+        style={FLAG_SIZE}
+        role="img"
+        aria-label="Country: unknown"
+        title="Unknown"
+      >
+        <Globe className="size-2.5" />
+      </span>
+    );
+  }
   const label = code.toUpperCase();
   return (
     <span
-      className={cn(
-        `fi fi-${code}`,
-        "shrink-0 rounded-[2px] ring-1 ring-inset ring-foreground/15",
-        className,
-      )}
-      // flag-icons keys size off font-size; pin it so the flag stays a mini
-      // rectangle regardless of the surrounding text size.
-      style={{ width: 18, height: 13 }}
+      className={cn(`fi fi-${code}`, FLAG_FRAME, className)}
+      style={FLAG_SIZE}
       role="img"
       aria-label={`Country: ${label}`}
       title={label}
