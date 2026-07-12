@@ -6,7 +6,11 @@ import { mpLeaveBattle, mpLeaveChannel } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
 import { ChatPane } from "../chat/ChatPane";
 import { ConversationSidebar } from "../chat/ConversationSidebar";
-import { type ConversationDescriptor, convId } from "../chat/conversation";
+import {
+  type ConversationDescriptor,
+  convId,
+  isBattleChannel,
+} from "../chat/conversation";
 import { MemberList } from "../chat/MemberList";
 import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
@@ -71,6 +75,22 @@ function ChatPage() {
   useEffect(() => {
     if (active) markSeen(convId(active), conv.messages.length);
   }, [active, conv.messages.length, markSeen]);
+
+  // Open on the first joined channel when nothing is selected (initial entry, and
+  // once autojoined channels arrive after connect). Battle chat is excluded — it's
+  // contextual, not a standing channel. Depends on the first name (a primitive) so
+  // it re-fires only when that value changes, not on every render.
+  const firstChannel =
+    (state
+      ? Object.keys(state.channels)
+          .filter((n) => !isBattleChannel(n))
+          .sort()[0]
+      : undefined) ?? null;
+  useEffect(() => {
+    if (active == null && firstChannel) {
+      setActive({ kind: "channel", name: firstChannel });
+    }
+  }, [active, firstChannel]);
 
   // Leave a channel: stop the server membership, forget it (no auto-rejoin), and
   // deselect it if it was the open conversation.

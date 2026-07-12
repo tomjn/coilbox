@@ -16,6 +16,7 @@ import {
   useLobbyAccounts,
 } from "../config";
 import { RegisterForm } from "../RegisterForm";
+import { AutojoinChannels } from "./components/AutojoinChannels";
 import { CheckField, Field } from "./components/Field";
 import { OptionSelect } from "./components/OptionSelect";
 
@@ -302,6 +303,9 @@ function AccountRow({
           placeholder={saved ? "•••••••• (saved)" : ""}
         />
       </Field>
+      {server && a.username.trim() !== "" && (
+        <AutojoinChannels serverKey={serverKeyFor(server, a.username)} />
+      )}
     </li>
   );
 }
