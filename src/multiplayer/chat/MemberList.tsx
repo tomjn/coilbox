@@ -1,16 +1,20 @@
-import { cn } from "@picoframe/frame";
+import { Button, cn } from "@picoframe/frame";
+import { UserCheck, UserX } from "lucide-react";
 import type { User } from "../bindings";
 import { PRESENCE_META, type Presence } from "./presence";
 
 /**
  * A reusable member panel: the users in the active conversation, with a coarse
- * status hint. Clicking a member (when `onSelect` is given) starts a DM.
+ * status hint. Clicking a member (when `onSelect` is given) starts a DM; a trailing
+ * ignore toggle (when `onToggleIgnore` is given) hides/shows that user's messages.
  */
 export function MemberList({
   members,
   onSelect,
   colorFor,
   presenceFor,
+  isIgnored,
+  onToggleIgnore,
 }: {
   members: User[];
   onSelect?: (username: string) => void;
@@ -20,6 +24,10 @@ export function MemberList({
   /** Optional per-member presence (in-game/in-battle/away/online/offline),
    * shown as a coloured dot plus a label for any non-online state. */
   presenceFor?: (username: string) => Presence;
+  /** Whether a member is currently on the ignore list (dims them + flips the toggle). */
+  isIgnored?: (username: string) => boolean;
+  /** Toggle a member on/off the ignore list. Renders a per-row ignore button. */
+  onToggleIgnore?: (username: string) => void;
 }) {
   // Reserve the swatch column only when at least one member has a colour, so
   // colour-less members (e.g. the host) still line up, while plain channel/DM
@@ -35,8 +43,11 @@ export function MemberList({
           const presence = presenceFor?.(u.name);
           const meta = presence ? PRESENCE_META[presence] : null;
           const color = colorFor?.(u.name);
+          const ignored = isIgnored?.(u.name) ?? false;
           const row = (
-            <span className="flex items-center gap-2">
+            <span
+              className={cn("flex items-center gap-2", ignored && "opacity-50")}
+            >
               {showSwatches &&
                 (color ? (
                   <span
@@ -63,17 +74,37 @@ export function MemberList({
             </span>
           );
           return (
-            <li key={u.name}>
+            <li key={u.name} className="flex items-center gap-1">
               {onSelect ? (
                 <button
                   type="button"
                   onClick={() => onSelect(u.name)}
-                  className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                  className="min-w-0 flex-1 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
                 >
                   {row}
                 </button>
               ) : (
-                <span className="block px-2 py-1.5 text-sm">{row}</span>
+                <span className="block min-w-0 flex-1 px-2 py-1.5 text-sm">
+                  {row}
+                </span>
+              )}
+              {onToggleIgnore && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="size-8 shrink-0 p-0"
+                  onClick={() => onToggleIgnore(u.name)}
+                  aria-label={
+                    ignored ? `Unignore ${u.name}` : `Ignore ${u.name}`
+                  }
+                  title={ignored ? "Unignore" : "Ignore"}
+                >
+                  {ignored ? (
+                    <UserCheck className="size-4" />
+                  ) : (
+                    <UserX className="size-4" />
+                  )}
+                </Button>
               )}
             </li>
           );

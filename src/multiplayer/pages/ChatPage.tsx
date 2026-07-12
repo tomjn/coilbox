@@ -1,5 +1,5 @@
 import { Button, NavGate } from "@picoframe/frame";
-import { Gamepad2, LogOut, Users } from "lucide-react";
+import { Gamepad2, LogOut, UserCheck, Users, UserX } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { mpLeaveBattle, mpLeaveChannel } from "../bindings";
@@ -14,6 +14,7 @@ import {
 import { MemberList } from "../chat/MemberList";
 import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
+import { addIgnore, isIgnored, removeIgnore, useIgnored } from "../ignore";
 import { useMpRevealed, useMultiplayer } from "../store";
 
 /**
@@ -33,6 +34,25 @@ function ChatPage() {
 
   const conv = useConversation(active);
   const me = mirror.state?.myUsername ?? null;
+
+  // Local ignore list, scoped to the connected account. Toggling hides/shows a
+  // user's messages (see `useConversation`); the member panel and DM header expose it.
+  const [ignored, setIgnored] = useIgnored();
+  const ignoredNow = useCallback(
+    (name: string) => (activeKey ? isIgnored(ignored, activeKey, name) : false),
+    [ignored, activeKey],
+  );
+  const toggleIgnore = useCallback(
+    (name: string) => {
+      if (!activeKey) return;
+      setIgnored(
+        isIgnored(ignored, activeKey, name)
+          ? removeIgnore(ignored, activeKey, name)
+          : addIgnore(ignored, activeKey, name),
+      );
+    },
+    [ignored, activeKey, setIgnored],
+  );
 
   // In a battle, tint messages by each player's team colour. The `teamColor` int
   // is `0xBBGGRR` (red is the low byte), matching the protocol's team_color_rgb.
@@ -153,7 +173,30 @@ function ChatPage() {
           isBot={isBot}
           onSend={conv.send}
           headerActions={
-            active.kind === "channel" || active.kind === "battle" ? (
+            active.kind === "dm" ? (
+              <Button
+                variant="secondary"
+                className="h-7 gap-1.5 px-2"
+                onClick={() => toggleIgnore(active.peer)}
+                aria-label={
+                  ignoredNow(active.peer)
+                    ? `Unignore ${active.peer}`
+                    : `Ignore ${active.peer}`
+                }
+              >
+                {ignoredNow(active.peer) ? (
+                  <>
+                    <UserCheck className="size-4" />
+                    Unignore
+                  </>
+                ) : (
+                  <>
+                    <UserX className="size-4" />
+                    Ignore
+                  </>
+                )}
+              </Button>
+            ) : active.kind === "channel" || active.kind === "battle" ? (
               <>
                 <Button
                   variant="secondary"
@@ -205,6 +248,8 @@ function ChatPage() {
             onSelect={(username) => setActive({ kind: "dm", peer: username })}
             colorFor={senderColor}
             presenceFor={presenceFor}
+            isIgnored={ignoredNow}
+            onToggleIgnore={toggleIgnore}
           />
         )}
 
