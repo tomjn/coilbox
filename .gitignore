@@ -25,3 +25,7 @@ src-tauri/binaries/coilbox-unitsync-worker-*
 # Design mockups are throwaway prototypes; not shipped and not linted (biome
 # honours this ignore file via useIgnoreFile).
 docs/mockups/
+
+# VitePress docs-site build artifacts (the site itself lives in docs/, its output
+# and dev cache do not). `dist` above already covers docs/.vitepress/dist.
+docs/.vitepress/cache/
