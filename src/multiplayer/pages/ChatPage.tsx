@@ -1,6 +1,6 @@
 import { Button, NavGate, useSetting } from "@picoframe/frame";
 import { Gamepad2, LogOut, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { type ChatMsg, mpLeaveBattle, mpLeaveChannel } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
@@ -80,6 +80,14 @@ function ChatPage() {
     (name: string) => (state ? userPresence(state, name) : "offline"),
     [state],
   );
+
+  // Tab-completion candidates for the composer: channel/battle member nicks, or
+  // the peer in a DM. Our own nick is excluded (you don't ping yourself).
+  const completions = useMemo(() => {
+    const names = conv.members.map((u) => u.name);
+    if (active?.kind === "dm") names.push(active.peer);
+    return me ? names.filter((n) => n !== me) : names;
+  }, [conv.members, active, me]);
 
   // For a DM header, mark the peer as a bot and show their richer presence.
   const dmPeer = active?.kind === "dm" ? active.peer : null;
@@ -167,6 +175,7 @@ function ChatPage() {
           senderColor={senderColor}
           isBot={isBot}
           isHighlighted={isHighlighted}
+          completions={completions}
           onSend={conv.send}
           headerActions={
             active.kind === "channel" || active.kind === "battle" ? (

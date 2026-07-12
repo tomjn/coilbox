@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ChatMsg } from "../bindings";
 import { FormattedText } from "./FormattedText";
 import { PRESENCE_META, type Presence } from "./presence";
+import { completeNick, type TabCycle } from "./tabComplete";
 
 /** Format a unix-millis timestamp as a short local time (blank when absent). */
 function formatTime(at: number): string {
@@ -64,6 +65,9 @@ export interface ChatPaneProps {
   variant?: "full" | "embedded";
   emptyState?: ReactNode;
   disabled?: boolean;
+  /** Nick candidates for Tab-completion (channel/battle members, DM peer).
+   * Omit to disable completion (Tab keeps its default focus behaviour). */
+  completions?: string[];
 }
 
 /**
@@ -86,10 +90,40 @@ export function ChatPane({
   variant = "full",
   emptyState,
   disabled = false,
+  completions,
 }: ChatPaneProps) {
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  // Tab-completion: cycle state persists across Tabs; the input element and a
+  // pending caret offset let us restore the selection after the controlled
+  // re-render (picoframe's Input doesn't forward a ref, so we grab the element
+  // from the keydown event).
+  const cycleRef = useRef<TabCycle | null>(null);
+  const inputElRef = useRef<HTMLInputElement | null>(null);
+  const pendingCursorRef = useRef<number | null>(null);
+
+  // Runs every render to apply a queued caret move from Tab-completion (the
+  // controlled Input resets the caret to the end on each change), then clears it.
+  useEffect(() => {
+    if (pendingCursorRef.current != null && inputElRef.current) {
+      const c = pendingCursorRef.current;
+      inputElRef.current.setSelectionRange(c, c);
+      pendingCursorRef.current = null;
+    }
+  });
+
+  function onTab(el: HTMLInputElement): boolean {
+    if (!completions || completions.length === 0) return false;
+    const cursor = el.selectionStart ?? draft.length;
+    const result = completeNick(draft, cursor, completions, cycleRef.current);
+    if (!result) return false;
+    inputElRef.current = el;
+    cycleRef.current = result.cycle;
+    pendingCursorRef.current = result.cursor;
+    setDraft(result.value);
+    return true;
+  }
 
   // Keep the newest message in view as the log grows.
   // biome-ignore lint/correctness/useExhaustiveDependencies: messages.length is the trigger that should re-run the scroll, not read in the body
@@ -290,6 +324,18 @@ export function ChatPane({
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               submit();
+              return;
+            }
+            if (
+              e.key === "Tab" &&
+              !e.shiftKey &&
+              !e.ctrlKey &&
+              !e.metaKey &&
+              !e.altKey
+            ) {
+              // Only trap Tab when we actually complete something; otherwise let
+              // it move focus normally.
+              if (onTab(e.currentTarget)) e.preventDefault();
             }
           }}
           placeholder="Type your message..."

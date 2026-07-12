@@ -1,4 +1,4 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, Input, useSetting } from "@picoframe/frame";
 import {
   AlertCircle,
   CheckCircle2,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
 import {
   type BarMap,
   dlBarMaps,
@@ -26,6 +27,7 @@ import {
 } from "../DownloadQueueProvider";
 import { OptionSelect } from "./components/OptionSelect";
 import { EmptyState, errMessage } from "./components/states";
+import { HIDE_INSTALLED_KEY } from "./hideInstalled";
 
 /** pr-downloader HTTP search endpoint for BAR map files. */
 const BAR_SEARCH_URL = "https://files-cdn.beyondallreason.dev/find";
@@ -101,6 +103,10 @@ export default function MapsPage() {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name-asc");
   const [limit, setLimit] = useState(PAGE);
+  const [hideInstalled, setHideInstalled] = useSetting<boolean>(
+    HIDE_INSTALLED_KEY,
+    false,
+  );
 
   const load = useCallback(async (src: Source) => {
     setLoading(true);
@@ -230,7 +236,9 @@ export default function MapsPage() {
 
   const sorted = useMemo(() => {
     if (!filtered) return null;
-    const arr = [...filtered];
+    const arr = hideInstalled
+      ? filtered.filter((it) => !installed.has(it.filename.toLowerCase()))
+      : [...filtered];
     arr.sort((a, b) => {
       switch (sort) {
         case "name-desc":
@@ -248,7 +256,7 @@ export default function MapsPage() {
       }
     });
     return arr;
-  }, [filtered, sort]);
+  }, [filtered, sort, hideInstalled, installed]);
 
   // Render incrementally — mounting the whole springfiles catalog is slow.
   // Paging resets to the first page in the source/filter/sort change handlers.
@@ -307,6 +315,20 @@ export default function MapsPage() {
             className="w-36"
             options={SORT_OPTIONS}
           />
+          <label
+            htmlFor="maps-hide-installed"
+            className="flex items-center gap-2 text-sm text-muted-foreground"
+          >
+            <Switch
+              id="maps-hide-installed"
+              checked={hideInstalled}
+              onCheckedChange={(v) => {
+                setHideInstalled(v);
+                setLimit(PAGE);
+              }}
+            />
+            Hide downloaded
+          </label>
           {items && (
             <span className="text-sm text-muted-foreground">
               {filter.trim() && filtered

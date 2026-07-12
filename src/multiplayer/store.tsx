@@ -23,6 +23,7 @@ import {
   mpConfirmAgreement,
   mpConnect,
   mpDisconnect,
+  mpJoinBattle,
   mpJoinChannel,
   mpReattach,
   mpRegister,
@@ -71,6 +72,19 @@ function incomingChatMsg(d: Delta, state: LobbyState): ChatMsg | null {
     return arr?.[arr.length - 1] ?? null;
   }
   return null;
+}
+
+/**
+ * Backoff delays (ms) between auto-reconnect attempts after an unexpected server
+ * drop. Indexed by attempt; the last value is the cap. The array length doubles as
+ * the attempt budget — after this many failed attempts the loop gives up.
+ */
+export const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 20000];
+
+/** The backoff delay for a 0-based attempt, clamped to the final (capped) value. */
+export function reconnectDelay(attempt: number): number {
+  const i = Math.min(Math.max(attempt, 0), RECONNECT_DELAYS_MS.length - 1);
+  return RECONNECT_DELAYS_MS[i];
 }
 
 /**
@@ -407,6 +421,53 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     }
   }, [activeKey, mirror.phase, joinedChannels]);
 
+  // --- Auto-rejoin on unexpected server drop (issue #192) --------------------
+  // Distinct from the reload-reattach path above: this handles a genuine server-
+  // side disconnect, where the Rust task dies and self-evicts. We re-run `connect`
+  // (which re-fetches the password and, on reaching `ready`, replays channels via
+  // the effect above) and best-effort rejoin the battle we were in.
+  const [autoRejoin] = useSetting<boolean>("multiplayer.autoRejoin", true);
+  const autoRejoinRef = useRef(autoRejoin);
+  useEffect(() => {
+    autoRejoinRef.current = autoRejoin;
+  }, [autoRejoin]);
+
+  // `true` while a user-initiated disconnect/cancel is in flight, so its clean
+  // `disconnected` event isn't mistaken for an unexpected drop. Reset on connect.
+  const intentionalRef = useRef(false);
+  // `true` once a session reached `ready`; only then is a drop worth reconnecting
+  // (excludes login-denied / initial-connect failures, which never logged in).
+  const loggedInRef = useRef(false);
+  // Enough to call `connect()` again; captured on each connect attempt.
+  const reconnectCtxRef = useRef<{
+    server: LobbyServer;
+    username: string;
+  } | null>(null);
+  // The battle to rejoin after a reconnect reaches `ready` (captured before the
+  // drop tears down state). Cleared once attempted or on a manual connect.
+  const rejoinBattleRef = useRef<{
+    id: number;
+    scriptPassword: string | null;
+  } | null>(null);
+  // Single-loop guards: a monotonic generation invalidates any in-flight loop, and
+  // the pending timer is tracked so it can be cancelled.
+  const reconnectGenRef = useRef(0);
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimerRef = useRef<number | null>(null);
+  // Late-bound so the frozen `openChannel` handler can invoke the latest logic.
+  const handleUnexpectedDropRef = useRef<() => void>(() => {});
+
+  // Cancel any running reconnect loop (a manual connect/disconnect supersedes it).
+  const stopReconnect = useCallback(() => {
+    reconnectGenRef.current += 1;
+    reconnectAttemptRef.current = 0;
+    rejoinBattleRef.current = null;
+    if (reconnectTimerRef.current != null) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
   // Build the event Channel for a connection and wire it to the mirror. Shared by
   // `connect` and the reload-rehydrate path so both handle events identically. The
   // Rust side evicts the connection on any teardown (socket close, or a rejected
@@ -504,6 +565,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       // verification-code handshake; surface that so the dialog can prompt. Any
       // other phase (e.g. the resume after submitting the code) clears it.
       if (ev.kind === "phase") {
+        // Mark a session as "logged in" once it reaches ready — only such a
+        // session's later drop is worth auto-reconnecting.
+        if (ev.phase === "ready") loggedInRef.current = true;
         setPendingAgreement((p) =>
           ev.phase === "awaitAgreement"
             ? { serverKey, text: ev.agreement ?? "" }
@@ -515,14 +579,21 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       if (ev.kind === "disconnected") {
         setActiveKey(null);
         setPendingAgreement((p) => (p?.serverKey === serverKey ? null : p));
+        handleUnexpectedDropRef.current();
       }
     };
     return onEvent;
   }, []);
 
-  const connect = useCallback(
+  // The core connect, shared by the public `connect` and the auto-reconnect loop.
+  // Records the reconnect context and resets the per-session drop flags so a later
+  // unexpected disconnect can rebuild the session.
+  const doConnect = useCallback(
     async (server: LobbyServer, username: string) => {
       setBusy(true);
+      intentionalRef.current = false;
+      loggedInRef.current = false;
+      reconnectCtxRef.current = { server, username };
       const serverKey = serverKeyFor(server, username);
       try {
         const cred = await lsGetCredential({ serverId: server.id, username });
@@ -556,6 +627,104 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     },
     [openChannel],
   );
+
+  // Public connect: a manual login supersedes any in-flight auto-reconnect loop.
+  const connect = useCallback(
+    async (server: LobbyServer, username: string) => {
+      stopReconnect();
+      await doConnect(server, username);
+    },
+    [doConnect, stopReconnect],
+  );
+
+  // Run the reconnect loop after an unexpected drop: retry `doConnect` on a bounded
+  // backoff. A monotonic generation lets a manual connect/disconnect invalidate it,
+  // and it self-stops on success or after exhausting the attempt budget.
+  const runReconnect = useCallback(() => {
+    const gen = ++reconnectGenRef.current;
+    reconnectAttemptRef.current = 0;
+    const step = async () => {
+      if (reconnectGenRef.current !== gen) return; // superseded
+      const ctx = reconnectCtxRef.current;
+      if (!ctx) return;
+      try {
+        await doConnect(ctx.server, ctx.username);
+        if (reconnectGenRef.current !== gen) return;
+        void notify({ title: "Reconnected to multiplayer", level: "success" });
+      } catch {
+        if (reconnectGenRef.current !== gen) return;
+        const attempt = ++reconnectAttemptRef.current;
+        if (attempt >= RECONNECT_DELAYS_MS.length) {
+          void notify({
+            title: "Couldn't reconnect to multiplayer",
+            body: "Log in again from the topbar when you're ready.",
+            level: "error",
+          });
+          return;
+        }
+        reconnectTimerRef.current = window.setTimeout(
+          step,
+          reconnectDelay(attempt),
+        );
+      }
+    };
+    reconnectTimerRef.current = window.setTimeout(step, reconnectDelay(0));
+  }, [doConnect]);
+
+  // React to a `disconnected` event: start the reconnect loop only for a genuine,
+  // unexpected drop of a logged-in session (not a manual disconnect, a login
+  // denial, or when the feature is off). Captures the current battle first so it
+  // can be rejoined once reconnected.
+  const handleUnexpectedDrop = useCallback(() => {
+    if (intentionalRef.current) return;
+    if (!autoRejoinRef.current) return;
+    if (!loggedInRef.current) return;
+    if (!reconnectCtxRef.current) return;
+    const st = stateRef.current;
+    if (st?.currentBattle != null) {
+      const battle = st.battles[String(st.currentBattle)];
+      const me = st.myUsername ? battle?.members[st.myUsername] : undefined;
+      rejoinBattleRef.current = {
+        id: st.currentBattle,
+        scriptPassword: me?.scriptPassword ?? null,
+      };
+    } else {
+      rejoinBattleRef.current = null;
+    }
+    void notify({ title: "Connection lost — reconnecting…" });
+    runReconnect();
+  }, [runReconnect]);
+  useEffect(() => {
+    handleUnexpectedDropRef.current = handleUnexpectedDrop;
+  }, [handleUnexpectedDrop]);
+
+  // After a reconnect reaches `ready`, rejoin the battle captured before the drop if
+  // it's still open (channels replay via the effect above). Once per connection and
+  // best-effort — a closed/passworded battle is skipped, never a crash.
+  const rejoinBattleDoneRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeKey == null) {
+      rejoinBattleDoneRef.current = null;
+      return;
+    }
+    if (mirror.phase !== "ready" || rejoinBattleDoneRef.current === activeKey) {
+      return;
+    }
+    rejoinBattleDoneRef.current = activeKey;
+    const target = rejoinBattleRef.current;
+    rejoinBattleRef.current = null;
+    if (!target) return;
+    const stillOpen = mirror.state?.battles[String(target.id)] != null;
+    if (!stillOpen) {
+      void notify({ title: "Your battle is no longer open" });
+      return;
+    }
+    mpJoinBattle({
+      serverKey: activeKey,
+      id: target.id,
+      scriptPassword: target.scriptPassword,
+    }).catch((e) => console.warn("multiplayer: auto-rejoin battle failed", e));
+  }, [activeKey, mirror.phase, mirror.state]);
 
   // Register a new account: open a throwaway connection that sends REGISTER, then
   // resolve on the `registered` phase / reject on `disconnected` (denial). The
@@ -640,12 +809,18 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
 
   const cancelAgreement = useCallback(async () => {
     if (!pendingAgreement) return;
+    // User-abandoned login: its `disconnected` is intentional, not a drop.
+    intentionalRef.current = true;
     const serverKey = pendingAgreement.serverKey;
     setPendingAgreement(null);
     await mpDisconnect({ serverKey }).catch(() => {});
   }, [pendingAgreement]);
 
   const disconnect = useCallback(async () => {
+    // Mark intentional and kill any reconnect loop before the guard, so a manual
+    // "log out" can't be mistaken for a drop even mid-reconnect (no active key).
+    intentionalRef.current = true;
+    stopReconnect();
     if (!activeKey) return;
     setBusy(true);
     try {
@@ -655,7 +830,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       setActiveKey(null);
       setBusy(false);
     }
-  }, [activeKey]);
+  }, [activeKey, stopReconnect]);
 
   const clearJoinError = useCallback(() => {
     dispatch({ type: "clearJoinError" });
