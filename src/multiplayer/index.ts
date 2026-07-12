@@ -2,6 +2,7 @@ import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   AtSign,
   Gamepad2,
+  History,
   LogIn,
   MessagesSquare,
   Swords,
@@ -64,6 +65,15 @@ const multiplayerPlugin: FramePlugin = {
           useVisible: useMpRevealed,
         },
         {
+          id: "multiplayer.chatlogs",
+          label: "Chat logs",
+          to: "/chatlogs",
+          end: true,
+          order: 4,
+          icon: History,
+          useVisible: useMpRevealed,
+        },
+        {
           id: "multiplayer.battle",
           // Static fallback; the live battle title comes from `useLabel`.
           label: "Battle Room",
@@ -93,6 +103,11 @@ const multiplayerPlugin: FramePlugin = {
       path: "battles",
       lazy: () => import("./pages/BattlesPage"),
       crumb: "Battles",
+    },
+    {
+      path: "chatlogs",
+      lazy: () => import("./pages/ChatLogPage"),
+      crumb: "Chat logs",
     },
     {
       path: "battle",
