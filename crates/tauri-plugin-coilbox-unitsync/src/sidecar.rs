@@ -142,6 +142,25 @@ pub fn build_heightmap_args(
     args
 }
 
+/// Build args for metalmap mode: scan args plus the map name, the `--metalmap`
+/// flag, the longest-side pixel cap, and the optional on-disk PNG cache directory.
+pub fn build_metalmap_args(
+    lib: &str,
+    datadir: &str,
+    map: &str,
+    max_side: i32,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--map".into());
+    args.push(map.into());
+    args.push("--metalmap".into());
+    args.push("--max-side".into());
+    args.push(max_side.to_string());
+    push_cache_dir(&mut args, cache_dir);
+    args
+}
+
 /// Build args for batch-thumbnail mode: scan args plus the thumbnail mip level and
 /// the optional on-disk PNG cache directory.
 pub fn build_thumbnails_args(
@@ -342,6 +361,26 @@ mod tests {
             Some("/cache/thumbs"),
         );
         assert!(a.contains(&"--heightmap".to_string()));
+        assert_eq!(
+            &a[a.len() - 2..],
+            &["--cache-dir".to_string(), "/cache/thumbs".to_string()]
+        );
+        let i = a.iter().position(|x| x == "--map").unwrap();
+        assert_eq!(a[i + 1], "Map v1");
+        let j = a.iter().position(|x| x == "--max-side").unwrap();
+        assert_eq!(a[j + 1], "512");
+    }
+
+    #[test]
+    fn metalmap_args_carry_map_flag_and_max_side() {
+        let a = build_metalmap_args(
+            "/eng/libunitsync.dylib",
+            "/data",
+            "Map v1",
+            512,
+            Some("/cache/thumbs"),
+        );
+        assert!(a.contains(&"--metalmap".to_string()));
         assert_eq!(
             &a[a.len() - 2..],
             &["--cache-dir".to_string(), "/cache/thumbs".to_string()]

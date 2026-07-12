@@ -6,6 +6,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_scan",
     "unitsync_minimap",
     "unitsync_heightmap",
+    "unitsync_metalmap",
     "unitsync_thumbnails",
     "unitsync_game_info",
     "unitsync_unit_buildpics",

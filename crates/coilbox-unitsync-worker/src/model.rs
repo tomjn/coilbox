@@ -222,6 +222,23 @@ pub struct HeightmapOutput {
     pub errors: Vec<String>,
 }
 
+/// A rendered metal infomap, returned by the lazy `metalmap` mode: a downscaled
+/// green-on-transparent RGBA PNG marking where mexes can extract, for overlaying
+/// on the minimap. Transparent where there's no metal, so it reads over the map.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MetalmapOutput {
+    /// RGBA PNG `data:` URL of the (downscaled) metal infomap, ready for an `<img>`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_url: Option<String>,
+    /// Metal infomap dimensions before downscaling (its ratio is the map's aspect).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    pub errors: Vec<String>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameItem {
