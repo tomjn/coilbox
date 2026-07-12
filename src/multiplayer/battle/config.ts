@@ -1,5 +1,5 @@
 import { randomTeamColorHex } from "@/lib/teamColor";
-import type { Battle, BattleStatus } from "../bindings";
+import type { Battle, BattleStatus, User } from "../bindings";
 
 // Re-exported so existing call sites (and config.test.ts) keep importing the
 // random-colour helper from `./config` unchanged; the implementation now lives in
@@ -113,6 +113,10 @@ export interface MemberRow {
   ally: number;
   side: number;
   colorHex: string;
+  /** Humans only: ISO 3166-1 alpha-2 country (from ADDUSER), when known. */
+  country?: string;
+  /** Humans only: server rank 0-7 (from ClientStatus), when known. */
+  rank?: number;
   /** Bots only: the AI dll and its owning player. */
   aiDll?: string;
   owner?: string;
@@ -145,17 +149,26 @@ function rowFromStatus(
  * logged-in user, then remaining humans alphabetically, then bots. Bots carry
  * their `aiDll`/`owner` for display.
  */
-export function membersToRows(battle: Battle, me: string | null): MemberRow[] {
+export function membersToRows(
+  battle: Battle,
+  me: string | null,
+  users?: Record<string, User>,
+): MemberRow[] {
   const rank = (name: string) =>
     name === battle.host ? 0 : name === me ? 1 : 2;
   const humans = Object.entries(battle.members)
     .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
-    .map(([name, m]) =>
-      rowFromStatus(name, "human", m.battleStatus, m.teamColor, {
-        self: name === me,
-        host: name === battle.host,
-      }),
-    );
+    .map(([name, m]) => {
+      const u = users?.[name];
+      return {
+        ...rowFromStatus(name, "human", m.battleStatus, m.teamColor, {
+          self: name === me,
+          host: name === battle.host,
+        }),
+        country: u?.country,
+        rank: u?.status.rank,
+      };
+    });
   const bots = Object.entries(battle.bots)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, bot]) => ({

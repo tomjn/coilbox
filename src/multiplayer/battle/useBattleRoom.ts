@@ -252,8 +252,8 @@ export function useBattleRoom(): BattleRoomView {
   const gameMissing = contentKnown && !localGame;
 
   const rows = useMemo(
-    () => (battle ? membersToRows(battle, me) : []),
-    [battle, me],
+    () => (battle ? membersToRows(battle, me, state?.users) : []),
+    [battle, me, state?.users],
   );
   const sync: SyncState = battle
     ? deriveSync(battle, { mapMissing, gameMissing })

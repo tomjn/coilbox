@@ -17,6 +17,7 @@ import {
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { CountryFlag, RankBadge } from "../UserBadges";
 import { allyLetter, type MemberRow as Row } from "./config";
 
 /** Host-only actions over another member, bound to that member's name. */
@@ -143,9 +144,11 @@ export function MemberRow({
               {row.kind === "bot" && (
                 <BotIcon className="size-3.5 text-muted-foreground" />
               )}
+              {row.country && <CountryFlag country={row.country} />}
               <span className={cn("truncate", row.self && "font-medium")}>
                 {row.name}
               </span>
+              {row.rank != null && <RankBadge rank={row.rank} />}
             </div>
             <span className="text-[11px] text-muted-foreground">
               {subtitle}

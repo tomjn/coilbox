@@ -2,6 +2,8 @@
 /* Generate the frame's utility classes from its published build (Tailwind v4 ignores node_modules by default). */
 @source "../node_modules/@picoframe/frame/dist";
 @import "@picoframe/frame/theme.css";
+/* Country flag sprites (fi fi-xx) for lobby user/battle lists — see multiplayer/UserBadges. */
+@import "flag-icons/css/flag-icons.min.css";
 
 html,
 body,
