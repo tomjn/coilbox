@@ -163,6 +163,9 @@ export function BattleMapCard({
         minimapLoading={minimap.loading}
         markerColors={markerColors}
         env={minimap.env}
+        // Dim the base minimap while a terrain overlay is shown so the metal /
+        // height layer reads clearly over it.
+        dimBase={!!overlayUrl}
         onSelectMap={selfHost ? setPendingMap : onSuggestMap}
         selectLabel={
           selfHost
@@ -181,7 +184,7 @@ export function BattleMapCard({
                 src={overlayUrl}
                 alt=""
                 aria-hidden
-                className="pointer-events-none absolute inset-0 size-full object-fill opacity-70"
+                className="pointer-events-none absolute inset-0 size-full object-fill opacity-95"
               />
             )}
             {canEditBoxes ? (

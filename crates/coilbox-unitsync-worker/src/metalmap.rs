@@ -24,12 +24,13 @@ fn metalmap_png(raw: &[u8], w: u32, h: u32, max_side: u32) -> Result<Vec<u8>, St
             w * h
         ));
     }
-    // Expand density -> RGBA (green, alpha = density). A small floor on non-zero
-    // density keeps faint spots visible without washing the map out.
+    // Expand density -> RGBA (bright green, alpha = density). A generous floor on
+    // non-zero density keeps even faint spots clearly readable — the overlay is
+    // meant to stand out against the (dimmed) minimap underneath it.
     let mut rgba = Vec::with_capacity(raw.len() * 4);
     for &v in raw {
-        let alpha = if v == 0 { 0 } else { v.max(64) };
-        rgba.extend_from_slice(&[0, 220, 40, alpha]);
+        let alpha = if v == 0 { 0 } else { v.max(140) };
+        rgba.extend_from_slice(&[40, 255, 90, alpha]);
     }
     let img =
         ImageBuffer::<Rgba<u8>, _>::from_raw(w, h, rgba).ok_or("failed to build metalmap image")?;
