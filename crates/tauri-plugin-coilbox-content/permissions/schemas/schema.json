@@ -343,6 +343,54 @@
           "markdownDescription": "Denies the content_candidates command without any pre-configured scope."
         },
         {
+          "description": "Enables the content_config_backup command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-config-backup",
+          "markdownDescription": "Enables the content_config_backup command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_config_backup command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-config-backup",
+          "markdownDescription": "Denies the content_config_backup command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_config_delete_profile command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-config-delete-profile",
+          "markdownDescription": "Enables the content_config_delete_profile command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_config_delete_profile command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-config-delete-profile",
+          "markdownDescription": "Denies the content_config_delete_profile command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_config_profiles command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-config-profiles",
+          "markdownDescription": "Enables the content_config_profiles command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_config_profiles command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-config-profiles",
+          "markdownDescription": "Denies the content_config_profiles command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_config_restore command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-config-restore",
+          "markdownDescription": "Enables the content_config_restore command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_config_restore command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-config-restore",
+          "markdownDescription": "Denies the content_config_restore command without any pre-configured scope."
+        },
+        {
           "description": "Enables the content_create_standard_root command without any pre-configured scope.",
           "type": "string",
           "const": "allow-content-create-standard-root",
@@ -475,10 +523,10 @@
           "markdownDescription": "Denies the content_verify_engine command without any pre-configured scope."
         },
         {
-          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`",
+          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-branding-catalog`\n- `allow-branding-image`"
+          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`"
         }
       ]
     }
