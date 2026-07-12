@@ -31,7 +31,7 @@
       "binaries/uberstress",
       "binaries/coilbox-unitsync-worker"
     ],
-    "resources": ["mapconv", "prdownloader", "branding/catalog.json"],
+    "resources": ["mapconv", "prdownloader", "../catalog.json"],
     "active": true,
     "createUpdaterArtifacts": true,
     "targets": ["appimage", "app", "dmg", "nsis"],
