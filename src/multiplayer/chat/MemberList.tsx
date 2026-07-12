@@ -1,5 +1,6 @@
 import { Button, cn } from "@picoframe/frame";
 import { UserCheck, UserX } from "lucide-react";
+import type { ReactNode } from "react";
 import type { User } from "../bindings";
 import { CountryFlag, RankBadge } from "../UserBadges";
 import { PRESENCE_META, type Presence } from "./presence";
@@ -16,6 +17,7 @@ export function MemberList({
   presenceFor,
   isIgnored,
   onToggleIgnore,
+  renderActions,
 }: {
   members: User[];
   onSelect?: (username: string) => void;
@@ -29,6 +31,9 @@ export function MemberList({
   isIgnored?: (username: string) => boolean;
   /** Toggle a member on/off the ignore list. Renders a per-row ignore button. */
   onToggleIgnore?: (username: string) => void;
+  /** Optional trailing per-member control (e.g. a moderation menu). Returns a node
+   * to render at the end of the row, or null/undefined to render nothing for it. */
+  renderActions?: (username: string) => ReactNode;
 }) {
   // Reserve the swatch column only when at least one member has a colour, so
   // colour-less members (e.g. the host) still line up, while plain channel/DM
@@ -109,6 +114,7 @@ export function MemberList({
                   )}
                 </Button>
               )}
+              {renderActions?.(u.name)}
             </li>
           );
         })}
