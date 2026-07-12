@@ -4,7 +4,7 @@
 //! concern — it keeps a map of these. Every type here crosses to the frontend,
 //! so all derive `Serialize` with camelCase field names.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -163,6 +163,11 @@ pub struct LobbyState {
     pub host_port: Option<u16>,
     /// The last-fetched public channel directory (from `CHANNELS`).
     pub channel_directory: Vec<DirChannel>,
+    /// Server-confirmed ignores for this account, reconciled from the server's
+    /// `IGNORELIST` and its `IGNORE`/`UNIGNORE` acks. The client-side ignore list
+    /// (a frontend preference) is the source of truth for hiding; this mirrors what
+    /// the server has stored so both can be converged on login.
+    pub server_ignores: BTreeSet<String>,
     /// A live SPADS autohost vote in the current battle, or `None` when none is
     /// open. Parsed from the bot's battle chat; drives the vote panel.
     pub current_vote: Option<Vote>,
