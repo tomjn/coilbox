@@ -7,6 +7,12 @@ side graphic, briefing voiceover and intro cutscene. Playing a mission launches 
 like any other skirmish; on exit Coilbox works out whether you won or lost and
 advances your progress.
 
+![A mission briefing screen: title, subtitle, briefing text and objectives over the mission's panorama, with a Start Mission button.](/screenshots/mission-briefing.png)
+
+Everything below is about authoring and shipping those missions — the mission is
+the unit of work in a campaign, so most of the detail (setup snapshot, briefing
+media, unit restrictions, win/loss) is per-mission.
+
 ## Authoring a campaign
 
 The **Campaign Builder** is an advanced-mode tool: turn on Advanced mode
