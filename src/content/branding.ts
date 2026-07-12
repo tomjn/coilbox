@@ -10,9 +10,9 @@ import type { GameItem, MapItem } from "./bindings";
  * game's own loading-screen art.
  */
 
-/** Default catalog URL — the copy in the main coilbox repo (main branch). */
+/** Default catalog URL — the copy in the main coilbox repo (main branch, repo root). */
 export const DEFAULT_BRANDING_CATALOG_URL =
-  "https://raw.githubusercontent.com/tomjn/coilbox/main/src-tauri/branding/catalog.json";
+  "https://raw.githubusercontent.com/tomjn/coilbox/main/catalog.json";
 
 export interface BrandingMatch {
   /** Case-insensitive regex tested against game.name. */

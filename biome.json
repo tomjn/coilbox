@@ -12,6 +12,7 @@
       "!src-tauri",
       "!crates",
       "!**/*.css",
+      "!catalog.json",
       "!src/dev/tauri-mcp-bridge.ts"
     ]
   },
