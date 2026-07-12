@@ -5,16 +5,40 @@ import { contentStateLoad } from "../content/bindings";
 import { dlInstalledContent, dlPathWritable } from "../downloads/bindings";
 import { useDownloadsConfig } from "../downloads/config";
 import {
+  type CampaignFailure,
   deriveHealthChecks,
   type HealthCheck,
   type HealthInputs,
 } from "./health";
+import { describeJsonError } from "./jsonError";
 import {
   getProfile,
   getProfileError,
+  getProfileErrorSnippet,
   getProfileRoot,
   getProfileSource,
 } from "./profile";
+
+/** The campaign's own `name`, or a placeholder when the JSON can't be read. */
+function campaignName(json: string): string {
+  try {
+    const o = JSON.parse(json) as { name?: unknown };
+    if (typeof o?.name === "string" && o.name.trim()) return o.name;
+  } catch {
+    // Unparseable — the syntax error (below) is the useful part.
+  }
+  return "(unnamed)";
+}
+
+/** Why a campaign was rejected: a located JSON syntax error, or a schema mismatch. */
+function campaignError(json: string): string {
+  try {
+    JSON.parse(json);
+  } catch (e) {
+    return describeJsonError(json, e).message;
+  }
+  return "valid JSON but does not match the campaign schema";
+}
 
 /** Assemble health-check inputs and derive the checklist. Fails soft: any input
  * that can't be read falls back to an empty/neutral value, so the affected check
@@ -53,13 +77,18 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
 
       const campaignFailures = await campaignList({})
         .then((r) => {
-          const acc = { bundled: 0, local: 0 };
+          const out: CampaignFailure[] = [];
           for (const item of r.items) {
-            if (parseCampaignJson(item.json) === null) acc[item.source] += 1;
+            if (parseCampaignJson(item.json) !== null) continue;
+            out.push({
+              source: item.source,
+              name: campaignName(item.json),
+              error: campaignError(item.json),
+            });
           }
-          return acc;
+          return out;
         })
-        .catch(() => ({ bundled: 0, local: 0 }));
+        .catch(() => [] as CampaignFailure[]);
 
       const probe = (path: string | undefined) =>
         path
@@ -80,6 +109,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         portableRoot,
         profileSource: getProfileSource(),
         profileError: getProfileError(),
+        profileErrorSnippet: getProfileErrorSnippet(),
         gameFilter: getProfile().gameFilter,
         roots,
         installedGames,

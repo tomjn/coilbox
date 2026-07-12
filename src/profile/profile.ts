@@ -2,6 +2,7 @@ import type { Accent, ThemeMode } from "@picoframe/frame";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { ConquestNames } from "../conquest/names";
 import type { SuggestedMapList } from "../content/branding";
+import { describeJsonError } from "./jsonError";
 
 /**
  * Distribution profile: a `profile.json` a bundler drops into the portable
@@ -176,6 +177,8 @@ let loaded: Profile = EMPTY_PROFILE;
 let loadedSource: ProfileSource = "default";
 let loadedRoot = "";
 let loadedError: string | null = null;
+/** A monospace source excerpt pinpointing a parse error, when one was locatable. */
+let loadedErrorSnippet: string | null = null;
 let loadPromise: Promise<{ profile: Profile; source: ProfileSource }> | null =
   null;
 
@@ -193,10 +196,13 @@ export function loadProfile(): Promise<{
         try {
           loaded = JSON.parse(res.json) as Profile;
           loadedError = null;
+          loadedErrorSnippet = null;
         } catch (e) {
           console.warn("profile: failed to parse profile.json", e);
           loaded = EMPTY_PROFILE;
-          loadedError = e instanceof Error ? e.message : String(e);
+          const detail = describeJsonError(res.json, e);
+          loadedError = detail.message;
+          loadedErrorSnippet = detail.snippet ?? null;
         }
         loadedSource = (res.source as ProfileSource) ?? "default";
         loadedRoot = res.root ?? "";
@@ -205,6 +211,7 @@ export function loadProfile(): Promise<{
       .catch((e) => {
         console.warn("profile: load failed", e);
         loadedError = e instanceof Error ? e.message : String(e);
+        loadedErrorSnippet = null;
         return { profile: EMPTY_PROFILE, source: "default" as ProfileSource };
       });
   }
@@ -292,6 +299,16 @@ export function getProfileRoot(): string {
  */
 export function getProfileError(): string | null {
   return loadedError;
+}
+
+/**
+ * A monospace source excerpt (with a caret under the offending character) for the
+ * last parse error, or `null` when there was no error or its location couldn't be
+ * recovered from the engine's message. Rendered under the health panel's parse-error
+ * row so a bundler can see exactly where the JSON broke.
+ */
+export function getProfileErrorSnippet(): string | null {
+  return loadedErrorSnippet;
 }
 
 /**
