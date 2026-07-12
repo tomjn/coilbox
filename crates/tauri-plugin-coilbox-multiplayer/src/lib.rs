@@ -428,6 +428,73 @@ fn mp_list_channels(registry: State<'_, Registry>, server_key: String) -> CliRes
     enqueue(registry.inner(), &server_key, command::list_channels())
 }
 
+/// `mp_friend_request` — send a friend request (optional message).
+#[tauri::command]
+fn mp_friend_request(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+    message: Option<String>,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::friend_request(&username, message.as_deref()),
+    )
+}
+
+/// `mp_accept_friend_request` — accept an incoming friend request.
+#[tauri::command]
+fn mp_accept_friend_request(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::accept_friend_request(&username),
+    )
+}
+
+/// `mp_decline_friend_request` — decline an incoming friend request.
+#[tauri::command]
+fn mp_decline_friend_request(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::decline_friend_request(&username),
+    )
+}
+
+/// `mp_unfriend` — remove an existing friendship.
+#[tauri::command]
+fn mp_unfriend(registry: State<'_, Registry>, server_key: String, username: String) -> CliResult {
+    enqueue(registry.inner(), &server_key, command::unfriend(&username))
+}
+
+/// `mp_friend_list` — request the mutual-friend list (streams
+/// `FRIENDLISTBEGIN..FRIENDLISTEND`). No-ops on servers without friend support.
+#[tauri::command]
+fn mp_friend_list(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    enqueue(registry.inner(), &server_key, command::friend_list())
+}
+
+/// `mp_friend_request_list` — request pending incoming friend requests (streams
+/// `FRIENDREQUESTLISTBEGIN..FRIENDREQUESTLISTEND`).
+#[tauri::command]
+fn mp_friend_request_list(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::friend_request_list(),
+    )
+}
+
 /// `mp_join_battle` — join an open battle (optional battle key and script password).
 #[tauri::command]
 fn mp_join_battle(
@@ -1084,6 +1151,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_join_channel,
             mp_leave_channel,
             mp_list_channels,
+            mp_friend_request,
+            mp_accept_friend_request,
+            mp_decline_friend_request,
+            mp_unfriend,
+            mp_friend_list,
+            mp_friend_request_list,
             mp_join_battle,
             mp_join_battle_deny,
             mp_leave_battle,
