@@ -25,6 +25,7 @@ export function BattleRow({
   battle,
   joined,
   canJoin,
+  inProgress = false,
   onJoin,
   onLeave,
   enginePath,
@@ -33,6 +34,8 @@ export function BattleRow({
   battle: Battle;
   joined: boolean;
   canJoin: boolean;
+  /** The battle is already running (host in-game): joining is not allowed. */
+  inProgress?: boolean;
   onJoin: (b: Battle, key?: string) => void;
   onLeave: () => void;
   enginePath?: string;
@@ -41,7 +44,7 @@ export function BattleRow({
   const players = occupancy(battle);
   const full = players >= battle.maxPlayers;
   const restricted = battle.passworded || battle.locked;
-  const disabled = joined || !canJoin || full;
+  const disabled = joined || !canJoin || full || inProgress;
   const [pwOpen, setPwOpen] = useState(false);
   const { dataUrl, loading } = useUnitsyncMinimap(
     enginePath,
@@ -135,7 +138,7 @@ export function BattleRow({
           disabled={disabled}
           onClick={() => onJoin(battle)}
         >
-          Join
+          {inProgress ? "In game" : "Join"}
         </Button>
       )}
     </li>
