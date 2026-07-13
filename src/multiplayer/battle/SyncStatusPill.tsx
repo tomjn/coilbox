@@ -23,9 +23,13 @@ const CONFIG: Record<SyncState, { pill: string; dot: string; label: string }> =
   };
 
 /**
- * Top-of-room sync indicator: a pill with a pulsing dot that reads green when
- * every player is synced and the local map+game are present, amber while sync is
- * still unknown, and red when someone is unsynced or content is missing.
+ * Top-of-room sync indicator: a pulsing dot that reads green when every player is
+ * synced and the local map+game are present, amber while sync is still unknown,
+ * and red when someone is unsynced or content is missing.
+ *
+ * When fully synced the status is ambient, so it collapses to a bare dot with the
+ * label in a hover tooltip. Any non-synced state keeps its text visible so it
+ * draws the eye and reads as something that needs attention.
  */
 export function SyncStatusPill({
   state,
@@ -35,14 +39,15 @@ export function SyncStatusPill({
   detail?: string;
 }) {
   const cfg = CONFIG[state];
+  const showLabel = state !== "synced";
   return (
     <Badge
       variant="ghost"
-      className={cn("gap-1.5", cfg.pill)}
+      className={cn("gap-1.5", cfg.pill, !showLabel && "px-1.5")}
       title={detail ?? cfg.label}
     >
       <span className={cn("size-2 rounded-full", cfg.dot)} />
-      {detail ?? cfg.label}
+      {showLabel && (detail ?? cfg.label)}
     </Badge>
   );
 }
