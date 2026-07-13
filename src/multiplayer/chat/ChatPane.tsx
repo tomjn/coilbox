@@ -156,27 +156,28 @@ export function ChatPane({
       <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-            {titlePresence && (
-              <span
-                role="img"
-                className={cn(
-                  "size-2 shrink-0 rounded-full",
-                  PRESENCE_META[titlePresence].dotClass,
-                )}
-                aria-label={PRESENCE_META[titlePresence].label}
-                title={PRESENCE_META[titlePresence].label}
-              />
-            )}
             {titleIsBot && <Bot className="size-4 shrink-0" aria-label="Bot" />}
             <span className="truncate">{title}</span>
           </h2>
-          {subtitle ? (
-            <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
-          ) : titlePresence ? (
-            <p className="truncate text-xs text-muted-foreground">
-              {PRESENCE_META[titlePresence].label}
+          {(subtitle || titlePresence) && (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {titlePresence && (
+                <span
+                  role="img"
+                  className={cn(
+                    "size-2 shrink-0 rounded-full",
+                    PRESENCE_META[titlePresence].dotClass,
+                  )}
+                  aria-label={PRESENCE_META[titlePresence].label}
+                  title={PRESENCE_META[titlePresence].label}
+                />
+              )}
+              <span className="truncate">
+                {subtitle ??
+                  (titlePresence ? PRESENCE_META[titlePresence].label : null)}
+              </span>
             </p>
-          ) : null}
+          )}
         </div>
         {headerActions && (
           <div className="flex shrink-0 items-center gap-1">
