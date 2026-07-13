@@ -64,6 +64,70 @@ folder exists). A normal per-user install ignores it.
 }
 ```
 
+## Custom pages
+
+A distribution can add its own screens — a rules page, a "getting started" guide, a
+credits page — by dropping Markdown files into a **`pages/` folder** inside `.coilbox`.
+Each `.md` file becomes an in-app page; no `profile.json` entry is needed (the folder is
+auto-discovered).
+
+```
+<YourGameFolder>/
+  .coilbox/
+    profile.json
+    pages/
+      about.md
+      rules.md
+      bg.jpg          # an asset a page references
+```
+
+Each file starts with an optional **frontmatter** block — a `---`-fenced set of
+`key: value` lines — that configures the page:
+
+```markdown
+---
+path: rules
+title: House Rules
+icon: info
+group: Info
+order: 10
+background: pages/bg.jpg
+---
+
+# House Rules
+
+1. Be excellent to each other.
+2. No sharing accounts.
+
+See the [about page](#/pages/about) for more.
+```
+
+| Key          | Meaning                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------ |
+| `path`       | Route slug. The page is served at `#/pages/<path>` (always namespaced under `pages/` so it can't collide with a built-in screen). Lowercase `a-z 0-9 - /`; omitted → derived from the filename. |
+| `title`      | Breadcrumb and sidebar label. Omitted → the slug.                                                |
+| `icon`       | Sidebar icon — same name list as [`links`](#links-object).                                       |
+| `nav`        | `false` keeps the page reachable by link/route but adds **no** sidebar item (a hidden-but-linkable page). Default `true`. |
+| `group`      | Sidebar group heading; pages sharing a `group` collect under it. Omitted → a top-level item.     |
+| `order`      | Sort order among pages (sidebar + routes).                                                        |
+| `background` | A full-page background image. `.coilbox`-relative (e.g. `pages/bg.jpg`) or an inline `data:`/`https:` URL. |
+
+Notes:
+
+- **Assets are `.coilbox`-relative**, the same convention as the splash/logo images. A
+  Markdown image `![](pages/diagram.png)` or a `background: pages/bg.jpg` resolves to a
+  file under `.coilbox/`. Audio/video files referenced as images render inline players.
+- **Link between pages** (or from a welcome screen) with `#/pages/<path>` — handy with
+  `nav: false` for pages you only want reached from elsewhere.
+- Content is trusted bundler-authored Markdown (safe by default: no raw HTML/JS).
+  Malformed or duplicate `path`s are skipped rather than breaking the app.
+
+## Verifying it's active
+
+Open **Settings > Distribution profile**. It shows whether a profile is loaded, where
+it came from (`file` / `default`), and a summary of everything it's changing. If no
+profile is loaded it reads "No distribution profile loaded — standard Coilbox".
+
 ## Fields
 
 Every field is optional except `version`. Unknown fields are ignored, and a malformed
@@ -544,67 +608,3 @@ overrides the branding catalog's per-game defaults.
 
 See the [Names and factions](conquest.md#names-and-factions) section for how the
 pools are drawn and the full merge order (profile over catalog over built-ins).
-
-## Custom pages
-
-A distribution can add its own screens — a rules page, a "getting started" guide, a
-credits page — by dropping Markdown files into a **`pages/` folder** inside `.coilbox`.
-Each `.md` file becomes an in-app page; no `profile.json` entry is needed (the folder is
-auto-discovered).
-
-```
-<YourGameFolder>/
-  .coilbox/
-    profile.json
-    pages/
-      about.md
-      rules.md
-      bg.jpg          # an asset a page references
-```
-
-Each file starts with an optional **frontmatter** block — a `---`-fenced set of
-`key: value` lines — that configures the page:
-
-```markdown
----
-path: rules
-title: House Rules
-icon: info
-group: Info
-order: 10
-background: pages/bg.jpg
----
-
-# House Rules
-
-1. Be excellent to each other.
-2. No sharing accounts.
-
-See the [about page](#/pages/about) for more.
-```
-
-| Key          | Meaning                                                                                          |
-| ------------ | ------------------------------------------------------------------------------------------------ |
-| `path`       | Route slug. The page is served at `#/pages/<path>` (always namespaced under `pages/` so it can't collide with a built-in screen). Lowercase `a-z 0-9 - /`; omitted → derived from the filename. |
-| `title`      | Breadcrumb and sidebar label. Omitted → the slug.                                                |
-| `icon`       | Sidebar icon — same name list as [`links`](#links-object).                                       |
-| `nav`        | `false` keeps the page reachable by link/route but adds **no** sidebar item (a hidden-but-linkable page). Default `true`. |
-| `group`      | Sidebar group heading; pages sharing a `group` collect under it. Omitted → a top-level item.     |
-| `order`      | Sort order among pages (sidebar + routes).                                                        |
-| `background` | A full-page background image. `.coilbox`-relative (e.g. `pages/bg.jpg`) or an inline `data:`/`https:` URL. |
-
-Notes:
-
-- **Assets are `.coilbox`-relative**, the same convention as the splash/logo images. A
-  Markdown image `![](pages/diagram.png)` or a `background: pages/bg.jpg` resolves to a
-  file under `.coilbox/`. Audio/video files referenced as images render inline players.
-- **Link between pages** (or from a welcome screen) with `#/pages/<path>` — handy with
-  `nav: false` for pages you only want reached from elsewhere.
-- Content is trusted bundler-authored Markdown (safe by default: no raw HTML/JS).
-  Malformed or duplicate `path`s are skipped rather than breaking the app.
-
-## Verifying it's active
-
-Open **Settings > Distribution profile**. It shows whether a profile is loaded, where
-it came from (`file` / `default`), and a summary of everything it's changing. If no
-profile is loaded it reads "No distribution profile loaded — standard Coilbox".
