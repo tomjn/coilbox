@@ -219,7 +219,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
  */
 export function HomeSetupCard() {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mb-2 flex flex-col gap-4">
       <SetupCard dismissible />
       <GetStartedCard />
     </div>
