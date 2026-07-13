@@ -1,0 +1,131 @@
+import { cn } from "@picoframe/frame";
+import type { FramePlugin, FrameRoute } from "@picoframe/plugin-sdk";
+import Markdown, { type Components } from "react-markdown";
+import { assetUrl, isLocalRef, mediaKind } from "../lib/assetUrl";
+import { buildPageNav, getProfilePages, type ProfilePage } from "./pages";
+
+/**
+ * Renders a custom distribution page (issue #255) as Markdown, with an optional
+ * background image. The content is bundler-authored and therefore trusted — but
+ * `react-markdown` is safe-by-default (no raw HTML), which is plenty here, so we don't
+ * pull in `rehype-raw`. Relative media/background refs are `.coilbox`-relative (the
+ * same convention as the splash/logo/welcome assets) and load through the `coilbox://`
+ * protocol; `data:`/`http(s):` refs are used verbatim.
+ */
+
+/** Resolve a page asset ref to a URL, mapping `.coilbox`-relative refs to the protocol. */
+function resolveSrc(src: unknown): string | undefined {
+  if (typeof src !== "string" || !src) return undefined;
+  return isLocalRef(src) ? assetUrl(src) : src;
+}
+
+const MEDIA_COMPONENTS: Components = {
+  img({ src, alt, title }) {
+    const url = resolveSrc(src);
+    if (!url) return null;
+    const kind = mediaKind(url);
+    if (kind === "audio") {
+      // biome-ignore lint/a11y/useMediaCaption: bundler-supplied page audio has no caption track
+      return <audio controls src={url} className="my-3 w-full" />;
+    }
+    if (kind === "video") {
+      return (
+        // biome-ignore lint/a11y/useMediaCaption: bundler-supplied page video has no caption track
+        <video
+          controls
+          src={url}
+          className="my-3 w-full rounded-md"
+          title={title}
+        />
+      );
+    }
+    return (
+      <img
+        src={url}
+        alt={alt ?? ""}
+        title={title}
+        className="my-3 max-w-full rounded-md"
+      />
+    );
+  },
+};
+
+/** Markdown page body with themed typography and inline media. */
+function PageProse({ children }: { children: string }) {
+  return (
+    <div
+      className={cn(
+        "text-sm leading-relaxed text-foreground/90",
+        "[&_a]:text-primary [&_a]:underline",
+        "[&_code]:font-mono [&_code]:text-xs",
+        "[&_h1]:mb-3 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:tracking-tight",
+        "[&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold",
+        "[&_h3]:mt-4 [&_h3]:mb-1 [&_h3]:font-semibold",
+        "[&_li]:ml-4 [&_li]:list-disc [&_p]:my-2 [&_ul]:my-2 [&_ol]:my-2",
+        "[&_ol_li]:list-decimal",
+      )}
+    >
+      <Markdown components={MEDIA_COMPONENTS}>{children}</Markdown>
+    </div>
+  );
+}
+
+/** One custom page: an optional full-bleed background behind a centered prose column. */
+export function MarkdownPage({ page }: { page: ProfilePage }) {
+  const bg = resolveSrc(page.background);
+  return (
+    <div className="relative min-h-full">
+      {bg && (
+        <div
+          className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${bg})` }}
+          aria-hidden
+        />
+      )}
+      <article
+        className={cn(
+          "relative mx-auto my-8 max-w-3xl rounded-lg px-6 py-8",
+          // A translucent scrim keeps the prose readable over any background image.
+          bg && "bg-background/80 shadow-sm backdrop-blur-sm",
+        )}
+      >
+        <PageProse>{page.body}</PageProse>
+      </article>
+    </div>
+  );
+}
+
+/**
+ * Build a frame route per page. Each route's `lazy` resolves immediately to a
+ * component bound (via closure) to its already-loaded page — there's nothing to fetch
+ * on navigation, but the frame's API is lazy, so we hand back a resolved promise.
+ */
+export function buildPageRoutes(pages: ProfilePage[]): FrameRoute[] {
+  return pages.map((page) => ({
+    path: page.route,
+    crumb: page.title,
+    lazy: async () => ({ default: () => <MarkdownPage page={page} /> }),
+  }));
+}
+
+/**
+ * Inject the profile's custom pages into the `profile` plugin as routes + sidebar nav.
+ * Called from `main.tsx` after `loadProfilePages()` resolves (the plugin list is built
+ * before the pages load). Mirrors `applyProfileLinks`. No-op — returns the same array —
+ * when there are no pages, so vanilla Coilbox is untouched.
+ */
+export function applyProfilePages(plugins: FramePlugin[]): FramePlugin[] {
+  const pages = getProfilePages();
+  if (pages.length === 0) return plugins;
+  const routes = buildPageRoutes(pages);
+  const nav = buildPageNav(pages);
+  return plugins.map((p) =>
+    p.id === "profile"
+      ? {
+          ...p,
+          routes: [...p.routes, ...routes],
+          nav: [...(p.nav ?? []), ...nav],
+        }
+      : p,
+  );
+}

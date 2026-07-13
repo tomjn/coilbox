@@ -6,9 +6,11 @@ import { plugins } from "./app.plugins";
 import SetupHome from "./content/pages/SetupHome";
 import { ErrorBoundary } from "./general/ErrorBoundary";
 import { SPLASH_ENABLED_KEY } from "./general/splash";
+import { applyProfilePages } from "./profile/CustomPage";
 import { applyProfileSettingsHiding } from "./profile/hidden";
 import { applyProfileSlots, buildLayoutConfig } from "./profile/layout";
 import { applyProfileLinks } from "./profile/links";
+import { loadProfilePages } from "./profile/pages";
 import {
   applyBootBackground,
   applyProfileSidebarSeed,
@@ -58,13 +60,21 @@ const logoImages = {
   right: await resolveProfileImage(profile.layout?.right?.image),
 };
 
+// Load the profile's custom markdown pages (.coilbox/pages/*.md) before finalizing
+// the plugin list, so their routes + nav items can be injected below. No-op (empty)
+// without a profile or a pages folder.
+await loadProfilePages();
+
 // Hide any settings sections the profile lists (uses SettingsSection.useVisible,
 // injected centrally so no plugin needs to opt in). No-op without a profile.
 // applyProfileSlots injects the profile's top-bar logos (left/center/right slots);
-// a no-op when the profile sets none.
-const appPlugins = applyProfileSlots(
-  applyProfileLinks(applyProfileSettingsHiding(plugins)),
-  logoImages,
+// a no-op when the profile sets none. applyProfilePages adds the custom-page routes
+// and their sidebar nav; a no-op when the profile ships no pages.
+const appPlugins = applyProfilePages(
+  applyProfileSlots(
+    applyProfileLinks(applyProfileSettingsHiding(plugins)),
+    logoImages,
+  ),
 );
 
 // The OS title bar is a separate surface from the AppFrame `title` prop (which
