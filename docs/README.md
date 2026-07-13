@@ -5,6 +5,7 @@ Guides for running Coilbox in **portable mode** and shipping it alongside a game
 ## Start here
 
 - **[Portable mode](portable-mode.md)** — the foundation. How to run Coilbox self-contained in a `.coilbox` folder, where files live, how to run it alongside skylobby, and how to bundle the game and package everything up for players. **Read this first.**
+- **[Distributing to players](distributing.md)** — the short, practical follow-up: the per-OS package layout (one zip each for Windows, Linux, macOS), why to ship a folder rather than loose files, and the macOS `.zip`-not-`.dmg` gotcha.
 
 ## Branding and shipping
 

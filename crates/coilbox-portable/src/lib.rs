@@ -28,12 +28,23 @@ use tauri::{AppHandle, Manager, Runtime};
 /// The directory coilbox is "next to" — the anchor for portable detection and for
 /// resolving relative content roots.
 ///
-/// Usually `current_exe().parent()`. On macOS the executable lives inside
-/// `Foo.app/Contents/MacOS/`, so if any ancestor is a `.app` bundle we return the
-/// bundle's *parent* — i.e. the folder the user sees the app in, where `.coilbox`
-/// would naturally sit beside it. Inert off macOS (no `.app` ancestors).
-fn app_dir_from_exe(exe: &Path) -> Option<PathBuf> {
-    let dir = exe.parent()?;
+/// Usually `current_exe().parent()`. Two platform wrinkles:
+///
+/// - **Linux AppImage:** an AppImage mounts itself at a throwaway temp path, so
+///   `current_exe()` points *inside the mount* (`/tmp/.mount_XXXX/usr/bin/coilbox`),
+///   not next to the `.AppImage` file the user actually placed. The runtime exposes
+///   the real file path in the `APPIMAGE` env var; when present we anchor on its
+///   parent so a `.coilbox` folder beside the AppImage is found. Absent everywhere
+///   but a running AppImage.
+/// - **macOS:** the executable lives inside `Foo.app/Contents/MacOS/`, so if any
+///   ancestor is a `.app` bundle we return the bundle's *parent* — the folder the
+///   user sees the app in, where `.coilbox` would naturally sit beside it. Inert off
+///   macOS (no `.app` ancestors).
+fn app_dir_from_exe(exe: Option<&Path>, appimage: Option<&Path>) -> Option<PathBuf> {
+    if let Some(appimage) = appimage {
+        return appimage.parent().map(Path::to_path_buf);
+    }
+    let dir = exe?.parent()?;
     if let Some(bundle) = dir
         .ancestors()
         .find(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("app")))
@@ -50,9 +61,9 @@ fn app_dir_from_exe(exe: &Path) -> Option<PathBuf> {
 pub fn app_dir() -> Option<PathBuf> {
     static DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
     DIR.get_or_init(|| {
-        std::env::current_exe()
-            .ok()
-            .and_then(|e| app_dir_from_exe(&e))
+        let appimage = std::env::var_os("APPIMAGE").map(PathBuf::from);
+        let exe = std::env::current_exe().ok();
+        app_dir_from_exe(exe.as_deref(), appimage.as_deref())
     })
     .clone()
 }
@@ -200,7 +211,7 @@ mod tests {
     fn app_dir_is_exe_parent_on_plain_layout() {
         let exe = Path::new("/opt/games/SplinterFaction/coilbox");
         assert_eq!(
-            app_dir_from_exe(exe),
+            app_dir_from_exe(Some(exe), None),
             Some(PathBuf::from("/opt/games/SplinterFaction"))
         );
     }
@@ -209,7 +220,22 @@ mod tests {
     fn app_dir_escapes_macos_bundle() {
         let exe = Path::new("/Applications/Coilbox.app/Contents/MacOS/coilbox");
         // `.coilbox` should sit beside the bundle, not inside Contents/MacOS.
-        assert_eq!(app_dir_from_exe(exe), Some(PathBuf::from("/Applications")));
+        assert_eq!(
+            app_dir_from_exe(Some(exe), None),
+            Some(PathBuf::from("/Applications"))
+        );
+    }
+
+    #[test]
+    fn app_dir_prefers_appimage_parent_over_exe_mount() {
+        // Inside an AppImage, current_exe() points into the throwaway mount; the
+        // real file (and any `.coilbox` beside it) lives at $APPIMAGE.
+        let exe = Path::new("/tmp/.mount_abc12/usr/bin/coilbox");
+        let appimage = Path::new("/home/player/SplinterFaction/coilbox.AppImage");
+        assert_eq!(
+            app_dir_from_exe(Some(exe), Some(appimage)),
+            Some(PathBuf::from("/home/player/SplinterFaction"))
+        );
     }
 
     #[test]
