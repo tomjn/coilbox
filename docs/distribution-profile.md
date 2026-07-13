@@ -406,37 +406,44 @@ For a fully branded exit instead of (or in addition to) the sidebar button, put 
 
 ### `layout` (object)
 
-Locks parts of the app-frame chrome — the breadcrumb, the top-bar history
-buttons, the popover menu-button branding, and centered top-bar content. Every
-knob is a **lock** (authoritative on every launch, like `title`/`hide`), not a
-user-overridable seed. Omit `layout` entirely and the chrome behaves as normal.
+Controls the app-frame chrome — the sidebar mode, the breadcrumb, the top-bar
+history/fullscreen buttons, the menu-button branding, and top-bar logos. These
+are **locks** (authoritative every launch, like `title`/`hide`, with no user
+toggle) except `sidebarCollapsed`, which is a **seed**. Omit `layout` and the
+chrome behaves as normal.
 
 ```json
 {
   "version": 1,
   "layout": {
+    "popover": true,
+    "sidebarCollapsed": true,
     "hideBreadcrumb": true,
     "historyButtons": false,
+    "fullscreenButton": false,
     "menu": {
       "label": "Splinter Faction",
       "icon": "game",
       "image": "menu-logo.webp"
     },
-    "center": { "image": "wordmark.webp" }
+    "center": { "image": "wordmark.webp", "href": "https://example.com" }
   }
 }
 ```
 
-| Field            | Type    | Meaning                                                                 |
-| ---------------- | ------- | ----------------------------------------------------------------------- |
-| `hideBreadcrumb` | boolean | Hide the breadcrumb region in the top bar entirely.                     |
-| `historyButtons` | boolean | Force the top-bar back/forward buttons on (`true`) or off (`false`).    |
-| `menu`           | object  | Branding for the sidebar menu button (see below).                       |
-| `center`         | object  | Centered top-bar content: `{ "text": "…" }` or `{ "image": "…" }`.      |
+| Field              | Type    | Meaning                                                                 |
+| ------------------ | ------- | ----------------------------------------------------------------------- |
+| `popover`          | boolean | `true` forces the sidebar into popover mode (a menu button opens it as an overlay); omitted/`false` is a persistent sidebar. A lock — the user has no toggle. |
+| `sidebarCollapsed` | boolean | **Seed** the sidebar to start collapsed. The user can still expand it, and their choice persists. Only meaningful when `popover` is off. |
+| `hideBreadcrumb`   | boolean | Hide the breadcrumb region in the top bar entirely.                     |
+| `historyButtons`   | boolean | Force the top-bar back/forward buttons on (`true`) or off (`false`).    |
+| `fullscreenButton` | boolean | `false` hides the top-bar fullscreen button and makes F11 inert (does **not** force fullscreen — that's [`fullscreenLocked`](#fullscreenlocked-boolean)). Default `true`. |
+| `menu`             | object  | Branding for the popover menu button (see below).                       |
+| `left` / `center` / `right` | object | A logo/text in the corresponding top-bar slot (see below).     |
 
-**`menu` (popover menu-button branding).** Coilbox's sidebar defaults to a
-popover opened by a menu button in the top bar; this rebrands that button. It is
-**only visible while the sidebar is in popover mode**.
+**`menu` (popover menu-button branding).** When the sidebar is in popover mode
+(`popover: true`) a menu button in the top bar opens it; this rebrands that
+button. It is **only visible in popover mode**.
 
 | Field          | Type    | Meaning                                                                         |
 | -------------- | ------- | ------------------------------------------------------------------------------- |
@@ -446,10 +453,14 @@ popover opened by a menu button in the top bar; this rebrands that button. It is
 | `iconOpen`     | string  | Icon name for the open state.                                                   |
 | `image`        | string  | A logo shown in place of the label text. Same source rules as [`splash.image`](#splash-object) (`.coilbox`-relative path, or inline `data:`/`https:`). Wins over `label` as the visible content; `label` stays the accessible name. |
 
-**`center` (centered top-bar content).** `text` renders as centered text;
-`image` (same source rules as `splash.image`) renders a centered logo. If both
-are set, **`image` wins**. If an image can't be loaded it's skipped — `center`
-falls back to `text`, and `menu` falls back to its `label`.
+**`left` / `center` / `right` (top-bar logos).** Each places a logo or text in
+that top-bar slot. Same shape:
+
+| Field   | Type   | Meaning                                                                          |
+| ------- | ------ | -------------------------------------------------------------------------------- |
+| `text`  | string | Text shown when no image resolves.                                               |
+| `image` | string | Logo image. Same source rules as [`splash.image`](#splash-object). **Wins over `text`** when it resolves; falls back to `text` if it can't be loaded. |
+| `href`  | string | Makes the logo a link opened in the system browser (`http(s)`/`mailto`/`tel`; other schemes are ignored). |
 
 ### `conquest` (object)
 
