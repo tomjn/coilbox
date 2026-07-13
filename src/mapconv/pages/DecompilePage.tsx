@@ -277,7 +277,7 @@ export default function DecompilePage() {
               </Button>
             ) : (
               <Button onClick={run} disabled={!canRun}>
-                <Play /> Decompile
+                <Play className="fill-current" /> Decompile
               </Button>
             )}
             {running && (

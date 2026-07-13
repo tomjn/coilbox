@@ -149,7 +149,8 @@ export function LuaRepl({
             disabled={session.running || input.trim() === ""}
             onClick={() => void submit()}
           >
-            <Play className="size-4" /> {session.running ? "Running…" : "Run"}
+            <Play className="size-4 fill-current" />{" "}
+            {session.running ? "Running…" : "Run"}
           </Button>
           <Button
             size="sm"

@@ -501,7 +501,7 @@ export default function CompilePage() {
               </Button>
             ) : (
               <Button onClick={run} disabled={!canRun}>
-                <Play /> Compile
+                <Play className="fill-current" /> Compile
               </Button>
             )}
             {running && (

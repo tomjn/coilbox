@@ -50,7 +50,7 @@ export function GameCard({
           className="pointer-events-auto relative z-10 shrink-0"
           onClick={onPlay}
         >
-          <Play className="size-4" />
+          <Play className="size-4 fill-current" />
         </Button>
       }
     >
