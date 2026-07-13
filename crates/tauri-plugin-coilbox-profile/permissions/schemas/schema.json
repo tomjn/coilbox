@@ -319,10 +319,22 @@
           "markdownDescription": "Denies the profile_load command without any pre-configured scope."
         },
         {
-          "description": "Allows reading the bundler-supplied distribution profile and its assets.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`",
+          "description": "Enables the profile_pages command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-profile-pages",
+          "markdownDescription": "Enables the profile_pages command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the profile_pages command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-profile-pages",
+          "markdownDescription": "Denies the profile_pages command without any pre-configured scope."
+        },
+        {
+          "description": "Allows reading the bundler-supplied distribution profile, its assets, and custom pages.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`\n- `allow-profile-pages`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows reading the bundler-supplied distribution profile and its assets.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`"
+          "markdownDescription": "Allows reading the bundler-supplied distribution profile, its assets, and custom pages.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`\n- `allow-profile-pages`"
         }
       ]
     }
