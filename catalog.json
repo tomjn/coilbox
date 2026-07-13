@@ -76,6 +76,167 @@
             "download": { "kind": "map", "springName": "Crystallized Plains" }
           }
         ]
+      },
+      {
+        "id": "space-maps",
+        "title": "Space maps",
+        "blurb": "Void-edged battlegrounds set among asteroids, moons and the stars.",
+        "maps": [
+          {
+            "id": "space-asteroid-mines-v3",
+            "title": "Asteroid Mines V3",
+            "filename": "asteroid_mines_v3.sd7",
+            "download": { "kind": "map", "springName": "Asteroid_Mines_V3" }
+          },
+          {
+            "id": "space-cloud9-v2",
+            "title": "Cloud9 V2",
+            "filename": "cloud9_v2.sd7",
+            "download": { "kind": "map", "springName": "Cloud9_V2" }
+          },
+          {
+            "id": "space-faster-than-light",
+            "title": "Faster Than Light 1.1",
+            "filename": "faster_than_light_1.1.sd7",
+            "download": { "kind": "map", "springName": "Faster Than Light 1.1" }
+          },
+          {
+            "id": "space-houses-of-tripolis",
+            "title": "Houses of Tripolis 1.3",
+            "filename": "houses_of_tripolis_1.3.sd7",
+            "download": {
+              "kind": "map",
+              "springName": "Houses of Tripolis 1.3",
+              "searchUrl": "https://files-cdn.beyondallreason.dev/find"
+            }
+          },
+          {
+            "id": "space-moonq20xr2",
+            "title": "MoonQ20XR2",
+            "filename": "moonq20xr2_2.0.sd7",
+            "download": { "kind": "map", "springName": "MoonQ20XR2 2.0" }
+          },
+          {
+            "id": "space-oort-cloud-v2",
+            "title": "Oort Cloud V2",
+            "filename": "oort_cloud_v2.sd7",
+            "download": { "kind": "map", "springName": "Oort_Cloud_V2" }
+          },
+          {
+            "id": "space-project-sd-129",
+            "title": "Project SD-129 v1.0",
+            "filename": "project_sd-129_v1.0.sd7",
+            "download": {
+              "kind": "map",
+              "springName": "Project SD-129 v1.0",
+              "searchUrl": "https://files-cdn.beyondallreason.dev/find"
+            }
+          },
+          {
+            "id": "space-tma20xr",
+            "title": "TMA20XR 2.1",
+            "filename": "tma20xr_2.1.sd7",
+            "download": { "kind": "map", "springName": "TMA20XR 2.1" }
+          }
+        ]
+      },
+      {
+        "id": "classics",
+        "title": "Classics",
+        "blurb": "Time-honoured battlefields that have decided games for two decades.",
+        "maps": [
+          {
+            "id": "classic-comet-catcher",
+            "title": "Comet Catcher",
+            "filename": "cometcatcher.sd7",
+            "download": { "kind": "map", "springName": "CometCatcher" }
+          },
+          {
+            "id": "classic-delta-siege-dry",
+            "title": "Delta Siege Dry",
+            "filename": "deltasiegedry.sd7",
+            "download": { "kind": "map", "springName": "DeltaSiegeDry" }
+          },
+          {
+            "id": "classic-evad-river-confluence",
+            "title": "Evad River Confluence",
+            "filename": "evad_river_confluence_v2.sd7",
+            "download": {
+              "kind": "map",
+              "springName": "Evad River Confluence_V2",
+              "searchUrl": "https://files-cdn.beyondallreason.dev/find"
+            }
+          },
+          {
+            "id": "classic-folsom-dam",
+            "title": "Folsom Dam",
+            "filename": "folsomdam.sd7",
+            "download": { "kind": "map", "springName": "FolsomDam" }
+          },
+          {
+            "id": "classic-great-divide",
+            "title": "Great Divide",
+            "filename": "great_divide_v1.sd7",
+            "download": {
+              "kind": "map",
+              "springName": "Great Divide V1",
+              "searchUrl": "https://files-cdn.beyondallreason.dev/find"
+            }
+          },
+          {
+            "id": "classic-painted-desert",
+            "title": "Painted Desert",
+            "filename": "painted_desert_v1.0.sd7",
+            "download": {
+              "kind": "map",
+              "springName": "Painted Desert v1.0",
+              "searchUrl": "https://files-cdn.beyondallreason.dev/find"
+            }
+          },
+          {
+            "id": "classic-the-cold-place",
+            "title": "The Cold Place",
+            "filename": "thecoldplace.sd7",
+            "download": { "kind": "map", "springName": "TheColdPlace" }
+          }
+        ]
+      },
+      {
+        "id": "resource-extremes",
+        "title": "Resource Extremes",
+        "blurb": "Metal-soaked and metal-starved maps for fast, focused fights.",
+        "maps": [
+          {
+            "id": "resource-duck",
+            "title": "Duck",
+            "filename": "duck.sd7",
+            "download": { "kind": "map", "springName": "duck" }
+          },
+          {
+            "id": "resource-mini-speedmetal",
+            "title": "Mini SpeedMetal",
+            "filename": "mini_speedmetal.sd7",
+            "download": { "kind": "map", "springName": "Mini_SpeedMetal" }
+          },
+          {
+            "id": "resource-nometal-speedmetal",
+            "title": "NoMetal SpeedMetal",
+            "filename": "nometal_speedmetal.sd7",
+            "download": { "kind": "map", "springName": "NoMetal SpeedMetal" }
+          },
+          {
+            "id": "resource-speed-ball",
+            "title": "Speed Ball",
+            "filename": "speed_ball.sd7",
+            "download": { "kind": "map", "springName": "Speed_Ball" }
+          },
+          {
+            "id": "resource-speedmetal",
+            "title": "SpeedMetal",
+            "filename": "speedmetal.sd7",
+            "download": { "kind": "map", "springName": "SpeedMetal" }
+          }
+        ]
       }
     ]
   },
