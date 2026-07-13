@@ -336,7 +336,11 @@ function AccountRow({
   );
 }
 
-/** A read-only built-in catalog entry. */
+/**
+ * A read-only catalog entry: a built-in preset or the profile's official server. Both
+ * are non-removable (no trash button); the official one is badged and listed first
+ * (see `buildCatalog`).
+ */
 function BuiltinServerRow({ server: s }: { server: LobbyServer }) {
   const tag =
     "rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground";
@@ -347,7 +351,17 @@ function BuiltinServerRow({ server: s }: { server: LobbyServer }) {
         {s.host}:{s.port}
       </span>
       {s.tls && <span className={tag}>TLS</span>}
-      <span className={cn("ml-auto", tag)}>Built-in</span>
+      {s.official ? (
+        <span
+          className={cn(
+            "ml-auto rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary",
+          )}
+        >
+          Official
+        </span>
+      ) : (
+        <span className={cn("ml-auto", tag)}>Built-in</span>
+      )}
     </li>
   );
 }

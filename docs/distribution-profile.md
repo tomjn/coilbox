@@ -263,6 +263,61 @@ won't open) are skipped; the rest still load.
 falls back to a generic external-link icon. (lucide ships no brand marks, so
 `discord` uses a generic chat glyph.)
 
+### `lobby` (object)
+
+Controls the multiplayer **lobby-server** presets a distribution ships: a preferred
+"official" server, which stock presets appear, and the chat channels a player joins on
+login. It narrows and brands the Settings > Lobby servers list without ever locking the
+player out — they can still add their own servers and remove their own logins.
+
+| Field      | Required | Meaning                                                          |
+| ---------- | -------- | ---------------------------------------------------------------- |
+| `official` | no       | The preferred server. Either a built-in **id** (a string, e.g. `"recoil-official"`) to promote an existing preset, or an inline server object (below). Shown with an **Official** badge, listed first, and not removable. |
+| `presets`  | no       | Allow-list of built-in server **ids** to keep. Omitted → all built-ins shown (the default). Present → only these appear (plus `official`); `[]` hides every stock preset, leaving just the official one. Never restricts the player's own custom servers. |
+| `channels` | no       | Channels seeded into the auto-join list the **first** time a login connects to the official server. A seed, not a lock: the player can leave them afterwards and they stay gone. Each entry is a channel name string, or `{ "name": "...", "key": "..." }` for a keyed channel. |
+
+An inline `official` server object:
+
+| Field             | Required | Meaning                                          |
+| ----------------- | -------- | ------------------------------------------------ |
+| `host`            | yes      | Hostname, e.g. `"lobby.example.org"`.            |
+| `name`            | no       | Display name; defaults to the host.              |
+| `port`            | no       | TCP port. Defaults to `8200`.                    |
+| `tls`             | no       | Connect over TLS. Defaults to `false`.           |
+| `allowSelfSigned` | no       | Accept a self-signed cert. Defaults to `false`.  |
+
+A single-server distribution — one official server, no stock presets:
+
+```json
+{
+  "version": 1,
+  "lobby": {
+    "official": {
+      "name": "Scary Lobby",
+      "host": "lobby.scary.example",
+      "tls": true,
+      "allowSelfSigned": true
+    },
+    "presets": [],
+    "channels": ["main", "newbies", { "name": "clan", "key": "s3cret" }]
+  }
+}
+```
+
+Or just promote and brand an existing built-in as official while keeping one other
+preset available:
+
+```json
+{
+  "version": 1,
+  "lobby": { "official": "recoil-official", "presets": ["bar"] }
+}
+```
+
+Built-in ids: `recoil-official`, `spring-official`, `techa`, `bar`, `bar-ssl`. An
+unknown `official` id (or an inline object with no `host`) is ignored — the rest of the
+block still applies.
+
 ### `splash` (object)
 
 Shows a brand splash over the whole window at startup: a centered image that fades in

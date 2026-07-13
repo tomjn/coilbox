@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 // migration.ts imports BUILTIN_SERVERS from config.ts, which pulls in useSetting
-// from @picoframe/frame; that package's dist won't load under Vitest's resolver.
-// The planner is pure, so stubbing the leaf package lets the module load.
+// from @picoframe/frame and, transitively via profile.ts, defineCommand from
+// @picoframe/plugin-sdk; neither package's dist loads under Vitest's resolver. The
+// planner is pure, so stubbing the leaves lets the module load.
 vi.mock("@picoframe/frame", () => ({
   useSetting: () => [{}, () => {}],
+}));
+vi.mock("@picoframe/plugin-sdk", () => ({
+  defineCommand: () => async () => ({}),
 }));
 
 import { type LegacyLobbyServer, planMigration } from "./migration";
