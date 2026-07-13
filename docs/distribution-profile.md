@@ -404,6 +404,53 @@ toggle, this button is **not** removed by the kiosk lock.
 For a fully branded exit instead of (or in addition to) the sidebar button, put a
 `data-coilbox-action="quit"` element in your [`welcome`](#welcome-object) HTML.
 
+### `layout` (object)
+
+Locks parts of the app-frame chrome — the breadcrumb, the top-bar history
+buttons, the popover menu-button branding, and centered top-bar content. Every
+knob is a **lock** (authoritative on every launch, like `title`/`hide`), not a
+user-overridable seed. Omit `layout` entirely and the chrome behaves as normal.
+
+```json
+{
+  "version": 1,
+  "layout": {
+    "hideBreadcrumb": true,
+    "historyButtons": false,
+    "menu": {
+      "label": "Splinter Faction",
+      "icon": "game",
+      "image": "menu-logo.webp"
+    },
+    "center": { "image": "wordmark.webp" }
+  }
+}
+```
+
+| Field            | Type    | Meaning                                                                 |
+| ---------------- | ------- | ----------------------------------------------------------------------- |
+| `hideBreadcrumb` | boolean | Hide the breadcrumb region in the top bar entirely.                     |
+| `historyButtons` | boolean | Force the top-bar back/forward buttons on (`true`) or off (`false`).    |
+| `menu`           | object  | Branding for the sidebar menu button (see below).                       |
+| `center`         | object  | Centered top-bar content: `{ "text": "…" }` or `{ "image": "…" }`.      |
+
+**`menu` (popover menu-button branding).** Coilbox's sidebar defaults to a
+popover opened by a menu button in the top bar; this rebrands that button. It is
+**only visible while the sidebar is in popover mode**.
+
+| Field          | Type    | Meaning                                                                         |
+| -------------- | ------- | ------------------------------------------------------------------------------- |
+| `label`        | string  | The button's accessible name and tooltip.                                       |
+| `labelVisible` | boolean | Show the label/logo beside the icon. Defaults to `true` when `label` or `image` is set; set `false` for an icon-only button that still has your `label` as its tooltip. |
+| `icon`         | string  | Icon name (same list as [`links`](#links-object)) for the closed state.         |
+| `iconOpen`     | string  | Icon name for the open state.                                                   |
+| `image`        | string  | A logo shown in place of the label text. Same source rules as [`splash.image`](#splash-object) (`.coilbox`-relative path, or inline `data:`/`https:`). Wins over `label` as the visible content; `label` stays the accessible name. |
+
+**`center` (centered top-bar content).** `text` renders as centered text;
+`image` (same source rules as `splash.image`) renders a centered logo. If both
+are set, **`image` wins**. If an image can't be loaded it's skipped — `center`
+falls back to `text`, and `menu` falls back to its `label`.
+
 ### `conquest` (object)
 
 Supplies system/faction names — and whole lore factions — for

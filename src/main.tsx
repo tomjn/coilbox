@@ -7,11 +7,13 @@ import SetupHome from "./content/pages/SetupHome";
 import { ErrorBoundary } from "./general/ErrorBoundary";
 import { SPLASH_ENABLED_KEY } from "./general/splash";
 import { applyProfileSettingsHiding } from "./profile/hidden";
+import { applyProfileCenterSlot, buildLayoutConfig } from "./profile/layout";
 import { applyProfileLinks } from "./profile/links";
 import {
   applyBootBackground,
   forceProfileTheme,
   loadProfile,
+  resolveProfileImage,
   resolveSplashSrc,
 } from "./profile/profile";
 import Splash from "./profile/Splash";
@@ -40,9 +42,21 @@ applyBootBackground();
 // picoframe's persisted theme so the brand wins even over a player's prior choice.
 forceProfileTheme();
 
+// Resolve the profile's layout images (popover menu logo + centered top-bar logo)
+// before first render, like the splash — a `.coilbox`-relative path round-trips to
+// a data URI, so it must be awaited before building the layout config / center slot.
+// Both null without a profile (or when the paths don't resolve).
+const menuImageSrc = await resolveProfileImage(profile.layout?.menu?.image);
+const centerImageSrc = await resolveProfileImage(profile.layout?.center?.image);
+
 // Hide any settings sections the profile lists (uses SettingsSection.useVisible,
 // injected centrally so no plugin needs to opt in). No-op without a profile.
-const appPlugins = applyProfileLinks(applyProfileSettingsHiding(plugins));
+// applyProfileCenterSlot injects the profile's centered top-bar content (topbar.center
+// slot); a no-op when the profile sets no `layout.center`.
+const appPlugins = applyProfileCenterSlot(
+  applyProfileLinks(applyProfileSettingsHiding(plugins)),
+  centerImageSrc,
+);
 
 // The OS title bar is a separate surface from the AppFrame `title` prop (which
 // drives in-app chrome), and is otherwise fixed by tauri.conf.json. Best-effort:
@@ -118,9 +132,7 @@ createRoot(root).render(
         plugins={appPlugins}
         title={appTitle}
         home={home}
-        layout={{
-          sidebar: { popover: { default: true, userConfigurable: true } },
-        }}
+        layout={buildLayoutConfig(profile, menuImageSrc)}
         settingsStorage={settingsStorage}
       />
     </ErrorBoundary>
