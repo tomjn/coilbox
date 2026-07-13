@@ -615,10 +615,10 @@
           "markdownDescription": "Denies the conquest_state_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`",
+          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`",
           "type": "string",
           "const": "coilbox-content:default",
-          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`"
+          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`"
         },
         {
           "description": "Enables the branding_catalog command without any pre-configured scope.",
@@ -675,6 +675,12 @@
           "markdownDescription": "Enables the content_create_standard_root command without any pre-configured scope."
         },
         {
+          "description": "Enables the content_delete_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-delete-save",
+          "markdownDescription": "Enables the content_delete_save command without any pre-configured scope."
+        },
+        {
           "description": "Enables the content_demo_chat command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-content:allow-content-demo-chat",
@@ -697,6 +703,12 @@
           "type": "string",
           "const": "coilbox-content:allow-content-list-replays",
           "markdownDescription": "Enables the content_list_replays command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_list_saves command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-list-saves",
+          "markdownDescription": "Enables the content_list_saves command without any pre-configured scope."
         },
         {
           "description": "Enables the content_open_path command without any pre-configured scope.",
@@ -795,6 +807,12 @@
           "markdownDescription": "Denies the content_create_standard_root command without any pre-configured scope."
         },
         {
+          "description": "Denies the content_delete_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-delete-save",
+          "markdownDescription": "Denies the content_delete_save command without any pre-configured scope."
+        },
+        {
           "description": "Denies the content_demo_chat command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-content:deny-content-demo-chat",
@@ -817,6 +835,12 @@
           "type": "string",
           "const": "coilbox-content:deny-content-list-replays",
           "markdownDescription": "Denies the content_list_replays command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_list_saves command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-list-saves",
+          "markdownDescription": "Denies the content_list_saves command without any pre-configured scope."
         },
         {
           "description": "Denies the content_open_path command without any pre-configured scope.",
@@ -1881,10 +1905,10 @@
           "markdownDescription": "Denies the mp_update_bot command without any pre-configured scope."
         },
         {
-          "description": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-export-script`\n- `allow-play-export-preset`\n- `allow-play-import-preset`\n- `allow-play-launch`\n- `allow-play-launch-replay`\n- `allow-play-cancel`\n- `allow-play-focus`",
+          "description": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-export-script`\n- `allow-play-export-preset`\n- `allow-play-import-preset`\n- `allow-play-launch`\n- `allow-play-launch-replay`\n- `allow-play-launch-save`\n- `allow-play-cancel`\n- `allow-play-focus`",
           "type": "string",
           "const": "coilbox-play:default",
-          "markdownDescription": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-export-script`\n- `allow-play-export-preset`\n- `allow-play-import-preset`\n- `allow-play-launch`\n- `allow-play-launch-replay`\n- `allow-play-cancel`\n- `allow-play-focus`"
+          "markdownDescription": "Allows the play plugin's start-script generation, engine launch and cancel commands.\n#### This default permission set includes:\n\n- `allow-play-generate-script`\n- `allow-play-export-script`\n- `allow-play-export-preset`\n- `allow-play-import-preset`\n- `allow-play-launch`\n- `allow-play-launch-replay`\n- `allow-play-launch-save`\n- `allow-play-cancel`\n- `allow-play-focus`"
         },
         {
           "description": "Enables the play_cancel command without any pre-configured scope.",
@@ -1935,6 +1959,12 @@
           "markdownDescription": "Enables the play_launch_replay command without any pre-configured scope."
         },
         {
+          "description": "Enables the play_launch_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-play:allow-play-launch-save",
+          "markdownDescription": "Enables the play_launch_save command without any pre-configured scope."
+        },
+        {
           "description": "Denies the play_cancel command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-play:deny-play-cancel",
@@ -1983,10 +2013,16 @@
           "markdownDescription": "Denies the play_launch_replay command without any pre-configured scope."
         },
         {
-          "description": "Allows reading the bundler-supplied distribution profile and its assets.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`",
+          "description": "Denies the play_launch_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-play:deny-play-launch-save",
+          "markdownDescription": "Denies the play_launch_save command without any pre-configured scope."
+        },
+        {
+          "description": "Allows reading the bundler-supplied distribution profile, its assets, and custom pages.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`\n- `allow-profile-pages`",
           "type": "string",
           "const": "coilbox-profile:default",
-          "markdownDescription": "Allows reading the bundler-supplied distribution profile and its assets.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`"
+          "markdownDescription": "Allows reading the bundler-supplied distribution profile, its assets, and custom pages.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`\n- `allow-profile-pages`"
         },
         {
           "description": "Enables the profile_asset command without any pre-configured scope.",
@@ -2001,6 +2037,12 @@
           "markdownDescription": "Enables the profile_load command without any pre-configured scope."
         },
         {
+          "description": "Enables the profile_pages command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-profile:allow-profile-pages",
+          "markdownDescription": "Enables the profile_pages command without any pre-configured scope."
+        },
+        {
           "description": "Denies the profile_asset command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-profile:deny-profile-asset",
@@ -2011,6 +2053,12 @@
           "type": "string",
           "const": "coilbox-profile:deny-profile-load",
           "markdownDescription": "Denies the profile_load command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the profile_pages command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-profile:deny-profile-pages",
+          "markdownDescription": "Denies the profile_pages command without any pre-configured scope."
         },
         {
           "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL, results dir, import/export).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`\n- `allow-us-results-dir`\n- `allow-us-export-report`\n- `allow-us-import-report`",

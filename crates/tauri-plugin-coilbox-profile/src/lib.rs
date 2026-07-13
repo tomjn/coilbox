@@ -99,10 +99,71 @@ async fn profile_asset(path: String) -> CliResult {
     CliResult::ok(json!({ "dataUri": data_uri }))
 }
 
+/// Pure core of [`profile_pages`]: enumerate `<root>/pages/*.md`, returning each
+/// file's `.coilbox`-relative path (`pages/<name>.md`) and text, sorted by path so nav
+/// order is stable. `list` yields the directory's entry paths; `read` reads one file.
+/// Empty when there's no portable root, the folder is absent/unreadable, or every read
+/// fails — the frontend treats an empty list as "no custom pages", so this never
+/// hard-fails. Non-`.md` entries are skipped.
+fn read_pages_from(
+    root: Option<PathBuf>,
+    list: impl Fn(&Path) -> std::io::Result<Vec<PathBuf>>,
+    read: impl Fn(&Path) -> std::io::Result<String>,
+) -> Vec<(String, String)> {
+    let Some(root) = root else {
+        return Vec::new();
+    };
+    let Ok(mut entries) = list(&root.join("pages")) else {
+        return Vec::new();
+    };
+    entries.sort();
+    let mut out = Vec::new();
+    for entry in entries {
+        if entry.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let Some(name) = entry.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if let Ok(text) = read(&entry) {
+            out.push((format!("pages/{name}"), text));
+        }
+    }
+    out
+}
+
+/// List a directory's immediate entries as full paths; the real reader for
+/// [`read_pages_from`]. A missing directory surfaces as an `Err`, which the core maps
+/// to an empty list.
+fn list_dir(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
+    Ok(std::fs::read_dir(dir)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .collect())
+}
+
+/// `profile_pages` — read the markdown files under the portable `.coilbox/pages/`
+/// folder so a distribution can add custom screens without a rebuild. Returns
+/// `{ pages: [{ path, content }] }`; the frontend parses each file's frontmatter and
+/// builds the routes/nav. Empty when not portable or the folder is absent.
+#[tauri::command]
+async fn profile_pages() -> CliResult {
+    let pages: Vec<_> = read_pages_from(coilbox_portable::portable_root(), list_dir, |p| {
+        std::fs::read_to_string(p)
+    })
+    .into_iter()
+    .map(|(path, content)| json!({ "path": path, "content": content }))
+    .collect();
+    CliResult::ok(json!({ "pages": pages }))
+}
+
 /// Build the plugin. Registered as `"coilbox-profile"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-profile")
-        .invoke_handler(tauri::generate_handler![profile_load, profile_asset])
+        .invoke_handler(tauri::generate_handler![
+            profile_load,
+            profile_asset,
+            profile_pages
+        ])
         .build()
 }
 
@@ -180,5 +241,75 @@ mod tests {
             Err(std::io::Error::from(std::io::ErrorKind::NotFound))
         });
         assert_eq!(uri, "");
+    }
+
+    #[test]
+    fn pages_lists_markdown_sorted_with_rel_paths() {
+        let out = read_pages_from(
+            Some(PathBuf::from("/pkg/.coilbox")),
+            |dir| {
+                assert_eq!(dir, Path::new("/pkg/.coilbox/pages"));
+                Ok(vec![
+                    PathBuf::from("/pkg/.coilbox/pages/rules.md"),
+                    PathBuf::from("/pkg/.coilbox/pages/about.md"),
+                    PathBuf::from("/pkg/.coilbox/pages/logo.png"), // non-md, skipped
+                ])
+            },
+            |p| Ok(format!("body of {}", p.display())),
+        );
+        assert_eq!(
+            out,
+            vec![
+                (
+                    "pages/about.md".to_string(),
+                    "body of /pkg/.coilbox/pages/about.md".to_string()
+                ),
+                (
+                    "pages/rules.md".to_string(),
+                    "body of /pkg/.coilbox/pages/rules.md".to_string()
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn pages_empty_when_folder_missing() {
+        let out = read_pages_from(
+            Some(PathBuf::from("/pkg/.coilbox")),
+            |_| Err(std::io::Error::from(std::io::ErrorKind::NotFound)),
+            |_| panic!("reader must not run when the folder is absent"),
+        );
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn pages_empty_when_not_portable() {
+        let out = read_pages_from(
+            None,
+            |_| panic!("lister must not run without a portable root"),
+            |_| panic!("reader must not run without a portable root"),
+        );
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn pages_skips_files_that_fail_to_read() {
+        let out = read_pages_from(
+            Some(PathBuf::from("/pkg/.coilbox")),
+            |_| {
+                Ok(vec![
+                    PathBuf::from("/pkg/.coilbox/pages/ok.md"),
+                    PathBuf::from("/pkg/.coilbox/pages/bad.md"),
+                ])
+            },
+            |p| {
+                if p.ends_with("bad.md") {
+                    Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+                } else {
+                    Ok("ok".to_string())
+                }
+            },
+        );
+        assert_eq!(out, vec![("pages/ok.md".to_string(), "ok".to_string())]);
     }
 }

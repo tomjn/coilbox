@@ -1,11 +1,12 @@
 ## Default Permission
 
-Allows reading the bundler-supplied distribution profile and its assets.
+Allows reading the bundler-supplied distribution profile, its assets, and custom pages.
 
 #### This default permission set includes the following:
 
 - `allow-profile-load`
 - `allow-profile-asset`
+- `allow-profile-pages`
 
 ## Permission Table
 
@@ -64,6 +65,32 @@ Enables the profile_load command without any pre-configured scope.
 <td>
 
 Denies the profile_load command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-profile:allow-profile-pages`
+
+</td>
+<td>
+
+Enables the profile_pages command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-profile:deny-profile-pages`
+
+</td>
+<td>
+
+Denies the profile_pages command without any pre-configured scope.
 
 </td>
 </tr>
