@@ -1,6 +1,14 @@
 import { Button, cn, Input } from "@picoframe/frame";
 import { ArrowUp, Bot } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/ui/message-scroller";
 import type { ChatMsg } from "../bindings";
 import { FormattedText } from "./FormattedText";
 import { PRESENCE_META, type Presence } from "./presence";
@@ -94,7 +102,6 @@ export function ChatPane({
 }: ChatPaneProps) {
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
   // Tab-completion: cycle state persists across Tabs; the input element and a
   // pending caret offset let us restore the selection after the controlled
   // re-render (picoframe's Input doesn't forward a ref, so we grab the element
@@ -124,12 +131,6 @@ export function ChatPane({
     setDraft(result.value);
     return true;
   }
-
-  // Keep the newest message in view as the log grows.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: messages.length is the trigger that should re-run the scroll, not read in the body
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length]);
 
   async function submit() {
     const text = draft.trim();
@@ -184,182 +185,213 @@ export function ChatPane({
         )}
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto px-4 py-3">
-        {messages.length === 0
-          ? (emptyState ?? (
-              <p className="text-sm text-muted-foreground">No messages yet.</p>
-            ))
-          : messages.map((m, i) => {
-              const key = `${m.from}-${m.at}-${i}`;
-              if (isNotice(m.kind)) {
-                const color = senderColor?.(m.from);
-                return (
-                  <div
-                    key={key}
-                    className="mt-2 py-0.5 text-center text-xs text-muted-foreground first:mt-0"
-                  >
-                    {m.kind === "system" ? (
-                      m.text
-                    ) : (
-                      <>
-                        <span
-                          className="font-medium"
-                          style={color ? { color } : undefined}
+      {/* Auto-scrolling log: pins to the newest message only while the reader is
+          already at the bottom, and surfaces a scroll-to-latest button otherwise
+          (via @shadcn/react's headless message-scroller). */}
+      <MessageScrollerProvider autoScroll>
+        <MessageScroller className="min-h-0 flex-1">
+          <MessageScrollerViewport className="px-4 py-3">
+            <MessageScrollerContent>
+              {messages.length === 0
+                ? (emptyState ?? (
+                    <p className="text-sm text-muted-foreground">
+                      No messages yet.
+                    </p>
+                  ))
+                : messages.map((m, i) => {
+                    const key = `${m.from}-${m.at}-${i}`;
+                    const own = currentUser != null && m.from === currentUser;
+                    // Group a run of messages from one sender: name on the first
+                    // only, timestamp on the last only, tight spacing between.
+                    const prev = messages[i - 1];
+                    const next = messages[i + 1];
+                    const prevSame = prev != null && grouped(prev, m);
+                    const nextSame = next != null && grouped(m, next);
+                    // Spacing rides on the MessageScrollerItem (the flex child) so
+                    // it survives the wrapper - the old `first:mt-0` broke once
+                    // each message became the only child of its own item.
+                    const spacing =
+                      i === 0 ? "mt-0" : prevSame ? "mt-0.5" : "mt-2";
+
+                    let body: ReactNode;
+                    if (isNotice(m.kind)) {
+                      const color = senderColor?.(m.from);
+                      body = (
+                        <div className="py-0.5 text-center text-xs text-muted-foreground">
+                          {m.kind === "system" ? (
+                            m.text
+                          ) : (
+                            <>
+                              <span
+                                className="font-medium"
+                                style={color ? { color } : undefined}
+                              >
+                                {m.from}
+                              </span>
+                              {m.kind === "join"
+                                ? " joined"
+                                : ` left${m.text ? `: ${m.text}` : ""}`}
+                            </>
+                          )}
+                        </div>
+                      );
+                    } else if (isAction(m.kind)) {
+                      // IRC-style emote: `* alice waves`, full-width and italic,
+                      // sender tinted. Reads the same whoever sent it (no
+                      // own/other bubble). Bots keep their glyph + monospace here
+                      // too (SPADS autohosts also emit `/me` lines).
+                      const color = senderColor?.(m.from);
+                      const bot = isBot?.(m.from) ?? false;
+                      body = (
+                        <div className="px-1 text-sm italic text-muted-foreground [overflow-wrap:anywhere]">
+                          {"* "}
+                          <span
+                            className="inline-flex items-center gap-1 align-middle font-medium not-italic"
+                            style={color ? { color } : undefined}
+                          >
+                            {bot && (
+                              <Bot
+                                className="size-4 shrink-0"
+                                aria-label="Bot"
+                              />
+                            )}
+                            {m.from}
+                          </span>{" "}
+                          <span className={cn(bot && "font-mono")}>
+                            <FormattedText text={m.text} />
+                          </span>
+                        </div>
+                      );
+                    } else {
+                      const color = senderColor?.(m.from);
+                      const bot = isBot?.(m.from) ?? false;
+                      const highlighted = isHighlighted?.(m) ?? false;
+                      body = (
+                        <div
+                          className={cn(
+                            "flex flex-col",
+                            own ? "items-end" : "items-start",
+                          )}
                         >
-                          {m.from}
-                        </span>
-                        {m.kind === "join"
-                          ? " joined"
-                          : ` left${m.text ? `: ${m.text}` : ""}`}
-                      </>
-                    )}
-                  </div>
-                );
-              }
-              if (isAction(m.kind)) {
-                // IRC-style emote: `* alice waves`, full-width and italic, sender
-                // tinted. Reads the same whoever sent it (no own/other bubble).
-                // Bots keep their glyph + monospace here too (SPADS autohosts also
-                // emit `/me` lines), so the special treatment isn't bypassed.
-                const color = senderColor?.(m.from);
-                const bot = isBot?.(m.from) ?? false;
-                return (
-                  <div
-                    key={key}
-                    className="mt-2 px-1 text-sm italic text-muted-foreground first:mt-0 [overflow-wrap:anywhere]"
-                  >
-                    {"* "}
-                    <span
-                      className="inline-flex items-center gap-1 align-middle font-medium not-italic"
-                      style={color ? { color } : undefined}
-                    >
-                      {bot && (
-                        <Bot className="size-4 shrink-0" aria-label="Bot" />
-                      )}
-                      {m.from}
-                    </span>{" "}
-                    <span className={cn(bot && "font-mono")}>
-                      <FormattedText text={m.text} />
-                    </span>
-                  </div>
-                );
-              }
-              const own = currentUser != null && m.from === currentUser;
-              const color = senderColor?.(m.from);
-              const bot = isBot?.(m.from) ?? false;
-              const highlighted = isHighlighted?.(m) ?? false;
-              // Group a run of messages from one sender: name on the first only,
-              // timestamp on the last only, tight spacing between.
-              const prev = messages[i - 1];
-              const next = messages[i + 1];
-              const prevSame = prev != null && grouped(prev, m);
-              const nextSame = next != null && grouped(m, next);
-              return (
-                <div
-                  key={key}
-                  className={cn(
-                    "flex flex-col first:mt-0",
-                    own ? "items-end" : "items-start",
-                    prevSame ? "mt-0.5" : "mt-2",
-                  )}
-                >
-                  {!own && !prevSame && (
-                    <span
-                      className={cn(
-                        "mb-0.5 flex items-center gap-1 px-1 text-xs",
-                        bot
-                          ? "font-semibold text-foreground"
-                          : "font-medium text-muted-foreground",
-                      )}
-                      style={color ? { color } : undefined}
-                    >
-                      {bot && (
-                        <Bot className="size-4 shrink-0" aria-label="Bot" />
-                      )}
-                      {m.from}
-                    </span>
-                  )}
-                  <div
-                    className={cn(
-                      own
-                        ? "max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-                        : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm",
-                      // Mention: accent ring so a flagged message stands out in the log.
-                      highlighted && "ring-2 ring-amber-400/60",
-                    )}
-                    // Wash the non-own bubble with the sender's team colour (low
-                    // alpha keeps the foreground text readable in both themes).
-                    style={
-                      !own && color
-                        ? { backgroundColor: `${color}26` }
-                        : undefined
+                          {!own && !prevSame && (
+                            <span
+                              className={cn(
+                                "mb-0.5 flex items-center gap-1 px-1 text-xs",
+                                bot
+                                  ? "font-semibold text-foreground"
+                                  : "font-medium text-muted-foreground",
+                              )}
+                              style={color ? { color } : undefined}
+                            >
+                              {bot && (
+                                <Bot
+                                  className="size-4 shrink-0"
+                                  aria-label="Bot"
+                                />
+                              )}
+                              {m.from}
+                            </span>
+                          )}
+                          <div
+                            className={cn(
+                              own
+                                ? "max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+                                : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm",
+                              // Mention: accent ring so a flagged message stands
+                              // out in the log.
+                              highlighted && "ring-2 ring-amber-400/60",
+                            )}
+                            // Wash the non-own bubble with the sender's team colour
+                            // (low alpha keeps the foreground text readable in both
+                            // themes).
+                            style={
+                              !own && color
+                                ? { backgroundColor: `${color}26` }
+                                : undefined
+                            }
+                          >
+                            <span
+                              className={cn(
+                                "whitespace-pre-wrap [overflow-wrap:anywhere]",
+                                // Bot output (SPADS command lists / stats tables)
+                                // relies on monospace alignment; human chat reads
+                                // better proportional.
+                                bot && "font-mono",
+                              )}
+                            >
+                              <FormattedText text={m.text} />
+                            </span>
+                          </div>
+                          {!nextSame && (
+                            <span className="px-1 pt-0.5 text-[10px] text-muted-foreground">
+                              {formatTime(m.at)}
+                            </span>
+                          )}
+                        </div>
+                      );
                     }
-                  >
-                    <span
-                      className={cn(
-                        "whitespace-pre-wrap [overflow-wrap:anywhere]",
-                        // Bot output (SPADS command lists / stats tables) relies
-                        // on monospace alignment; human chat reads better
-                        // proportional.
-                        bot && "font-mono",
-                      )}
-                    >
-                      <FormattedText text={m.text} />
-                    </span>
-                  </div>
-                  {!nextSame && (
-                    <span className="px-1 pt-0.5 text-[10px] text-muted-foreground">
-                      {formatTime(m.at)}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-        <div ref={endRef} />
-      </div>
 
-      {sendError && (
-        <p className="px-4 pb-1 text-xs text-destructive">
-          Failed to send: {sendError}
-        </p>
-      )}
+                    return (
+                      <MessageScrollerItem
+                        key={key}
+                        messageId={key}
+                        scrollAnchor={own}
+                        className={spacing}
+                      >
+                        {body}
+                      </MessageScrollerItem>
+                    );
+                  })}
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <MessageScrollerButton />
+        </MessageScroller>
+      </MessageScrollerProvider>
 
-      <div className="flex gap-2 border-t border-border px-4 py-3">
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-              return;
-            }
-            if (
-              e.key === "Tab" &&
-              !e.shiftKey &&
-              !e.ctrlKey &&
-              !e.metaKey &&
-              !e.altKey
-            ) {
-              // Only trap Tab when we actually complete something; otherwise let
-              // it move focus normally.
-              if (onTab(e.currentTarget)) e.preventDefault();
-            }
-          }}
-          placeholder="Type your message..."
-          disabled={disabled}
-          aria-label="Message"
-          className="placeholder:italic"
-        />
-        <Button
-          onClick={submit}
-          disabled={disabled || draft.trim() === ""}
-          size="icon"
-          aria-label="Send"
-          title="Send"
-        >
-          <ArrowUp className="size-4" />
-        </Button>
+      <div className="px-4 py-3">
+        {sendError && (
+          <p className="pb-1 text-xs text-destructive">
+            Failed to send: {sendError}
+          </p>
+        )}
+        <div className="flex items-center gap-2 rounded-2xl border border-input bg-background px-3 py-1.5 focus-within:ring-2 focus-within:ring-ring">
+          <Input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+                return;
+              }
+              if (
+                e.key === "Tab" &&
+                !e.shiftKey &&
+                !e.ctrlKey &&
+                !e.metaKey &&
+                !e.altKey
+              ) {
+                // Only trap Tab when we actually complete something; otherwise let
+                // it move focus normally.
+                if (onTab(e.currentTarget)) e.preventDefault();
+              }
+            }}
+            placeholder="Type your message..."
+            disabled={disabled}
+            aria-label="Message"
+            className="border-0 bg-transparent shadow-none focus-visible:ring-0 placeholder:italic"
+          />
+          <Button
+            onClick={submit}
+            disabled={disabled || draft.trim() === ""}
+            size="icon"
+            aria-label="Send"
+            title="Send"
+            className="shrink-0 rounded-full"
+          >
+            <ArrowUp className="size-4" />
+          </Button>
+        </div>
       </div>
     </section>
   );
