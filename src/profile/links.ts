@@ -80,7 +80,7 @@ export function resolveLinkIcon(name?: string): IconComponent {
 }
 
 /** Schemes the Tauri opener will open (matches `opener:default`'s allow-list). */
-const ALLOWED_SCHEME = /^(https?:\/\/|mailto:|tel:)/i;
+export const ALLOWED_SCHEME = /^(https?:\/\/|mailto:|tel:)/i;
 
 /** Default group label for links that don't set `group`. */
 const DEFAULT_GROUP_LABEL = "Links";
