@@ -363,7 +363,7 @@ export default function SkirmishPage() {
             <Bookmark className="size-4" /> Presets
           </Button>
           <Button onClick={onStart} disabled={!canStart}>
-            <Play className="size-4" />{" "}
+            <Play className="size-4 fill-current" />{" "}
             {running ? "Game running…" : "Start Game"}
           </Button>
         </div>

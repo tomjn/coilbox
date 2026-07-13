@@ -406,7 +406,7 @@ export default function HistoryPage() {
                 <ReportHeader report={report} />
                 <div className="flex shrink-0 gap-2">
                   <Button variant="outline" size="sm" onClick={rerunTest}>
-                    <Play /> Re-run
+                    <Play className="fill-current" /> Re-run
                   </Button>
                   <Button variant="outline" size="sm" onClick={exportReport}>
                     <Download /> Export

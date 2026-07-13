@@ -78,7 +78,7 @@ export function GameHeader({
           )}
         </div>
         <Button size="sm" className="shrink-0 gap-1.5" onClick={onPlay}>
-          <Play className="size-4" /> Play
+          <Play className="size-4 fill-current" /> Play
         </Button>
       </div>
     </header>

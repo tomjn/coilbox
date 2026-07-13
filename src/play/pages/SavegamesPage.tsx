@@ -211,7 +211,7 @@ export default function SavegamesPage() {
                       }
                       className="gap-1.5"
                     >
-                      <Play className="size-4" />
+                      <Play className="size-4 fill-current" />
                       {pending ? "Resuming…" : "Resume"}
                     </Button>
                     <Button

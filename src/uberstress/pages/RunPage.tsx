@@ -639,7 +639,7 @@ export default function RunPage() {
               </Button>
             ) : (
               <Button onClick={run} disabled={!canRun}>
-                <Play /> Run test
+                <Play className="fill-current" /> Run test
               </Button>
             )}
             {running && (

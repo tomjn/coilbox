@@ -38,7 +38,7 @@ export function BrandingLinks({ entry }: { entry: BrandingEntry }) {
             className="gap-1.5"
             onClick={() => openUrl(videoUrl(v)).catch(() => {})}
           >
-            <Play className="size-4" /> {v.title ?? "Video"}
+            <Play className="size-4 fill-current" /> {v.title ?? "Video"}
           </Button>
         ))}
       </div>

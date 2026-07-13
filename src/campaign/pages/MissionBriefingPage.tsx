@@ -287,7 +287,7 @@ function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
   return (
     <div className="flex items-center gap-3">
       <Button onClick={run.start} disabled={!run.canStart}>
-        <Play className="size-4" />{" "}
+        <Play className="size-4 fill-current" />{" "}
         {run.running
           ? "Game running…"
           : run.scanLoading
@@ -477,7 +477,7 @@ function Victory({
             )}`}
             className={cn(buttonVariants())}
           >
-            <Play className="size-4" /> Continue
+            <Play className="size-4 fill-current" /> Continue
           </Link>
         ) : null}
         <Link

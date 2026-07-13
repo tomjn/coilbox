@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Lock, LogOut, Play } from "lucide-react";
 import { useState } from "react";
+import { ButtonGroup } from "@/components/ui/button-group";
 import {
   Popover,
   PopoverContent,
@@ -54,15 +55,15 @@ export function BattleRoomHeader({
   const [confirmClose, setConfirmClose] = useState(false);
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border p-4">
-      <div className="flex min-w-0 items-center gap-3">
-        <h1 className="truncate text-lg font-semibold">
+    <header className="flex items-center justify-between gap-4 border-b border-border p-4">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <h1 className="break-words text-lg font-semibold">
           {battle.title || `Battle ${battle.id}`}
         </h1>
         <SyncStatusPill state={sync} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex shrink-0 items-center gap-4">
         <label
           htmlFor="battle-spectate"
           className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
@@ -103,60 +104,62 @@ export function BattleRoomHeader({
             Locked
           </label>
         )}
-        {selfHost ? (
-          <Popover open={confirmClose} onOpenChange={setConfirmClose}>
-            <PopoverTrigger asChild>
-              <Button variant="secondary">
-                <LogOut className="size-4" />
-                Close battle
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-64 space-y-3">
-              <p className="text-sm">
-                Close this battle? Everyone will be removed and it will
-                disappear from the battle list.
-              </p>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setConfirmClose(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    setConfirmClose(false);
-                    onLeave();
-                  }}
-                >
+        <ButtonGroup>
+          {selfHost ? (
+            <Popover open={confirmClose} onOpenChange={setConfirmClose}>
+              <PopoverTrigger asChild>
+                <Button variant="outline">
+                  <LogOut className="size-4" />
                   Close battle
                 </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
-        ) : (
-          <Button variant="secondary" onClick={onLeave}>
-            <LogOut className="size-4" />
-            Leave
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 space-y-3">
+                <p className="text-sm">
+                  Close this battle? Everyone will be removed and it will
+                  disappear from the battle list.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setConfirmClose(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      setConfirmClose(false);
+                      onLeave();
+                    }}
+                  >
+                    Close battle
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Button variant="outline" onClick={onLeave}>
+              <LogOut className="size-4" />
+              Leave
+            </Button>
+          )}
+          <Button
+            onClick={onStart}
+            disabled={hostIngame || !allReady}
+            title={
+              hostIngame
+                ? "The match is already running"
+                : allReady
+                  ? "Ask the autohost to start the match"
+                  : "All players must be ready first"
+            }
+          >
+            <Play className="size-4 fill-current" />
+            {hostIngame ? "In game" : "Start"}
           </Button>
-        )}
-        <Button
-          onClick={onStart}
-          disabled={hostIngame || !allReady}
-          title={
-            hostIngame
-              ? "The match is already running"
-              : allReady
-                ? "Ask the autohost to start the match"
-                : "All players must be ready first"
-          }
-        >
-          <Play className="size-4" />
-          {hostIngame ? "In game" : "Start"}
-        </Button>
+        </ButtonGroup>
       </div>
     </header>
   );

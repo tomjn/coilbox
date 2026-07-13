@@ -61,7 +61,7 @@ export function WatchButton({
         title={title}
         className="gap-1.5"
       >
-        <Play className="size-4" />
+        <Play className="size-4 fill-current" />
         {pending ? "Watching…" : "Watch"}
       </Button>
       {resolved && !resolved.matched && (
