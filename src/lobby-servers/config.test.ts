@@ -1,17 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
 
-// config.ts imports useSetting from @picoframe/frame, whose published dist uses
+// config.ts imports useSetting from @picoframe/frame and, transitively via
+// profile.ts, defineCommand from @picoframe/plugin-sdk — both published dists use
 // extensionless relative imports that Vitest's node resolver won't load from
-// node_modules. These tests only exercise the pure helpers, so stubbing the leaf
-// package is enough to let the module load.
+// node_modules. These tests only exercise the pure helpers, so stubbing the leaves
+// is enough to let the module load. `allServers` reads the profile singleton, which
+// stays the empty `{ version: 1 }` here (loadProfile is never called), so its output
+// is the vanilla catalog.
 vi.mock("@picoframe/frame", () => ({
   useSetting: () => [{}, () => {}],
 }));
+vi.mock("@picoframe/plugin-sdk", () => ({
+  defineCommand: () => async () => ({}),
+}));
 
+import type { ProfileLobby } from "../profile/profile";
 import {
   allServers,
   BUILTIN_SERVERS,
+  buildCatalog,
   type LobbyServer,
+  OFFICIAL_ID,
+  resolveProfileServerRules,
   resolveServer,
 } from "./config";
 
@@ -49,5 +59,102 @@ describe("resolveServer", () => {
   });
   it("returns undefined for an unknown id", () => {
     expect(resolveServer("nope", [custom])).toBeUndefined();
+  });
+});
+
+describe("resolveProfileServerRules", () => {
+  it("returns empty rules when there's no lobby block", () => {
+    expect(resolveProfileServerRules(undefined)).toEqual({});
+  });
+
+  it("promotes a built-in by id, flagged official", () => {
+    const { official } = resolveProfileServerRules({
+      official: "recoil-official",
+    });
+    expect(official).toMatchObject({ id: "recoil-official", official: true });
+  });
+
+  it("ignores an unknown built-in id", () => {
+    expect(
+      resolveProfileServerRules({ official: "nope" }).official,
+    ).toBeUndefined();
+  });
+
+  it("builds an inline server with defaulted ports/flags", () => {
+    const { official } = resolveProfileServerRules({
+      official: { host: "lobby.example.org" },
+    });
+    expect(official).toEqual({
+      id: OFFICIAL_ID,
+      name: "lobby.example.org",
+      host: "lobby.example.org",
+      port: 8200,
+      tls: false,
+      allowSelfSigned: false,
+      official: true,
+    });
+  });
+
+  it("honours explicit inline fields", () => {
+    const lobby: ProfileLobby = {
+      official: {
+        name: "Scary",
+        host: "s.host",
+        port: 9000,
+        tls: true,
+        allowSelfSigned: true,
+      },
+    };
+    expect(resolveProfileServerRules(lobby).official).toMatchObject({
+      name: "Scary",
+      port: 9000,
+      tls: true,
+      allowSelfSigned: true,
+    });
+  });
+
+  it("ignores an object official with no host", () => {
+    expect(
+      resolveProfileServerRules({ official: {} as never }).official,
+    ).toBeUndefined();
+  });
+
+  it("passes the preset allow-list through", () => {
+    expect(resolveProfileServerRules({ presets: ["bar"] }).presets).toEqual([
+      "bar",
+    ]);
+  });
+});
+
+describe("buildCatalog", () => {
+  it("puts the official server first and marks it non-removable", () => {
+    const rules = resolveProfileServerRules({ official: { host: "off.host" } });
+    const out = buildCatalog([], rules);
+    expect(out[0]).toMatchObject({
+      id: OFFICIAL_ID,
+      official: true,
+      builtin: true,
+    });
+  });
+
+  it("hides every stock preset when presets is empty, keeping the official one", () => {
+    const rules = resolveProfileServerRules({
+      official: { host: "off.host" },
+      presets: [],
+    });
+    const out = buildCatalog([custom], rules);
+    expect(out.map((s) => s.id)).toEqual([OFFICIAL_ID, "custom-1"]);
+  });
+
+  it("narrows built-ins to the allow-list", () => {
+    const out = buildCatalog([], { presets: ["bar", "techa"] });
+    expect(out.map((s) => s.id)).toEqual(["techa", "bar"]);
+  });
+
+  it("does not list a promoted built-in twice", () => {
+    const rules = resolveProfileServerRules({ official: "recoil-official" });
+    const out = buildCatalog([], rules);
+    expect(out.filter((s) => s.id === "recoil-official")).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: "recoil-official", official: true });
   });
 });

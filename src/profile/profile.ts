@@ -128,6 +128,55 @@ export interface ProfileLayout {
   right?: ProfileLogo;
 }
 
+/** A lobby server the profile defines inline (no id — the app assigns a stable one). */
+export interface ProfileLobbyServer {
+  /** Display name; defaults to the host when omitted. */
+  name?: string;
+  /** Hostname, e.g. "lobby.example.org". Required. */
+  host: string;
+  /** TCP port. Defaults to 8200 (the TASServer convention). */
+  port?: number;
+  /** Connect over TLS. Defaults to false. */
+  tls?: boolean;
+  /** Accept a self-signed server cert (uberserver ships one). Defaults to false. */
+  allowSelfSigned?: boolean;
+}
+
+/** A channel the profile auto-joins on first connect to the official server. */
+export interface ProfileChannel {
+  name: string;
+  /** Optional channel key/password sent with `JOIN <chan> <key>`. */
+  key?: string;
+}
+
+/**
+ * Lobby-server presets a distribution controls. Lets a bundler ship a single
+ * "official" server (badged, non-removable, listed first), narrow which stock
+ * presets appear, and seed the channels a player joins on login — without stopping
+ * the player adding their own servers or removing their own logins.
+ */
+export interface ProfileLobby {
+  /**
+   * The preferred/"official" server: either a built-in id (e.g. "recoil-official")
+   * to promote an existing preset, or an inline {@link ProfileLobbyServer}. Shown
+   * with an "Official" badge, sorted first, and not removable (like the built-ins).
+   */
+  official?: string | ProfileLobbyServer;
+  /**
+   * Allow-list of built-in server ids to keep in the catalog. Omitted → all
+   * built-ins are shown (vanilla behaviour). Present → only these appear (plus the
+   * `official` server); `[]` hides every stock preset, leaving just the official one.
+   * Never restricts the player's own custom servers.
+   */
+  presets?: string[];
+  /**
+   * Channels seeded into the auto-join list the first time a login connects to the
+   * official server. A seed, not a lock: the player can leave them afterwards and
+   * they stay gone (matching the per-user "remembered channels" list).
+   */
+  channels?: (string | ProfileChannel)[];
+}
+
 export interface Profile {
   version: number;
   /** Window + in-app title, e.g. "Splinter Faction - Coilbox". */
@@ -144,6 +193,8 @@ export interface Profile {
   welcome?: WelcomeConfig;
   /** External links added to the sidebar/launcher, e.g. a Discord invite. */
   links?: LinkConfig[];
+  /** Lobby-server presets: an official server, a preset allow-list, seed channels. */
+  lobby?: ProfileLobby;
   /** Brand splash shown over the whole window at startup. */
   splash?: SplashConfig;
   /**

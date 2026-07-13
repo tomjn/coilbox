@@ -1,4 +1,6 @@
 import { useSetting } from "@picoframe/frame";
+import type { ProfileLobby } from "../profile/profile";
+import { getProfile } from "../profile/profile";
 
 /**
  * A channel the user auto-joins on connect, optionally with a key/password. This is
@@ -57,6 +59,29 @@ export function removeChannel(
   name: string,
 ): JoinedChannel[] {
   return normalizeChannelList(list).filter((c) => c.name !== name);
+}
+
+/**
+ * The distribution's seed channels from a profile `lobby.channels` block, normalized
+ * to {@link JoinedChannel}s. Pure (takes the block, not the singleton) so it's
+ * unit-testable; entries may be bare names or `{ name, key }`, and blank names drop.
+ */
+export function defaultChannelsFrom(
+  lobby: ProfileLobby | undefined,
+): JoinedChannel[] {
+  const out: JoinedChannel[] = [];
+  for (const c of lobby?.channels ?? []) {
+    const name = (typeof c === "string" ? c : c.name)?.trim();
+    if (!name) continue;
+    const key = typeof c === "string" ? undefined : c.key;
+    out.push(key ? { name, key } : { name });
+  }
+  return out;
+}
+
+/** The profile's seed channels (from the load-once profile singleton). */
+export function profileDefaultChannels(): JoinedChannel[] {
+  return defaultChannelsFrom(getProfile().lobby);
 }
 
 /**

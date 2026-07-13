@@ -11,7 +11,10 @@ import {
   useState,
 } from "react";
 import { lsGetCredential } from "../lobby-servers/bindings";
-import type { LobbyServer } from "../lobby-servers/config";
+import {
+  type LobbyServer,
+  profileOfficialServer,
+} from "../lobby-servers/config";
 import { notify } from "../notify/notify";
 import {
   type ChatMsg,
@@ -36,6 +39,7 @@ import {
 import {
   addChannel,
   normalizeChannelList,
+  profileDefaultChannels,
   removeChannel,
   useJoinedChannels,
 } from "./channels";
@@ -487,9 +491,23 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     }
     if (mirror.phase === "ready" && rejoinedForRef.current !== activeKey) {
       rejoinedForRef.current = activeKey;
-      for (const { name, key } of normalizeChannelList(
-        joinedChannels[activeKey],
-      )) {
+      // First-ever connect for this login (no stored list yet) to the profile's
+      // official server: seed the distribution's default channels. Seed-once — this
+      // persists them, after which the user can leave them and they stay gone.
+      let entries = normalizeChannelList(joinedChannels[activeKey]);
+      const official = profileOfficialServer();
+      if (
+        joinedChannels[activeKey] === undefined &&
+        official != null &&
+        activeKey.endsWith(`@${official.host}:${official.port}`)
+      ) {
+        const seed = profileDefaultChannels();
+        if (seed.length > 0) {
+          entries = seed;
+          setJoinedChannels({ ...joinedChannels, [activeKey]: seed });
+        }
+      }
+      for (const { name, key } of entries) {
         // A settings row can be added before it's named; don't JOIN "".
         if (!name.trim()) continue;
         requestJoinChannel(name, key).catch((e) =>
@@ -501,7 +519,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       // send a list, and local hiding still applies.
       mpIgnoreList({ serverKey: activeKey }).catch(() => {});
     }
-  }, [activeKey, mirror.phase, joinedChannels, requestJoinChannel]);
+  }, [
+    activeKey,
+    mirror.phase,
+    joinedChannels,
+    requestJoinChannel,
+    setJoinedChannels,
+  ]);
 
   // Reconcile the local ignore list with the server's once its IGNORELIST arrives:
   // fold any server-confirmed ignores we lack into the local store, and push any

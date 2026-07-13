@@ -1,15 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
-// channels.ts imports `useSetting` from @picoframe/frame, whose published dist
-// uses extensionless relative imports Vitest's node resolver won't load. These
-// pure-helper tests never call the hook, so stubbing the leaf package is enough
-// to let the module import (same pattern as store.test.ts).
+// channels.ts imports `useSetting` from @picoframe/frame and, transitively via
+// profile.ts, `defineCommand` from @picoframe/plugin-sdk — both published dists use
+// extensionless relative imports Vitest's node resolver won't load. These pure-helper
+// tests never call the hook or a command, so stubbing the leaves is enough to let the
+// module import (same pattern as store.test.ts).
 vi.mock("@picoframe/frame", () => ({
   useSetting: () => [{}, () => {}],
+}));
+vi.mock("@picoframe/plugin-sdk", () => ({
+  defineCommand: () => async () => ({}),
 }));
 
 import {
   addChannel,
+  defaultChannelsFrom,
   type JoinedChannel,
   normalizeChannelList,
   removeChannel,
@@ -78,6 +83,32 @@ describe("addChannel", () => {
       { name: "main" },
       { name: "off-topic" },
     ]);
+  });
+});
+
+describe("defaultChannelsFrom", () => {
+  it("returns [] when there's no lobby block or no channels", () => {
+    expect(defaultChannelsFrom(undefined)).toEqual([]);
+    expect(defaultChannelsFrom({})).toEqual([]);
+  });
+
+  it("normalizes bare-string channels", () => {
+    expect(defaultChannelsFrom({ channels: ["main", "help"] })).toEqual([
+      { name: "main" },
+      { name: "help" },
+    ]);
+  });
+
+  it("passes object channels through, keeping keys", () => {
+    expect(
+      defaultChannelsFrom({ channels: [{ name: "secret", key: "k" }] }),
+    ).toEqual([{ name: "secret", key: "k" }]);
+  });
+
+  it("trims names and drops blank entries", () => {
+    expect(
+      defaultChannelsFrom({ channels: ["  main  ", "", { name: "  " }] }),
+    ).toEqual([{ name: "main" }]);
   });
 });
 

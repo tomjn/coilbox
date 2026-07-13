@@ -1,4 +1,6 @@
 import { useSetting } from "@picoframe/frame";
+import type { ProfileLobby } from "../profile/profile";
+import { getProfile } from "../profile/profile";
 
 /**
  * A lobby server (connection target). Secrets are NOT stored here — passwords live
@@ -15,7 +17,12 @@ export interface LobbyServer {
   allowSelfSigned: boolean;
   /** True for built-in catalog entries. Absent on user-defined custom servers. */
   builtin?: boolean;
+  /** The distribution's preferred server (profile `lobby.official`): badged + first. */
+  official?: boolean;
 }
+
+/** The id assigned to an inline profile-defined official server (no natural id). */
+export const OFFICIAL_ID = "profile-official";
 
 /**
  * The well-known public lobby servers, taken from SkyLobby's `default-servers`
@@ -66,9 +73,78 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
   },
 ];
 
-/** The merged server list: built-ins (tagged `builtin`) followed by custom servers. */
+/** The official server + preset allow-list a profile's `lobby` block resolves to. */
+export interface ProfileServerRules {
+  /** The normalized official server, or undefined when the profile sets none. */
+  official?: LobbyServer;
+  /** Built-in ids to keep; undefined keeps them all (see {@link ProfileLobby.presets}). */
+  presets?: string[];
+}
+
+/**
+ * Resolve a profile `lobby` block into an official server + preset allow-list. Pure
+ * (takes the block, not the singleton) so it's unit-testable. A string `official`
+ * promotes a built-in by id; an object defines an inline server (id {@link OFFICIAL_ID},
+ * host required, ports/flags defaulted). An unknown built-in id or a hostless object
+ * yields no official server (the block is otherwise still honoured).
+ */
+export function resolveProfileServerRules(
+  lobby: ProfileLobby | undefined,
+): ProfileServerRules {
+  if (!lobby) return {};
+  let official: LobbyServer | undefined;
+  if (typeof lobby.official === "string") {
+    const b = BUILTIN_SERVERS.find((s) => s.id === lobby.official);
+    if (b) official = { ...b, official: true };
+  } else if (lobby.official?.host) {
+    const o = lobby.official;
+    official = {
+      id: OFFICIAL_ID,
+      name: o.name || o.host,
+      host: o.host,
+      port: o.port ?? 8200,
+      tls: o.tls ?? false,
+      allowSelfSigned: o.allowSelfSigned ?? false,
+      official: true,
+    };
+  }
+  return { official, presets: lobby.presets };
+}
+
+/**
+ * Build the visible catalog from the profile rules + the user's custom servers. Pure
+ * and order-stable: the official server first, then the (narrowed) built-ins, then
+ * custom servers. A built-in promoted to official appears only once — as the official
+ * entry, not also as a plain preset.
+ */
+export function buildCatalog(
+  custom: LobbyServer[],
+  rules: ProfileServerRules,
+): LobbyServer[] {
+  const officialId = rules.official?.id;
+  const builtins = BUILTIN_SERVERS.filter(
+    (s) =>
+      s.id !== officialId &&
+      (rules.presets == null || rules.presets.includes(s.id)),
+  ).map((s) => ({ ...s, builtin: true }));
+  const list: LobbyServer[] = [];
+  if (rules.official) list.push({ ...rules.official, builtin: true });
+  list.push(...builtins, ...custom);
+  return list;
+}
+
+/**
+ * The merged server list: the profile's official server (if any) first, the built-ins
+ * it allows next, then the user's custom servers. Reads the load-once profile
+ * singleton, so it's constant for the session (same pattern as `getProfile()`).
+ */
 export function allServers(custom: LobbyServer[]): LobbyServer[] {
-  return [...BUILTIN_SERVERS.map((s) => ({ ...s, builtin: true })), ...custom];
+  return buildCatalog(custom, resolveProfileServerRules(getProfile().lobby));
+}
+
+/** The profile's official server (normalized), or undefined when none is configured. */
+export function profileOfficialServer(): LobbyServer | undefined {
+  return resolveProfileServerRules(getProfile().lobby).official;
 }
 
 /** Resolve a server id against the built-in catalog + the given custom servers. */
