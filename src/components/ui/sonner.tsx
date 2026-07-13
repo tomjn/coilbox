@@ -15,9 +15,13 @@ function Toaster(props: ToasterProps) {
       richColors
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
+          // Use the resolved `hsl(...)` colour tokens, not the bare
+          // `--popover` HSL components: sonner needs a valid CSS colour here, and
+          // `var(--popover)` alone ("0 0% 100%") paints as nothing - a
+          // transparent toast (default/typeless toasts don't get richColors).
+          "--normal-bg": "var(--color-popover)",
+          "--normal-text": "var(--color-popover-foreground)",
+          "--normal-border": "var(--color-border)",
         } as React.CSSProperties
       }
       {...props}
