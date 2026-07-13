@@ -57,10 +57,47 @@ export interface SplashConfig {
   duration?: number;
 }
 
+/**
+ * App-frame chrome the profile can lock (picoframe `LayoutConfig` knobs, exposed
+ * as JSON). All are locks (authoritative), not user-overridable seeds. Menu
+ * branding only shows while the sidebar is in popover mode (Coilbox's default).
+ */
+export interface ProfileLayout {
+  /** Hide the breadcrumb region entirely. */
+  hideBreadcrumb?: boolean;
+  /** Lock the top-bar back/forward buttons on (true) or off (false). */
+  historyButtons?: boolean;
+  /** Popover menu-button branding. */
+  menu?: {
+    /** Accessible name + tooltip for the menu button. */
+    label?: string;
+    /**
+     * Show the label/logo beside the icon. Defaulted to true when `label` or
+     * `image` is set (the frame only renders either while this is true); set
+     * false explicitly for an icon-only button with a custom tooltip.
+     */
+    labelVisible?: boolean;
+    /** Curated lucide icon name (see docs) for the closed state. */
+    icon?: string;
+    /** Curated lucide icon name for the open state. */
+    iconOpen?: string;
+    /**
+     * `.coilbox`-relative path (or inline `data:`/`http(s):`) to a logo image,
+     * resolved to a data URI and shown in place of the label text. Wins over
+     * `label` as the visible content; `label` stays the accessible name.
+     */
+    image?: string;
+  };
+  /** Centered top-bar content; `image` wins over `text` when both resolve. */
+  center?: { text?: string; image?: string };
+}
+
 export interface Profile {
   version: number;
   /** Window + in-app title, e.g. "Splinter Faction - Coilbox". */
   title?: string;
+  /** App-frame chrome locks (breadcrumb/history/menu/center). */
+  layout?: ProfileLayout;
   /** Nav item ids to hide from the sidebar/launcher, e.g. ["downloads.games"]. */
   hide?: string[];
   /** Settings section ids to hide from the settings nav, e.g. ["uberstress"]. */
@@ -164,6 +201,26 @@ export async function resolveSplashSrc(): Promise<string | null> {
     return dataUri || null;
   } catch (e) {
     console.warn("profile: splash asset load failed", e);
+    return null;
+  }
+}
+
+/**
+ * Resolve a profile image reference to an `<img src>` value. A `data:`/`http(s):`
+ * string is used verbatim; anything else is treated as a `.coilbox`-relative path
+ * and read by the Rust plugin into a data URI (same transport as {@link resolveSplashSrc}).
+ * Returns `null` for an absent path or a failed read, so callers omit the image.
+ */
+export async function resolveProfileImage(
+  path: string | undefined,
+): Promise<string | null> {
+  if (!path) return null;
+  if (/^(data:|https?:)/i.test(path)) return path;
+  try {
+    const { dataUri } = await profileAssetCmd({ path });
+    return dataUri || null;
+  } catch (e) {
+    console.warn("profile: image asset load failed", e);
     return null;
   }
 }
