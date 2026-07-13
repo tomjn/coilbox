@@ -3,7 +3,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { Bookmark, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
@@ -344,7 +344,7 @@ export default function SkirmishPage() {
               htmlFor="spectate-you"
               className="inline-flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
             >
-              <Checkbox
+              <Switch
                 id="spectate-you"
                 checked={you.spectator}
                 disabled={running}
