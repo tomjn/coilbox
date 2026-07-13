@@ -27,7 +27,7 @@ export function AutohostControls({
         {quick.map((q) => (
           <Button
             key={q.cmd}
-            variant="secondary"
+            variant="outline"
             size="sm"
             onClick={() => onCommand(q.cmd)}
           >
@@ -35,7 +35,7 @@ export function AutohostControls({
           </Button>
         ))}
         <Button
-          variant="secondary"
+          variant="outline"
           size="sm"
           onClick={() => onCommand(locked ? "!unlock" : "!lock")}
         >
