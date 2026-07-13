@@ -49,7 +49,7 @@ Once portable mode is on, Coilbox writes **its own** data and caches inside `.co
 
 **Important distinction:** this covers Coilbox's *own* files. It does **not** automatically include the game itself — the engine, the `.sdz`/`.sd7` game archive, and maps. Those are **content**, and where they live is a separate choice covered in [Bundling the game content](#bundling-the-game-content) below.
 
-> **Put the game *beside* `.coilbox/`, not inside it.** `.coilbox/` is Coilbox's private data/config folder. Your engine, game archive and maps go in a **sibling** folder next to the Coilbox binary (e.g. `game/`), at the same level as `.coilbox/` — **not** in `.coilbox/game/`. Coilbox scans content roots you register, and a portable root must live inside the *app* folder (the folder holding the binary and `.coilbox/`), not inside `.coilbox/` itself. Nesting the game under `.coilbox/` mixes your read-only content in with Coilbox's managed `data/`/`cache/` and won't be picked up as a content root — resetting Coilbox's data could even take your game with it.
+> **Put the game *beside* `.coilbox/`, not inside it.** `.coilbox/` is Coilbox's private data/config folder. Your engine, game archive and maps go at the **top level of the app folder** (the folder holding the binary and `.coilbox/`), in the standard Spring subfolders — `games/`, `maps/`, `engine/` — **not** inside `.coilbox/`. The app folder itself is the content root: it looks like an ordinary `~/.spring`-style data directory that happens to also contain `coilbox` and `.coilbox/`. Nesting the game under `.coilbox/` mixes your read-only content in with Coilbox's managed `data/`/`cache/`, won't be picked up as a content root, and could be lost if Coilbox's data is reset.
 
 ## Running Coilbox alongside skylobby
 
@@ -76,24 +76,26 @@ Content (engine + game archive + maps) is tracked as **content roots** — folde
 
 To bundle content portably:
 
-1. Put the engine and game files at the **top level of the app folder** (the folder that contains the binary and `.coilbox`) — i.e. in a folder **beside** `.coilbox/`, such as a `game/` subfolder holding your engine and `.sdz`. **Do not put them inside `.coilbox/`** (see the warning above).
-2. In **Settings > Content Folders**, add that folder as a root and tick **Portable** (the checkbox is only meaningful in portable mode). Coilbox stores it as a relative path and shows a **Portable** badge on the root.
+1. Lay the game content out **directly in the app folder** (the folder that contains the binary and `.coilbox/`), using the ordinary **Spring/Recoil data-root layout**: the `.sdz`/`.sd7` game archive under a **`games/`** subfolder, maps under **`maps/`**, and the engine under **`engine/`**. Coilbox (like every Spring/Recoil tool) only scans a game archive if it sits in `games/` — a `.sdz` dropped loose in the app folder is invisible. **Do not put any of this inside `.coilbox/`** (see the warning above).
+2. In **Settings > Content Folders**, add the **app folder itself** as a root and tick **Portable** (the checkbox is only meaningful in portable mode). Coilbox stores it as a relative path (`.` for the app folder) and shows a **Portable** badge. In portable mode the app folder is usually seeded as a root automatically, so it may already be listed.
 
 ```
-SplinterFaction/                 <- the folder you zip and distribute
+SplinterFaction/                 <- the folder you zip and distribute; THIS is the content root
   coilbox.exe
   .coilbox/                      <- Coilbox's private data (NOT your game)
     profile.json
     data/  cache/                (created on first run)
-  game/                          <- bundled content, a SIBLING of .coilbox/,
-    engine/                         added as a Portable root
+  games/                         <- bundled content, at the app-folder top level
     splinterfaction.sdz
-    maps/
+  maps/
+  engine/
 ```
 
-`game/` sits **next to** `.coilbox/`, not inside it. A layout like
-`.coilbox/game/…` is wrong — Coilbox won't scan content nested inside its own data
-folder, and the game would be tangled up with files Coilbox manages and may reset.
+The app folder plays the role of a `~/.spring`-style data directory: `games/`,
+`maps/` and `engine/` sit at its top level, right beside `coilbox.exe` and
+`.coilbox/`. Coilbox ignores `.coilbox/` when scanning content. A layout that
+buries the game *inside* `.coilbox/` (e.g. `.coilbox/games/…`) is wrong — that
+content won't be scanned and could be lost when Coilbox's data is reset.
 
 Rules to know:
 
