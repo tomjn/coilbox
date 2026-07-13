@@ -22,7 +22,7 @@ use model::{
     load_store, save_store, ContentRoot, ContentState, RootCounts, RootKind, RootSource, StoreFile,
     UserRoot, SCHEMA_VERSION,
 };
-use paths::{candidate_roots, current_os, BaseDirs};
+use paths::{candidate_roots, current_os, BaseDirs, Candidate};
 use picoframe_core::CliResult;
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -198,19 +198,36 @@ fn build_root(a: Acc, with_counts: bool, now: u64) -> ContentRoot {
     }
 }
 
-/// The core rescan: merge auto candidates with the user's manual roots, scan each,
-/// and drop auto roots that don't validate (manual roots are always kept so the
-/// user can see/remove them).
-fn compute_state<R: Runtime>(
-    app: &AppHandle<R>,
-    store: &StoreFile,
-    with_counts: bool,
-    include_zerok: bool,
-) -> ContentState {
-    let base = base_dirs(app, include_zerok);
-    let mut accs: Vec<Acc> = Vec::new();
+/// The app dir to seed a self-contained content root at when running portable,
+/// else `None`. A portable install keeps all content beside the binary, so this is
+/// the single anchor both `compute_state` and `content_candidates` use to suppress
+/// OS-wide auto-discovery.
+fn portable_seed_dir() -> Option<PathBuf> {
+    coilbox_portable::is_portable()
+        .then(coilbox_portable::app_dir)
+        .flatten()
+}
 
-    for c in candidate_roots(current_os(), &base) {
+/// Build the auto-discovered accumulators before manual roots are merged in.
+///
+/// In portable mode the app is fully self-contained: OS-wide auto-discovery is
+/// skipped entirely and a single root is seeded at the app dir (where game content
+/// sits beside the binary). It's `forced` so a freshly shipped, still-empty package
+/// keeps a writable root, and `portable` so it's stored relative to the app dir.
+/// Otherwise the candidate list is merged, deduped by canonical path.
+fn auto_accs(portable_app_dir: Option<PathBuf>, candidates: Vec<Candidate>) -> Vec<Acc> {
+    if let Some(app_dir) = portable_app_dir {
+        return vec![Acc {
+            canon: canonical(&app_dir),
+            origins: vec!["portable".into()],
+            source: RootSource::Auto,
+            label: None,
+            forced: true,
+            portable: true,
+        }];
+    }
+    let mut accs: Vec<Acc> = Vec::new();
+    for c in candidates {
         let canon = canonical(&c.path);
         match accs.iter_mut().find(|a| a.canon == canon) {
             Some(a) => {
@@ -228,6 +245,23 @@ fn compute_state<R: Runtime>(
             }),
         }
     }
+    accs
+}
+
+/// The core rescan: merge auto candidates with the user's manual roots, scan each,
+/// and drop auto roots that don't validate (manual roots are always kept so the
+/// user can see/remove them).
+fn compute_state<R: Runtime>(
+    app: &AppHandle<R>,
+    store: &StoreFile,
+    with_counts: bool,
+    include_zerok: bool,
+) -> ContentState {
+    let base = base_dirs(app, include_zerok);
+    // Portable installs are fully self-contained: skip OS-wide auto-discovery and
+    // seed a single root at the app dir (game content sits beside the binary). A
+    // user can still add extra roots by hand below.
+    let mut accs = auto_accs(portable_seed_dir(), candidate_roots(current_os(), &base));
 
     for u in &store.user_roots {
         let canon = canonical(&resolve_stored(&u.path));
@@ -338,10 +372,21 @@ async fn content_candidates<R: Runtime>(
     app: AppHandle<R>,
     include_zerok: Option<bool>,
 ) -> Result<CliResult, ()> {
-    let base = base_dirs(&app, include_zerok.unwrap_or(false));
+    // Portable mode is self-contained: the only "candidate" is the app dir itself,
+    // never the shared OS locations (which we don't even stat).
+    let candidates = match portable_seed_dir() {
+        Some(app_dir) => vec![Candidate {
+            path: app_dir,
+            origin: "portable".into(),
+        }],
+        None => {
+            let base = base_dirs(&app, include_zerok.unwrap_or(false));
+            candidate_roots(current_os(), &base)
+        }
+    };
     let mut seen: Vec<PathBuf> = Vec::new();
     let mut out: Vec<serde_json::Value> = Vec::new();
-    for c in candidate_roots(current_os(), &base) {
+    for c in candidates {
         let canon = canonical(&c.path);
         if seen.contains(&canon) {
             continue;
@@ -1017,6 +1062,63 @@ mod tests {
         // ending in the relative component.
         assert!(r.is_absolute());
         assert!(r.ends_with("game-data"));
+    }
+
+    fn cand(path: &str, origin: &str) -> Candidate {
+        Candidate {
+            path: PathBuf::from(path),
+            origin: origin.into(),
+        }
+    }
+
+    #[test]
+    fn auto_accs_portable_seeds_single_forced_root() {
+        let app = if cfg!(windows) { "C:\\pkg" } else { "/pkg" };
+        // Even with shared candidates present, portable mode ignores them and
+        // seeds exactly one root at the app dir.
+        let accs = auto_accs(
+            Some(PathBuf::from(app)),
+            vec![
+                cand("/home/u/.spring", "prd-default"),
+                cand("/opt/bar", "bar"),
+            ],
+        );
+        assert_eq!(accs.len(), 1);
+        let a = &accs[0];
+        assert_eq!(a.canon, PathBuf::from(app));
+        assert_eq!(a.origins, vec!["portable".to_string()]);
+        assert!(
+            a.forced,
+            "seeded root must be forced so an empty package keeps it"
+        );
+        assert!(a.portable, "seeded root is stored relative to the app dir");
+        assert!(a.source == RootSource::Auto);
+    }
+
+    #[test]
+    fn auto_accs_non_portable_merges_candidates() {
+        // Not portable: candidates become auto roots, deduped by path (origins merged),
+        // never forced or portable.
+        let accs = auto_accs(
+            None,
+            vec![
+                cand("/home/u/.spring", "prd-default"),
+                cand("/home/u/.spring", "springlobby"),
+                cand("/opt/bar", "bar"),
+            ],
+        );
+        assert_eq!(accs.len(), 2);
+        let spring = accs
+            .iter()
+            .find(|a| a.canon.to_str() == Some("/home/u/.spring"))
+            .unwrap();
+        assert_eq!(
+            spring.origins,
+            vec!["prd-default".to_string(), "springlobby".to_string()]
+        );
+        assert!(!spring.forced);
+        assert!(!spring.portable);
+        assert!(spring.source == RootSource::Auto);
     }
 
     #[test]
