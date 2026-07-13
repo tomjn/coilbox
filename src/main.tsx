@@ -118,6 +118,9 @@ createRoot(root).render(
         plugins={appPlugins}
         title={appTitle}
         home={home}
+        layout={{
+          sidebar: { popover: { default: true, userConfigurable: true } },
+        }}
         settingsStorage={settingsStorage}
       />
     </ErrorBoundary>
