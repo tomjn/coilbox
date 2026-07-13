@@ -1,5 +1,6 @@
 import { Button, cn } from "@picoframe/frame";
 import {
+  Bot,
   Check,
   ChevronRight,
   Hash,
@@ -443,6 +444,9 @@ export function ConversationSidebar({
             {peers.map((peer) => {
               const id = `dm:${peer}`;
               const msgs = state?.dms[peer] ?? [];
+              // Autohosts (SPADS bots) are DM'd to configure them; a bot glyph
+              // marks them apart from human conversations at a glance.
+              const bot = state?.users[peer]?.status.bot ?? false;
               return (
                 <li key={id} className="group relative">
                   <button
@@ -450,7 +454,14 @@ export function ConversationSidebar({
                     className={cn(rowClass(id), "pr-9")}
                     onClick={() => onSelect({ kind: "dm", peer })}
                   >
-                    <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+                    {bot ? (
+                      <Bot
+                        className="size-4 shrink-0 text-muted-foreground"
+                        aria-label="Bot"
+                      />
+                    ) : (
+                      <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+                    )}
                     <span className="truncate">{peer}</span>
                     <Badge n={unreadBadge(id, msgs)} />
                   </button>
