@@ -1,27 +1,35 @@
 import type { LayoutConfig } from "@picoframe/frame";
-import type { FramePlugin, SlotContribution } from "@picoframe/plugin-sdk";
-import { resolveLinkIcon } from "./links";
-import { getProfile, type Profile, type ProfileLayout } from "./profile";
+import type {
+  FramePlugin,
+  SlotContribution,
+  SlotId,
+} from "@picoframe/plugin-sdk";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { ALLOWED_SCHEME, resolveLinkIcon } from "./links";
+import {
+  getProfile,
+  type Profile,
+  type ProfileLayout,
+  type ProfileLogo,
+} from "./profile";
 
 /**
- * Map a profile's `layout` block onto a frame {@link LayoutConfig}, merged onto
- * the default popover config (a popover sidebar the user may still toggle, kept
- * unless the profile changes chrome around it). Booleans become bare-value locks
- * (breadcrumb.hidden, history.buttons — authoritative, not user-toggleable).
- * `menu.icon`/`iconOpen` resolve via the shared lucide-name map. `menuImage` is
- * the pre-resolved logo data URI (or null); it becomes `menuLabelContent` and,
- * like a visible label, defaults `labelVisible` to true (the frame renders
- * neither unless it is).
+ * Map a profile's `layout` block onto a frame {@link LayoutConfig}. Popover is a
+ * bare-value **lock** (no user toggle): `layout.popover` true forces popover mode,
+ * otherwise a persistent sidebar. Breadcrumb-hide and history-buttons are likewise
+ * bare-value locks. `menu.icon`/`iconOpen` resolve via the shared lucide-name map;
+ * `menuImage` is the pre-resolved logo data URI (or null) and becomes
+ * `menuLabelContent`, defaulting `labelVisible` to true like a visible label.
  */
 export function buildLayoutConfig(
   profile: Profile,
   menuImage: string | null,
 ): LayoutConfig {
+  const layout = profile.layout;
   const sidebar: NonNullable<LayoutConfig["sidebar"]> = {
-    popover: { default: true, userConfigurable: true },
+    popover: layout?.popover === true,
   };
   const cfg: LayoutConfig = { sidebar };
-  const layout = profile.layout;
   if (!layout) return cfg;
 
   if (layout.hideBreadcrumb) cfg.breadcrumb = { hidden: true };
@@ -46,53 +54,82 @@ export function buildLayoutConfig(
 }
 
 /**
- * Resolve which piece of centered top-bar content to render. Image wins over text
- * when it resolved; falls back to text when the image failed; `null` when there's
- * nothing to show. `image` is the pre-resolved data URI (or null).
+ * Resolve which piece of a top-bar logo to render. Image wins over text when it
+ * resolved; falls back to text when the image failed; `null` when there's nothing
+ * to show. `image` is the pre-resolved data URI (or null).
  */
-export function resolveCenterContent(
-  center: ProfileLayout["center"],
+export function resolveLogoContent(
+  logo: ProfileLogo | undefined,
   image: string | null,
 ): { image: string } | { text: string } | null {
-  if (!center) return null;
+  if (!logo) return null;
   if (image) return { image };
-  if (center.text) return { text: center.text };
+  if (logo.text) return { text: logo.text };
   return null;
 }
 
-/**
- * Build the `topbar.center` slot contribution from a profile's `layout.center`,
- * or `null` when there's nothing to show. `centerImage` is the pre-resolved logo
- * data URI (or null).
- */
-export function buildCenterSlot(
-  profile: Profile,
-  centerImage: string | null,
-): SlotContribution | null {
-  const content = resolveCenterContent(profile.layout?.center, centerImage);
-  if (!content) return null;
-  const Component = () =>
-    "image" in content ? (
-      <img src={content.image} alt="" className="h-6 w-auto" />
-    ) : (
-      <span className="text-sm font-medium">{content.text}</span>
-    );
-  return { slot: "topbar.center", Component };
+/** Whether an `href` is a scheme the opener will open (so the logo can be a link). */
+export function isLinkable(href: string | undefined): boolean {
+  return !!href && ALLOWED_SCHEME.test(href);
 }
 
 /**
- * Inject the profile's `topbar.center` slot contribution into the `profile`
- * plugin's slots. Called from `main.tsx` after the center image resolves. Mirrors
- * `applyProfileLinks`: returns the same array by identity when there's no center
- * content, so vanilla Coilbox's top bar is untouched.
+ * Build a top-bar slot contribution rendering a profile logo (image or text), or
+ * `null` when there's nothing to show. `image` is the pre-resolved data URI. When
+ * `logo.href` is a valid scheme the logo becomes a button that opens it in the
+ * system browser (reusing the opener allow-list `links` uses).
  */
-export function applyProfileCenterSlot(
+export function buildLogoSlot(
+  slot: SlotId,
+  logo: ProfileLogo | undefined,
+  image: string | null,
+): SlotContribution | null {
+  const content = resolveLogoContent(logo, image);
+  if (!content) return null;
+  const href = logo && isLinkable(logo.href) ? logo.href : undefined;
+  const Component = () => {
+    const inner =
+      "image" in content ? (
+        <img src={content.image} alt="" className="h-6 w-auto" />
+      ) : (
+        <span className="text-sm font-medium">{content.text}</span>
+      );
+    if (!href) return inner;
+    return (
+      <button
+        type="button"
+        className="flex items-center rounded-md hover:opacity-80"
+        onClick={() => {
+          openUrl(href).catch((e) =>
+            console.warn("profile: could not open logo link", e),
+          );
+        }}
+      >
+        {inner}
+      </button>
+    );
+  };
+  return { slot, Component };
+}
+
+/**
+ * Inject the profile's top-bar logo slots (left/center/right) into the `profile`
+ * plugin's slots. Called from `main.tsx` after the logo images resolve; `images`
+ * holds the pre-resolved data URIs. Mirrors `applyProfileLinks`: returns the same
+ * array by identity when no logos are configured, so vanilla Coilbox is untouched.
+ */
+export function applyProfileSlots(
   plugins: FramePlugin[],
-  centerImage: string | null,
+  images: { left: string | null; center: string | null; right: string | null },
 ): FramePlugin[] {
-  const slot = buildCenterSlot(getProfile(), centerImage);
-  if (!slot) return plugins;
+  const layout: ProfileLayout | undefined = getProfile().layout;
+  const slots = [
+    buildLogoSlot("topbar.left", layout?.left, images.left),
+    buildLogoSlot("topbar.center", layout?.center, images.center),
+    buildLogoSlot("topbar.right", layout?.right, images.right),
+  ].filter((s): s is SlotContribution => s !== null);
+  if (slots.length === 0) return plugins;
   return plugins.map((p) =>
-    p.id === "profile" ? { ...p, slots: [...(p.slots ?? []), slot] } : p,
+    p.id === "profile" ? { ...p, slots: [...(p.slots ?? []), ...slots] } : p,
   );
 }

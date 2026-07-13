@@ -7,10 +7,11 @@ import SetupHome from "./content/pages/SetupHome";
 import { ErrorBoundary } from "./general/ErrorBoundary";
 import { SPLASH_ENABLED_KEY } from "./general/splash";
 import { applyProfileSettingsHiding } from "./profile/hidden";
-import { applyProfileCenterSlot, buildLayoutConfig } from "./profile/layout";
+import { applyProfileSlots, buildLayoutConfig } from "./profile/layout";
 import { applyProfileLinks } from "./profile/links";
 import {
   applyBootBackground,
+  applyProfileSidebarSeed,
   forceProfileTheme,
   loadProfile,
   resolveProfileImage,
@@ -42,20 +43,28 @@ applyBootBackground();
 // picoframe's persisted theme so the brand wins even over a player's prior choice.
 forceProfileTheme();
 
-// Resolve the profile's layout images (popover menu logo + centered top-bar logo)
-// before first render, like the splash — a `.coilbox`-relative path round-trips to
-// a data URI, so it must be awaited before building the layout config / center slot.
-// Both null without a profile (or when the paths don't resolve).
+// Seed the sidebar-collapsed state from the profile (only when the user has no
+// stored value), before render so the sidebar starts in the intended state.
+applyProfileSidebarSeed();
+
+// Resolve the profile's layout images (popover menu logo + the three top-bar slot
+// logos) before first render, like the splash — a `.coilbox`-relative path round-
+// trips to a data URI, so it must be awaited before building the layout config /
+// slot contributions. All null without a profile (or when the paths don't resolve).
 const menuImageSrc = await resolveProfileImage(profile.layout?.menu?.image);
-const centerImageSrc = await resolveProfileImage(profile.layout?.center?.image);
+const logoImages = {
+  left: await resolveProfileImage(profile.layout?.left?.image),
+  center: await resolveProfileImage(profile.layout?.center?.image),
+  right: await resolveProfileImage(profile.layout?.right?.image),
+};
 
 // Hide any settings sections the profile lists (uses SettingsSection.useVisible,
 // injected centrally so no plugin needs to opt in). No-op without a profile.
-// applyProfileCenterSlot injects the profile's centered top-bar content (topbar.center
-// slot); a no-op when the profile sets no `layout.center`.
-const appPlugins = applyProfileCenterSlot(
+// applyProfileSlots injects the profile's top-bar logos (left/center/right slots);
+// a no-op when the profile sets none.
+const appPlugins = applyProfileSlots(
   applyProfileLinks(applyProfileSettingsHiding(plugins)),
-  centerImageSrc,
+  logoImages,
 );
 
 // The OS title bar is a separate surface from the AppFrame `title` prop (which

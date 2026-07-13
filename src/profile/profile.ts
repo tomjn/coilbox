@@ -57,16 +57,48 @@ export interface SplashConfig {
   duration?: number;
 }
 
+/** Text and/or logo image for a top-bar slot; `href` makes it a link. */
+export interface ProfileLogo {
+  /** Text shown when no image resolves. */
+  text?: string;
+  /**
+   * `.coilbox`-relative path (or inline `data:`/`http(s):`) to a logo image,
+   * resolved to a data URI. Wins over `text` when it resolves.
+   */
+  image?: string;
+  /**
+   * URL opened in the system browser (http(s)/mailto/tel). When set and valid,
+   * the logo/text becomes a clickable link.
+   */
+  href?: string;
+}
+
 /**
- * App-frame chrome the profile can lock (picoframe `LayoutConfig` knobs, exposed
- * as JSON). All are locks (authoritative), not user-overridable seeds. Menu
- * branding only shows while the sidebar is in popover mode (Coilbox's default).
+ * App-frame chrome the profile controls (picoframe `LayoutConfig` knobs + top-bar
+ * slots, exposed as JSON). Mostly locks (authoritative, not user-overridable);
+ * `sidebarCollapsed` is a seed. Menu branding only shows in popover mode.
  */
 export interface ProfileLayout {
   /** Hide the breadcrumb region entirely. */
   hideBreadcrumb?: boolean;
   /** Lock the top-bar back/forward buttons on (true) or off (false). */
   historyButtons?: boolean;
+  /**
+   * Force the sidebar into popover mode (true) or a persistent rail (false).
+   * A lock — no user toggle. Omitted → persistent sidebar (the vanilla default).
+   */
+  popover?: boolean;
+  /**
+   * Start with the sidebar collapsed. A seed, not a lock: applies only until the
+   * user expands/collapses it, after which their choice persists. Only meaningful
+   * when the sidebar is a persistent rail (popover off).
+   */
+  sidebarCollapsed?: boolean;
+  /**
+   * Show the top-bar fullscreen button (default true). When false the button is
+   * hidden and F11 is inert (but fullscreen is not forced — see `fullscreenLocked`).
+   */
+  fullscreenButton?: boolean;
   /** Popover menu-button branding. */
   menu?: {
     /** Accessible name + tooltip for the menu button. */
@@ -88,15 +120,19 @@ export interface ProfileLayout {
      */
     image?: string;
   };
-  /** Centered top-bar content; `image` wins over `text` when both resolve. */
-  center?: { text?: string; image?: string };
+  /** Logo/text in the left top-bar slot. */
+  left?: ProfileLogo;
+  /** Logo/text centered in the top bar. */
+  center?: ProfileLogo;
+  /** Logo/text in the right top-bar slot. */
+  right?: ProfileLogo;
 }
 
 export interface Profile {
   version: number;
   /** Window + in-app title, e.g. "Splinter Faction - Coilbox". */
   title?: string;
-  /** App-frame chrome locks (breadcrumb/history/menu/center). */
+  /** App-frame chrome (breadcrumb/history/popover/fullscreen/menu/logos). */
   layout?: ProfileLayout;
   /** Nav item ids to hide from the sidebar/launcher, e.g. ["downloads.games"]. */
   hide?: string[];
@@ -322,6 +358,41 @@ export function applyBootBackground(): void {
     }
   } catch {
     // localStorage unavailable — the in-session background above still applied.
+  }
+}
+
+// picoframe's AppLayout persists the sidebar-collapsed flag here (JSON boolean).
+const SIDEBAR_COLLAPSED_KEY = "picoframe.sidebar.collapsed";
+
+/**
+ * Whether to seed the sidebar-collapsed flag: only when the profile asks for it
+ * AND the user has no stored value yet. Pure so it's unit-testable; `existing` is
+ * the raw `localStorage` string (or `null` when unset).
+ */
+export function shouldSeedCollapsed(
+  existing: string | null,
+  layout: ProfileLayout | undefined,
+): boolean {
+  return layout?.sidebarCollapsed === true && existing === null;
+}
+
+/**
+ * Seed picoframe's sidebar-collapsed state from `layout.sidebarCollapsed` before
+ * first render. A seed, not a lock: written only when the user has no stored value
+ * (see {@link shouldSeedCollapsed}), so a returning user's choice persists. No-op
+ * when the profile is silent or localStorage is unavailable.
+ */
+export function applyProfileSidebarSeed(): void {
+  try {
+    if (
+      shouldSeedCollapsed(
+        localStorage.getItem(SIDEBAR_COLLAPSED_KEY),
+        loaded.layout,
+      )
+    )
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, "true");
+  } catch {
+    // localStorage unavailable — the sidebar simply starts in its default state.
   }
 }
 

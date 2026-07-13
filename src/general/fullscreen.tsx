@@ -32,6 +32,16 @@ export function isFullscreenLocked(): boolean {
   return getProfile().fullscreenLocked === true;
 }
 
+/**
+ * Distribution profile opt-out of the fullscreen affordance (`layout.fullscreenButton:
+ * false`): hides the top-bar button and makes F11 inert, without forcing fullscreen
+ * on (that's {@link isFullscreenLocked}). Independent of the lock, so a windowed
+ * build can simply drop the button.
+ */
+export function isFullscreenButtonHidden(): boolean {
+  return getProfile().layout?.fullscreenButton === false;
+}
+
 /** Best-effort: push the setting to the OS window; must not throw. */
 export function applyFullscreen(enabled: boolean): void {
   getCurrentWindow()
@@ -47,6 +57,9 @@ export function applyFullscreen(enabled: boolean): void {
 export function FullscreenControls() {
   const locked = isFullscreenLocked();
   const [fs, setFs] = useFullscreenSetting();
+  // A kiosk lock or a profile that hides the fullscreen button both remove the
+  // affordance: no button, no F11. The lock additionally forces fullscreen on.
+  const hidden = locked || isFullscreenButtonHidden();
 
   // Keep the OS window in sync with the setting, whichever surface changed it.
   // A locked (kiosk) build forces fullscreen and ignores the stored setting.
@@ -57,9 +70,9 @@ export function FullscreenControls() {
   // F11 toggles the setting. No global-shortcut plugin exists, so a plain DOM
   // keydown listener is the lightest route. `fs` is a dep so the handler always
   // toggles against the current value (the store's setter takes a value, not an
-  // updater function). Disabled when locked so a kiosk build can't be exited.
+  // updater function). Inert when the affordance is hidden (kiosk or profile).
   useEffect(() => {
-    if (locked) return;
+    if (hidden) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F11") {
         e.preventDefault();
@@ -68,10 +81,10 @@ export function FullscreenControls() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [locked, fs, setFs]);
+  }, [hidden, fs, setFs]);
 
-  // No toggle button in a locked build.
-  if (locked) return null;
+  // No toggle button when the affordance is hidden (locked kiosk or profile opt-out).
+  if (hidden) return null;
 
   return (
     <Button
