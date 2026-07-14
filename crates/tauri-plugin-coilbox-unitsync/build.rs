@@ -15,6 +15,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_map_skybox",
     "unitsync_skirmish_ais",
     "unitsync_engine_config",
+    "unitsync_engine_config_set",
     "unitsync_archive_tree",
     "unitsync_archive_file",
     "unitsync_game_headers",

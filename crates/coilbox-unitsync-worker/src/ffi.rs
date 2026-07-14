@@ -48,8 +48,11 @@ type FloatByStrFloatFn = unsafe extern "C" fn(*const c_char, c_float) -> c_float
 type FloatByIntFloatFn = unsafe extern "C" fn(c_int, c_float) -> c_float; // lpGetIntKeyFloatVal(index, def)
 type StrByStrStrFn = unsafe extern "C" fn(*const c_char, *const c_char) -> *const c_char; // GetSpringConfigString
 type IntByStrIntFn = unsafe extern "C" fn(*const c_char, c_int) -> c_int; // GetSpringConfigInt
-                                                                          // archive file access (VFS browsing): open/close an archive, iterate its members,
-                                                                          // and read individual member bytes.
+type VoidByStrStrFn = unsafe extern "C" fn(*const c_char, *const c_char); // SetSpringConfigString(name, value)
+type VoidByStrIntFn = unsafe extern "C" fn(*const c_char, c_int); // SetSpringConfigInt(name, value)
+type VoidByStrFloatFn = unsafe extern "C" fn(*const c_char, c_float); // SetSpringConfigFloat(name, value)
+                                                                      // archive file access (VFS browsing): open/close an archive, iterate its members,
+                                                                      // and read individual member bytes.
 type VoidByIntFn = unsafe extern "C" fn(c_int); // CloseArchive(archive)
 type VoidByIntIntFn = unsafe extern "C" fn(c_int, c_int); // CloseArchiveFile(archive, file)
 type IntByIntIntFn = unsafe extern "C" fn(c_int, c_int) -> c_int; // SizeArchiveFile(archive, file)
@@ -202,6 +205,9 @@ pub struct Unitsync {
     spring_config_string_fn: Option<StrByStrStrFn>,
     spring_config_int_fn: Option<IntByStrIntFn>,
     spring_config_float_fn: Option<FloatByStrFloatFn>,
+    set_spring_config_string_fn: Option<VoidByStrStrFn>,
+    set_spring_config_int_fn: Option<VoidByStrIntFn>,
+    set_spring_config_float_fn: Option<VoidByStrFloatFn>,
     spring_config_file_fn: Option<StrFn>,
 }
 
@@ -315,6 +321,9 @@ impl Unitsync {
             spring_config_string_fn: opt(&lib, b"GetSpringConfigString\0"),
             spring_config_int_fn: opt(&lib, b"GetSpringConfigInt\0"),
             spring_config_float_fn: opt(&lib, b"GetSpringConfigFloat\0"),
+            set_spring_config_string_fn: opt(&lib, b"SetSpringConfigString\0"),
+            set_spring_config_int_fn: opt(&lib, b"SetSpringConfigInt\0"),
+            set_spring_config_float_fn: opt(&lib, b"SetSpringConfigFloat\0"),
             spring_config_file_fn: opt(&lib, b"GetSpringConfigFile\0"),
             _lib: lib,
         };
@@ -1532,12 +1541,56 @@ impl Unitsync {
         Some(unsafe { f(c.as_ptr(), default) })
     }
 
+    /// Write a string config value. Returns false if the build lacks the setter
+    /// or the name can't be encoded. `SetSpringConfig*` persist to the config
+    /// source selected by `preinit_config`, so call that first.
+    pub fn set_spring_config_string(&self, name: &str, value: &str) -> bool {
+        let Some(f) = self.set_spring_config_string_fn else {
+            return false;
+        };
+        let (Ok(c), Ok(v)) = (CString::new(name), CString::new(value)) else {
+            return false;
+        };
+        unsafe { f(c.as_ptr(), v.as_ptr()) };
+        true
+    }
+
+    pub fn set_spring_config_int(&self, name: &str, value: i32) -> bool {
+        let Some(f) = self.set_spring_config_int_fn else {
+            return false;
+        };
+        let Ok(c) = CString::new(name) else {
+            return false;
+        };
+        unsafe { f(c.as_ptr(), value) };
+        true
+    }
+
+    pub fn set_spring_config_float(&self, name: &str, value: f32) -> bool {
+        let Some(f) = self.set_spring_config_float_fn else {
+            return false;
+        };
+        let Ok(c) = CString::new(name) else {
+            return false;
+        };
+        unsafe { f(c.as_ptr(), value) };
+        true
+    }
+
     /// Whether any config accessor resolved — false means this build can't read
     /// engine configuration at all.
     pub fn has_spring_config(&self) -> bool {
         self.spring_config_string_fn.is_some()
             || self.spring_config_int_fn.is_some()
             || self.spring_config_float_fn.is_some()
+    }
+
+    /// Whether any config *setter* resolved — false means this build can read but
+    /// not write engine configuration.
+    pub fn has_spring_config_set(&self) -> bool {
+        self.set_spring_config_string_fn.is_some()
+            || self.set_spring_config_int_fn.is_some()
+            || self.set_spring_config_float_fn.is_some()
     }
 
     /// Path of the config file unitsync reads (`springsettings.cfg`), for display.

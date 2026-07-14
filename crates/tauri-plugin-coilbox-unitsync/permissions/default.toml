@@ -15,6 +15,7 @@ permissions = [
   "allow-unitsync-map-skybox",
   "allow-unitsync-skirmish-ais",
   "allow-unitsync-engine-config",
+  "allow-unitsync-engine-config-set",
   "allow-unitsync-archive-tree",
   "allow-unitsync-archive-file",
   "allow-unitsync-game-headers",
