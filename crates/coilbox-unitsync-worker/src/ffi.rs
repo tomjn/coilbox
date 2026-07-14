@@ -1288,6 +1288,78 @@ impl Unitsync {
         Some(patterns)
     }
 
+    /// Read a game's `LuaAI.lua` from the mounted VFS and return each declared Lua
+    /// AI as `(name, desc)`. These are the game's own bots (e.g. SplinterFaction's
+    /// `SimpleAI`/`ChickensAI`/`Sandbox`); unlike native skirmish AIs they are NOT
+    /// reported by `GetSkirmishAICount`, so — like skylobby — we read the file
+    /// directly. Same `LuaParser` walk as [`Self::valid_ais`]; an absent or garbled
+    /// file yields an empty list (the game simply has no Lua AIs).
+    pub fn lua_ais(&self) -> Vec<(String, String)> {
+        let (
+            Some(open),
+            Some(execute),
+            Some(close),
+            Some(root),
+            Some(sub_int),
+            Some(pop),
+            Some(int_count),
+            Some(int_entry),
+            Some(str_val),
+        ) = (
+            self.lp_open_file_fn,
+            self.lp_execute_fn,
+            self.lp_close_fn,
+            self.lp_root_table_fn,
+            self.lp_sub_table_int_fn,
+            self.lp_pop_table_fn,
+            self.lp_int_key_list_count_fn,
+            self.lp_int_key_list_entry_fn,
+            self.lp_str_key_str_val_fn,
+        )
+        else {
+            return Vec::new();
+        };
+        // "rmMbe" = SPRING_VFS_ALL; the VFS is case-insensitive, so the lowercase
+        // path resolves a `LuaAI.lua` of any casing inside the mounted archive.
+        let (Ok(file), Ok(modes), Ok(name_key), Ok(desc_key), Ok(empty)) = (
+            CString::new("luaai.lua"),
+            CString::new("rmMbe"),
+            CString::new("name"),
+            CString::new("desc"),
+            CString::new(""),
+        ) else {
+            return Vec::new();
+        };
+
+        let mut ais = Vec::new();
+        unsafe {
+            if open(file.as_ptr(), modes.as_ptr(), modes.as_ptr()) == 0 {
+                return Vec::new();
+            }
+            execute();
+            if root() == 0 {
+                close();
+                return Vec::new();
+            }
+            let count = int_count();
+            for i in 0..count {
+                let key = int_entry(i);
+                if sub_int(key) != 0 {
+                    if let Some(name) =
+                        cstr(str_val(name_key.as_ptr(), empty.as_ptr())).filter(|s| !s.is_empty())
+                    {
+                        let desc =
+                            cstr(str_val(desc_key.as_ptr(), empty.as_ptr())).unwrap_or_default();
+                        ais.push((name, desc));
+                    }
+                    pop(); // entry table
+                }
+            }
+            close();
+        }
+        ais
+    }
+
     /// Execute a Lua source string through unitsync's `LuaParser` with `modes`
     /// VFS access. The caller must wrap the user's code so the chunk returns a
     /// table with a string `result` field (and an optional `__error` field) —

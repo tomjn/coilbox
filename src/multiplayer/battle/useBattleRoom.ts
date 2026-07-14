@@ -156,14 +156,17 @@ export interface BattleRoomView {
     kick: (user: string) => void;
     removeBot: (name: string) => void;
   };
-  /** Native engine AIs available to add as bots (host only). */
-  nativeAis: {
+  /** AIs the host can add as bots (host only): the game's own AIs — native engine
+   *  AIs and/or its Lua AIs — or the engine's natives when the game declares none. */
+  addableAis: {
     shortName: string;
+    kind: "native" | "lua";
     name?: string;
     version?: string;
     description?: string;
   }[];
-  /** Add a native AI bot on the next free team/ally (host only). */
+  /** Add an AI bot on the next free team/ally (host only). Lua AIs are addable too:
+   *  ADDBOT carries the shortName and the host scripts each as an `[AI]` block. */
   addBot: (aiShortName: string) => void;
   leave: () => Promise<void>;
   autohostSend: (command: string) => Promise<void>;
@@ -224,20 +227,19 @@ export function useBattleRoom(): BattleRoomView {
   // drive the roster/options over the protocol and launch the game as founder.
   const selfHost = isFounder && !hostIsBot;
 
-  // Native engine AIs the host can add as bots (Lua AIs aren't addable over the
-  // lobby — they attach to a team via the start script, not ADDBOT). Prefer the
-  // game's own natives, but a game whose `validais.lua` whitelists only Lua AIs
-  // (e.g. SplinterFaction) returns an empty native list — fall back to the
-  // engine's native AIs (a no-game query skips the whitelist) so "Add AI" is
-  // never uselessly empty.
+  // AIs the host can add as bots. The game-scoped query already applies the game's
+  // `validais.lua` whitelist and includes its own Lua AIs (from `LuaAI.lua`) — both
+  // are addable over the lobby: ADDBOT carries the shortName and the host scripts
+  // each as an `[AI]` block, so the engine resolves native and Lua AIs alike. Only
+  // when the game declares no AIs at all (e.g. an empty/absent whitelist with no
+  // Lua AIs) do we fall back to the engine's natives (a no-game query skips the
+  // whitelist) so "Add AI" is never uselessly empty.
   const { ais } = useSkirmishAis(enginePath, dataDir, gameArchive);
   const { ais: engineAis } = useSkirmishAis(enginePath, dataDir, undefined);
-  const nativeAis = useMemo(() => {
-    const gameNative = ais.filter((a) => a.kind === "native");
-    return gameNative.length > 0
-      ? gameNative
-      : engineAis.filter((a) => a.kind === "native");
-  }, [ais, engineAis]);
+  const addableAis = useMemo(
+    () => (ais.length > 0 ? ais : engineAis.filter((a) => a.kind === "native")),
+    [ais, engineAis],
+  );
 
   const [contentNonce, setContentNonce] = useState(0);
 
@@ -696,7 +698,7 @@ export function useBattleRoom(): BattleRoomView {
     },
     setIngame,
     hostControls,
-    nativeAis,
+    addableAis,
     addBot,
     leave,
     autohostSend,

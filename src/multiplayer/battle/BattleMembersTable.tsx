@@ -29,7 +29,7 @@ export function BattleMembersTable({
   maxSlots,
   selfHost,
   hostControls,
-  nativeAis,
+  addableAis,
   onAddBot,
   onSide,
   onTeam,
@@ -50,9 +50,10 @@ export function BattleMembersTable({
     kick: (user: string) => void;
     removeBot: (name: string) => void;
   };
-  /** Native AIs the host can add as bots. */
-  nativeAis: {
+  /** AIs the host can add as bots — native engine AIs and the game's own Lua AIs. */
+  addableAis: {
     shortName: string;
+    kind: "native" | "lua";
     name?: string;
     version?: string;
     description?: string;
@@ -64,14 +65,14 @@ export function BattleMembersTable({
   onColor: (hex: string) => void;
 }) {
   const { justWentIngame } = useMultiplayer();
-  // The native AI the host will add next; defaults to the first available.
+  // The AI the host will add next; defaults to the first available.
   const [chosenAi, setChosenAi] = useState("");
   useEffect(() => {
-    if (nativeAis.length > 0)
+    if (addableAis.length > 0)
       setChosenAi((c) =>
-        nativeAis.some((a) => a.shortName === c) ? c : nativeAis[0].shortName,
+        addableAis.some((a) => a.shortName === c) ? c : addableAis[0].shortName,
       );
-  }, [nativeAis]);
+  }, [addableAis]);
 
   const slots = Math.max(2, Math.min(maxSlots || 0, 16));
   const sideOptions = sides.map((s: Side, i) => ({
@@ -181,7 +182,7 @@ export function BattleMembersTable({
           <OptionSelect
             value={chosenAi}
             onValueChange={setChosenAi}
-            options={nativeAis.map((a) => ({
+            options={addableAis.map((a) => ({
               value: a.shortName,
               label: a.name ?? a.shortName,
               description: aiByline(a),
@@ -189,7 +190,7 @@ export function BattleMembersTable({
             size="sm"
             className="w-auto min-w-40"
             placeholder={
-              nativeAis.length > 0 ? "Select an AI" : "No AIs installed"
+              addableAis.length > 0 ? "Select an AI" : "No AIs installed"
             }
           />
           <Button
