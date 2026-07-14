@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { Battle, BattleStatus, MemberStatus } from "../bindings";
 import {
   allyLetter,
+  battleStartable,
   colorIntToHex,
   deriveSync,
   hexToColorInt,
+  type MemberRow,
   membersToRows,
   randomTeamColorHex,
   readableText,
@@ -318,5 +320,73 @@ describe("deriveSync", () => {
     expect(deriveSync(battle, { mapMissing: false, gameMissing: false })).toBe(
       "synced",
     );
+  });
+});
+
+const row = (p: Partial<MemberRow> = {}): MemberRow => ({
+  name: "x",
+  kind: "human",
+  self: false,
+  host: false,
+  ready: false,
+  sync: 1,
+  spectator: false,
+  teamId: 0,
+  ally: 0,
+  side: 0,
+  colorHex: "#000000",
+  ...p,
+});
+
+describe("battleStartable", () => {
+  it("starts an all-bot match with the host spectating", () => {
+    // The reported bug: host spectates, only bots play -> Start stayed disabled.
+    expect(
+      battleStartable([
+        row({ kind: "human", host: true, spectator: true }),
+        row({ kind: "bot", ready: true, ally: 0 }),
+        row({ kind: "bot", ready: true, ally: 1 }),
+      ]),
+    ).toBe(true);
+  });
+
+  it("does not start an all-spectator room", () => {
+    expect(
+      battleStartable([
+        row({ kind: "human", spectator: true }),
+        row({ kind: "human", spectator: true }),
+      ]),
+    ).toBe(false);
+  });
+
+  it("does not start with no members", () => {
+    expect(battleStartable([])).toBe(false);
+  });
+
+  it("blocks while a playing human is not ready", () => {
+    expect(
+      battleStartable([
+        row({ kind: "human", spectator: false, ready: false }),
+        row({ kind: "bot", ready: true }),
+      ]),
+    ).toBe(false);
+  });
+
+  it("starts when every playing human is ready", () => {
+    expect(
+      battleStartable([
+        row({ kind: "human", spectator: false, ready: true }),
+        row({ kind: "bot", ready: true }),
+      ]),
+    ).toBe(true);
+  });
+
+  it("ignores a non-ready spectating human", () => {
+    expect(
+      battleStartable([
+        row({ kind: "human", spectator: true, ready: false }),
+        row({ kind: "human", spectator: false, ready: true }),
+      ]),
+    ).toBe(true);
   });
 });

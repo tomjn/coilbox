@@ -35,6 +35,7 @@ import {
 import { useMultiplayer } from "../store";
 import { battleOptionTags, canEditBattleOptions } from "./battleOptions";
 import {
+  battleStartable,
   deriveSync,
   hexToColorInt,
   type MemberRow,
@@ -132,7 +133,8 @@ export interface BattleRoomView {
    * one-click vote panel. Vote with `autohostSend("!vote y|n|b")`.
    */
   currentVote: Vote | null;
-  /** Whether every non-spectator human player has readied up. */
+  /** Whether the match can start: a playing participant (human or bot) exists and
+   * every non-spectator human is ready (see `battleStartable`). */
   allReady: boolean;
   serverKey: string | null;
   /** Bumped on rescan/download so content-dependent subtrees can remount+refetch. */
@@ -265,12 +267,12 @@ export function useBattleRoom(): BattleRoomView {
     : "pending";
 
   // Match state + start gating. The match has "started" once the host (autohost)
-  // goes in-game; `allReady` gates our Start button on every human player being
-  // ready (the autohost still enforces its own rules).
+  // goes in-game; `allReady` gates our Start button on there being a playing
+  // participant (human or bot) with every non-spectator human ready — so an
+  // all-bot match with the host spectating still starts (the autohost/engine
+  // enforces its own rules).
   const hostIngame = !!battle && !!state?.users[battle.host]?.status.ingame;
-  const humansPlaying = rows.filter((r) => r.kind === "human" && !r.spectator);
-  const allReady =
-    humansPlaying.length > 0 && humansPlaying.every((r) => r.ready);
+  const allReady = battleStartable(rows);
   const startPosType = battle ? startPosTypeOf(battle) : 0;
 
   // The colour we last intended (as the `0xBBGGRR` int), so a status push that
