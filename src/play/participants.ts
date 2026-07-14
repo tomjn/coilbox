@@ -13,6 +13,27 @@ import type { BattleConfig } from "./bindings";
 export const aiKey = (a: { kind: string; shortName: string }) =>
   `${a.kind}:${a.shortName}`;
 
+/**
+ * A one-line byline for an AI dropdown item — its version and description when
+ * present, as `"v1.2 · Balanced macro AI"`. A numeric version gets a `v` prefix;
+ * a non-numeric one (e.g. `stable`) is left as-is. Returns undefined when the AI
+ * carries neither field (many native AIs have no metadata), so callers can omit
+ * the subline entirely. Author isn't a unitsync AI key, so it's never included.
+ */
+export function aiByline(a: {
+  version?: string;
+  description?: string;
+}): string | undefined {
+  const version = a.version?.trim();
+  const description = a.description?.trim();
+  const v = version
+    ? /^\d/.test(version)
+      ? `v${version}`
+      : version
+    : undefined;
+  return [v, description].filter(Boolean).join(" · ") || undefined;
+}
+
 /** Narrow a full `SkirmishAi` to the reference stored on a participant. */
 const toAiRef = (a?: SkirmishAi): Participant["ai"] | undefined =>
   a ? { kind: a.kind, shortName: a.shortName, name: a.name } : undefined;

@@ -13,6 +13,7 @@ export type { Participant, Rgb } from "./participants";
 // imports) so campaign/conquest logic and unit tests can use it directly;
 // re-exported here so existing launcher imports keep working.
 export {
+  aiByline,
   aiKey,
   defaultAi,
   hexToRgb,

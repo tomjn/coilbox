@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import type { Side, SkirmishAi } from "@/content/bindings";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
-import { hexToRgb, type Participant, rgbToHex } from "../../config";
+import { aiByline, hexToRgb, type Participant, rgbToHex } from "../../config";
 
 /** Ally-team letters (A, B, C…) mapped to indices, offered per row. */
 const allyLetter = (n: number) => String.fromCharCode(65 + n);
@@ -145,7 +145,11 @@ export function ParticipantsTable({
                             <SelectGroup>
                               <SelectLabel>Engine AIs</SelectLabel>
                               {nativeAis.map((a) => (
-                                <SelectItem key={aiValue(a)} value={aiValue(a)}>
+                                <SelectItem
+                                  key={aiValue(a)}
+                                  value={aiValue(a)}
+                                  description={aiByline(a)}
+                                >
                                   {aiLabel(a)}
                                 </SelectItem>
                               ))}
@@ -155,7 +159,11 @@ export function ParticipantsTable({
                             <SelectGroup>
                               <SelectLabel>Game AIs (Lua)</SelectLabel>
                               {luaAis.map((a) => (
-                                <SelectItem key={aiValue(a)} value={aiValue(a)}>
+                                <SelectItem
+                                  key={aiValue(a)}
+                                  value={aiValue(a)}
+                                  description={aiByline(a)}
+                                >
                                   {aiLabel(a)}
                                 </SelectItem>
                               ))}
