@@ -35,6 +35,7 @@ import {
   unitsyncArchiveTree,
   unitsyncCancel,
   unitsyncEngineConfig,
+  unitsyncEngineConfigSet,
   unitsyncGameHeaders,
   unitsyncGameInfo,
   unitsyncHeightmap,
@@ -738,6 +739,38 @@ export function useUnitsyncEngineConfig(enginePath?: string, dataDir?: string) {
     [enginePath, dataDir],
   );
 
+  // Write one setting, then reflect the new value in both local state and the
+  // session cache (the cache short-circuits re-reads, so it must stay in sync).
+  const write = useCallback(
+    async (key: string, value: string) => {
+      if (!enginePath || !dataDir) {
+        return { ok: false, errors: ["no engine selected"] };
+      }
+      const res = await unitsyncEngineConfigSet({
+        enginePath,
+        dataDir,
+        key,
+        value,
+      });
+      if (res.ok) {
+        const cacheKey = `${dataDir}::${enginePath}`;
+        setData((prev) => {
+          if (!prev) return prev;
+          const next: EngineConfigResult = {
+            ...prev,
+            settings: prev.settings.map((s) =>
+              s.key === key ? { ...s, value } : s,
+            ),
+          };
+          engineConfigCache.set(cacheKey, next);
+          return next;
+        });
+      }
+      return res;
+    },
+    [enginePath, dataDir],
+  );
+
   useEffect(() => {
     if (!enginePath || !dataDir) {
       setData(null);
@@ -746,7 +779,7 @@ export function useUnitsyncEngineConfig(enginePath?: string, dataDir?: string) {
     run(false);
   }, [enginePath, dataDir, run]);
 
-  return { data, loading, error, run };
+  return { data, loading, error, run, write };
 }
 
 /* -------------------------------------------------------------------------- *

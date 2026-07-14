@@ -11,7 +11,7 @@
 //! the catalog is maintained against the engine, not guessed.
 
 use crate::ffi::Unitsync;
-use crate::model::{EngineConfigOutput, EngineConfigSetting};
+use crate::model::{EngineConfigOutput, EngineConfigSetting, EngineConfigWriteOutput};
 use std::path::Path;
 
 /// A curated key's type plus the engine default returned when it isn't set.
@@ -218,17 +218,124 @@ pub fn render(lib: &str) -> EngineConfigOutput {
                 category: v.category.to_string(),
                 value_type,
                 value,
+                default: default_string(&v.kind),
             })
         })
         .collect();
 
     let config_path = us.spring_config_file();
+    let writable = us.has_spring_config_set();
     errors.extend(us.drain_errors());
 
     EngineConfigOutput {
         settings,
         config_path,
+        writable,
         errors,
+    }
+}
+
+/// Write one curated engine setting back to `springsettings.cfg` via unitsync's
+/// `SetSpringConfig*`. The `key` must be a catalog key (its `Kind` decides which
+/// setter and how the string is parsed); `data_dir`/`SPRING_DATADIR` selects the
+/// config source, exactly as the read path does. Errors are non-fatal diagnostics.
+pub fn apply(lib: &str, key: &str, value: &str) -> EngineConfigWriteOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(us) => us,
+        Err(e) => {
+            return EngineConfigWriteOutput {
+                ok: false,
+                errors: vec![e],
+            }
+        }
+    };
+
+    if !us.has_spring_config_set() {
+        return EngineConfigWriteOutput {
+            ok: false,
+            errors: vec![
+                "this engine's libunitsync does not expose SetSpringConfig* — \
+                 cannot write engine settings"
+                    .into(),
+            ],
+        };
+    }
+
+    let Some(var) = CATALOG.iter().find(|v| v.key == key) else {
+        return EngineConfigWriteOutput {
+            ok: false,
+            errors: vec![format!("unknown engine config key: {key}")],
+        };
+    };
+
+    let parsed = match parse_value(&var.kind, value) {
+        Ok(p) => p,
+        Err(e) => {
+            return EngineConfigWriteOutput {
+                ok: false,
+                errors: vec![e],
+            }
+        }
+    };
+
+    let mut errors = Vec::new();
+    if !us.preinit_config() && us.init(false, 0) == 0 {
+        errors.push("unitsync Init returned 0 (failure); config may be unavailable".into());
+    }
+
+    let ok = match parsed {
+        SetValue::Str(s) => us.set_spring_config_string(key, &s),
+        SetValue::Int(n) => us.set_spring_config_int(key, n),
+        SetValue::Float(f) => us.set_spring_config_float(key, f),
+    };
+    if !ok {
+        errors.push(format!("unitsync rejected the write for {key}"));
+    }
+
+    errors.extend(us.drain_errors());
+    EngineConfigWriteOutput { ok, errors }
+}
+
+/// The typed value to hand to a `SetSpringConfig*` setter.
+enum SetValue {
+    Str(String),
+    Int(i32),
+    Float(f32),
+}
+
+/// Coerce a user-supplied string into the typed value a catalog key expects,
+/// returning a human-readable error on malformed input. Pure (FFI-free) so it
+/// can be unit-tested. Booleans map to the engine's `0`/`1` ints.
+fn parse_value(kind: &Kind, raw: &str) -> Result<SetValue, String> {
+    match kind {
+        Kind::Str(_) => Ok(SetValue::Str(raw.to_string())),
+        Kind::Bool(_) => match raw.trim() {
+            "1" | "true" | "True" | "on" => Ok(SetValue::Int(1)),
+            "0" | "false" | "False" | "off" | "" => Ok(SetValue::Int(0)),
+            other => Err(format!(
+                "expected a boolean (0/1/true/false), got {other:?}"
+            )),
+        },
+        Kind::Int(_) => raw
+            .trim()
+            .parse::<i32>()
+            .map(SetValue::Int)
+            .map_err(|e| format!("expected an integer, got {:?}: {e}", raw.trim())),
+        Kind::Float(_) => raw
+            .trim()
+            .parse::<f32>()
+            .map(SetValue::Float)
+            .map_err(|e| format!("expected a number, got {:?}: {e}", raw.trim())),
+    }
+}
+
+/// The engine default for a key, stringified the same way its read value is.
+fn default_string(kind: &Kind) -> String {
+    match kind {
+        Kind::Str(d) => d.to_string(),
+        Kind::Bool(d) => (*d as i32).to_string(),
+        Kind::Int(d) => d.to_string(),
+        Kind::Float(d) => fmt_float(*d),
     }
 }
 
@@ -244,4 +351,66 @@ pub fn emit_error(msg: String) {
         ..Default::default()
     };
     println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
+/// Emit an [`EngineConfigWriteOutput`] carrying a single fatal error.
+pub fn emit_write_error(msg: String) {
+    let out = EngineConfigWriteOutput {
+        ok: false,
+        errors: vec![msg],
+    };
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_bool_accepts_common_forms() {
+        for (raw, want) in [
+            ("1", 1),
+            ("true", 1),
+            ("on", 1),
+            ("0", 0),
+            ("false", 0),
+            ("", 0),
+        ] {
+            match parse_value(&Kind::Bool(false), raw) {
+                Ok(SetValue::Int(n)) => assert_eq!(n, want, "raw {raw:?}"),
+                _ => panic!("bool {raw:?} did not parse to an int"),
+            }
+        }
+        assert!(parse_value(&Kind::Bool(false), "maybe").is_err());
+    }
+
+    #[test]
+    fn parse_int_and_float() {
+        assert!(matches!(
+            parse_value(&Kind::Int(0), " 60 "),
+            Ok(SetValue::Int(60))
+        ));
+        assert!(parse_value(&Kind::Int(0), "6.5").is_err());
+        match parse_value(&Kind::Float(0.0), "-25") {
+            Ok(SetValue::Float(f)) => assert_eq!(f, -25.0),
+            _ => panic!("expected float"),
+        }
+        assert!(parse_value(&Kind::Float(0.0), "nope").is_err());
+    }
+
+    #[test]
+    fn parse_str_passthrough() {
+        match parse_value(&Kind::Str(""), "Some Name") {
+            Ok(SetValue::Str(s)) => assert_eq!(s, "Some Name"),
+            _ => panic!("expected string"),
+        }
+    }
+
+    #[test]
+    fn default_string_matches_kind() {
+        assert_eq!(default_string(&Kind::Bool(true)), "1");
+        assert_eq!(default_string(&Kind::Int(60)), "60");
+        assert_eq!(default_string(&Kind::Float(0.02)), "0.02");
+        assert_eq!(default_string(&Kind::Str("UnnamedPlayer")), "UnnamedPlayer");
+    }
 }

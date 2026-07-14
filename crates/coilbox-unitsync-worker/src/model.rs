@@ -411,6 +411,8 @@ pub struct EngineConfigSetting {
     pub value_type: &'static str,
     /// The value as read (stringified); empty string when unset and no default.
     pub value: String,
+    /// The engine's default for this key (stringified), for reset + change hints.
+    pub default: String,
 }
 
 /// Output of the `config` mode: the curated engine settings and the config file path.
@@ -421,6 +423,16 @@ pub struct EngineConfigOutput {
     /// Path of the `springsettings.cfg` unitsync reads, when the build exposes it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config_path: Option<String>,
+    /// Whether this unitsync build can *write* config (`SetSpringConfig*` present).
+    pub writable: bool,
+    pub errors: Vec<String>,
+}
+
+/// Output of the `config-set` mode: whether the write applied, plus diagnostics.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineConfigWriteOutput {
+    pub ok: bool,
     pub errors: Vec<String>,
 }
 

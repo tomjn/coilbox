@@ -13,10 +13,11 @@ mod sidecar;
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
-    build_config_args, build_game_args, build_game_headers_args, build_heightmap_args,
-    build_lua_args, build_lua_repl_args, build_map_info_args, build_map_skybox_args,
-    build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
-    build_unit_buildpics_args, build_unit_dataset_args, find_unitsync, resolve_sidecar,
+    build_config_args, build_config_set_args, build_game_args, build_game_headers_args,
+    build_heightmap_args, build_lua_args, build_lua_repl_args, build_map_info_args,
+    build_map_skybox_args, build_metalmap_args, build_minimap_args, build_skirmish_ai_args,
+    build_thumbnails_args, build_unit_buildpics_args, build_unit_dataset_args, find_unitsync,
+    resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -574,6 +575,26 @@ async fn unitsync_engine_config(engine_path: String, data_dir: String) -> Result
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config", None).await)
 }
 
+/// `unitsync_engine_config_set` — write one curated engine setting back to the
+/// user's `springsettings.cfg` via `SetSpringConfig*`. `data_dir` selects which
+/// data root's config is written (same resolution as the read command); `key`
+/// must be a curated catalog key.
+#[tauri::command]
+async fn unitsync_engine_config_set(
+    engine_path: String,
+    data_dir: String,
+    key: String,
+    value: String,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let args = build_config_set_args(&libpath.to_string_lossy(), &data_dir, &key, &value);
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config write", None).await)
+}
+
 /// `unitsync_archive_tree` — list the member tree of one archive (and resolve its
 /// on-disk path). `archive` is the archive name as unitsync knows it.
 #[tauri::command]
@@ -748,6 +769,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_map_skybox,
             unitsync_skirmish_ais,
             unitsync_engine_config,
+            unitsync_engine_config_set,
             unitsync_archive_tree,
             unitsync_archive_file,
             unitsync_game_headers,

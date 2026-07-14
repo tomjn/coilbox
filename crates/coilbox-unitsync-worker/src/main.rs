@@ -54,6 +54,11 @@ struct Args {
     /// `--map-skybox`: read one map's `atmosphere.skyBox` DDS (combined with `--map`).
     map_skybox: bool,
     config: bool,
+    /// `--config-set`: write one curated engine setting (with `--config-key` and
+    /// `--config-value`) back to `springsettings.cfg` via `SetSpringConfig*`.
+    config_set: bool,
+    config_key: Option<String>,
+    config_value: Option<String>,
     /// `--skirmish-ais`: list native skirmish AIs (+ a game's Lua AIs when
     /// combined with `--game`).
     skirmish_ais: bool,
@@ -325,6 +330,30 @@ fn run() -> i32 {
         };
     }
 
+    // Engine settings write: set one curated config key via SetSpringConfig*.
+    if args.config_set {
+        let Some(key) = args.config_key.clone() else {
+            config::emit_write_error("--config-set needs --config-key".into());
+            return 1;
+        };
+        let value = args.config_value.clone().unwrap_or_default();
+        return match std::panic::catch_unwind(|| config::apply(&args.lib, &key, &value)) {
+            Ok(out) => {
+                let ok = out.ok;
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                if ok {
+                    0
+                } else {
+                    1
+                }
+            }
+            Err(_) => {
+                config::emit_write_error("worker panicked while writing engine config".into());
+                1
+            }
+        };
+    }
+
     // Lazy map info: one map's options + attributed warnings (mounts the map).
     if args.map_info {
         if let Some(map) = args.map.clone() {
@@ -451,6 +480,9 @@ fn parse_args() -> Result<Args, String> {
     let mut map_info = false;
     let mut map_skybox = false;
     let mut config = false;
+    let mut config_set = false;
+    let mut config_key = None;
+    let mut config_value = None;
     let mut skirmish_ais = false;
     let mut game_headers = false;
     let mut unit_buildpics = false;
@@ -485,6 +517,9 @@ fn parse_args() -> Result<Args, String> {
             }
             "--cache-dir" => cache_dir = it.next(),
             "--config" => config = true,
+            "--config-set" => config_set = true,
+            "--config-key" => config_key = it.next(),
+            "--config-value" => config_value = it.next(),
             "--skirmish-ais" => skirmish_ais = true,
             "--game-headers" => game_headers = true,
             "--unit-buildpics" => unit_buildpics = true,
@@ -527,6 +562,9 @@ fn parse_args() -> Result<Args, String> {
         map_info,
         map_skybox,
         config,
+        config_set,
+        config_key,
+        config_value,
         skirmish_ais,
         game_headers,
         unit_buildpics,

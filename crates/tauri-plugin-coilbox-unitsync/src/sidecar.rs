@@ -241,6 +241,18 @@ pub fn build_config_args(lib: &str, datadir: &str) -> Vec<String> {
     args
 }
 
+/// Build args for engine-config write mode: scan args plus `--config-set` and the
+/// `--config-key`/`--config-value` pair to set.
+pub fn build_config_set_args(lib: &str, datadir: &str, key: &str, value: &str) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--config-set".into());
+    args.push("--config-key".into());
+    args.push(key.into());
+    args.push("--config-value".into());
+    args.push(value.into());
+    args
+}
+
 /// Build args for archive-tree mode: scan args plus the archive name.
 pub fn build_archive_tree_args(lib: &str, datadir: &str, archive: &str) -> Vec<String> {
     let mut args = build_args(lib, datadir);
