@@ -45,7 +45,7 @@
         "id": "crystallized-plains",
         "title": "Crystallized Plains",
         "filename": "crystallized_plains_1.1.sd7",
-        "download": { "kind": "map", "springName": "Crystallized Plains" }
+        "download": { "kind": "map", "springName": "Crystallized Plains 1.1" }
       }
     ],
     "mapLists": [
@@ -73,7 +73,7 @@
             "id": "crystallized-plains",
             "title": "Crystallized Plains",
             "filename": "crystallized_plains_1.1.sd7",
-            "download": { "kind": "map", "springName": "Crystallized Plains" }
+            "download": { "kind": "map", "springName": "Crystallized Plains 1.1" }
           }
         ]
       },
