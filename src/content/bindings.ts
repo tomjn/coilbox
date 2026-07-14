@@ -688,24 +688,44 @@ export interface EngineConfigSetting {
   type: "bool" | "number" | "string";
   /** The effective value (configured value, or the engine default when unset). */
   value: string;
+  /** The engine's default for this key, for reset + "changed" hints. */
+  default: string;
 }
 
 export interface EngineConfigResult {
   settings: EngineConfigSetting[];
   /** Path of the `springsettings.cfg` unitsync reads, when the build exposes it. */
   configPath?: string;
+  /** Whether this unitsync build can write config (`SetSpringConfig*` present). */
+  writable: boolean;
   errors: string[];
 }
 
 /**
  * Read a curated set of engine settings from the user's `springsettings.cfg`.
- * unitsync can't enumerate keys, so the worker reads a hand-picked catalog; values
- * are read-only. `enginePath` selects the libunitsync; `dataDir` the data root.
+ * unitsync can't enumerate keys, so the worker reads a hand-picked catalog.
+ * `enginePath` selects the libunitsync; `dataDir` the data root.
  */
 export const unitsyncEngineConfig = defineCommand<
   { enginePath: string; dataDir: string },
   EngineConfigResult
 >("coilbox-unitsync", "unitsync_engine_config");
+
+/** Outcome of writing one engine setting. */
+export interface EngineConfigWriteResult {
+  ok: boolean;
+  errors: string[];
+}
+
+/**
+ * Write one curated engine setting back to `springsettings.cfg` via
+ * `SetSpringConfig*`. `key` must be a catalog key; `dataDir` selects the data
+ * root whose config is written (same resolution as the read command).
+ */
+export const unitsyncEngineConfigSet = defineCommand<
+  { enginePath: string; dataDir: string; key: string; value: string },
+  EngineConfigWriteResult
+>("coilbox-unitsync", "unitsync_engine_config_set");
 
 /**
  * Render a small minimap thumbnail for every map in one unitsync session (for the
