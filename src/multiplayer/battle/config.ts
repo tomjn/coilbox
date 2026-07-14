@@ -206,3 +206,16 @@ export function deriveSync(
   if (players.some((s) => s === 0)) return "pending";
   return "synced";
 }
+
+/**
+ * Whether the Start button should enable: the battle has at least one non-spectator
+ * participant (human *or* bot) and every non-spectator human has readied up. Bots
+ * count as players and are always ready, so an all-bot match with the host
+ * spectating is startable (the engine/autohost still enforces its own team rules).
+ * An all-spectator room is never startable.
+ */
+export function battleStartable(rows: MemberRow[]): boolean {
+  const playing = rows.filter((r) => !r.spectator);
+  if (playing.length === 0) return false;
+  return playing.every((r) => r.kind !== "human" || r.ready);
+}
