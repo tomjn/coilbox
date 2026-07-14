@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Side } from "@/content/bindings";
+import { aiByline } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { useMultiplayer } from "../store";
 import { allyLetter, type MemberRow as Row } from "./config";
@@ -50,7 +51,12 @@ export function BattleMembersTable({
     removeBot: (name: string) => void;
   };
   /** Native AIs the host can add as bots. */
-  nativeAis: { shortName: string; name?: string }[];
+  nativeAis: {
+    shortName: string;
+    name?: string;
+    version?: string;
+    description?: string;
+  }[];
   onAddBot: (aiShortName: string) => void;
   onSide: (side: number) => void;
   onTeam: (teamId: number) => void;
@@ -178,6 +184,7 @@ export function BattleMembersTable({
             options={nativeAis.map((a) => ({
               value: a.shortName,
               label: a.name ?? a.shortName,
+              description: aiByline(a),
             }))}
             size="sm"
             className="w-auto min-w-40"

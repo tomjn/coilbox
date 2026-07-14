@@ -155,7 +155,12 @@ export interface BattleRoomView {
     removeBot: (name: string) => void;
   };
   /** Native engine AIs available to add as bots (host only). */
-  nativeAis: { shortName: string; name?: string }[];
+  nativeAis: {
+    shortName: string;
+    name?: string;
+    version?: string;
+    description?: string;
+  }[];
   /** Add a native AI bot on the next free team/ally (host only). */
   addBot: (aiShortName: string) => void;
   leave: () => Promise<void>;

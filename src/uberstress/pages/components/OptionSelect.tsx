@@ -24,7 +24,7 @@ export function OptionSelect({
 }: {
   value: string;
   onValueChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; description?: string }[];
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -37,7 +37,7 @@ export function OptionSelect({
       </SelectTrigger>
       <SelectContent>
         {options.map((o) => (
-          <SelectItem key={o.value} value={o.value}>
+          <SelectItem key={o.value} value={o.value} description={o.description}>
             {o.label}
           </SelectItem>
         ))}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isBlackHex } from "@/lib/teamColor";
 import {
+  aiByline,
   initialParticipants,
   makeAiParticipant,
   PALETTE,
@@ -68,5 +69,27 @@ describe("sanitizeColors", () => {
   it("returns the same array reference when nothing needs healing", () => {
     const ps = initialParticipants();
     expect(sanitizeColors(ps, "")).toBe(ps);
+  });
+});
+
+describe("aiByline", () => {
+  it("joins a v-prefixed numeric version and description", () => {
+    expect(aiByline({ version: "1.2", description: "Balanced macro AI" })).toBe(
+      "v1.2 · Balanced macro AI",
+    );
+  });
+
+  it("shows the description alone when there is no version", () => {
+    expect(aiByline({ description: "Rushes early" })).toBe("Rushes early");
+  });
+
+  it("shows a version alone, v-prefixed only when numeric", () => {
+    expect(aiByline({ version: "1.0" })).toBe("v1.0");
+    expect(aiByline({ version: "stable" })).toBe("stable");
+  });
+
+  it("returns undefined when neither field is present or usable", () => {
+    expect(aiByline({})).toBeUndefined();
+    expect(aiByline({ version: "  ", description: "" })).toBeUndefined();
   });
 });
