@@ -160,7 +160,7 @@ function BattleRoomPage() {
             maxSlots={battle.maxPlayers}
             selfHost={room.selfHost}
             hostControls={room.hostControls}
-            nativeAis={room.nativeAis}
+            addableAis={room.addableAis}
             onAddBot={room.addBot}
             onSide={room.setSide}
             onTeam={room.setTeam}
