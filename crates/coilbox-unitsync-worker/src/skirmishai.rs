@@ -1,11 +1,11 @@
 //! Skirmish-AI enumeration: native engine AIs plus a game's bundled Lua AIs.
 //!
-//! `GetSkirmishAICount` lists native AIs (from the engine's AI data dirs) first,
-//! then appends any Lua AIs declared inside a mounted mod. So we count once with
-//! no game mounted (all native), and — if a game archive is given — mount it and
-//! count again: the indices past the native count are that game's Lua AIs. Each
+//! `GetSkirmishAICount` lists the engine's native AIs (from its AI data dirs); each
 //! AI's `shortName`/`version`/`name`/`description` come from the shared `GetInfo*`
-//! accessors, just like map/game metadata.
+//! accessors, just like map/game metadata. A game's *own* AIs are Lua AIs declared
+//! in its `LuaAI.lua` — these are NOT reported by `GetSkirmishAICount`, so when a
+//! game archive is given we mount it and read `LuaAI.lua` from the VFS directly (as
+//! skylobby does), then honour the game's `validais.lua` whitelist over the lot.
 
 use crate::ffi::Unitsync;
 use crate::model::{SkirmishAi, SkirmishAiOutput};
@@ -35,11 +35,12 @@ pub fn render(lib: &str, game_archive: Option<&str>) -> SkirmishAiOutput {
     if let Some(game) = game_archive.filter(|g| !g.is_empty()) {
         if us.add_all_archives(game) {
             errors.extend(us.drain_errors());
-            // Lua AIs are appended after the natives, so anything past the
-            // pre-mount count belongs to this game.
-            let total = us.skirmish_ai_count().max(0);
-            for i in native_count..total {
-                ais.push(read_ai(&us, i, "lua"));
+            // The game's own Lua AIs are declared in its `LuaAI.lua`, read from the
+            // mounted VFS. `GetSkirmishAICount` only lists the engine's native AI
+            // interfaces — mounting a game does not add its Lua AIs to that count —
+            // so we read the file directly, as skylobby does.
+            for (name, desc) in us.lua_ais() {
+                ais.push(lua_ai(name, desc));
             }
             // Honour the game's validais.lua whitelist while its archive is still
             // mounted (the Lua parser reads from the VFS). Absent file -> `None`,
@@ -58,6 +59,20 @@ pub fn render(lib: &str, game_archive: Option<&str>) -> SkirmishAiOutput {
     us.uninit();
 
     SkirmishAiOutput { ais, errors }
+}
+
+/// Build a Lua-AI entry from a `LuaAI.lua` declaration. The `name` doubles as the
+/// unitsync `shortName` (the value written to `[AI].ShortName` / `[TEAM].LuaAI`),
+/// and the `desc` becomes the description shown in the picker — empty descriptions
+/// collapse to `None`.
+fn lua_ai(name: String, desc: String) -> SkirmishAi {
+    SkirmishAi {
+        short_name: name.clone(),
+        version: None,
+        name: Some(name),
+        description: (!desc.is_empty()).then_some(desc),
+        kind: "lua".to_string(),
+    }
 }
 
 /// Read one AI's info block into a [`SkirmishAi`] with the given `kind`.
@@ -118,6 +133,23 @@ mod tests {
             .into_iter()
             .map(|a| a.short_name)
             .collect()
+    }
+
+    #[test]
+    fn lua_ai_builds_lua_kind_entry() {
+        let a = lua_ai("SimpleAI".into(), "EasyAI (Simple)".into());
+        assert_eq!(a.short_name, "SimpleAI");
+        assert_eq!(a.name.as_deref(), Some("SimpleAI"));
+        assert_eq!(a.description.as_deref(), Some("EasyAI (Simple)"));
+        assert_eq!(a.kind, "lua");
+        assert_eq!(a.version, None);
+    }
+
+    #[test]
+    fn lua_ai_empty_desc_is_none() {
+        let a = lua_ai("Sandbox".into(), String::new());
+        assert_eq!(a.short_name, "Sandbox");
+        assert_eq!(a.description, None);
     }
 
     // Uses SplinterFaction's real validais.lua patterns. Note the *regex*
