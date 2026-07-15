@@ -1,5 +1,6 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ReactNode } from "react";
+import { jumbojiCount } from "./jumboji";
 import { type Inline, parseMessage } from "./parseMessage";
 
 /**
@@ -9,6 +10,12 @@ import { type Inline, parseMessage } from "./parseMessage";
  * forcing an accent) so it stays legible on both the muted and primary bubbles.
  */
 export function FormattedText({ text }: { text: string }) {
+  // Jumboji: a message that is only a handful of emoji renders enlarged, the
+  // way Slack/Discord do. Above the small cap it falls back to normal rendering.
+  const jumbo = jumbojiCount(text);
+  if (jumbo >= 1 && jumbo <= 3) {
+    return <span className="text-3xl leading-tight">{text.trim()}</span>;
+  }
   return <>{render(parseMessage(text))}</>;
 }
 
