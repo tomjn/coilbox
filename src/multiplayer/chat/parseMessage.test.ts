@@ -74,4 +74,35 @@ describe("parseMessage", () => {
   it("leaves a lone asterisk as literal text", () => {
     expect(parseMessage("2 * 3")).toEqual([{ type: "text", value: "2 * 3" }]);
   });
+
+  it("wraps a leading > line in a quote token", () => {
+    expect(parseMessage("> hello")).toEqual([
+      { type: "quote", children: [{ type: "text", value: "hello" }] },
+    ]);
+  });
+
+  it("keeps inline formatting inside a quote", () => {
+    expect(parseMessage("> a **b**")).toEqual([
+      {
+        type: "quote",
+        children: [
+          { type: "text", value: "a " },
+          { type: "bold", children: [{ type: "text", value: "b" }] },
+        ],
+      },
+    ]);
+  });
+
+  it("does not treat a mid-line > as a quote", () => {
+    expect(parseMessage("2 > 1")).toEqual([{ type: "text", value: "2 > 1" }]);
+  });
+
+  it("groups consecutive quote lines into one quote token", () => {
+    expect(parseMessage("> one\n> two")).toEqual([
+      {
+        type: "quote",
+        children: [{ type: "text", value: "one\ntwo" }],
+      },
+    ]);
+  });
 });

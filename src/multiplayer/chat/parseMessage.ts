@@ -4,7 +4,8 @@ export type Inline =
   | { type: "command"; value: string }
   | { type: "url"; value: string }
   | { type: "bold"; children: Inline[] }
-  | { type: "italic"; children: Inline[] };
+  | { type: "italic"; children: Inline[] }
+  | { type: "quote"; children: Inline[] };
 
 /**
  * Parse a chat message into inline formatting tokens. Pure and React-free so it
@@ -19,7 +20,40 @@ export function parseMessage(text: string): Inline[] {
       ...parseInline(text.slice(cmd[0].length)),
     ];
   }
-  return parseInline(text);
+  return parseBlocks(text);
+}
+
+/**
+ * Block-level pass for `>` quotes. Consecutive quote lines fold into one quote
+ * token; runs of ordinary lines are handed to inline parsing untouched. When no
+ * line is a quote we short-circuit so plain messages keep their exact tokens.
+ */
+function parseBlocks(text: string): Inline[] {
+  const marker = /^\s*>\s?/;
+  const lines = text.split("\n");
+  if (!lines.some((l) => marker.test(l))) return parseInline(text);
+
+  const out: Inline[] = [];
+  let buf: string[] = [];
+  let quoting = false;
+  const flush = () => {
+    if (buf.length === 0) return;
+    const body = buf.join("\n");
+    if (quoting) out.push({ type: "quote", children: parseInline(body) });
+    else out.push(...parseInline(body));
+    buf = [];
+  };
+  for (const line of lines) {
+    const m = marker.exec(line);
+    const lineQuotes = m !== null;
+    if (lineQuotes !== quoting) {
+      flush();
+      quoting = lineQuotes;
+    }
+    buf.push(m ? line.slice(m[0].length) : line);
+  }
+  flush();
+  return out;
 }
 
 /** Code spans first (literal), remaining runs handed to URL/emphasis parsing. */

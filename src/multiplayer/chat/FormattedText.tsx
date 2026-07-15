@@ -60,5 +60,14 @@ function renderNode(n: Inline, key: string): ReactNode {
           {render(n.children)}
         </em>
       );
+    case "quote":
+      return (
+        <blockquote
+          key={key}
+          className="my-0.5 border-l-2 border-foreground/30 pl-2 text-foreground/80"
+        >
+          {render(n.children)}
+        </blockquote>
+      );
   }
 }
