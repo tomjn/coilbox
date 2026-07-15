@@ -3,6 +3,7 @@ import { defineCommand } from "@picoframe/plugin-sdk";
 import type { ConquestNames } from "../conquest/names";
 import type { SuggestedMapList } from "../content/branding";
 import { describeJsonError } from "./jsonError";
+import { type OnboardingPlacement, onboardingPlacement } from "./onboarding";
 
 /**
  * Distribution profile: a `profile.json` a bundler drops into the portable
@@ -191,6 +192,20 @@ export interface Profile {
   gameFilter?: GameFilter;
   /** Branded landing page shown in place of the default launcher. */
   welcome?: WelcomeConfig;
+  /**
+   * Where the first-run onboarding (the "Set up Coilbox" + get-started download
+   * suggestion cards) sits on the branded home. The {@link welcome} is always
+   * rendered and never replaced by the onboarding — this only positions the cards
+   * relative to it:
+   * - `"below"` (default): under the welcome.
+   * - `"above"`: over the welcome.
+   * - `"off"`: hidden entirely, leaving the welcome as the whole home.
+   *
+   * Only meaningful when `welcome` is set (a vanilla build shows the onboarding via
+   * the launcher's `home.top` slot instead). An omitted/unknown value is treated as
+   * `"below"`.
+   */
+  onboarding?: OnboardingPlacement;
   /** External links added to the sidebar/launcher, e.g. a Discord invite. */
   links?: LinkConfig[];
   /** Lobby-server presets: an official server, a preset allow-list, seed channels. */
@@ -460,6 +475,11 @@ export function getProfileSource(): ProfileSource {
 /** Curated map packs this profile ships (empty when it defines none). */
 export function getProfileMapLists(): SuggestedMapList[] {
   return loaded.mapLists ?? [];
+}
+
+/** The active onboarding placement for the branded home (see `onboarding`). */
+export function getOnboardingPlacement(): OnboardingPlacement {
+  return onboardingPlacement(loaded.onboarding);
 }
 
 /**

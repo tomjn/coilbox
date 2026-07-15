@@ -51,7 +51,10 @@ export default function BrandedWelcome() {
 
   if (!welcome) return null;
   return (
-    <main className="h-full overflow-auto">
+    // Natural height (not `h-full`): the SetupHome scroll container sizes and scrolls
+    // this, so a short welcome can't collapse to zero the way `height:100%` does
+    // against an auto-height parent inside picoframe's overflow-auto content region.
+    <section className="w-full">
       {css && (
         // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted bundler-authored profile CSS
         <style dangerouslySetInnerHTML={{ __html: css }} />
@@ -64,6 +67,6 @@ export default function BrandedWelcome() {
           dangerouslySetInnerHTML={{ __html: html }}
         />
       )}
-    </main>
+    </section>
   );
 }

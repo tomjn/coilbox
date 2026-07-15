@@ -1,8 +1,10 @@
 import { useSetting } from "@picoframe/frame";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ContentState } from "../content/bindings";
 import { contentStateLoad } from "../content/bindings";
+import { getProfileRoot } from "../profile/profile";
 import { dlSetEngineDirs } from "./bindings";
+import { healWriteRoot, packageDirOf } from "./writeRoot";
 
 /** A user-configured rapid master. `url` is the base; `dl_repos` appends `/repos.gz`. */
 export interface RapidRepo {
@@ -98,20 +100,33 @@ export function useRegisterEngineDirs(): void {
  * via the content plugin's detected roots. Shared by every download screen so
  * they all write into the same chosen folder. `undefined` when none is set or
  * the root no longer exists.
+ *
+ * In portable mode this also self-heals: if the configured root resolves outside the
+ * package (e.g. a stale absolute root copied in from another install), it falls back
+ * to an in-package root and persists that correction, so downloads can't silently
+ * land next to the wrong folder. See {@link healWriteRoot}.
  */
 export function useWriteRootPath(): string | undefined {
-  const [cfg] = useDownloadsConfig();
+  const [cfg, setCfg] = useDownloadsConfig();
+  // Latest config for the heal-persist below, without re-running the load every
+  // render (the effect keys on the writeRootId primitive, not the cfg object).
+  const cfgRef = useRef(cfg);
+  cfgRef.current = cfg;
   const [path, setPath] = useState<string | undefined>(undefined);
   useEffect(() => {
-    if (!cfg.writeRootId) {
-      setPath(undefined);
-      return;
-    }
     contentStateLoad(undefined)
-      .then(({ state }) =>
-        setPath(state.roots.find((r) => r.id === cfg.writeRootId)?.path),
-      )
+      .then(({ state }) => {
+        const packageDir = packageDirOf(getProfileRoot());
+        const chosen = healWriteRoot(state.roots, cfg.writeRootId, packageDir);
+        setPath(chosen?.path);
+        // Persist the correction so downstream readers of `writeRootId` agree and the
+        // stale id doesn't linger. One-shot: once the id matches, this stops firing.
+        // Spread the latest config (via ref) so a concurrent rapid-repo edit isn't lost.
+        if (chosen && chosen.id !== cfg.writeRootId) {
+          setCfg({ ...cfgRef.current, writeRootId: chosen.id });
+        }
+      })
       .catch(() => setPath(undefined));
-  }, [cfg.writeRootId]);
+  }, [cfg.writeRootId, setCfg]);
   return path;
 }
