@@ -14,7 +14,7 @@ export function FormattedText({ text }: { text: string }) {
   // way Slack/Discord do. Above the small cap it falls back to normal rendering.
   const jumbo = jumbojiCount(text);
   if (jumbo >= 1 && jumbo <= 3) {
-    return <span className="text-3xl leading-tight">{text.trim()}</span>;
+    return <span className="text-5xl leading-none">{text.trim()}</span>;
   }
   return <>{render(parseMessage(text))}</>;
 }
@@ -68,20 +68,21 @@ function renderNode(n: Inline, key: string): ReactNode {
         </em>
       );
     case "quote":
+      // Inherit the bubble's text colour (own bubbles use a dark foreground);
+      // opacity dims the whole quote so it reads as secondary on either bubble.
       return (
         <blockquote
           key={key}
-          className="my-0.5 border-l-2 border-foreground/30 pl-2 text-foreground/80"
+          className="my-0.5 border-l-2 border-current pl-2 opacity-70"
         >
           {render(n.children)}
         </blockquote>
       );
     case "mention":
+      // Mirror the command chip: subtle tint + weight, no forced text colour,
+      // so it stays legible on both the primary and muted bubbles.
       return (
-        <span
-          key={key}
-          className="rounded bg-primary/15 px-0.5 font-medium text-primary"
-        >
+        <span key={key} className="rounded bg-primary/20 px-0.5 font-semibold">
           @{n.value}
         </span>
       );
