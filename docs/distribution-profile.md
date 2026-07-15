@@ -293,6 +293,28 @@ CSS only (no JavaScript).
 The HTML is trusted (it ships inside your distribution): apart from rewriting relative
 asset URLs (above), it is injected as-is, so only put content you control in it.
 
+### `onboarding` (string)
+
+Where the first-run onboarding sits on the branded home. The onboarding is the
+"Set up Coilbox" card (offers to create a content folder / download an engine) plus
+the get-started card (curated game/map download suggestions); both self-hide once
+setup is complete and content is installed.
+
+Your `welcome` is **always** shown and is never replaced by the onboarding — this
+field only positions the cards relative to it:
+
+- `"below"` (default) — under the welcome.
+- `"above"` — over the welcome.
+- `"off"` — hidden entirely, leaving the welcome as the whole home.
+
+```json
+{ "version": 1, "welcome": { "html": "…" }, "onboarding": "off" }
+```
+
+Only meaningful alongside `welcome` (without it, a vanilla build shows the onboarding
+above the launcher tool grid). An omitted or unrecognized value is treated as
+`"below"`.
+
 ### `links` (object[])
 
 Adds external links to the sidebar **and** the home launcher — e.g. a Discord
