@@ -74,4 +74,68 @@ describe("parseMessage", () => {
   it("leaves a lone asterisk as literal text", () => {
     expect(parseMessage("2 * 3")).toEqual([{ type: "text", value: "2 * 3" }]);
   });
+
+  it("wraps a leading > line in a quote token", () => {
+    expect(parseMessage("> hello")).toEqual([
+      { type: "quote", children: [{ type: "text", value: "hello" }] },
+    ]);
+  });
+
+  it("keeps inline formatting inside a quote", () => {
+    expect(parseMessage("> a **b**")).toEqual([
+      {
+        type: "quote",
+        children: [
+          { type: "text", value: "a " },
+          { type: "bold", children: [{ type: "text", value: "b" }] },
+        ],
+      },
+    ]);
+  });
+
+  it("does not treat a mid-line > as a quote", () => {
+    expect(parseMessage("2 > 1")).toEqual([{ type: "text", value: "2 > 1" }]);
+  });
+
+  it("groups consecutive quote lines into one quote token", () => {
+    expect(parseMessage("> one\n> two")).toEqual([
+      {
+        type: "quote",
+        children: [{ type: "text", value: "one\ntwo" }],
+      },
+    ]);
+  });
+
+  it("tokenizes a leading @mention", () => {
+    expect(parseMessage("@bob hi")).toEqual([
+      { type: "mention", value: "bob" },
+      { type: "text", value: " hi" },
+    ]);
+  });
+
+  it("tokenizes an @mention after text", () => {
+    expect(parseMessage("hey @bob")).toEqual([
+      { type: "text", value: "hey " },
+      { type: "mention", value: "bob" },
+    ]);
+  });
+
+  it("keeps clan-tag characters in a mention", () => {
+    expect(parseMessage("@[ABC]bob go")).toEqual([
+      { type: "mention", value: "[ABC]bob" },
+      { type: "text", value: " go" },
+    ]);
+  });
+
+  it("does not treat an email local part as a mention", () => {
+    expect(parseMessage("mail a@b.com")).toEqual([
+      { type: "text", value: "mail a@b.com" },
+    ]);
+  });
+
+  it("parses a mention inside bold", () => {
+    expect(parseMessage("**@bob**")).toEqual([
+      { type: "bold", children: [{ type: "mention", value: "bob" }] },
+    ]);
+  });
 });

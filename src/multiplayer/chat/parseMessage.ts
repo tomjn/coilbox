@@ -4,7 +4,9 @@ export type Inline =
   | { type: "command"; value: string }
   | { type: "url"; value: string }
   | { type: "bold"; children: Inline[] }
-  | { type: "italic"; children: Inline[] };
+  | { type: "italic"; children: Inline[] }
+  | { type: "quote"; children: Inline[] }
+  | { type: "mention"; value: string };
 
 /**
  * Parse a chat message into inline formatting tokens. Pure and React-free so it
@@ -19,7 +21,40 @@ export function parseMessage(text: string): Inline[] {
       ...parseInline(text.slice(cmd[0].length)),
     ];
   }
-  return parseInline(text);
+  return parseBlocks(text);
+}
+
+/**
+ * Block-level pass for `>` quotes. Consecutive quote lines fold into one quote
+ * token; runs of ordinary lines are handed to inline parsing untouched. When no
+ * line is a quote we short-circuit so plain messages keep their exact tokens.
+ */
+function parseBlocks(text: string): Inline[] {
+  const marker = /^\s*>\s?/;
+  const lines = text.split("\n");
+  if (!lines.some((l) => marker.test(l))) return parseInline(text);
+
+  const out: Inline[] = [];
+  let buf: string[] = [];
+  let quoting = false;
+  const flush = () => {
+    if (buf.length === 0) return;
+    const body = buf.join("\n");
+    if (quoting) out.push({ type: "quote", children: parseInline(body) });
+    else out.push(...parseInline(body));
+    buf = [];
+  };
+  for (const line of lines) {
+    const m = marker.exec(line);
+    const lineQuotes = m !== null;
+    if (lineQuotes !== quoting) {
+      flush();
+      quoting = lineQuotes;
+    }
+    buf.push(m ? line.slice(m[0].length) : line);
+  }
+  flush();
+  return out;
 }
 
 /** Code spans first (literal), remaining runs handed to URL/emphasis parsing. */
@@ -64,14 +99,32 @@ function parseEmphasis(text: string): Inline[] {
   const re = /\*\*([^*]+)\*\*|\*([^*]+)\*|_([^_]+)_/g;
   let last = 0;
   for (const m of text.matchAll(re)) {
-    if (m.index > last) {
-      out.push({ type: "text", value: text.slice(last, m.index) });
-    }
+    if (m.index > last) out.push(...parseMentions(text.slice(last, m.index)));
     if (m[1] !== undefined) {
       out.push({ type: "bold", children: parseEmphasis(m[1]) });
     } else {
       out.push({ type: "italic", children: parseEmphasis(m[2] ?? m[3]) });
     }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(...parseMentions(text.slice(last)));
+  return out;
+}
+
+/**
+ * `@nick` mentions in a plain-text run. The lookbehind excludes a preceding
+ * word char (so an email local part like `a@b` is not a mention) and a second
+ * `@`. The nick charset covers lobby/IRC names including clan tags like [ABC].
+ */
+function parseMentions(text: string): Inline[] {
+  const out: Inline[] = [];
+  const re = /(?<![\w@])@([A-Za-z0-9_[\]{}|^\\-]+)/g;
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    if (m.index > last) {
+      out.push({ type: "text", value: text.slice(last, m.index) });
+    }
+    out.push({ type: "mention", value: m[1] });
     last = m.index + m[0].length;
   }
   if (last < text.length) out.push({ type: "text", value: text.slice(last) });

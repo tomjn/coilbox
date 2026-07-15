@@ -336,7 +336,6 @@ export function ChatPane({
                       <MessageScrollerItem
                         key={key}
                         messageId={key}
-                        scrollAnchor={own}
                         className={spacing}
                       >
                         {body}
