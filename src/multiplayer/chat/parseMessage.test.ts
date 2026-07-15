@@ -105,4 +105,37 @@ describe("parseMessage", () => {
       },
     ]);
   });
+
+  it("tokenizes a leading @mention", () => {
+    expect(parseMessage("@bob hi")).toEqual([
+      { type: "mention", value: "bob" },
+      { type: "text", value: " hi" },
+    ]);
+  });
+
+  it("tokenizes an @mention after text", () => {
+    expect(parseMessage("hey @bob")).toEqual([
+      { type: "text", value: "hey " },
+      { type: "mention", value: "bob" },
+    ]);
+  });
+
+  it("keeps clan-tag characters in a mention", () => {
+    expect(parseMessage("@[ABC]bob go")).toEqual([
+      { type: "mention", value: "[ABC]bob" },
+      { type: "text", value: " go" },
+    ]);
+  });
+
+  it("does not treat an email local part as a mention", () => {
+    expect(parseMessage("mail a@b.com")).toEqual([
+      { type: "text", value: "mail a@b.com" },
+    ]);
+  });
+
+  it("parses a mention inside bold", () => {
+    expect(parseMessage("**@bob**")).toEqual([
+      { type: "bold", children: [{ type: "mention", value: "bob" }] },
+    ]);
+  });
 });

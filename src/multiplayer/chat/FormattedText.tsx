@@ -69,5 +69,14 @@ function renderNode(n: Inline, key: string): ReactNode {
           {render(n.children)}
         </blockquote>
       );
+    case "mention":
+      return (
+        <span
+          key={key}
+          className="rounded bg-primary/15 px-0.5 font-medium text-primary"
+        >
+          @{n.value}
+        </span>
+      );
   }
 }

@@ -5,7 +5,8 @@ export type Inline =
   | { type: "url"; value: string }
   | { type: "bold"; children: Inline[] }
   | { type: "italic"; children: Inline[] }
-  | { type: "quote"; children: Inline[] };
+  | { type: "quote"; children: Inline[] }
+  | { type: "mention"; value: string };
 
 /**
  * Parse a chat message into inline formatting tokens. Pure and React-free so it
@@ -98,14 +99,32 @@ function parseEmphasis(text: string): Inline[] {
   const re = /\*\*([^*]+)\*\*|\*([^*]+)\*|_([^_]+)_/g;
   let last = 0;
   for (const m of text.matchAll(re)) {
-    if (m.index > last) {
-      out.push({ type: "text", value: text.slice(last, m.index) });
-    }
+    if (m.index > last) out.push(...parseMentions(text.slice(last, m.index)));
     if (m[1] !== undefined) {
       out.push({ type: "bold", children: parseEmphasis(m[1]) });
     } else {
       out.push({ type: "italic", children: parseEmphasis(m[2] ?? m[3]) });
     }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(...parseMentions(text.slice(last)));
+  return out;
+}
+
+/**
+ * `@nick` mentions in a plain-text run. The lookbehind excludes a preceding
+ * word char (so an email local part like `a@b` is not a mention) and a second
+ * `@`. The nick charset covers lobby/IRC names including clan tags like [ABC].
+ */
+function parseMentions(text: string): Inline[] {
+  const out: Inline[] = [];
+  const re = /(?<![\w@])@([A-Za-z0-9_[\]{}|^\\-]+)/g;
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    if (m.index > last) {
+      out.push({ type: "text", value: text.slice(last, m.index) });
+    }
+    out.push({ type: "mention", value: m[1] });
     last = m.index + m[0].length;
   }
   if (last < text.length) out.push({ type: "text", value: text.slice(last) });
