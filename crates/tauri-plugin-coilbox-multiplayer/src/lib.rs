@@ -1094,9 +1094,20 @@ fn battle_to_host_config(state: &LobbyState) -> Result<Value, String> {
     let ally_index: BTreeMap<u8, usize> =
         ally_ids.iter().enumerate().map(|(i, a)| (*a, i)).collect();
 
+    // `[PLAYERn]` is positional, so a member's index in this (sorted) list *is* its
+    // engine player number. `AI.Host` and `Team.TeamLeader` are both player numbers
+    // and have to be looked up here rather than assumed: sorting by name means the
+    // host is rarely player 0.
+    let player_index: BTreeMap<&str, usize> = members
+        .iter()
+        .enumerate()
+        .map(|(i, (name, _))| (name.as_str(), i))
+        .collect();
+    let my_index = player_index.get(me.as_str()).copied().unwrap_or(0);
+
     let mut teams: BTreeMap<usize, Value> = BTreeMap::new();
     let mut players = Vec::new();
-    for (name, ms) in &members {
+    for (i, (name, ms)) in members.iter().enumerate() {
         let bs = ms.battle_status;
         let mut player = json!({ "name": name, "spectator": !bs.mode });
         if bs.mode {
@@ -1104,7 +1115,7 @@ fn battle_to_host_config(state: &LobbyState) -> Result<Value, String> {
             player["team"] = json!(pos);
             teams
                 .entry(pos)
-                .or_insert_with(|| host_team_value(ally_index[&bs.ally], ms.team_color));
+                .or_insert_with(|| host_team_value(ally_index[&bs.ally], ms.team_color, i));
         }
         players.push(player);
     }
@@ -1113,15 +1124,25 @@ fn battle_to_host_config(state: &LobbyState) -> Result<Value, String> {
     for (name, bot) in &bots {
         let bs = bot.battle_status;
         let pos = team_index[&bs.team_id];
+        // The engine runs an AI only on the machine whose player number matches
+        // `Host` (SkirmishAIHandler::IsLocalSkirmishAI), so it must name the bot's
+        // owner. An owner who has since left the battle has no [PLAYER] section, and
+        // a Host naming one is a fatal content_error, so fall back to ourselves.
+        let owner = player_index
+            .get(bot.owner.as_str())
+            .copied()
+            .unwrap_or(my_index);
         ais.push(json!({
             "name": name,
             "shortName": bot.ai_dll,
             "team": pos,
-            "host": 0,
+            "host": owner,
         }));
+        // Members are walked first, so this only fires for an AI-only team, whose
+        // leader is by convention the player hosting the AI.
         teams
             .entry(pos)
-            .or_insert_with(|| host_team_value(ally_index[&bs.ally], bot.team_color));
+            .or_insert_with(|| host_team_value(ally_index[&bs.ally], bot.team_color, owner));
     }
 
     let (start_pos_type, mod_options, map_options, restricted_units) =
@@ -1164,11 +1185,12 @@ fn battle_to_host_config(state: &LobbyState) -> Result<Value, String> {
     }))
 }
 
-/// One host-mode `teams[]` entry, with an already-renumbered ally index.
-fn host_team_value(ally: usize, color: u32) -> Value {
+/// One host-mode `teams[]` entry, with an already-renumbered ally index and the
+/// player number leading the team.
+fn host_team_value(ally: usize, color: u32, leader: usize) -> Value {
     let (r, g, b) = team_color_rgb(color);
     json!({
-        "teamLeader": 0,
+        "teamLeader": leader,
         "allyTeam": ally,
         "rgbColor": [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0],
     })
@@ -1585,6 +1607,77 @@ mod tests {
         // ally 9 -> 1; pos 1 = our ally 5 -> 0.
         assert_eq!(teams[0]["allyTeam"], 1);
         assert_eq!(teams[1]["allyTeam"], 0);
+    }
+
+    /// The engine runs an AI only where `AI.Host` matches the local player number,
+    /// so a hardcoded 0 hands our bots to whoever sorts first by name, and they then
+    /// never get placed. `me` hosts but is player 1 here, which is the whole point.
+    #[test]
+    fn host_config_points_ai_host_at_the_owning_player() {
+        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let players = cfg["players"].as_array().unwrap();
+        assert_eq!(players[0]["name"], "ally", "the host does not sort first");
+        assert_eq!(players[1]["name"], "me");
+
+        // BARb is owned by `me`, so it runs on player 1's machine, not player 0's.
+        assert_eq!(cfg["ais"][0]["host"], 1);
+    }
+
+    #[test]
+    fn host_config_leads_an_ai_only_team_with_the_ai_host() {
+        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let teams = cfg["teams"].as_array().unwrap();
+        // Team pos 0 holds only BARb, owned by `me` -> player 1.
+        assert_eq!(teams[0]["teamLeader"], 1);
+    }
+
+    #[test]
+    fn host_config_leads_human_teams_with_their_own_player() {
+        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let teams = cfg["teams"].as_array().unwrap();
+        // pos 1 is `me` (player 1); pos 2 is `ally` (player 0).
+        assert_eq!(teams[1]["teamLeader"], 1);
+        assert_eq!(teams[2]["teamLeader"], 0);
+    }
+
+    /// A bot whose owner left has no [PLAYER] section; naming it in `Host` is a
+    /// fatal content_error in the engine, so we take the team over instead.
+    #[test]
+    fn host_config_falls_back_to_us_for_an_orphaned_bot() {
+        let mut state = hosted_state();
+        let battle = state.battles.get_mut(&9).unwrap();
+        battle.bots.get_mut("BARb").unwrap().owner = "departed".into();
+
+        let cfg = battle_to_host_config(&state).unwrap();
+        assert_eq!(cfg["ais"][0]["host"], 1, "falls back to us, not player 0");
+        assert_eq!(cfg["teams"][0]["teamLeader"], 1);
+    }
+
+    /// A non-host member's bot runs on that member's machine, matching skylobby and
+    /// springlobby.
+    #[test]
+    fn host_config_points_a_guests_bot_at_the_guest() {
+        let mut state = hosted_state();
+        let battle = state.battles.get_mut(&9).unwrap();
+        battle.bots.get_mut("BARb").unwrap().owner = "ally".into();
+
+        let cfg = battle_to_host_config(&state).unwrap();
+        assert_eq!(cfg["ais"][0]["host"], 0);
+        assert_eq!(cfg["teams"][0]["teamLeader"], 0);
+    }
+
+    /// Every emitted TeamLeader/Host must name a real [PLAYERn], or the engine
+    /// throws "invalid AI.Host" / "Team N has invalid leader" and the script dies.
+    #[test]
+    fn host_config_player_references_are_all_in_range() {
+        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let n = cfg["players"].as_array().unwrap().len();
+        for team in cfg["teams"].as_array().unwrap() {
+            assert!(team["teamLeader"].as_u64().unwrap() < n as u64);
+        }
+        for ai in cfg["ais"].as_array().unwrap() {
+            assert!(ai["host"].as_u64().unwrap() < n as u64);
+        }
     }
 
     #[test]
