@@ -28,6 +28,7 @@ import {
   useSkirmishAis,
 } from "../config";
 import { useSkirmishDraft } from "../drafts";
+import { effectiveOptions } from "../modOptions";
 import { usePlay } from "../PlayProvider";
 import {
   parsePresetJson,
@@ -232,19 +233,12 @@ export default function SkirmishPage() {
   // or map isn't selected yet. Shared by launch and export so they never drift.
   function buildConfig(): BattleConfig | null {
     if (!selectedGame || !selectedMap) return null;
-    // Only send options the user actually changed from their default; the
-    // engine applies the rest.
-    const overrides: Record<string, string> = {};
-    for (const o of modOptions) {
-      const v = modOptionValues[o.key];
-      if (v !== undefined && v !== (o.default ?? "")) overrides[o.key] = v;
-    }
     return toBattleConfig({
       participants,
       mapName: selectedMap.name,
       gameType: selectedGame.name,
       startPosType,
-      modOptions: overrides,
+      modOptions: effectiveOptions(modOptions, modOptionValues),
     });
   }
 
