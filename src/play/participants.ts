@@ -198,8 +198,10 @@ export function rgbToHex([r, g, b]: Rgb): string {
 /**
  * Derive the engine-shaped `BattleConfig` from the UI model. Spectators are
  * dropped from the team list; non-spectator participants get team indices by
- * order; ally-team values are remapped to a contiguous 0..k range. A native AI
- * becomes an `[AI]` block; a Lua AI is set on its team via `LuaAI`.
+ * order; ally-team values are remapped to a contiguous 0..k range. Every AI —
+ * native or game Lua — becomes an `[AI]` block: `LoadSkirmishAIs` is the engine's
+ * only route into the script, and it decides Lua-ness itself by matching the
+ * shortname against the game's `LuaAI.lua`.
  */
 export function toBattleConfig(opts: {
   participants: Participant[];
@@ -239,15 +241,17 @@ export function toBattleConfig(opts: {
     // fraction — the modern spelling of the legacy `Handicap` field), which
     // the play crate already emits per team.
     if (p.handicap) team.advantage = p.handicap / 100;
-    if (p.ai?.kind === "lua") team.luaAi = p.ai.shortName;
     return team;
   });
 
   const ais = active
-    .filter((p) => p.ai?.kind === "native")
+    .filter((p) => p.ai)
     .map((p) => ({
       name: p.name,
       shortName: p.ai?.shortName ?? "",
+      // A game Lua AI has no library version; the engine resolves it from the
+      // game itself, so mark it as such rather than leaving the field blank.
+      version: p.ai?.kind === "lua" ? "<game>" : undefined,
       team: teamIndexById.get(p.id) ?? 0,
       host: 0,
     }));

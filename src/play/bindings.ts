@@ -14,7 +14,11 @@ export interface Player {
   team?: number;
 }
 
-/** A native skirmish AI — becomes an `[AI]` block. */
+/**
+ * A skirmish AI — becomes an `[AI]` block. Native and game-Lua AIs use the same
+ * block; the engine matches `shortName` against the game's `LuaAI.lua` to tell
+ * them apart, and a Lua one carries `version: "<game>"`.
+ */
 export interface Ai {
   name: string;
   shortName: string;
@@ -35,8 +39,6 @@ export interface Team {
   incomeMultiplier?: number;
   startPosX?: number;
   startPosZ?: number;
-  /** A game Lua AI controlling this team — set INSTEAD of an `[AI]` block. */
-  luaAi?: string;
 }
 
 export interface AllyTeam {
