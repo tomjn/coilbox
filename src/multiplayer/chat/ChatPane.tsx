@@ -23,6 +23,37 @@ function formatTime(at: number): string {
   });
 }
 
+const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+/** Label a unix-millis timestamp as a calendar day, spelled out in full so a
+ * line from a channel's backlog can't be mistaken for one from today. */
+function formatDay(at: number): string {
+  const d = new Date(at);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (sameDay(d, today)) return "Today";
+  if (sameDay(d, yesterday)) return "Yesterday";
+  return d.toLocaleDateString([], {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** Whether a day divider belongs above `m`. True for the first dated message, so
+ * a conversation always opens with the day it starts on. Messages with no
+ * timestamp (`at === 0`) can't place themselves on a day, so they never divide. */
+function dayChanged(prev: ChatMsg | undefined, m: ChatMsg): boolean {
+  if (!m.at) return false;
+  if (prev == null || !prev.at) return true;
+  return !sameDay(new Date(prev.at), new Date(m.at));
+}
+
 /** Messages within this window from one sender are visually grouped. */
 const GROUP_WINDOW_MS = 5 * 60_000;
 
@@ -43,6 +74,9 @@ function grouped(a: ChatMsg, b: ChatMsg): boolean {
   if (isNotice(a.kind) || isNotice(b.kind)) return false;
   if (isAction(a.kind) || isAction(b.kind)) return false;
   if (a.from !== b.from) return false;
+  // A run that straddles midnight is about to be split by a day divider, so it
+  // can't group across one - the window alone would let 23:59 and 00:01 group.
+  if (dayChanged(a, b)) return false;
   return Math.abs(b.at - a.at) <= GROUP_WINDOW_MS;
 }
 
@@ -338,6 +372,15 @@ export function ChatPane({
                         messageId={key}
                         className={spacing}
                       >
+                        {dayChanged(prev, m) && (
+                          <div className="flex items-center gap-3 py-2">
+                            <span className="h-px flex-1 bg-border" />
+                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              {formatDay(m.at)}
+                            </span>
+                            <span className="h-px flex-1 bg-border" />
+                          </div>
+                        )}
                         {body}
                       </MessageScrollerItem>
                     );
