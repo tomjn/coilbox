@@ -10,17 +10,28 @@
  */
 
 /** The formats the composer can apply to a selection. */
-export type Format = "bold" | "italic" | "code" | "quote";
+export type Format = "bold" | "italic" | "code" | "strike" | "quote" | "bullet";
 
-/** The inline formats, and the markers that bracket them. */
-const FORMAT_MARKER: Record<Exclude<Format, "quote">, string> = {
-  bold: "**",
-  italic: "_",
-  code: "`",
+/**
+ * How a format is applied: `wrap` brackets the selection, `prefix` marks every
+ * line it touches. The split is the parser's, not a style choice - `>` and `-`
+ * are only markers at the head of a line.
+ */
+type Rule =
+  | { kind: "wrap"; marker: string }
+  | { kind: "prefix"; prefix: string };
+
+/** Keyed by every format, so a new one can't be added without saying which it
+ * is. `~~` for strike: the parser takes `~x~` too, but the doubled form is the
+ * one other clients are most likely to render. */
+const FORMAT_RULE: Record<Format, Rule> = {
+  bold: { kind: "wrap", marker: "**" },
+  italic: { kind: "wrap", marker: "_" },
+  code: { kind: "wrap", marker: "`" },
+  strike: { kind: "wrap", marker: "~~" },
+  quote: { kind: "prefix", prefix: "> " },
+  bullet: { kind: "prefix", prefix: "- " },
 };
-
-/** What `parseBlocks` reads as a quoted line. */
-const QUOTE_PREFIX = "> ";
 
 export interface FormatResult {
   value: string;
@@ -37,37 +48,43 @@ export function formatSelection(
   end: number,
   format: Format,
 ): FormatResult {
-  return format === "quote"
-    ? quoteLines(value, start, end)
-    : wrapSelection(value, start, end, format);
+  const rule = FORMAT_RULE[format];
+  return rule.kind === "prefix"
+    ? prefixLines(value, start, end, rule.prefix)
+    : wrapSelection(value, start, end, rule.marker);
 }
 
 /**
- * Prefix every line the selection touches with `> `. Whole lines, because a
- * quote that started mid-line is not a quote to the parser - it reads the marker
- * at the head of a line or not at all.
+ * Prefix every line the selection touches with `prefix`. Whole lines, because a
+ * marker that started mid-line is not a marker to the parser - it reads them at
+ * the head of a line or not at all.
  *
- * With nothing selected this quotes the line the caret is on and carries the
+ * With nothing selected this prefixes the line the caret is on and carries the
  * caret along with the text, rather than selecting the line: a selection here
  * would be wiped by the next keystroke.
  */
-function quoteLines(value: string, start: number, end: number): FormatResult {
+function prefixLines(
+  value: string,
+  start: number,
+  end: number,
+  prefix: string,
+): FormatResult {
   const from = value.lastIndexOf("\n", start - 1) + 1;
   const next = value.indexOf("\n", end);
   const to = next === -1 ? value.length : next;
 
-  const quoted = value
+  const prefixed = value
     .slice(from, to)
     .split("\n")
-    .map((line) => QUOTE_PREFIX + line)
+    .map((line) => prefix + line)
     .join("\n");
-  const quotedValue = value.slice(0, from) + quoted + value.slice(to);
+  const prefixedValue = value.slice(0, from) + prefixed + value.slice(to);
 
   if (start === end) {
-    const caret = start + QUOTE_PREFIX.length;
-    return { value: quotedValue, start: caret, end: caret };
+    const caret = start + prefix.length;
+    return { value: prefixedValue, start: caret, end: caret };
   }
-  return { value: quotedValue, start: from, end: from + quoted.length };
+  return { value: prefixedValue, start: from, end: from + prefixed.length };
 }
 
 /**
@@ -84,9 +101,8 @@ function wrapSelection(
   value: string,
   start: number,
   end: number,
-  format: Exclude<Format, "quote">,
+  marker: string,
 ): FormatResult {
-  const marker = FORMAT_MARKER[format];
   const selected = value.slice(start, end);
   const lead = /^\s*/.exec(selected)?.[0].length ?? 0;
   const trail = /\s*$/.exec(selected)?.[0].length ?? 0;

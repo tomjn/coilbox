@@ -117,11 +117,36 @@ describe("formatSelection quoting", () => {
   });
 });
 
+describe("formatSelection bulleting", () => {
+  it("prefixes every line the selection touches", () => {
+    expect(formatSelection("one\ntwo", 0, 7, "bullet")).toEqual({
+      value: "- one\n- two",
+      start: 0,
+      end: 11,
+    });
+  });
+
+  it("leaves the lines around the selection alone", () => {
+    expect(formatSelection("one\ntwo\nthree", 4, 7, "bullet").value).toBe(
+      "one\n- two\nthree",
+    );
+  });
+
+  it("carries the caret rather than selecting the line", () => {
+    expect(formatSelection("one", 3, 3, "bullet")).toEqual({
+      value: "- one",
+      start: 5,
+      end: 5,
+    });
+  });
+});
+
 describe("formatSelection output round-trips through parseMessage", () => {
   const cases: [Format, string][] = [
     ["bold", "bold"],
     ["italic", "italic"],
     ["code", "code"],
+    ["strike", "strike"],
     ["quote", "quote"],
   ];
   for (const [format, type] of cases) {
@@ -132,4 +157,18 @@ describe("formatSelection output round-trips through parseMessage", () => {
       );
     });
   }
+
+  it("emits a list once the button is used on two lines", () => {
+    // A single bulleted line is deliberately not a list, so the button can only
+    // produce one over a multi-line selection.
+    const { value } = formatSelection("one\ntwo", 0, 7, "bullet");
+    expect(parseMessage(value)).toContainEqual(
+      expect.objectContaining({ type: "list" }),
+    );
+  });
+
+  it("emits plain text when the button bullets a single line", () => {
+    const { value } = formatSelection("one", 0, 3, "bullet");
+    expect(parseMessage(value)).toEqual([{ type: "text", value: "- one" }]);
+  });
 });

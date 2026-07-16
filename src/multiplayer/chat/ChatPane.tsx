@@ -1,5 +1,14 @@
 import { Button, cn } from "@picoframe/frame";
-import { ArrowUp, Bold, Bot, Code, Italic, TextQuote } from "lucide-react";
+import {
+  ArrowUp,
+  Bold,
+  Bot,
+  Code,
+  Italic,
+  List,
+  Strikethrough,
+  TextQuote,
+} from "lucide-react";
 import {
   type ReactNode,
   useEffect,
@@ -79,8 +88,10 @@ function dayChanged(prev: ChatMsg | undefined, m: ChatMsg): boolean {
 const FORMAT_BUTTONS: { format: Format; label: string; Icon: typeof Bold }[] = [
   { format: "bold", label: "Bold", Icon: Bold },
   { format: "italic", label: "Italic", Icon: Italic },
+  { format: "strike", label: "Strikethrough", Icon: Strikethrough },
   { format: "code", label: "Code", Icon: Code },
   { format: "quote", label: "Quote", Icon: TextQuote },
+  { format: "bullet", label: "Bullet list", Icon: List },
 ];
 
 /** A row of the composer's autocomplete menu. The two triggers share the menu
