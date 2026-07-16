@@ -1,5 +1,5 @@
 import { Button, cn } from "@picoframe/frame";
-import { ArrowUp, Bold, Bot, Code, Italic } from "lucide-react";
+import { ArrowUp, Bold, Bot, Code, Italic, TextQuote } from "lucide-react";
 import {
   type ReactNode,
   useEffect,
@@ -28,7 +28,7 @@ import {
   emojiQuery,
 } from "./emojiMenu";
 import { FormattedText } from "./FormattedText";
-import { type Format, wrapSelection } from "./formatting";
+import { type Format, formatSelection } from "./formatting";
 import { applyMention, mentionMatches, mentionQuery } from "./mentionMenu";
 import { PRESENCE_META, type Presence } from "./presence";
 import { completeNick, type TabCycle } from "./tabComplete";
@@ -80,6 +80,7 @@ const FORMAT_BUTTONS: { format: Format; label: string; Icon: typeof Bold }[] = [
   { format: "bold", label: "Bold", Icon: Bold },
   { format: "italic", label: "Italic", Icon: Italic },
   { format: "code", label: "Code", Icon: Code },
+  { format: "quote", label: "Quote", Icon: TextQuote },
 ];
 
 /** A row of the composer's autocomplete menu. The two triggers share the menu
@@ -318,14 +319,14 @@ export function ChatPane({
     el?.focus();
   }
 
-  /** Wrap the composer's selection in `format`'s markers, keeping the wrapped
-   * text selected so it can be typed over or wrapped again. */
+  /** Format the composer's selection, keeping the formatted text selected so it
+   * can be typed over or formatted again. */
   function applyFormat(format: Format) {
     const el = inputElRef.current;
     if (!el || disabled) return;
     const start = el.selectionStart ?? draft.length;
     const end = el.selectionEnd ?? start;
-    const result = wrapSelection(draft, start, end, format);
+    const result = formatSelection(draft, start, end, format);
     cycleRef.current = null;
     pendingSelectionRef.current = [result.start, result.end];
     setDraft(result.value);

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { type Format, wrapSelection } from "./formatting";
+import { type Format, formatSelection } from "./formatting";
 import { parseMessage } from "./parseMessage";
 
-describe("wrapSelection", () => {
+describe("formatSelection wrapping", () => {
   it("wraps a selection in bold markers and keeps it selected", () => {
-    expect(wrapSelection("hello world", 6, 11, "bold")).toEqual({
+    expect(formatSelection("hello world", 6, 11, "bold")).toEqual({
       value: "hello **world**",
       start: 8,
       end: 13,
@@ -12,7 +12,7 @@ describe("wrapSelection", () => {
   });
 
   it("wraps in italic markers", () => {
-    expect(wrapSelection("hello", 0, 5, "italic")).toEqual({
+    expect(formatSelection("hello", 0, 5, "italic")).toEqual({
       value: "_hello_",
       start: 1,
       end: 6,
@@ -20,7 +20,7 @@ describe("wrapSelection", () => {
   });
 
   it("wraps in code markers", () => {
-    expect(wrapSelection("!status", 0, 7, "code")).toEqual({
+    expect(formatSelection("!status", 0, 7, "code")).toEqual({
       value: "`!status`",
       start: 1,
       end: 8,
@@ -28,7 +28,7 @@ describe("wrapSelection", () => {
   });
 
   it("puts the caret between the markers when nothing is selected", () => {
-    expect(wrapSelection("hi ", 3, 3, "bold")).toEqual({
+    expect(formatSelection("hi ", 3, 3, "bold")).toEqual({
       value: "hi ****",
       start: 5,
       end: 5,
@@ -36,7 +36,7 @@ describe("wrapSelection", () => {
   });
 
   it("leaves a selection's trailing space outside the markers", () => {
-    expect(wrapSelection("foo bar", 0, 4, "bold")).toEqual({
+    expect(formatSelection("foo bar", 0, 4, "bold")).toEqual({
       value: "**foo** bar",
       start: 2,
       end: 5,
@@ -44,7 +44,7 @@ describe("wrapSelection", () => {
   });
 
   it("leaves a selection's leading space outside the markers", () => {
-    expect(wrapSelection("foo bar", 3, 7, "bold")).toEqual({
+    expect(formatSelection("foo bar", 3, 7, "bold")).toEqual({
       value: "foo **bar**",
       start: 6,
       end: 9,
@@ -52,7 +52,7 @@ describe("wrapSelection", () => {
   });
 
   it("treats a whitespace-only selection as a caret at its end", () => {
-    expect(wrapSelection("a  b", 1, 3, "code")).toEqual({
+    expect(formatSelection("a  b", 1, 3, "code")).toEqual({
       value: "a  ``b",
       start: 4,
       end: 4,
@@ -60,7 +60,7 @@ describe("wrapSelection", () => {
   });
 
   it("wraps a multi-line selection as one span", () => {
-    expect(wrapSelection("one\ntwo", 0, 7, "bold")).toEqual({
+    expect(formatSelection("one\ntwo", 0, 7, "bold")).toEqual({
       value: "**one\ntwo**",
       start: 2,
       end: 9,
@@ -68,15 +68,65 @@ describe("wrapSelection", () => {
   });
 });
 
-describe("wrapSelection output round-trips through parseMessage", () => {
+describe("formatSelection quoting", () => {
+  it("prefixes the selected line", () => {
+    expect(formatSelection("hello", 0, 5, "quote")).toEqual({
+      value: "> hello",
+      start: 0,
+      end: 7,
+    });
+  });
+
+  it("prefixes every line the selection touches", () => {
+    expect(formatSelection("one\ntwo\nthree", 0, 7, "quote")).toEqual({
+      value: "> one\n> two\nthree",
+      start: 0,
+      end: 11,
+    });
+  });
+
+  it("quotes whole lines, not from where the selection started", () => {
+    // The parser reads `>` at the head of a line or not at all, so quoting from
+    // the caret would emit a line that renders as literal text.
+    expect(formatSelection("hello there", 6, 11, "quote").value).toBe(
+      "> hello there",
+    );
+  });
+
+  it("leaves the lines around the selection alone", () => {
+    expect(formatSelection("one\ntwo\nthree", 4, 7, "quote").value).toBe(
+      "one\n> two\nthree",
+    );
+  });
+
+  it("carries the caret rather than selecting the line", () => {
+    // A selection here would be wiped by the next keystroke.
+    expect(formatSelection("hello", 5, 5, "quote")).toEqual({
+      value: "> hello",
+      start: 7,
+      end: 7,
+    });
+  });
+
+  it("starts a quote in an empty draft", () => {
+    expect(formatSelection("", 0, 0, "quote")).toEqual({
+      value: "> ",
+      start: 2,
+      end: 2,
+    });
+  });
+});
+
+describe("formatSelection output round-trips through parseMessage", () => {
   const cases: [Format, string][] = [
     ["bold", "bold"],
     ["italic", "italic"],
     ["code", "code"],
+    ["quote", "quote"],
   ];
   for (const [format, type] of cases) {
     it(`emits markup the renderer tokenizes as ${type}`, () => {
-      const { value } = wrapSelection("hey there", 4, 9, format);
+      const { value } = formatSelection("hey there", 4, 9, format);
       expect(parseMessage(value)).toContainEqual(
         expect.objectContaining({ type }),
       );
