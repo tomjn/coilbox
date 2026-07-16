@@ -43,19 +43,22 @@ export interface EmojiEntry {
  *
  * Labels are hard-coded rather than pulled from emojibase's messages dataset:
  * that would be a fourth JSON to ship for nine strings, in a GUI with no
- * translations to feed them into.
+ * translations to feed them into. `icon` is the tab's glyph - nine text labels
+ * don't fit the width of a popover, so each tab is shown as an emoji from the
+ * group it opens (the label stays as its accessible name).
  */
-export const EMOJI_GROUPS: { group: GroupKey; label: string }[] = [
-  { group: GROUP_KEY_SMILEYS_EMOTION, label: "Smileys" },
-  { group: GROUP_KEY_PEOPLE_BODY, label: "People" },
-  { group: GROUP_KEY_ANIMALS_NATURE, label: "Nature" },
-  { group: GROUP_KEY_FOOD_DRINK, label: "Food" },
-  { group: GROUP_KEY_TRAVEL_PLACES, label: "Travel" },
-  { group: GROUP_KEY_ACTIVITIES, label: "Activities" },
-  { group: GROUP_KEY_OBJECTS, label: "Objects" },
-  { group: GROUP_KEY_SYMBOLS, label: "Symbols" },
-  { group: GROUP_KEY_FLAGS, label: "Flags" },
-];
+export const EMOJI_GROUPS: { group: GroupKey; label: string; icon: string }[] =
+  [
+    { group: GROUP_KEY_SMILEYS_EMOTION, label: "Smileys", icon: "😀" },
+    { group: GROUP_KEY_PEOPLE_BODY, label: "People", icon: "👋" },
+    { group: GROUP_KEY_ANIMALS_NATURE, label: "Nature", icon: "🐻" },
+    { group: GROUP_KEY_FOOD_DRINK, label: "Food", icon: "🍔" },
+    { group: GROUP_KEY_TRAVEL_PLACES, label: "Travel", icon: "🚀" },
+    { group: GROUP_KEY_ACTIVITIES, label: "Activities", icon: "⚽" },
+    { group: GROUP_KEY_OBJECTS, label: "Objects", icon: "💡" },
+    { group: GROUP_KEY_SYMBOLS, label: "Symbols", icon: "❤️" },
+    { group: GROUP_KEY_FLAGS, label: "Flags", icon: "🏁" },
+  ];
 
 let pending: Promise<EmojiEntry[]> | null = null;
 

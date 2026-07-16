@@ -17,7 +17,8 @@ const CODE = "a-z0-9_+-";
 export const MIN_EMOJI_QUERY = 2;
 
 /** How many matches the menu offers. `:a` alone matches hundreds; a popup is not
- * a place to scroll through them. */
+ * a place to scroll through them. The picker searches the same way but shows a
+ * grid, so it asks for more. */
 export const MAX_EMOJI_MATCHES = 10;
 
 /** The `:` token the caret sits in, if any. */
@@ -53,6 +54,7 @@ export function emojiQuery(value: string, cursor: number): EmojiQuery | null {
 export function emojiMatches(
   query: string,
   entries: EmojiEntry[],
+  limit: number = MAX_EMOJI_MATCHES,
 ): EmojiEntry[] {
   const q = query.toLowerCase();
   const prefix: [string, EmojiEntry][] = [];
@@ -70,7 +72,7 @@ export function emojiMatches(
   const byCode = (a: [string, EmojiEntry], b: [string, EmojiEntry]) =>
     a[0].length - b[0].length || a[0].localeCompare(b[0]);
   return [...prefix.sort(byCode), ...infix.sort(byCode)]
-    .slice(0, MAX_EMOJI_MATCHES)
+    .slice(0, limit)
     .map(([, entry]) => entry);
 }
 

@@ -19,6 +19,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { ChatMsg } from "../bindings";
 import { composeDraft } from "./compose";
+import { EmojiPicker } from "./EmojiPicker";
 import { type EmojiEntry, loadEmoji, shortcodeIndex } from "./emoji";
 import {
   applyEmoji,
@@ -301,6 +302,20 @@ export function ChatPane({
     }
     setDraft(value);
     setCaret(cursor);
+  }
+
+  /** Insert a picked emoji over the composer's selection. The picker takes focus
+   * while it's open, so the caret is wherever the draft was left. */
+  function insertEmoji(unicode: string) {
+    const el = inputElRef.current;
+    const start = el?.selectionStart ?? draft.length;
+    const end = el?.selectionEnd ?? start;
+    const result = applyEmoji(draft, start, end, unicode);
+    cycleRef.current = null;
+    pendingSelectionRef.current = [result.cursor, result.cursor];
+    setDraft(result.value);
+    setCaret(result.cursor);
+    el?.focus();
   }
 
   /** Wrap the composer's selection in `format`'s markers, keeping the wrapped
@@ -678,6 +693,7 @@ export function ChatPane({
             className="max-h-32 min-h-0 resize-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:ring-0 placeholder:italic"
           />
           <div className="flex items-center gap-0.5">
+            <EmojiPicker onPick={insertEmoji} disabled={disabled} />
             {FORMAT_BUTTONS.map(({ format, label, Icon }) => (
               <Button
                 key={format}
