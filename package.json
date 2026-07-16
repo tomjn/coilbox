@@ -33,6 +33,8 @@
     "@tauri-apps/plugin-updater": "^2.10.1",
     "@xyflow/react": "^12.11.1",
     "clsx": "^2.1.1",
+    "emojibase": "^17.0.0",
+    "emojibase-data": "^17.0.0",
     "flag-icons": "^7.5.0",
     "lucide-react": "^1.21.0",
     "radix-ui": "^1.6.0",
