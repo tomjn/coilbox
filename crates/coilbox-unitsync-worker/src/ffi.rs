@@ -171,6 +171,7 @@ pub struct Unitsync {
     option_key_fn: Option<StrByIntFn>,
     option_name_fn: Option<StrByIntFn>,
     option_desc_fn: Option<StrByIntFn>,
+    option_section_fn: Option<StrByIntFn>,
     // option typing + defaults (bool/number/list/string)
     option_type_fn: Option<IntByIntFn>,
     option_bool_def_fn: Option<IntByIntFn>,
@@ -291,6 +292,7 @@ impl Unitsync {
             option_key_fn: opt(&lib, b"GetOptionKey\0"),
             option_name_fn: opt(&lib, b"GetOptionName\0"),
             option_desc_fn: opt(&lib, b"GetOptionDesc\0"),
+            option_section_fn: opt(&lib, b"GetOptionSection\0"),
             option_type_fn: opt(&lib, b"GetOptionType\0"),
             option_bool_def_fn: opt(&lib, b"GetOptionBoolDef\0"),
             option_number_def_fn: opt(&lib, b"GetOptionNumberDef\0"),
@@ -809,7 +811,17 @@ impl Unitsync {
             .filter(|s| !s.is_empty())
     }
 
-    /// unitsync option type code: 1 bool, 2 list, 3 number, 4 string (0 unknown).
+    /// The key of the section an option belongs to, empty when it is top-level.
+    /// Sections are themselves options (type 5), so this is how the flat option
+    /// list encodes its grouping.
+    pub fn option_section(&self, i: i32) -> Option<String> {
+        self.option_section_fn
+            .and_then(|f| unsafe { cstr(f(i)) })
+            .filter(|s| !s.is_empty())
+    }
+
+    /// unitsync option type code: 1 bool, 2 list, 3 number, 4 string, 5 section
+    /// (0 unknown).
     pub fn option_type(&self, i: i32) -> i32 {
         self.option_type_fn.map(|f| unsafe { f(i) }).unwrap_or(0)
     }

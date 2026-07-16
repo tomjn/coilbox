@@ -757,17 +757,21 @@ fn dir_size(p: &Path) -> u64 {
 /// Build config options from the global table set by the most recent
 /// `GetMapOptionCount` / `GetModOptionCount` call, including each option's type,
 /// default and (for numbers/lists) bounds/items so the UI can render a proper
-/// control. `GetOptionType`: 1 bool, 2 list, 3 number, 4 string.
+/// control. `GetOptionType`: 1 bool, 2 list, 3 number, 4 string, 5 section.
+/// Sections are group headers carrying no value; they keep their place in the
+/// list so the UI can group the options that name them via `section`.
 pub(crate) fn read_options(us: &Unitsync, count: i32) -> Vec<ConfigOption> {
     (0..count)
         .filter_map(|i| {
             let key = us.option_key(i)?;
             let name = us.option_name(i).unwrap_or_else(|| key.clone());
             let description = us.option_desc(i);
+            let section = us.option_section(i);
             let mut opt = ConfigOption {
                 key,
                 name,
                 description,
+                section,
                 ..Default::default()
             };
             match us.option_type(i) {
@@ -795,6 +799,9 @@ pub(crate) fn read_options(us: &Unitsync, count: i32) -> Vec<ConfigOption> {
                     opt.kind = Some("string".into());
                     opt.default = us.option_string_def(i);
                 }
+                // A section has no value or default of its own; leaving it
+                // untyped made the UI render it as an empty text box.
+                5 => opt.kind = Some("section".into()),
                 _ => {}
             }
             Some(opt)
