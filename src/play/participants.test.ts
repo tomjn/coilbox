@@ -8,6 +8,7 @@ import {
   type Participant,
   rgbToHex,
   sanitizeColors,
+  toBattleConfig,
 } from "./participants";
 
 const you = (color: Participant["color"]): Participant => ({
@@ -69,6 +70,55 @@ describe("sanitizeColors", () => {
   it("returns the same array reference when nothing needs healing", () => {
     const ps = initialParticipants();
     expect(sanitizeColors(ps, "")).toBe(ps);
+  });
+});
+
+describe("toBattleConfig AI blocks", () => {
+  const base = {
+    mapName: "All That Glitters v2.2.3",
+    gameType: "SplinterFaction 0.1.75",
+    startPosType: 0,
+    modOptions: {},
+  };
+
+  const withAi = (kind: "native" | "lua", shortName: string) =>
+    toBattleConfig({
+      ...base,
+      participants: [
+        you(PALETTE[0]),
+        {
+          ...ai("bot1", PALETTE[1]),
+          ai: { kind, shortName, name: shortName },
+        },
+      ],
+    });
+
+  it("emits a game Lua AI as an [AI] block the engine parses, not a team key", () => {
+    const cfg = withAi("lua", "SimpleAI");
+    // The engine only reads [GAME]\AIn sections; a `LuaAI` team key is ignored,
+    // leaving the team with no controller at all.
+    expect(cfg.ais).toEqual([
+      {
+        name: "bot1",
+        shortName: "SimpleAI",
+        version: "<game>",
+        team: 1,
+        host: 0,
+      },
+    ]);
+  });
+
+  it("emits a native AI as an [AI] block with no version", () => {
+    const cfg = withAi("native", "NullAI");
+    expect(cfg.ais).toEqual([
+      {
+        name: "bot1",
+        shortName: "NullAI",
+        version: undefined,
+        team: 1,
+        host: 0,
+      },
+    ]);
   });
 });
 

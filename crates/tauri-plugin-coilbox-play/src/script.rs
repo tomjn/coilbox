@@ -134,9 +134,6 @@ pub struct Team {
     pub start_pos_x: Option<f32>,
     #[serde(default)]
     pub start_pos_z: Option<f32>,
-    /// A game Lua AI controlling this team — set INSTEAD of an `[AI]` block.
-    #[serde(default)]
-    pub lua_ai: Option<String>,
 }
 
 #[derive(Deserialize, Clone, Debug, Default)]
@@ -235,9 +232,6 @@ pub fn generate_script(cfg: &BattleConfig) -> String {
             if let (Some(x), Some(z)) = (t.start_pos_x, t.start_pos_z) {
                 kv(s, 2, "StartPosX", &fmt_f(x));
                 kv(s, 2, "StartPosZ", &fmt_f(z));
-            }
-            if let Some(lua) = &t.lua_ai {
-                kv(s, 2, "LuaAI", lua);
             }
         });
     }
@@ -412,14 +406,18 @@ mod tests {
         assert!(!s.contains("LuaAI="));
     }
 
+    /// A game Lua AI goes through the same `[AI]` block as a native one: the
+    /// engine's `LoadSkirmishAIs` is the only reader of the script, and it flags
+    /// Lua-ness itself by matching ShortName against the game's `LuaAI.lua`.
     #[test]
-    fn lua_ai_renders_on_team_without_ai_block() {
+    fn lua_ai_renders_an_ai_block_with_game_version() {
         let mut cfg = sample();
-        cfg.ais.clear();
-        cfg.teams[1].lua_ai = Some("Scavengers".into());
+        cfg.ais[0].short_name = "Scavengers".into();
+        cfg.ais[0].version = Some("<game>".into());
         let s = generate_script(&cfg);
-        assert!(!s.contains("[AI0]"));
-        assert!(s.contains("LuaAI=Scavengers;"));
+        assert!(s.contains("[AI0]"));
+        assert!(s.contains("ShortName=Scavengers;"));
+        assert!(s.contains("Version=<game>;"));
     }
 
     #[test]
