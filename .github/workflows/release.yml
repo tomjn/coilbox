@@ -62,7 +62,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Pin an exact semver: setup-bun only resolves a tag through
+      # api.github.com when the version isn't strict semver, and that API
+      # going down took out a whole release build. An exact version skips
+      # the lookup and downloads straight from the releases CDN.
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
 
       - uses: dtolnay/rust-toolchain@stable
 
