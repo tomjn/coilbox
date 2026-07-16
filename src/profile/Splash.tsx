@@ -64,7 +64,11 @@ export default function Splash({
   }, [reduceMotion, duration, fadeOutMs, dismiss]);
 
   // Keyboard dismiss (Escape/Enter/Space). Click is handled on the overlay button.
+  // Gated on `mounted`: we hide by rendering null rather than unmounting, so
+  // without the dep the listener would outlive the splash and swallow every
+  // space in the app.
   useEffect(() => {
+    if (!mounted) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
         e.preventDefault();
@@ -73,7 +77,7 @@ export default function Splash({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dismiss]);
+  }, [dismiss, mounted]);
 
   if (!mounted) return null;
 
