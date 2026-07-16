@@ -112,7 +112,11 @@ export function EmojiPicker({ onPick, disabled = false }: EmojiPickerProps) {
               if (picked) setGroup(picked.group);
             }}
             spacing={1}
-            className="mb-2 w-full"
+            // The rule separates the tabs from the grid they filter. It rides on
+            // the tabs rather than the grid so it comes and goes with them - a
+            // search replaces the tabs, and a rule under the search box alone
+            // would be a line dividing nothing.
+            className="mb-2 w-full rounded-none border-b border-border pb-2"
           >
             {EMOJI_GROUPS.map((g) => (
               <ToggleGroupItem
