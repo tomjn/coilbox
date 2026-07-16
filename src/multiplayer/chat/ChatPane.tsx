@@ -690,7 +690,15 @@ export function ChatPane({
             // Height is driven by the auto-grow effect; the cap here is what it
             // grows to before the box scrolls instead. `resize-none` because a
             // drag handle would fight that effect.
-            className="max-h-32 min-h-0 resize-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:ring-0 placeholder:italic"
+            //
+            // The box around this is the input, as far as the reader is
+            // concerned - it draws the border, the focus ring and the
+            // background, and the toolbar sits inside it. So the textarea has to
+            // disappear into it. `dark:bg-transparent` rather than
+            // `bg-transparent` alone because Textarea's own `dark:bg-input/30`
+            // is variant-prefixed: an unprefixed utility never overrides it, and
+            // tailwind-merge keeps both as non-conflicting.
+            className="max-h-32 min-h-0 resize-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:ring-0 dark:bg-transparent placeholder:italic"
           />
           <div className="flex items-center gap-0.5">
             <EmojiPicker onPick={insertEmoji} disabled={disabled} />
