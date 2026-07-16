@@ -1,4 +1,4 @@
-import { Button, cn, Input } from "@picoframe/frame";
+import { Button, cn } from "@picoframe/frame";
 import { ArrowUp, Bot } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import {
@@ -9,7 +9,9 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
+import { Textarea } from "@/components/ui/textarea";
 import type { ChatMsg } from "../bindings";
+import { composeDraft } from "./compose";
 import { FormattedText } from "./FormattedText";
 import { applyMention, mentionMatches, mentionQuery } from "./mentionMenu";
 import { PRESENCE_META, type Presence } from "./presence";
@@ -139,10 +141,9 @@ export function ChatPane({
   const [sendError, setSendError] = useState<string | null>(null);
   // Tab-completion: cycle state persists across Tabs; the input element and a
   // pending caret offset let us restore the selection after the controlled
-  // re-render (picoframe's Input doesn't forward a ref, so we grab the element
-  // from the keydown event).
+  // re-render.
   const cycleRef = useRef<TabCycle | null>(null);
-  const inputElRef = useRef<HTMLInputElement | null>(null);
+  const inputElRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingCursorRef = useRef<number | null>(null);
   // Mention menu (#279): the caret drives which `@` token (if any) is being
   // typed; `dismissedAt` remembers the token Escape closed so it stays closed
@@ -173,7 +174,7 @@ export function ChatPane({
   }, [queryKey]);
 
   // Runs every render to apply a queued caret move from Tab-completion (the
-  // controlled Input resets the caret to the end on each change), then clears it.
+  // controlled input resets the caret to the end on each change), then clears it.
   useEffect(() => {
     if (pendingCursorRef.current != null && inputElRef.current) {
       const c = pendingCursorRef.current;
@@ -182,12 +183,23 @@ export function ChatPane({
     }
   });
 
-  function onTab(el: HTMLInputElement): boolean {
+  // Grow the composer with its content up to the max height the class sets,
+  // then let it scroll. Measured rather than left to `field-sizing: content`,
+  // which the three webviews we ship on don't support alike. Reset to `auto`
+  // first so the box also shrinks back (e.g. once a send clears the draft).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: remeasured when the draft changes, which is what changes the height
+  useEffect(() => {
+    const el = inputElRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draft]);
+
+  function onTab(el: HTMLTextAreaElement): boolean {
     if (!completions || completions.length === 0) return false;
     const cursor = el.selectionStart ?? draft.length;
     const result = completeNick(draft, cursor, completions, cycleRef.current);
     if (!result) return false;
-    inputElRef.current = el;
     cycleRef.current = result.cycle;
     pendingCursorRef.current = result.cursor;
     setDraft(result.value);
@@ -206,15 +218,28 @@ export function ChatPane({
   }
 
   async function submit() {
-    const text = draft.trim();
-    if (!text || disabled) return;
+    if (disabled) return;
+    const composed = composeDraft(draft);
+    if (composed.kind === "error") {
+      setSendError(composed.reason);
+      return;
+    }
+    const lines = composed.lines;
+    if (lines.length === 0) return;
     setDraft("");
     setSendError(null);
-    try {
-      await onSend(text);
-    } catch (e) {
-      setDraft(text); // restore so the user doesn't lose their message
-      setSendError(String(e));
+    // One command per line, awaited in turn: concurrent sends can reach the
+    // socket out of order and scramble the message. On a failure only the lines
+    // that never went out are restored - putting the whole draft back would
+    // duplicate the published ones on the next Enter.
+    for (const [i, line] of lines.entries()) {
+      try {
+        await onSend(line);
+      } catch (e) {
+        setDraft(lines.slice(i).join("\n"));
+        setSendError(String(e));
+        return;
+      }
     }
   }
 
@@ -436,7 +461,9 @@ export function ChatPane({
             Failed to send: {sendError}
           </p>
         )}
-        <div className="relative flex items-center gap-2 rounded-2xl border border-input bg-background px-3 py-1.5 focus-within:ring-2 focus-within:ring-ring">
+        {/* `items-end` keeps the send button on the last line as the composer
+            grows, rather than floating it in the middle of the block. */}
+        <div className="relative flex items-end gap-2 rounded-2xl border border-input bg-background px-3 py-1.5 focus-within:ring-2 focus-within:ring-ring">
           {menuOpen && (
             <div
               id={listId}
@@ -471,17 +498,16 @@ export function ChatPane({
               ))}
             </div>
           )}
-          <Input
+          <Textarea
+            ref={inputElRef}
+            rows={1}
             value={draft}
             onChange={(e) => {
               setDraft(e.target.value);
               setCaret(e.target.selectionStart ?? e.target.value.length);
-              inputElRef.current = e.currentTarget;
             }}
             onSelect={(e) => {
-              const el = e.currentTarget;
-              inputElRef.current = el;
-              setCaret(el.selectionStart ?? draft.length);
+              setCaret(e.currentTarget.selectionStart ?? draft.length);
             }}
             role="combobox"
             aria-expanded={menuOpen}
@@ -531,7 +557,10 @@ export function ChatPane({
             placeholder="Type your message..."
             disabled={disabled}
             aria-label="Message"
-            className="border-0 bg-transparent shadow-none focus-visible:ring-0 placeholder:italic"
+            // Height is driven by the auto-grow effect; the cap here is what it
+            // grows to before the box scrolls instead. `resize-none` because a
+            // drag handle would fight that effect.
+            className="max-h-32 min-h-0 resize-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:ring-0 placeholder:italic"
           />
           <Button
             onClick={submit}
