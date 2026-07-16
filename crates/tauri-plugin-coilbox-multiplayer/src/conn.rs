@@ -245,6 +245,20 @@ async fn run_loop(
                         outbound.push(command::join_battle_accept(username));
                     }
 
+                    // We just joined a channel and it starts empty: ask for its stored
+                    // backlog so the conversation has some history behind it. Safe to
+                    // ask unconditionally — a channel that stores no history (the
+                    // default) replies with nothing rather than an error — except for
+                    // battle channels, which are never registered and so never have any.
+                    //
+                    // Cursor 0 asks for the channel's whole retained window. How much
+                    // that is, is the server's call: some cap the read, some don't.
+                    if let ServerMessage::Join { channel } = &msg {
+                        if !channel.starts_with("__battle__") {
+                            outbound.push(command::get_channel_messages(channel, 0));
+                        }
+                    }
+
                     let now = now_ms();
                     let deltas = reduce_at(&mut lock_or_recover(&state), msg, now);
                     for delta in deltas {
@@ -271,7 +285,11 @@ async fn run_loop(
                                 .get(ch)
                                 .and_then(|c| c.messages.get(*index))
                                 .cloned();
-                            if let Some(m) = m {
+                            // An id means the server replayed this from its own history,
+                            // so it is already in the log from when it was live. Writing
+                            // it again would grow a fresh duplicate copy of the backlog
+                            // on every connect.
+                            if let Some(m) = m.filter(|m| m.id.is_none()) {
                                 chan_log.append(ch, &m);
                             }
                         }
