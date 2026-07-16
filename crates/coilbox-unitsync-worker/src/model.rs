@@ -22,9 +22,14 @@ pub struct ConfigOption {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    /// `"bool"`, `"number"`, `"list"`, or `"string"` (omitted if unknown).
+    /// `"bool"`, `"number"`, `"list"`, `"string"`, or `"section"` (omitted if
+    /// unknown). A `"section"` is a group header, not a setting: it carries no
+    /// value and must never be written to a start script.
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
+    /// Key of the section this option belongs under; absent when top-level.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub section: Option<String>,
     /// Default value, stringified (`"1"`/`"0"` for bool, the item key for list).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,

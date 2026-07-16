@@ -367,8 +367,14 @@ export interface ConfigOption {
   key: string;
   name: string;
   description?: string;
-  /** `"bool"` | `"number"` | `"list"` | `"string"` (omitted if unknown). */
-  type?: "bool" | "number" | "list" | "string";
+  /**
+   * `"bool"` | `"number"` | `"list"` | `"string"` | `"section"` (omitted if
+   * unknown). A `"section"` is a group header rather than a setting: it has no
+   * value and is never written to a start script.
+   */
+  type?: "bool" | "number" | "list" | "string" | "section";
+  /** Key of the section this option groups under; absent when top-level. */
+  section?: string;
   /** Default value, stringified (`"1"`/`"0"` for bool, the item key for list). */
   default?: string;
   numberMin?: number;
