@@ -60,11 +60,16 @@ function parseFences(text: string): Inline[] {
 const QUOTE = /^\s*>\s?/;
 
 /**
- * A bullet. The space after the dash is required, so a negative number or an
- * em-dash-ish `-foo` isn't a bullet, and leading indent is allowed so ` - item`
- * is one.
+ * A bullet: `-`, `+` or `*`, as Markdown has it. The space after the marker is
+ * required, so a negative number (`-5`) isn't a bullet and - the reason `*` can
+ * be a marker at all - neither is `*italic*`. Leading indent is allowed, so
+ * ` - item` is one.
+ *
+ * A run of bullet lines is one list whatever markers it mixes. Markdown would
+ * start a new list at each change of marker; nobody types a deliberate `-` then
+ * `+` in chat meaning two lists.
  */
-const BULLET = /^\s*-\s+/;
+const BULLET = /^\s*[-+*]\s+/;
 
 type LineKind = "quote" | "bullet" | "text";
 
@@ -162,28 +167,47 @@ function parseUrls(text: string): Inline[] {
 }
 
 /**
- * Bold (`**x**`), strikethrough (`~~x~~` / `~x~`) then italic (`*x*` / `_x_`).
- * Content cannot span the same marker, so an unmatched or lone marker simply
- * falls through as literal text. Matched content is parsed recursively to allow
- * one level of nesting.
+ * Bold-italic (`***x***`), bold (`**x**`), strikethrough (`~~x~~` / `~x~`) then
+ * italic (`*x*` / `_x_`). Content cannot span the same marker, so an unmatched
+ * or lone marker simply falls through as literal text. Matched content is parsed
+ * recursively to allow one level of nesting.
  *
  * Both strike markers are accepted because both are in the wild - `~~x~~` is
  * Discord and GitHub, `~x~` is Slack - and italic already takes either of its
- * two. The doubled form has to be tried first or it would match as an empty
- * `~x~` bracketed by stray tildes.
+ * two.
+ *
+ * Longest marker first, and that ordering is what makes it work: `***x***` tried
+ * as `**` matches from the second asterisk and leaves stray ones either side,
+ * and `~~x~~` tried as `~` matches an empty span. Named groups because six
+ * alternatives is too many to renumber by hand.
  */
 function parseEmphasis(text: string): Inline[] {
   const out: Inline[] = [];
-  const re = /\*\*([^*]+)\*\*|~~([^~]+)~~|~([^~]+)~|\*([^*]+)\*|_([^_]+)_/g;
+  const re =
+    /\*\*\*(?<boldItalic>[^*]+)\*\*\*|\*\*(?<bold>[^*]+)\*\*|~~(?<strikeLong>[^~]+)~~|~(?<strike>[^~]+)~|\*(?<italicStar>[^*]+)\*|_(?<italicBar>[^_]+)_/g;
   let last = 0;
   for (const m of text.matchAll(re)) {
     if (m.index > last) out.push(...parseMentions(text.slice(last, m.index)));
-    if (m[1] !== undefined) {
-      out.push({ type: "bold", children: parseEmphasis(m[1]) });
-    } else if (m[2] !== undefined || m[3] !== undefined) {
-      out.push({ type: "strike", children: parseEmphasis(m[2] ?? m[3]) });
+    const g = m.groups ?? {};
+    if (g.boldItalic !== undefined) {
+      // Both at once, as one inside the other - no token of its own, so the
+      // renderer needs nothing new to show it.
+      out.push({
+        type: "bold",
+        children: [{ type: "italic", children: parseEmphasis(g.boldItalic) }],
+      });
+    } else if (g.bold !== undefined) {
+      out.push({ type: "bold", children: parseEmphasis(g.bold) });
+    } else if (g.strikeLong !== undefined || g.strike !== undefined) {
+      out.push({
+        type: "strike",
+        children: parseEmphasis(g.strikeLong ?? g.strike),
+      });
     } else {
-      out.push({ type: "italic", children: parseEmphasis(m[4] ?? m[5]) });
+      out.push({
+        type: "italic",
+        children: parseEmphasis(g.italicStar ?? g.italicBar),
+      });
     }
     last = m.index + m[0].length;
   }

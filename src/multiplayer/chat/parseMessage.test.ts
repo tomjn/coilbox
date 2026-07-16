@@ -231,6 +231,25 @@ describe("parseMessage", () => {
       { type: "text", value: "~/coilbox" },
     ]);
   });
+
+  it("tokenizes ***x*** as bold and italic at once", () => {
+    expect(parseMessage("***loud***")).toEqual([
+      {
+        type: "bold",
+        children: [
+          { type: "italic", children: [{ type: "text", value: "loud" }] },
+        ],
+      },
+    ]);
+  });
+
+  it("keeps bold and italic apart from bold-italic", () => {
+    expect(parseMessage("**b** *i*")).toEqual([
+      { type: "bold", children: [{ type: "text", value: "b" }] },
+      { type: "text", value: " " },
+      { type: "italic", children: [{ type: "text", value: "i" }] },
+    ]);
+  });
 });
 
 describe("parseMessage lists", () => {
@@ -239,6 +258,30 @@ describe("parseMessage lists", () => {
   it("groups consecutive bullet lines into one list", () => {
     expect(parseMessage("- first\n- second")).toEqual([
       { type: "list", items: [item("first"), item("second")] },
+    ]);
+  });
+
+  it("takes + and * as bullets too", () => {
+    expect(parseMessage("+ first\n+ second")).toEqual([
+      { type: "list", items: [item("first"), item("second")] },
+    ]);
+    expect(parseMessage("* first\n* second")).toEqual([
+      { type: "list", items: [item("first"), item("second")] },
+    ]);
+  });
+
+  it("reads a run of mixed markers as one list", () => {
+    expect(parseMessage("- first\n+ second\n* third")).toEqual([
+      { type: "list", items: [item("first"), item("second"), item("third")] },
+    ]);
+  });
+
+  it("does not mistake italic for a bullet", () => {
+    // The space after the marker is what keeps `*` usable as a bullet at all.
+    expect(parseMessage("*first*\n*second*")).toEqual([
+      { type: "italic", children: [{ type: "text", value: "first" }] },
+      { type: "text", value: "\n" },
+      { type: "italic", children: [{ type: "text", value: "second" }] },
     ]);
   });
 
