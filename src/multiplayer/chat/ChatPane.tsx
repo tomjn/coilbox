@@ -37,7 +37,7 @@ import {
   emojiQuery,
 } from "./emojiMenu";
 import { FormattedText } from "./FormattedText";
-import { type Format, formatSelection } from "./formatting";
+import { type Format, formatSelection, listContinuation } from "./formatting";
 import { applyMention, mentionMatches, mentionQuery } from "./mentionMenu";
 import { PRESENCE_META, type Presence } from "./presence";
 import { completeNick, type TabCycle } from "./tabComplete";
@@ -328,6 +328,19 @@ export function ChatPane({
     setDraft(result.value);
     setCaret(result.cursor);
     el?.focus();
+  }
+
+  /** Break the line and open the next one with `marker`, replacing whatever was
+   * selected the way a plain newline would. */
+  function continueList(el: HTMLTextAreaElement, marker: string) {
+    const start = el.selectionStart ?? draft.length;
+    const end = el.selectionEnd ?? start;
+    const inserted = `\n${marker}`;
+    const caret = start + inserted.length;
+    cycleRef.current = null;
+    pendingSelectionRef.current = [caret, caret];
+    setDraft(draft.slice(0, start) + inserted + draft.slice(end));
+    setCaret(caret);
   }
 
   /** Format the composer's selection, keeping the formatted text selected so it
@@ -682,6 +695,19 @@ export function ChatPane({
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 submit();
+                return;
+              }
+              // Shift+Enter on a bullet line opens the next one with the same
+              // marker. A list takes two lines to be a list, so without this the
+              // second one is the user's job every time.
+              if (e.key === "Enter" && e.shiftKey) {
+                const el = e.currentTarget;
+                const start = el.selectionStart ?? draft.length;
+                const marker = listContinuation(draft, start);
+                if (marker) {
+                  e.preventDefault();
+                  continueList(el, marker);
+                }
                 return;
               }
               if (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Format, formatSelection } from "./formatting";
+import { type Format, formatSelection, listContinuation } from "./formatting";
 import { parseMessage } from "./parseMessage";
 
 describe("formatSelection wrapping", () => {
@@ -138,6 +138,45 @@ describe("formatSelection bulleting", () => {
       start: 5,
       end: 5,
     });
+  });
+});
+
+describe("listContinuation", () => {
+  it("continues a bullet line", () => {
+    expect(listContinuation("- first", 7)).toBe("- ");
+  });
+
+  it("keeps the marker the line already uses", () => {
+    expect(listContinuation("+ first", 7)).toBe("+ ");
+    expect(listContinuation("* first", 7)).toBe("* ");
+  });
+
+  it("keeps the line's indent", () => {
+    expect(listContinuation("  - first", 9)).toBe("  - ");
+  });
+
+  it("continues from the last line of a list", () => {
+    expect(listContinuation("- first\n- second", 16)).toBe("- ");
+  });
+
+  it("does not continue an ordinary line", () => {
+    expect(listContinuation("hello", 5)).toBeNull();
+  });
+
+  it("does not continue a line whose dash has no space", () => {
+    expect(listContinuation("-5 points", 9)).toBeNull();
+  });
+
+  it("does not continue from a plain line under a list", () => {
+    expect(listContinuation("- first\nprose", 13)).toBeNull();
+  });
+
+  it("continues from a caret mid-item", () => {
+    expect(listContinuation("- first", 4)).toBe("- ");
+  });
+
+  it("does not continue from a caret before the marker", () => {
+    expect(listContinuation("- first", 1)).toBeNull();
   });
 });
 

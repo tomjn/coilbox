@@ -41,6 +41,27 @@ export interface FormatResult {
   end: number;
 }
 
+/**
+ * A bullet line, split into its indent and marker. Mirrors `parseMessage`'s own
+ * bullet rule: a marker only counts at the head of a line, with a space after
+ * it.
+ */
+const BULLET_LINE = /^(\s*)([-+*])\s+/;
+
+/**
+ * What to open the next line with to keep a list going, or null when the caret
+ * isn't on a bullet line. The composer calls this on Shift+Enter.
+ *
+ * The marker is the one already on the line rather than our own `-`: a list the
+ * user deliberately started with `+` is theirs to keep, and the parser reads a
+ * run of mixed markers as one list anyway.
+ */
+export function listContinuation(value: string, cursor: number): string | null {
+  const lineStart = value.lastIndexOf("\n", cursor - 1) + 1;
+  const m = BULLET_LINE.exec(value.slice(lineStart, cursor));
+  return m ? `${m[1]}${m[2]} ` : null;
+}
+
 /** Apply `format` to `[start, end)`. */
 export function formatSelection(
   value: string,
