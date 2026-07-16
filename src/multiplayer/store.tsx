@@ -43,7 +43,7 @@ import {
   removeChannel,
   useJoinedChannels,
 } from "./channels";
-import { conversationCounts } from "./chat/conversation";
+import { backfilledCounts, conversationCounts } from "./chat/conversation";
 import {
   HIGHLIGHT_OWN_KEY,
   HIGHLIGHT_SOUND_KEY,
@@ -391,11 +391,26 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       baselineDoneRef.current = false;
       return;
     }
-    if (!baselineDoneRef.current && mirror.state) {
+    if (!mirror.state) return;
+    if (!baselineDoneRef.current) {
       seenRef.current = conversationCounts(mirror.state);
       baselineDoneRef.current = true;
       forceSeenTick();
+      return;
     }
+    // A channel's stored backlog arrives after that baseline — we only ask for it
+    // once joined — and streams in a message at a time, so it would otherwise read
+    // as a channel's worth of unread the moment you join. Keep each seen mark at
+    // or above the backlog behind it. This only ever raises, so live messages
+    // arriving afterwards still count as unread as normal.
+    let raised = false;
+    for (const [id, n] of Object.entries(backfilledCounts(mirror.state))) {
+      if ((seenRef.current[id] ?? 0) < n) {
+        seenRef.current[id] = n;
+        raised = true;
+      }
+    }
+    if (raised) forceSeenTick();
   }, [activeKey, mirror.state]);
 
   const unreadFor = useCallback((id: string, count: number) => {
@@ -776,11 +791,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             // username fires the mention cue (a soft ping + taskbar flash), gated
             // behind the sound setting. Skip our own messages and non-chat lines
             // (join/leave/system). The text lives in the snapshot, not the delta.
+            // Skip replayed channel history too (`id != null`): joining a channel
+            // would otherwise ping once per past mention in its backlog.
             const msg = incomingChatMsg(d, r.state);
             const hl = highlightRef.current;
             if (
               hl.sound &&
               msg &&
+              msg.id == null &&
               msg.from !== r.state.myUsername &&
               (msg.kind === "said" ||
                 msg.kind === "saidEx" ||

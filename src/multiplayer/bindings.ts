@@ -58,6 +58,13 @@ export interface ChatMsg {
   text: string;
   kind: ChatKind;
   at: number;
+  /**
+   * The server's channel-history id, present only on messages replayed from a
+   * channel's backlog; live chat carries none. So `id != null` means "this is
+   * history, not news" — which is what keeps a backlog from being counted as
+   * unread or firing the mention cue. On these, `at` is the original send time.
+   */
+  id: number | null;
 }
 
 export interface ChannelState {

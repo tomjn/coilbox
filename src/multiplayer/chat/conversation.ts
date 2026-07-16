@@ -38,6 +38,22 @@ export function conversationCounts(state: LobbyState): Record<string, number> {
   return out;
 }
 
+/** Per-conversation count of messages replayed from the server's channel history
+ * (those carrying an `id`), keyed as `conversationCounts` keys them.
+ *
+ * A backlog is history, not news, so unread bookkeeping has to discount it. This
+ * counts rather than assuming the backlog sits at the head of the array: a live
+ * message can land mid-burst, and a count doesn't care where. Only channels can
+ * have any — DMs are never replayed by the server. */
+export function backfilledCounts(state: LobbyState): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const name of Object.keys(state.channels)) {
+    const n = state.channels[name].messages.filter((m) => m.id != null).length;
+    if (n > 0) out[`channel:${name}`] = n;
+  }
+  return out;
+}
+
 /** Resolve members of a conversation from the snapshot (empty for DMs). */
 export function conversationMembers(
   state: LobbyState,

@@ -596,6 +596,7 @@ dependencies = [
  "base64 0.22.1",
  "md-5",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

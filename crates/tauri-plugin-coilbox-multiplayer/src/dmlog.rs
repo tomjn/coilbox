@@ -140,6 +140,7 @@ mod tests {
             text: text.to_string(),
             kind: ChatKind::Private,
             at,
+            id: None,
         }
     }
 
@@ -156,6 +157,28 @@ mod tests {
         assert_eq!(loaded["bob"][0].text, "hi bob");
         assert_eq!(loaded["bob"][1].from, "bob");
         assert_eq!(loaded["carol"].len(), 1);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Lines written before `ChatMsg` grew an `id` have no such field. Bad lines
+    /// are skipped silently, so without a serde default this wouldn't fail loudly
+    /// - it would just quietly discard every existing user's DM history.
+    #[test]
+    fn loads_lines_written_before_the_id_field_existed() {
+        let dir = std::env::temp_dir().join(format!("coilbox-dmlog-legacy-{}", std::process::id()));
+        fs::create_dir_all(&dir).expect("temp dir");
+        let key = "me@host:8200";
+        fs::write(
+            dir.join(format!("{}.jsonl", sanitize_key(key))),
+            "{\"peer\":\"bob\",\"msg\":{\"channel\":null,\"from\":\"bob\",\"text\":\"from before\",\"kind\":\"private\",\"at\":1}}\n",
+        )
+        .expect("seed legacy log");
+
+        let loaded = DmLog::new(&dir, key).load();
+        assert_eq!(loaded["bob"].len(), 1, "legacy line must still load");
+        assert_eq!(loaded["bob"][0].text, "from before");
+        assert_eq!(loaded["bob"][0].id, None);
 
         let _ = std::fs::remove_dir_all(&dir);
     }

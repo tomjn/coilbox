@@ -218,8 +218,21 @@ pub enum ServerMessage {
     Agreement { line: String },
     /// `AGREEMENTEND`
     AgreementEnd,
-    /// `JSON <payload>`
+    /// `JSON <payload>` - any JSON frame we don't parse into a typed variant,
+    /// kept raw so an unrecognised or malformed one still reaches the console.
     Json { payload: String },
+    /// `JSON {"SAID":{..}}` - a stored channel message replayed in answer to
+    /// `GETCHANNELMESSAGES`. `at_ms` is the original send time (already
+    /// normalised from whichever dialect the server used), `id` its history
+    /// cursor. Live chat arrives as `Said`/`SaidEx` and has neither.
+    JsonSaid {
+        channel: String,
+        username: String,
+        message: String,
+        ex_msg: bool,
+        id: u64,
+        at_ms: u64,
+    },
     /// `REGISTRATIONACCEPTED`
     RegistrationAccepted,
     /// `REGISTRATIONDENIED <reason>`
@@ -640,9 +653,7 @@ pub fn parse_line(line: &str) -> ServerMessage {
             line: rest.to_string(),
         },
         "AGREEMENTEND" => ServerMessage::AgreementEnd,
-        "JSON" => ServerMessage::Json {
-            payload: rest.to_string(),
-        },
+        "JSON" => parse_json_frame(rest),
         "REGISTRATIONACCEPTED" => ServerMessage::RegistrationAccepted,
         "REGISTRATIONDENIED" => ServerMessage::RegistrationDenied {
             reason: rest.to_string(),
@@ -698,6 +709,59 @@ pub fn parse_line(line: &str) -> ServerMessage {
         },
         "FRIENDREQUESTLISTEND" => ServerMessage::FriendRequestListEnd,
         _ => ServerMessage::Unknown { raw: raw() },
+    }
+}
+
+/// Normalise a JSON chat frame's `time` to unix millis.
+///
+/// The dialect depends on the `jsonchat` compat flag, which we don't set: without
+/// it the server sends a string of unix seconds, with it an integer of unix
+/// microseconds. Accept both, so enabling the flag later can't silently shift
+/// every timestamp by a factor of a million.
+fn chat_time_ms(v: &serde_json::Value) -> Option<u64> {
+    match v {
+        serde_json::Value::String(s) => s.parse::<u64>().ok()?.checked_mul(1_000),
+        serde_json::Value::Number(n) => Some(n.as_u64()? / 1_000),
+        _ => None,
+    }
+}
+
+/// Parse a `JSON <payload>` frame into a typed variant. Frames are single-key
+/// envelopes, `{"<COMMAND>":{..fields..}}`.
+///
+/// Anything unrecognised or unreadable degrades to the raw [`ServerMessage::Json`]
+/// passthrough rather than failing: a server that grows a new JSON frame, or sends
+/// a malformed one, must not take the connection down with it.
+fn parse_json_frame(rest: &str) -> ServerMessage {
+    let fallback = || ServerMessage::Json {
+        payload: rest.to_string(),
+    };
+    let Ok(frame) = serde_json::from_str::<serde_json::Value>(rest) else {
+        return fallback();
+    };
+    let Some(body) = frame.get("SAID") else {
+        return fallback();
+    };
+    let (Some(channel), Some(username), Some(message), Some(id), Some(at_ms)) = (
+        body.get("chanName").and_then(serde_json::Value::as_str),
+        body.get("userName").and_then(serde_json::Value::as_str),
+        body.get("msg").and_then(serde_json::Value::as_str),
+        body.get("id").and_then(serde_json::Value::as_u64),
+        body.get("time").and_then(chat_time_ms),
+    ) else {
+        return fallback();
+    };
+    ServerMessage::JsonSaid {
+        channel: channel.to_string(),
+        username: username.to_string(),
+        message: message.to_string(),
+        // The only field whose absence has a safe reading: not an action.
+        ex_msg: body
+            .get("ex_msg")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        id,
+        at_ms,
     }
 }
 
@@ -820,6 +884,79 @@ mod tests {
                 message: "hello   world  with spaces".into(),
             }
         );
+    }
+
+    #[test]
+    fn json_said_reads_a_history_frame() {
+        let m = parse_line(
+            r#"JSON {"SAID":{"chanName":"main","time":"1718200000","userName":"bob","msg":"hi there","ex_msg":false,"id":42}}"#,
+        );
+        assert_eq!(
+            m,
+            ServerMessage::JsonSaid {
+                channel: "main".into(),
+                username: "bob".into(),
+                message: "hi there".into(),
+                ex_msg: false,
+                id: 42,
+                at_ms: 1_718_200_000_000,
+            }
+        );
+    }
+
+    /// The dialect depends on a compat flag, so the same instant must parse
+    /// identically whether or not `jsonchat` is ever enabled. Getting this wrong
+    /// misplaces every history line by a factor of a million.
+    #[test]
+    fn json_said_time_dialects_agree() {
+        let seconds = parse_line(
+            r#"JSON {"SAID":{"chanName":"main","time":"1718200000","userName":"bob","msg":"hi","ex_msg":false,"id":1}}"#,
+        );
+        let micros = parse_line(
+            r#"JSON {"SAID":{"chanName":"main","time":1718200000000000,"userName":"bob","msg":"hi","ex_msg":false,"id":1}}"#,
+        );
+        assert_eq!(seconds, micros);
+        let ServerMessage::JsonSaid { at_ms, .. } = seconds else {
+            panic!("expected JsonSaid");
+        };
+        assert_eq!(at_ms, 1_718_200_000_000);
+    }
+
+    #[test]
+    fn json_said_carries_ex_msg_and_spaces() {
+        let m = parse_line(
+            r#"JSON {"SAID":{"chanName":"main","time":"1718200000","userName":"bob","msg":"waves   slowly","ex_msg":true,"id":7}}"#,
+        );
+        assert!(matches!(
+            m,
+            ServerMessage::JsonSaid {
+                ex_msg: true,
+                ref message,
+                ..
+            } if message == "waves   slowly"
+        ));
+    }
+
+    /// A JSON frame we don't model, or can't read, must degrade to the raw
+    /// passthrough rather than panic or vanish - it still reaches the console.
+    #[test]
+    fn unreadable_json_frames_fall_back_to_passthrough() {
+        for payload in [
+            r#"{"SAIDPRIVATE":{"userName":"bob","msg":"hi"}}"#, // a frame we don't model
+            r#"{"SAID":{"chanName":"main"}}"#,                  // SAID missing its fields
+            r#"{"SAID":{"chanName":"main","time":"nonsense","userName":"b","msg":"m","id":1}}"#,
+            "not json at all",
+            "",
+        ] {
+            let m = parse_line(&format!("JSON {payload}"));
+            assert_eq!(
+                m,
+                ServerMessage::Json {
+                    payload: payload.to_string()
+                },
+                "payload should have fallen back: {payload}"
+            );
+        }
     }
 
     #[test]
