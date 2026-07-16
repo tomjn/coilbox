@@ -1,5 +1,5 @@
 import { Button, cn } from "@picoframe/frame";
-import { ArrowUp, Bot } from "lucide-react";
+import { ArrowUp, Bold, Bot, Code, Italic } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import {
   MessageScroller,
@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ChatMsg } from "../bindings";
 import { composeDraft } from "./compose";
 import { FormattedText } from "./FormattedText";
+import { type Format, wrapSelection } from "./formatting";
 import { applyMention, mentionMatches, mentionQuery } from "./mentionMenu";
 import { PRESENCE_META, type Presence } from "./presence";
 import { completeNick, type TabCycle } from "./tabComplete";
@@ -56,6 +57,15 @@ function dayChanged(prev: ChatMsg | undefined, m: ChatMsg): boolean {
   if (prev == null || !prev.at) return true;
   return !sameDay(new Date(prev.at), new Date(m.at));
 }
+
+/** The composer's formatting buttons, in toolbar order. Only the formats
+ * `parseMessage` tokenizes: a button for markup we don't render would be a
+ * button that appears to do nothing. */
+const FORMAT_BUTTONS: { format: Format; label: string; Icon: typeof Bold }[] = [
+  { format: "bold", label: "Bold", Icon: Bold },
+  { format: "italic", label: "Italic", Icon: Italic },
+  { format: "code", label: "Code", Icon: Code },
+];
 
 /** Messages within this window from one sender are visually grouped. */
 const GROUP_WINDOW_MS = 5 * 60_000;
@@ -140,11 +150,12 @@ export function ChatPane({
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   // Tab-completion: cycle state persists across Tabs; the input element and a
-  // pending caret offset let us restore the selection after the controlled
-  // re-render.
+  // pending selection let us restore the caret after the controlled re-render.
+  // A range rather than an offset because the formatting buttons re-select the
+  // text they wrapped, so it can be typed over or wrapped again.
   const cycleRef = useRef<TabCycle | null>(null);
   const inputElRef = useRef<HTMLTextAreaElement | null>(null);
-  const pendingCursorRef = useRef<number | null>(null);
+  const pendingSelectionRef = useRef<[number, number] | null>(null);
   // Mention menu (#279): the caret drives which `@` token (if any) is being
   // typed; `dismissedAt` remembers the token Escape closed so it stays closed
   // until the user starts a different one.
@@ -173,13 +184,14 @@ export function ChatPane({
     if (queryKey == null) setDismissedAt(null);
   }, [queryKey]);
 
-  // Runs every render to apply a queued caret move from Tab-completion (the
-  // controlled input resets the caret to the end on each change), then clears it.
+  // Runs every render to apply a queued caret move from Tab-completion or a
+  // toolbar insert (the controlled input resets the caret to the end on each
+  // change), then clears it.
   useEffect(() => {
-    if (pendingCursorRef.current != null && inputElRef.current) {
-      const c = pendingCursorRef.current;
-      inputElRef.current.setSelectionRange(c, c);
-      pendingCursorRef.current = null;
+    if (pendingSelectionRef.current != null && inputElRef.current) {
+      const [start, end] = pendingSelectionRef.current;
+      inputElRef.current.setSelectionRange(start, end);
+      pendingSelectionRef.current = null;
     }
   });
 
@@ -201,7 +213,7 @@ export function ChatPane({
     const result = completeNick(draft, cursor, completions, cycleRef.current);
     if (!result) return false;
     cycleRef.current = result.cycle;
-    pendingCursorRef.current = result.cursor;
+    pendingSelectionRef.current = [result.cursor, result.cursor];
     setDraft(result.value);
     return true;
   }
@@ -211,10 +223,25 @@ export function ChatPane({
     if (!query) return;
     const result = applyMention(draft, query.start, caret, name);
     cycleRef.current = null;
-    pendingCursorRef.current = result.cursor;
+    pendingSelectionRef.current = [result.cursor, result.cursor];
     setDraft(result.value);
     setCaret(result.cursor);
     inputElRef.current?.focus();
+  }
+
+  /** Wrap the composer's selection in `format`'s markers, keeping the wrapped
+   * text selected so it can be typed over or wrapped again. */
+  function applyFormat(format: Format) {
+    const el = inputElRef.current;
+    if (!el || disabled) return;
+    const start = el.selectionStart ?? draft.length;
+    const end = el.selectionEnd ?? start;
+    const result = wrapSelection(draft, start, end, format);
+    cycleRef.current = null;
+    pendingSelectionRef.current = [result.start, result.end];
+    setDraft(result.value);
+    setCaret(result.end);
+    el.focus();
   }
 
   async function submit() {
@@ -461,9 +488,10 @@ export function ChatPane({
             Failed to send: {sendError}
           </p>
         )}
-        {/* `items-end` keeps the send button on the last line as the composer
-            grows, rather than floating it in the middle of the block. */}
-        <div className="relative flex items-end gap-2 rounded-2xl border border-input bg-background px-3 py-1.5 focus-within:ring-2 focus-within:ring-ring">
+        {/* The draft sits on its own row above the toolbar, so the buttons stay
+            put on the last line as the composer grows rather than floating in
+            the middle of the block. */}
+        <div className="relative rounded-2xl border border-input bg-background px-3 py-1.5 focus-within:ring-2 focus-within:ring-ring">
           {menuOpen && (
             <div
               id={listId}
@@ -562,16 +590,36 @@ export function ChatPane({
             // drag handle would fight that effect.
             className="max-h-32 min-h-0 resize-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:ring-0 placeholder:italic"
           />
-          <Button
-            onClick={submit}
-            disabled={disabled || draft.trim() === ""}
-            size="icon"
-            aria-label="Send"
-            title="Send"
-            className="shrink-0 rounded-full"
-          >
-            <ArrowUp className="size-4" />
-          </Button>
+          <div className="flex items-center gap-0.5">
+            {FORMAT_BUTTONS.map(({ format, label, Icon }) => (
+              <Button
+                key={format}
+                // The composer owns the keyboard and the selection the wrap
+                // applies to; a real click would blur it away first.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyFormat(format)}
+                disabled={disabled}
+                variant="ghost"
+                size="icon"
+                aria-label={label}
+                title={label}
+                className="size-7 shrink-0 rounded-md text-muted-foreground"
+              >
+                <Icon className="size-4" />
+              </Button>
+            ))}
+            <div className="flex-1" />
+            <Button
+              onClick={submit}
+              disabled={disabled || draft.trim() === ""}
+              size="icon"
+              aria-label="Send"
+              title="Send"
+              className="size-8 shrink-0 rounded-full"
+            >
+              <ArrowUp className="size-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </section>
