@@ -19,6 +19,12 @@ export function FormattedText({ text }: { text: string }) {
   return <>{render(parseMessage(text))}</>;
 }
 
+/** A list item. Split out so the key is built where the rest of them are, rather
+ * than from an index at the JSX. */
+function renderItem(item: Inline[], key: string): ReactNode {
+  return <li key={key}>{render(item)}</li>;
+}
+
 function render(nodes: Inline[]): ReactNode[] {
   // Tokens are derived fresh from the text and never reorder, so a per-node
   // type+position key is stable for React's reconciliation.
@@ -81,6 +87,20 @@ function renderNode(n: Inline, key: string): ReactNode {
         <em key={key} className="italic">
           {render(n.children)}
         </em>
+      );
+    case "strike":
+      return (
+        <s key={key} className="line-through">
+          {render(n.children)}
+        </s>
+      );
+    case "list":
+      // `list-inside` so a wrapped item's second line doesn't hang under its
+      // own marker, which the bubble's narrow column makes common.
+      return (
+        <ul key={key} className="my-0.5 list-inside list-disc">
+          {n.items.map((item, i) => renderItem(item, `${key}-${i}`))}
+        </ul>
       );
     case "quote":
       // Inherit the bubble's text colour (own bubbles use a dark foreground);
