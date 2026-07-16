@@ -112,7 +112,11 @@ export function EmojiPicker({ onPick, disabled = false }: EmojiPickerProps) {
               if (picked) setGroup(picked.group);
             }}
             spacing={1}
-            className="mb-2 w-full justify-between"
+            // The rule separates the tabs from the grid they filter. It rides on
+            // the tabs rather than the grid so it comes and goes with them - a
+            // search replaces the tabs, and a rule under the search box alone
+            // would be a line dividing nothing.
+            className="mb-2 w-full rounded-none border-b border-border pb-2"
           >
             {EMOJI_GROUPS.map((g) => (
               <ToggleGroupItem
@@ -120,7 +124,10 @@ export function EmojiPicker({ onPick, disabled = false }: EmojiPickerProps) {
                 value={g.group}
                 aria-label={g.label}
                 title={g.label}
-                className="size-8 px-0 text-base"
+                // The tabs divide the row rather than taking a fixed width:
+                // nine 32px tabs plus their gaps are wider than the popover, and
+                // any width that fits today is one group away from not fitting.
+                className="h-8 min-w-0 flex-1 px-0 text-base"
               >
                 {g.icon}
               </ToggleGroupItem>

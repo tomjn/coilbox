@@ -201,4 +201,172 @@ describe("parseMessage", () => {
       { type: "bold", children: [{ type: "mention", value: "bob" }] },
     ]);
   });
+
+  it("tokenizes ~~strikethrough~~", () => {
+    expect(parseMessage("~~gone~~")).toEqual([
+      { type: "strike", children: [{ type: "text", value: "gone" }] },
+    ]);
+  });
+
+  it("tokenizes Slack's single-tilde strikethrough", () => {
+    expect(parseMessage("~gone~")).toEqual([
+      { type: "strike", children: [{ type: "text", value: "gone" }] },
+    ]);
+  });
+
+  it("parses bold inside strikethrough", () => {
+    expect(parseMessage("~~a **b**~~")).toEqual([
+      {
+        type: "strike",
+        children: [
+          { type: "text", value: "a " },
+          { type: "bold", children: [{ type: "text", value: "b" }] },
+        ],
+      },
+    ]);
+  });
+
+  it("leaves a lone tilde as text", () => {
+    expect(parseMessage("~/coilbox")).toEqual([
+      { type: "text", value: "~/coilbox" },
+    ]);
+  });
+
+  it("tokenizes __x__ as bold", () => {
+    expect(parseMessage("__loud__")).toEqual([
+      { type: "bold", children: [{ type: "text", value: "loud" }] },
+    ]);
+  });
+
+  it("tokenizes ***x*** as bold and italic at once", () => {
+    expect(parseMessage("***loud***")).toEqual([
+      {
+        type: "bold",
+        children: [
+          { type: "italic", children: [{ type: "text", value: "loud" }] },
+        ],
+      },
+    ]);
+  });
+
+  it("tokenizes ___x___ as bold and italic at once", () => {
+    expect(parseMessage("___loud___")).toEqual([
+      {
+        type: "bold",
+        children: [
+          { type: "italic", children: [{ type: "text", value: "loud" }] },
+        ],
+      },
+    ]);
+  });
+
+  it("reads * and _ as the same three strengths", () => {
+    expect(parseMessage("_i_ __b__ ___both___")).toEqual(
+      parseMessage("*i* **b** ***both***"),
+    );
+  });
+
+  it("keeps bold and italic apart from bold-italic", () => {
+    expect(parseMessage("**b** *i*")).toEqual([
+      { type: "bold", children: [{ type: "text", value: "b" }] },
+      { type: "text", value: " " },
+      { type: "italic", children: [{ type: "text", value: "i" }] },
+    ]);
+  });
+});
+
+describe("parseMessage lists", () => {
+  const item = (value: string) => [{ type: "text", value }];
+
+  it("groups consecutive bullet lines into one list", () => {
+    expect(parseMessage("- first\n- second")).toEqual([
+      { type: "list", items: [item("first"), item("second")] },
+    ]);
+  });
+
+  it("takes + and * as bullets too", () => {
+    expect(parseMessage("+ first\n+ second")).toEqual([
+      { type: "list", items: [item("first"), item("second")] },
+    ]);
+    expect(parseMessage("* first\n* second")).toEqual([
+      { type: "list", items: [item("first"), item("second")] },
+    ]);
+  });
+
+  it("reads a run of mixed markers as one list", () => {
+    expect(parseMessage("- first\n+ second\n* third")).toEqual([
+      { type: "list", items: [item("first"), item("second"), item("third")] },
+    ]);
+  });
+
+  it("does not mistake italic for a bullet", () => {
+    // The space after the marker is what keeps `*` usable as a bullet at all.
+    expect(parseMessage("*first*\n*second*")).toEqual([
+      { type: "italic", children: [{ type: "text", value: "first" }] },
+      { type: "text", value: "\n" },
+      { type: "italic", children: [{ type: "text", value: "second" }] },
+    ]);
+  });
+
+  it("takes an indented bullet", () => {
+    expect(parseMessage(" - first\n   - second")).toEqual([
+      { type: "list", items: [item("first"), item("second")] },
+    ]);
+  });
+
+  it("leaves a lone bullet line as text", () => {
+    // People start a line with a dash all the time; one is not a list.
+    expect(parseMessage("- yeah, that")).toEqual([
+      { type: "text", value: "- yeah, that" },
+    ]);
+  });
+
+  it("leaves separated bullet lines as text", () => {
+    expect(parseMessage("- one\nnope\n- two")).toEqual([
+      { type: "text", value: "- one\nnope\n- two" },
+    ]);
+  });
+
+  it("does not treat a mid-line dash as a bullet", () => {
+    expect(parseMessage("a - b\nc - d")).toEqual([
+      { type: "text", value: "a - b\nc - d" },
+    ]);
+  });
+
+  it("needs a space after the dash", () => {
+    expect(parseMessage("-1\n-2")).toEqual([{ type: "text", value: "-1\n-2" }]);
+  });
+
+  it("parses inline formatting inside an item", () => {
+    expect(parseMessage("- **a**\n- @bob")).toEqual([
+      {
+        type: "list",
+        items: [
+          [{ type: "bold", children: [{ type: "text", value: "a" }] }],
+          [{ type: "mention", value: "bob" }],
+        ],
+      },
+    ]);
+  });
+
+  it("keeps the text around a list", () => {
+    expect(parseMessage("todo:\n- one\n- two\ndone")).toEqual([
+      { type: "text", value: "todo:" },
+      { type: "list", items: [item("one"), item("two")] },
+      { type: "text", value: "done" },
+    ]);
+  });
+
+  it("reads a quoted dash as a quote, not a list", () => {
+    expect(parseMessage("> - one\n> - two")).toEqual([
+      { type: "quote", children: [{ type: "text", value: "- one\n- two" }] },
+    ]);
+  });
+
+  it("separates a list from an adjacent quote", () => {
+    expect(parseMessage("> said\n- one\n- two")).toEqual([
+      { type: "quote", children: [{ type: "text", value: "said" }] },
+      { type: "list", items: [item("one"), item("two")] },
+    ]);
+  });
 });

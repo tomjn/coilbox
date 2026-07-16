@@ -1,5 +1,14 @@
 import { Button, cn } from "@picoframe/frame";
-import { ArrowUp, Bold, Bot, Code, Italic } from "lucide-react";
+import {
+  ArrowUp,
+  Bold,
+  Bot,
+  Code,
+  Italic,
+  List,
+  Strikethrough,
+  TextQuote,
+} from "lucide-react";
 import {
   type ReactNode,
   useEffect,
@@ -28,7 +37,7 @@ import {
   emojiQuery,
 } from "./emojiMenu";
 import { FormattedText } from "./FormattedText";
-import { type Format, wrapSelection } from "./formatting";
+import { type Format, formatSelection, listContinuation } from "./formatting";
 import { applyMention, mentionMatches, mentionQuery } from "./mentionMenu";
 import { PRESENCE_META, type Presence } from "./presence";
 import { completeNick, type TabCycle } from "./tabComplete";
@@ -79,7 +88,10 @@ function dayChanged(prev: ChatMsg | undefined, m: ChatMsg): boolean {
 const FORMAT_BUTTONS: { format: Format; label: string; Icon: typeof Bold }[] = [
   { format: "bold", label: "Bold", Icon: Bold },
   { format: "italic", label: "Italic", Icon: Italic },
+  { format: "strike", label: "Strikethrough", Icon: Strikethrough },
   { format: "code", label: "Code", Icon: Code },
+  { format: "quote", label: "Quote", Icon: TextQuote },
+  { format: "bullet", label: "Bullet list", Icon: List },
 ];
 
 /** A row of the composer's autocomplete menu. The two triggers share the menu
@@ -318,14 +330,27 @@ export function ChatPane({
     el?.focus();
   }
 
-  /** Wrap the composer's selection in `format`'s markers, keeping the wrapped
-   * text selected so it can be typed over or wrapped again. */
+  /** Break the line and open the next one with `marker`, replacing whatever was
+   * selected the way a plain newline would. */
+  function continueList(el: HTMLTextAreaElement, marker: string) {
+    const start = el.selectionStart ?? draft.length;
+    const end = el.selectionEnd ?? start;
+    const inserted = `\n${marker}`;
+    const caret = start + inserted.length;
+    cycleRef.current = null;
+    pendingSelectionRef.current = [caret, caret];
+    setDraft(draft.slice(0, start) + inserted + draft.slice(end));
+    setCaret(caret);
+  }
+
+  /** Format the composer's selection, keeping the formatted text selected so it
+   * can be typed over or formatted again. */
   function applyFormat(format: Format) {
     const el = inputElRef.current;
     if (!el || disabled) return;
     const start = el.selectionStart ?? draft.length;
     const end = el.selectionEnd ?? start;
-    const result = wrapSelection(draft, start, end, format);
+    const result = formatSelection(draft, start, end, format);
     cycleRef.current = null;
     pendingSelectionRef.current = [result.start, result.end];
     setDraft(result.value);
@@ -672,6 +697,19 @@ export function ChatPane({
                 submit();
                 return;
               }
+              // Shift+Enter on a bullet line opens the next one with the same
+              // marker. A list takes two lines to be a list, so without this the
+              // second one is the user's job every time.
+              if (e.key === "Enter" && e.shiftKey) {
+                const el = e.currentTarget;
+                const start = el.selectionStart ?? draft.length;
+                const marker = listContinuation(draft, start);
+                if (marker) {
+                  e.preventDefault();
+                  continueList(el, marker);
+                }
+                return;
+              }
               if (
                 e.key === "Tab" &&
                 !e.shiftKey &&
@@ -690,7 +728,15 @@ export function ChatPane({
             // Height is driven by the auto-grow effect; the cap here is what it
             // grows to before the box scrolls instead. `resize-none` because a
             // drag handle would fight that effect.
-            className="max-h-32 min-h-0 resize-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:ring-0 placeholder:italic"
+            //
+            // The box around this is the input, as far as the reader is
+            // concerned - it draws the border, the focus ring and the
+            // background, and the toolbar sits inside it. So the textarea has to
+            // disappear into it. `dark:bg-transparent` rather than
+            // `bg-transparent` alone because Textarea's own `dark:bg-input/30`
+            // is variant-prefixed: an unprefixed utility never overrides it, and
+            // tailwind-merge keeps both as non-conflicting.
+            className="max-h-32 min-h-0 resize-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:ring-0 dark:bg-transparent placeholder:italic"
           />
           <div className="flex items-center gap-0.5">
             <EmojiPicker onPick={insertEmoji} disabled={disabled} />
