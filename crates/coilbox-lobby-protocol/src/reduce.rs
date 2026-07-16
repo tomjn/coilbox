@@ -242,6 +242,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                     text: String::new(),
                     kind: ChatKind::Join,
                     at: now_ms,
+                    id: None,
                 },
             )
         }
@@ -269,6 +270,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                     text: reason.unwrap_or_default(),
                     kind: ChatKind::Leave,
                     at: now_ms,
+                    id: None,
                 },
             )
         }
@@ -297,6 +299,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                 text,
                 kind: ChatKind::System,
                 at: now_ms,
+                id: None,
             },
         ),
         ServerMessage::Said {
@@ -312,6 +315,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                 text: message,
                 kind: ChatKind::Said,
                 at: now_ms,
+                id: None,
             },
         ),
         ServerMessage::SaidEx {
@@ -327,6 +331,34 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                 text: message,
                 kind: ChatKind::SaidEx,
                 at: now_ms,
+                id: None,
+            },
+        ),
+        // Channel backlog replayed by GETCHANNELMESSAGES. Appending is correct
+        // without sorting: the server sends the burst oldest-first in answer to
+        // our request right after JOIN, so it lands ahead of any live chat.
+        // Unlike live chat, `at` is the server's send time, not our receive time.
+        ServerMessage::JsonSaid {
+            channel,
+            username,
+            message,
+            ex_msg,
+            id,
+            at_ms,
+        } => push_chat(
+            state,
+            &channel,
+            ChatMsg {
+                channel: Some(channel.clone()),
+                from: username,
+                text: message,
+                kind: if ex_msg {
+                    ChatKind::SaidEx
+                } else {
+                    ChatKind::Said
+                },
+                at: at_ms,
+                id: Some(id),
             },
         ),
         ServerMessage::SaidPrivate { username, message } => {
@@ -358,6 +390,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                     text: message,
                     kind: ChatKind::Private,
                     at: now_ms,
+                    id: None,
                 },
             )
         }
@@ -376,6 +409,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                     text: message,
                     kind: ChatKind::SaidEx,
                     at: now_ms,
+                    id: None,
                 },
             )
         }
@@ -477,6 +511,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                         text,
                         kind: ChatKind::System,
                         at: now_ms,
+                        id: None,
                     },
                 ));
             }
@@ -912,6 +947,7 @@ pub fn record_outgoing_private(
             text: text.to_string(),
             kind,
             at: now_ms,
+            id: None,
         },
     )
 }
@@ -950,6 +986,7 @@ fn reduce_battle_chat(
                 text: message,
                 kind,
                 at: now_ms,
+                id: None,
             },
         ),
         None => vec![Delta::ChatMessage {

@@ -37,6 +37,17 @@ pub enum ChatKind {
 /// A single chat line. `channel` is `None` for battle chat with no known channel
 /// and for private messages. `at` is a unix-millis receive timestamp (0 when the
 /// reducer is driven without a clock, e.g. in tests via `reduce`).
+///
+/// `id` is the server's channel-history row id, set only on lines replayed by
+/// `GETCHANNELMESSAGES`; live chat carries no id, so `Some` means "backlog" and
+/// `None` means "just happened". Consumers rely on that to avoid re-logging,
+/// re-notifying and mis-counting a replayed backlog as unread. For `at` it also
+/// marks the one case where the timestamp is the server's send time rather than
+/// our receive time.
+///
+/// This is a disk format as well as a wire one: chat logs are JSONL of `ChatMsg`
+/// and a line that fails to parse is skipped silently, so any field added here
+/// must tolerate its own absence in lines written before it existed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatMsg {
@@ -45,6 +56,7 @@ pub struct ChatMsg {
     pub text: String,
     pub kind: ChatKind,
     pub at: u64,
+    pub id: Option<u64>,
 }
 
 /// The state of a joined channel.

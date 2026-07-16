@@ -82,6 +82,16 @@ pub fn leave_channel(chan: &str) -> String {
     format!("LEAVE {chan}")
 }
 
+/// `GETCHANNELMESSAGES <chan> <last_msg_id>` - request the channel's stored
+/// backlog, replayed as a burst of `JSON {"SAID":{..}}` frames, oldest first.
+///
+/// Only valid once joined. `last_msg_id` is a cursor, not a timestamp: `0` cold-
+/// starts, otherwise pass the highest id already seen. Channels that don't store
+/// history (the default) reply with nothing at all rather than an error.
+pub fn get_channel_messages(chan: &str, last_msg_id: u64) -> String {
+    format!("GETCHANNELMESSAGES {chan} {last_msg_id}")
+}
+
 /// `SAY <chan> <msg>`.
 pub fn say(chan: &str, msg: &str) -> String {
     format!("SAY {chan} {msg}")
@@ -456,6 +466,11 @@ mod tests {
         assert_eq!(exit(Some("bye")), "EXIT bye");
         assert_eq!(say("main", "hi there"), "SAY main hi there");
         assert_eq!(force_team_color("bob", 255), "FORCETEAMCOLOR bob 255");
+        assert_eq!(get_channel_messages("main", 0), "GETCHANNELMESSAGES main 0");
+        assert_eq!(
+            get_channel_messages("main", 42),
+            "GETCHANNELMESSAGES main 42"
+        );
     }
 
     #[test]
