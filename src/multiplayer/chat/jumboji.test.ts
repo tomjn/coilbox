@@ -26,6 +26,12 @@ describe("jumbojiCount", () => {
     expect(jumbojiCount("   ")).toBe(0);
   });
 
+  it("counts emoji across lines, newlines being whitespace", () => {
+    // Deliberate: a coalesced block of emoji-only lines is still an emoji-only
+    // message, and renders jumbo like any other. Pinned so it isn't "fixed".
+    expect(jumbojiCount("😀\n🎉\n🚀")).toBe(3);
+  });
+
   it("counts past the jumbo threshold so the caller can gate", () => {
     expect(jumbojiCount("😀😀😀😀")).toBe(4);
   });

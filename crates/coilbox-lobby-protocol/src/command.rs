@@ -8,6 +8,18 @@ use std::collections::BTreeMap;
 
 use crate::status::{BattleStatus, ClientStatus};
 
+/// Whether a built line is safe to put on the wire.
+///
+/// Newline is the protocol's own message delimiter and the writer appends it
+/// without inspecting the payload, so a `\n` or `\r` inside an argument is not a
+/// malformed command — it is a second command injected after the first. Nothing
+/// here escapes: an argument that needs to span lines must be split by the
+/// caller into separate commands. Reaching the wire with a break is therefore a
+/// caller bug, so the send path rejects rather than silently strips it.
+pub fn is_wire_safe(line: &str) -> bool {
+    !line.contains(['\n', '\r'])
+}
+
 /// `LOGIN <user> <pass> <cpu> <local_ip> <agent>\t<client_id>\t<flags>`.
 ///
 /// `pw_hash` is the already-computed `BASE64(MD5(password))`. `cpu` is fixed at
@@ -478,6 +490,31 @@ mod tests {
         assert_eq!(say_ex("main", "waves"), "SAYEX main waves");
         assert_eq!(say_private_ex("bob", "waves"), "SAYPRIVATEEX bob waves");
         assert_eq!(say_battle_ex("waves"), "SAYBATTLEEX waves");
+    }
+
+    #[test]
+    fn say_builders() {
+        assert_eq!(say("main", "hi"), "SAY main hi");
+        assert_eq!(say_private("bob", "hi"), "SAYPRIVATE bob hi");
+        assert_eq!(say_battle("hi"), "SAYBATTLE hi");
+        // The body is passed through verbatim: it is the last argument, so
+        // spaces in it are part of the message and need no quoting.
+        assert_eq!(say("main", "a  b\tc"), "SAY main a  b\tc");
+    }
+
+    #[test]
+    fn wire_safety_rejects_line_breaks() {
+        assert!(is_wire_safe(&say("main", "hi there")));
+        assert!(is_wire_safe(""));
+        // Each of these builds a line that would arrive as two commands.
+        assert!(!is_wire_safe(&say("main", "hi\nSAY other pwned")));
+        assert!(!is_wire_safe(&say_private("bob", "a\rb")));
+        assert!(!is_wire_safe(&say_battle("a\r\nb")));
+        assert!(!is_wire_safe(&say_ex("main", "waves\nx")));
+        assert!(!is_wire_safe(&say_private_ex("bob", "waves\nx")));
+        assert!(!is_wire_safe(&say_battle_ex("waves\nx")));
+        // Not chat-specific: any argument can carry a break.
+        assert!(!is_wire_safe(&join_channel("main", Some("k\ney"))));
     }
 
     #[test]

@@ -10,6 +10,7 @@ import {
 } from "../bindings";
 import { isIgnored, useIgnored } from "../ignore";
 import { useMultiplayer } from "../store";
+import { coalesceMessages } from "./coalesce";
 import {
   type ConversationDescriptor,
   conversationMembers,
@@ -41,10 +42,19 @@ export function useConversation(
   // Hide ignored senders client-side (channels, battles, and DMs alike). This local
   // filter is belt-and-braces: once #188's server-side IGNORE is set the server also
   // stops relaying them, but this still hides anything the server does relay.
+  //
+  // Coalescing happens here, above `ChatPane`, because callers derive per-message
+  // state from the text they are handed: highlight matching (#193) runs on these,
+  // so a mention on the third line of a block has to be part of that block's text
+  // by the time it is tested. It runs after the ignore filter, so a hidden sender
+  // can't split someone else's block, and is memoised because it is O(n) over the
+  // conversation's whole history on every snapshot.
   const messages = useMemo(() => {
     const all = state && desc ? conversationMessages(state, desc) : [];
-    if (!activeKey) return all;
-    return all.filter((m) => !isIgnored(ignored, activeKey, m.from));
+    const visible = activeKey
+      ? all.filter((m) => !isIgnored(ignored, activeKey, m.from))
+      : all;
+    return coalesceMessages(visible);
   }, [state, desc, ignored, activeKey]);
   const members = useMemo(
     () => (state && desc ? conversationMembers(state, desc) : []),
