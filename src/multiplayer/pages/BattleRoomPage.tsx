@@ -159,6 +159,7 @@ function BattleRoomPage() {
             sides={room.sides}
             maxSlots={battle.maxPlayers}
             selfHost={room.selfHost}
+            canAddBot={room.canAddBot}
             hostControls={room.hostControls}
             addableAis={room.addableAis}
             onAddBot={room.addBot}
