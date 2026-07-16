@@ -51,9 +51,16 @@ fn log_dirs<R: Runtime>(
 
 /// Enqueue one raw wire line on a live connection. The shared body behind every
 /// typed action command: look the connection up, push the line onto its writer
-/// channel, and translate the two failure modes (unknown key / closed socket) into
-/// a `CliResult` error.
+/// channel, and translate the failure modes (embedded line break / unknown key /
+/// closed socket) into a `CliResult` error.
+///
+/// The break check lives here rather than in each builder because this is the one
+/// path every command's arguments take to the socket, and the writer appends the
+/// delimiter without looking at the payload (see `command::is_wire_safe`).
 fn enqueue(registry: &Registry, server_key: &str, line: String) -> CliResult {
+    if !command::is_wire_safe(&line) {
+        return CliResult::err("refusing to send a line containing a line break");
+    }
     let map = lock_or_recover(registry);
     match map.get(server_key) {
         Some(conn) => match conn.tx.send(Outbound::Line(line)) {
