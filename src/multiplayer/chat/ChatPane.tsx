@@ -681,7 +681,9 @@ export function ChatPane({
                   setMenuIndex((active - 1 + options.length) % options.length);
                   return;
                 }
-                if (e.key === "Enter" || e.key === "Tab") {
+                // Shift+Enter belongs to the composer even with the menu open:
+                // the menu owns bare Enter, a new line is the other rule.
+                if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
                   e.preventDefault();
                   insertOption(options[active]);
                   return;
