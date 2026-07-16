@@ -16,7 +16,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
+      # Exact semver keeps setup-bun off api.github.com (see release.yml).
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Biome (lint + format check)
