@@ -167,42 +167,42 @@ function parseUrls(text: string): Inline[] {
 }
 
 /**
- * Bold-italic (`***x***`), bold (`**x**`), strikethrough (`~~x~~` / `~x~`) then
- * italic (`*x*` / `_x_`). Content cannot span the same marker, so an unmatched
- * or lone marker simply falls through as literal text. Matched content is parsed
- * recursively to allow one level of nesting.
+ * Emphasis, as Markdown has it: `*` and `_` are the same marker in three
+ * strengths - one is italic, two is bold, three is both - plus strikethrough
+ * (`~~x~~` / `~x~`, the first being Discord and GitHub, the second Slack).
  *
- * Both strike markers are accepted because both are in the wild - `~~x~~` is
- * Discord and GitHub, `~x~` is Slack - and italic already takes either of its
- * two.
+ * Content cannot span the same marker, so an unmatched or lone marker simply
+ * falls through as literal text. Matched content is parsed recursively to allow
+ * one level of nesting.
  *
  * Longest marker first, and that ordering is what makes it work: `***x***` tried
  * as `**` matches from the second asterisk and leaves stray ones either side,
- * and `~~x~~` tried as `~` matches an empty span. Named groups because six
- * alternatives is too many to renumber by hand.
+ * and `~~x~~` tried as `~` matches an empty span. Named groups because eight
+ * alternatives is well past renumbering by hand.
  */
 function parseEmphasis(text: string): Inline[] {
   const out: Inline[] = [];
   const re =
-    /\*\*\*(?<boldItalic>[^*]+)\*\*\*|\*\*(?<bold>[^*]+)\*\*|~~(?<strikeLong>[^~]+)~~|~(?<strike>[^~]+)~|\*(?<italicStar>[^*]+)\*|_(?<italicBar>[^_]+)_/g;
+    /\*\*\*(?<bothStar>[^*]+)\*\*\*|___(?<bothBar>[^_]+)___|\*\*(?<boldStar>[^*]+)\*\*|__(?<boldBar>[^_]+)__|~~(?<strikeLong>[^~]+)~~|~(?<strike>[^~]+)~|\*(?<italicStar>[^*]+)\*|_(?<italicBar>[^_]+)_/g;
   let last = 0;
   for (const m of text.matchAll(re)) {
     if (m.index > last) out.push(...parseMentions(text.slice(last, m.index)));
     const g = m.groups ?? {};
-    if (g.boldItalic !== undefined) {
+    const both = g.bothStar ?? g.bothBar;
+    const bold = g.boldStar ?? g.boldBar;
+    const strike = g.strikeLong ?? g.strike;
+
+    if (both !== undefined) {
       // Both at once, as one inside the other - no token of its own, so the
       // renderer needs nothing new to show it.
       out.push({
         type: "bold",
-        children: [{ type: "italic", children: parseEmphasis(g.boldItalic) }],
+        children: [{ type: "italic", children: parseEmphasis(both) }],
       });
-    } else if (g.bold !== undefined) {
-      out.push({ type: "bold", children: parseEmphasis(g.bold) });
-    } else if (g.strikeLong !== undefined || g.strike !== undefined) {
-      out.push({
-        type: "strike",
-        children: parseEmphasis(g.strikeLong ?? g.strike),
-      });
+    } else if (bold !== undefined) {
+      out.push({ type: "bold", children: parseEmphasis(bold) });
+    } else if (strike !== undefined) {
+      out.push({ type: "strike", children: parseEmphasis(strike) });
     } else {
       out.push({
         type: "italic",

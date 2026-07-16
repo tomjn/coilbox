@@ -232,6 +232,12 @@ describe("parseMessage", () => {
     ]);
   });
 
+  it("tokenizes __x__ as bold", () => {
+    expect(parseMessage("__loud__")).toEqual([
+      { type: "bold", children: [{ type: "text", value: "loud" }] },
+    ]);
+  });
+
   it("tokenizes ***x*** as bold and italic at once", () => {
     expect(parseMessage("***loud***")).toEqual([
       {
@@ -241,6 +247,23 @@ describe("parseMessage", () => {
         ],
       },
     ]);
+  });
+
+  it("tokenizes ___x___ as bold and italic at once", () => {
+    expect(parseMessage("___loud___")).toEqual([
+      {
+        type: "bold",
+        children: [
+          { type: "italic", children: [{ type: "text", value: "loud" }] },
+        ],
+      },
+    ]);
+  });
+
+  it("reads * and _ as the same three strengths", () => {
+    expect(parseMessage("_i_ __b__ ___both___")).toEqual(
+      parseMessage("*i* **b** ***both***"),
+    );
   });
 
   it("keeps bold and italic apart from bold-italic", () => {
