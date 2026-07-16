@@ -20,7 +20,7 @@ import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { CountryFlag, RankBadge } from "../UserBadges";
 import { allyLetter, type MemberRow as Row } from "./config";
 
-/** Host-only actions over another member, bound to that member's name. */
+/** Actions over another member (host) or over a bot we own, bound to its name. */
 export interface MemberControls {
   onForceTeam: (team: number) => void;
   onForceAlly: (ally: number) => void;
@@ -48,10 +48,12 @@ function ReadyIcon({ row }: { row: Row }) {
  * ally, colour → MYBATTLESTATUS). In a battle WE host, `control` is also supplied
  * for OTHER members so the host can force their team/ally/colour (inline), and
  * spectate or kick them from a trailing `⋮` menu (there's no force-faction
- * command, so side stays read-only for others). Every remaining row is read-only.
+ * command, so side stays read-only for others). Bots we own get `control` too, for
+ * removal only. Every remaining row is read-only.
  *
  * `showActions` reserves the trailing actions column so every row lines up even
- * when a particular row has no menu (our own row, or a non-hosted battle).
+ * when a particular row has no menu (our own row, or a battle we neither host nor
+ * have a bot in).
  */
 export function MemberRow({
   row,

@@ -65,6 +65,12 @@ export interface BattleRoomView {
   isFounder: boolean;
   /** We founded this battle AND we host it ourselves (not via an autohost bot). */
   selfHost: boolean;
+  /**
+   * Whether we may add a bot. ADDBOT is per-user (a bot carries its `owner`), not
+   * founder-only, so any seated member qualifies — in an autohost battle nobody is
+   * the founder. A host that forbids bots rejects it and we surface the error.
+   */
+  canAddBot: boolean;
   target: PlayTarget | null;
   targetLoading: boolean;
   enginePath: string | undefined;
@@ -226,6 +232,7 @@ export function useBattleRoom(): BattleRoomView {
   // We founded the battle and run it ourselves (no autohost bot relaying it), so we
   // drive the roster/options over the protocol and launch the game as founder.
   const selfHost = isFounder && !hostIsBot;
+  const canAddBot = !!battle && !!myStatus;
 
   // AIs the host can add as bots. The game-scoped query already applies the game's
   // `validais.lua` whitelist and includes its own Lua AIs (from `LuaAI.lua`) — both
@@ -651,6 +658,7 @@ export function useBattleRoom(): BattleRoomView {
     myStatus,
     isFounder,
     selfHost,
+    canAddBot,
     target,
     targetLoading,
     enginePath,

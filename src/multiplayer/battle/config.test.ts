@@ -153,6 +153,23 @@ describe("membersToRows", () => {
     expect(rows.map((r) => r.kind)).toEqual(["human", "human", "human", "bot"]);
   });
 
+  it("shows an autohost founder's row above ours", () => {
+    // The reducer seats every founder, so a spectating autohost is a member like
+    // any other and must appear even though it never joined explicitly.
+    const battle = mkBattle({
+      host: "sfhost1",
+      members: {
+        scarypoo: member(),
+        sfhost1: member({ battleStatus: status({ mode: false }) }),
+      },
+    });
+    const rows = membersToRows(battle, "scarypoo");
+    expect(rows.map((r) => r.name)).toEqual(["sfhost1", "scarypoo"]);
+    expect(rows[0].host).toBe(true);
+    expect(rows[0].self).toBe(false);
+    expect(rows[0].spectator).toBe(true);
+  });
+
   it("marks the current user's row as self", () => {
     const battle = mkBattle({ members: { alice: member(), bob: member() } });
     const rows = membersToRows(battle, "bob");

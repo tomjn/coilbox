@@ -28,6 +28,7 @@ export function BattleMembersTable({
   sides,
   maxSlots,
   selfHost,
+  canAddBot,
   hostControls,
   addableAis,
   onAddBot,
@@ -42,6 +43,8 @@ export function BattleMembersTable({
   maxSlots: number;
   /** When true, the viewer hosts this battle and may force/kick other members. */
   selfHost: boolean;
+  /** When true, the viewer may add a bot (any seated member — see `useBattleRoom`). */
+  canAddBot: boolean;
   hostControls: {
     forceTeam: (user: string, team: number) => void;
     forceAlly: (user: string, ally: number) => void;
@@ -50,7 +53,7 @@ export function BattleMembersTable({
     kick: (user: string) => void;
     removeBot: (name: string) => void;
   };
-  /** AIs the host can add as bots — native engine AIs and the game's own Lua AIs. */
+  /** AIs addable as bots — native engine AIs and the game's own Lua AIs. */
   addableAis: {
     shortName: string;
     kind: "native" | "lua";
@@ -73,6 +76,13 @@ export function BattleMembersTable({
         addableAis.some((a) => a.shortName === c) ? c : addableAis[0].shortName,
       );
   }, [addableAis]);
+
+  // Bots we added ourselves are ours to remove (REMOVEBOT accepts the owner as
+  // well as the founder), which matters in an autohost battle where nobody here is
+  // the founder. `self` marks our own row, so the roster already names us.
+  const me = rows.find((r) => r.self)?.name;
+  const ownsABot = rows.some((r) => r.kind === "bot" && r.owner === me);
+  const showActions = selfHost || ownsABot;
 
   const slots = Math.max(2, Math.min(maxSlots || 0, 16));
   const sideOptions = sides.map((s: Side, i) => ({
@@ -111,7 +121,7 @@ export function BattleMembersTable({
               <TableHead className="px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
                 Ally
               </TableHead>
-              {selfHost && (
+              {showActions && (
                 <TableHead className="px-2 pb-2 pt-3">
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -122,7 +132,8 @@ export function BattleMembersTable({
             {rows.map((row) => {
               // The host controls other members: humans get force/kick, bots get
               // removal only (MemberRow ignores the force handlers for bots). Our
-              // own row stays the self-editable path.
+              // own row stays the self-editable path. Outside a battle we host, we
+              // still control the bots we added.
               let control: MemberControls | null = null;
               if (selfHost && row.kind === "human" && !row.self) {
                 control = {
@@ -132,7 +143,7 @@ export function BattleMembersTable({
                   onForceSpectator: () => hostControls.forceSpectator(row.name),
                   onKick: () => hostControls.kick(row.name),
                 };
-              } else if (selfHost && row.kind === "bot") {
+              } else if (row.kind === "bot" && (selfHost || row.owner === me)) {
                 const noop = () => {};
                 control = {
                   onForceTeam: noop,
@@ -148,7 +159,7 @@ export function BattleMembersTable({
                   row={row}
                   editable={row.self}
                   control={control}
-                  showActions={selfHost}
+                  showActions={showActions}
                   flashIngame={justWentIngame.has(row.name)}
                   sideOptions={sideOptions}
                   teamOptions={teamOptions}
@@ -163,7 +174,7 @@ export function BattleMembersTable({
             {rows.length === 0 && (
               <TableRow className="border-border/40 hover:bg-transparent">
                 <TableCell
-                  colSpan={selfHost ? 6 : 5}
+                  colSpan={showActions ? 6 : 5}
                   className="px-3 py-6 text-center text-sm text-muted-foreground"
                 >
                   Waiting for players…
@@ -174,7 +185,7 @@ export function BattleMembersTable({
         </Table>
       </div>
 
-      {selfHost && (
+      {canAddBot && (
         <div className="flex items-center gap-2 border-t border-border/40 p-2">
           <span className="text-xs font-medium text-muted-foreground">
             Add AI
