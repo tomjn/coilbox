@@ -1,6 +1,6 @@
 import { Button, cn, Input } from "@picoframe/frame";
 import { ArrowUp, Bot } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/message-scroller";
 import type { ChatMsg } from "../bindings";
 import { FormattedText } from "./FormattedText";
+import { applyMention, mentionMatches, mentionQuery } from "./mentionMenu";
 import { PRESENCE_META, type Presence } from "./presence";
 import { completeNick, type TabCycle } from "./tabComplete";
 
@@ -143,6 +144,33 @@ export function ChatPane({
   const cycleRef = useRef<TabCycle | null>(null);
   const inputElRef = useRef<HTMLInputElement | null>(null);
   const pendingCursorRef = useRef<number | null>(null);
+  // Mention menu (#279): the caret drives which `@` token (if any) is being
+  // typed; `dismissedAt` remembers the token Escape closed so it stays closed
+  // until the user starts a different one.
+  const [caret, setCaret] = useState(0);
+  const [menuIndex, setMenuIndex] = useState(0);
+  const [dismissedAt, setDismissedAt] = useState<number | null>(null);
+  const listId = useId();
+
+  const query =
+    completions && completions.length > 0 ? mentionQuery(draft, caret) : null;
+  const matches =
+    query && query.start !== dismissedAt
+      ? mentionMatches(query.query, completions ?? [])
+      : [];
+  const menuOpen = matches.length > 0;
+  const active = menuOpen ? Math.min(menuIndex, matches.length - 1) : 0;
+
+  // Restart the selection at the top whenever the token being typed changes, so
+  // the first match is always the default Enter/Tab target. Leaving the token
+  // also clears an Escape dismissal, so a later `@` at the same offset (the old
+  // one deleted and retyped) opens the menu again.
+  const queryKey = query ? `${query.start}:${query.query}` : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the token, not the value it derives from
+  useEffect(() => {
+    setMenuIndex(0);
+    if (queryKey == null) setDismissedAt(null);
+  }, [queryKey]);
 
   // Runs every render to apply a queued caret move from Tab-completion (the
   // controlled Input resets the caret to the end on each change), then clears it.
@@ -164,6 +192,17 @@ export function ChatPane({
     pendingCursorRef.current = result.cursor;
     setDraft(result.value);
     return true;
+  }
+
+  /** Insert `name` over the `@` token being typed and close the menu. */
+  function insertMention(name: string) {
+    if (!query) return;
+    const result = applyMention(draft, query.start, caret, name);
+    cycleRef.current = null;
+    pendingCursorRef.current = result.cursor;
+    setDraft(result.value);
+    setCaret(result.cursor);
+    inputElRef.current?.focus();
   }
 
   async function submit() {
@@ -397,11 +436,81 @@ export function ChatPane({
             Failed to send: {sendError}
           </p>
         )}
-        <div className="flex items-center gap-2 rounded-2xl border border-input bg-background px-3 py-1.5 focus-within:ring-2 focus-within:ring-ring">
+        <div className="relative flex items-center gap-2 rounded-2xl border border-input bg-background px-3 py-1.5 focus-within:ring-2 focus-within:ring-ring">
+          {menuOpen && (
+            <div
+              id={listId}
+              role="listbox"
+              aria-label="Mention a user"
+              className="absolute bottom-full left-0 z-10 mb-2 max-h-48 w-64 overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md"
+            >
+              {matches.map((name, i) => (
+                <div
+                  key={name}
+                  id={`${listId}-${i}`}
+                  role="option"
+                  // The composer keeps focus (it owns the keyboard); -1 keeps
+                  // options out of the tab order but still programmatically
+                  // focusable, per the ARIA combobox pattern.
+                  tabIndex={-1}
+                  aria-selected={i === active}
+                  // Insert on mousedown: clicking must not blur the composer
+                  // first, or the caret (and so the token) is gone by click.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    insertMention(name);
+                  }}
+                  onMouseEnter={() => setMenuIndex(i)}
+                  className={cn(
+                    "cursor-pointer truncate px-3 py-1.5 text-sm",
+                    i === active && "bg-accent text-accent-foreground",
+                  )}
+                >
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
           <Input
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setCaret(e.target.selectionStart ?? e.target.value.length);
+              inputElRef.current = e.currentTarget;
+            }}
+            onSelect={(e) => {
+              const el = e.currentTarget;
+              inputElRef.current = el;
+              setCaret(el.selectionStart ?? draft.length);
+            }}
+            role="combobox"
+            aria-expanded={menuOpen}
+            aria-controls={menuOpen ? listId : undefined}
+            aria-activedescendant={menuOpen ? `${listId}-${active}` : undefined}
+            aria-autocomplete="list"
             onKeyDown={(e) => {
+              if (menuOpen) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setMenuIndex((active + 1) % matches.length);
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setMenuIndex((active - 1 + matches.length) % matches.length);
+                  return;
+                }
+                if (e.key === "Enter" || e.key === "Tab") {
+                  e.preventDefault();
+                  insertMention(matches[active]);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setDismissedAt(query?.start ?? null);
+                  return;
+                }
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 submit();
