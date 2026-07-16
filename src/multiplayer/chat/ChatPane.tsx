@@ -1,6 +1,13 @@
 import { Button, cn } from "@picoframe/frame";
-import { ArrowUp, Bot } from "lucide-react";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { ArrowUp, Bold, Bot, Code, Italic } from "lucide-react";
+import {
+  type ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -12,7 +19,16 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { ChatMsg } from "../bindings";
 import { composeDraft } from "./compose";
+import { EmojiPicker } from "./EmojiPicker";
+import { type EmojiEntry, loadEmoji, shortcodeIndex } from "./emoji";
+import {
+  applyEmoji,
+  closedShortcode,
+  emojiMatches,
+  emojiQuery,
+} from "./emojiMenu";
 import { FormattedText } from "./FormattedText";
+import { type Format, wrapSelection } from "./formatting";
 import { applyMention, mentionMatches, mentionQuery } from "./mentionMenu";
 import { PRESENCE_META, type Presence } from "./presence";
 import { completeNick, type TabCycle } from "./tabComplete";
@@ -56,6 +72,21 @@ function dayChanged(prev: ChatMsg | undefined, m: ChatMsg): boolean {
   if (prev == null || !prev.at) return true;
   return !sameDay(new Date(prev.at), new Date(m.at));
 }
+
+/** The composer's formatting buttons, in toolbar order. Only the formats
+ * `parseMessage` tokenizes: a button for markup we don't render would be a
+ * button that appears to do nothing. */
+const FORMAT_BUTTONS: { format: Format; label: string; Icon: typeof Bold }[] = [
+  { format: "bold", label: "Bold", Icon: Bold },
+  { format: "italic", label: "Italic", Icon: Italic },
+  { format: "code", label: "Code", Icon: Code },
+];
+
+/** A row of the composer's autocomplete menu. The two triggers share the menu
+ * because they can't both be open: the caret is in one token at a time. */
+type MenuOption =
+  | { kind: "mention"; key: string; name: string }
+  | { kind: "emoji"; key: string; entry: EmojiEntry };
 
 /** Messages within this window from one sender are visually grouped. */
 const GROUP_WINDOW_MS = 5 * 60_000;
@@ -140,46 +171,80 @@ export function ChatPane({
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   // Tab-completion: cycle state persists across Tabs; the input element and a
-  // pending caret offset let us restore the selection after the controlled
-  // re-render.
+  // pending selection let us restore the caret after the controlled re-render.
+  // A range rather than an offset because the formatting buttons re-select the
+  // text they wrapped, so it can be typed over or wrapped again.
   const cycleRef = useRef<TabCycle | null>(null);
   const inputElRef = useRef<HTMLTextAreaElement | null>(null);
-  const pendingCursorRef = useRef<number | null>(null);
-  // Mention menu (#279): the caret drives which `@` token (if any) is being
-  // typed; `dismissedAt` remembers the token Escape closed so it stays closed
-  // until the user starts a different one.
+  const pendingSelectionRef = useRef<[number, number] | null>(null);
+  // Autocomplete menu: the caret drives which token (if any) is being typed -
+  // an `@` mention (#279) or a `:` emoji shortcode (#283). `dismissedAt`
+  // remembers the token Escape closed so it stays closed until the user starts a
+  // different one.
   const [caret, setCaret] = useState(0);
   const [menuIndex, setMenuIndex] = useState(0);
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
   const listId = useId();
+  // The emoji dataset is ~600k of JSON, so it loads on demand rather than with
+  // the app. A colon in the draft is the earliest hint we get: waiting for the
+  // menu's own threshold would leave a fully typed `:tada:` racing the load.
+  const [emojis, setEmojis] = useState<EmojiEntry[]>([]);
+  const wantsEmoji = draft.includes(":");
+  useEffect(() => {
+    if (!wantsEmoji) return;
+    let live = true;
+    loadEmoji().then((loaded) => {
+      if (live) setEmojis(loaded);
+    });
+    return () => {
+      live = false;
+    };
+  }, [wantsEmoji]);
+  const shortcodes = useMemo(() => shortcodeIndex(emojis), [emojis]);
 
-  const query =
+  // Mentions win a tie: `completions` is a real list of people in the room,
+  // where an emoji is only ever a suggestion.
+  const mention =
     completions && completions.length > 0 ? mentionQuery(draft, caret) : null;
-  const matches =
-    query && query.start !== dismissedAt
-      ? mentionMatches(query.query, completions ?? [])
-      : [];
-  const menuOpen = matches.length > 0;
-  const active = menuOpen ? Math.min(menuIndex, matches.length - 1) : 0;
+  const emojiToken = mention ? null : emojiQuery(draft, caret);
+  const token = mention ?? emojiToken;
+  const live = token != null && token.start !== dismissedAt;
+  let options: MenuOption[] = [];
+  if (live && mention) {
+    options = mentionMatches(mention.query, completions ?? []).map((name) => ({
+      kind: "mention",
+      key: name,
+      name,
+    }));
+  } else if (live && emojiToken) {
+    options = emojiMatches(emojiToken.query, emojis).map((entry) => ({
+      kind: "emoji",
+      key: entry.unicode,
+      entry,
+    }));
+  }
+  const menuOpen = options.length > 0;
+  const active = menuOpen ? Math.min(menuIndex, options.length - 1) : 0;
 
   // Restart the selection at the top whenever the token being typed changes, so
   // the first match is always the default Enter/Tab target. Leaving the token
   // also clears an Escape dismissal, so a later `@` at the same offset (the old
   // one deleted and retyped) opens the menu again.
-  const queryKey = query ? `${query.start}:${query.query}` : null;
+  const queryKey = token ? `${token.start}:${token.query}` : null;
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the token, not the value it derives from
   useEffect(() => {
     setMenuIndex(0);
     if (queryKey == null) setDismissedAt(null);
   }, [queryKey]);
 
-  // Runs every render to apply a queued caret move from Tab-completion (the
-  // controlled input resets the caret to the end on each change), then clears it.
+  // Runs every render to apply a queued caret move from Tab-completion or a
+  // toolbar insert (the controlled input resets the caret to the end on each
+  // change), then clears it.
   useEffect(() => {
-    if (pendingCursorRef.current != null && inputElRef.current) {
-      const c = pendingCursorRef.current;
-      inputElRef.current.setSelectionRange(c, c);
-      pendingCursorRef.current = null;
+    if (pendingSelectionRef.current != null && inputElRef.current) {
+      const [start, end] = pendingSelectionRef.current;
+      inputElRef.current.setSelectionRange(start, end);
+      pendingSelectionRef.current = null;
     }
   });
 
@@ -201,20 +266,71 @@ export function ChatPane({
     const result = completeNick(draft, cursor, completions, cycleRef.current);
     if (!result) return false;
     cycleRef.current = result.cycle;
-    pendingCursorRef.current = result.cursor;
+    pendingSelectionRef.current = [result.cursor, result.cursor];
     setDraft(result.value);
     return true;
   }
 
-  /** Insert `name` over the `@` token being typed and close the menu. */
-  function insertMention(name: string) {
-    if (!query) return;
-    const result = applyMention(draft, query.start, caret, name);
+  /** Insert `option` over the token being typed, which closes the menu. */
+  function insertOption(option: MenuOption) {
+    if (!token) return;
+    const result =
+      option.kind === "mention"
+        ? applyMention(draft, token.start, caret, option.name)
+        : applyEmoji(draft, token.start, caret, option.entry.unicode);
     cycleRef.current = null;
-    pendingCursorRef.current = result.cursor;
+    pendingSelectionRef.current = [result.cursor, result.cursor];
     setDraft(result.value);
     setCaret(result.cursor);
     inputElRef.current?.focus();
+  }
+
+  /** Take a change from the textarea, substituting a `:shortcode:` the user has
+   * just closed. Typing one out in full is the other half of the menu: someone
+   * who knows `:tada:` shouldn't have to look at a list to get 🎉. An unknown
+   * shortcode is left exactly as typed. */
+  function onDraftChange(value: string, cursor: number) {
+    const closed = closedShortcode(value, cursor);
+    const unicode = closed && shortcodes.get(closed.name);
+    if (closed && unicode) {
+      const result = applyEmoji(value, closed.start, cursor, unicode);
+      cycleRef.current = null;
+      pendingSelectionRef.current = [result.cursor, result.cursor];
+      setDraft(result.value);
+      setCaret(result.cursor);
+      return;
+    }
+    setDraft(value);
+    setCaret(cursor);
+  }
+
+  /** Insert a picked emoji over the composer's selection. The picker takes focus
+   * while it's open, so the caret is wherever the draft was left. */
+  function insertEmoji(unicode: string) {
+    const el = inputElRef.current;
+    const start = el?.selectionStart ?? draft.length;
+    const end = el?.selectionEnd ?? start;
+    const result = applyEmoji(draft, start, end, unicode);
+    cycleRef.current = null;
+    pendingSelectionRef.current = [result.cursor, result.cursor];
+    setDraft(result.value);
+    setCaret(result.cursor);
+    el?.focus();
+  }
+
+  /** Wrap the composer's selection in `format`'s markers, keeping the wrapped
+   * text selected so it can be typed over or wrapped again. */
+  function applyFormat(format: Format) {
+    const el = inputElRef.current;
+    if (!el || disabled) return;
+    const start = el.selectionStart ?? draft.length;
+    const end = el.selectionEnd ?? start;
+    const result = wrapSelection(draft, start, end, format);
+    cycleRef.current = null;
+    pendingSelectionRef.current = [result.start, result.end];
+    setDraft(result.value);
+    setCaret(result.end);
+    el.focus();
   }
 
   async function submit() {
@@ -461,19 +577,20 @@ export function ChatPane({
             Failed to send: {sendError}
           </p>
         )}
-        {/* `items-end` keeps the send button on the last line as the composer
-            grows, rather than floating it in the middle of the block. */}
-        <div className="relative flex items-end gap-2 rounded-2xl border border-input bg-background px-3 py-1.5 focus-within:ring-2 focus-within:ring-ring">
+        {/* The draft sits on its own row above the toolbar, so the buttons stay
+            put on the last line as the composer grows rather than floating in
+            the middle of the block. */}
+        <div className="relative rounded-2xl border border-input bg-background px-3 py-1.5 focus-within:ring-2 focus-within:ring-ring">
           {menuOpen && (
             <div
               id={listId}
               role="listbox"
-              aria-label="Mention a user"
+              aria-label={mention ? "Mention a user" : "Insert an emoji"}
               className="absolute bottom-full left-0 z-10 mb-2 max-h-48 w-64 overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md"
             >
-              {matches.map((name, i) => (
+              {options.map((option, i) => (
                 <div
-                  key={name}
+                  key={option.key}
                   id={`${listId}-${i}`}
                   role="option"
                   // The composer keeps focus (it owns the keyboard); -1 keeps
@@ -485,15 +602,26 @@ export function ChatPane({
                   // first, or the caret (and so the token) is gone by click.
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    insertMention(name);
+                    insertOption(option);
                   }}
                   onMouseEnter={() => setMenuIndex(i)}
                   className={cn(
-                    "cursor-pointer truncate px-3 py-1.5 text-sm",
+                    "flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm",
                     i === active && "bg-accent text-accent-foreground",
                   )}
                 >
-                  {name}
+                  {option.kind === "mention" ? (
+                    <span className="truncate">{option.name}</span>
+                  ) : (
+                    <>
+                      <span className="text-base leading-none">
+                        {option.entry.unicode}
+                      </span>
+                      <span className="truncate text-muted-foreground">
+                        :{option.entry.shortcodes[0]}:
+                      </span>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -503,8 +631,10 @@ export function ChatPane({
             rows={1}
             value={draft}
             onChange={(e) => {
-              setDraft(e.target.value);
-              setCaret(e.target.selectionStart ?? e.target.value.length);
+              onDraftChange(
+                e.target.value,
+                e.target.selectionStart ?? e.target.value.length,
+              );
             }}
             onSelect={(e) => {
               setCaret(e.currentTarget.selectionStart ?? draft.length);
@@ -518,22 +648,22 @@ export function ChatPane({
               if (menuOpen) {
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
-                  setMenuIndex((active + 1) % matches.length);
+                  setMenuIndex((active + 1) % options.length);
                   return;
                 }
                 if (e.key === "ArrowUp") {
                   e.preventDefault();
-                  setMenuIndex((active - 1 + matches.length) % matches.length);
+                  setMenuIndex((active - 1 + options.length) % options.length);
                   return;
                 }
                 if (e.key === "Enter" || e.key === "Tab") {
                   e.preventDefault();
-                  insertMention(matches[active]);
+                  insertOption(options[active]);
                   return;
                 }
                 if (e.key === "Escape") {
                   e.preventDefault();
-                  setDismissedAt(query?.start ?? null);
+                  setDismissedAt(token?.start ?? null);
                   return;
                 }
               }
@@ -562,16 +692,37 @@ export function ChatPane({
             // drag handle would fight that effect.
             className="max-h-32 min-h-0 resize-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:ring-0 placeholder:italic"
           />
-          <Button
-            onClick={submit}
-            disabled={disabled || draft.trim() === ""}
-            size="icon"
-            aria-label="Send"
-            title="Send"
-            className="shrink-0 rounded-full"
-          >
-            <ArrowUp className="size-4" />
-          </Button>
+          <div className="flex items-center gap-0.5">
+            <EmojiPicker onPick={insertEmoji} disabled={disabled} />
+            {FORMAT_BUTTONS.map(({ format, label, Icon }) => (
+              <Button
+                key={format}
+                // The composer owns the keyboard and the selection the wrap
+                // applies to; a real click would blur it away first.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyFormat(format)}
+                disabled={disabled}
+                variant="ghost"
+                size="icon"
+                aria-label={label}
+                title={label}
+                className="size-7 shrink-0 rounded-md text-muted-foreground"
+              >
+                <Icon className="size-4" />
+              </Button>
+            ))}
+            <div className="flex-1" />
+            <Button
+              onClick={submit}
+              disabled={disabled || draft.trim() === ""}
+              size="icon"
+              aria-label="Send"
+              title="Send"
+              className="size-8 shrink-0 rounded-full"
+            >
+              <ArrowUp className="size-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </section>
