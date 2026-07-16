@@ -33,6 +33,69 @@ describe("parseMessage", () => {
     expect(parseMessage("a ` b")).toEqual([{ type: "text", value: "a ` b" }]);
   });
 
+  it("keeps a plain multi-line message as one text token", () => {
+    expect(parseMessage("one\ntwo\nthree")).toEqual([
+      { type: "text", value: "one\ntwo\nthree" },
+    ]);
+  });
+
+  it("parses a fenced block with a lang tag", () => {
+    expect(parseMessage("```js\nlet a = 1;\n```")).toEqual([
+      { type: "codeblock", value: "let a = 1;", lang: "js" },
+    ]);
+  });
+
+  it("parses a fenced block without a lang tag", () => {
+    expect(parseMessage("```\nplain\n```")).toEqual([
+      { type: "codeblock", value: "plain" },
+    ]);
+  });
+
+  it("keeps the text either side of a fence", () => {
+    expect(parseMessage("try\n```\nfoo\n```\nthen go")).toEqual([
+      { type: "text", value: "try\n" },
+      { type: "codeblock", value: "foo" },
+      { type: "text", value: "\nthen go" },
+    ]);
+  });
+
+  it("keeps a fence's own markers out of the block, formatting included", () => {
+    expect(parseMessage("```\n*not bold* `not code`\n```")).toEqual([
+      { type: "codeblock", value: "*not bold* `not code`" },
+    ]);
+  });
+
+  it("does not let a fence swallow the prose between two of them", () => {
+    expect(parseMessage("```\na\n```mid```\nb\n```")).toEqual([
+      { type: "codeblock", value: "a" },
+      { type: "text", value: "mid" },
+      { type: "codeblock", value: "b" },
+    ]);
+  });
+
+  it("leaves an unterminated fence as literal text", () => {
+    expect(parseMessage("```js\nlet a = 1;")).toEqual([
+      { type: "text", value: "```js\nlet a = 1;" },
+    ]);
+  });
+
+  it("parses inline code alongside a fence", () => {
+    expect(parseMessage("run `x` in\n```\ny\n```")).toEqual([
+      { type: "text", value: "run " },
+      { type: "code", value: "x" },
+      { type: "text", value: " in\n" },
+      { type: "codeblock", value: "y" },
+    ]);
+  });
+
+  it("parses a fence after a leading command", () => {
+    expect(parseMessage("!help\n```\nx\n```")).toEqual([
+      { type: "command", value: "!help" },
+      { type: "text", value: "\n" },
+      { type: "codeblock", value: "x" },
+    ]);
+  });
+
   it("auto-links a bare URL", () => {
     expect(parseMessage("see https://example.com yo")).toEqual([
       { type: "text", value: "see " },

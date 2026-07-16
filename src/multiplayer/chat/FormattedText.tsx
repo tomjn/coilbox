@@ -35,6 +35,21 @@ function renderNode(n: Inline, key: string): ReactNode {
           {n.value}
         </code>
       );
+    case "codeblock":
+      // `pre` for the block's own whitespace and horizontal scrolling: the
+      // bubble wraps prose at any character, which would mangle indented code.
+      // The `language-` class is the usual convention and is what a highlighter
+      // would key off later.
+      return (
+        <pre
+          key={key}
+          className="my-1 overflow-x-auto rounded bg-foreground/10 p-2 font-mono text-xs"
+        >
+          <code className={n.lang ? `language-${n.lang}` : undefined}>
+            {n.value}
+          </code>
+        </pre>
+      );
     case "command":
       return (
         <span key={key} className="rounded bg-primary/20 px-1 font-medium">
