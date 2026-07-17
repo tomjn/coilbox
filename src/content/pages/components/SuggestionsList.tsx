@@ -151,7 +151,7 @@ export function SuggestionsList({
         )}
       </div>
 
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
+      <ul className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-3">
         {items.map((item) => (
           <SuggestionCard
             key={item.id}
