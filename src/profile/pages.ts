@@ -1,6 +1,7 @@
 import type { NavGroup, NavItem } from "@picoframe/plugin-sdk";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { resolveLinkIcon } from "./links";
+import { parseRef, readProfileFile } from "./refs";
 
 /**
  * Custom distribution pages (issue #255): a bundler drops Markdown files into the
@@ -85,11 +86,60 @@ export function parseFrontmatter(raw: string): {
   return { data, body: raw.slice(m[0].length) };
 }
 
+/** Include-recursion cap: a runaway/deeply-nested include chain stops here. */
+const MAX_INCLUDE_DEPTH = 8;
+
+/**
+ * Expand `@.coilbox/*.md` include directives (issue #274): a line whose sole content is
+ * a markdown file reference is replaced by that file's text, recursively — Claude-style
+ * transclusion so pages can share fragments. Only a *lone* `@.coilbox/....md` line is an
+ * include (an inline `@`-ref mid-sentence is left as text); non-`.md` refs are ignored.
+ *
+ * Fails loud, never hangs: a missing/unsafe file or a cycle (A→B→A) becomes a visible
+ * error/cycle marker line instead of a blank or an infinite loop. The `seen` set tracks
+ * the current include chain — seeded by the caller with the host page's own path — and a
+ * fresh copy is passed down each branch, so the same fragment included twice in different
+ * places is fine; only genuine recursion is flagged. `read` is injected for testability.
+ */
+export async function expandIncludes(
+  body: string,
+  read: (path: string) => Promise<{ text: string; ok: boolean }>,
+  seen: Set<string> = new Set(),
+  depth = 0,
+): Promise<string> {
+  const out: string[] = [];
+  for (const line of body.split(/\r?\n/)) {
+    const ref = parseRef(line.trim());
+    if (ref?.kind !== "file" || !/\.md$/i.test(ref.path)) {
+      out.push(line);
+      continue;
+    }
+    if (seen.has(ref.path)) {
+      out.push(`> **Include error:** cycle detected at \`${line.trim()}\``);
+      continue;
+    }
+    if (depth >= MAX_INCLUDE_DEPTH) {
+      out.push(
+        `> **Include error:** include nesting too deep at \`${line.trim()}\``,
+      );
+      continue;
+    }
+    const { text, ok } = await read(ref.path);
+    if (!ok) {
+      out.push(`> **Include error:** could not read \`${line.trim()}\``);
+      continue;
+    }
+    const nextSeen = new Set(seen).add(ref.path);
+    out.push(await expandIncludes(text, read, nextSeen, depth + 1));
+  }
+  return out.join("\n");
+}
+
 /** A route slug: lowercase segments of `[a-z0-9]`, joined by `-` or `/` (for nesting). */
 const SLUG = /^[a-z0-9]+(?:[/-][a-z0-9]+)*$/;
 
 /** Derive a slug from a file path: `pages/About Us.md` → `about-us`. */
-function slugFromPath(path: string): string {
+export function slugFromPath(path: string): string {
   const file = path.split("/").pop() ?? path;
   return file
     .replace(/\.md$/i, "")
@@ -209,7 +259,20 @@ let loadedPages: ProfilePage[] = [];
 export async function loadProfilePages(): Promise<ProfilePage[]> {
   try {
     const { pages } = await pagesLoadCmd({});
-    loadedPages = buildProfilePages(pages ?? []);
+    // Expand `@.coilbox/*.md` includes before building pages, so each page's body is
+    // fully resolved and rendering stays synchronous. The cycle guard is seeded with the
+    // page's own file path so a page that includes itself is caught immediately.
+    const expanded = await Promise.all(
+      (pages ?? []).map(async (f) => ({
+        path: f.path,
+        content: await expandIncludes(
+          f.content,
+          readProfileFile,
+          new Set([f.path]),
+        ),
+      })),
+    );
+    loadedPages = buildProfilePages(expanded);
   } catch (e) {
     console.warn("profile: failed to load custom pages", e);
     loadedPages = [];
