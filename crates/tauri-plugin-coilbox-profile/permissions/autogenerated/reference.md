@@ -6,6 +6,7 @@ Allows reading the bundler-supplied distribution profile, its assets, and custom
 
 - `allow-profile-load`
 - `allow-profile-asset`
+- `allow-profile-file`
 - `allow-profile-pages`
 
 ## Permission Table
@@ -39,6 +40,32 @@ Enables the profile_asset command without any pre-configured scope.
 <td>
 
 Denies the profile_asset command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-profile:allow-profile-file`
+
+</td>
+<td>
+
+Enables the profile_file command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-profile:deny-profile-file`
+
+</td>
+<td>
+
+Denies the profile_file command without any pre-configured scope.
 
 </td>
 </tr>

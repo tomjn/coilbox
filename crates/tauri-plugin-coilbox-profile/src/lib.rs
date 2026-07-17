@@ -99,6 +99,42 @@ async fn profile_asset(path: String) -> CliResult {
     CliResult::ok(json!({ "dataUri": data_uri }))
 }
 
+/// Pure core of [`profile_file`]: resolve `<root>/<rel>`, read it as raw UTF-8 text via
+/// the supplied reader, and return `(text, ok)`. Unlike [`read_asset_from`] (which
+/// base64-encodes into a data URI for `<img>`), this returns the text verbatim so it can
+/// be spliced into markdown/HTML/CSS (the `@`-reference feature, issue #274). `ok` is
+/// `false` — with empty text — when there's no portable root, the path is unsafe, or the
+/// read fails, so a bad reference fails loud in the frontend rather than silently.
+fn read_file_from(
+    root: Option<PathBuf>,
+    rel: &str,
+    read: impl Fn(&Path) -> std::io::Result<String>,
+) -> (String, bool) {
+    let Some(root) = root else {
+        return (String::new(), false);
+    };
+    let rel_path = Path::new(rel);
+    if !is_safe_rel(rel_path) {
+        return (String::new(), false);
+    }
+    match read(&root.join(rel_path)) {
+        Ok(text) => (text, true),
+        Err(_) => (String::new(), false),
+    }
+}
+
+/// `profile_file` — read a text file from the portable `.coilbox/` folder and return its
+/// contents so the frontend can splice referenced HTML/CSS/markdown into a profile
+/// (`@.coilbox/...` references). Path-traversal guarded; `{ ok: false }` on any miss (see
+/// [`read_file_from`]).
+#[tauri::command]
+async fn profile_file(path: String) -> CliResult {
+    let (text, ok) = read_file_from(coilbox_portable::portable_root(), &path, |p| {
+        std::fs::read_to_string(p)
+    });
+    CliResult::ok(json!({ "text": text, "ok": ok }))
+}
+
 /// Pure core of [`profile_pages`]: enumerate `<root>/pages/*.md`, returning each
 /// file's `.coilbox`-relative path (`pages/<name>.md`) and text, sorted by path so nav
 /// order is stable. `list` yields the directory's entry paths; `read` reads one file.
@@ -162,6 +198,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             profile_load,
             profile_asset,
+            profile_file,
             profile_pages
         ])
         .build()
@@ -241,6 +278,55 @@ mod tests {
             Err(std::io::Error::from(std::io::ErrorKind::NotFound))
         });
         assert_eq!(uri, "");
+    }
+
+    #[test]
+    fn file_reads_present_file_as_text() {
+        let (text, ok) =
+            read_file_from(Some(PathBuf::from("/pkg/.coilbox")), "welcome.html", |p| {
+                assert_eq!(p, Path::new("/pkg/.coilbox/welcome.html"));
+                Ok("<p>hi</p>".to_string())
+            });
+        assert!(ok);
+        assert_eq!(text, "<p>hi</p>");
+    }
+
+    #[test]
+    fn file_rejects_parent_traversal() {
+        let (text, ok) = read_file_from(Some(PathBuf::from("/pkg/.coilbox")), "../secret", |_| {
+            panic!("reader must not run for an unsafe path")
+        });
+        assert!(!ok);
+        assert_eq!(text, "");
+    }
+
+    #[test]
+    fn file_rejects_absolute_path() {
+        let (text, ok) =
+            read_file_from(Some(PathBuf::from("/pkg/.coilbox")), "/etc/passwd", |_| {
+                panic!("reader must not run for an absolute path")
+            });
+        assert!(!ok);
+        assert_eq!(text, "");
+    }
+
+    #[test]
+    fn file_not_ok_when_not_portable() {
+        let (text, ok) = read_file_from(None, "welcome.html", |_| {
+            panic!("reader must not run without a portable root")
+        });
+        assert!(!ok);
+        assert_eq!(text, "");
+    }
+
+    #[test]
+    fn file_not_ok_when_read_fails() {
+        let (text, ok) =
+            read_file_from(Some(PathBuf::from("/pkg/.coilbox")), "missing.html", |_| {
+                Err(std::io::Error::from(std::io::ErrorKind::NotFound))
+            });
+        assert!(!ok);
+        assert_eq!(text, "");
     }
 
     #[test]

@@ -2019,16 +2019,22 @@
           "markdownDescription": "Denies the play_launch_save command without any pre-configured scope."
         },
         {
-          "description": "Allows reading the bundler-supplied distribution profile, its assets, and custom pages.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`\n- `allow-profile-pages`",
+          "description": "Allows reading the bundler-supplied distribution profile, its assets, and custom pages.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`\n- `allow-profile-file`\n- `allow-profile-pages`",
           "type": "string",
           "const": "coilbox-profile:default",
-          "markdownDescription": "Allows reading the bundler-supplied distribution profile, its assets, and custom pages.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`\n- `allow-profile-pages`"
+          "markdownDescription": "Allows reading the bundler-supplied distribution profile, its assets, and custom pages.\n#### This default permission set includes:\n\n- `allow-profile-load`\n- `allow-profile-asset`\n- `allow-profile-file`\n- `allow-profile-pages`"
         },
         {
           "description": "Enables the profile_asset command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-profile:allow-profile-asset",
           "markdownDescription": "Enables the profile_asset command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the profile_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-profile:allow-profile-file",
+          "markdownDescription": "Enables the profile_file command without any pre-configured scope."
         },
         {
           "description": "Enables the profile_load command without any pre-configured scope.",
@@ -2047,6 +2053,12 @@
           "type": "string",
           "const": "coilbox-profile:deny-profile-asset",
           "markdownDescription": "Denies the profile_asset command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the profile_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-profile:deny-profile-file",
+          "markdownDescription": "Denies the profile_file command without any pre-configured scope."
         },
         {
           "description": "Denies the profile_load command without any pre-configured scope.",

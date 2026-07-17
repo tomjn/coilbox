@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { quitApp } from "../general/quit";
-import { getProfile } from "./profile";
+import { getProfile, getResolvedWelcome } from "./profile";
 import { rewriteBrandedCss, rewriteBrandedHtml } from "./welcomeAssets";
 
 /**
@@ -20,16 +20,20 @@ import { rewriteBrandedCss, rewriteBrandedHtml } from "./welcomeAssets";
  */
 export default function BrandedWelcome() {
   const welcome = getProfile().welcome;
+  // `welcome.html`/`css` may be `@.coilbox/...` file references; they're resolved to
+  // the referenced file's text at startup (see resolveWelcome), so read the resolved
+  // strings here. Inline fragments resolve to themselves, so this is unchanged for them.
+  const resolved = getResolvedWelcome();
   // Rewrite relative asset URLs (images/audio/video/fonts) to the `coilbox://`
   // protocol so a bundler can reference `.coilbox/`-relative files by path. Memoised
   // on the raw strings so the DOM parse runs once, not every render.
   const html = useMemo(
-    () => (welcome?.html ? rewriteBrandedHtml(welcome.html) : undefined),
-    [welcome?.html],
+    () => (resolved?.html ? rewriteBrandedHtml(resolved.html) : undefined),
+    [resolved?.html],
   );
   const css = useMemo(
-    () => (welcome?.css ? rewriteBrandedCss(welcome.css) : undefined),
-    [welcome?.css],
+    () => (resolved?.css ? rewriteBrandedCss(resolved.css) : undefined),
+    [resolved?.css],
   );
   // Delegated listener attached to the injected-HTML container (not a JSX `onClick`,
   // which would trip a11y lints on a static div): a bubbled click on any element
@@ -55,6 +59,11 @@ export default function BrandedWelcome() {
     // this, so a short welcome can't collapse to zero the way `height:100%` does
     // against an auto-height parent inside picoframe's overflow-auto content region.
     <section className="w-full">
+      {resolved?.error && (
+        <div className="m-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {resolved.error}
+        </div>
+      )}
       {css && (
         // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted bundler-authored profile CSS
         <style dangerouslySetInnerHTML={{ __html: css }} />

@@ -4,6 +4,7 @@ import type { ConquestNames } from "../conquest/names";
 import type { SuggestedMapList } from "../content/branding";
 import { describeJsonError } from "./jsonError";
 import { type OnboardingPlacement, onboardingPlacement } from "./onboarding";
+import { readProfileFile, resolveFileRef } from "./refs";
 
 /**
  * Distribution profile: a `profile.json` a bundler drops into the portable
@@ -23,9 +24,17 @@ export interface GameFilter {
 
 /** Declarative branded welcome screen. Trusted, bundler-authored; no JS by design. */
 export interface WelcomeConfig {
-  /** Raw HTML rendered into the welcome page body. */
+  /**
+   * Raw HTML rendered into the welcome page body. Either an inline fragment, or a
+   * `@.coilbox/<path>.html` reference resolved to the file's contents at startup
+   * (issue #274) — the file's raw HTML is the sole sanctioned exception to the
+   * otherwise script-free, markdown-safe content model.
+   */
   html?: string;
-  /** CSS injected alongside the welcome HTML. */
+  /**
+   * CSS injected alongside the welcome HTML. Inline, or a `@.coilbox/<path>.css`
+   * file reference (resolved like {@link WelcomeConfig.html}).
+   */
   css?: string;
 }
 
@@ -325,6 +334,48 @@ export async function resolveProfileImage(
     console.warn("profile: image asset load failed", e);
     return null;
   }
+}
+
+/** The welcome's html/css after `@.coilbox/...` file references are resolved to text. */
+export interface ResolvedWelcome {
+  html?: string;
+  css?: string;
+  /** A visible message when a referenced file couldn't be read (fail-loud). */
+  error?: string;
+}
+
+// Populated by resolveWelcome() at startup (main.tsx awaits it before render) so
+// BrandedWelcome can read the resolved html/css synchronously. Null when the profile
+// has no welcome.
+let resolvedWelcome: ResolvedWelcome | null = null;
+
+/**
+ * Resolve the welcome's `html`/`css`, following any `@.coilbox/<path>` file references
+ * to the referenced file's contents (issue #274). Inline fragments pass through
+ * unchanged, so existing profiles are untouched. A bad reference surfaces a visible
+ * `error` rather than silently blanking the welcome. Idempotent; a no-op (leaves the
+ * resolved welcome null) when the profile ships no welcome.
+ */
+export async function resolveWelcome(): Promise<void> {
+  const w = loaded.welcome;
+  if (!w) {
+    resolvedWelcome = null;
+    return;
+  }
+  const html = w.html
+    ? await resolveFileRef(w.html, readProfileFile)
+    : undefined;
+  const css = w.css ? await resolveFileRef(w.css, readProfileFile) : undefined;
+  resolvedWelcome = {
+    html: html?.text,
+    css: css?.text,
+    error: html?.error ?? css?.error,
+  };
+}
+
+/** The welcome after file-reference resolution (null until resolveWelcome() runs). */
+export function getResolvedWelcome(): ResolvedWelcome | null {
+  return resolvedWelcome;
 }
 
 const EMPTY_PROFILE: Profile = { version: 1 };
