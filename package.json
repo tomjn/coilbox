@@ -22,8 +22,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@picoframe/frame": "^0.5.1",
-    "@picoframe/plugin-sdk": "^0.5.1",
+    "@picoframe/frame": "^0.5.2",
+    "@picoframe/plugin-sdk": "^0.5.2",
     "@shadcn/react": "^0.2.1",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-dialog": "^2.7.1",
