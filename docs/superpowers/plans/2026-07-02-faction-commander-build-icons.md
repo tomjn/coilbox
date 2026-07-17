@@ -40,8 +40,7 @@ texpresso = "2"
 
 - [ ] **Step 2: Verify it resolves and builds**
 
-Run: `cargo build -p coilbox-unitsync-worker`
-Expected: compiles (no code uses the crates yet; this just locks the dependency graph).
+Run: `cargo build -p coilbox-unitsync-worker` Expected: compiles (no code uses the crates yet; this just locks the dependency graph).
 
 - [ ] **Step 3: Commit**
 
@@ -131,8 +130,7 @@ mod tests {
 
 - [ ] **Step 3: Run tests to verify they fail**
 
-Run: `cargo test -p coilbox-unitsync-worker texture::`
-Expected: FAIL — `decode_texture`, `bc_format`, `encode_icon_png` not defined.
+Run: `cargo test -p coilbox-unitsync-worker texture::` Expected: FAIL — `decode_texture`, `bc_format`, `encode_icon_png` not defined.
 
 - [ ] **Step 4: Write the implementation**
 
@@ -227,8 +225,7 @@ pub fn encode_icon_png(img: image::RgbaImage) -> Option<String> {
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `cargo test -p coilbox-unitsync-worker texture::`
-Expected: PASS (4 tests). If `bc_format_mapping` fails to compile, fix the `DxgiFormat`/`D3DFormat` variant names to match the installed `ddsfile` and re-run.
+Run: `cargo test -p coilbox-unitsync-worker texture::` Expected: PASS (4 tests). If `bc_format_mapping` fails to compile, fix the `DxgiFormat`/`D3DFormat` variant names to match the installed `ddsfile` and re-run.
 
 - [ ] **Step 6: Commit**
 
@@ -262,8 +259,7 @@ pub struct UnitBuildpicsOutput {
 
 - [ ] **Step 2: Verify it compiles**
 
-Run: `cargo build -p coilbox-unitsync-worker`
-Expected: compiles (struct unused for now — a `dead_code` warning is acceptable until Task 4 wires it).
+Run: `cargo build -p coilbox-unitsync-worker` Expected: compiles (struct unused for now — a `dead_code` warning is acceptable until Task 4 wires it).
 
 - [ ] **Step 3: Commit**
 
@@ -360,8 +356,7 @@ mod tests {
 
 - [ ] **Step 3: Run tests to verify they fail**
 
-Run: `cargo test -p coilbox-unitsync-worker buildpic::`
-Expected: FAIL — helpers not defined.
+Run: `cargo test -p coilbox-unitsync-worker buildpic::` Expected: FAIL — helpers not defined.
 
 - [ ] **Step 4: Write the pure helpers**
 
@@ -444,8 +439,7 @@ fn push_unique(v: &mut Vec<String>, s: String) {
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `cargo test -p coilbox-unitsync-worker buildpic::`
-Expected: PASS (4 tests).
+Run: `cargo test -p coilbox-unitsync-worker buildpic::` Expected: PASS (4 tests).
 
 - [ ] **Step 6: Write the `render` entry point + cache + emit_error**
 
@@ -647,10 +641,7 @@ pub fn emit_error(msg: String) {
 
 - [ ] **Step 8: Run tests + build to verify**
 
-Run: `cargo test -p coilbox-unitsync-worker buildpic::`
-Expected: PASS (the 4 pure-helper tests; `render` is not unit-tested).
-Run: `cargo build -p coilbox-unitsync-worker`
-Expected: compiles.
+Run: `cargo test -p coilbox-unitsync-worker buildpic::` Expected: PASS (the 4 pure-helper tests; `render` is not unit-tested). Run: `cargo build -p coilbox-unitsync-worker` Expected: compiles.
 
 - [ ] **Step 9: Commit**
 
@@ -739,10 +730,7 @@ In `run()`, insert this block immediately after the `--game-headers` block (afte
 
 - [ ] **Step 4: Verify build + existing tests**
 
-Run: `cargo build -p coilbox-unitsync-worker`
-Expected: compiles, no unused-field warnings.
-Run: `cargo test -p coilbox-unitsync-worker`
-Expected: PASS (all worker tests).
+Run: `cargo build -p coilbox-unitsync-worker` Expected: compiles, no unused-field warnings. Run: `cargo test -p coilbox-unitsync-worker` Expected: PASS (all worker tests).
 
 - [ ] **Step 5: Commit**
 
@@ -791,8 +779,7 @@ In `crates/tauri-plugin-coilbox-unitsync/src/sidecar.rs`, inside `mod tests`, ad
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `cargo test -p tauri-plugin-coilbox-unitsync build_unit_buildpics_args`
-Expected: FAIL — `build_unit_buildpics_args` not defined.
+Run: `cargo test -p tauri-plugin-coilbox-unitsync build_unit_buildpics_args` Expected: FAIL — `build_unit_buildpics_args` not defined.
 
 - [ ] **Step 3: Add the arg builder**
 
@@ -821,8 +808,7 @@ pub fn build_unit_buildpics_args(
 
 - [ ] **Step 4: Run to verify it passes**
 
-Run: `cargo test -p tauri-plugin-coilbox-unitsync build_unit_buildpics_args`
-Expected: PASS.
+Run: `cargo test -p tauri-plugin-coilbox-unitsync build_unit_buildpics_args` Expected: PASS.
 
 - [ ] **Step 5: Add the cache-dir helper + command in `lib.rs`**
 
@@ -896,10 +882,7 @@ In `crates/tauri-plugin-coilbox-unitsync/permissions/default.toml`, add `"allow-
 
 - [ ] **Step 10: Build + test the plugin crate**
 
-Run: `cargo build -p tauri-plugin-coilbox-unitsync`
-Expected: compiles; the tauri-plugin build helper autogenerates `allow-unitsync-unit-buildpics` from COMMANDS.
-Run: `cargo test -p tauri-plugin-coilbox-unitsync`
-Expected: PASS.
+Run: `cargo build -p tauri-plugin-coilbox-unitsync` Expected: compiles; the tauri-plugin build helper autogenerates `allow-unitsync-unit-buildpics` from COMMANDS. Run: `cargo test -p tauri-plugin-coilbox-unitsync` Expected: PASS.
 
 - [ ] **Step 11: Commit**
 
@@ -992,10 +975,7 @@ export function useUnitsyncUnitBuildpics(
 
 - [ ] **Step 3: Typecheck + lint**
 
-Run: `bun run typecheck`
-Expected: no errors.
-Run: `bunx biome ci src/content/bindings.ts src/content/config.ts`
-Expected: no errors. (If biome flags the `useEffect` dep comment or import order, apply its fix.)
+Run: `bun run typecheck` Expected: no errors. Run: `bunx biome ci src/content/bindings.ts src/content/config.ts` Expected: no errors. (If biome flags the `useEffect` dep comment or import order, apply its fix.)
 
 - [ ] **Step 4: Commit**
 
@@ -1088,10 +1068,7 @@ to:
 
 - [ ] **Step 4: Typecheck + lint**
 
-Run: `bun run typecheck`
-Expected: no errors.
-Run: `bunx biome ci src/content/pages/GameDetailPage.tsx`
-Expected: no errors.
+Run: `bun run typecheck` Expected: no errors. Run: `bunx biome ci src/content/pages/GameDetailPage.tsx` Expected: no errors.
 
 - [ ] **Step 5: Commit**
 
@@ -1110,18 +1087,13 @@ The DDS decode path and the unitsync-driven `render` are only exercisable agains
 
 - [ ] **Step 1: Run the full CI lint suite locally**
 
-Run: `cargo fmt --all --check`
-Run: `cargo clippy --all-targets --all-features -- -D warnings`
-Run: `bunx biome ci .`
-Run: `bun run typecheck`
-Expected: all pass. Fix any findings (rustfmt: run `cargo fmt --all` to auto-fix).
+Run: `cargo fmt --all --check` Run: `cargo clippy --all-targets --all-features -- -D warnings` Run: `bunx biome ci .` Run: `bun run typecheck` Expected: all pass. Fix any findings (rustfmt: run `cargo fmt --all` to auto-fix).
 
 Note: clippy compiles the Tauri app crate, which needs the sidecars built. If clippy fails to find `coilbox-unitsync-worker`, build it first: `bun run sidecar:unitsync` (see CLAUDE.md).
 
 - [ ] **Step 2: Build the worker sidecar for dev**
 
-Run: `bun run sidecar:unitsync`
-Expected: builds the worker; `bun tauri dev` will pick it up (or set `UNITSYNC_WORKER` to the built binary path).
+Run: `bun run sidecar:unitsync` Expected: builds the worker; `bun tauri dev` will pick it up (or set `UNITSYNC_WORKER` to the built binary path).
 
 - [ ] **Step 3: Live smoke via `bun tauri dev`**
 

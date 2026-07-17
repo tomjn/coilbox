@@ -48,9 +48,7 @@
 
 - [ ] **Step 1: Install vitest**
 
-Run: `bun add -d vitest`
-Expected: `vitest` appears under `devDependencies` in `package.json`.
-Note (risk): the repo pins `vite@^8`. If bun reports a peer-dependency conflict with vitest, install the newest vitest that resolves against Vite 8 and confirm `bunx vitest --version` prints a version. Do not downgrade Vite.
+Run: `bun add -d vitest` Expected: `vitest` appears under `devDependencies` in `package.json`. Note (risk): the repo pins `vite@^8`. If bun reports a peer-dependency conflict with vitest, install the newest vitest that resolves against Vite 8 and confirm `bunx vitest --version` prints a version. Do not downgrade Vite.
 
 - [ ] **Step 2: Add the test script**
 
@@ -77,8 +75,7 @@ export default defineConfig({
 
 - [ ] **Step 4: Verify the harness launches**
 
-Run: `bunx vitest run --passWithNoTests`
-Expected: exits 0, reporting "No test files found" (config loads without error).
+Run: `bunx vitest run --passWithNoTests` Expected: exits 0, reporting "No test files found" (config loads without error).
 
 - [ ] **Step 5: Commit**
 
@@ -229,8 +226,7 @@ describe("filterSortBattles", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `bunx vitest run src/multiplayer/battles/battleList.test.ts`
-Expected: FAIL — cannot resolve `./battleList` (module not created yet).
+Run: `bunx vitest run src/multiplayer/battles/battleList.test.ts` Expected: FAIL — cannot resolve `./battleList` (module not created yet).
 
 - [ ] **Step 3: Write the implementation**
 
@@ -293,8 +289,7 @@ export function filterSortBattles(battles: Battle[], f: BattleFilters): Battle[]
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `bunx vitest run src/multiplayer/battles/battleList.test.ts`
-Expected: PASS (all cases).
+Run: `bunx vitest run src/multiplayer/battles/battleList.test.ts` Expected: PASS (all cases).
 
 - [ ] **Step 5: Commit**
 
@@ -363,8 +358,7 @@ describe("mirrorReducer join-failure handling", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `bunx vitest run src/multiplayer/store.test.ts`
-Expected: FAIL — `lastJoinError` missing and `clearJoinError` action unhandled.
+Run: `bunx vitest run src/multiplayer/store.test.ts` Expected: FAIL — `lastJoinError` missing and `clearJoinError` action unhandled.
 
 - [ ] **Step 3: Add `lastJoinError` to the mirror interface + initial value**
 
@@ -424,8 +418,7 @@ Inside the `case "event":` inner `switch (ev.kind)` (line 74), add a `delta` cas
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `bunx vitest run src/multiplayer/store.test.ts`
-Expected: PASS.
+Run: `bunx vitest run src/multiplayer/store.test.ts` Expected: PASS.
 
 - [ ] **Step 6: Expose `lastJoinError` + `clearJoinError` from the provider**
 
@@ -457,8 +450,7 @@ Add both to the context `value` object (line 278-288):
 
 - [ ] **Step 7: Typecheck**
 
-Run: `bun run typecheck`
-Expected: no errors.
+Run: `bun run typecheck` Expected: no errors.
 
 - [ ] **Step 8: Commit**
 
@@ -503,8 +495,7 @@ In the `routes` array (after the `chat` route, line 46-50):
 
 - [ ] **Step 3: Typecheck**
 
-Run: `bun run typecheck`
-Expected: FAIL — `./pages/BattlesPage` does not exist yet (created in Task 8). This is expected; it resolves once Task 8 lands.
+Run: `bun run typecheck` Expected: FAIL — `./pages/BattlesPage` does not exist yet (created in Task 8). This is expected; it resolves once Task 8 lands.
 
 - [ ] **Step 4: Commit**
 
@@ -603,8 +594,7 @@ export function JoinBattlePopover({
 
 - [ ] **Step 3: Typecheck**
 
-Run: `bun run typecheck`
-Expected: FAIL only on the still-missing `./pages/BattlesPage` (from Task 4). `JoinBattlePopover.tsx` itself must not add new errors — if the popover import path or exports differ, fix the import to match `src/components/ui/popover.tsx`'s actual exports.
+Run: `bun run typecheck` Expected: FAIL only on the still-missing `./pages/BattlesPage` (from Task 4). `JoinBattlePopover.tsx` itself must not add new errors — if the popover import path or exports differ, fix the import to match `src/components/ui/popover.tsx`'s actual exports.
 
 - [ ] **Step 4: Commit**
 
@@ -708,8 +698,7 @@ export function BattleRow({
 
 - [ ] **Step 2: Typecheck**
 
-Run: `bun run typecheck`
-Expected: FAIL only on the still-missing `./pages/BattlesPage`. `BattleRow.tsx` must add no new errors.
+Run: `bun run typecheck` Expected: FAIL only on the still-missing `./pages/BattlesPage`. `BattleRow.tsx` must add no new errors.
 
 - [ ] **Step 3: Commit**
 
@@ -782,8 +771,7 @@ export function BattleList({
 
 - [ ] **Step 2: Typecheck**
 
-Run: `bun run typecheck`
-Expected: FAIL only on the still-missing `./pages/BattlesPage`.
+Run: `bun run typecheck` Expected: FAIL only on the still-missing `./pages/BattlesPage`.
 
 - [ ] **Step 3: Commit**
 
@@ -996,18 +984,15 @@ function Toggle({
 
 - [ ] **Step 2: Typecheck (now the route resolves)**
 
-Run: `bun run typecheck`
-Expected: PASS — the `./pages/BattlesPage` import from Task 4 now resolves and all components typecheck.
+Run: `bun run typecheck` Expected: PASS — the `./pages/BattlesPage` import from Task 4 now resolves and all components typecheck.
 
 - [ ] **Step 3: Lint the frontend as CI does**
 
-Run: `bunx biome ci .`
-Expected: PASS. Fix any formatting/lint findings (biome owns formatting; run `bunx biome format --write .` if needed, then re-run `bunx biome ci .`).
+Run: `bunx biome ci .` Expected: PASS. Fix any formatting/lint findings (biome owns formatting; run `bunx biome format --write .` if needed, then re-run `bunx biome ci .`).
 
 - [ ] **Step 4: Run the full test suite**
 
-Run: `bun run test`
-Expected: PASS (battleList + store tests).
+Run: `bun run test` Expected: PASS (battleList + store tests).
 
 - [ ] **Step 5: Commit**
 

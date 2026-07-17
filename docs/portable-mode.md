@@ -91,11 +91,7 @@ SplinterFaction/                 <- the folder you zip and distribute; THIS is t
   engine/
 ```
 
-The app folder plays the role of a `~/.spring`-style data directory: `games/`,
-`maps/` and `engine/` sit at its top level, right beside `coilbox.exe` and
-`.coilbox/`. Coilbox ignores `.coilbox/` when scanning content. A layout that
-buries the game *inside* `.coilbox/` (e.g. `.coilbox/games/…`) is wrong — that
-content won't be scanned and could be lost when Coilbox's data is reset.
+The app folder plays the role of a `~/.spring`-style data directory: `games/`, `maps/` and `engine/` sit at its top level, right beside `coilbox.exe` and `.coilbox/`. Coilbox ignores `.coilbox/` when scanning content. A layout that buries the game *inside* `.coilbox/` (e.g. `.coilbox/games/…`) is wrong — that content won't be scanned and could be lost when Coilbox's data is reset.
 
 Rules to know:
 

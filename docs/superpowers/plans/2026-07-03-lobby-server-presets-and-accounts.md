@@ -219,13 +219,11 @@ describe("resolveServer", () => {
 
 - [ ] **Step 3: Run the tests**
 
-Run: `bun run test src/lobby-servers/config.test.ts`
-Expected: PASS (5 tests). If `allServers` mutation test fails, the map is spreading correctly — recheck `{ ...s, builtin: true }`.
+Run: `bun run test src/lobby-servers/config.test.ts` Expected: PASS (5 tests). If `allServers` mutation test fails, the map is spreading correctly — recheck `{ ...s, builtin: true }`.
 
 - [ ] **Step 4: Typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS (legacy exports still satisfy existing consumers).
+Run: `bun run typecheck` Expected: PASS (legacy exports still satisfy existing consumers).
 
 - [ ] **Step 5: Commit**
 
@@ -321,8 +319,7 @@ describe("planMigration", () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `bun run test src/lobby-servers/migration.test.ts`
-Expected: FAIL — cannot find module `./migration`.
+Run: `bun run test src/lobby-servers/migration.test.ts` Expected: FAIL — cannot find module `./migration`.
 
 - [ ] **Step 3: Write `migration.ts`**
 
@@ -412,8 +409,7 @@ export function planMigration(
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `bun run test src/lobby-servers/migration.test.ts`
-Expected: PASS (5 tests).
+Run: `bun run test src/lobby-servers/migration.test.ts` Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -484,8 +480,7 @@ export function OptionSelect({
 
 - [ ] **Step 2: Typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
 - [ ] **Step 3: Commit**
 
@@ -1166,11 +1161,9 @@ function CustomServerRow({
 
 - [ ] **Step 5: Typecheck + run all unit tests**
 
-Run: `bun run typecheck`
-Expected: PASS. If it reports `Property 'username' does not exist on type 'LobbyServer'`, a consumer still reads the removed field — fix that call site.
+Run: `bun run typecheck` Expected: PASS. If it reports `Property 'username' does not exist on type 'LobbyServer'`, a consumer still reads the removed field — fix that call site.
 
-Run: `bun run test`
-Expected: PASS (config + migration + existing multiplayer tests unaffected).
+Run: `bun run test` Expected: PASS (config + migration + existing multiplayer tests unaffected).
 
 - [ ] **Step 6: Commit**
 
@@ -1287,8 +1280,7 @@ If `FramePlugin` has no `Provider` field (TS error), confirm the property name u
 
 - [ ] **Step 3: Typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
 - [ ] **Step 4: Commit**
 
@@ -1305,22 +1297,17 @@ git commit -m "feat(lobby): one-time migration from directory to accounts"
 
 - [ ] **Step 1: Frontend static checks (the exact commands CI runs)**
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
-Run: `bunx biome ci .`
-Expected: PASS. If it flags the `cn_ml_auto` helper or an unused import, resolve per the note in Task 4 Step 4.
+Run: `bunx biome ci .` Expected: PASS. If it flags the `cn_ml_auto` helper or an unused import, resolve per the note in Task 4 Step 4.
 
-Run: `bun run test`
-Expected: PASS (all suites).
+Run: `bun run test` Expected: PASS (all suites).
 
 - [ ] **Step 2: Rust static checks (untouched, but CI runs both)**
 
-Run: `cargo fmt --all --check`
-Expected: PASS.
+Run: `cargo fmt --all --check` Expected: PASS.
 
-Run: `cargo clippy --all-targets --all-features -- -D warnings`
-Expected: PASS. (Requires the unitsync sidecar per CLAUDE.md: `bun run sidecar:unitsync` first if clippy fails to build the app crate.)
+Run: `cargo clippy --all-targets --all-features -- -D warnings` Expected: PASS. (Requires the unitsync sidecar per CLAUDE.md: `bun run sidecar:unitsync` first if clippy fails to build the app crate.)
 
 - [ ] **Step 3: Live smoke — new UI + connect**
 

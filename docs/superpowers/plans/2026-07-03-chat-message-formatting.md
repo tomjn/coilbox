@@ -66,8 +66,7 @@ describe("parseMessage", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts`
-Expected: FAIL — cannot find module `./parseMessage`.
+Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts` Expected: FAIL — cannot find module `./parseMessage`.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -110,8 +109,7 @@ function parseUrls(text: string): Inline[] {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts`
-Expected: PASS (3 tests).
+Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts` Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -146,8 +144,7 @@ git commit -m "feat(multiplayer): parse leading autohost command in chat text"
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts`
-Expected: FAIL — code not split out; whole string returned as one text token.
+Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts` Expected: FAIL — code not split out; whole string returned as one text token.
 
 - [ ] **Step 3: Update `parseInline` to split code spans first**
 
@@ -172,8 +169,7 @@ function parseInline(text: string): Inline[] {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts`
-Expected: PASS (5 tests).
+Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts` Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -212,8 +208,7 @@ git commit -m "feat(multiplayer): parse inline code spans in chat text"
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts`
-Expected: FAIL — URLs still returned as plain text.
+Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts` Expected: FAIL — URLs still returned as plain text.
 
 - [ ] **Step 3: Replace the stub `parseUrls` with the real implementation**
 
@@ -244,8 +239,7 @@ function parseEmphasis(text: string): Inline[] {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts`
-Expected: PASS (7 tests).
+Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts` Expected: PASS (7 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -292,8 +286,7 @@ git commit -m "feat(multiplayer): auto-link URLs in chat text"
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts`
-Expected: FAIL — emphasis not parsed; bold/italic returned as literal text.
+Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts` Expected: FAIL — emphasis not parsed; bold/italic returned as literal text.
 
 - [ ] **Step 3: Replace the stub `parseEmphasis` with the real implementation**
 
@@ -324,8 +317,7 @@ function parseEmphasis(text: string): Inline[] {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts`
-Expected: PASS (10 tests).
+Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts` Expected: PASS (10 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -409,8 +401,7 @@ function render(nodes: Inline[]): ReactNode[] {
 
 - [ ] **Step 2: Typecheck the new component**
 
-Run: `bun run typecheck`
-Expected: PASS (no errors).
+Run: `bun run typecheck` Expected: PASS (no errors).
 
 - [ ] **Step 3: Commit**
 
@@ -454,13 +445,11 @@ Replace with:
 
 - [ ] **Step 3: Typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
 - [ ] **Step 4: Full parser test run**
 
-Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts`
-Expected: PASS (10 tests).
+Run: `bunx vitest run src/multiplayer/chat/parseMessage.test.ts` Expected: PASS (10 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -477,18 +466,15 @@ git commit -m "feat(multiplayer): render chat messages with inline formatting"
 
 - [ ] **Step 1: Run the frontend lint suite CI runs**
 
-Run: `bunx biome ci .`
-Expected: PASS. If Biome flags the `switch` with no `default` in `render`, add a `default: return null;` case and re-run.
+Run: `bunx biome ci .` Expected: PASS. If Biome flags the `switch` with no `default` in `render`, add a `default: return null;` case and re-run.
 
 - [ ] **Step 2: Typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
 - [ ] **Step 3: Manual smoke in the app**
 
-Run: `bun tauri dev`
-In a chat/DM, send messages exercising each rule and confirm rendering:
+Run: `bun tauri dev` In a chat/DM, send messages exercising each rule and confirm rendering:
 - `!help now` → `!help` highlighted (as a tinted chip), ` now` plain — on BOTH your own (right) bubble and someone else's (left) bubble the chip text stays readable.
 - `use `+"`code`"+` here` → `code` shows as a chip.
 - `**bold** and *italic* and _also_` → weights/slant applied, markers gone.

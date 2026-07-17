@@ -58,8 +58,7 @@ Add a new test after `build_config_maps_join_case`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cargo test -p tauri-plugin-coilbox-multiplayer build_config_maps_script_tags_to_options`
-Expected: FAIL — `startPosType` is `0` and `modOptions`/`mapOptions` are `Null` (assertion/index panic).
+Run: `cargo test -p tauri-plugin-coilbox-multiplayer build_config_maps_script_tags_to_options` Expected: FAIL — `startPosType` is `0` and `modOptions`/`mapOptions` are `Null` (assertion/index panic).
 
 - [ ] **Step 3: Write the implementation**
 
@@ -106,8 +105,7 @@ Then in the returned `json!`, replace the `"startPosType": 0,` line with:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cargo test -p tauri-plugin-coilbox-multiplayer`
-Expected: PASS — both `build_config_maps_join_case` and `build_config_maps_script_tags_to_options` green (the first still passes: its fixture now carries tags but it does not assert their absence).
+Run: `cargo test -p tauri-plugin-coilbox-multiplayer` Expected: PASS — both `build_config_maps_join_case` and `build_config_maps_script_tags_to_options` green (the first still passes: its fixture now carries tags but it does not assert their absence).
 
 - [ ] **Step 5: Commit**
 
@@ -197,8 +195,7 @@ describe("battleOptions", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `bun run test src/multiplayer/battle/battleOptions.test.ts`
-Expected: FAIL — cannot resolve `./battleOptions` (module does not exist).
+Run: `bun run test src/multiplayer/battle/battleOptions.test.ts` Expected: FAIL — cannot resolve `./battleOptions` (module does not exist).
 
 - [ ] **Step 3: Write the implementation**
 
@@ -305,8 +302,7 @@ export function displayedValue(
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `bun run test src/multiplayer/battle/battleOptions.test.ts`
-Expected: PASS — all cases green.
+Run: `bun run test src/multiplayer/battle/battleOptions.test.ts` Expected: PASS — all cases green.
 
 - [ ] **Step 5: Commit**
 
@@ -342,8 +338,7 @@ export function ModOptionField({
 
 - [ ] **Step 2: Verify it still typechecks**
 
-Run: `bun run typecheck`
-Expected: PASS — no new errors.
+Run: `bun run typecheck` Expected: PASS — no new errors.
 
 - [ ] **Step 3: Commit**
 
@@ -434,8 +429,7 @@ export function useBattleOptions(
 
 - [ ] **Step 2: Verify it typechecks**
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
 - [ ] **Step 3: Commit**
 
@@ -547,8 +541,7 @@ In the returned object, after `sides,` add:
 
 - [ ] **Step 5: Verify it typechecks**
 
-Run: `bun run typecheck`
-Expected: PASS. (`scriptTagKey` is imported for use by the drawer via the view; if the linter flags it unused here, drop it from this file's import — the drawer imports it directly. See Task 6.)
+Run: `bun run typecheck` Expected: PASS. (`scriptTagKey` is imported for use by the drawer via the view; if the linter flags it unused here, drop it from this file's import — the drawer imports it directly. See Task 6.)
 
 Note: remove `scriptTagKey` from the Step 1 import if unused in this file — only `canEditBattleOptions` is used here. Corrected import:
 
@@ -790,8 +783,7 @@ Note: the `startPos` fallback above references a non-scoped tag. Simplify it —
 
 - [ ] **Step 2: Verify it typechecks**
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
 - [ ] **Step 3: Commit**
 
@@ -833,11 +825,9 @@ In the right `aside`, immediately after the `<StartPosOptions ... />` block (bef
 
 - [ ] **Step 3: Verify build + lint**
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
-Run: `bunx biome ci .`
-Expected: PASS (no lint/format errors in the new files).
+Run: `bunx biome ci .` Expected: PASS (no lint/format errors in the new files).
 
 - [ ] **Step 4: Commit**
 

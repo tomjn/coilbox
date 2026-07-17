@@ -57,8 +57,7 @@ describe("playExtentFor", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `bun run test src/conquest/galaxy3d/layout.test.ts`
-Expected: FAIL — `playExtentFor` / `BASE_NODE_COUNT` not exported; custom-extent test still spans 100.
+Run: `bun run test src/conquest/galaxy3d/layout.test.ts` Expected: FAIL — `playExtentFor` / `BASE_NODE_COUNT` not exported; custom-extent test still spans 100.
 
 - [ ] **Step 3: Implement**
 
@@ -98,8 +97,7 @@ Also update the doc comment's "scales to {@link PLAY_EXTENT}" to "scales to `ext
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `bun run test src/conquest/galaxy3d/layout.test.ts`
-Expected: PASS (all existing tests too — the default keeps old behaviour).
+Run: `bun run test src/conquest/galaxy3d/layout.test.ts` Expected: PASS (all existing tests too — the default keeps old behaviour).
 
 - [ ] **Step 5: Commit**
 
@@ -154,8 +152,7 @@ Verify no stragglers: `grep -n "PLAY_EXTENT" src/conquest/galaxy3d/GalaxyView.ts
 
 - [ ] **Step 3: Typecheck**
 
-Run: `bun run typecheck`
-Expected: clean.
+Run: `bun run typecheck` Expected: clean.
 
 - [ ] **Step 4: Commit**
 
@@ -197,8 +194,7 @@ it("varies spacing between seeds (jittered acceptance distance)", () => {
 
 - [ ] **Step 2: Run test**
 
-Run: `bun run test src/conquest/generate.test.ts`
-Expected: likely PASS already (plain dart-throwing has some NN spread) — that is fine; this test is a regression guard for determinism-per-seed and against a future change collapsing variance. Note the actual result honestly and continue.
+Run: `bun run test src/conquest/generate.test.ts` Expected: likely PASS already (plain dart-throwing has some NN spread) — that is fine; this test is a regression guard for determinism-per-seed and against a future change collapsing variance. Note the actual result honestly and continue.
 
 - [ ] **Step 3: Implement the jitter**
 
@@ -235,8 +231,7 @@ Update the four call sites to pass `rng` first: in `scatterDisc`, `scatterSpiral
 
 - [ ] **Step 4: Run the full conquest suite**
 
-Run: `bun run test src/conquest`
-Expected: PASS — determinism, connectivity and round-trip tests all still hold (the jitter draws from the same seeded rng).
+Run: `bun run test src/conquest` Expected: PASS — determinism, connectivity and round-trip tests all still hold (the jitter draws from the same seeded rng).
 
 - [ ] **Step 5: Commit**
 
@@ -310,8 +305,7 @@ it("persists the generation knobs for reroll", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `bun run test src/conquest/model.test.ts src/conquest/generate.test.ts`
-Expected: FAIL — type error on the `generated` literal / missing knobs in output.
+Run: `bun run test src/conquest/model.test.ts src/conquest/generate.test.ts` Expected: FAIL — type error on the `generated` literal / missing knobs in output.
 
 - [ ] **Step 3: Extend the schema in `model.ts`**
 
@@ -395,8 +389,7 @@ In `src/conquest/generate.ts`, replace `generated: { seed: opts.seed },` (line 4
 
 - [ ] **Step 5: Run the full conquest suite**
 
-Run: `bun run test src/conquest`
-Expected: PASS — including the pre-existing "survives its own validator" round-trip, which now exercises the new fields.
+Run: `bun run test src/conquest` Expected: PASS — including the pre-existing "survives its own validator" round-trip, which now exercises the new fields.
 
 - [ ] **Step 6: Commit**
 
@@ -442,8 +435,7 @@ describe("regenerateGalaxy", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `bun run test src/conquest/generate.test.ts`
-Expected: FAIL — `regenerateGalaxy` is not exported.
+Run: `bun run test src/conquest/generate.test.ts` Expected: FAIL — `regenerateGalaxy` is not exported.
 
 - [ ] **Step 3: Implement**
 
@@ -497,8 +489,7 @@ export function regenerateGalaxy(
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `bun run test src/conquest/generate.test.ts`
-Expected: PASS.
+Run: `bun run test src/conquest/generate.test.ts` Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -600,8 +591,7 @@ The saved doc flows back through `refreshGalaxies` → `useGalaxies` → the `ga
 
 - [ ] **Step 4: Typecheck + lint**
 
-Run: `bun run typecheck && bunx biome ci src/conquest/pages/GalaxyPage.tsx`
-Expected: clean.
+Run: `bun run typecheck && bunx biome ci src/conquest/pages/GalaxyPage.tsx` Expected: clean.
 
 - [ ] **Step 5: Commit**
 
@@ -774,8 +764,7 @@ After the seed `div` (closes line 493), before `{error && ...}`:
 
 - [ ] **Step 4: Verify**
 
-Run: `bun run typecheck && bunx biome ci . && bun run test src/conquest`
-Expected: all clean/passing.
+Run: `bun run typecheck && bunx biome ci . && bun run test src/conquest` Expected: all clean/passing.
 
 - [ ] **Step 5: Commit**
 
@@ -790,14 +779,11 @@ git commit -m "feat(conquest): live 2D galaxy preview in the create wizard"
 
 - [ ] **Step 1: Full frontend suite**
 
-Run: `bun run test && bunx biome ci . && bun run typecheck`
-Expected: all pass. Fix anything that fails before continuing.
+Run: `bun run test && bunx biome ci . && bun run typecheck` Expected: all pass. Fix anything that fails before continuing.
 
 - [ ] **Step 2: Rust suite (CI runs it even for frontend-only changes)**
 
-Run: `cargo fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings`
-Note: clippy compiles the Tauri app crate; if it complains about a missing unitsync sidecar binary, run `bun run sidecar:unitsync` first.
-Expected: clean (no Rust was touched).
+Run: `cargo fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings` Note: clippy compiles the Tauri app crate; if it complains about a missing unitsync sidecar binary, run `bun run sidecar:unitsync` first. Expected: clean (no Rust was touched).
 
 - [ ] **Step 3: STOP — user live test**
 

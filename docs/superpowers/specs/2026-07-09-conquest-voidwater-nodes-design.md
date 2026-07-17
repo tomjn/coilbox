@@ -1,7 +1,6 @@
 # Conquest voidwater asteroid/comet nodes (PR C)
 
-Date: 2026-07-09
-Status: approved
+Date: 2026-07-09 Status: approved
 
 ## Problem
 

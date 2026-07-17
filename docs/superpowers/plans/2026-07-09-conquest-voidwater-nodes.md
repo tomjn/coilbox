@@ -16,10 +16,7 @@
 
 ### Task 1: Map-appearance cache module
 
-Note: `@picoframe/frame`'s dist is not node-importable under vitest, so the pure
-helper (`spaceMapNames`) lives in `src/content/mapAppearance.ts` (type-only
-import) with its test there; the `useSetting`-backed hooks live in
-`src/content/mapAppearanceCache.ts` and are exercised live.
+Note: `@picoframe/frame`'s dist is not node-importable under vitest, so the pure helper (`spaceMapNames`) lives in `src/content/mapAppearance.ts` (type-only import) with its test there; the `useSetting`-backed hooks live in `src/content/mapAppearanceCache.ts` and are exercised live.
 
 **Files:**
 - Create: `src/content/mapAppearance.ts` (pure), `src/content/mapAppearanceCache.ts` (hooks)
@@ -56,8 +53,7 @@ describe("spaceMapNames", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `bun run test src/content/mapAppearanceCache.test.ts`
-Expected: FAIL — module/`spaceMapNames` not found.
+Run: `bun run test src/content/mapAppearanceCache.test.ts` Expected: FAIL — module/`spaceMapNames` not found.
 
 - [ ] **Step 3: Implement the module**
 
@@ -126,8 +122,7 @@ export function useRecordMapAppearance(): (
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `bun run test src/content/mapAppearanceCache.test.ts`
-Expected: PASS.
+Run: `bun run test src/content/mapAppearanceCache.test.ts` Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -194,8 +189,7 @@ The `apply` callback (lines 1018-1049) already builds an `appearance` object. Ca
 
 - [ ] **Step 3: Typecheck**
 
-Run: `bun run typecheck`
-Expected: clean.
+Run: `bun run typecheck` Expected: clean.
 
 - [ ] **Step 4: Commit**
 
@@ -245,8 +239,7 @@ describe("bodyLabel", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `bun run test src/conquest/galaxy3d/bodies.test.ts`
-Expected: FAIL — module not found.
+Run: `bun run test src/conquest/galaxy3d/bodies.test.ts` Expected: FAIL — module not found.
 
 - [ ] **Step 3: Implement**
 
@@ -275,8 +268,7 @@ export function bodyLabel(body: VoidBody): string {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `bun run test src/conquest/galaxy3d/bodies.test.ts`
-Expected: PASS.
+Run: `bun run test src/conquest/galaxy3d/bodies.test.ts` Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -384,8 +376,7 @@ export function cometTailTexture(size: number): THREE.Texture {
 
 - [ ] **Step 2: Typecheck**
 
-Run: `bun run typecheck`
-Expected: clean.
+Run: `bun run typecheck` Expected: clean.
 
 - [ ] **Step 3: Commit**
 
@@ -583,8 +574,7 @@ Add the prop to the `<GalaxyView ... />` element (beside `visibleIds={visibleIds
 
 - [ ] **Step 7: Typecheck + lint**
 
-Run: `bun run typecheck && bunx biome ci src/conquest src/content`
-Expected: clean (0 errors; repo-wide pre-existing warnings are not these files).
+Run: `bun run typecheck && bunx biome ci src/conquest src/content` Expected: clean (0 errors; repo-wide pre-existing warnings are not these files).
 
 - [ ] **Step 8: Commit**
 
@@ -599,14 +589,11 @@ git commit -m "feat(conquest): render asteroid/comet bodies on space-map nodes"
 
 - [ ] **Step 1: Full frontend suite**
 
-Run: `bun run test && bunx biome ci . && bun run typecheck`
-Expected: all pass. Fix anything that fails.
+Run: `bun run test && bunx biome ci . && bun run typecheck` Expected: all pass. Fix anything that fails.
 
 - [ ] **Step 2: Rust suite (CI runs it regardless)**
 
-Run: `cargo fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings`
-If clippy fails on a missing sidecar/resource: `bun run sidecar:unitsync`, then `mkdir -p src-tauri/mapconv src-tauri/prdownloader`, and re-run.
-Expected: clean (no Rust touched).
+Run: `cargo fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings` If clippy fails on a missing sidecar/resource: `bun run sidecar:unitsync`, then `mkdir -p src-tauri/mapconv src-tauri/prdownloader`, and re-run. Expected: clean (no Rust touched).
 
 - [ ] **Step 3: STOP — user live test**
 

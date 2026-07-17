@@ -63,8 +63,7 @@ mod writable_tests {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cargo test -p tauri-plugin-coilbox-downloads writable_tests`
-Expected: FAIL — `cannot find function probe_writable`.
+Run: `cargo test -p tauri-plugin-coilbox-downloads writable_tests` Expected: FAIL — `cannot find function probe_writable`.
 
 - [ ] **Step 3: Implement the probe helper + command**
 
@@ -130,10 +129,7 @@ In `crates/tauri-plugin-coilbox-downloads/permissions/default.toml`, add to `per
 
 - [ ] **Step 6: Run tests + clippy to verify pass**
 
-Run: `cargo test -p tauri-plugin-coilbox-downloads writable_tests`
-Expected: PASS (both tests).
-Run: `cargo clippy -p tauri-plugin-coilbox-downloads --all-targets -- -D warnings`
-Expected: no warnings.
+Run: `cargo test -p tauri-plugin-coilbox-downloads writable_tests` Expected: PASS (both tests). Run: `cargo clippy -p tauri-plugin-coilbox-downloads --all-targets -- -D warnings` Expected: no warnings.
 
 - [ ] **Step 7: Commit**
 
@@ -164,8 +160,7 @@ export const dlPathWritable = defineCommand<
 
 - [ ] **Step 2: Typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS (no errors).
+Run: `bun run typecheck` Expected: PASS (no errors).
 
 - [ ] **Step 3: Commit**
 
@@ -227,8 +222,7 @@ export function getProfileError(): string | null {
 
 - [ ] **Step 2: Typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
 - [ ] **Step 3: Commit**
 
@@ -348,8 +342,7 @@ describe("deriveHealthChecks", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `bunx vitest run src/profile/health.test.ts`
-Expected: FAIL — cannot resolve `./health`.
+Run: `bunx vitest run src/profile/health.test.ts` Expected: FAIL — cannot resolve `./health`.
 
 - [ ] **Step 3: Implement `health.ts`**
 
@@ -546,8 +539,7 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `bunx vitest run src/profile/health.test.ts`
-Expected: PASS (all cases).
+Run: `bunx vitest run src/profile/health.test.ts` Expected: PASS (all cases).
 
 - [ ] **Step 5: Commit**
 
@@ -665,8 +657,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
 
 - [ ] **Step 2: Typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS. Fix any hook-order / unused-var issues flagged (see the implementer note above).
+Run: `bun run typecheck` Expected: PASS. Fix any hook-order / unused-var issues flagged (see the implementer note above).
 
 - [ ] **Step 3: Commit**
 
@@ -744,10 +735,7 @@ function Row({ check }: { check: HealthCheck }) {
 
 - [ ] **Step 2: Typecheck + lint**
 
-Run: `bun run typecheck`
-Expected: PASS.
-Run: `bunx biome check src/profile/HealthChecklist.tsx`
-Expected: no errors.
+Run: `bun run typecheck` Expected: PASS. Run: `bunx biome check src/profile/HealthChecklist.tsx` Expected: no errors.
 
 - [ ] **Step 3: Commit**
 
@@ -798,10 +786,7 @@ In the main `return`, add `<HealthChecklist />` after the closing `</section>` o
 
 - [ ] **Step 2: Typecheck + lint**
 
-Run: `bun run typecheck`
-Expected: PASS.
-Run: `bunx biome check src/profile/SettingsSection.tsx`
-Expected: no errors.
+Run: `bun run typecheck` Expected: PASS. Run: `bunx biome check src/profile/SettingsSection.tsx` Expected: no errors.
 
 - [ ] **Step 3: Commit**
 
@@ -818,12 +803,7 @@ git commit -m "feat: show health checklist in Distribution profile settings"
 
 - [ ] **Step 1: Run the full lint suite CI runs**
 
-Run: `cargo fmt --all --check`
-Run: `cargo clippy --all-targets --all-features -- -D warnings`
-Run: `bunx biome ci .`
-Run: `bun run typecheck`
-Run: `bunx vitest run src/profile/health.test.ts`
-Expected: all pass.
+Run: `cargo fmt --all --check` Run: `cargo clippy --all-targets --all-features -- -D warnings` Run: `bunx biome ci .` Run: `bun run typecheck` Run: `bunx vitest run src/profile/health.test.ts` Expected: all pass.
 
 - [ ] **Step 2: Manual smoke test**
 

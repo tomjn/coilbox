@@ -44,8 +44,7 @@ pub struct LuaExecOutput {
 
 - [ ] **Step 2: Verify it compiles**
 
-Run: `cargo check -p coilbox-unitsync-worker`
-Expected: compiles (warning about unused `LuaExecOutput` is fine until Task 4).
+Run: `cargo check -p coilbox-unitsync-worker` Expected: compiles (warning about unused `LuaExecOutput` is fine until Task 4).
 
 - [ ] **Step 3: Commit**
 
@@ -208,8 +207,7 @@ mod model;
 
 - [ ] **Step 4: Run the tests — expect them to pass**
 
-Run: `cargo test -p coilbox-unitsync-worker lua::`
-Expected: 4 tests pass (`dumps_a_returned_table`, `scalar_return_is_serialized`, `no_return_yields_nil`, `runtime_error_is_captured`).
+Run: `cargo test -p coilbox-unitsync-worker lua::` Expected: 4 tests pass (`dumps_a_returned_table`, `scalar_return_is_serialized`, `no_return_yields_nil`, `runtime_error_is_captured`).
 
 (If `mlua` vendored build is slow on first compile, that's expected — it builds Lua from source once.)
 
@@ -323,8 +321,7 @@ Add this method inside `impl Unitsync` (place it right after `start_positions`, 
 
 - [ ] **Step 5: Verify it compiles**
 
-Run: `cargo check -p coilbox-unitsync-worker`
-Expected: compiles (an unused-method warning for `run_lua_source` is fine until Task 4).
+Run: `cargo check -p coilbox-unitsync-worker` Expected: compiles (an unused-method warning for `run_lua_source` is fine until Task 4).
 
 - [ ] **Step 6: Commit**
 
@@ -399,8 +396,7 @@ pub fn emit_error(msg: String) {
 
 - [ ] **Step 2: Verify it compiles and existing tests still pass**
 
-Run: `cargo test -p coilbox-unitsync-worker lua::`
-Expected: the 4 serializer tests still pass; no unused warnings for `run`/`emit_error` once `main` calls them (Task 5) — a warning here is acceptable until then.
+Run: `cargo test -p coilbox-unitsync-worker lua::` Expected: the 4 serializer tests still pass; no unused warnings for `run`/`emit_error` once `main` calls them (Task 5) — a warning here is acceptable until then.
 
 - [ ] **Step 3: Commit**
 
@@ -479,8 +475,7 @@ In `run()`, insert this block immediately after the `cache_dir` line (line 68) a
 
 - [ ] **Step 4: Verify it compiles and the worker still builds**
 
-Run: `cargo build -p coilbox-unitsync-worker`
-Expected: builds with no warnings.
+Run: `cargo build -p coilbox-unitsync-worker` Expected: builds with no warnings.
 
 - [ ] **Step 5: Commit**
 
@@ -520,8 +515,7 @@ In the `#[cfg(test)] mod tests` block of `crates/tauri-plugin-coilbox-unitsync/s
 
 - [ ] **Step 2: Run it — expect a compile failure (function missing)**
 
-Run: `cargo test -p tauri-plugin-coilbox-unitsync build_lua_args`
-Expected: FAIL — `cannot find function build_lua_args`.
+Run: `cargo test -p tauri-plugin-coilbox-unitsync build_lua_args` Expected: FAIL — `cannot find function build_lua_args`.
 
 - [ ] **Step 3: Implement `build_lua_args`**
 
@@ -543,8 +537,7 @@ pub fn build_lua_args(lib: &str, datadir: &str, archive: &str, source_file: &str
 
 - [ ] **Step 4: Run the test — expect pass**
 
-Run: `cargo test -p tauri-plugin-coilbox-unitsync build_lua_args`
-Expected: PASS.
+Run: `cargo test -p tauri-plugin-coilbox-unitsync build_lua_args` Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -634,8 +627,7 @@ Add `unitsync_lua_exec` to the `generate_handler![ ... ]` list in `init()` (afte
 
 - [ ] **Step 5: Verify the plugin compiles**
 
-Run: `cargo check -p tauri-plugin-coilbox-unitsync`
-Expected: compiles.
+Run: `cargo check -p tauri-plugin-coilbox-unitsync` Expected: compiles.
 
 - [ ] **Step 6: Commit**
 
@@ -679,8 +671,7 @@ export const unitsyncLuaExec = defineCommand<
 
 - [ ] **Step 2: Typecheck**
 
-Run: `bun run typecheck`
-Expected: passes (no new errors).
+Run: `bun run typecheck` Expected: passes (no new errors).
 
 - [ ] **Step 3: Commit**
 
@@ -742,8 +733,7 @@ export function useUnitsyncLuaExec(
 
 - [ ] **Step 3: Typecheck**
 
-Run: `bun run typecheck`
-Expected: passes.
+Run: `bun run typecheck` Expected: passes.
 
 - [ ] **Step 4: Commit**
 
@@ -851,9 +841,7 @@ export function LuaConsoleDrawer({
 
 - [ ] **Step 2: Typecheck + lint the new file**
 
-Run: `bun run typecheck`
-Then: `bunx biome check src/content/pages/components/LuaConsoleDrawer.tsx`
-Expected: both pass.
+Run: `bun run typecheck` Then: `bunx biome check src/content/pages/components/LuaConsoleDrawer.tsx` Expected: both pass.
 
 - [ ] **Step 3: Commit**
 
@@ -933,9 +921,7 @@ In the `<div className="ml-auto flex shrink-0 gap-2">` block (line 99), add this
 
 - [ ] **Step 4: Typecheck + lint**
 
-Run: `bun run typecheck`
-Then: `bunx biome check src/content/pages/ArchiveDetailPage.tsx`
-Expected: both pass.
+Run: `bun run typecheck` Then: `bunx biome check src/content/pages/ArchiveDetailPage.tsx` Expected: both pass.
 
 - [ ] **Step 5: Commit**
 
@@ -954,29 +940,23 @@ Run the **same** commands CI runs (per `CLAUDE.md`). The unitsync worker sidecar
 
 - [ ] **Step 1: Build the unitsync worker sidecar**
 
-Run: `bun run sidecar:unitsync`
-Expected: builds the worker into `src-tauri/binaries` (so the app crate compiles).
+Run: `bun run sidecar:unitsync` Expected: builds the worker into `src-tauri/binaries` (so the app crate compiles).
 
 - [ ] **Step 2: Rust format check**
 
-Run: `cargo fmt --all --check`
-Expected: no diff. If it fails, run `cargo fmt --all` and re-commit the formatting.
+Run: `cargo fmt --all --check` Expected: no diff. If it fails, run `cargo fmt --all` and re-commit the formatting.
 
 - [ ] **Step 3: Rust clippy (all crates, CI flags)**
 
-Run: `cargo clippy --all-targets --all-features -- -D warnings`
-Expected: no warnings.
+Run: `cargo clippy --all-targets --all-features -- -D warnings` Expected: no warnings.
 
 - [ ] **Step 4: Rust tests**
 
-Run: `cargo test -p coilbox-unitsync-worker -p tauri-plugin-coilbox-unitsync`
-Expected: all pass (4 serializer tests + the sidecar arg tests).
+Run: `cargo test -p coilbox-unitsync-worker -p tauri-plugin-coilbox-unitsync` Expected: all pass (4 serializer tests + the sidecar arg tests).
 
 - [ ] **Step 5: Frontend lint + types (CI commands)**
 
-Run: `bunx biome ci .`
-Then: `bun run typecheck`
-Expected: both pass.
+Run: `bunx biome ci .` Then: `bun run typecheck` Expected: both pass.
 
 - [ ] **Step 6: Commit any formatting fixups**
 
@@ -996,8 +976,7 @@ The serializer/wrapper and arg builders are unit-tested, but the real `libunitsy
 
 - [ ] **Step 1: Launch the app**
 
-Run: `bun tauri dev`
-(Lets the user test; the unitsync worker is rebuilt by the dev flow.)
+Run: `bun tauri dev` (Lets the user test; the unitsync worker is rebuilt by the dev flow.)
 
 - [ ] **Step 2: Open an archive and the console**
 

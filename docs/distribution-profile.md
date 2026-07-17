@@ -1,11 +1,6 @@
 # Distribution profiles
 
-A **distribution profile** lets you ship Coilbox alongside a game (or otherwise
-brand/narrow it) **without forking or rebuilding**. You drop a single
-`profile.json` file next to the app; Coilbox reads it once at startup and applies
-it: window title, hidden features, a preset game filter, a branded welcome screen,
-theme colours, hidden settings sections, extra sidebar links, custom Markdown pages,
-and a GitHub-releases update source for the game.
+A **distribution profile** lets you ship Coilbox alongside a game (or otherwise brand/narrow it) **without forking or rebuilding**. You drop a single `profile.json` file next to the app; Coilbox reads it once at startup and applies it: window title, hidden features, a preset game filter, a branded welcome screen, theme colours, hidden settings sections, extra sidebar links, custom Markdown pages, and a GitHub-releases update source for the game.
 
 If no profile is present, Coilbox behaves exactly as normal.
 
@@ -16,10 +11,7 @@ If no profile is present, Coilbox behaves exactly as normal.
 
 ## Where the file goes
 
-Profiles ride on **[portable mode](portable-mode.md)**. Put a `.coilbox` folder
-next to the Coilbox executable and place `profile.json` inside it. The presence of
-that `profile.json` is exactly what turns portable mode on (a bare `.coilbox`
-folder is no longer enough, since the Windows installer keeps sidecars there too):
+Profiles ride on **[portable mode](portable-mode.md)**. Put a `.coilbox` folder next to the Coilbox executable and place `profile.json` inside it. The presence of that `profile.json` is exactly what turns portable mode on (a bare `.coilbox` folder is no longer enough, since the Windows installer keeps sidecars there too):
 
 ```
 <YourGameFolder>/
@@ -31,11 +23,9 @@ folder is no longer enough, since the Windows installer keeps sidecars there too
 ```
 
 - On **macOS**, `.coilbox` sits beside `Coilbox.app`, not inside it.
-- In **development** (`bun tauri dev`), the binary runs from `target/debug/`, so the
-  file lives at `target/debug/.coilbox/profile.json`.
+- In **development** (`bun tauri dev`), the binary runs from `target/debug/`, so the file lives at `target/debug/.coilbox/profile.json`.
 
-The profile is only read when Coilbox is running in portable mode (i.e. a `.coilbox`
-folder exists). A normal per-user install ignores it.
+The profile is only read when Coilbox is running in portable mode (i.e. a `.coilbox` folder exists). A normal per-user install ignores it.
 
 ## Minimal example
 
@@ -66,10 +56,7 @@ folder exists). A normal per-user install ignores it.
 
 ## Custom pages
 
-A distribution can add its own screens — a rules page, a "getting started" guide, a
-credits page — by dropping Markdown files into a **`pages/` folder** inside `.coilbox`.
-Each `.md` file becomes an in-app page; no `profile.json` entry is needed (the folder is
-auto-discovered).
+A distribution can add its own screens — a rules page, a "getting started" guide, a credits page — by dropping Markdown files into a **`pages/` folder** inside `.coilbox`. Each `.md` file becomes an in-app page; no `profile.json` entry is needed (the folder is auto-discovered).
 
 ```
 <YourGameFolder>/
@@ -81,8 +68,7 @@ auto-discovered).
       bg.jpg          # an asset a page references
 ```
 
-Each file starts with an optional **frontmatter** block — a `---`-fenced set of
-`key: value` lines — that configures the page:
+Each file starts with an optional **frontmatter** block — a `---`-fenced set of `key: value` lines — that configures the page:
 
 ```markdown
 ---
@@ -114,23 +100,14 @@ See the [about page](#/pages/about) for more.
 
 Notes:
 
-- **Assets are `.coilbox`-relative**, the same convention as the splash/logo images. A
-  Markdown image `![](pages/diagram.png)` or a `background: pages/bg.jpg` resolves to a
-  file under `.coilbox/`. Audio/video files referenced as images render inline players.
-- **Link between pages** (or from a welcome screen) with `#/pages/<path>`, or a plain
-  `[label](other.md)` link — handy with `nav: false` for pages reached only from
-  elsewhere. See [File references](#file-references) for the full link/route scheme.
-- **Compose** pages with [`@` references](#file-references): include shared fragments
-  (`@.coilbox/pages/_foo.md`), link to routes (`@route/singleplayer`), and embed live GUI
-  (`@widget/onboarding`, `@widget/build-tree/<game>`).
-- Content is trusted bundler-authored Markdown (safe by default: no raw HTML/JS).
-  Malformed or duplicate `path`s are skipped rather than breaking the app.
+- **Assets are `.coilbox`-relative**, the same convention as the splash/logo images. A Markdown image `![](pages/diagram.png)` or a `background: pages/bg.jpg` resolves to a file under `.coilbox/`. Audio/video files referenced as images render inline players.
+- **Link between pages** (or from a welcome screen) with `#/pages/<path>`, or a plain `[label](other.md)` link — handy with `nav: false` for pages reached only from elsewhere. See [File references](#file-references) for the full link/route scheme.
+- **Compose** pages with [`@` references](#file-references): include shared fragments (`@.coilbox/pages/_foo.md`), link to routes (`@route/singleplayer`), and embed live GUI (`@widget/onboarding`, `@widget/build-tree/<game>`).
+- Content is trusted bundler-authored Markdown (safe by default: no raw HTML/JS). Malformed or duplicate `path`s are skipped rather than breaking the app.
 
 ## File references (`@`)
 
-Profile content is composable through a single `@<namespace>/<rest>` token. The first
-segment after `@` is a namespace, so there's no ambiguity between (say) a file named
-`route` and the route namespace:
+Profile content is composable through a single `@<namespace>/<rest>` token. The first segment after `@` is a namespace, so there's no ambiguity between (say) a file named `route` and the route namespace:
 
 | Token                          | Means                                                                 |
 | ------------------------------ | --------------------------------------------------------------------- |
@@ -138,27 +115,21 @@ segment after `@` is a namespace, so there's no ambiguity between (say) a file n
 | `@route/<app-route>`           | An **in-app route**, e.g. `@route/singleplayer`, `@route/downloads/games`. |
 | `@widget/<name>[/<arg>]`       | An embedded **live Coilbox component** (see [widgets](#widget-catalogue) below). |
 
-Anything that can't be resolved (a missing file, an unknown widget, an escaping path)
-renders a **visible error/placeholder**, never a silent blank — so a typo in a bundle is
-obvious rather than mysterious.
+Anything that can't be resolved (a missing file, an unknown widget, an escaping path) renders a **visible error/placeholder**, never a silent blank — so a typo in a bundle is obvious rather than mysterious.
 
 ### File-reference profile fields
 
-The [`welcome`](#welcome-object) `html`/`css` fields accept a `@.coilbox/<path>` reference
-instead of an inline fragment, so you can keep the markup in its own file:
+The [`welcome`](#welcome-object) `html`/`css` fields accept a `@.coilbox/<path>` reference instead of an inline fragment, so you can keep the markup in its own file:
 
 ```json
 { "welcome": { "html": "@.coilbox/welcome.html", "css": "@.coilbox/welcome.css" } }
 ```
 
-The referenced `.html` file's raw HTML is injected as-is — the **one** place raw HTML is
-allowed (it's your own trusted, script-free file, same as the inline fragment).
+The referenced `.html` file's raw HTML is injected as-is — the **one** place raw HTML is allowed (it's your own trusted, script-free file, same as the inline fragment).
 
 ### Including files into a page
 
-A custom page can **transclude** another Markdown file: a line whose sole content is a
-`@.coilbox/<path>.md` reference is replaced by that file's contents (recursively), so
-pages can share a common header, footer, or rules block:
+A custom page can **transclude** another Markdown file: a line whose sole content is a `@.coilbox/<path>.md` reference is replaced by that file's contents (recursively), so pages can share a common header, footer, or rules block:
 
 ```markdown
 # Getting started
@@ -168,23 +139,19 @@ pages can share a common header, footer, or rules block:
 Now pick a faction below.
 ```
 
-Includes are cycle-guarded and depth-capped; a missing file or an include loop shows an
-error marker line instead of hanging.
+Includes are cycle-guarded and depth-capped; a missing file or an include loop shows an error marker line instead of hanging.
 
 ### Linking between pages and routes
 
 Markdown links resolve intelligently:
 
-- `[Rules](rules.md)` → the page `#/pages/rules` (a `.md` link maps to its page by
-  filename; a nested page can be linked with `@route/pages/...`).
+- `[Rules](rules.md)` → the page `#/pages/rules` (a `.md` link maps to its page by filename; a nested page can be linked with `@route/pages/...`).
 - `[Play](@route/singleplayer)` → navigates in-app.
-- `[Discord](https://discord.gg/…)` → opens in the system browser (never navigates the
-  app's own window away).
+- `[Discord](https://discord.gg/…)` → opens in the system browser (never navigates the app's own window away).
 
 ### Widget catalogue
 
-Drop a live piece of Coilbox GUI into a page by putting a `@widget/<name>` token on its
-own line:
+Drop a live piece of Coilbox GUI into a page by putting a `@widget/<name>` token on its own line:
 
 ```markdown
 # Welcome
@@ -208,20 +175,15 @@ own line:
 | `@widget/build-tree/<game>`     | A game's full build-tree graph (all factions, tabbed) in the page.      |
 | `@widget/faction-button/<game>` | Per-faction buttons that open the build-tree drawer.                    |
 
-The `<game>` arg matches a game's name or shortname (case-insensitive); on a single-game
-install it can be omitted. While the game is being scanned, or if it isn't installed, the
-widget shows a skeleton/notice rather than a blank.
+The `<game>` arg matches a game's name or shortname (case-insensitive); on a single-game install it can be omitted. While the game is being scanned, or if it isn't installed, the widget shows a skeleton/notice rather than a blank.
 
 ## Verifying it's active
 
-Open **Settings > Distribution profile**. It shows whether a profile is loaded, where
-it came from (`file` / `default`), and a summary of everything it's changing. If no
-profile is loaded it reads "No distribution profile loaded — standard Coilbox".
+Open **Settings > Distribution profile**. It shows whether a profile is loaded, where it came from (`file` / `default`), and a summary of everything it's changing. If no profile is loaded it reads "No distribution profile loaded — standard Coilbox".
 
 ## Fields
 
-Every field is optional except `version`. Unknown fields are ignored, and a malformed
-file falls back to defaults rather than breaking the app.
+Every field is optional except `version`. Unknown fields are ignored, and a malformed file falls back to defaults rather than breaking the app.
 
 ### `version` (number, required)
 
@@ -237,11 +199,7 @@ Overrides the OS window title **and** the in-app title. Defaults to `"Coilbox"`.
 
 ### `mode` (string)
 
-Forces the colour scheme: `"light"`, `"dark"`, or `"system"`. Applied on every
-launch (it overrides a value the user may have set previously — including one carried
-over from a vanilla Coilbox install). The user can still switch it for the current
-session under Settings > Appearance; it reverts to the profile next launch. Omit to
-leave the colour scheme entirely under the user's control.
+Forces the colour scheme: `"light"`, `"dark"`, or `"system"`. Applied on every launch (it overrides a value the user may have set previously — including one carried over from a vanilla Coilbox install). The user can still switch it for the current session under Settings > Appearance; it reverts to the profile next launch. Omit to leave the colour scheme entirely under the user's control.
 
 ```json
 { "version": 1, "mode": "dark" }
@@ -249,14 +207,9 @@ leave the colour scheme entirely under the user's control.
 
 ### `accent` (string)
 
-Forces a built-in accent colour — the `--primary` brand hue. This recolours the
-whole shell cohesively (primary, ring, sidebar, in both light and dark) using
-picoframe's vetted palette. Same force-each-launch / session-override behaviour as
-`mode`. The full set of accents:
+Forces a built-in accent colour — the `--primary` brand hue. This recolours the whole shell cohesively (primary, ring, sidebar, in both light and dark) using picoframe's vetted palette. Same force-each-launch / session-override behaviour as `mode`. The full set of accents:
 
-`neutral` (the default — no hue, the plain grey shell), `blue`, `green`, `rose`,
-`violet`, `orange`, `red`, `amber`, `yellow`, `teal`, `cyan`, `sky`, `indigo`,
-`purple`, `pink`, plus two animated/gradient accents `rainbow` and `opal`.
+`neutral` (the default — no hue, the plain grey shell), `blue`, `green`, `rose`, `violet`, `orange`, `red`, `amber`, `yellow`, `teal`, `cyan`, `sky`, `indigo`, `purple`, `pink`, plus two animated/gradient accents `rainbow` and `opal`.
 
 ```json
 { "version": 1, "accent": "orange" }
@@ -272,8 +225,7 @@ picoframe's vetted palette. Same force-each-launch / session-override behaviour 
 
 ### `hide` (string[])
 
-Hides top-level navigation items (sidebar + welcome launcher) by id, and makes their
-routes redirect home. Currently these nav ids can be hidden:
+Hides top-level navigation items (sidebar + welcome launcher) by id, and makes their routes redirect home. Currently these nav ids can be hidden:
 
 | id                 | Sidebar item          |
 | ------------------ | --------------------- |
@@ -291,8 +243,7 @@ routes redirect home. Currently these nav ids can be hidden:
 
 ### `hideSettings` (string[])
 
-Hides settings sections from the Settings navigation by id. **Any** app settings
-section can be hidden:
+Hides settings sections from the Settings navigation by id. **Any** app settings section can be hidden:
 
 | id                | Settings section   |
 | ----------------- | ------------------ |
@@ -313,8 +264,7 @@ section can be hidden:
 { "version": 1, "hideSettings": ["engines", "engine-settings", "downloads"] }
 ```
 
-Hiding the built-in **Appearance** section pairs well with forcing `mode` / `accent`
-— it removes the theme controls so the brand's look is fixed:
+Hiding the built-in **Appearance** section pairs well with forcing `mode` / `accent` — it removes the theme controls so the brand's look is fixed:
 
 ```json
 { "version": 1, "mode": "dark", "accent": "orange", "hideSettings": ["frame.appearance"] }
@@ -325,9 +275,7 @@ Hiding the built-in **Appearance** section pairs well with forcing `mode` / `acc
 
 ### `gameFilter` (object)
 
-Narrows game lists to a single game. When set, the multiplayer **Battles** list and
-the game picker only show matching games. Matched case-insensitively against the
-game name.
+Narrows game lists to a single game. When set, the multiplayer **Battles** list and the game picker only show matching games. Matched case-insensitively against the game name.
 
 ```json
 { "version": 1, "gameFilter": { "regex": "^Splinter *Faction" } }
@@ -344,8 +292,7 @@ Provide either or both; an entry matches if the regex matches or any name matche
 
 ### `welcome` (object)
 
-Replaces the default home launcher with a branded landing page. Declarative HTML +
-CSS only (no JavaScript).
+Replaces the default home launcher with a branded landing page. Declarative HTML + CSS only (no JavaScript).
 
 ```json
 {
@@ -357,43 +304,40 @@ CSS only (no JavaScript).
 }
 ```
 
-- `html` — injected into the welcome page body. Style it via `.coilbox-welcome …`.
-  Either an inline fragment (above) or a `@.coilbox/<path>.html`
-  [file reference](#file-references) to keep the markup in its own file.
+Instead of inlining the markup, point `html`/`css` at a **file** in your `.coilbox/` folder with a [`@.coilbox/<path>` reference](#file-references) — much easier to edit and version than a one-line JSON string, and the only place raw HTML is allowed (it's your own trusted, script-free file):
+
+```json
+{
+  "version": 1,
+  "welcome": { "html": "@.coilbox/welcome.html", "css": "@.coilbox/welcome.css" }
+}
+```
+
+```
+<YourGameFolder>/
+  .coilbox/
+    profile.json
+    welcome.html     # your landing-page markup
+    welcome.css      # its styles
+```
+
+- `html` — injected into the welcome page body. Style it via `.coilbox-welcome …`. Either an inline fragment (above) or a `@.coilbox/<path>.html` [file reference](#file-references) to keep the markup in its own file.
 - `css` — injected alongside the HTML. Inline, or a `@.coilbox/<path>.css` reference.
-- **Local media**: reference files bundled in your `.coilbox/` folder by relative path,
-  and Coilbox resolves them at load time — in both the HTML and the CSS. So
-  `<img src="images/logo.webp">`, `background: url(images/hero.gif)`, and even
-  `@font-face { src: url(fonts/brand.woff2) }` all pull from `.coilbox/images/…`,
-  `.coilbox/fonts/…`, etc. Images, animated GIFs, audio (`<audio src="…">`), video
-  (`<video>`) and web fonts are supported. Absolute URLs (`https:`, `data:`) and
-  app-absolute paths (`/…`) are left untouched, so remote `https` images still work
-  directly with no embedding.
-- **In-app links**: because Coilbox uses hash routing, an `<a href="#/play/skirmish">`
-  navigates inside the app without a reload. Useful routes include
-  `#/play/skirmish`, `#/content/maps`, `#/content/replays`, `#/battles`,
-  `#/settings` — the full list is in **[routes.md](routes.md)**.
-- **Quit action**: the welcome HTML can't run JavaScript, but any element carrying
-  `data-coilbox-action="quit"` closes Coilbox when clicked — the one interactive hook
-  available. Use it to add your own exit control to a branded landing page (handy for
-  fullscreen builds). This works regardless of the [`quit`](#quit-boolean) flag.
+- **Local media**: reference files bundled in your `.coilbox/` folder by relative path, and Coilbox resolves them at load time — in both the HTML and the CSS. So `<img src="images/logo.webp">`, `background: url(images/hero.gif)`, and even `@font-face { src: url(fonts/brand.woff2) }` all pull from `.coilbox/images/…`, `.coilbox/fonts/…`, etc. Images, animated GIFs, audio (`<audio src="…">`), video (`<video>`) and web fonts are supported. Absolute URLs (`https:`, `data:`) and app-absolute paths (`/…`) are left untouched, so remote `https` images still work directly with no embedding.
+- **In-app links**: because Coilbox uses hash routing, an `<a href="#/play/skirmish">` navigates inside the app without a reload. Useful routes include `#/play/skirmish`, `#/content/maps`, `#/content/replays`, `#/battles`, `#/settings` — the full list is in **[routes.md](routes.md)**.
+- **Quit action**: the welcome HTML can't run JavaScript, but any element carrying `data-coilbox-action="quit"` closes Coilbox when clicked — the one interactive hook available. Use it to add your own exit control to a branded landing page (handy for fullscreen builds). This works regardless of the [`quit`](#quit-boolean) flag.
 
   ```json
   { "html": "<button data-coilbox-action=\"quit\">Exit</button>" }
   ```
 
-The HTML is trusted (it ships inside your distribution): apart from rewriting relative
-asset URLs (above), it is injected as-is, so only put content you control in it.
+The HTML is trusted (it ships inside your distribution): apart from rewriting relative asset URLs (above), it is injected as-is, so only put content you control in it.
 
 ### `onboarding` (string)
 
-Where the first-run onboarding sits on the branded home. The onboarding is the
-"Set up Coilbox" card (offers to create a content folder / download an engine) plus
-the get-started card (curated game/map download suggestions); both self-hide once
-setup is complete and content is installed.
+Where the first-run onboarding sits on the branded home. The onboarding is the "Set up Coilbox" card (offers to create a content folder / download an engine) plus the get-started card (curated game/map download suggestions); both self-hide once setup is complete and content is installed.
 
-Your `welcome` is **always** shown and is never replaced by the onboarding — this
-field only positions the cards relative to it:
+Your `welcome` is **always** shown and is never replaced by the onboarding — this field only positions the cards relative to it:
 
 - `"below"` (default) — under the welcome.
 - `"above"` — over the welcome.
@@ -403,14 +347,11 @@ field only positions the cards relative to it:
 { "version": 1, "welcome": { "html": "…" }, "onboarding": "off" }
 ```
 
-Only meaningful alongside `welcome` (without it, a vanilla build shows the onboarding
-above the launcher tool grid). An omitted or unrecognized value is treated as
-`"below"`.
+Only meaningful alongside `welcome` (without it, a vanilla build shows the onboarding above the launcher tool grid). An omitted or unrecognized value is treated as `"below"`.
 
 ### `links` (object[])
 
-Adds external links to the sidebar **and** the home launcher — e.g. a Discord
-invite or a wiki. Each entry:
+Adds external links to the sidebar **and** the home launcher — e.g. a Discord invite or a wiki. Each entry:
 
 | Field   | Required | Meaning                                                        |
 | ------- | -------- | -------------------------------------------------------------- |
@@ -430,23 +371,13 @@ invite or a wiki. Each entry:
 }
 ```
 
-Malformed entries (missing `label` / `href`, or an href scheme the browser opener
-won't open) are skipped; the rest still load.
+Malformed entries (missing `label` / `href`, or an href scheme the browser opener won't open) are skipped; the rest still load.
 
-**Icon names:** `discord`, `forum` / `forums`, `chat` / `message`,
-`globe` / `website` / `web`, `docs` / `book` / `wiki`, `news` / `blog`,
-`rss` / `feed`, `heart` / `donate`, `support` / `help`, `users` / `community`,
-`mail` / `email` / `contact`, `link`, `game` / `play`, `calendar` / `events`,
-`star`, `info`, `hash` / `channel`, `bell` / `updates`, `trophy`. Anything else
-falls back to a generic external-link icon. (lucide ships no brand marks, so
-`discord` uses a generic chat glyph.)
+**Icon names:** `discord`, `forum` / `forums`, `chat` / `message`, `globe` / `website` / `web`, `docs` / `book` / `wiki`, `news` / `blog`, `rss` / `feed`, `heart` / `donate`, `support` / `help`, `users` / `community`, `mail` / `email` / `contact`, `link`, `game` / `play`, `calendar` / `events`, `star`, `info`, `hash` / `channel`, `bell` / `updates`, `trophy`. Anything else falls back to a generic external-link icon. (lucide ships no brand marks, so `discord` uses a generic chat glyph.)
 
 ### `lobby` (object)
 
-Controls the multiplayer **lobby-server** presets a distribution ships: a preferred
-"official" server, which stock presets appear, and the chat channels a player joins on
-login. It narrows and brands the Settings > Lobby servers list without ever locking the
-player out — they can still add their own servers and remove their own logins.
+Controls the multiplayer **lobby-server** presets a distribution ships: a preferred "official" server, which stock presets appear, and the chat channels a player joins on login. It narrows and brands the Settings > Lobby servers list without ever locking the player out — they can still add their own servers and remove their own logins.
 
 | Field      | Required | Meaning                                                          |
 | ---------- | -------- | ---------------------------------------------------------------- |
@@ -482,8 +413,7 @@ A single-server distribution — one official server, no stock presets:
 }
 ```
 
-Or just promote and brand an existing built-in as official while keeping one other
-preset available:
+Or just promote and brand an existing built-in as official while keeping one other preset available:
 
 ```json
 {
@@ -492,16 +422,11 @@ preset available:
 }
 ```
 
-Built-in ids: `recoil-official`, `spring-official`, `techa`, `bar`, `bar-ssl`. An
-unknown `official` id (or an inline object with no `host`) is ignored — the rest of the
-block still applies.
+Built-in ids: `recoil-official`, `spring-official`, `techa`, `bar`, `bar-ssl`. An unknown `official` id (or an inline object with no `host`) is ignored — the rest of the block still applies.
 
 ### `splash` (object)
 
-Shows a brand splash over the whole window at startup: a centered image that fades in
-on a solid background, holds, then fades out. Plays on every launch; the user can turn
-it off (Settings > General > Display > "Startup splash") and can dismiss it early by
-clicking it or pressing Escape.
+Shows a brand splash over the whole window at startup: a centered image that fades in on a solid background, holds, then fades out. Plays on every launch; the user can turn it off (Settings > General > Display > "Startup splash") and can dismiss it early by clicking it or pressing Escape.
 
 ```json
 {
@@ -514,39 +439,25 @@ clicking it or pressing Escape.
 }
 ```
 
-- `image` — the centered image. Either a path **relative to the `.coilbox/` folder**
-  (read locally, so it works offline — put e.g. `logo.webp` next to `profile.json`),
-  or an inline `data:` / `https:` URL used as-is. Paths can't escape `.coilbox/`
-  (no `..` or absolute paths).
-- `background` (optional) — solid backdrop CSS colour. Defaults to the profile's
-  top-level [`background`](#background-string) if set, else the theme background.
-- `duration` (optional) — total time in ms (fade in + hold + fade out). Defaults to
-  `3000`.
+- `image` — the centered image. Either a path **relative to the `.coilbox/` folder** (read locally, so it works offline — put e.g. `logo.webp` next to `profile.json`), or an inline `data:` / `https:` URL used as-is. Paths can't escape `.coilbox/` (no `..` or absolute paths).
+- `background` (optional) — solid backdrop CSS colour. Defaults to the profile's top-level [`background`](#background-string) if set, else the theme background.
+- `duration` (optional) — total time in ms (fade in + hold + fade out). Defaults to `3000`.
 
-Honours `prefers-reduced-motion` (skips the fades). If the image can't be loaded the
-splash is silently skipped — it never blocks startup.
+Honours `prefers-reduced-motion` (skips the fades). If the image can't be loaded the splash is silently skipped — it never blocks startup.
 
 ### `background` (string)
 
-A solid CSS colour painted behind everything from the first frame until the app has
-rendered. A dark distribution otherwise briefly flashes the default white page while
-it loads; setting this paints your colour instead. It's also the splash's default
-backdrop, so one colour covers the boot screen and the splash seamlessly.
+A solid CSS colour painted behind everything from the first frame until the app has rendered. A dark distribution otherwise briefly flashes the default white page while it loads; setting this paints your colour instead. It's also the splash's default backdrop, so one colour covers the boot screen and the splash seamlessly.
 
 ```json
 { "version": 1, "mode": "dark", "background": "hsl(240 6% 7%)" }
 ```
 
-The colour is cached so it applies before the first paint on subsequent launches (the
-very first launch of a fresh install still shows one brief flash). A vanilla install
-(no profile) is unaffected.
+The colour is cached so it applies before the first paint on subsequent launches (the very first launch of a fresh install still shows one brief flash). A vanilla install (no profile) is unaffected.
 
 ### `theme` (object)
 
-Fine-grained override of Coilbox's colour tokens app-wide, for anything the named
-`accent` doesn't cover. Each key is a CSS custom property; each value is an HSL triple
-(`H S% L%`, no `hsl()` wrapper). These re-point picoframe's design tokens, so the
-whole shell recolours. For a simple brand accent, prefer `accent` above.
+Fine-grained override of Coilbox's colour tokens app-wide, for anything the named `accent` doesn't cover. Each key is a CSS custom property; each value is an HSL triple (`H S% L%`, no `hsl()` wrapper). These re-point picoframe's design tokens, so the whole shell recolours. For a simple brand accent, prefer `accent` above.
 
 ```json
 {
@@ -560,10 +471,7 @@ whole shell recolours. For a simple brand accent, prefer `accent` above.
 }
 ```
 
-Common tokens: `--primary`, `--primary-foreground`, `--ring`, `--accent`,
-`--sidebar-primary`, `--background`, `--foreground`, `--border`. See
-`node_modules/@picoframe/frame/src/theme.css` for the full list and the light/dark
-defaults.
+Common tokens: `--primary`, `--primary-foreground`, `--ring`, `--accent`, `--sidebar-primary`, `--background`, `--foreground`, `--border`. See `node_modules/@picoframe/frame/src/theme.css` for the full list and the light/dark defaults.
 
 > Coilbox also ships built-in named [`accent`](#accent-string)s (neutral, blue,
 > green, rose, orange, … — the full axis) selectable under Settings > Appearance.
@@ -571,11 +479,7 @@ defaults.
 
 ### `release` (object)
 
-Points Coilbox at a GitHub repository whose **releases** ship the game's archive
-(`.sdz` / `.sd7`) — for games distributed outside the rapid ecosystem (e.g. straight
-from GitHub). On launch Coilbox checks the repo's latest release; if none of that
-release's archives are already installed, a **Game updates** settings section and a
-topbar badge offer a one-click download that installs the archive and rescans content.
+Points Coilbox at a GitHub repository whose **releases** ship the game's archive (`.sdz` / `.sd7`) — for games distributed outside the rapid ecosystem (e.g. straight from GitHub). On launch Coilbox checks the repo's latest release; if none of that release's archives are already installed, a **Game updates** settings section and a topbar badge offer a one-click download that installs the archive and rescans content.
 
 ```json
 { "version": 1, "release": { "repo": "your-org/your-game" } }
@@ -583,17 +487,11 @@ topbar badge offer a one-click download that installs the archive and rescans co
 
 - `repo` — the GitHub repository as `"owner/name"`.
 
-"Latest" is whatever GitHub marks as the latest release. If that release also carries
-an asset named exactly `profile.json`, Coilbox installs it into `.coilbox/` alongside
-the game archive; because the profile is read once at startup, the app then prompts for
-a restart to apply the updated profile.
+"Latest" is whatever GitHub marks as the latest release. If that release also carries an asset named exactly `profile.json`, Coilbox installs it into `.coilbox/` alongside the game archive; because the profile is read once at startup, the app then prompts for a restart to apply the updated profile.
 
 ### `mapLists` (object[])
 
-Curated **map packs** offered for bulk download on the Maps download page — a
-tournament set, a galactic-conquest galaxy, "space maps", etc. Each pack has an
-`id`, a `title`, an optional `blurb`, and a `maps[]` array; **Download all** queues
-every not-yet-present map in the pack through the normal download queue.
+Curated **map packs** offered for bulk download on the Maps download page — a tournament set, a galactic-conquest galaxy, "space maps", etc. Each pack has an `id`, a `title`, an optional `blurb`, and a `maps[]` array; **Download all** queues every not-yet-present map in the pack through the normal download queue.
 
 ```json
 {
@@ -616,34 +514,21 @@ every not-yet-present map in the pack through the normal download queue.
 }
 ```
 
-Each map's `download` is `{ "kind": "map", "springName", "searchUrl"? }` (fetched
-by springname via pr-downloader) or `{ "kind": "url", "url", "filename", "subdir"? }`
-(a direct mirror file); `filename` enables "already downloaded" detection. This is
-the same shape and mechanism the branding catalog's `suggested.mapLists` uses — see
-[Branding catalog](../README.md#branding-catalog); catalog packs are listed first,
-then a profile's, deduped by `id`.
+Each map's `download` is `{ "kind": "map", "springName", "searchUrl"? }` (fetched by springname via pr-downloader) or `{ "kind": "url", "url", "filename", "subdir"? }` (a direct mirror file); `filename` enables "already downloaded" detection. This is the same shape and mechanism the branding catalog's `suggested.mapLists` uses — see [Branding catalog](../README.md#branding-catalog); catalog packs are listed first, then a profile's, deduped by `id`.
 
 ### `quit` (boolean)
 
-Adds a **Quit** button to the bottom of the sidebar that closes Coilbox. Off by
-default. It's an escape hatch for fullscreen or kiosk (`fullscreenLocked`) builds,
-where a player may otherwise have no obvious way out — so unlike the fullscreen
-toggle, this button is **not** removed by the kiosk lock.
+Adds a **Quit** button to the bottom of the sidebar that closes Coilbox. Off by default. It's an escape hatch for fullscreen or kiosk (`fullscreenLocked`) builds, where a player may otherwise have no obvious way out — so unlike the fullscreen toggle, this button is **not** removed by the kiosk lock.
 
 ```json
 { "version": 1, "fullscreen": true, "quit": true }
 ```
 
-For a fully branded exit instead of (or in addition to) the sidebar button, put a
-`data-coilbox-action="quit"` element in your [`welcome`](#welcome-object) HTML.
+For a fully branded exit instead of (or in addition to) the sidebar button, put a `data-coilbox-action="quit"` element in your [`welcome`](#welcome-object) HTML.
 
 ### `layout` (object)
 
-Controls the app-frame chrome — the sidebar mode, the breadcrumb, the top-bar
-history/fullscreen buttons, the menu-button branding, and top-bar logos. These
-are **locks** (authoritative every launch, like `title`/`hide`, with no user
-toggle) except `sidebarCollapsed`, which is a **seed**. Omit `layout` and the
-chrome behaves as normal.
+Controls the app-frame chrome — the sidebar mode, the breadcrumb, the top-bar history/fullscreen buttons, the menu-button branding, and top-bar logos. These are **locks** (authoritative every launch, like `title`/`hide`, with no user toggle) except `sidebarCollapsed`, which is a **seed**. Omit `layout` and the chrome behaves as normal.
 
 ```json
 {
@@ -674,9 +559,7 @@ chrome behaves as normal.
 | `menu`             | object  | Branding for the popover menu button (see below).                       |
 | `left` / `center` / `right` | object | A logo/text in the corresponding top-bar slot (see below).     |
 
-**`menu` (popover menu-button branding).** When the sidebar is in popover mode
-(`popover: true`) a menu button in the top bar opens it; this rebrands that
-button. It is **only visible in popover mode**.
+**`menu` (popover menu-button branding).** When the sidebar is in popover mode (`popover: true`) a menu button in the top bar opens it; this rebrands that button. It is **only visible in popover mode**.
 
 | Field          | Type    | Meaning                                                                         |
 | -------------- | ------- | ------------------------------------------------------------------------------- |
@@ -686,8 +569,7 @@ button. It is **only visible in popover mode**.
 | `iconOpen`     | string  | Icon name for the open state.                                                   |
 | `image`        | string  | A logo shown in place of the label text. Same source rules as [`splash.image`](#splash-object) (`.coilbox`-relative path, or inline `data:`/`https:`). Wins over `label` as the visible content; `label` stays the accessible name. |
 
-**`left` / `center` / `right` (top-bar logos).** Each places a logo or text in
-that top-bar slot. Same shape:
+**`left` / `center` / `right` (top-bar logos).** Each places a logo or text in that top-bar slot. Same shape:
 
 | Field   | Type   | Meaning                                                                          |
 | ------- | ------ | -------------------------------------------------------------------------------- |
@@ -697,10 +579,7 @@ that top-bar slot. Same shape:
 
 ### `conquest` (object)
 
-Supplies system/faction names — and whole lore factions — for
-**[Galactic Conquest](conquest.md)** galaxies generated in this distribution, so
-they read as your game rather than generic space. Every field is optional and
-overrides the branding catalog's per-game defaults.
+Supplies system/faction names — and whole lore factions — for **[Galactic Conquest](conquest.md)** galaxies generated in this distribution, so they read as your game rather than generic space. Every field is optional and overrides the branding catalog's per-game defaults.
 
 ```json
 {
@@ -714,11 +593,8 @@ overrides the branding catalog's per-game defaults.
 }
 ```
 
-- `starNames` / `starPrefixes` / `starSuffixes` — full system names (used first),
-  then syllables synthesized names are built from.
+- `starNames` / `starPrefixes` / `starSuffixes` — full system names (used first), then syllables synthesized names are built from.
 - `factionNames` — full faction names, used when no `factions` presets are given.
-- `factions` — lore factions assigned in order (the player first); each is
-  `{ name, color?, side?, aggression? }`.
+- `factions` — lore factions assigned in order (the player first); each is `{ name, color?, side?, aggression? }`.
 
-See the [Names and factions](conquest.md#names-and-factions) section for how the
-pools are drawn and the full merge order (profile over catalog over built-ins).
+See the [Names and factions](conquest.md#names-and-factions) section for how the pools are drawn and the full merge order (profile over catalog over built-ins).
