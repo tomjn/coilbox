@@ -33,19 +33,61 @@
         "id": "all-that-glitters",
         "title": "All That Glitters",
         "filename": "all_that_glitters_v2.2.3.sd7",
+        "blurb": "Large 12-16 player brawl over rich reclaim fields.",
+        "thumb": [
+          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/fR1RVNhtF6IpcVo9ULC0/photo/KD2oyVd0jwnNe3STx9i8-atg223.jpg"
+        ],
         "download": { "kind": "map", "springName": "All That Glitters v2.2.3" }
       },
       {
         "id": "supreme-isthmus",
         "title": "Supreme Isthmus v2.1",
         "filename": "supreme_isthmus_v2.1.sd7",
+        "blurb": "10-16 player clashes across a contested isthmus.",
+        "thumb": [
+          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/ACgCe99NC8yZFecMwRCm/photo/UqqPuTiEnwSHueRztAHk-supreme2.1mini.png"
+        ],
         "download": { "kind": "map", "springName": "Supreme Isthmus v2.1" }
       },
       {
         "id": "crystallized-plains",
         "title": "Crystallized Plains",
         "filename": "crystallized_plains_1.1.sd7",
+        "blurb": "Compact 2-4 player duel on crystal flats.",
+        "thumb": [
+          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/g7NeIaS3XxFSn2KcrCiL/photo/n2pJT5svY3Z0PnYbv6Cg-crystalmini.png"
+        ],
         "download": { "kind": "map", "springName": "Crystallized Plains 1.1" }
+      },
+      {
+        "id": "altair-crossing",
+        "title": "Altair Crossing",
+        "filename": "altair_crossing_v4.1.sd7",
+        "blurb": "Small 2-6 player map built for fast T1 fights.",
+        "thumb": [
+          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/An6zReiqIWD15Yx7bZ3b/photo/heuM6R3jGDJawc5i0pwn-Altair_Crossing_V4.jpg"
+        ],
+        "download": { "kind": "map", "springName": "Altair_Crossing_V4.1" }
+      },
+      {
+        "id": "fallendell",
+        "title": "Fallendell",
+        "filename": "fallendell_v4.sd7",
+        "blurb": "2-4 player map with varied terrain and routes.",
+        "thumb": [
+          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/etCTTwexgYVGMV63rOWy/photo/ImLSdU3DQgDs5RFubq77-Fallendell_V4.jpg"
+        ],
+        "download": { "kind": "map", "springName": "Fallendell_V4" }
+      },
+      {
+        "id": "heartbreak-hill",
+        "title": "Heartbreak Hill",
+        "filename": "heartbreak_hill_v4.0.1.sd7",
+        "blurb": "2-6 player fight over ridgelines to the central hill.",
+        "thumb": [
+          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/44vuVzD9DD5wyzZz0L7i/photo/aM9vt5DiowJMZqxOJJBf-Heartbreak%20Hill.jpg"
+        ],
+        "download": { "kind": "map", "springName": "Heartbreak Hill v4.0.1" }
       }
     ],
     "mapLists": [
@@ -58,6 +100,10 @@
             "id": "all-that-glitters",
             "title": "All That Glitters",
             "filename": "all_that_glitters_v2.2.3.sd7",
+            "blurb": "Large 12-16 player brawl over rich reclaim fields.",
+            "thumb": [
+              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/fR1RVNhtF6IpcVo9ULC0/photo/KD2oyVd0jwnNe3STx9i8-atg223.jpg"
+            ],
             "download": {
               "kind": "map",
               "springName": "All That Glitters v2.2.3"
@@ -67,13 +113,51 @@
             "id": "supreme-isthmus",
             "title": "Supreme Isthmus v2.1",
             "filename": "supreme_isthmus_v2.1.sd7",
+            "blurb": "10-16 player clashes across a contested isthmus.",
+            "thumb": [
+              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/ACgCe99NC8yZFecMwRCm/photo/UqqPuTiEnwSHueRztAHk-supreme2.1mini.png"
+            ],
             "download": { "kind": "map", "springName": "Supreme Isthmus v2.1" }
           },
           {
             "id": "crystallized-plains",
             "title": "Crystallized Plains",
             "filename": "crystallized_plains_1.1.sd7",
+            "blurb": "Compact 2-4 player duel on crystal flats.",
+            "thumb": [
+              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/g7NeIaS3XxFSn2KcrCiL/photo/n2pJT5svY3Z0PnYbv6Cg-crystalmini.png"
+            ],
             "download": { "kind": "map", "springName": "Crystallized Plains 1.1" }
+          },
+          {
+            "id": "altair-crossing",
+            "title": "Altair Crossing",
+            "filename": "altair_crossing_v4.1.sd7",
+            "blurb": "Small 2-6 player map built for fast T1 fights.",
+            "thumb": [
+              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/An6zReiqIWD15Yx7bZ3b/photo/heuM6R3jGDJawc5i0pwn-Altair_Crossing_V4.jpg"
+            ],
+            "download": { "kind": "map", "springName": "Altair_Crossing_V4.1" }
+          },
+          {
+            "id": "fallendell",
+            "title": "Fallendell",
+            "filename": "fallendell_v4.sd7",
+            "blurb": "2-4 player map with varied terrain and routes.",
+            "thumb": [
+              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/etCTTwexgYVGMV63rOWy/photo/ImLSdU3DQgDs5RFubq77-Fallendell_V4.jpg"
+            ],
+            "download": { "kind": "map", "springName": "Fallendell_V4" }
+          },
+          {
+            "id": "heartbreak-hill",
+            "title": "Heartbreak Hill",
+            "filename": "heartbreak_hill_v4.0.1.sd7",
+            "blurb": "2-6 player fight over ridgelines to the central hill.",
+            "thumb": [
+              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/44vuVzD9DD5wyzZz0L7i/photo/aM9vt5DiowJMZqxOJJBf-Heartbreak%20Hill.jpg"
+            ],
+            "download": { "kind": "map", "springName": "Heartbreak Hill v4.0.1" }
           }
         ]
       },
