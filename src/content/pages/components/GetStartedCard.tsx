@@ -6,7 +6,9 @@ import {
   useContentRootPaths,
   useWriteRootPath,
 } from "../../../downloads/config";
+import { MapPacksBanner } from "../../../downloads/pages/components/MapPacksBanner";
 import { usePreferredTarget } from "../../../play/config";
+import { getGameMatcher } from "../../../profile/profile";
 import {
   filterUninstalledGames,
   filterUninstalledMaps,
@@ -15,6 +17,7 @@ import {
   useSuggestedMaps,
 } from "../../branding";
 import { useSetupStatus, useUnitsyncScan } from "../../config";
+import { filterSuggestedGamesByFilter } from "../../suggestedGames";
 import { SuggestionsList } from "./SuggestionsList";
 
 /**
@@ -69,10 +72,17 @@ export function GetStartedCard() {
   const scannedGames = scan.data?.games ?? [];
   const scanSettled = scan.data != null || scan.error != null;
   const hasGames = installed.games.size > 0 || scannedGames.length > 0;
+  // A distribution's gameFilter narrows the suggestions first, so a single-game
+  // distribution (e.g. SplinterFaction) never advertises other games' downloads.
+  const scopedGames = filterSuggestedGamesByFilter(
+    suggestedGames,
+    entries,
+    getGameMatcher(),
+  );
   const games =
     scanSettled && !hasGames
       ? filterUninstalledGames(
-          suggestedGames,
+          scopedGames,
           entries,
           installed.games,
           scannedGames,
@@ -112,13 +122,16 @@ export function GetStartedCard() {
         />
       )}
       {maps.length > 0 && (
-        <SuggestionsList
-          kind="map"
-          heading="Maps"
-          items={maps}
-          writePath={writePath}
-          onComplete={refreshInstalled}
-        />
+        <>
+          <SuggestionsList
+            kind="map"
+            heading="Maps"
+            items={maps}
+            writePath={writePath}
+            onComplete={refreshInstalled}
+          />
+          <MapPacksBanner installed={installed.maps} writePath={writePath} />
+        </>
       )}
     </Card>
   );
