@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-runlite-meta-load"
+description = "Enables the runlite_meta_load command without any pre-configured scope."
+commands.allow = ["runlite_meta_load"]
+
+[[permission]]
+identifier = "deny-runlite-meta-load"
+description = "Denies the runlite_meta_load command without any pre-configured scope."
+commands.deny = ["runlite_meta_load"]

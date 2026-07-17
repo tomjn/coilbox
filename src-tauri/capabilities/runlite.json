@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "runlite",
+  "description": "Grants the roguelite-run plugin's active-run and meta-progression storage commands to the main window.",
+  "windows": ["main"],
+  "permissions": ["coilbox-runlite:default"]
+}

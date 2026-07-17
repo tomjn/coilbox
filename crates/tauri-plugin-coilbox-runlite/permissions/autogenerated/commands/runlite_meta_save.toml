@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-runlite-meta-save"
+description = "Enables the runlite_meta_save command without any pre-configured scope."
+commands.allow = ["runlite_meta_save"]
+
+[[permission]]
+identifier = "deny-runlite-meta-save"
+description = "Denies the runlite_meta_save command without any pre-configured scope."
+commands.deny = ["runlite_meta_save"]
