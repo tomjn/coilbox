@@ -87,8 +87,7 @@ export { Toaster };
 
 - [ ] **Step 3: Verify the package is present and typechecks**
 
-Run: `bun run typecheck`
-Expected: PASS (no errors from `src/components/ui/sonner.tsx`).
+Run: `bun run typecheck` Expected: PASS (no errors from `src/components/ui/sonner.tsx`).
 
 - [ ] **Step 4: Commit**
 
@@ -135,8 +134,7 @@ In `src-tauri/capabilities/default.json`, add `"notification:default"` to the `p
 
 - [ ] **Step 4: Verify the Rust crate compiles**
 
-Run: `cargo check --manifest-path src-tauri/Cargo.toml`
-Expected: PASS (downloads and compiles `tauri-plugin-notification`).
+Run: `cargo check --manifest-path src-tauri/Cargo.toml` Expected: PASS (downloads and compiles `tauri-plugin-notification`).
 
 - [ ] **Step 5: Commit**
 
@@ -181,8 +179,7 @@ describe("route", () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `bunx vitest run src/notify/route.test.ts`
-Expected: FAIL with "Cannot find module './route'".
+Run: `bunx vitest run src/notify/route.test.ts` Expected: FAIL with "Cannot find module './route'".
 
 - [ ] **Step 3: Implement `src/notify/route.ts`**
 
@@ -210,8 +207,7 @@ export function route(
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `bunx vitest run src/notify/route.test.ts`
-Expected: PASS (4 tests).
+Run: `bunx vitest run src/notify/route.test.ts` Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -324,8 +320,7 @@ export { toast };
 
 - [ ] **Step 3: Verify it typechecks**
 
-Run: `bun run typecheck`
-Expected: PASS. (No test here — the IO helper is exercised manually in Task 9; its logic core `route` is already tested.)
+Run: `bun run typecheck` Expected: PASS. (No test here — the IO helper is exercised manually in Task 9; its logic core `route` is already tested.)
 
 - [ ] **Step 4: Commit**
 
@@ -516,8 +511,7 @@ Add it to the `plugins` array after `gameUpdatesPlugin` (line 37):
 
 - [ ] **Step 5: Verify typecheck and lint**
 
-Run: `bun run typecheck && bunx biome check src/notify src/app.plugins.ts`
-Expected: PASS.
+Run: `bun run typecheck && bunx biome check src/notify src/app.plugins.ts` Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
@@ -580,8 +574,7 @@ describe("withDownloadNotify", () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `bunx vitest run src/downloads/downloadNotify.test.ts`
-Expected: FAIL with "Cannot find module './downloadNotify'".
+Run: `bunx vitest run src/downloads/downloadNotify.test.ts` Expected: FAIL with "Cannot find module './downloadNotify'".
 
 - [ ] **Step 3: Implement `src/downloads/downloadNotify.ts`**
 
@@ -631,8 +624,7 @@ export function withDownloadNotify<A, D>(
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `bunx vitest run src/downloads/downloadNotify.test.ts`
-Expected: PASS (3 tests).
+Run: `bunx vitest run src/downloads/downloadNotify.test.ts` Expected: PASS (3 tests).
 
 - [ ] **Step 5: Wrap the download-start exports in `src/downloads/bindings.ts`**
 
@@ -669,8 +661,7 @@ Do not change the `defineCommand` type arguments or ACL ids — only wrap the re
 
 - [ ] **Step 6: Verify typecheck, lint, and the full test run**
 
-Run: `bun run typecheck && bunx vitest run && bunx biome check src/downloads`
-Expected: PASS. Confirm no caller of the wrapped bindings broke (the wrapper preserves the `(args) => Promise<Data>` shape).
+Run: `bun run typecheck && bunx vitest run && bunx biome check src/downloads` Expected: PASS. Confirm no caller of the wrapped bindings broke (the wrapper preserves the `(args) => Promise<Data>` shape).
 
 - [ ] **Step 7: Commit**
 
@@ -709,8 +700,7 @@ In `runCheck`, after `setUpdate(found);` (line 58), add a guarded notify so it o
 
 - [ ] **Step 3: Verify typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS. (`found` is `Update | null`; `found.version` is valid inside the guard.)
+Run: `bun run typecheck` Expected: PASS. (`found` is `Update | null`; `found.version` is valid inside the guard.)
 
 - [ ] **Step 4: Commit**
 
@@ -756,8 +746,7 @@ After the `updateAvailable` `useMemo` block (ends line 121), add:
 
 - [ ] **Step 3: Verify typecheck and lint**
 
-Run: `bun run typecheck && bunx biome check src/game-updates`
-Expected: PASS.
+Run: `bun run typecheck && bunx biome check src/game-updates` Expected: PASS.
 
 - [ ] **Step 4: Commit**
 

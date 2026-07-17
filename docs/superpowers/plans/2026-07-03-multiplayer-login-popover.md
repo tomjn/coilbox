@@ -77,13 +77,11 @@ export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger };
 
 - [ ] **Step 2: Verify it typechecks**
 
-Run: `bun run typecheck`
-Expected: PASS (no errors). This confirms `radix-ui` exports `Popover` and that `@/lib/utils` `cn` resolves.
+Run: `bun run typecheck` Expected: PASS (no errors). This confirms `radix-ui` exports `Popover` and that `@/lib/utils` `cn` resolves.
 
 - [ ] **Step 3: Verify lint**
 
-Run: `bunx biome ci .`
-Expected: PASS.
+Run: `bunx biome ci .` Expected: PASS.
 
 - [ ] **Step 4: Commit**
 
@@ -145,13 +143,11 @@ In the `<MultiplayerContext.Provider value={{ ... }}>` object (lines 278-288), a
 
 - [ ] **Step 5: Verify typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS. (`useState`/`useCallback` are already imported at the top of the file.)
+Run: `bun run typecheck` Expected: PASS. (`useState`/`useCallback` are already imported at the top of the file.)
 
 - [ ] **Step 6: Verify lint**
 
-Run: `bunx biome ci .`
-Expected: PASS.
+Run: `bunx biome ci .` Expected: PASS.
 
 - [ ] **Step 7: Commit**
 
@@ -382,13 +378,11 @@ function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
 
 - [ ] **Step 2: Verify typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS. Confirms the context now exposes `loginPopoverOpen`/`openLoginPopover`/`closeLoginPopover` (Task 2) and that `PopoverTrigger asChild` accepts a single `<button>` child.
+Run: `bun run typecheck` Expected: PASS. Confirms the context now exposes `loginPopoverOpen`/`openLoginPopover`/`closeLoginPopover` (Task 2) and that `PopoverTrigger asChild` accepts a single `<button>` child.
 
 - [ ] **Step 3: Verify lint**
 
-Run: `bunx biome ci .`
-Expected: PASS.
+Run: `bunx biome ci .` Expected: PASS.
 
 - [ ] **Step 4: Commit**
 
@@ -424,13 +418,11 @@ In the `multiplayerPlugin` object, add a `slots` property (place it right before
 
 - [ ] **Step 3: Verify typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS (`slots` is a valid `FramePlugin` field per `@picoframe/plugin-sdk` types).
+Run: `bun run typecheck` Expected: PASS (`slots` is a valid `FramePlugin` field per `@picoframe/plugin-sdk` types).
 
 - [ ] **Step 4: Verify lint**
 
-Run: `bunx biome ci .`
-Expected: PASS.
+Run: `bunx biome ci .` Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -495,13 +487,11 @@ Leave the `{error && ...}` and `{mirror.error && ...}` lines (originally 160-163
 
 - [ ] **Step 4: Verify typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS with no "declared but never used" errors. If any appear, an import/variable from the removed section was missed — remove it.
+Run: `bun run typecheck` Expected: PASS with no "declared but never used" errors. If any appear, an import/variable from the removed section was missed — remove it.
 
 - [ ] **Step 5: Verify lint**
 
-Run: `bunx biome ci .`
-Expected: PASS (biome also flags unused imports).
+Run: `bunx biome ci .` Expected: PASS (biome also flags unused imports).
 
 - [ ] **Step 6: Commit**
 
@@ -522,8 +512,7 @@ Every "not connected → go connect" prompt should open the topbar popover inste
 
 - [ ] **Step 1: Audit for other CTAs**
 
-Run: `grep -rn 'to="/lobby"' src/ ; grep -rn "Go to the Lobby\|not connected\|Not connected" src/`
-Expected: matches in `ChatPage.tsx` (the CTA) and `LobbyPage.tsx` (the hint added in Task 5, which already uses `openLoginPopover` — leave it). If any OTHER component renders a "go to lobby to connect" CTA, apply the same rewire pattern shown below to it.
+Run: `grep -rn 'to="/lobby"' src/ ; grep -rn "Go to the Lobby\|not connected\|Not connected" src/` Expected: matches in `ChatPage.tsx` (the CTA) and `LobbyPage.tsx` (the hint added in Task 5, which already uses `openLoginPopover` — leave it). If any OTHER component renders a "go to lobby to connect" CTA, apply the same rewire pattern shown below to it.
 
 - [ ] **Step 2: Rewire the ChatPage CTA**
 
@@ -552,13 +541,11 @@ import { Link } from "react-router";
 
 - [ ] **Step 4: Verify typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS with no unused-import error for `Link`.
+Run: `bun run typecheck` Expected: PASS with no unused-import error for `Link`.
 
 - [ ] **Step 5: Verify lint**
 
-Run: `bunx biome ci .`
-Expected: PASS.
+Run: `bunx biome ci .` Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
@@ -575,11 +562,9 @@ git commit -m "feat(multiplayer): ChatPage connect CTA opens login popover"
 
 - [ ] **Step 1: Full lint + typecheck (CI parity)**
 
-Run: `bunx biome ci .`
-Expected: PASS.
+Run: `bunx biome ci .` Expected: PASS.
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
 - [ ] **Step 2: Manual smoke via the app**
 

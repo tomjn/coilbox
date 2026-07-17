@@ -1,7 +1,6 @@
 # Conquest galaxy spacing + regeneration (PR A)
 
-Date: 2026-07-09
-Status: approved
+Date: 2026-07-09 Status: approved
 
 ## Problem
 

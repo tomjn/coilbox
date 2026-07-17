@@ -650,8 +650,7 @@ Expected: all pass.
 
 Run `bun tauri dev`. Using the Tauri MCP:
 - Navigate to `/settings/updates`; confirm the section renders, shows the current version, and shows "Updates are disabled in development builds."
-- Confirm the topbar pill is absent (no update in dev).
-Expected: no console errors from the updater plugin.
+- Confirm the topbar pill is absent (no update in dev). Expected: no console errors from the updater plugin.
 
 - [ ] **Step 3: Release round-trip (the real test)**
 

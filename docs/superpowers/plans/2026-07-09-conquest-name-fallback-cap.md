@@ -74,8 +74,7 @@ describe("toRoman", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `bun run test src/conquest/names.test.ts`
-Expected: FAIL — `toRoman` not exported; the numeral test gets synthesized names, not `Vega II`.
+Run: `bun run test src/conquest/names.test.ts` Expected: FAIL — `toRoman` not exported; the numeral test gets synthesized names, not `Vega II`.
 
 - [ ] **Step 3: Implement**
 
@@ -152,8 +151,7 @@ Update the `makeStarNamer` doc comment's "then synthesizing" clause to mention t
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `bun run test src/conquest/names.test.ts`
-Expected: PASS (the pre-existing "draining the explicit pool first" test still holds — it only asserts 6 unique names containing Vega/Altair).
+Run: `bun run test src/conquest/names.test.ts` Expected: PASS (the pre-existing "draining the explicit pool first" test still holds — it only asserts 6 unique names containing Vega/Altair).
 
 - [ ] **Step 5: Commit**
 
@@ -203,8 +201,7 @@ Add to the `resolveConquestNames` describe block:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `bun run test src/conquest/names.test.ts`
-Expected: FAIL — `limitToNamed` is not a known property.
+Run: `bun run test src/conquest/names.test.ts` Expected: FAIL — `limitToNamed` is not a known property.
 
 - [ ] **Step 3: Implement**
 
@@ -237,8 +234,7 @@ In `resolveConquestNames` return (after `factions`, line 278):
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `bun run test src/conquest/names.test.ts`
-Expected: PASS.
+Run: `bun run test src/conquest/names.test.ts` Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -303,8 +299,7 @@ Add to the `generateGalaxy` describe block in `src/conquest/generate.test.ts`:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `bun run test src/conquest/generate.test.ts`
-Expected: FAIL — first three tests get 60/16/40 (uncapped) or a type error until the cap exists.
+Run: `bun run test src/conquest/generate.test.ts` Expected: FAIL — first three tests get 60/16/40 (uncapped) or a type error until the cap exists.
 
 - [ ] **Step 3: Implement**
 
@@ -338,8 +333,7 @@ Reorder so `names` is resolved first, then derive the (possibly capped) count. R
 
 - [ ] **Step 4: Run the full conquest suite**
 
-Run: `bun run test src/conquest`
-Expected: PASS — the cap tests plus every pre-existing generator test (determinism, round-trip, connectivity).
+Run: `bun run test src/conquest` Expected: PASS — the cap tests plus every pre-existing generator test (determinism, round-trip, connectivity).
 
 - [ ] **Step 5: Commit**
 
@@ -388,8 +382,7 @@ Replace it with a version that notes a cap when the realized galaxy is smaller t
 
 - [ ] **Step 2: Typecheck + lint**
 
-Run: `bun run typecheck && bunx biome ci src/conquest/pages/ConquestListPage.tsx`
-Expected: clean (0 errors; pre-existing warnings elsewhere are not this file).
+Run: `bun run typecheck && bunx biome ci src/conquest/pages/ConquestListPage.tsx` Expected: clean (0 errors; pre-existing warnings elsewhere are not this file).
 
 - [ ] **Step 3: Commit**
 
@@ -404,14 +397,11 @@ git commit -m "feat(conquest): note the named-star cap in the wizard preview"
 
 - [ ] **Step 1: Full frontend suite**
 
-Run: `bun run test && bunx biome ci . && bun run typecheck`
-Expected: all pass. Fix anything that fails before continuing.
+Run: `bun run test && bunx biome ci . && bun run typecheck` Expected: all pass. Fix anything that fails before continuing.
 
 - [ ] **Step 2: Rust suite (CI runs it even for frontend-only changes)**
 
-Run: `cargo fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings`
-If clippy fails on a missing sidecar/resource: `bun run sidecar:unitsync`, then `mkdir -p src-tauri/mapconv src-tauri/prdownloader`, and re-run.
-Expected: clean (no Rust touched).
+Run: `cargo fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings` If clippy fails on a missing sidecar/resource: `bun run sidecar:unitsync`, then `mkdir -p src-tauri/mapconv src-tauri/prdownloader`, and re-run. Expected: clean (no Rust touched).
 
 - [ ] **Step 3: STOP — user live test**
 

@@ -68,9 +68,7 @@ Registered in `src/app.plugins.ts` alongside the other frame-level plugins (`gen
 
 ## Triggers
 
-1. **Download complete / failed** — wrap the download-start bindings in `src/downloads/bindings.ts`:
-   `dlDownload`, `dlDownloadMap`, `dlDownloadFile`, `dlDownloadEngineRecoil`, `dlDownloadEngineSpring`.
-   Each wrapped function fires `notify({ level: "success" | "error", ... })` when the underlying command settles, deriving a human-readable label from the call's `tag` / `springname` / URL / engine version. This covers all ~8 call sites (GamesPage, MapsPage, ExplorerPage, ReplayDetailPage, SuggestionsList, BattleOverlay, game-updates, engine install, branding) with no call-site edits. Automatic/background downloads also toast, but focus-aware routing keeps those to an in-app toast (window is focused), never an OS banner.
+1. **Download complete / failed** — wrap the download-start bindings in `src/downloads/bindings.ts`: `dlDownload`, `dlDownloadMap`, `dlDownloadFile`, `dlDownloadEngineRecoil`, `dlDownloadEngineSpring`. Each wrapped function fires `notify({ level: "success" | "error", ... })` when the underlying command settles, deriving a human-readable label from the call's `tag` / `springname` / URL / engine version. This covers all ~8 call sites (GamesPage, MapsPage, ExplorerPage, ReplayDetailPage, SuggestionsList, BattleOverlay, game-updates, engine install, branding) with no call-site edits. Automatic/background downloads also toast, but focus-aware routing keeps those to an in-app toast (window is focused), never an OS banner.
 
 2. **App update available** — in `src/updater/UpdaterProvider.tsx` `runCheck`, `notify(...)` when `found` is non-null (a new release was detected). Complements the existing topbar pill.
 

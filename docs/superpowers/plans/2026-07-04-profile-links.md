@@ -58,8 +58,7 @@ In the `Profile` interface, after the `welcome?` field (around line 56), add:
 
 - [ ] **Step 3: Typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS (no errors).
+Run: `bun run typecheck` Expected: PASS (no errors).
 
 - [ ] **Step 4: Commit**
 
@@ -180,8 +179,7 @@ describe("buildProfileNav", () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `bunx vitest run src/profile/links.test.ts`
-Expected: FAIL — cannot resolve `./links` (module does not exist yet).
+Run: `bunx vitest run src/profile/links.test.ts` Expected: FAIL — cannot resolve `./links` (module does not exist yet).
 
 - [ ] **Step 3: Implement `src/profile/links.ts`**
 
@@ -327,15 +325,11 @@ export function buildProfileNav(profile: Profile): NavGroup[] {
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `bunx vitest run src/profile/links.test.ts`
-Expected: PASS — all cases green.
+Run: `bunx vitest run src/profile/links.test.ts` Expected: PASS — all cases green.
 
 - [ ] **Step 5: Typecheck + lint the new file**
 
-Run: `bun run typecheck`
-Expected: PASS.
-Run: `bunx biome check src/profile/links.ts src/profile/links.test.ts`
-Expected: PASS (no errors). If biome reports formatting, run `bunx biome format --write src/profile/links.ts src/profile/links.test.ts` and re-run.
+Run: `bun run typecheck` Expected: PASS. Run: `bunx biome check src/profile/links.ts src/profile/links.test.ts` Expected: PASS (no errors). If biome reports formatting, run `bunx biome format --write src/profile/links.ts src/profile/links.test.ts` and re-run.
 
 - [ ] **Step 6: Commit**
 
@@ -389,8 +383,7 @@ Note: `getProfile()` returns the module singleton, which is the empty profile in
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `bunx vitest run src/profile/links.test.ts`
-Expected: FAIL — `applyProfileLinks` is not exported.
+Run: `bunx vitest run src/profile/links.test.ts` Expected: FAIL — `applyProfileLinks` is not exported.
 
 - [ ] **Step 3: Implement `applyProfileLinks` in `src/profile/links.ts`**
 
@@ -422,8 +415,7 @@ export function applyProfileLinks(plugins: FramePlugin[]): FramePlugin[] {
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `bunx vitest run src/profile/links.test.ts`
-Expected: PASS — all cases green.
+Run: `bunx vitest run src/profile/links.test.ts` Expected: PASS — all cases green.
 
 - [ ] **Step 5: Wire into `main.tsx`**
 
@@ -447,10 +439,7 @@ const appPlugins = applyProfileLinks(applyProfileSettingsHiding(plugins));
 
 - [ ] **Step 6: Typecheck + lint**
 
-Run: `bun run typecheck`
-Expected: PASS.
-Run: `bunx biome check src/profile/links.ts src/profile/links.test.ts src/main.tsx`
-Expected: PASS (format with `bunx biome format --write` if needed, then re-run).
+Run: `bun run typecheck` Expected: PASS. Run: `bunx biome check src/profile/links.ts src/profile/links.test.ts src/main.tsx` Expected: PASS (format with `bunx biome format --write` if needed, then re-run).
 
 - [ ] **Step 7: Commit**
 
@@ -497,15 +486,9 @@ invite or a wiki. Each entry:
 }
 ```
 
-Malformed entries (missing `label`/`href`, or an href scheme the browser opener
-won't open) are skipped; the rest still load.
+Malformed entries (missing `label`/`href`, or an href scheme the browser opener won't open) are skipped; the rest still load.
 
-**Icon names:** `discord`, `forum`/`forums`, `chat`/`message`, `globe`/`website`/`web`,
-`docs`/`book`/`wiki`, `news`/`blog`, `rss`/`feed`, `heart`/`donate`, `support`/`help`,
-`users`/`community`, `mail`/`email`/`contact`, `link`, `game`/`play`,
-`calendar`/`events`, `star`, `info`, `hash`/`channel`, `bell`/`updates`, `trophy`.
-Anything else falls back to a generic external-link icon. (lucide ships no brand
-marks, so `discord` uses a generic chat glyph.)
+**Icon names:** `discord`, `forum`/`forums`, `chat`/`message`, `globe`/`website`/`web`, `docs`/`book`/`wiki`, `news`/`blog`, `rss`/`feed`, `heart`/`donate`, `support`/`help`, `users`/`community`, `mail`/`email`/`contact`, `link`, `game`/`play`, `calendar`/`events`, `star`, `info`, `hash`/`channel`, `bell`/`updates`, `trophy`. Anything else falls back to a generic external-link icon. (lucide ships no brand marks, so `discord` uses a generic chat glyph.)
 ```
 
 - [ ] **Step 3: Commit**
@@ -523,15 +506,11 @@ git commit -m "docs: document profile links field"
 
 - [ ] **Step 1: Full frontend lint suite (the same commands CI runs)**
 
-Run: `bunx biome ci .`
-Expected: PASS.
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bunx biome ci .` Expected: PASS. Run: `bun run typecheck` Expected: PASS.
 
 - [ ] **Step 2: Full test run**
 
-Run: `bun run test`
-Expected: PASS (existing suites + new `links.test.ts`).
+Run: `bun run test` Expected: PASS (existing suites + new `links.test.ts`).
 
 - [ ] **Step 3: Live smoke via a sample profile**
 
@@ -547,8 +526,7 @@ Create a throwaway portable profile to exercise the real path. Determine the app
 }
 ```
 
-Run: `bun tauri dev`
-Then, via the Tauri MCP tools:
+Run: `bun tauri dev` Then, via the Tauri MCP tools:
 - `query_page` (map mode) → confirm a **Links** group with a "Discord" item and a **Community** group with a "Wiki" item appear at the bottom of the sidebar.
 - `click` the "Wiki" item → confirm it opens the URL in the system browser (the app itself does not navigate; opener launches the default browser).
 

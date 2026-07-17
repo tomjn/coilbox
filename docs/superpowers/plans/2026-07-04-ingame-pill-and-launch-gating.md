@@ -253,19 +253,15 @@ permissions = [
 
 - [ ] **Step 6: Build the crate (macOS path compiles locally)**
 
-Run: `cargo build -p tauri-plugin-coilbox-play`
-Expected: PASS. First build downloads `objc2-app-kit`. If `runningApplicationWithProcessIdentifier` / `activateWithOptions` / `NSApplicationActivationOptions::ActivateAllWindows` fail to resolve, the installed `objc2-app-kit` minor differs from 0.3.2 — check `cargo doc --open -p objc2-app-kit` for the current method/variant names and adjust (do not guess).
+Run: `cargo build -p tauri-plugin-coilbox-play` Expected: PASS. First build downloads `objc2-app-kit`. If `runningApplicationWithProcessIdentifier` / `activateWithOptions` / `NSApplicationActivationOptions::ActivateAllWindows` fail to resolve, the installed `objc2-app-kit` minor differs from 0.3.2 — check `cargo doc --open -p objc2-app-kit` for the current method/variant names and adjust (do not guess).
 
 - [ ] **Step 7: Format + clippy (Linux path compiles via clippy on any host? No — verify)**
 
-Run: `cargo fmt --all` then `cargo clippy -p tauri-plugin-coilbox-play --all-targets --all-features -- -D warnings`
-Expected: PASS on the host platform (macOS). Note the `x11rb` path is NOT compiled on macOS (cfg linux); it is compiled by CI on ubuntu. The `windows` path is compiled by neither — see Step 8.
+Run: `cargo fmt --all` then `cargo clippy -p tauri-plugin-coilbox-play --all-targets --all-features -- -D warnings` Expected: PASS on the host platform (macOS). Note the `x11rb` path is NOT compiled on macOS (cfg linux); it is compiled by CI on ubuntu. The `windows` path is compiled by neither — see Step 8.
 
 - [ ] **Step 8: (Optional, recommended) cross-check the Windows path**
 
-Run: `rustup target add x86_64-pc-windows-msvc` then
-`cargo clippy -p tauri-plugin-coilbox-play --target x86_64-pc-windows-msvc -- -D warnings`
-Expected: PASS (clippy type-checks without linking, so no MSVC toolchain is needed). If the target/toolchain can't be set up in this environment, skip this step and record in the commit/PR that the Windows focus path is verified by inspection only until the Windows release build compiles it.
+Run: `rustup target add x86_64-pc-windows-msvc` then `cargo clippy -p tauri-plugin-coilbox-play --target x86_64-pc-windows-msvc -- -D warnings` Expected: PASS (clippy type-checks without linking, so no MSVC toolchain is needed). If the target/toolchain can't be set up in this environment, skip this step and record in the commit/PR that the Windows focus path is verified by inspection only until the Windows release build compiles it.
 
 - [ ] **Step 9: Commit**
 
@@ -302,8 +298,7 @@ export const playFocus = defineCommand<
 
 - [ ] **Step 2: Typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
 - [ ] **Step 3: Commit**
 
@@ -319,10 +314,7 @@ git commit -m "feat(play): playFocus binding"
 **Files:**
 - Create: `src/play/PlayProvider.tsx`
 
-The provider owns the single run lifecycle. `runningRef` mirrors the backend's
-single-game guard on the frontend so a second concurrent `launch` throws
-immediately **without** clobbering the first run's `running`/`activeRunId` state
-(e.g. the joined-battle auto-launch effect firing while a skirmish already runs).
+The provider owns the single run lifecycle. `runningRef` mirrors the backend's single-game guard on the frontend so a second concurrent `launch` throws immediately **without** clobbering the first run's `running`/`activeRunId` state (e.g. the joined-battle auto-launch effect firing while a skirmish already runs).
 
 - [ ] **Step 1: Create `src/play/PlayProvider.tsx`**
 
@@ -456,8 +448,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
 
 - [ ] **Step 2: Typecheck**
 
-Run: `bun run typecheck`
-Expected: PASS.
+Run: `bun run typecheck` Expected: PASS.
 
 - [ ] **Step 3: Commit**
 
@@ -476,9 +467,7 @@ git commit -m "feat(play): PlayProvider shared game-run context"
 
 - [ ] **Step 1: Create `src/play/InGameBadge.tsx`**
 
-`animate-pulse` provides the pulse; `motion-reduce:animate-none` respects the
-reduced-motion setting. Orange uses Tailwind literal color utilities (the theme's
-CSS-var tokens have no orange). The visible "In game" text is the accessible name.
+`animate-pulse` provides the pulse; `motion-reduce:animate-none` respects the reduced-motion setting. Orange uses Tailwind literal color utilities (the theme's CSS-var tokens have no orange). The visible "In game" text is the accessible name.
 
 ```tsx
 import { usePlay } from "./PlayProvider";
@@ -513,9 +502,7 @@ import InGameBadge from "./InGameBadge";
 import { PlayProvider } from "./PlayProvider";
 ```
 
-Add `Provider` and `slots` to the `playPlugin` object (after `routes`). Order
-`-10` places the pill left of the updater's "Update available" pill (`order: 0`)
-in the shared `topbar.right` slot:
+Add `Provider` and `slots` to the `playPlugin` object (after `routes`). Order `-10` places the pill left of the updater's "Update available" pill (`order: 0`) in the shared `topbar.right` slot:
 
 ```ts
   routes: [
@@ -532,8 +519,7 @@ in the shared `topbar.right` slot:
 
 - [ ] **Step 3: Typecheck + biome**
 
-Run: `bun run typecheck` then `bunx biome ci src/play`
-Expected: PASS.
+Run: `bun run typecheck` then `bunx biome ci src/play` Expected: PASS.
 
 - [ ] **Step 4: Commit**
 
@@ -615,16 +601,11 @@ Replace the whole `onStart` function (lines 198-236) with:
   }
 ```
 
-(`running` is unchanged in `canStart` and the button label — it now reflects
-app-wide state, so the skirmish Start disables while a multiplayer battle or
-replay runs too. The freeze banner and frozen inputs likewise reflect any running
-game, which is correct: you cannot start a second game regardless.)
+(`running` is unchanged in `canStart` and the button label — it now reflects app-wide state, so the skirmish Start disables while a multiplayer battle or replay runs too. The freeze banner and frozen inputs likewise reflect any running game, which is correct: you cannot start a second game regardless.)
 
 - [ ] **Step 4: Typecheck + biome**
 
-Run: `bun run typecheck` then `bunx biome ci src/play`
-Expected: PASS. Typecheck confirms no dangling references to the removed
-`Channel`/`playLaunch`/`setRunning`.
+Run: `bun run typecheck` then `bunx biome ci src/play` Expected: PASS. Typecheck confirms no dangling references to the removed `Channel`/`playLaunch`/`setRunning`.
 
 - [ ] **Step 5: Commit**
 
@@ -640,8 +621,7 @@ git commit -m "refactor(play): skirmish launch via PlayProvider"
 **Files:**
 - Modify: `src/multiplayer/battle/useBattleLaunch.ts`
 
-The public shape `{ running, error, launch }` is preserved, so `BattleRoomPage`
-needs no change. `running` becomes app-wide; `error` stays local.
+The public shape `{ running, error, launch }` is preserved, so `BattleRoomPage` needs no change. `running` becomes app-wide; `error` stays local.
 
 - [ ] **Step 1: Rewrite `useBattleLaunch.ts`**
 
@@ -693,8 +673,7 @@ export function useBattleLaunch(
 
 - [ ] **Step 2: Typecheck + biome**
 
-Run: `bun run typecheck` then `bunx biome ci src/multiplayer`
-Expected: PASS.
+Run: `bun run typecheck` then `bunx biome ci src/multiplayer` Expected: PASS.
 
 - [ ] **Step 3: Commit**
 
@@ -710,9 +689,7 @@ git commit -m "refactor(multiplayer): battle launch via PlayProvider"
 **Files:**
 - Modify: `src/content/pages/components/WatchButton.tsx`
 
-`running` (app-wide) drives `disabled`; a local `pending` flag preserves the
-per-button "Watching…" feedback and a distinct title so other replay rows show
-"a game is running" rather than all claiming to be watching.
+`running` (app-wide) drives `disabled`; a local `pending` flag preserves the per-button "Watching…" feedback and a distinct title so other replay rows show "a game is running" rather than all claiming to be watching.
 
 - [ ] **Step 1: Rewrite `WatchButton.tsx`**
 
@@ -794,8 +771,7 @@ export function WatchButton({
 
 - [ ] **Step 2: Typecheck + biome**
 
-Run: `bun run typecheck` then `bunx biome ci src/content`
-Expected: PASS.
+Run: `bun run typecheck` then `bunx biome ci src/content` Expected: PASS.
 
 - [ ] **Step 3: Commit**
 
@@ -812,16 +788,11 @@ git commit -m "refactor(content): replay Watch launch via PlayProvider"
 
 - [ ] **Step 1: Frontend checks (same as CI)**
 
-Run: `bunx biome ci .` then `bun run typecheck`
-Expected: PASS both.
+Run: `bunx biome ci .` then `bun run typecheck` Expected: PASS both.
 
 - [ ] **Step 2: Rust checks (same as CI)**
 
-Run: `cargo fmt --all --check` then
-`cargo clippy --all-targets --all-features -- -D warnings`
-Expected: PASS. (This compiles the macOS focus path locally. The Linux path is
-compiled by CI on ubuntu; the Windows path only by Step 8 of Task 1 or the
-Windows release build.)
+Run: `cargo fmt --all --check` then `cargo clippy --all-targets --all-features -- -D warnings` Expected: PASS. (This compiles the macOS focus path locally. The Linux path is compiled by CI on ubuntu; the Windows path only by Step 8 of Task 1 or the Windows release build.)
 
 - [ ] **Step 3: Commit any formatting fixes**
 
@@ -840,42 +811,27 @@ git commit -m "chore: fmt"
 
 - [ ] **Step 1: Launch the app**
 
-Run: `bun tauri dev`
-Expected: app boots; the top bar shows no "In game" pill (no game running).
+Run: `bun tauri dev` Expected: app boots; the top bar shows no "In game" pill (no game running).
 
 - [ ] **Step 2: Start a skirmish and alt-tab back**
 
-Go to Play → Singleplayer, pick a game/map/opponent, click Start Game. When the
-engine window appears, alt-tab (or Cmd-Tab) back to Coilbox.
-Expected: an **orange, pulsing "In game" pill** is visible in the top bar, to the
-LEFT of the "Update available" pill's position. The skirmish form is frozen with
-the "Game running — settings are frozen…" banner.
+Go to Play → Singleplayer, pick a game/map/opponent, click Start Game. When the engine window appears, alt-tab (or Cmd-Tab) back to Coilbox. Expected: an **orange, pulsing "In game" pill** is visible in the top bar, to the LEFT of the "Update available" pill's position. The skirmish form is frozen with the "Game running — settings are frozen…" banner.
 
 - [ ] **Step 3: Confirm gating across launchers**
 
-While the skirmish runs, navigate to the Replays list.
-Expected: every Watch button is disabled with the title "A game is already
-running." (Hover to confirm the title.)
+While the skirmish runs, navigate to the Replays list. Expected: every Watch button is disabled with the title "A game is already running." (Hover to confirm the title.)
 
 - [ ] **Step 4: Click the pill → refocus**
 
-Click the "In game" pill.
-Expected: the game window comes to the foreground (Coilbox is no longer frontmost).
-On macOS this uses `NSRunningApplication.activate` and should reliably raise the
-engine. If it does not, report exactly what happened — do not claim success.
+Click the "In game" pill. Expected: the game window comes to the foreground (Coilbox is no longer frontmost). On macOS this uses `NSRunningApplication.activate` and should reliably raise the engine. If it does not, report exactly what happened — do not claim success.
 
 - [ ] **Step 5: Exit the game**
 
-Quit the engine (or use the game's exit).
-Expected: within ~150ms the pill disappears, the skirmish form unfreezes, and the
-Watch buttons re-enable.
+Quit the engine (or use the game's exit). Expected: within ~150ms the pill disappears, the skirmish form unfreezes, and the Watch buttons re-enable.
 
 - [ ] **Step 6: Record platform coverage honestly**
 
-In the PR description, state: refocus verified live on macOS; Windows/X11 code
-present and compiled where possible (X11 in CI; Windows via cross-target clippy or
-release build) but not behaviourally tested on this machine. Wayland is a
-documented no-op.
+In the PR description, state: refocus verified live on macOS; Windows/X11 code present and compiled where possible (X11 in CI; Windows via cross-target clippy or release build) but not behaviourally tested on this machine. Wayland is a documented no-op.
 
 ---
 
