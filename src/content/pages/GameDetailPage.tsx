@@ -1,11 +1,10 @@
-import { Button, useDrawer } from "@picoframe/frame";
+import { Button } from "@picoframe/frame";
 import { FolderOpen } from "lucide-react";
 import { useMemo } from "react";
 import { useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type Archive, contentOpenPath } from "../bindings";
 import { useBrandingEntry } from "../branding";
-import { buildEdgeMap, reachableCounts } from "../buildTree";
 import {
   classifyArchive,
   useScanTargetSelection,
@@ -19,7 +18,7 @@ import { usePlayGame } from "../usePlayGame";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { BrandingLinks } from "./components/BrandingLinks";
 import { BrandingScreenshots } from "./components/BrandingScreenshots";
-import { BuildTreeDrawer } from "./components/BuildTreeDrawer";
+import { FactionBuildList } from "./components/FactionBuildList";
 import { GameHeader } from "./components/GameHeader";
 import { OptionsList } from "./components/OptionsList";
 import {
@@ -70,22 +69,13 @@ export default function GameDetailPage() {
     game?.primaryArchive.name,
     startUnits,
   );
-  // The reusable unit graph (units + buildoptions edges) backs both the per-side
-  // unit counts below and the build-tree drawer. Fetched on demand when this page
-  // opens — never during the scan.
+  // The reusable unit graph (units + buildoptions edges) backs the per-side build
+  // buttons + drawer (see FactionBuildList). Fetched on demand when this page opens —
+  // never during the scan.
   const { dataset } = useUnitsyncUnitDataset(
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
-  );
-  const drawer = useDrawer();
-  const buildEdges = useMemo(
-    () => buildEdgeMap(dataset?.units ?? []),
-    [dataset],
-  );
-  const sideUnitCounts = useMemo(
-    () => reachableCounts(gameInfo?.sides ?? [], buildEdges),
-    [gameInfo, buildEdges],
   );
   const brand = useBrandingEntry(game);
 
@@ -109,27 +99,6 @@ export default function GameDetailPage() {
     // A .sdd path is the folder itself; otherwise open the containing folder.
     const target = isSdd(a) ? a.path : a.path.replace(/[\\/][^\\/]*$/, "");
     contentOpenPath({ path: target }).catch(() => {});
-  };
-
-  // Open the per-faction build-tree drawer, starting on the clicked side.
-  const openBuildTree = (sideName: string) => {
-    if (!selected?.enginePath || !selected.rootPath || !gameInfo) return;
-    drawer.open({
-      title: `${game.name} — Build tree`,
-      description:
-        "Units each faction's commander can build, directly or indirectly.",
-      width: "72rem",
-      content: (
-        <BuildTreeDrawer
-          enginePath={selected.enginePath}
-          dataDir={selected.rootPath}
-          gameArchive={game.primaryArchive.name}
-          sides={gameInfo.sides}
-          units={dataset?.units ?? []}
-          initialSide={sideName}
-        />
-      ),
-    });
   };
 
   return (
@@ -188,52 +157,18 @@ export default function GameDetailPage() {
               ? ` · ${gameInfo.unitCount} units`
               : ""}
           </h2>
-          {gameInfoLoading ? (
+          {gameInfoLoading || !gameInfo || !selected ? (
             <Skeleton className="h-12 rounded-lg border border-border/50 bg-card" />
           ) : (
-            <ul className="flex flex-col gap-2">
-              {gameInfo?.sides.map((s) => {
-                const icon = s.startUnit
-                  ? buildpics?.units[s.startUnit]?.icon
-                  : undefined;
-                // Prefer the unitdef's human name; fall back to the engine's
-                // start-unit name, then the internal id.
-                const unitLabel =
-                  (s.startUnit && buildpics?.units[s.startUnit]?.name) ||
-                  s.startUnitName ||
-                  s.startUnit;
-                // Units reachable from this faction's commander via buildoptions.
-                // Omitted (and the card left inert) when the dataset is still
-                // loading or the game exposes no buildoptions (0).
-                const count = sideUnitCounts.get(s.name) ?? 0;
-                return (
-                  <li key={s.name}>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={count === 0}
-                      onClick={() => openBuildTree(s.name)}
-                      className="h-auto w-full justify-between gap-3 p-3"
-                    >
-                      <span className="flex items-center gap-3">
-                        {icon && (
-                          <img
-                            src={icon}
-                            alt=""
-                            className="h-16 w-16 shrink-0 rounded object-contain"
-                          />
-                        )}
-                        <span className="font-medium">{s.name}</span>
-                      </span>
-                      <span className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground">
-                        {count > 0 && <span>{count} units</span>}
-                        {unitLabel && <span>{unitLabel}</span>}
-                      </span>
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
+            <FactionBuildList
+              enginePath={selected.enginePath}
+              dataDir={selected.rootPath}
+              gameArchive={game.primaryArchive.name}
+              gameName={game.name}
+              sides={gameInfo.sides}
+              units={dataset?.units ?? []}
+              buildpics={buildpics}
+            />
           )}
         </section>
       )}
