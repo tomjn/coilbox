@@ -4,6 +4,7 @@ import {
   contentListReplays,
   type ReplayFile,
 } from "../content/bindings";
+import { useBrandingEntry } from "../content/branding";
 import { useUnitsyncScan } from "../content/config";
 import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
@@ -139,6 +140,9 @@ export function useConquestBattleRun(
     target?.dataDir,
     installedGame?.primaryArchive.name,
   );
+  // The game's branding entry carries its conquest AI rules (deny-list, faction
+  // pool, neutral/chicken AI). Called unconditionally — accepts undefined.
+  const aiConfig = useBrandingEntry(installedGame)?.conquestAi;
 
   const noEngine = !targetLoading && !target;
   const scanLoading = !!target && !scanReady && scan.loading;
@@ -184,6 +188,7 @@ export function useConquestBattleRun(
       playerName: PLAYER_NAME,
       gameName: installedGame.name,
       ais,
+      aiConfig,
     });
     if (!draft) return;
     const config: BattleConfig = toBattleConfig({
@@ -238,6 +243,7 @@ export function useConquestBattleRun(
     galaxy,
     mode,
     ais,
+    aiConfig,
     launch,
     applyResult,
   ]);

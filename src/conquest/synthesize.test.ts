@@ -129,4 +129,55 @@ describe("synthesizeBattle", () => {
     const s = newConquestState(g, { seed: 1 }, "t0");
     expect(synthesizeBattle(g, s, "zz", "attack", opts)).toBeNull();
   });
+
+  it("never fields a denied AI even when a faction is baked to one", () => {
+    const g = galaxy();
+    // An old galaxy whose enemy faction was assigned the do-nothing Sandbox bot.
+    g.factions[1].aiKey = "lua:Sandbox";
+    const withSandbox: SkirmishAi[] = [
+      { kind: "lua", shortName: "Sandbox", name: "Sandbox" },
+      { kind: "native", shortName: "BARb", name: "BARbarIAn" },
+    ] as SkirmishAi[];
+    const s = newConquestState(g, { seed: 1 }, "t0");
+    const draft = synthesizeBattle(g, s, "c", "attack", {
+      ...opts,
+      ais: withSandbox,
+    });
+    for (const e of draft?.participants.slice(1) ?? []) {
+      expect(e.ai?.shortName).toBe("BARb");
+    }
+  });
+
+  it("fields a chicken AI on a neutral garrison and merges neutral mod options", () => {
+    const g = galaxy();
+    const withChickens: SkirmishAi[] = [
+      { kind: "native", shortName: "BARb", name: "BARbarIAn" },
+      { kind: "lua", shortName: "ChickensAI", name: "Chickens" },
+    ] as SkirmishAi[];
+    const s = newConquestState(g, { seed: 1 }, "t0");
+    const draft = synthesizeBattle(g, s, "b", "attack", {
+      ...opts,
+      ais: withChickens,
+      aiConfig: { neutralModOptions: { chicken_difficulty: "hard" } },
+    });
+    expect(draft?.participants[1]?.ai?.shortName).toBe("ChickensAI");
+    expect(draft?.modOptionValues).toEqual({ chicken_difficulty: "hard" });
+  });
+
+  it("lets an authored node battle override the neutral chicken options", () => {
+    const g = galaxy();
+    // Node "b" is neutral; author pins its own mod options on the battle spec.
+    g.nodes[1].battle.modOptionValues = { chicken_difficulty: "easy" };
+    const withChickens: SkirmishAi[] = [
+      { kind: "native", shortName: "BARb", name: "BARbarIAn" },
+      { kind: "lua", shortName: "ChickensAI", name: "Chickens" },
+    ] as SkirmishAi[];
+    const s = newConquestState(g, { seed: 1 }, "t0");
+    const draft = synthesizeBattle(g, s, "b", "attack", {
+      ...opts,
+      ais: withChickens,
+      aiConfig: { neutralModOptions: { chicken_difficulty: "hard" } },
+    });
+    expect(draft?.modOptionValues).toEqual({ chicken_difficulty: "easy" });
+  });
 });

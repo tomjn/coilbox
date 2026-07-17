@@ -1,5 +1,6 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { useEffect, useState } from "react";
+import type { ConquestAiConfig } from "../conquest/ai";
 import type { ConquestNames } from "../conquest/names";
 import type { GameItem, MapItem } from "./bindings";
 import { withMapSource } from "./mapSource";
@@ -43,6 +44,8 @@ export interface BrandingEntry {
   links?: BrandingLink[];
   /** Galactic-conquest naming defaults for this game (see `../conquest/names`). */
   conquest?: ConquestNames;
+  /** Galactic-conquest AI rules for this game (deny-list, faction pool, chickens). */
+  conquestAi?: ConquestAiConfig;
 }
 /**
  * How a suggested item is fetched. Mirrors the downloads-plugin commands:
