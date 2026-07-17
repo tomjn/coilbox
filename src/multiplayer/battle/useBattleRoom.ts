@@ -77,6 +77,8 @@ export interface BattleRoomView {
   dataDir: string | undefined;
   /** All locally-scanned maps (for the map-suggestion picker). */
   maps: MapItem[];
+  /** The map list is still being scanned, so no maps are available yet. */
+  mapsLoading: boolean;
   /** The locally-scanned map matching the battle, for true proportions. */
   localMap: MapItem | undefined;
   /** The locally-scanned game matching the battle, if installed. */
@@ -664,6 +666,9 @@ export function useBattleRoom(): BattleRoomView {
     enginePath,
     dataDir,
     maps,
+    // Still scanning with nothing yet: the map picker shows a spinner rather
+    // than a false "no maps installed".
+    mapsLoading: scan.loading && maps.length === 0,
     localMap,
     localGame,
     rows,

@@ -179,6 +179,7 @@ function BattleRoomPage() {
             enginePath={room.enginePath}
             dataDir={room.dataDir}
             maps={room.maps}
+            mapsLoading={room.mapsLoading}
             localMap={room.localMap}
             mapMissing={room.mapMissing}
             startPosType={room.startPosType}
