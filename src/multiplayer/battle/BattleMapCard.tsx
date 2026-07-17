@@ -30,6 +30,7 @@ export function BattleMapCard({
   enginePath,
   dataDir,
   maps,
+  mapsLoading,
   localMap,
   mapMissing,
   startPosType,
@@ -46,6 +47,8 @@ export function BattleMapCard({
   enginePath: string | undefined;
   dataDir: string | undefined;
   maps: MapItem[];
+  /** The map list is still being scanned, so no maps are available yet. */
+  mapsLoading: boolean;
   localMap: MapItem | undefined;
   mapMissing: boolean;
   startPosType: number;
@@ -157,6 +160,7 @@ export function BattleMapCard({
       <MapCard
         map={displayMap}
         maps={maps}
+        mapsLoading={mapsLoading}
         thumbs={thumbs}
         minimapDataUrl={minimap.dataUrl}
         startPositions={startPositions}

@@ -1,5 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
-import { Check, ImageOff, Search, X } from "lucide-react";
+import { Check, ImageOff, Loader2, Search, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useMemo, useState } from "react";
 import type { MapItem } from "@/content/bindings";
@@ -21,6 +21,7 @@ export function MapPickerDrawer({
   thumbs,
   selectedName,
   onSelect,
+  mapsLoading,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -28,6 +29,9 @@ export function MapPickerDrawer({
   thumbs: Map<string, MapThumbData>;
   selectedName: string;
   onSelect: (name: string) => void;
+  /** The map list is still being scanned, so an empty grid means "not loaded
+   * yet" rather than "no maps installed". */
+  mapsLoading?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -145,11 +149,22 @@ export function MapPickerDrawer({
                   </button>
                 );
               })}
-              {filtered.length === 0 && (
-                <p className="col-span-3 py-8 text-center text-sm text-muted-foreground">
-                  No maps match “{query}”.
-                </p>
-              )}
+              {filtered.length === 0 &&
+                (mapsLoading ? (
+                  <div className="col-span-3 flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                    Scanning maps…
+                  </div>
+                ) : maps.length === 0 ? (
+                  <div className="col-span-3 flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
+                    <ImageOff className="size-6" aria-hidden />
+                    No maps installed.
+                  </div>
+                ) : (
+                  <p className="col-span-3 py-8 text-center text-sm text-muted-foreground">
+                    No maps match “{query}”.
+                  </p>
+                ))}
             </div>
           </div>
         </DialogPrimitive.Content>
