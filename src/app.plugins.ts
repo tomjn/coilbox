@@ -13,6 +13,7 @@ import multiplayerPlugin from "./multiplayer";
 import notifyPlugin from "./notify";
 import playPlugin from "./play";
 import profilePlugin from "./profile";
+import runlitePlugin from "./runlite";
 import uberstressPlugin from "./uberstress";
 import updaterPlugin from "./updater";
 // picoframe:imports-end
@@ -29,6 +30,7 @@ export const plugins: FramePlugin[] = [
   playPlugin,
   campaignPlugin,
   conquestPlugin,
+  runlitePlugin,
   lobbyServersPlugin,
   multiplayerPlugin,
   // picoframe:plugins-end

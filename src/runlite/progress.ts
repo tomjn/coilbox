@@ -1,5 +1,6 @@
 import {
   HISTORY_CAP,
+  type RewardOption,
   type RogueliteRun,
   type RunNode,
   type RunProgress,
@@ -129,4 +130,133 @@ export function resolveBattle(
     history: pushHistory(run, { nodeId, type: node.type, outcome }),
     updatedAt: now ?? touch(),
   };
+}
+
+// --- Reward / event / shop resolution --------------------------------------
+
+/** Apply one reward option to progress (mutates the passed copy). An unlock
+ * widens the shared arsenal; a perk is banked for the player's team. */
+function grantOption(p: RunProgress, option: RewardOption): void {
+  if (option.kind === "unlock") {
+    p.unlockedUnits = [
+      ...new Set([...p.unlockedUnits, option.unit, ...option.opens]),
+    ];
+  } else {
+    p.perks = [...p.perks, option.perk];
+  }
+}
+
+const clampHull = (v: number, max: number) => Math.max(0, Math.min(max, v));
+
+/** Take one option at a reward node, then mark it resolved. */
+export function applyReward(
+  run: RogueliteRun,
+  nodeId: string,
+  optionIndex: number,
+  now?: string,
+): RogueliteRun {
+  const node = nodeById(run, nodeId);
+  if (!node?.reward || isResolved(run, nodeId)) return run;
+  const p: RunProgress = { ...run.progress };
+  const option = node.reward.options[optionIndex];
+  if (option) grantOption(p, option);
+  p.visited = [...p.visited, nodeId];
+  return {
+    ...run,
+    progress: p,
+    history: pushHistory(run, { nodeId, type: node.type }),
+    updatedAt: now ?? touch(),
+  };
+}
+
+/** Take one choice at an event node, applying its effects, then resolve it. */
+export function applyEvent(
+  run: RogueliteRun,
+  nodeId: string,
+  choiceIndex: number,
+  now?: string,
+): RogueliteRun {
+  const node = nodeById(run, nodeId);
+  if (!node?.event || isResolved(run, nodeId)) return run;
+  const choice = node.event.choices[choiceIndex];
+  const p: RunProgress = { ...run.progress };
+  if (choice) {
+    if (choice.hull) p.hull = clampHull(p.hull + choice.hull, p.maxHull);
+    if (choice.salvage) p.salvage = Math.max(0, p.salvage + choice.salvage);
+    if (choice.perk) p.perks = [...p.perks, choice.perk];
+    if (choice.unlock) {
+      p.unlockedUnits = [...new Set([...p.unlockedUnits, choice.unlock])];
+    }
+  }
+  if (p.hull <= 0) p.status = "lost";
+  p.visited = [...p.visited, nodeId];
+  return {
+    ...run,
+    progress: p,
+    history: pushHistory(run, { nodeId, type: node.type }),
+    updatedAt: now ?? touch(),
+  };
+}
+
+/** Buy one shop offer (if affordable). The shop stays open — resolve it with
+ * {@link leaveNode} when the player is done. A no-op if unaffordable. */
+export function buyOffer(
+  run: RogueliteRun,
+  nodeId: string,
+  offerIndex: number,
+  now?: string,
+): RogueliteRun {
+  const node = nodeById(run, nodeId);
+  const offer = node?.shop?.offers[offerIndex];
+  if (!offer || run.progress.salvage < offer.cost) return run;
+  const p: RunProgress = {
+    ...run.progress,
+    salvage: run.progress.salvage - offer.cost,
+  };
+  grantOption(p, offer.option);
+  return { ...run, progress: p, updatedAt: now ?? touch() };
+}
+
+/** Take the shop's rest option (hull for salvage), if offered and affordable. */
+export function restAtShop(
+  run: RogueliteRun,
+  nodeId: string,
+  now?: string,
+): RogueliteRun {
+  const node = nodeById(run, nodeId);
+  const shop = node?.shop;
+  if (!shop?.restHull || run.progress.hull >= run.progress.maxHull) return run;
+  const cost = shop.restCost ?? 0;
+  if (run.progress.salvage < cost) return run;
+  const p: RunProgress = {
+    ...run.progress,
+    salvage: run.progress.salvage - cost,
+    hull: clampHull(run.progress.hull + shop.restHull, run.progress.maxHull),
+  };
+  return { ...run, progress: p, updatedAt: now ?? touch() };
+}
+
+/** Mark a non-battle node resolved (leave a shop, or dismiss a resolved card). */
+export function leaveNode(
+  run: RogueliteRun,
+  nodeId: string,
+  now?: string,
+): RogueliteRun {
+  const node = nodeById(run, nodeId);
+  if (!node || isResolved(run, nodeId)) return run;
+  return {
+    ...run,
+    progress: { ...run.progress, visited: [...run.progress.visited, nodeId] },
+    history: pushHistory(run, { nodeId, type: node.type }),
+    updatedAt: now ?? touch(),
+  };
+}
+
+/** The deepest column the player has reached (for meta stats). */
+export function deepestColumn(run: RogueliteRun): number {
+  let deepest = 0;
+  for (const n of run.nodes) {
+    if (run.progress.visited.includes(n.id)) deepest = Math.max(deepest, n.col);
+  }
+  return deepest;
 }
