@@ -1,8 +1,14 @@
 import { cn } from "@picoframe/frame";
 import type { FramePlugin, FrameRoute } from "@picoframe/plugin-sdk";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import type { ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
+import { useNavigate } from "react-router";
 import { assetUrl, isLocalRef, mediaKind } from "../lib/assetUrl";
+import { classifyMarkdownLink } from "./pageLinks";
 import { buildPageNav, getProfilePages, type ProfilePage } from "./pages";
+import { splitWidgets } from "./pageWidgets";
+import { PageWidget } from "./widgets";
 
 /**
  * Renders a custom distribution page (issue #255) as Markdown, with an optional
@@ -19,7 +25,63 @@ function resolveSrc(src: unknown): string | undefined {
   return isLocalRef(src) ? assetUrl(src) : src;
 }
 
+/**
+ * Renders a markdown link with the page-link scheme applied (issue #274): external URLs
+ * open in the system browser (never navigating the webview away from the app), `.md` /
+ * `@route/` / app-absolute links navigate in-app via the router, `@.coilbox` assets get
+ * a `coilbox://` href, and a `@widget/`/malformed ref renders inert (plain text) so a bad
+ * link can't break the page.
+ */
+function MarkdownLink({
+  href,
+  title,
+  children,
+}: {
+  href?: string;
+  title?: string;
+  children?: ReactNode;
+}) {
+  const navigate = useNavigate();
+  const target = classifyMarkdownLink(href);
+  if (target.kind === "inert") {
+    return <span title={href}>{children}</span>;
+  }
+  if (target.kind === "anchor") {
+    return (
+      <a href={target.href} title={title}>
+        {children}
+      </a>
+    );
+  }
+  if (target.kind === "asset") {
+    return (
+      <a href={target.url} title={title}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <a
+      href={target.kind === "external" ? target.url : target.to}
+      title={title}
+      onClick={(e) => {
+        e.preventDefault();
+        if (target.kind === "external") {
+          openUrl(target.url).catch((err) =>
+            console.warn("profile: could not open link", err),
+          );
+        } else {
+          navigate(target.to);
+        }
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 const MEDIA_COMPONENTS: Components = {
+  a: MarkdownLink,
   img({ src, alt, title }) {
     const url = resolveSrc(src);
     if (!url) return null;
@@ -50,22 +112,47 @@ const MEDIA_COMPONENTS: Components = {
   },
 };
 
-/** Markdown page body with themed typography and inline media. */
+/** Themed typography for a run of markdown prose. */
+const PROSE_CLASSES = cn(
+  "text-sm leading-relaxed text-foreground/90",
+  "[&_a]:text-primary [&_a]:underline",
+  "[&_code]:font-mono [&_code]:text-xs",
+  "[&_h1]:mb-3 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:tracking-tight",
+  "[&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold",
+  "[&_h3]:mt-4 [&_h3]:mb-1 [&_h3]:font-semibold",
+  "[&_li]:ml-4 [&_li]:list-disc [&_p]:my-2 [&_ul]:my-2 [&_ol]:my-2",
+  "[&_ol_li]:list-decimal",
+);
+
+/**
+ * Markdown page body with themed typography, inline media, and embedded `@widget/...`
+ * tokens (issue #274). The body is split into prose/widget segments: prose runs through
+ * react-markdown with the {@link PROSE_CLASSES} typography, widgets render bare (their
+ * own components own their styling) between the prose. The no-widget case renders exactly
+ * as before — a single prose block.
+ */
 function PageProse({ children }: { children: string }) {
+  const segments = splitWidgets(children);
+  if (segments.length === 1 && segments[0].kind === "text") {
+    return (
+      <div className={PROSE_CLASSES}>
+        <Markdown components={MEDIA_COMPONENTS}>{segments[0].text}</Markdown>
+      </div>
+    );
+  }
   return (
-    <div
-      className={cn(
-        "text-sm leading-relaxed text-foreground/90",
-        "[&_a]:text-primary [&_a]:underline",
-        "[&_code]:font-mono [&_code]:text-xs",
-        "[&_h1]:mb-3 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:tracking-tight",
-        "[&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold",
-        "[&_h3]:mt-4 [&_h3]:mb-1 [&_h3]:font-semibold",
-        "[&_li]:ml-4 [&_li]:list-disc [&_p]:my-2 [&_ul]:my-2 [&_ol]:my-2",
-        "[&_ol_li]:list-decimal",
+    <div className="space-y-4">
+      {segments.map((seg, i) =>
+        seg.kind === "text" ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: segments derive from a static body and never reorder
+          <div key={i} className={PROSE_CLASSES}>
+            <Markdown components={MEDIA_COMPONENTS}>{seg.text}</Markdown>
+          </div>
+        ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: segments derive from a static body and never reorder
+          <PageWidget key={i} name={seg.name} arg={seg.arg} />
+        ),
       )}
-    >
-      <Markdown components={MEDIA_COMPONENTS}>{children}</Markdown>
     </div>
   );
 }
