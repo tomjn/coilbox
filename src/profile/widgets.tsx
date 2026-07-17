@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useState } from "react";
+import { BuildTreeEmbed } from "../content/pages/components/BuildTreeEmbed";
 import { HomeSetupCard } from "../content/pages/components/SetupCard";
 import { dlInstalledContent } from "../downloads/bindings";
 import { useContentRootPaths, useWriteRootPath } from "../downloads/config";
@@ -39,6 +40,8 @@ export const WIDGET_REGISTRY: Record<string, (arg?: string) => ReactNode> = {
   onboarding: () => <HomeSetupCard />,
   welcome: () => <BrandedWelcome />,
   "map-pack": () => <MapPackWidget />,
+  "build-tree": (arg) => <BuildTreeEmbed arg={arg} mode="graph" />,
+  "faction-button": (arg) => <BuildTreeEmbed arg={arg} mode="buttons" />,
 };
 
 /** The names a distribution can embed — used by docs/validation. */

@@ -117,10 +117,100 @@ Notes:
 - **Assets are `.coilbox`-relative**, the same convention as the splash/logo images. A
   Markdown image `![](pages/diagram.png)` or a `background: pages/bg.jpg` resolves to a
   file under `.coilbox/`. Audio/video files referenced as images render inline players.
-- **Link between pages** (or from a welcome screen) with `#/pages/<path>` — handy with
-  `nav: false` for pages you only want reached from elsewhere.
+- **Link between pages** (or from a welcome screen) with `#/pages/<path>`, or a plain
+  `[label](other.md)` link — handy with `nav: false` for pages reached only from
+  elsewhere. See [File references](#file-references) for the full link/route scheme.
+- **Compose** pages with [`@` references](#file-references): include shared fragments
+  (`@.coilbox/pages/_foo.md`), link to routes (`@route/singleplayer`), and embed live GUI
+  (`@widget/onboarding`, `@widget/build-tree/<game>`).
 - Content is trusted bundler-authored Markdown (safe by default: no raw HTML/JS).
   Malformed or duplicate `path`s are skipped rather than breaking the app.
+
+## File references (`@`)
+
+Profile content is composable through a single `@<namespace>/<rest>` token. The first
+segment after `@` is a namespace, so there's no ambiguity between (say) a file named
+`route` and the route namespace:
+
+| Token                          | Means                                                                 |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `@.coilbox/<path>`             | A **file** under the portable `.coilbox/` folder. A path that escapes the folder (`..`, absolute) is rejected — it can only read files you shipped. |
+| `@route/<app-route>`           | An **in-app route**, e.g. `@route/singleplayer`, `@route/downloads/games`. |
+| `@widget/<name>[/<arg>]`       | An embedded **live Coilbox component** (see [widgets](#widget-catalogue) below). |
+
+Anything that can't be resolved (a missing file, an unknown widget, an escaping path)
+renders a **visible error/placeholder**, never a silent blank — so a typo in a bundle is
+obvious rather than mysterious.
+
+### File-reference profile fields
+
+The [`welcome`](#welcome-object) `html`/`css` fields accept a `@.coilbox/<path>` reference
+instead of an inline fragment, so you can keep the markup in its own file:
+
+```json
+{ "welcome": { "html": "@.coilbox/welcome.html", "css": "@.coilbox/welcome.css" } }
+```
+
+The referenced `.html` file's raw HTML is injected as-is — the **one** place raw HTML is
+allowed (it's your own trusted, script-free file, same as the inline fragment).
+
+### Including files into a page
+
+A custom page can **transclude** another Markdown file: a line whose sole content is a
+`@.coilbox/<path>.md` reference is replaced by that file's contents (recursively), so
+pages can share a common header, footer, or rules block:
+
+```markdown
+# Getting started
+
+@.coilbox/pages/_shared-intro.md
+
+Now pick a faction below.
+```
+
+Includes are cycle-guarded and depth-capped; a missing file or an include loop shows an
+error marker line instead of hanging.
+
+### Linking between pages and routes
+
+Markdown links resolve intelligently:
+
+- `[Rules](rules.md)` → the page `#/pages/rules` (a `.md` link maps to its page by
+  filename; a nested page can be linked with `@route/pages/...`).
+- `[Play](@route/singleplayer)` → navigates in-app.
+- `[Discord](https://discord.gg/…)` → opens in the system browser (never navigates the
+  app's own window away).
+
+### Widget catalogue
+
+Drop a live piece of Coilbox GUI into a page by putting a `@widget/<name>` token on its
+own line:
+
+```markdown
+# Welcome
+
+@widget/onboarding
+
+## Maps
+
+@widget/map-pack
+
+## Factions
+
+@widget/faction-button/Beyond All Reason
+```
+
+| Widget                          | Renders                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| `@widget/onboarding`            | The first-run "Set up Coilbox" + get-started download cards.            |
+| `@widget/welcome`               | The branded [`welcome`](#welcome-object) screen.                        |
+| `@widget/map-pack`              | The curated [map-pack](#maplists-object) download banner.               |
+| `@widget/build-tree/<game>`     | A game's full build-tree graph (all factions, tabbed) in the page.      |
+| `@widget/faction-button/<game>` | Per-faction buttons that open the build-tree drawer.                    |
+
+The `<game>` arg matches a game's name or shortname (case-insensitive); on a single-game
+install it can be omitted. While the game is being scanned, or if it isn't installed, the
+widget shows a skeleton/notice rather than a blank.
 
 ## Verifying it's active
 
@@ -268,7 +358,9 @@ CSS only (no JavaScript).
 ```
 
 - `html` — injected into the welcome page body. Style it via `.coilbox-welcome …`.
-- `css` — injected alongside the HTML.
+  Either an inline fragment (above) or a `@.coilbox/<path>.html`
+  [file reference](#file-references) to keep the markup in its own file.
+- `css` — injected alongside the HTML. Inline, or a `@.coilbox/<path>.css` reference.
 - **Local media**: reference files bundled in your `.coilbox/` folder by relative path,
   and Coilbox resolves them at load time — in both the HTML and the CSS. So
   `<img src="images/logo.webp">`, `background: url(images/hero.gif)`, and even
