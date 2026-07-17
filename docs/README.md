@@ -16,6 +16,7 @@ Guides for running Coilbox in **portable mode** and shipping it alongside a game
 
 - **[Campaigns](campaigns.md)** — authoring a linear sequence of skirmish missions in the Campaign Builder, mission media and unit restrictions, export/import, and bundling campaigns into a distribution.
 - **[Galactic Conquest](conquest.md)** — the single-player conquest map: generating a galaxy (size, layout, starting territory, fog of war, theatre skin), how a run plays, supplying your game's system/faction names via the profile or branding catalog, and bundling a galaxy.
+- **[Roguelite Run](roguelite-run.md)** — the single-player roguelite mode built on the conquest engine: crossing a forward-only node map once, unit-unlocks as a shared tech ceiling, per-team perks, hull/salvage, and between-run meta-progression.
 
 ---
 

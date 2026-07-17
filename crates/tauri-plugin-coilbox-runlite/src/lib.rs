@@ -5,10 +5,10 @@
 //! frontend owns and validates (see `src/runlite/model.ts`).
 //!
 //! On-disk layout under `<data_dir>/runlite/`:
-//!   - `run.json`   the single active run (a fresh run replaces it; abandoning
-//!                  or completing clears it)
-//!   - `meta.json`  persistent between-run unlocks (loadouts, event pools,
-//!                  ascension tiers)
+//!   - `run.json` the single active run (a fresh run replaces it; abandoning or
+//!     completing clears it)
+//!   - `meta.json` persistent between-run unlocks (loadouts, event pools,
+//!     ascension tiers)
 //!
 //! Unlike conquest there is no authored/bundled document to list: a run is
 //! generated fresh from a seed and disposable, so this crate only loads/saves
