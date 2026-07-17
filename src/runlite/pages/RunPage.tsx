@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Trophy, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { resolveGameByShortname } from "../../conquest/model";
 import { buildEdgeMap, reachableFrom } from "../../content/buildTree";
@@ -11,10 +11,11 @@ import {
 } from "../../content/pages/components/states";
 import { useReduceMotion } from "../../general/display";
 import { usePreferredTarget } from "../../play/config";
+import { awardMeta } from "../meta";
 import { isBattleNode, type RunNode } from "../model";
 import { moveTo, nextChoices, pendingNode } from "../progress";
 import { RunMapView } from "../RunMapView";
-import { useRun } from "../runs";
+import { useRun, useRunMeta } from "../runs";
 import { EncounterOverlay } from "./components/EncounterOverlay";
 import {
   EventOverlay,
@@ -32,9 +33,12 @@ import { RunHud } from "./components/RunHud";
  */
 export default function RunPage() {
   const { run, loading, save } = useRun();
+  const { meta, save: saveMeta } = useRunMeta();
   const reduceMotion = useReduceMotion();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  // Guard so a finished run awards meta-progression exactly once.
+  const awardedRef = useRef<string | null>(null);
 
   // The arsenal ceiling size, for the HUD gauge (best-effort).
   const { target } = usePreferredTarget();
@@ -59,6 +63,15 @@ export default function RunPage() {
   useEffect(() => {
     if (pending) setActiveNodeId(pending.id);
   }, [pending]);
+
+  // When a run reaches won/lost, fold it into meta-progression once.
+  useEffect(() => {
+    if (!run || run.progress.status === "active") return;
+    const key = `${run.createdAt}:${run.settings.seed}`;
+    if (awardedRef.current === key) return;
+    awardedRef.current = key;
+    saveMeta(awardMeta(meta, run));
+  }, [run, meta, saveMeta]);
 
   if (loading) return <SkeletonList />;
   if (!run) {

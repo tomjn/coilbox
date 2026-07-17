@@ -62,6 +62,9 @@ export interface GenerateRunOpts {
   build?: GenBuildGraph;
   /** Default enemy skirmish AI (`kind:shortName`) for encounters. */
   enemyAiKey?: string;
+  /** Which of the start unit's build branches to pre-unlock (-1 = none). From
+   * the chosen meta loadout; ignored without a build graph. */
+  loadoutBranch?: number;
   /** Injected timestamp (tests); defaults to now. */
   now?: string;
 }
@@ -483,10 +486,20 @@ export function generateRun(opts: GenerateRunOpts): RogueliteRun {
   const nodes = columns.flat();
 
   // Seed the arsenal with the shallowest connected build subtree, so the first
-  // encounter is playable before any unlock.
-  const unlockedUnits = planner
+  // encounter is playable before any unlock. A loadout pre-unlocks one of the
+  // commander's build branches on top, opening the run committed to a doctrine.
+  let unlockedUnits: string[] = planner
     ? planner.order.slice(0, STARTER_UNIT_COUNT)
     : [];
+  if (planner && opts.loadoutBranch != null && opts.loadoutBranch >= 0) {
+    const roots = planner.children.get(planner.order[0]) ?? [];
+    const root = roots[opts.loadoutBranch];
+    if (root) {
+      unlockedUnits = [
+        ...new Set([...unlockedUnits, ...unlockBranch(planner, root)]),
+      ];
+    }
+  }
 
   const difficulty = opts.difficulty;
   const ascension = opts.ascension ?? 0;

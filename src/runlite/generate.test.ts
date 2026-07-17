@@ -168,6 +168,18 @@ describe("generateRun", () => {
     expect(lCols).toBeGreaterThan(qCols);
   });
 
+  it("a loadout pre-unlocks a commander build branch", () => {
+    const base = generateRun(opts());
+    // branch 0 = the first of the commander's build options (mex), branch 2 =
+    // vplant, whose branch pulls in tank/scout/con.
+    const withVplant = generateRun(opts({ loadoutBranch: 2 }));
+    expect(withVplant.progress.unlockedUnits.length).toBeGreaterThanOrEqual(
+      base.progress.unlockedUnits.length,
+    );
+    expect(withVplant.progress.unlockedUnits).toContain("vplant");
+    expect(withVplant.progress.unlockedUnits).toContain("tank");
+  });
+
   it("falls back to perk-only rewards without a build graph", () => {
     const run = generateRun(opts({ build: undefined }));
     expect(run.startUnit).toBeUndefined();

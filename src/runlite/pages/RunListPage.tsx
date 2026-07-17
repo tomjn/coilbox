@@ -15,6 +15,7 @@ import {
   type GenRunMap,
   generateRun,
 } from "../generate";
+import { loadoutById, unlockedLoadouts } from "../meta";
 import type { RunLength, RunSkin } from "../model";
 import { useRun, useRunMeta } from "../runs";
 import { OptionSelect } from "./components/OptionSelect";
@@ -41,7 +42,10 @@ export default function RunListPage() {
   const [difficulty, setDifficulty] = useState(2);
   const [ascension, setAscension] = useState(0);
   const [skin, setSkin] = useState<RunSkin>("galaxy");
+  const [loadoutId, setLoadoutId] = useState("standard");
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9));
+
+  const loadouts = unlockedLoadouts(meta);
 
   // Default to the first installed game once the scan lands.
   useEffect(() => {
@@ -114,6 +118,7 @@ export default function RunListPage() {
       maps: genMaps,
       build,
       enemyAiKey,
+      loadoutBranch: loadoutById(loadoutId).branchIndex,
     };
     await save(generateRun(opts));
     navigate("/runlite/active");
@@ -178,6 +183,16 @@ export default function RunListPage() {
               value={sideName}
               onValueChange={setSideName}
               options={sides.map((s) => ({ value: s.name, label: s.name }))}
+            />
+          </Field>
+        )}
+
+        {loadouts.length > 1 && (
+          <Field label="Loadout">
+            <OptionSelect
+              value={loadoutId}
+              onValueChange={setLoadoutId}
+              options={loadouts.map((l) => ({ value: l.id, label: l.label }))}
             />
           </Field>
         )}
