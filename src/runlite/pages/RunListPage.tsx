@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { Dices, Play, Swords, Trash2 } from "lucide-react";
+import { Dices, Loader2, Play, Swords, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -54,18 +54,36 @@ export default function RunListPage() {
     }
   }, [games, shortname]);
 
+  // One option per game shortname — multiple installed versions collapse to a
+  // single entry (the run resolves the newest at battle time), so a game with
+  // two versions installed doesn't show up twice.
+  const gameOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const opts: { value: string; label: string }[] = [];
+    for (const g of games) {
+      const value = g.info.shortname ?? g.name;
+      if (seen.has(value)) continue;
+      seen.add(value);
+      opts.push({ value, label: g.info.name ?? g.name });
+    }
+    return opts;
+  }, [games]);
+
   const game = games.find((g) => (g.info.shortname ?? g.name) === shortname);
   const archive = game?.primaryArchive.name;
-  const { info } = useUnitsyncGameInfo(
+  const { info, loading: infoLoading } = useUnitsyncGameInfo(
     target?.enginePath,
     target?.dataDir,
     archive,
   );
-  const { dataset } = useUnitsyncUnitDataset(
+  const { dataset, loading: datasetLoading } = useUnitsyncUnitDataset(
     target?.enginePath,
     target?.dataDir,
     archive,
   );
+  // The game's sides/build tree load asynchronously after a game switch; the
+  // faction, loadout and Begin controls all derive from them, so gate them.
+  const gameLoading = !!archive && (infoLoading || datasetLoading);
   const { ais } = useSkirmishAis(target?.enginePath, target?.dataDir, archive);
 
   const sides = info?.sides ?? [];
@@ -102,7 +120,7 @@ export default function RunListPage() {
 
   const enemyAiKey = ais[0] ? `${ais[0].kind}:${ais[0].shortName}` : undefined;
 
-  const canGenerate = !!game && genMaps.length > 0;
+  const canGenerate = !!game && genMaps.length > 0 && !gameLoading;
 
   const startRun = async () => {
     if (!game) return;
@@ -169,21 +187,25 @@ export default function RunListPage() {
           <OptionSelect
             value={shortname}
             onValueChange={setShortname}
-            options={games.map((g) => ({
-              value: g.info.shortname ?? g.name,
-              label: g.info.name ?? g.name,
-            }))}
+            options={gameOptions}
             placeholder="Select a game"
           />
         </Field>
 
-        {sides.length > 0 && (
+        {(sides.length > 0 || gameLoading) && (
           <Field label="Faction / side">
-            <OptionSelect
-              value={sideName}
-              onValueChange={setSideName}
-              options={sides.map((s) => ({ value: s.name, label: s.name }))}
-            />
+            {gameLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                Loading the game's factions…
+              </div>
+            ) : (
+              <OptionSelect
+                value={sideName}
+                onValueChange={setSideName}
+                options={sides.map((s) => ({ value: s.name, label: s.name }))}
+              />
+            )}
           </Field>
         )}
 
@@ -262,7 +284,16 @@ export default function RunListPage() {
         </Field>
 
         <Button onClick={startRun} disabled={!canGenerate} className="w-full">
-          <Swords className="mr-1.5 size-4" aria-hidden /> Begin run
+          {gameLoading ? (
+            <>
+              <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
+              Loading game data…
+            </>
+          ) : (
+            <>
+              <Swords className="mr-1.5 size-4" aria-hidden /> Begin run
+            </>
+          )}
         </Button>
         {!build && game && (
           <p className="text-xs text-muted-foreground">
