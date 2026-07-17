@@ -304,6 +304,23 @@ Replaces the default home launcher with a branded landing page. Declarative HTML
 }
 ```
 
+Instead of inlining the markup, point `html`/`css` at a **file** in your `.coilbox/` folder with a [`@.coilbox/<path>` reference](#file-references) — much easier to edit and version than a one-line JSON string, and the only place raw HTML is allowed (it's your own trusted, script-free file):
+
+```json
+{
+  "version": 1,
+  "welcome": { "html": "@.coilbox/welcome.html", "css": "@.coilbox/welcome.css" }
+}
+```
+
+```
+<YourGameFolder>/
+  .coilbox/
+    profile.json
+    welcome.html     # your landing-page markup
+    welcome.css      # its styles
+```
+
 - `html` — injected into the welcome page body. Style it via `.coilbox-welcome …`. Either an inline fragment (above) or a `@.coilbox/<path>.html` [file reference](#file-references) to keep the markup in its own file.
 - `css` — injected alongside the HTML. Inline, or a `@.coilbox/<path>.css` reference.
 - **Local media**: reference files bundled in your `.coilbox/` folder by relative path, and Coilbox resolves them at load time — in both the HTML and the CSS. So `<img src="images/logo.webp">`, `background: url(images/hero.gif)`, and even `@font-face { src: url(fonts/brand.woff2) }` all pull from `.coilbox/images/…`, `.coilbox/fonts/…`, etc. Images, animated GIFs, audio (`<audio src="…">`), video (`<video>`) and web fonts are supported. Absolute URLs (`https:`, `data:`) and app-absolute paths (`/…`) are left untouched, so remote `https` images still work directly with no embedding.
