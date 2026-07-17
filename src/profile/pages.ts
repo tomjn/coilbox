@@ -139,7 +139,7 @@ export async function expandIncludes(
 const SLUG = /^[a-z0-9]+(?:[/-][a-z0-9]+)*$/;
 
 /** Derive a slug from a file path: `pages/About Us.md` → `about-us`. */
-function slugFromPath(path: string): string {
+export function slugFromPath(path: string): string {
   const file = path.split("/").pop() ?? path;
   return file
     .replace(/\.md$/i, "")

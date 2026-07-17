@@ -1,7 +1,11 @@
 import { cn } from "@picoframe/frame";
 import type { FramePlugin, FrameRoute } from "@picoframe/plugin-sdk";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import type { ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
+import { useNavigate } from "react-router";
 import { assetUrl, isLocalRef, mediaKind } from "../lib/assetUrl";
+import { classifyMarkdownLink } from "./pageLinks";
 import { buildPageNav, getProfilePages, type ProfilePage } from "./pages";
 
 /**
@@ -19,7 +23,63 @@ function resolveSrc(src: unknown): string | undefined {
   return isLocalRef(src) ? assetUrl(src) : src;
 }
 
+/**
+ * Renders a markdown link with the page-link scheme applied (issue #274): external URLs
+ * open in the system browser (never navigating the webview away from the app), `.md` /
+ * `@route/` / app-absolute links navigate in-app via the router, `@.coilbox` assets get
+ * a `coilbox://` href, and a `@widget/`/malformed ref renders inert (plain text) so a bad
+ * link can't break the page.
+ */
+function MarkdownLink({
+  href,
+  title,
+  children,
+}: {
+  href?: string;
+  title?: string;
+  children?: ReactNode;
+}) {
+  const navigate = useNavigate();
+  const target = classifyMarkdownLink(href);
+  if (target.kind === "inert") {
+    return <span title={href}>{children}</span>;
+  }
+  if (target.kind === "anchor") {
+    return (
+      <a href={target.href} title={title}>
+        {children}
+      </a>
+    );
+  }
+  if (target.kind === "asset") {
+    return (
+      <a href={target.url} title={title}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <a
+      href={target.kind === "external" ? target.url : target.to}
+      title={title}
+      onClick={(e) => {
+        e.preventDefault();
+        if (target.kind === "external") {
+          openUrl(target.url).catch((err) =>
+            console.warn("profile: could not open link", err),
+          );
+        } else {
+          navigate(target.to);
+        }
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 const MEDIA_COMPONENTS: Components = {
+  a: MarkdownLink,
   img({ src, alt, title }) {
     const url = resolveSrc(src);
     if (!url) return null;
