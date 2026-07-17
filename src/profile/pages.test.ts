@@ -10,6 +10,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import {
   buildPageNav,
   buildProfilePages,
+  expandIncludes,
   type PageFile,
   parseFrontmatter,
 } from "./pages";
@@ -120,6 +121,66 @@ describe("buildProfilePages", () => {
       file("pages/b.md", "---\npath: b\norder: 10\n---\n"),
     ]);
     expect(pages.map((p) => p.route)).toEqual(["pages/b", "pages/a"]);
+  });
+});
+
+describe("expandIncludes", () => {
+  // A fake profile_file reader backed by an in-memory map.
+  const reader = (files: Record<string, string>) => async (path: string) =>
+    path in files ? { text: files[path], ok: true } : { text: "", ok: false };
+
+  it("leaves a body with no include lines unchanged", async () => {
+    const body = "# Hi\n\nSome text.";
+    expect(await expandIncludes(body, reader({}))).toBe(body);
+  });
+
+  it("replaces a lone @.coilbox/*.md line with the referenced file", async () => {
+    const body = "before\n@.coilbox/shared.md\nafter";
+    const out = await expandIncludes(body, reader({ "shared.md": "SHARED" }));
+    expect(out).toBe("before\nSHARED\nafter");
+  });
+
+  it("expands includes recursively", async () => {
+    const out = await expandIncludes(
+      "@.coilbox/a.md",
+      reader({ "a.md": "A\n@.coilbox/b.md", "b.md": "B" }),
+    );
+    expect(out).toBe("A\nB");
+  });
+
+  it("ignores an @-ref that isn't alone on its line", async () => {
+    const body = "see @.coilbox/x.md for details";
+    expect(await expandIncludes(body, reader({ "x.md": "X" }))).toBe(body);
+  });
+
+  it("ignores non-.md file refs (only markdown is transcluded)", async () => {
+    const body = "@.coilbox/logo.png";
+    expect(await expandIncludes(body, reader({ "logo.png": "binary" }))).toBe(
+      body,
+    );
+  });
+
+  it("emits a visible error for a missing include rather than blanking", async () => {
+    const out = await expandIncludes("@.coilbox/missing.md", reader({}));
+    expect(out).toMatch(/error/i);
+    expect(out).toMatch(/missing\.md/);
+  });
+
+  it("detects a direct cycle instead of looping forever", async () => {
+    const out = await expandIncludes(
+      "@.coilbox/loop.md",
+      reader({ "loop.md": "@.coilbox/loop.md" }),
+      new Set(["pages/host.md"]),
+    );
+    expect(out).toMatch(/cycle/i);
+  });
+
+  it("allows the same fragment included twice in different places", async () => {
+    const out = await expandIncludes(
+      "@.coilbox/f.md\n---\n@.coilbox/f.md",
+      reader({ "f.md": "FRAG" }),
+    );
+    expect(out).toBe("FRAG\n---\nFRAG");
   });
 });
 
