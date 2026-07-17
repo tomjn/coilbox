@@ -33,6 +33,22 @@ describe("generateGalaxy", () => {
     expect(a.generated?.seed).toBe(1234);
   });
 
+  it("never assigns a denied or chicken AI to a faction", () => {
+    const messyAis = [
+      { kind: "lua" as const, shortName: "Sandbox", name: "Sandbox" },
+      { kind: "lua" as const, shortName: "ChickensAI", name: "Chickens" },
+      { kind: "lua" as const, shortName: "SimpleAI", name: "Simple" },
+    ];
+    const doc = generateGalaxy(
+      { ...base, ais: messyAis, factionCount: 3 },
+      "t0",
+    );
+    // Player faction (index 0) never gets an AI; every enemy uses SimpleAI.
+    for (const f of doc.factions.slice(1)) {
+      expect(f.aiKey).toBe("lua:SimpleAI");
+    }
+  });
+
   it("survives its own validator (round-trips parseGalaxyJson)", () => {
     for (const seed of [1, 7, 99, 2026]) {
       const doc = generateGalaxy({ ...base, seed }, "t0");

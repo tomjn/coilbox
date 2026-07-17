@@ -1,4 +1,5 @@
 import { aiKey } from "../play/participants";
+import { type ConquestAiConfig, factionAiPool } from "./ai";
 import type { Faction, GalaxyDoc, GalaxyNode } from "./model";
 import { MAX_DIFFICULTY, NEUTRAL } from "./model";
 import type { ConquestNames } from "./names";
@@ -49,6 +50,8 @@ export interface GenerateOptions {
   fogOfWar?: boolean;
   /** Naming pools / faction presets from a profile and/or the branding catalog. */
   names?: ConquestNames;
+  /** Per-game conquest AI config from the branding catalog (deny-list, pool). */
+  aiConfig?: ConquestAiConfig;
   /** Document id; defaults to `generated-<seed>`. */
   id?: string;
   title?: string;
@@ -335,14 +338,16 @@ export function generateGalaxy(
   const usedNames = new Set<string>();
   const starName = makeStarNamer(rng, names);
   const specs = factionSpecs(rng, names, enemyCount + 1);
+  // Faction opponents draw only from real playing AIs — never a do-nothing test
+  // bot or a chicken/wildlife AI (which is reserved for neutral garrisons).
+  const pool = factionAiPool(opts.ais, opts.aiConfig);
   const factions: Faction[] = specs.map((spec, i) => ({
     id: i === 0 ? "player" : `enemy-${i}`,
     name: spec.name,
     color: spec.color,
     aggression: i === 0 ? 0 : (spec.aggression ?? 0.3 + rng() * 0.2),
     side: spec.side,
-    aiKey:
-      opts.ais.length > 0 ? aiKey(opts.ais[i % opts.ais.length]) : undefined,
+    aiKey: pool.length > 0 ? aiKey(pool[i % pool.length]) : undefined,
   }));
 
   // Ownership: each capital plus a ring of its nearest neighbours. Without a
@@ -446,6 +451,7 @@ export interface RegenerateEnv {
   maps: GenMap[];
   ais: GenAi[];
   names?: ConquestNames;
+  aiConfig?: ConquestAiConfig;
 }
 
 /**
@@ -477,6 +483,7 @@ export function regenerateGalaxy(
       startingSystems: g.startingSystems,
       fogOfWar: g.fogOfWar,
       names: env.names,
+      aiConfig: env.aiConfig,
       id: galaxy.id,
       title: galaxy.title,
     },

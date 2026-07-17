@@ -6,6 +6,12 @@ import {
   type Participant,
   resolveAi,
 } from "../play/participants";
+import {
+  type ConquestAiConfig,
+  fallbackFactionAi,
+  isDeniedAi,
+  neutralAi,
+} from "./ai";
 import type { ConquestState, Faction, GalaxyDoc, GalaxyNode } from "./model";
 import { difficultyHandicap, difficultyTable } from "./rules";
 
@@ -31,19 +37,33 @@ function opposingFaction(
   return galaxy.factions.find((f) => f.id === id);
 }
 
-/** Resolve the enemy AI for a node: node override -> faction -> first installed. */
+const toRef = (a?: SkirmishAi): Participant["ai"] | undefined =>
+  a ? { kind: a.kind, shortName: a.shortName, name: a.name } : undefined;
+
+/**
+ * Resolve the enemy AI for a node. Authored keys (node override, then the
+ * faction's AI) win, but a key resolving to a denied do-nothing bot is ignored
+ * — conquest never fields a test/null AI. The fallback depends on the enemy:
+ * a neutral garrison (no faction) prefers a chicken/wildlife AI as a hazard;
+ * a faction enemy gets the first real playing AI installed.
+ */
 function enemyAi(
   node: GalaxyNode,
   faction: Faction | undefined,
   ais: SkirmishAi[],
+  config?: ConquestAiConfig,
 ): Participant["ai"] | undefined {
-  const fromKey = (key?: string) => (key ? resolveAi(key, ais) : undefined);
+  const fromKey = (key?: string) => {
+    const ref = key ? resolveAi(key, ais) : undefined;
+    return ref && !isDeniedAi(ref, config) ? ref : undefined;
+  };
+  const fallback = faction
+    ? fallbackFactionAi(ais, config)
+    : neutralAi(ais, config);
   return (
     fromKey(node.battle.enemyAiKey) ??
     fromKey(faction?.aiKey) ??
-    (ais[0]
-      ? { kind: ais[0].kind, shortName: ais[0].shortName, name: ais[0].name }
-      : undefined)
+    toRef(fallback)
   );
 }
 
@@ -65,6 +85,8 @@ export function synthesizeBattle(
     /** Exact installed game archive name (resolved from `galaxy.game`). */
     gameName: string;
     ais: SkirmishAi[];
+    /** Per-game conquest AI config (deny-list, faction pool, neutral AI). */
+    aiConfig?: ConquestAiConfig;
   },
 ): SkirmishDraft | null {
   const node = galaxy.nodes.find((n) => n.id === nodeId);
@@ -75,7 +97,7 @@ export function synthesizeBattle(
     (f) => f.id === state.playerFactionId,
   );
   const enemyFaction = opposingFaction(galaxy, state, node, mode);
-  const ai = enemyAi(node, enemyFaction, opts.ais);
+  const ai = enemyAi(node, enemyFaction, opts.ais, opts.aiConfig);
   const enemyCount = spec.enemyAiCount ?? difficultyTable(node.difficulty);
   const handicap = spec.handicap ?? difficultyHandicap(node.difficulty);
   const enemyColor = enemyFaction ? hexToRgb(enemyFaction.color) : PALETTE[7]; // grey — a neutral garrison flies no colours
@@ -101,11 +123,17 @@ export function synthesizeBattle(
     handicap: handicap > 0 ? handicap : undefined,
   }));
 
+  // Neutral (chicken) garrisons carry the catalog's neutral mod options; an
+  // authored battle spec overrides them per-node.
+  const neutralOptions = enemyFaction
+    ? undefined
+    : opts.aiConfig?.neutralModOptions;
+
   return {
     participants: [you, ...enemies],
     gameName: opts.gameName,
     mapName: spec.mapName,
     startPosType: spec.startPosType ?? 0,
-    modOptionValues: spec.modOptionValues ?? {},
+    modOptionValues: { ...neutralOptions, ...spec.modOptionValues },
   };
 }
