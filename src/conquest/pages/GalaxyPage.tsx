@@ -539,6 +539,7 @@ function RunSetupPanel({
             getProfile().conquest,
             brandingEntry?.conquest,
           ),
+          aiConfig: brandingEntry?.conquestAi,
         },
         Math.floor(Math.random() * 100000),
       );

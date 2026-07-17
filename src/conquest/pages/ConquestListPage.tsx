@@ -364,6 +364,7 @@ function GenerateGalaxyForm({
         shortName: a.shortName,
         name: a.name,
       })),
+      aiConfig: brandingEntry?.conquestAi,
       nodeCount: Number(size),
       factionCount: Number(factions),
       layout: layout as GenerateOptions["layout"],
@@ -386,6 +387,7 @@ function GenerateGalaxyForm({
       starting,
       fog,
       names,
+      brandingEntry,
     ],
   );
 
