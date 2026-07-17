@@ -147,6 +147,7 @@ export function MapCard({
         thumbs={thumbs}
         selectedName={map?.name ?? ""}
         onSelect={onSelectMap}
+        mapsLoading={mapsLoading}
       />
     </div>
   );
