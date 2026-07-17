@@ -24,7 +24,8 @@ export type RunKind =
   | "replay"
   | "save"
   | "campaign"
-  | "conquest";
+  | "conquest"
+  | "runlite";
 
 interface LaunchOpts {
   config: BattleConfig;
@@ -52,7 +53,7 @@ interface PlayContextValue {
   kind: RunKind | null;
   /** Launch a skirmish, battle or campaign mission; resolves when the engine exits. */
   launch: (
-    kind: "skirmish" | "battle" | "campaign" | "conquest",
+    kind: "skirmish" | "battle" | "campaign" | "conquest" | "runlite",
     opts: LaunchOpts,
   ) => Promise<{ exitCode: number | null }>;
   /** Launch a replay; resolves when the engine exits. */
@@ -112,7 +113,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
 
   const launch = useCallback(
     (
-      runKind: "skirmish" | "battle" | "campaign" | "conquest",
+      runKind: "skirmish" | "battle" | "campaign" | "conquest" | "runlite",
       opts: LaunchOpts,
     ) =>
       start(runKind, (runId, onEvent) =>
