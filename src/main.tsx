@@ -18,6 +18,7 @@ import {
   loadProfile,
   resolveProfileImage,
   resolveSplashSrc,
+  resolveWelcome,
 } from "./profile/profile";
 import Splash from "./profile/Splash";
 import { createTauriSettingsStorage } from "./settings-storage";
@@ -64,6 +65,11 @@ const logoImages = {
 // the plugin list, so their routes + nav items can be injected below. No-op (empty)
 // without a profile or a pages folder.
 await loadProfilePages();
+
+// Resolve the welcome's html/css `@.coilbox/...` file references to text before render
+// so BrandedWelcome has its content ready (like the splash/logo resolves above). No-op
+// when the profile has no welcome; inline fragments resolve to themselves.
+await resolveWelcome();
 
 // Hide any settings sections the profile lists (uses SettingsSection.useVisible,
 // injected centrally so no plugin needs to opt in). No-op without a profile.

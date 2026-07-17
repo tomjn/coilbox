@@ -2,4 +2,4 @@
 
 [default]
 description = "Allows reading the bundler-supplied distribution profile, its assets, and custom pages."
-permissions = ["allow-profile-load", "allow-profile-asset", "allow-profile-pages"]
+permissions = ["allow-profile-load", "allow-profile-asset", "allow-profile-file", "allow-profile-pages"]
