@@ -1,22 +1,35 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import {
   CSS2DObject,
   CSS2DRenderer,
 } from "three/addons/renderers/CSS2DRenderer.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { assetUrl } from "../../lib/assetUrl";
-import type { GalaxyDoc, Incursion } from "../model";
+import type { GalaxyDoc, GalaxyNode, Incursion } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
 import { bodyLabel, type VoidBody, voidBodiesFor } from "./bodies";
 import { factionSides } from "./factionShape";
-import { hashString, layoutNodes, playBounds, playExtentFor } from "./layout";
+import {
+  hashString,
+  layoutNodes,
+  playBounds,
+  playExtentFor,
+  type WorldPos,
+} from "./layout";
 import { buildStarfield } from "./starfield";
 import {
+  accretionTexture,
+  anomalyTexture,
   asteroidTexture,
   cometTailTexture,
+  gasGiantTexture,
+  greebleTexture,
   radialTexture,
+  spaceEnvTexture,
   spikesTexture,
 } from "./textures";
 
@@ -56,6 +69,32 @@ export interface NodeEmphasis {
   marker?: "check";
   /** Occasional ambient combat flashes over the node (upcoming battle sites). */
   flash?: boolean;
+}
+
+/**
+ * Warpath-only per-node identity (see {@link GalaxyViewProps.identities}). Some
+ * run nodes read as a distinct body — a depot station, a salvage wreck, an event
+ * anomaly, the start beacon, or the warlord's lair — instead of a plain star;
+ * others keep their star tinted toward a danger hue. Default-off, so conquest —
+ * which omits the prop — is unchanged.
+ */
+export type NodeBodyKind =
+  | "station"
+  | "wreck"
+  | "anomaly"
+  | "beacon"
+  | "warlord-blackhole"
+  | "warlord-hypergiant"
+  | "warlord-fortress";
+
+export interface NodeIdentity {
+  /** Replace the node's star with a special body. */
+  body?: NodeBodyKind;
+  /**
+   * Nudge the (still-stellar) star toward this `#rrggbb` — danger red for battle
+   * sites. Kept subtle and stellar-plausible by the caller.
+   */
+  starTint?: string;
 }
 
 interface GalaxyViewProps {
@@ -102,6 +141,20 @@ interface GalaxyViewProps {
   burstNodeId?: string | null;
   /** Map spring-names known to be space maps; their nodes render as asteroids. */
   spaceMaps?: Set<string>;
+  /**
+   * Warpath-only per-node identity: special bodies (station / wreck / anomaly /
+   * beacon / warlord) and danger star-tints, keyed by node id. Applied at build
+   * time (a new map rebuilds the scene, like `galaxy`), since it derives from the
+   * run's stable structure. Default-off; conquest omits it so its sky is
+   * byte-identical.
+   */
+  identities?: Map<string, NodeIdentity>;
+  /**
+   * Warpath-only: redden and darken the nebula toward the warlord (the far
+   * column), so the sky grows more ominous with map depth. Applied at build time
+   * from each cloud's world-X. Default `false`; conquest keeps its even haze.
+   */
+  depthMood?: boolean;
   /**
    * Zoom the camera in on a node (e.g. the system being fought over) and lock
    * user controls; `null`/undefined eases back to the framed overview. Driven
@@ -188,8 +241,35 @@ export function starSystemLabel(system: StarSystem): string {
 }
 
 /**
+ * Rare exotic stellar phenomena, shared across conquest and warpath so both skies
+ * gain a few unusual systems. Kept sparse (a few percent) and physically-grounded
+ * — a blue-white pulsar, a pulsing variable, a ringed gas giant, a dying carbon
+ * star. The warlord's black hole is deliberately *not* here (boss-only). Rolled
+ * on an independent `-exotic` hash, so no existing star assignment shifts.
+ */
+export type ExoticClass = "pulsar" | "variable" | "gasgiant" | "carbon";
+
+const EXOTIC_LABEL: Record<ExoticClass, string> = {
+  pulsar: "pulsar",
+  variable: "variable star",
+  gasgiant: "ringed gas giant",
+  carbon: "carbon star",
+};
+
+/** The exotic class for a node, or `undefined` for an ordinary star (~94%). */
+export function exoticClassFor(nodeId: string): ExoticClass | undefined {
+  const h = hashString(`${nodeId}-exotic`) % 1000;
+  if (h < 15) return "pulsar";
+  if (h < 30) return "variable";
+  if (h < 45) return "gasgiant";
+  if (h < 60) return "carbon";
+  return undefined;
+}
+
+/**
  * Selection-panel label for a node. `voidBody` (from the galaxy-wide
- * `voidBodiesFor`) is set for space-map nodes and undefined otherwise.
+ * `voidBodiesFor`) is set for space-map nodes and undefined otherwise. Non-void,
+ * non-capital nodes may be a rare exotic; otherwise the stellar-system name.
  */
 export function nodeBodyLabel(
   nodeId: string,
@@ -197,6 +277,10 @@ export function nodeBodyLabel(
   voidBody: VoidBody | undefined,
 ): string {
   if (voidBody) return bodyLabel(voidBody);
+  if (!capital) {
+    const exotic = exoticClassFor(nodeId);
+    if (exotic) return EXOTIC_LABEL[exotic];
+  }
   return starSystemLabel(starSystemFor(nodeId, capital));
 }
 
@@ -510,6 +594,8 @@ export function GalaxyView({
   pathLinks,
   burstNodeId,
   spaceMaps,
+  identities,
+  depthMood = false,
   focusNodeId,
   display,
   className,
@@ -887,6 +973,16 @@ export function GalaxyView({
         sprite.scale.set(scale, scale * 0.6, 1);
         sprite.raycast = () => {};
         scene.add(sprite);
+        // Depth mood (warpath): clouds toward the warlord (higher world-X, the
+        // far column) tint deep red — a cool cloud goes dark-muddy, so it both
+        // reddens and darkens as the run nears its end.
+        if (depthMood) {
+          const moodT = Math.min(
+            1,
+            Math.max(0, 0.5 + sprite.position.x / extent),
+          );
+          mat.color.lerp(new THREE.Color("#b81e10"), 0.65 * moodT);
+        }
       }
     }
 
@@ -1112,6 +1208,35 @@ export function GalaxyView({
     const spikeTex = spikesTexture(256);
     const asteroidTex = asteroidTexture(128);
     const cometTailTex = cometTailTexture(256);
+    // Warpath identity textures (created only if any node needs one): the wispy
+    // anomaly field and a soft annulus (anomaly halo / gas-giant ring / black-hole
+    // photon ring). The ring-stations are real 3D geometry, not a texture.
+    const anyIdentity = !!identities?.size;
+    const anomalyTex = anyIdentity ? anomalyTexture(128) : undefined;
+    const bodyRingTex = anyIdentity ? ringBurstTexture(128) : undefined;
+    if (anomalyTex) disposables.push(anomalyTex);
+    if (bodyRingTex) disposables.push(bodyRingTex);
+    // Greeble/panel detail tiled around the ring-stations (diffuse + bump).
+    const greebleTex = anyIdentity ? greebleTexture(256) : undefined;
+    if (greebleTex) {
+      greebleTex.wrapS = THREE.RepeatWrapping;
+      greebleTex.wrapT = THREE.RepeatWrapping;
+      greebleTex.repeat.set(3, 2);
+      disposables.push(greebleTex);
+    }
+    // Environment map the metal reflects, so it reads as machined metal (glinting
+    // on the sunward edges) rather than matte plastic-grey.
+    const envTex = anyIdentity ? spaceEnvTexture() : undefined;
+    if (envTex) disposables.push(envTex);
+    // A raking directional key light + very low ambient so the 3D ring-stations
+    // shade hard (a real dark side and terminator, not an evenly-lit balloon).
+    // Only lit materials respond; every other object is unlit MeshBasic/Sprite,
+    // so conquest and the rest of the map are unchanged. Warpath-only.
+    if (anyIdentity) {
+      const key = new THREE.DirectionalLight(0xffffff, 2.6);
+      key.position.set(-0.85, 0.55, 0.35);
+      scene.add(key, new THREE.AmbientLight(0xffffff, 0.14));
+    }
     // Comet coma: a bright icy core fading through a soft dusty halo, so it
     // blends into the tail under additive blending (a comet is dust and ice,
     // not rock — no lit surface).
@@ -1154,6 +1279,59 @@ export function GalaxyView({
       coronaBase: number;
     }
     const companions: Companion[] = [];
+
+    // Warpath identity bodies that animate: an anomaly's field slowly rotates and
+    // shimmers, a beacon's glow breathes. Driven by the loop when motion is on;
+    // static otherwise. Node index carries the emphasis dimming.
+    interface IdentityPulse {
+      i: number;
+      kind: "anomaly" | "beacon";
+      sprite: THREE.Sprite;
+      mat: THREE.SpriteMaterial;
+      baseScale: number;
+      baseOpacity: number;
+      phase: number;
+    }
+    const identityPulses: IdentityPulse[] = [];
+
+    // The warlord lair's motion: a black hole's accretion disc shimmers (its
+    // billboard material slowly rotates), a hypergiant breathes. Driven by the
+    // loop when motion is on.
+    interface WarlordAnim {
+      i: number;
+      /** A billboard disc material whose rotation shimmers (accretion disc). */
+      discMat?: THREE.SpriteMaterial;
+      discRate?: number;
+      /** Sprites that breathe in scale + opacity (hypergiant). */
+      pulse?: {
+        sprite: THREE.Sprite;
+        mat: THREE.SpriteMaterial;
+        base: number;
+      }[];
+    }
+    const warlordAnims: WarlordAnim[] = [];
+
+    // Exotic-star motion (shared across both modes): a pulsar twinkles fast, a
+    // variable star's glow breathes slowly. Driven by the loop when motion is on.
+    const pulsarTwinkles: { i: number; mat: THREE.SpriteMaterial }[] = [];
+    const variablePulses: {
+      i: number;
+      mat: THREE.SpriteMaterial;
+      base: number;
+    }[] = [];
+
+    // Slowly-spinning 3D structures (the ring-stations): rotating a lit metal ring
+    // sweeps its specular highlight around, so it shimmers as metal rather than
+    // sitting flat. `base` is the node's fixed orientation; the loop adds time.
+    const spinners: { mesh: THREE.Object3D; base: number; rate: number }[] = [];
+    // The ring-stations are OPAQUE (so they occlude the stars behind them), which
+    // means emphasis can't dim them by opacity — it darkens their metal colour
+    // instead. Each entry holds the shared metal colour + its full-bright base.
+    const structureDims: {
+      i: number;
+      color: THREE.Color;
+      base: THREE.Color;
+    }[] = [];
 
     // Intro warp-in: sprites pop from zero to their target scale (staggered by
     // node), lanes fade up, and the camera eases in. Only when motion is on.
@@ -1226,6 +1404,774 @@ export function GalaxyView({
     );
 
     const WHITE = new THREE.Color(0xffffff);
+
+    /**
+     * A built structure (depot ring-station, warlord fortress) as *real 3D
+     * geometry*, not a sprite: an OPAQUE metal ring-station — a ring of discrete
+     * habitat modules (not a smooth torus), structural spokes to a central
+     * drum-and-dome hub, and two solar-panel wings — lit by the scene's key light
+     * with a specular sheen so
+     * it reads as machined metal, and spun slowly so the highlight sweeps around
+     * it. Opaque so it occludes the stars behind it. The ring (with all parts as
+     * children sharing its metal) takes the spike slot; a soft glow sits in the
+     * corona slot; the star slot stays empty. Emphasis dims it by darkening the
+     * metal colour (see `structureDims`), since an opaque mesh can't fade by
+     * opacity.
+     */
+    const buildStructureBody = (
+      i: number,
+      node: GalaxyNode,
+      p: WorldPos,
+      opts: {
+        scale: number;
+        tint: string;
+        glowColor: string;
+        glowOpacity: number;
+        glowScale: number;
+      },
+    ): boolean => {
+      // OPAQUE so it occludes the stars behind it (a transparent mesh can't cull
+      // the additive starfield already drawn behind it). Greeble diffuse + bump so
+      // the surface is busy machined metal; a tighter specular catches the relief.
+      const metal = new THREE.MeshPhongMaterial({
+        color: new THREE.Color(opts.tint),
+        map: greebleTex,
+        bumpMap: greebleTex,
+        bumpScale: 0.35,
+        specular: new THREE.Color(0xdfe3ea),
+        shininess: 70,
+        envMap: envTex,
+        reflectivity: 0.42,
+        combine: THREE.MixOperation,
+      });
+      // Opaque ring can't dim by opacity, so emphasis darkens its colour instead.
+      structureDims.push({ i, color: metal.color, base: metal.color.clone() });
+      // Dark, glossy solar-panel material (reflects the env too).
+      const panelMat = new THREE.MeshPhongMaterial({
+        color: new THREE.Color(0x223052),
+        specular: new THREE.Color(0x90a0c0),
+        shininess: 90,
+        envMap: envTex,
+        reflectivity: 0.4,
+      });
+      disposables.push(metal, panelMat);
+
+      // A darker material for mechanical detail (hub, docking caps, tanks, spine).
+      const coreMat = new THREE.MeshPhongMaterial({
+        color: new THREE.Color(0x6b6f78),
+        map: greebleTex,
+        bumpMap: greebleTex,
+        bumpScale: 0.3,
+        specular: new THREE.Color(0xaab0bc),
+        shininess: 65,
+        envMap: envTex,
+        reflectivity: 0.35,
+        combine: THREE.MixOperation,
+      });
+      disposables.push(coreMat);
+
+      // The station is a detailed ring of habitat modules aligned radially (each
+      // faces the central hub); neighbouring modules are joined by docking tubes
+      // into a ring, with just four spokes to a stepped central spine. Each
+      // module is a multi-part assembly; to keep a busy station cheap, every part
+      // is baked (cloned, transformed into station space) into three merged
+      // meshes — one per material — so the whole thing is only a few draw calls.
+      const station = new THREE.Group();
+      const RING_R = 0.52;
+      const MODULES = 12;
+      const metalParts: THREE.BufferGeometry[] = [];
+      const coreParts: THREE.BufferGeometry[] = [];
+      const panelParts: THREE.BufferGeometry[] = [];
+      const partM = new THREE.Matrix4();
+      const partLocal = new THREE.Matrix4();
+      const partQ = new THREE.Quaternion();
+      const partE = new THREE.Euler();
+      const partP = new THREE.Vector3();
+      const partS = new THREE.Vector3();
+      // Bake `geo` (non-indexed clone) into `arr`, at parent matrix `pm` then a
+      // local translate / Y-rotate / uniform-ish scale.
+      const part = (
+        arr: THREE.BufferGeometry[],
+        geo: THREE.BufferGeometry,
+        pm: THREE.Matrix4,
+        px: number,
+        py: number,
+        pz: number,
+        ry = 0,
+        sx = 1,
+        sy = 1,
+        sz = 1,
+      ) => {
+        partE.set(0, ry, 0);
+        partQ.setFromEuler(partE);
+        partLocal.compose(partP.set(px, py, pz), partQ, partS.set(sx, sy, sz));
+        partM.multiplyMatrices(pm, partLocal);
+        // A fresh, non-indexed copy every time (never mutate the shared base):
+        // toNonIndexed clones an indexed geo; clone() copies an already-unindexed
+        // one. Uniform non-indexing lets mergeGeometries combine them.
+        const g = geo.index ? geo.toNonIndexed() : geo.clone();
+        g.applyMatrix4(partM);
+        arr.push(g);
+      };
+
+      // Reusable base part geometries. Modules are RADIAL (long X axis points at
+      // the hub), so the hull is long in X and the caps' axis is along X.
+      const bodyGeo = new RoundedBoxGeometry(0.28, 0.15, 0.17, 3, 0.035);
+      const deckGeo = new RoundedBoxGeometry(0.18, 0.07, 0.11, 2, 0.025);
+      const capGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.06, 12);
+      capGeo.rotateZ(Math.PI / 2); // axis along X (radial)
+      const tankGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.1, 8);
+      const antGeo = new THREE.BoxGeometry(0.012, 0.13, 0.012);
+      const spanelGeo = new RoundedBoxGeometry(0.12, 0.014, 0.16, 1, 0.012);
+      const strutGeo = new THREE.BoxGeometry(0.06, 0.025, 0.025);
+      // Docking tube linking neighbouring modules (axis Z -> tangential once the
+      // placement rotates it), and a stouter spoke from the hub to the ring.
+      const tubeGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8);
+      tubeGeo.rotateX(Math.PI / 2);
+      const spokeGeo = new THREE.BoxGeometry(0.28, 0.05, 0.06);
+      spokeGeo.translate(0.28, 0, 0); // pivot at hub, reach out to the ring
+
+      const modMat = new THREE.Matrix4();
+      const modQ = new THREE.Quaternion();
+      const modE = new THREE.Euler();
+      const modP = new THREE.Vector3();
+      const modS = new THREE.Vector3();
+      for (let s = 0; s < MODULES; s++) {
+        const a = (s / MODULES) * Math.PI * 2;
+        const j = (hashString(`${node.id}-mod${s}`) % 100) / 100;
+        // rotation.y = -a aligns the module's long +X axis with the radius, so
+        // every module faces the centre (using +a would mirror half the ring).
+        modE.set(0, -a, 0);
+        modQ.setFromEuler(modE);
+        modMat.compose(
+          modP.set(Math.cos(a) * RING_R, 0, Math.sin(a) * RING_R),
+          modQ,
+          modS.set(1, 0.9 + 0.2 * j, 1),
+        );
+        // Hull + raised deck (long axis radial).
+        part(metalParts, bodyGeo, modMat, 0, 0, 0);
+        part(metalParts, deckGeo, modMat, 0.01, 0.085, 0);
+        // Docking caps at the inner and outer radial ends.
+        part(coreParts, capGeo, modMat, 0.16, 0, 0);
+        part(coreParts, capGeo, modMat, -0.16, 0, 0);
+        // Tanks on the tangential sides + an antenna mast.
+        part(coreParts, tankGeo, modMat, 0.02, 0.075, 0.06);
+        part(coreParts, tankGeo, modMat, -0.02, 0.07, -0.06, 0, 0.8, 0.8, 0.8);
+        part(coreParts, antGeo, modMat, -0.05, 0.14, 0.03);
+        // Solar array on every third module, radially outward.
+        if (s % 3 === 1) {
+          part(coreParts, strutGeo, modMat, 0.19, 0, 0);
+          part(panelParts, spanelGeo, modMat, 0.3, 0, 0);
+        }
+        // Docking tube joining this module to its neighbour (at the mid-angle),
+        // so the modules form a connected ring rather than 12 hub spokes.
+        const am = ((s + 0.5) / MODULES) * Math.PI * 2;
+        modE.set(0, am, 0);
+        modQ.setFromEuler(modE);
+        modMat.compose(
+          modP.set(Math.cos(am) * RING_R, 0, Math.sin(am) * RING_R),
+          modQ,
+          modS.set(1, 1, 1),
+        );
+        part(coreParts, tubeGeo, modMat, 0, 0, 0);
+      }
+
+      // Central hub: a stepped docking spine on a drum, reached by just four
+      // spokes (not one per module).
+      const hubMat = new THREE.Matrix4();
+      const drumGeo = new THREE.CylinderGeometry(0.14, 0.16, 0.13, 16);
+      const spine1 = new THREE.CylinderGeometry(0.07, 0.09, 0.1, 12);
+      const spine2 = new THREE.CylinderGeometry(0.045, 0.06, 0.09, 12);
+      const spine3 = new THREE.CylinderGeometry(0.028, 0.04, 0.07, 10);
+      part(coreParts, drumGeo, hubMat, 0, 0, 0);
+      part(coreParts, spine1, hubMat, 0, 0.1, 0);
+      part(coreParts, spine2, hubMat, 0, 0.19, 0);
+      part(coreParts, spine3, hubMat, 0, 0.27, 0);
+      for (let s = 0; s < 4; s++) {
+        // Align each spoke with a module (every third), pointing radially out.
+        const a = ((s * 3) / MODULES) * Math.PI * 2;
+        part(metalParts, spokeGeo, hubMat, 0, 0, 0, -a);
+      }
+
+      // Merge each material's parts into one mesh (a busy station = 3 draw calls).
+      const addMerged = (
+        parts: THREE.BufferGeometry[],
+        mat: THREE.Material,
+      ) => {
+        const merged = parts.length ? mergeGeometries(parts, false) : null;
+        for (const g of parts) g.dispose();
+        if (!merged) return;
+        disposables.push(merged);
+        const mesh = new THREE.Mesh(merged, mat);
+        mesh.raycast = () => {};
+        station.add(mesh);
+      };
+      addMerged(metalParts, metal);
+      addMerged(coreParts, coreMat);
+      addMerged(panelParts, panelMat);
+      for (const g of [
+        bodyGeo,
+        deckGeo,
+        capGeo,
+        tankGeo,
+        antGeo,
+        spanelGeo,
+        strutGeo,
+        tubeGeo,
+        spokeGeo,
+        drumGeo,
+        spine1,
+        spine2,
+        spine3,
+      ]) {
+        g.dispose();
+      }
+      // One warm light spec on the ring — no window detail at this distance.
+      const specMat = new THREE.SpriteMaterial({
+        map: coronaTex,
+        color: new THREE.Color(opts.glowColor),
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const spec = new THREE.Sprite(specMat);
+      spec.scale.setScalar(0.2);
+      spec.position.set(0.5, 0.1, 0);
+      spec.raycast = () => {};
+      station.add(spec);
+      disposables.push(specMat);
+
+      station.position.set(p[0], p[1] + 0.1, p[2]);
+      const base = ((hashString(`${node.id}-rot`) % 100) / 100) * Math.PI * 2;
+      station.rotation.y = base;
+      registerIntro(station, starScale(i) * opts.scale, node.id);
+      scene.add(station);
+      spinners.push({ mesh: station, base, rate: 1 / 6000 });
+
+      const glowMat = new THREE.SpriteMaterial({
+        map: coronaTex,
+        color: new THREE.Color(opts.glowColor),
+        transparent: true,
+        opacity: opts.glowOpacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const glow = new THREE.Sprite(glowMat);
+      glow.position.set(p[0], p[1], p[2]);
+      registerIntro(
+        glow,
+        coronaScale(i, false) * opts.glowScale,
+        `${node.id}-corona`,
+      );
+      glow.raycast = () => {};
+
+      const ownRingMat = new THREE.MeshBasicMaterial({
+        color: ownerColor(ownersRef.current[node.id] ?? node.owner),
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const ownRing = new THREE.Mesh(ringGeoFor(0), ownRingMat);
+      ownRing.rotation.x = -Math.PI / 2;
+      ownRing.position.set(p[0], p[1] - 0.4, p[2]);
+      ownRing.raycast = () => {};
+
+      starSprites.push(undefined);
+      starMats.push(undefined);
+      spikeSprites.push(station);
+      coronaSprites.push(glow);
+      ownerRingMats.push(ownRingMat);
+      ownerRings.push(ownRing);
+      disposables.push(glowMat, ownRingMat);
+      scene.add(glow, ownRing);
+      return true;
+    };
+
+    /**
+     * Build the warlord's lair — the run's final node — in one of three per-run
+     * forms: a stylised black hole (dark core + a flat accretion disc that
+     * foreshortens into an ellipse, plus a gravitational glow; no lensing), a
+     * blood-red hypergiant (hot core, violent corona + spikes, slow breathing),
+     * or an armoured fortress station (metal hub + a spinning defensive ring).
+     * Reuses the star / corona / spike slots like the other bodies. Built once
+     * (a single boss node), so its bespoke textures live here, not in the shared
+     * block. Returns `true` — always handles the warlord kinds.
+     */
+    const buildWarlordBody = (
+      i: number,
+      node: GalaxyNode,
+      p: WorldPos,
+      variant: NodeBodyKind,
+    ): boolean => {
+      // A fortress is a built structure, not a star — the flat foreshortened
+      // ring-station at large scale with an armoured red wash and a hot glow.
+      if (variant === "warlord-fortress") {
+        return buildStructureBody(i, node, p, {
+          scale: 0.8,
+          tint: "#c07a6a",
+          glowColor: "#ff7a4a",
+          glowOpacity: 0.4,
+          glowScale: 0.6,
+        });
+      }
+
+      const base = starScale(i);
+      const anim: WarlordAnim = { i };
+      let head: THREE.Sprite;
+      let headMat: THREE.SpriteMaterial;
+      let glowMat: THREE.SpriteMaterial;
+      let extra: THREE.Object3D | undefined;
+
+      if (variant === "warlord-blackhole") {
+        // A solid black event horizon that occludes the sky, ringed by a bright
+        // accretion disc laid flat (so it foreshortens to an ellipse). The outer
+        // glow is kept small so it rims the disc instead of washing it into a
+        // fuzzy orange star.
+        const coreTex = radialTexture(128, [
+          [0, "#000000ff"],
+          [0.62, "#000000ff"],
+          [0.85, "#0a0603f2"],
+          [1, "#00000000"],
+        ]);
+        disposables.push(coreTex);
+        headMat = new THREE.SpriteMaterial({
+          map: coreTex,
+          color: 0xffffff,
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+        });
+        head = new THREE.Sprite(headMat);
+        head.position.set(p[0], p[1], p[2]);
+        registerIntro(head, base * 0.5, node.id);
+        head.raycast = () => {};
+        // Accretion disc: a BILLBOARD (not a flat plane). A flat plane looked
+        // wrong from the side and split into two side patches behind the core; a
+        // billboard reads as the same disc from every angle and its radial fade
+        // always stays inside the sprite (no square cut-offs). It shimmers by
+        // slowly rotating its material (the texture has a faint angular flow).
+        const discTex = accretionTexture(256);
+        const discMat = new THREE.SpriteMaterial({
+          map: discTex,
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        });
+        disposables.push(discTex, discMat);
+        const disc = new THREE.Sprite(discMat);
+        disc.position.set(p[0], p[1], p[2]);
+        registerIntro(disc, base * 1.4, `${node.id}-disc`);
+        disc.raycast = () => {};
+        scene.add(disc);
+        extra = disc;
+        anim.discMat = discMat;
+        anim.discRate = 0.00018;
+        // Photon ring: a bright thin ring hugging the event horizon. Billboarded,
+        // so it stays a circle around the dark sphere from any angle — the lensed
+        // bright-rim look from Interstellar, without real lensing.
+        if (bodyRingTex) {
+          const photonMat = new THREE.SpriteMaterial({
+            map: bodyRingTex,
+            color: new THREE.Color("#ffe6b0"),
+            transparent: true,
+            opacity: 0.95,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+          });
+          const photon = new THREE.Sprite(photonMat);
+          photon.position.set(p[0], p[1] + 0.02, p[2]);
+          registerIntro(photon, base * 0.78, `${node.id}-photon`);
+          photon.raycast = () => {};
+          disposables.push(photonMat);
+          scene.add(photon);
+        }
+        glowMat = new THREE.SpriteMaterial({
+          map: coronaTex,
+          color: new THREE.Color("#ff7a2a"),
+          transparent: true,
+          opacity: 0.32,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+      } else {
+        // Hypergiant: a hot, swollen red star with violent spikes.
+        const red = new THREE.Color("#ff3a1e");
+        headMat = new THREE.SpriteMaterial({
+          map: starTex,
+          color: red.clone().lerp(WHITE, 0.3),
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+        });
+        head = new THREE.Sprite(headMat);
+        head.position.set(p[0], p[1], p[2]);
+        registerIntro(head, base * 1.2, node.id);
+        head.raycast = () => {};
+        const spikeMat = new THREE.SpriteMaterial({
+          map: spikeTex,
+          color: red.clone().lerp(WHITE, 0.35),
+          transparent: true,
+          opacity: 0.32,
+          rotation: ((hashString(`${node.id}-spin`) % 100) / 100 - 0.5) * 0.6,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const spikes = new THREE.Sprite(spikeMat);
+        spikes.position.set(p[0], p[1], p[2]);
+        registerIntro(spikes, base * 2.2, `${node.id}-spike`);
+        spikes.raycast = () => {};
+        disposables.push(spikeMat);
+        scene.add(spikes);
+        extra = spikes;
+        glowMat = new THREE.SpriteMaterial({
+          map: coronaTex,
+          color: red,
+          transparent: true,
+          opacity: 0.85,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+      }
+
+      const glow = new THREE.Sprite(glowMat);
+      glow.position.set(p[0], p[1], p[2]);
+      // The black hole's glow is small so it rims the disc; the hypergiant's is
+      // broad so it reads as a swollen star.
+      const glowScale =
+        coronaScale(i, false) * (variant === "warlord-blackhole" ? 0.42 : 1.4);
+      registerIntro(glow, glowScale, `${node.id}-corona`);
+      glow.raycast = () => {};
+
+      // A hypergiant breathes (scale only — opacity stays owned by fog/emphasis).
+      if (variant === "warlord-hypergiant") {
+        anim.pulse = [
+          { sprite: head, mat: headMat, base: base * 1.2 },
+          { sprite: glow, mat: glowMat, base: glowScale },
+        ];
+      }
+      if (anim.discMat || anim.pulse) warlordAnims.push(anim);
+
+      const ownRingMat = new THREE.MeshBasicMaterial({
+        color: ownerColor(ownersRef.current[node.id] ?? node.owner),
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const ownRing = new THREE.Mesh(ringGeoFor(0), ownRingMat);
+      ownRing.rotation.x = -Math.PI / 2;
+      ownRing.position.set(p[0], p[1] - 0.4, p[2]);
+      ownRing.raycast = () => {};
+      starSprites.push(head);
+      starMats.push(headMat);
+      spikeSprites.push(extra);
+      coronaSprites.push(glow);
+      ownerRingMats.push(ownRingMat);
+      ownerRings.push(ownRing);
+      disposables.push(headMat, glowMat, ownRingMat);
+      scene.add(head, glow, ownRing);
+      return true;
+    };
+
+    /**
+     * Build a warpath identity body for node `i`, reusing the star / corona /
+     * spike slots (like the void branch) so intro, ownership rings, selection and
+     * fog keep working. Cohesive palette: a station is metallic with a depot-teal
+     * running-light, a wreck sooty carbon with a dim distress ember, an anomaly an
+     * eerie violet phenomenon, a beacon a friendly cyan pulse. Returns `false` for
+     * a kind it doesn't build (warlord lairs — handled elsewhere) so the caller
+     * falls through to a normal star. Never runs for theatre / void nodes.
+     */
+    const buildIdentityBody = (
+      i: number,
+      node: GalaxyNode,
+      p: WorldPos,
+      body: NodeBodyKind,
+    ): boolean => {
+      if (body.startsWith("warlord")) return buildWarlordBody(i, node, p, body);
+      // A depot is a built structure: a flat, foreshortened ring-station, not a
+      // billboarded body (which read as a logo).
+      if (body === "station") {
+        return buildStructureBody(i, node, p, {
+          scale: 0.5,
+          tint: "#cfd3da",
+          glowColor: "#7fe08a",
+          glowOpacity: 0.22,
+          glowScale: 0.45,
+        });
+      }
+      // Per-kind recipe. `head` is the body in the star slot, `glow` a soft halo
+      // in the corona slot. No clean rings — a tidy annulus read as HUD; identity
+      // instead comes from a lit/organic body plus the existing type ring. All
+      // colours stay within the grounded palette.
+      type Recipe = {
+        head: { tex: THREE.Texture; color: string; additive?: boolean };
+        headScale: number;
+        glow: { color: string; opacity: number; scale: number };
+        pulse?: "anomaly" | "beacon";
+      };
+      let recipe: Recipe | undefined;
+      if (body === "wreck") {
+        recipe = {
+          head: { tex: asteroidTex, color: "#4a453e" },
+          headScale: 0.9,
+          glow: { color: "#8a3320", opacity: 0.35, scale: 0.6 },
+        };
+      } else if (body === "anomaly" && anomalyTex) {
+        // A wispy, irregular energy field (not a star, not a ring); it shimmers
+        // via a slow rotation and brightness breathe in the loop.
+        recipe = {
+          head: { tex: anomalyTex, color: "#b98cff", additive: true },
+          headScale: 1.25,
+          glow: { color: "#8f5cff", opacity: 0.5, scale: 1.0 },
+          pulse: "anomaly",
+        };
+      } else if (body === "beacon") {
+        // A friendly bright point whose halo breathes — no ping ring.
+        recipe = {
+          head: { tex: starTex, color: "#d6fff8" },
+          headScale: 0.9,
+          glow: { color: "#4fe6d6", opacity: 0.55, scale: 1.2 },
+          pulse: "beacon",
+        };
+      }
+      if (!recipe) return false;
+
+      const headMat = new THREE.SpriteMaterial({
+        map: recipe.head.tex,
+        color: new THREE.Color(recipe.head.color),
+        transparent: true,
+        opacity: 1,
+        depthWrite: false,
+        blending: recipe.head.additive
+          ? THREE.AdditiveBlending
+          : THREE.NormalBlending,
+        // A wreck reuses the lit asteroid; spin it per node so no two align.
+        rotation:
+          body === "wreck"
+            ? ((hashString(`${node.id}-rock`) % 100) / 100) * Math.PI * 2
+            : 0,
+      });
+      const head = new THREE.Sprite(headMat);
+      head.position.set(p[0], p[1], p[2]);
+      const headScale = starScale(i) * recipe.headScale;
+      registerIntro(head, headScale, node.id);
+      head.raycast = () => {};
+
+      const glowMat = new THREE.SpriteMaterial({
+        map: coronaTex,
+        color: new THREE.Color(recipe.glow.color),
+        transparent: true,
+        opacity: recipe.glow.opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const glow = new THREE.Sprite(glowMat);
+      glow.position.set(p[0], p[1], p[2]);
+      const glowScale = coronaScale(i, false) * recipe.glow.scale;
+      registerIntro(glow, glowScale, `${node.id}-corona`);
+      glow.raycast = () => {};
+
+      // The anomaly shimmers (rotate + breathe the field); the beacon's halo
+      // breathes. Both loop-driven; static under reduce-motion.
+      const phase = (hashString(`${node.id}-idpulse`) % 100) / 100;
+      if (recipe.pulse === "anomaly") {
+        identityPulses.push({
+          i,
+          kind: "anomaly",
+          sprite: head,
+          mat: headMat,
+          baseScale: headScale,
+          baseOpacity: 1,
+          phase,
+        });
+      } else if (recipe.pulse === "beacon") {
+        identityPulses.push({
+          i,
+          kind: "beacon",
+          sprite: glow,
+          mat: glowMat,
+          baseScale: glowScale,
+          baseOpacity: recipe.glow.opacity,
+          phase,
+        });
+      }
+
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: ownerColor(ownersRef.current[node.id] ?? node.owner),
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const ring = new THREE.Mesh(ringGeoFor(0), ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(p[0], p[1] - 0.4, p[2]);
+      ring.raycast = () => {};
+      starSprites.push(head);
+      starMats.push(headMat);
+      spikeSprites.push(undefined);
+      coronaSprites.push(glow);
+      ownerRingMats.push(ringMat);
+      ownerRings.push(ring);
+      disposables.push(headMat, glowMat, ringMat);
+      scene.add(head, glow, ring);
+      return true;
+    };
+
+    // Exotic textures are shared across both modes and created lazily on first
+    // use (conquest has no identity ring, so it can't borrow `bodyRingTex`).
+    let gasGiantTex: THREE.Texture | undefined;
+    let exoticRingTex: THREE.Texture | undefined;
+    const getGasGiantTex = () => {
+      if (!gasGiantTex) {
+        gasGiantTex = gasGiantTexture(128);
+        disposables.push(gasGiantTex);
+      }
+      return gasGiantTex;
+    };
+    const getExoticRing = () => {
+      if (bodyRingTex) return bodyRingTex;
+      if (!exoticRingTex) {
+        exoticRingTex = ringBurstTexture(128);
+        disposables.push(exoticRingTex);
+      }
+      return exoticRingTex;
+    };
+
+    /**
+     * Build a full-replacement exotic body (pulsar or ringed gas giant) in the
+     * star / corona / spike slots. The pulsar is a tiny blue-white core with
+     * bright beamed spikes and a fast twinkle; the gas giant a warm banded globe
+     * with a flat ring quad that foreshortens into an ellipse. Variable and carbon
+     * stars stay ordinary stars (handled in the normal branch) so they keep the
+     * corona/binary machinery. Returns `true` when it builds.
+     */
+    const buildExoticBody = (
+      i: number,
+      node: GalaxyNode,
+      p: WorldPos,
+      exotic: ExoticClass,
+    ): boolean => {
+      const base = starScale(i);
+      let head: THREE.Sprite;
+      let headMat: THREE.SpriteMaterial;
+      let glowMat: THREE.SpriteMaterial;
+      let extra: THREE.Object3D | undefined;
+
+      if (exotic === "pulsar") {
+        const blue = new THREE.Color("#cfe4ff");
+        headMat = new THREE.SpriteMaterial({
+          map: starTex,
+          color: blue.clone().lerp(WHITE, 0.55),
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+        });
+        head = new THREE.Sprite(headMat);
+        head.position.set(p[0], p[1], p[2]);
+        registerIntro(head, base * 0.55, node.id);
+        head.raycast = () => {};
+        // Bright beamed spikes — the pulsar's lighthouse look.
+        const spikeMat = new THREE.SpriteMaterial({
+          map: spikeTex,
+          color: blue.clone().lerp(WHITE, 0.5),
+          transparent: true,
+          opacity: 0.42,
+          rotation: ((hashString(`${node.id}-spin`) % 100) / 100 - 0.5) * 0.6,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const spikes = new THREE.Sprite(spikeMat);
+        spikes.position.set(p[0], p[1], p[2]);
+        registerIntro(spikes, base * 2.3, `${node.id}-spike`);
+        spikes.raycast = () => {};
+        disposables.push(spikeMat);
+        scene.add(spikes);
+        extra = spikes;
+        glowMat = new THREE.SpriteMaterial({
+          map: coronaTex,
+          color: blue,
+          transparent: true,
+          opacity: 0.55,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        pulsarTwinkles.push({ i, mat: headMat });
+      } else {
+        // Ringed gas giant: a lit globe (normal blending) plus a flat ring.
+        headMat = new THREE.SpriteMaterial({
+          map: getGasGiantTex(),
+          color: new THREE.Color("#d8b488"),
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+          rotation: ((hashString(`${node.id}-rock`) % 100) / 100) * Math.PI * 2,
+        });
+        head = new THREE.Sprite(headMat);
+        head.position.set(p[0], p[1], p[2]);
+        registerIntro(head, base * 1.0, node.id);
+        head.raycast = () => {};
+        const ringMat = new THREE.SpriteMaterial({
+          map: getExoticRing(),
+          color: new THREE.Color("#e8d0a8"),
+          transparent: true,
+          opacity: 0.45,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const ring = new THREE.Sprite(ringMat);
+        ring.position.set(p[0], p[1] + 0.1, p[2]);
+        registerIntro(ring, base * 1.9, `${node.id}-pring`);
+        ring.raycast = () => {};
+        disposables.push(ringMat);
+        scene.add(ring);
+        extra = ring;
+        // A thin warm atmosphere haze rather than a stellar corona.
+        glowMat = new THREE.SpriteMaterial({
+          map: coronaTex,
+          color: new THREE.Color("#c8a878"),
+          transparent: true,
+          opacity: 0.2,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+      }
+
+      const glow = new THREE.Sprite(glowMat);
+      glow.position.set(p[0], p[1], p[2]);
+      registerIntro(
+        glow,
+        coronaScale(i, false) * (exotic === "pulsar" ? 0.8 : 0.5),
+        `${node.id}-corona`,
+      );
+      glow.raycast = () => {};
+
+      const ownRingMat = new THREE.MeshBasicMaterial({
+        color: ownerColor(ownersRef.current[node.id] ?? node.owner),
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const ownRing = new THREE.Mesh(ringGeoFor(0), ownRingMat);
+      ownRing.rotation.x = -Math.PI / 2;
+      ownRing.position.set(p[0], p[1] - 0.4, p[2]);
+      ownRing.raycast = () => {};
+      starSprites.push(head);
+      starMats.push(headMat);
+      spikeSprites.push(extra);
+      coronaSprites.push(glow);
+      ownerRingMats.push(ownRingMat);
+      ownerRings.push(ownRing);
+      disposables.push(headMat, glowMat, ownRingMat);
+      scene.add(head, glow, ownRing);
+      return true;
+    };
+
     galaxy.nodes.forEach((n, i) => {
       const p = positions.get(n.id);
       if (!p) {
@@ -1256,11 +2202,28 @@ export function GalaxyView({
         return;
       }
       discMats.push(undefined);
+      // Warpath node-identity: a run node may read as a built/void body (station,
+      // wreck, anomaly, beacon) rather than a star. Takes precedence over the
+      // voidwater asteroid and reuses the same slots. A `starTint`-only identity
+      // (battle danger red) keeps the star and is applied in the normal branch.
+      const identity = identities?.get(n.id);
+      if (identity?.body && buildIdentityBody(i, n, p, identity.body)) return;
       // Space maps (voidwater) read as asteroid fields, not star systems — a
       // rare comet variant gets a trailing tail. Reuses the star/corona/spike
       // slots so intro, ownership rings and selection keep working; skips the
       // binary companion. See `./bodies` for the pure asteroid/comet split.
       const isVoid = !!spaceMaps?.has(n.battle.mapName);
+      // Rare exotic star (shared with conquest): pulsar / gas giant fully replace
+      // the star; variable / carbon tweak the ordinary star below. Never for
+      // capitals (they read as important giants) or void asteroid fields.
+      const exotic =
+        n.kind === "capital" || isVoid ? undefined : exoticClassFor(n.id);
+      if (
+        (exotic === "pulsar" || exotic === "gasgiant") &&
+        buildExoticBody(i, n, p, exotic)
+      ) {
+        return;
+      }
       if (isVoid) {
         const body = voidBodies.get(n.id) ?? "asteroid";
         const isComet = body === "comet";
@@ -1366,6 +2329,15 @@ export function GalaxyView({
       }
       const type = nodeType[i];
       const stellar = new THREE.Color(type.color);
+      // Danger tint (battle/elite): pull the star toward a hot red so the site
+      // reads as hostile while staying a plausible star colour. The corona and
+      // spikes below inherit `stellar`, so the whole system reddens together.
+      if (identity?.starTint) {
+        stellar.lerp(new THREE.Color(identity.starTint), 0.55);
+      }
+      // Carbon (dying) star: a deep, sooty red. A variable star keeps its class
+      // colour but its glow breathes (registered after the corona is built).
+      if (exotic === "carbon") stellar.set("#c81e08");
       // Normal blending (not additive): the hot core is near-opaque, so the
       // decorative starfield behind a node can't shine through it. Dwarfs
       // keep their saturation; hot stars blow out toward white (type.tint).
@@ -1413,6 +2385,9 @@ export function GalaxyView({
       corona.position.set(p[0], p[1], p[2]);
       registerIntro(corona, coronaScale(i, false), `${n.id}-corona`);
       corona.raycast = () => {};
+      if (exotic === "variable") {
+        variablePulses.push({ i, mat: coronaMat, base: coronaMat.opacity });
+      }
       // Ownership lives on the ring alone (saturated faction colour).
       const ringMat = new THREE.MeshBasicMaterial({
         color: ownerColor(ownersRef.current[n.id] ?? n.owner),
@@ -2061,6 +3036,10 @@ export function GalaxyView({
         (c.corona.material as THREE.SpriteMaterial).opacity =
           c.coronaBase * factor;
       }
+      // Opaque ring-stations dim by darkening their metal (they can't fade).
+      for (const s of structureDims) {
+        s.color.copy(s.base).multiplyScalar(dimOf(galaxy.nodes[s.i].id));
+      }
     };
     applyVisibilityRef.current = applyVisibility;
 
@@ -2325,6 +3304,53 @@ export function GalaxyView({
             c.star.position.set(x, c.center[1], z);
             c.corona.position.set(x, c.center[1], z);
           }
+          // Warpath identity rings: an anomaly slowly rotates and breathes; a
+          // beacon pings outward on a repeating cycle. Faded by the node's own
+          // emphasis so a distant one is subtler.
+          for (const pu of identityPulses) {
+            const dim = dimOf(galaxy.nodes[pu.i].id);
+            if (pu.kind === "anomaly") {
+              // Shimmer: rotate the energy field + breathe its brightness/scale.
+              pu.mat.rotation = now / 4000 + pu.phase * 6.283;
+              const breathe =
+                0.5 + 0.5 * Math.sin(now / 650 + pu.phase * 6.283);
+              pu.mat.opacity = pu.baseOpacity * (0.6 + 0.5 * breathe) * dim;
+              pu.sprite.scale.setScalar(pu.baseScale * (0.92 + 0.12 * breathe));
+            } else {
+              // Beacon: a steady halo that breathes brightness and a little size.
+              const breathe =
+                0.5 + 0.5 * Math.sin(now / 900 + pu.phase * 6.283);
+              pu.mat.opacity = pu.baseOpacity * (0.55 + 0.6 * breathe) * dim;
+              pu.sprite.scale.setScalar(pu.baseScale * (0.95 + 0.12 * breathe));
+            }
+          }
+          // Warlord lair: spin the accretion disc / defensive ring; breathe a
+          // hypergiant (scale only, so fog/emphasis keep owning its opacity).
+          // Ring-stations spin slowly so their specular sweeps (metal shimmer).
+          for (const sp of spinners) {
+            sp.mesh.rotation.y = sp.base + now * sp.rate;
+          }
+          for (const wa of warlordAnims) {
+            if (wa.discMat) wa.discMat.rotation = now * (wa.discRate ?? 0);
+            if (wa.pulse && !introActive) {
+              const breathe = 1 + 0.06 * Math.sin(now / 900);
+              for (const pr of wa.pulse)
+                pr.sprite.scale.setScalar(pr.base * breathe);
+            }
+          }
+          // Exotic stars (shared): pulsars flicker fast, variable stars' glows
+          // breathe. Both fade by the node's own emphasis.
+          for (const pt of pulsarTwinkles) {
+            pt.mat.opacity =
+              (0.45 + 0.55 * (0.5 + 0.5 * Math.sin(now / 120))) *
+              dimOf(galaxy.nodes[pt.i].id);
+          }
+          for (const vp of variablePulses) {
+            vp.mat.opacity =
+              vp.base *
+              (0.55 + 0.45 * Math.sin(now / 1100)) *
+              dimOf(galaxy.nodes[vp.i].id);
+          }
           if (sel.idx >= 0) {
             const ring = ownerRings[sel.idx];
             const mat = ownerRingMats[sel.idx];
@@ -2424,6 +3450,8 @@ export function GalaxyView({
     performanceMode,
     spaceMaps,
     laneFlow,
+    identities,
+    depthMood,
   ]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is

@@ -8,6 +8,63 @@ import * as THREE from "three";
  * as coloured speckles on the stars. Pure maths has no dither.
  */
 
+/**
+ * A tiny equirectangular "space" environment map for the metal ring-stations to
+ * reflect: mostly dark, with one bright warm key highlight and a faint galactic
+ * band. Without something to reflect, metal in an unlit-background scene collapses
+ * to matte plastic; this gives it a glint on the sunward edges and a dark body —
+ * reading as machined metal. Returned with reflection mapping set.
+ */
+export function spaceEnvTexture(): THREE.Texture {
+  const w = 256;
+  const h = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const u = x / w;
+        const v = y / h;
+        // Bright warm key highlight (wrap u for seamless longitude).
+        let du = Math.abs(u - 0.32);
+        du = Math.min(du, 1 - du);
+        const key = Math.exp(-(du * du + (v - 0.3) ** 2) * 45);
+        // A small cool secondary highlight opposite it.
+        let du2 = Math.abs(u - 0.72);
+        du2 = Math.min(du2, 1 - du2);
+        const key2 = Math.exp(-(du2 * du2 + (v - 0.42) ** 2) * 70) * 0.4;
+        // Faint galactic band near the horizon.
+        const band = Math.exp(-((v - 0.5) ** 2) / (2 * 0.16 * 0.16)) * 0.1;
+        // A soft bright zenith (top of the sky) so top-facing surfaces reflect
+        // something toward a top-down camera — else the reflection never shows.
+        const zen = Math.exp(-(v * v) / (2 * 0.22 * 0.22)) * 0.5;
+        const o = (y * w + x) * 4;
+        img.data[o] = Math.min(
+          255,
+          (0.03 + key * 1 + key2 * 0.6 + band + zen) * 255,
+        );
+        img.data[o + 1] = Math.min(
+          255,
+          (0.03 + key * 0.92 + key2 * 0.8 + band * 0.9 + zen) * 255,
+        );
+        img.data[o + 2] = Math.min(
+          255,
+          (0.045 + key * 0.72 + key2 + band * 1.1 + zen * 1.1) * 255,
+        );
+        img.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 /** Parse `#rrggbb` / `#rrggbbaa` into 0-255 channels. */
 export function hexRgba(hex: string): [number, number, number, number] {
   const h = hex.replace("#", "");
@@ -252,6 +309,209 @@ export function asteroidTexture(size: number): THREE.Texture {
         img.data[o + 1] = g;
         img.data[o + 2] = g;
         img.data[o + 3] = Math.round(alpha * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * A ringed gas giant's globe: a smoothly-lit sphere banded by latitude with a
+ * little fbm swirl — gas, so no bump/craters and a soft limb, unlike the rocky
+ * asteroid. Greyscale and per-pixel (dither-free); the sprite material supplies
+ * the warm tint, and a separate flat ring quad completes the Saturn read.
+ */
+export function gasGiantTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(size, size);
+    const half = size / 2;
+    const px = 1 / half;
+    const L = [-0.55, -0.5, 0.66] as const;
+    const R = 0.94;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const nx = (x + 0.5 - half) / half;
+        const ny = (y + 0.5 - half) / half;
+        const d = Math.hypot(nx, ny);
+        let value = 0;
+        let alpha = 0;
+        if (d <= R) {
+          const zc = Math.sqrt(Math.max(0, 1 - (d / R) ** 2));
+          const lam = Math.max(
+            0,
+            (nx / R) * L[0] + (ny / R) * L[1] + zc * L[2],
+          );
+          // Latitude bands, warped by a little turbulence so they swirl.
+          const swirl = fbm(nx * 2.5, ny * 2.5, 7) * 0.5;
+          const band =
+            0.62 +
+            0.3 * Math.sin(ny * 9 + swirl * 4) +
+            0.08 * Math.sin(ny * 23);
+          let v = (0.12 + 0.9 * lam) * Math.max(0.4, Math.min(1, band));
+          v += (1 - zc) ** 3 * 0.05; // soft limb
+          value = Math.max(0, Math.min(1, v));
+          alpha = Math.max(0, Math.min(1, (R - d) / (1.5 * px)));
+        }
+        const o = (y * size + x) * 4;
+        const g = Math.round(value * 255);
+        img.data[o] = g;
+        img.data[o + 1] = g;
+        img.data[o + 2] = g;
+        img.data[o + 3] = Math.round(alpha * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * A warlord black hole's accretion disc: a hot annulus with a cleared hole in
+ * the middle (where the dark core sprite sits), computed per-pixel and dither-
+ * free. Colour is baked — a white-hot inner edge grading through orange to a
+ * deep-red outer rim — so a plane laid flat in the galaxy plane foreshortens
+ * into an ellipse under the tilted camera, no screen-space lensing needed.
+ */
+export function accretionTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(size, size);
+    const half = size / 2;
+    // White-hot inner -> orange mid -> deep-red outer, lerped by band radius.
+    const inner = [255, 244, 214] as const;
+    const mid = [255, 154, 60] as const;
+    const outer = [176, 52, 20] as const;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const nx = (x + 0.5 - half) / half;
+        const ny = (y + 0.5 - half) / half;
+        const d = Math.hypot(nx, ny);
+        // A gaussian band centred at ~0.52, with the hole cleared below ~0.2.
+        const band = Math.exp(-((d - 0.52) ** 2) / (2 * 0.15 * 0.15));
+        const hole = Math.min(1, Math.max(0, (d - 0.2) / 0.1));
+        // Faint angular flow (swirled by turbulence) so a slowly-rotated
+        // billboard shimmers as if the disc were orbiting.
+        const ang = Math.atan2(ny, nx);
+        const flow =
+          0.72 + 0.28 * Math.sin(ang * 3 + fbm(nx * 2 + 5, ny * 2, 6) * 6.283);
+        const a = Math.min(1, band * hole * flow);
+        const t = Math.min(1, Math.max(0, (d - 0.34) / 0.4)); // 0 inner..1 outer
+        const seg = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+        const lo = t < 0.5 ? inner : mid;
+        const hi = t < 0.5 ? mid : outer;
+        const o = (y * size + x) * 4;
+        for (let c = 0; c < 3; c++) {
+          img.data[o + c] = Math.round(lo[c] + (hi[c] - lo[c]) * seg);
+        }
+        img.data[o + 3] = Math.round(a * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * Greeble/panel detail for the metal ring-stations: blocky panels with darker
+ * seams, scattered raised/recessed greebles, and fine machined noise. Used as
+ * BOTH the diffuse detail and a bump map (tiled around the torus) so the surface
+ * reads as busy machined metal — the specular breaks up over relief instead of
+ * sliding across a smooth plastic donut. Greyscale, opaque, per-pixel.
+ */
+export function greebleTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(size, size);
+    // Deterministic per-panel pseudo-random (no RNG — reproducible).
+    const rnd = (a: number, b: number) => {
+      const s = Math.sin(a * 91.7 + b * 47.3) * 43758.5453;
+      return s - Math.floor(s);
+    };
+    const cols = 7;
+    const rows = 4;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const u = (x + 0.5) / size;
+        const v = (y + 0.5) / size;
+        const cx = Math.floor(u * cols);
+        const cy = Math.floor(v * rows);
+        let val = 0.62 + 0.28 * rnd(cx, cy);
+        // Seams between panels.
+        const fu = u * cols - cx;
+        const fv = v * rows - cy;
+        if (fu < 0.05 || fu > 0.95 || fv < 0.05 || fv > 0.95) val *= 0.5;
+        // A greeble block inside some panels, raised (bright) or recessed (dark).
+        const gb = rnd(cx + 3.1, cy + 1.7);
+        if (gb > 0.58 && fu > 0.25 && fu < 0.7 && fv > 0.3 && fv < 0.78) {
+          val *= gb > 0.8 ? 1.3 : 0.68;
+        }
+        // Fine machined grain.
+        val *= 0.9 + 0.16 * fbm(u * 40, v * 22, 4);
+        const o = (y * size + x) * 4;
+        const g = Math.round(Math.max(0, Math.min(1, val)) * 255);
+        img.data[o] = g;
+        img.data[o + 1] = g;
+        img.data[o + 2] = g;
+        img.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * An event anomaly: an irregular, wispy energy field rather than a clean star or
+ * ring (a tidy annulus read as a HUD element). A bright unstable core fades into
+ * fbm-warped tendrils, so it shimmers as an eldritch phenomenon when the sprite
+ * slowly rotates. Greyscale, per-pixel; the material tints it violet.
+ */
+export function anomalyTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(size, size);
+    const half = size / 2;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const nx = (x + 0.5 - half) / half;
+        const ny = (y + 0.5 - half) / half;
+        const d = Math.hypot(nx, ny);
+        const ang = Math.atan2(ny, nx);
+        const warp = fbm(nx * 2.2 + 3, ny * 2.2 - 2, 5); // 0..1 turbulence
+        const wisps = 0.5 + 0.5 * Math.sin(ang * 4 + warp * 6.283);
+        const core = Math.exp(-d * d * 6);
+        const field = Math.exp(-d * d * 2.2) * (0.3 + 0.9 * warp) * wisps;
+        let alpha = Math.min(1, core * 1.1 + field);
+        alpha *= Math.max(0, 1 - Math.max(0, (d - 0.9) / 0.1)); // hard fade at rim
+        const v = Math.min(1, 0.5 + core * 0.6 + wisps * 0.15);
+        const o = (y * size + x) * 4;
+        const g = Math.round(v * 255);
+        img.data[o] = g;
+        img.data[o + 1] = g;
+        img.data[o + 2] = g;
+        img.data[o + 3] = Math.round(Math.max(0, alpha) * 255);
       }
     }
     ctx.putImageData(img, 0, 0);

@@ -1,4 +1,9 @@
-import type { NodeEmphasis } from "../conquest/galaxy3d/GalaxyView";
+import type {
+  NodeBodyKind,
+  NodeEmphasis,
+  NodeIdentity,
+} from "../conquest/galaxy3d/GalaxyView";
+import { hashString } from "../conquest/galaxy3d/layout";
 import type { Faction, GalaxyDoc } from "../conquest/model";
 import { isBattleNode, type RogueliteRun, type RunNodeType } from "./model";
 import { successors } from "./progress";
@@ -187,6 +192,72 @@ export function runPathLinks(run: RogueliteRun): Set<string> {
     if (edges.has(key)) out.add(key);
   }
   return out;
+}
+
+/** Repeated node types that read as a distinct body — but only for a seeded
+ * fraction of them, so a long run never shows ten identical stations. */
+const IDENTITY_BODY: Partial<Record<RunNodeType, NodeBodyKind>> = {
+  shop: "station",
+  reward: "wreck",
+  event: "anomaly",
+};
+
+/** Battle sites keep their star, tinted toward a hostile red (elite a hotter,
+ * whiter danger) so the threat reads without a bespoke body. */
+const DANGER_TINT: Partial<Record<RunNodeType, string>> = {
+  battle: "#e0473a",
+  elite: "#ff6a2a",
+};
+
+/** Chance (%) a repeated body-type rolls its special body. Low enough that most
+ * depots/salvage/events stay plain stars and the special ones read as accents. */
+const BODY_CHANCE = 30;
+
+/**
+ * Per-node visual identity for the warpath map (GalaxyView's `identities` prop,
+ * warpath-only). The singular endpoints are always special — the start is an
+ * allied beacon, the warlord its own lair; battle sites take a danger tint; and a
+ * seeded ~30% of the repeated service nodes (depot/salvage/event) read as a
+ * station / wreck / anomaly rather than a plain star, kept sparse so they punctuate
+ * the run instead of tiling it. Conquest never sets this, so its sky is unchanged.
+ */
+export function runIdentities(run: RogueliteRun): Map<string, NodeIdentity> {
+  const out = new Map<string, NodeIdentity>();
+  for (const n of run.nodes) {
+    if (n.type === "start") {
+      out.set(n.id, { body: "beacon" });
+      continue;
+    }
+    if (n.type === "boss") {
+      out.set(n.id, { body: warlordBodyFor(run.settings.seed) });
+      continue;
+    }
+    const tint = DANGER_TINT[n.type];
+    if (tint) {
+      out.set(n.id, { starTint: tint });
+      continue;
+    }
+    const body = IDENTITY_BODY[n.type];
+    if (body && hashString(`${n.id}-identity`) % 100 < BODY_CHANCE) {
+      out.set(n.id, { body });
+    }
+  }
+  return out;
+}
+
+/** The warlord's lair varies per run so no two warpaths end at the same sight:
+ * a stylised black hole, a blood-red hypergiant, or an armoured fortress. */
+const WARLORD_BODIES: NodeBodyKind[] = [
+  "warlord-blackhole",
+  "warlord-hypergiant",
+  "warlord-fortress",
+];
+
+export function warlordBodyFor(seed: number): NodeBodyKind {
+  const i =
+    ((Math.trunc(seed) % WARLORD_BODIES.length) + WARLORD_BODIES.length) %
+    WARLORD_BODIES.length;
+  return WARLORD_BODIES[i];
 }
 
 /** Every node reachable by following forward edges from `fromId` (inclusive). */
