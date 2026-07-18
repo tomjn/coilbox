@@ -1709,7 +1709,7 @@ export function GalaxyView({
       // ring-station at large scale with an armoured red wash and a hot glow.
       if (variant === "warlord-fortress") {
         return buildStructureBody(i, node, p, {
-          scale: 1.0,
+          scale: 0.8,
           tint: "#c07a6a",
           glowColor: "#ff7a4a",
           glowOpacity: 0.4,
@@ -1896,7 +1896,7 @@ export function GalaxyView({
       // billboarded body (which read as a logo).
       if (body === "station") {
         return buildStructureBody(i, node, p, {
-          scale: 0.63,
+          scale: 0.5,
           tint: "#cfd3da",
           glowColor: "#7fe08a",
           glowOpacity: 0.22,
