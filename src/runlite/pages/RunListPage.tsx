@@ -2,6 +2,8 @@ import { Button } from "@picoframe/frame";
 import { Loader2, Play, Swords, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { Slider } from "@/components/ui/slider";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
@@ -189,13 +191,16 @@ export default function RunListPage() {
 
       <div className="flex flex-col gap-4 rounded-lg border border-border/50 bg-card/50 p-5">
         <Field label="Game">
-          <GameSelectCard
-            game={game}
-            games={games}
-            headers={gameHeaders}
-            gamesLoading={scan.loading}
-            onSelectGame={setGameName}
-          />
+          {/* Compact picker, not a full-width battle card. */}
+          <div className="max-w-[20rem]">
+            <GameSelectCard
+              game={game}
+              games={games}
+              headers={gameHeaders}
+              gamesLoading={scan.loading}
+              onSelectGame={setGameName}
+            />
+          </div>
         </Field>
 
         {(sides.length > 0 || gameLoading) && (
@@ -206,48 +211,76 @@ export default function RunListPage() {
                 Loading the game's factions…
               </div>
             ) : (
-              <OptionSelect
+              <ToggleGroup
+                type="single"
                 value={sideName}
-                onValueChange={setSideName}
-                options={sides.map((s) => ({ value: s.name, label: s.name }))}
-              />
+                onValueChange={(v) => v && setSideName(v)}
+                className="flex-wrap justify-start gap-2"
+              >
+                {sides.map((s) => (
+                  <ToggleGroupItem
+                    key={s.name}
+                    value={s.name}
+                    className="rounded-md border border-border/60 px-4 data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+                  >
+                    {s.name}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
             )}
           </Field>
         )}
 
         {loadouts.length > 1 && (
           <Field label="Loadout">
-            <OptionSelect
+            <ToggleGroup
+              type="single"
               value={loadoutId}
-              onValueChange={setLoadoutId}
-              options={loadouts.map((l) => ({ value: l.id, label: l.label }))}
-            />
+              onValueChange={(v) => v && setLoadoutId(v)}
+              className="flex-wrap justify-start gap-2"
+            >
+              {loadouts.map((l) => (
+                <ToggleGroupItem
+                  key={l.id}
+                  value={l.id}
+                  className="rounded-md border border-border/60 px-4 data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+                >
+                  {l.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </Field>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Length">
-            <OptionSelect
-              value={length}
-              onValueChange={(v) => setLength(v as RunLength)}
-              options={[
-                { value: "quick", label: "Quick" },
-                { value: "standard", label: "Standard" },
-                { value: "long", label: "Long" },
-              ]}
-            />
-          </Field>
-          <Field label="Difficulty">
-            <OptionSelect
-              value={String(difficulty)}
-              onValueChange={(v) => setDifficulty(Number(v))}
-              options={[1, 2, 3, 4, 5].map((d) => ({
-                value: String(d),
-                label: `Level ${d}`,
-              }))}
-            />
-          </Field>
-        </div>
+        <Field label="Length">
+          <ToggleGroup
+            type="single"
+            value={length}
+            onValueChange={(v) => v && setLength(v as RunLength)}
+            className="justify-start gap-2"
+          >
+            {(["quick", "standard", "long"] as const).map((l) => (
+              <ToggleGroupItem
+                key={l}
+                value={l}
+                className="rounded-md border border-border/60 px-4 capitalize data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+              >
+                {l}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </Field>
+
+        <Field label={`Difficulty — level ${difficulty}`}>
+          <Slider
+            min={1}
+            max={5}
+            step={1}
+            value={[difficulty]}
+            onValueChange={([v]) => setDifficulty(v)}
+            className="py-2"
+          />
+        </Field>
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Map style">
