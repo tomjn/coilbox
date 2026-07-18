@@ -9,7 +9,6 @@ import {
   EmptyState,
   SkeletonList,
 } from "../../content/pages/components/states";
-import { useReduceMotion } from "../../general/display";
 import { usePreferredTarget } from "../../play/config";
 import { awardMeta } from "../meta";
 import { isBattleNode, type RunNode } from "../model";
@@ -34,7 +33,6 @@ import { RunHud } from "./components/RunHud";
 export default function RunPage() {
   const { run, loading, save } = useRun();
   const { meta, save: saveMeta } = useRunMeta();
-  const reduceMotion = useReduceMotion();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   // Guard so a finished run awards meta-progression exactly once.
@@ -113,23 +111,25 @@ export default function RunPage() {
     await save(next);
   };
 
+  // Centre the camera on the node being briefed; else frame the whole run.
+  const focusId = active ? active.id : null;
+
   return (
-    <div className="flex h-full flex-col gap-3 p-4">
-      <RunHud run={run} arsenalTotal={arsenalTotal} />
+    <div className="relative h-full overflow-hidden">
+      <RunMapView
+        run={run}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        focusId={focusId}
+        className="absolute inset-0"
+      />
 
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border/50 bg-background/40">
-        <RunMapView
-          nodes={run.nodes}
-          edges={run.edges}
-          skin={run.settings.skin}
-          currentId={run.progress.currentNodeId}
-          visited={run.progress.visited}
-          reachable={choices.map((n) => n.id)}
-          selectedId={selectedId}
-          onSelect={onSelect}
-          reduceMotion={reduceMotion}
-        />
+      {/* HUD overlaid on the map, not stacked above it. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 p-4">
+        <RunHud run={run} arsenalTotal={arsenalTotal} />
+      </div>
 
+      <div className="pointer-events-none absolute inset-0 [&>*]:pointer-events-auto">
         {selectedId && !active && (
           <InspectPanel
             node={run.nodes.find((n) => n.id === selectedId)}

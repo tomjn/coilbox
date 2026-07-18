@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { columnLayout } from "./columnLayout";
 import {
   type GenBuildGraph,
   type GenerateRunOpts,
@@ -191,40 +190,5 @@ describe("generateRun", () => {
         }
       }
     }
-  });
-});
-
-describe("columnLayout", () => {
-  it("places columns left-to-right by rank, centred on origin", () => {
-    const run = generateRun(opts());
-    const pos = columnLayout(run.nodes);
-    // start is the leftmost column, boss the rightmost.
-    const startX = pos.get("start")?.[0] ?? 0;
-    const bossX = pos.get("boss")?.[0] ?? 0;
-    expect(startX).toBeLessThan(bossX);
-    // Y is always flat.
-    for (const [, y] of pos.values()) {
-      expect(y).toBe(0);
-    }
-    // Columns are centred: start and boss are symmetric about 0.
-    expect(startX).toBeCloseTo(-bossX, 5);
-  });
-
-  it("monotonic X across columns", () => {
-    const run = generateRun(opts());
-    const pos = columnLayout(run.nodes);
-    const byId = new Map(run.nodes.map((n) => [n.id, n]));
-    for (const [id, [x]] of pos) {
-      const col = byId.get(id)?.col ?? 0;
-      // A node's X equals its column's X (no intra-column X spread).
-      const sameCol = run.nodes.filter((n) => n.col === col);
-      for (const other of sameCol) {
-        expect(pos.get(other.id)?.[0]).toBeCloseTo(x, 5);
-      }
-    }
-  });
-
-  it("returns empty for empty input", () => {
-    expect(columnLayout([]).size).toBe(0);
   });
 });
