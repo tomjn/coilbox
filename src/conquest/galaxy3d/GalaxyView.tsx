@@ -650,9 +650,9 @@ export function GalaxyView({
     const uTime = { value: 0 };
 
     // Ambient motion (shared across both modes): solar flares erupting from giant
-    // stars and faint sheet-lightning inside the nebula. Only worth animating with
-    // motion + effects on and out of performance mode. Both lists are filled
-    // during the build and driven by the loop; under reduce-motion they stay put.
+    // stars. Only worth animating with motion + effects on and out of performance
+    // mode. The list is filled during the build and driven by the loop; under
+    // reduce-motion the flares stay put.
     const ambientMotion = effects && !performanceMode && !reduceMotion;
     interface Flare {
       i: number;
@@ -664,13 +664,6 @@ export function GalaxyView({
       period: number;
     }
     const flares: Flare[] = [];
-    const nebulaFlashes: {
-      mat: THREE.SpriteMaterial;
-      base: number;
-      boost: number;
-      phase: number;
-      period: number;
-    }[] = [];
 
     const skin = galaxy.theme?.skin ?? "galaxy";
     // Bigger galaxies get a proportionally bigger plane (constant density);
@@ -994,8 +987,7 @@ export function GalaxyView({
         scene.add(sprite);
         // Depth mood (warpath): clouds toward the warlord (higher world-X, the
         // far column) tint deep red — a cool cloud goes dark-muddy, so it both
-        // reddens and darkens as the run nears its end. Colour-only, so the
-        // lightning flicker (which restores opacity to base) doesn't undo it.
+        // reddens and darkens as the run nears its end.
         if (depthMood) {
           const moodT = Math.min(
             1,
@@ -1003,16 +995,6 @@ export function GalaxyView({
           );
           mat.color.lerp(new THREE.Color("#b81e10"), 0.65 * moodT);
         }
-        // Sheet-lightning flicker: phase/period from an independent hash (never
-        // the nebula RNG, which must keep its sequence so placement is stable).
-        nebulaFlashes.push({
-          mat,
-          base: opacity,
-          boost:
-            0.12 + 0.08 * ((hashString(`${galaxy.id}-nlb${i}`) % 100) / 100),
-          phase: (hashString(`${galaxy.id}-nlp${i}`) % 1000) / 1000,
-          period: 6000 + (hashString(`${galaxy.id}-nlper${i}`) % 6000),
-        });
       }
     }
 
@@ -3119,16 +3101,6 @@ export function GalaxyView({
               fl.mat.opacity = 0.75 * a * dimOf(galaxy.nodes[fl.i].id);
             } else if (fl.sprite.visible) {
               fl.sprite.visible = false;
-            }
-          }
-          // Nebula sheet-lightning: a brief brighten on each cloud's long cycle.
-          for (const nb of nebulaFlashes) {
-            const t = (now + nb.phase * nb.period) % nb.period;
-            if (t < 150) {
-              nb.mat.opacity =
-                nb.base + Math.sin((Math.PI * t) / 150) * nb.boost;
-            } else if (nb.mat.opacity !== nb.base) {
-              nb.mat.opacity = nb.base;
             }
           }
           if (sel.idx >= 0) {
