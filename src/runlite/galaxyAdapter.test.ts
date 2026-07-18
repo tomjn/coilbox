@@ -75,19 +75,23 @@ describe("forwardReachable", () => {
 describe("runEmphasis", () => {
   it("leaves the current node and its choices at full brightness", () => {
     const e = runEmphasis(run());
-    // start (current) and b1/b2 (the choices ahead) are absent = bright.
+    // start (current) is absent = bright.
     expect(e.has("start")).toBe(false);
-    expect(e.has("b1")).toBe(false);
-    expect(e.has("b2")).toBe(false);
-    // boss is reachable but not an immediate choice -> dimmed future.
+    // b1/b2 (the choices ahead) stay bright (no opacity) but flash as battles.
+    expect(e.get("b1")?.opacity).toBeUndefined();
+    expect(e.get("b1")?.flash).toBe(true);
+    expect(e.get("b2")?.opacity).toBeUndefined();
+    // boss is reachable but not an immediate choice -> dimmed future, flashing.
     expect(e.get("boss")?.opacity).toBe(RUN_DIM.future);
+    expect(e.get("boss")?.flash).toBe(true);
   });
 
   it("mutes the crossed path and greatly dims the branch not taken", () => {
     const r = resolveBattle(run(), "b1", "victory", "now"); // now at b1
     const e = runEmphasis(r);
-    // boss is the only choice now -> bright.
-    expect(e.has("boss")).toBe(false);
+    // boss is the only choice now -> bright (no opacity), still flashes.
+    expect(e.get("boss")?.opacity).toBeUndefined();
+    expect(e.get("boss")?.flash).toBe(true);
     expect(e.has("b1")).toBe(false); // current
     // start is behind you -> muted and marked done.
     expect(e.get("start")?.opacity).toBe(RUN_DIM.done);

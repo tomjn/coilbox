@@ -1,6 +1,6 @@
 import type { NodeEmphasis } from "../conquest/galaxy3d/GalaxyView";
 import type { Faction, GalaxyDoc } from "../conquest/model";
-import type { RogueliteRun, RunNodeType } from "./model";
+import { isBattleNode, type RogueliteRun, type RunNodeType } from "./model";
 import { successors } from "./progress";
 
 /**
@@ -226,15 +226,23 @@ export function runEmphasis(run: RogueliteRun): Map<string, NodeEmphasis> {
   const visited = new Set(run.progress.visited);
   const emphasis = new Map<string, NodeEmphasis>();
   for (const n of run.nodes) {
-    if (n.id === current || nextIds.has(n.id)) continue; // full brightness
+    if (n.id === current) continue; // where you stand — full brightness
     if (visited.has(n.id)) {
-      // Crossed: muted and marked done with a check.
+      // Crossed: muted and marked done with a check (no combat there anymore).
       emphasis.set(n.id, { opacity: RUN_DIM.done, marker: "check" });
-    } else {
-      emphasis.set(n.id, {
-        opacity: reachable.has(n.id) ? RUN_DIM.future : RUN_DIM.unreachable,
-      });
+      continue;
     }
+    const entry: NodeEmphasis = {};
+    // Immediate choices stay full-bright (no opacity key); anything further is
+    // dimmed by reachability.
+    if (!nextIds.has(n.id)) {
+      entry.opacity = reachable.has(n.id)
+        ? RUN_DIM.future
+        : RUN_DIM.unreachable;
+    }
+    // Battle sites still ahead flicker with distant combat.
+    if (isBattleNode(n.type)) entry.flash = true;
+    if (entry.opacity !== undefined || entry.flash) emphasis.set(n.id, entry);
   }
   return emphasis;
 }

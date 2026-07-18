@@ -54,6 +54,8 @@ export interface NodeEmphasis {
   opacity?: number;
   /** A small glyph drawn over the node. `check` = a completed/crossed marker. */
   marker?: "check";
+  /** Occasional ambient combat flashes over the node (upcoming battle sites). */
+  flash?: boolean;
 }
 
 interface GalaxyViewProps {
@@ -1506,6 +1508,60 @@ export function GalaxyView({
       return sprite;
     };
 
+    // Ambient combat flashes (emphasis `flash`): a small warm pop over upcoming
+    // battle sites every few seconds, staggered per node, faded by the node's
+    // own emphasis so distant fronts flicker fainter. Lazily created; the loop
+    // drives the pulse when motion is on (so reduce-motion stays still).
+    const flashSprites: (THREE.Sprite | undefined)[] = new Array(
+      galaxy.nodes.length,
+    ).fill(undefined);
+    const flashEnabled = new Set<number>();
+    const flashClock = galaxy.nodes.map((n) => ({
+      phase: (hashString(`${n.id}-fp`) % 1000) / 1000,
+      period: 2200 + (hashString(`${n.id}-fperiod`) % 1800),
+    }));
+    const FLASH_MS = 200;
+    let flashTex: THREE.Texture | undefined;
+    const ensureFlash = (i: number): THREE.Sprite | undefined => {
+      const existing = flashSprites[i];
+      if (existing) return existing;
+      const p = positions.get(galaxy.nodes[i].id);
+      if (!p) return undefined;
+      if (!flashTex) {
+        flashTex = radialTexture(64, [
+          [0, "#ffffffff"],
+          [0.3, "#ffd9a0cc"],
+          [0.7, "#ff883322"],
+          [1, "#ff880000"],
+        ]);
+        disposables.push(flashTex);
+      }
+      const mat = new THREE.SpriteMaterial({
+        map: flashTex,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+      });
+      disposables.push(mat);
+      // Offset off the star centre so it reads as a battlefront flash, not a
+      // second star.
+      const h = hashString(`${galaxy.nodes[i].id}-flashoff`);
+      const sprite = new THREE.Sprite(mat);
+      sprite.position.set(
+        p[0] + (((h % 100) / 100) * 2 - 1) * 0.7,
+        p[1] + 0.2,
+        p[2] + ((((h >> 7) % 100) / 100) * 2 - 1) * 0.7,
+      );
+      sprite.renderOrder = 4;
+      sprite.raycast = () => {};
+      sprite.visible = false;
+      scene.add(sprite);
+      flashSprites[i] = sprite;
+      return sprite;
+    };
+
     // Fade the lanes up during the intro (their target opacities are captured
     // now, then restored as the intro clock advances).
     if (animateIntro) {
@@ -1904,6 +1960,15 @@ export function GalaxyView({
         } else if (checkSprites[i]) {
           (checkSprites[i] as THREE.Sprite).visible = false;
         }
+        // Ambient combat flash: enabled here, pulsed in the animation loop.
+        if (emphasisRef.current?.get(n.id)?.flash && vis) {
+          ensureFlash(i);
+          flashEnabled.add(i);
+        } else {
+          flashEnabled.delete(i);
+          const fs = flashSprites[i];
+          if (fs) fs.visible = false;
+        }
       });
       for (const c of companions) {
         const id = galaxy.nodes[c.i].id;
@@ -2151,6 +2216,24 @@ export function GalaxyView({
               if (!chev.mesh.visible) continue;
               chev.mat.opacity =
                 0.22 + 0.78 * (0.5 + 0.5 * Math.sin(now / 240 - chev.t * 7));
+            }
+          }
+          // Ambient combat flashes: a brief pop on a per-node cycle, faded by
+          // the node's emphasis so distant fronts flicker fainter.
+          for (const i of flashEnabled) {
+            const fs = flashSprites[i];
+            if (!fs) continue;
+            const { phase, period } = flashClock[i];
+            const local = (now + phase * period) % period;
+            if (local < FLASH_MS) {
+              const a = Math.sin((Math.PI * local) / FLASH_MS);
+              const capital = galaxy.nodes[i].kind === "capital";
+              fs.visible = true;
+              (fs.material as THREE.SpriteMaterial).opacity =
+                0.55 * a * dimOf(galaxy.nodes[i].id);
+              fs.scale.setScalar((2.0 + 1.4 * a) * (capital ? 1.3 : 1));
+            } else if (fs.visible) {
+              fs.visible = false;
             }
           }
           // Binary companions orbit their primary in the map plane.
