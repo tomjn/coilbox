@@ -6,7 +6,12 @@ import {
   usePerformanceMode,
   useReduceMotion,
 } from "../general/display";
-import { PLAYER_FACTION, runOwners, runToGalaxyDoc } from "./galaxyAdapter";
+import {
+  PLAYER_FACTION,
+  runOwners,
+  runToGalaxyDoc,
+  runVisible,
+} from "./galaxyAdapter";
 import type { RogueliteRun } from "./model";
 
 /**
@@ -41,10 +46,15 @@ export function RunMapView({
     () => runToGalaxyDoc(run),
     [run.nodes, run.edges, run.settings.skin],
   );
-  // biome-ignore lint/correctness/useExhaustiveDependencies: owners depends only on the current node moving, applied live by GalaxyView
+  // biome-ignore lint/correctness/useExhaustiveDependencies: owners/fog depend only on progress moving, applied live by GalaxyView
   const owners = useMemo(
     () => runOwners(run),
-    [run.nodes, run.progress.currentNodeId],
+    [run.nodes, run.progress.currentNodeId, run.progress.visited],
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see above
+  const visibleIds = useMemo(
+    () => runVisible(run),
+    [run.nodes, run.edges, run.progress.currentNodeId, run.progress.status],
   );
 
   const spaceMaps = useKnownSpaceMaps();
@@ -60,6 +70,7 @@ export function RunMapView({
       selectedId={selectedId}
       onSelect={onSelect}
       focusNodeId={focusId ?? null}
+      visibleIds={visibleIds}
       spaceMaps={spaceMaps}
       display={{ reduceMotion, effects, performanceMode }}
       className={className}
