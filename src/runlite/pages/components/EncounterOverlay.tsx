@@ -40,8 +40,8 @@ export function EncounterOverlay({
         : "Battle";
 
   return (
-    <div className="absolute inset-0 z-20 flex items-end justify-center p-4 pb-8">
-      <div className="flex w-[30rem] max-w-full flex-col gap-4 rounded-lg border border-border/50 bg-card/85 p-5 backdrop-blur-sm">
+    <div className="absolute inset-0 z-20 flex items-end justify-center p-4 pb-10">
+      <div className="flex w-[40rem] max-w-full flex-col gap-4 rounded-xl border border-border/50 bg-card/90 p-7 backdrop-blur-md">
         <header className="flex flex-col gap-1">
           <button
             type="button"
