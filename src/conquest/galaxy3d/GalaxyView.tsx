@@ -1401,9 +1401,10 @@ export function GalaxyView({
 
     /**
      * A built structure (depot ring-station, warlord fortress) as *real 3D
-     * geometry*, not a sprite: an OPAQUE metal ring-station — an outer habitation
-     * ring with mounted pods, structural spokes to a central drum-and-dome hub, and
-     * two solar-panel wings — lit by the scene's key light with a specular sheen so
+     * geometry*, not a sprite: an OPAQUE metal ring-station — a ring of discrete
+     * habitat modules (not a smooth torus), structural spokes to a central
+     * drum-and-dome hub, and two solar-panel wings — lit by the scene's key light
+     * with a specular sheen so
      * it reads as machined metal, and spun slowly so the highlight sweeps around
      * it. Opaque so it occludes the stars behind it. The ring (with all parts as
      * children sharing its metal) takes the spike slot; a soft glow sits in the
@@ -1444,64 +1445,67 @@ export function GalaxyView({
       });
       disposables.push(metal, panelMat);
 
-      // Outer habitation ring.
-      const torusGeo = new THREE.TorusGeometry(0.5, 0.11, 16, 52);
-      torusGeo.rotateX(Math.PI / 2); // lie flat in the galaxy plane
-      const ring = new THREE.Mesh(torusGeo, metal);
-      ring.raycast = () => {};
-      disposables.push(torusGeo);
+      // The station is a ring of discrete habitat modules (not a smooth torus)
+      // around a central hub. Parented to a Group so every part scales, spins and
+      // occludes together.
+      const station = new THREE.Group();
 
-      // Central hub: a wide shallow drum with a smaller dome on top. Everything
-      // below is a child of the ring, so it shares the metal, dims together, and
-      // spins with the ring.
-      const hubGeo = new THREE.CylinderGeometry(0.2, 0.24, 0.14, 20);
+      // Module ring: chunky boxes tiled tangentially so their long (Z) axis
+      // follows the circle, forming a segmented ring; per-module scale jitter
+      // makes it read as irregular built modules with gaps, not a smooth donut.
+      const modGeo = new THREE.BoxGeometry(0.16, 0.13, 0.26);
+      disposables.push(modGeo);
+      const MODULES = 12;
+      for (let s = 0; s < MODULES; s++) {
+        const a = (s / MODULES) * Math.PI * 2;
+        const mod = new THREE.Mesh(modGeo, metal);
+        mod.position.set(Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5);
+        mod.rotation.y = a;
+        const j = (hashString(`${node.id}-mod${s}`) % 100) / 100;
+        mod.scale.set(0.85 + 0.5 * j, 0.7 + 0.7 * j, 0.85 + 0.12 * j);
+        mod.raycast = () => {};
+        station.add(mod);
+      }
+
+      // Central hub: a wide shallow drum with a smaller dome on top.
+      const hubGeo = new THREE.CylinderGeometry(0.17, 0.2, 0.14, 18);
       const hub = new THREE.Mesh(hubGeo, metal);
       hub.raycast = () => {};
-      ring.add(hub);
-      const domeGeo = new THREE.CylinderGeometry(0.08, 0.14, 0.1, 16);
+      station.add(hub);
+      const domeGeo = new THREE.CylinderGeometry(0.07, 0.12, 0.1, 14);
       const dome = new THREE.Mesh(domeGeo, metal);
-      dome.position.y = 0.11;
+      dome.position.y = 0.1;
       dome.raycast = () => {};
-      ring.add(dome);
+      station.add(dome);
       disposables.push(hubGeo, domeGeo);
 
-      // Structural spokes bridging hub to ring.
-      const spokeGeo = new THREE.BoxGeometry(0.34, 0.06, 0.07);
-      spokeGeo.translate(0.33, 0, 0); // pivot at hub, reach out to the ring
+      // Structural spokes bridging the hub to the module ring.
+      const spokeGeo = new THREE.BoxGeometry(0.3, 0.05, 0.06);
+      spokeGeo.translate(0.32, 0, 0); // pivot at hub, reach out to the ring
       disposables.push(spokeGeo);
       for (let s = 0; s < 6; s++) {
         const spoke = new THREE.Mesh(spokeGeo, metal);
         spoke.rotation.y = (s / 6) * Math.PI * 2;
         spoke.raycast = () => {};
-        ring.add(spoke);
-      }
-      // Pods/modules mounted around the outer ring (like the reference's units).
-      const podGeo = new THREE.CylinderGeometry(0.06, 0.07, 0.16, 10);
-      disposables.push(podGeo);
-      for (let s = 0; s < 6; s++) {
-        const a = (s / 6) * Math.PI * 2 + Math.PI / 6;
-        const pod = new THREE.Mesh(podGeo, metal);
-        pod.position.set(Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5);
-        pod.raycast = () => {};
-        ring.add(pod);
+        station.add(spoke);
       }
       // Two solar-panel wings on struts.
       const strutGeo = new THREE.BoxGeometry(0.16, 0.03, 0.04);
-      strutGeo.translate(0.58, 0, 0);
+      strutGeo.translate(0.6, 0, 0);
       const panelGeo = new THREE.BoxGeometry(0.24, 0.02, 0.16);
-      panelGeo.translate(0.78, 0, 0);
+      panelGeo.translate(0.82, 0, 0);
       disposables.push(strutGeo, panelGeo);
       for (const a of [Math.PI * 0.28, Math.PI * 1.15]) {
         const strut = new THREE.Mesh(strutGeo, metal);
         strut.rotation.y = a;
         strut.raycast = () => {};
-        ring.add(strut);
+        station.add(strut);
         const panel = new THREE.Mesh(panelGeo, panelMat);
         panel.rotation.y = a;
         panel.raycast = () => {};
-        ring.add(panel);
+        station.add(panel);
       }
-      // One warm light spec on the rim — no window detail at this distance.
+      // One warm light spec on the ring — no window detail at this distance.
       const specMat = new THREE.SpriteMaterial({
         map: coronaTex,
         color: new THREE.Color(opts.glowColor),
@@ -1512,17 +1516,17 @@ export function GalaxyView({
       });
       const spec = new THREE.Sprite(specMat);
       spec.scale.setScalar(0.2);
-      spec.position.set(0.5, 0.08, 0);
+      spec.position.set(0.5, 0.1, 0);
       spec.raycast = () => {};
-      ring.add(spec);
+      station.add(spec);
       disposables.push(specMat);
 
-      ring.position.set(p[0], p[1] + 0.1, p[2]);
+      station.position.set(p[0], p[1] + 0.1, p[2]);
       const base = ((hashString(`${node.id}-rot`) % 100) / 100) * Math.PI * 2;
-      ring.rotation.y = base;
-      registerIntro(ring, starScale(i) * opts.scale, node.id);
-      scene.add(ring);
-      spinners.push({ mesh: ring, base, rate: 1 / 6000 });
+      station.rotation.y = base;
+      registerIntro(station, starScale(i) * opts.scale, node.id);
+      scene.add(station);
+      spinners.push({ mesh: station, base, rate: 1 / 6000 });
 
       const glowMat = new THREE.SpriteMaterial({
         map: coronaTex,
@@ -1555,7 +1559,7 @@ export function GalaxyView({
 
       starSprites.push(undefined);
       starMats.push(undefined);
-      spikeSprites.push(ring);
+      spikeSprites.push(station);
       coronaSprites.push(glow);
       ownerRingMats.push(ownRingMat);
       ownerRings.push(ownRing);
