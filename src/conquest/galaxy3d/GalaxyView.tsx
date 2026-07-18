@@ -649,22 +649,6 @@ export function GalaxyView({
     const scene = new THREE.Scene();
     const uTime = { value: 0 };
 
-    // Ambient motion (shared across both modes): solar flares erupting from giant
-    // stars. Only worth animating with motion + effects on and out of performance
-    // mode. The list is filled during the build and driven by the loop; under
-    // reduce-motion the flares stay put.
-    const ambientMotion = effects && !performanceMode && !reduceMotion;
-    interface Flare {
-      i: number;
-      center: [number, number, number];
-      radius: number;
-      sprite: THREE.Sprite;
-      mat: THREE.SpriteMaterial;
-      phase: number;
-      period: number;
-    }
-    const flares: Flare[] = [];
-
     const skin = galaxy.theme?.skin ?? "galaxy";
     // Bigger galaxies get a proportionally bigger plane (constant density);
     // the backdrop, nebulae and camera framing all scale with it.
@@ -1228,15 +1212,6 @@ export function GalaxyView({
     const bodyRingTex = anyIdentity ? ringBurstTexture(128) : undefined;
     if (stationTex) disposables.push(stationTex);
     if (bodyRingTex) disposables.push(bodyRingTex);
-    // Solar-flare puff: a soft hot blob tinted per giant, erupted at the limb.
-    const flareTex = ambientMotion
-      ? radialTexture(64, [
-          [0, "#ffffffff"],
-          [0.4, "#ffffffaa"],
-          [1, "#ffffff00"],
-        ])
-      : undefined;
-    if (flareTex) disposables.push(flareTex);
     // Comet coma: a bright icy core fading through a soft dusty halo, so it
     // blends into the tail under additive blending (a comet is dust and ice,
     // not rock — no lit surface).
@@ -1390,37 +1365,6 @@ export function GalaxyView({
 
     const WHITE = new THREE.Color(0xffffff);
 
-    // Attach a solar flare to a giant star at node `i` (only under ambient
-    // motion). One reusable puff parked invisible; the loop erupts it on a
-    // per-star cycle from a hashed limb angle, tinted the star's own colour.
-    const addFlare = (i: number, p: WorldPos, color: THREE.Color) => {
-      if (!ambientMotion || !flareTex) return;
-      const mat = new THREE.SpriteMaterial({
-        map: flareTex,
-        color: color.clone(),
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const sprite = new THREE.Sprite(mat);
-      sprite.visible = false;
-      sprite.renderOrder = 3;
-      sprite.raycast = () => {};
-      scene.add(sprite);
-      disposables.push(mat);
-      const id = galaxy.nodes[i].id;
-      flares.push({
-        i,
-        center: [p[0], p[1], p[2]],
-        radius: starScale(i) * 0.55,
-        sprite,
-        mat,
-        phase: (hashString(`${id}-flare`) % 1000) / 1000,
-        period: 3000 + (hashString(`${id}-flareper`) % 2600),
-      });
-    };
-
     /**
      * Build the warlord's lair — the run's final node — in one of three per-run
      * forms: a stylised black hole (dark core + a flat accretion disc that
@@ -1521,8 +1465,6 @@ export function GalaxyView({
         disposables.push(spikeMat);
         scene.add(spikes);
         extra = spikes;
-        // A hypergiant erupts violently — a hotter, more frequent flare.
-        addFlare(i, p, new THREE.Color("#ff5a2a"));
         glowMat = new THREE.SpriteMaterial({
           map: coronaTex,
           color: red,
@@ -2108,8 +2050,6 @@ export function GalaxyView({
         spikes.raycast = () => {};
         disposables.push(spikeMat);
         scene.add(spikes);
-        // Giants throw ambient solar flares from their limb.
-        addFlare(i, p, stellar);
       }
       const coronaMat = new THREE.SpriteMaterial({
         map: coronaTex,
@@ -3077,31 +3017,6 @@ export function GalaxyView({
               vp.base *
               (0.55 + 0.45 * Math.sin(now / 1100)) *
               dimOf(galaxy.nodes[vp.i].id);
-          }
-          // Solar flares: erupt on a per-star cycle from a limb angle that walks
-          // each cycle (golden-angle step) so they never pulse from one spot.
-          for (const fl of flares) {
-            const t = (now + fl.phase * fl.period) % fl.period;
-            const DUR = 620;
-            if (t < DUR) {
-              const a = Math.sin((Math.PI * t) / DUR);
-              const cycle = Math.floor(
-                (now + fl.phase * fl.period) / fl.period,
-              );
-              const ang = (cycle * 2.39996 + fl.phase * 6.283) % (Math.PI * 2);
-              const r = fl.radius * (0.85 + 0.6 * a);
-              fl.sprite.visible = true;
-              fl.sprite.position.set(
-                fl.center[0] + Math.cos(ang) * r,
-                fl.center[1] + 0.1,
-                fl.center[2] + Math.sin(ang) * r,
-              );
-              const s = fl.radius * (0.6 + a);
-              fl.sprite.scale.set(s * 1.3, s, 1);
-              fl.mat.opacity = 0.75 * a * dimOf(galaxy.nodes[fl.i].id);
-            } else if (fl.sprite.visible) {
-              fl.sprite.visible = false;
-            }
           }
           if (sel.idx >= 0) {
             const ring = ownerRings[sel.idx];
