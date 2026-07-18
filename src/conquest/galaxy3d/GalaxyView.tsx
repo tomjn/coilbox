@@ -21,6 +21,7 @@ import {
 import { buildStarfield } from "./starfield";
 import {
   accretionTexture,
+  anomalyTexture,
   asteroidTexture,
   cometTailTexture,
   gasGiantTexture,
@@ -1209,8 +1210,10 @@ export function GalaxyView({
     // warlord rings.
     const anyIdentity = !!identities?.size;
     const stationTex = anyIdentity ? stationTexture(128) : undefined;
+    const anomalyTex = anyIdentity ? anomalyTexture(128) : undefined;
     const bodyRingTex = anyIdentity ? ringBurstTexture(128) : undefined;
     if (stationTex) disposables.push(stationTex);
+    if (anomalyTex) disposables.push(anomalyTex);
     if (bodyRingTex) disposables.push(bodyRingTex);
     // Comet coma: a bright icy core fading through a soft dusty halo, so it
     // blends into the tail under additive blending (a comet is dust and ice,
@@ -1255,15 +1258,16 @@ export function GalaxyView({
     }
     const companions: Companion[] = [];
 
-    // Warpath identity bodies that animate: an anomaly's slow-rotating ring, a
-    // beacon's expanding ping. Driven by the loop when motion is on; static
-    // otherwise. Node index carries the emphasis dimming.
+    // Warpath identity bodies that animate: an anomaly's field slowly rotates and
+    // shimmers, a beacon's glow breathes. Driven by the loop when motion is on;
+    // static otherwise. Node index carries the emphasis dimming.
     interface IdentityPulse {
       i: number;
       kind: "anomaly" | "beacon";
-      ring: THREE.Sprite;
-      ringMat: THREE.SpriteMaterial;
+      sprite: THREE.Sprite;
+      mat: THREE.SpriteMaterial;
       baseScale: number;
+      baseOpacity: number;
       phase: number;
     }
     const identityPulses: IdentityPulse[] = [];
@@ -1474,38 +1478,21 @@ export function GalaxyView({
           depthWrite: false,
         });
       } else {
-        // Fortress station: a big armoured hub with a spinning defensive ring.
+        // Fortress station: the lit satellite hull at large scale, armoured with
+        // a warning-red wash and a hot glow — no ring (that read as HUD).
         const structTex = stationTexture(128);
-        const ringTex = ringBurstTexture(128);
-        disposables.push(structTex, ringTex);
+        disposables.push(structTex);
         headMat = new THREE.SpriteMaterial({
           map: structTex,
-          color: new THREE.Color("#baa39c"),
+          color: new THREE.Color("#c07a6a"),
           transparent: true,
           opacity: 1,
           depthWrite: false,
         });
         head = new THREE.Sprite(headMat);
         head.position.set(p[0], p[1], p[2]);
-        registerIntro(head, base * 1.15, node.id);
+        registerIntro(head, base * 1.5, node.id);
         head.raycast = () => {};
-        const ringMat = new THREE.SpriteMaterial({
-          map: ringTex,
-          color: new THREE.Color("#ff5a3c"),
-          transparent: true,
-          opacity: 0.7,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        });
-        const ring = new THREE.Sprite(ringMat);
-        ring.position.set(p[0], p[1] + 0.12, p[2]);
-        registerIntro(ring, base * 1.8, `${node.id}-fring`);
-        ring.raycast = () => {};
-        disposables.push(ringMat);
-        scene.add(ring);
-        extra = ring;
-        anim.spin = ring;
-        anim.spinRate = -1 / 9000;
         glowMat = new THREE.SpriteMaterial({
           map: coronaTex,
           color: new THREE.Color("#ff7a4a"),
@@ -1569,22 +1556,22 @@ export function GalaxyView({
       body: NodeBodyKind,
     ): boolean => {
       if (body.startsWith("warlord")) return buildWarlordBody(i, node, p, body);
-      // Per-kind recipe. `head` is drawn in the star slot, `glow` in the corona
-      // slot, and an optional `ring` (anomaly/beacon) in the spike slot, animated
-      // by the loop. All colours stay within the grounded palette.
+      // Per-kind recipe. `head` is the body in the star slot, `glow` a soft halo
+      // in the corona slot. No clean rings — a tidy annulus read as HUD; identity
+      // instead comes from a lit/organic body plus the existing type ring. All
+      // colours stay within the grounded palette.
       type Recipe = {
         head: { tex: THREE.Texture; color: string; additive?: boolean };
         headScale: number;
         glow: { color: string; opacity: number; scale: number };
-        ring?: { color: string; opacity: number; scale: number };
         pulse?: "anomaly" | "beacon";
       };
       let recipe: Recipe | undefined;
       if (body === "station" && stationTex) {
         recipe = {
-          head: { tex: stationTex, color: "#b8bcc4" },
-          headScale: 0.9,
-          glow: { color: "#7fe08a", opacity: 0.3, scale: 0.7 },
+          head: { tex: stationTex, color: "#c2c6ce" },
+          headScale: 1.05,
+          glow: { color: "#7fe08a", opacity: 0.28, scale: 0.75 },
         };
       } else if (body === "wreck") {
         recipe = {
@@ -1592,20 +1579,21 @@ export function GalaxyView({
           headScale: 0.9,
           glow: { color: "#8a3320", opacity: 0.35, scale: 0.6 },
         };
-      } else if (body === "anomaly" && bodyRingTex) {
+      } else if (body === "anomaly" && anomalyTex) {
+        // A wispy, irregular energy field (not a star, not a ring); it shimmers
+        // via a slow rotation and brightness breathe in the loop.
         recipe = {
-          head: { tex: starTex, color: "#d9b8ff", additive: true },
-          headScale: 0.75,
-          glow: { color: "#b98cff", opacity: 0.6, scale: 0.95 },
-          ring: { color: "#c9a8ff", opacity: 0.5, scale: 1.6 },
+          head: { tex: anomalyTex, color: "#b98cff", additive: true },
+          headScale: 1.25,
+          glow: { color: "#8f5cff", opacity: 0.5, scale: 1.0 },
           pulse: "anomaly",
         };
-      } else if (body === "beacon" && bodyRingTex) {
+      } else if (body === "beacon") {
+        // A friendly bright point whose halo breathes — no ping ring.
         recipe = {
           head: { tex: starTex, color: "#d6fff8" },
-          headScale: 0.85,
-          glow: { color: "#4fe6d6", opacity: 0.55, scale: 1.1 },
-          ring: { color: "#7ff0e4", opacity: 0.5, scale: 1.4 },
+          headScale: 0.9,
+          glow: { color: "#4fe6d6", opacity: 0.55, scale: 1.2 },
           pulse: "beacon",
         };
       }
@@ -1628,7 +1616,8 @@ export function GalaxyView({
       });
       const head = new THREE.Sprite(headMat);
       head.position.set(p[0], p[1], p[2]);
-      registerIntro(head, starScale(i) * recipe.headScale, node.id);
+      const headScale = starScale(i) * recipe.headScale;
+      registerIntro(head, headScale, node.id);
       head.raycast = () => {};
 
       const glowMat = new THREE.SpriteMaterial({
@@ -1641,41 +1630,33 @@ export function GalaxyView({
       });
       const glow = new THREE.Sprite(glowMat);
       glow.position.set(p[0], p[1], p[2]);
-      registerIntro(
-        glow,
-        coronaScale(i, false) * recipe.glow.scale,
-        `${node.id}-corona`,
-      );
+      const glowScale = coronaScale(i, false) * recipe.glow.scale;
+      registerIntro(glow, glowScale, `${node.id}-corona`);
       glow.raycast = () => {};
 
-      let spikes: THREE.Object3D | undefined;
-      if (recipe.ring && bodyRingTex) {
-        const ringMat = new THREE.SpriteMaterial({
-          map: bodyRingTex,
-          color: new THREE.Color(recipe.ring.color),
-          transparent: true,
-          opacity: recipe.ring.opacity,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
+      // The anomaly shimmers (rotate + breathe the field); the beacon's halo
+      // breathes. Both loop-driven; static under reduce-motion.
+      const phase = (hashString(`${node.id}-idpulse`) % 100) / 100;
+      if (recipe.pulse === "anomaly") {
+        identityPulses.push({
+          i,
+          kind: "anomaly",
+          sprite: head,
+          mat: headMat,
+          baseScale: headScale,
+          baseOpacity: 1,
+          phase,
         });
-        const ring = new THREE.Sprite(ringMat);
-        ring.position.set(p[0], p[1] + 0.15, p[2]);
-        const ringScale = starScale(i) * recipe.ring.scale;
-        registerIntro(ring, ringScale, `${node.id}-idring`);
-        ring.raycast = () => {};
-        disposables.push(ringMat);
-        scene.add(ring);
-        spikes = ring;
-        if (recipe.pulse) {
-          identityPulses.push({
-            i,
-            kind: recipe.pulse,
-            ring,
-            ringMat,
-            baseScale: ringScale,
-            phase: (hashString(`${node.id}-idpulse`) % 100) / 100,
-          });
-        }
+      } else if (recipe.pulse === "beacon") {
+        identityPulses.push({
+          i,
+          kind: "beacon",
+          sprite: glow,
+          mat: glowMat,
+          baseScale: glowScale,
+          baseOpacity: recipe.glow.opacity,
+          phase,
+        });
       }
 
       const ringMat = new THREE.MeshBasicMaterial({
@@ -1691,7 +1672,7 @@ export function GalaxyView({
       ring.raycast = () => {};
       starSprites.push(head);
       starMats.push(headMat);
-      spikeSprites.push(spikes);
+      spikeSprites.push(undefined);
       coronaSprites.push(glow);
       ownerRingMats.push(ringMat);
       ownerRings.push(ring);
@@ -2984,15 +2965,18 @@ export function GalaxyView({
           for (const pu of identityPulses) {
             const dim = dimOf(galaxy.nodes[pu.i].id);
             if (pu.kind === "anomaly") {
-              pu.ringMat.rotation = now / 3000 + pu.phase * 6.283;
+              // Shimmer: rotate the energy field + breathe its brightness/scale.
+              pu.mat.rotation = now / 4000 + pu.phase * 6.283;
               const breathe =
-                0.5 + 0.5 * Math.sin(now / 700 + pu.phase * 6.283);
-              pu.ringMat.opacity = (0.28 + 0.32 * breathe) * dim;
-              pu.ring.scale.setScalar(pu.baseScale * (0.94 + 0.1 * breathe));
+                0.5 + 0.5 * Math.sin(now / 650 + pu.phase * 6.283);
+              pu.mat.opacity = pu.baseOpacity * (0.6 + 0.5 * breathe) * dim;
+              pu.sprite.scale.setScalar(pu.baseScale * (0.92 + 0.12 * breathe));
             } else {
-              const t = (now / 1600 + pu.phase) % 1;
-              pu.ring.scale.setScalar(pu.baseScale * (0.55 + 0.9 * t));
-              pu.ringMat.opacity = (1 - t) * 0.6 * dim;
+              // Beacon: a steady halo that breathes brightness and a little size.
+              const breathe =
+                0.5 + 0.5 * Math.sin(now / 900 + pu.phase * 6.283);
+              pu.mat.opacity = pu.baseOpacity * (0.55 + 0.6 * breathe) * dim;
+              pu.sprite.scale.setScalar(pu.baseScale * (0.95 + 0.12 * breathe));
             }
           }
           // Warlord lair: spin the accretion disc / defensive ring; breathe a

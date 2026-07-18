@@ -362,11 +362,11 @@ export function accretionTexture(size: number): THREE.Texture {
 }
 
 /**
- * An orbital station: a geometric, artificial silhouette — a central hab core,
- * a docking ring on radial spokes, and two solar-panel wings — so it reads as
- * *built structure*, not a fuzzy star. Drawn with solid fills/strokes (no
- * gradients, so no WebKit dither) in greyscale; the sprite material supplies the
- * metallic tint, with a couple of near-white window specks catching the light.
+ * An orbital station: a lit satellite silhouette — a shaded cylindrical hab hull
+ * with two solar-panel wings on struts. Shaded per-pixel from a fixed light
+ * (like the asteroid) so it reads as a solid *object* catching the sun, not a
+ * flat emblem; the earlier flat wheel-and-spokes read as a symbol. Greyscale
+ * (the sprite material tints it metallic), dither-free, with a few window specks.
  */
 export function stationTexture(size: number): THREE.Texture {
   const canvas = document.createElement("canvas");
@@ -374,68 +374,111 @@ export function stationTexture(size: number): THREE.Texture {
   canvas.height = size;
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    ctx.clearRect(0, 0, size, size);
-    const m = size / 2;
-    // Solar-panel wings: dark framed rectangles reaching past the ring, drawn
-    // first so the hub structure overlaps them.
-    ctx.fillStyle = "rgb(70,70,74)";
-    ctx.strokeStyle = "rgb(150,150,156)";
-    ctx.lineWidth = size * 0.012;
-    for (const dir of [-1, 1]) {
-      const px = m + dir * size * 0.34;
-      ctx.fillRect(
-        px - size * 0.11,
-        m - size * 0.075,
-        size * 0.22,
-        size * 0.15,
-      );
-      ctx.strokeRect(
-        px - size * 0.11,
-        m - size * 0.075,
-        size * 0.22,
-        size * 0.15,
-      );
-      // Cell divisions.
-      for (let k = 1; k < 3; k++) {
-        const x = px - size * 0.11 + (size * 0.22 * k) / 3;
-        ctx.beginPath();
-        ctx.moveTo(x, m - size * 0.075);
-        ctx.lineTo(x, m + size * 0.075);
-        ctx.stroke();
+    const img = ctx.createImageData(size, size);
+    const half = size / 2;
+    const px = 1 / half;
+    // Light from upper-left (screen up = -y), matching the asteroid.
+    const L = [-0.5, -0.62, 0.6] as const;
+    const hl = 0.3; // hull half-length
+    const hr = 0.16; // hull radius
+    const pIn = 0.42; // panel inner / outer / half-height
+    const pOut = 0.9;
+    const pH = 0.23;
+    const windows = [
+      [-0.12, -0.03],
+      [0.02, 0.03],
+      [0.15, -0.02],
+    ] as const;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const nx = (x + 0.5 - half) / half;
+        const ny = (y + 0.5 - half) / half;
+        const anx = Math.abs(nx);
+        let v = 0;
+        let a = 0;
+        // Hull: a horizontal capsule shaded as a lit cylinder (radial normal in
+        // the y/z plane along the body, spherical at the end caps).
+        const rx = anx > hl ? anx - hl : 0;
+        const sx = nx < 0 ? -rx : rx;
+        const rlen = Math.hypot(sx, ny);
+        if (rlen <= hr) {
+          const z = Math.sqrt(Math.max(0, 1 - (rlen / hr) ** 2));
+          const lam = Math.max(
+            0,
+            (sx / hr) * L[0] + (ny / hr) * L[1] + z * L[2],
+          );
+          v = 0.14 + 0.86 * lam;
+          // Window lights catching the sun on the lit face.
+          for (const [wx, wy] of windows) {
+            if (Math.hypot(nx - wx, ny - wy) < 0.03) v = Math.max(v, 0.95);
+          }
+          a = Math.min(1, (hr - rlen) / (1.2 * px));
+        } else if (anx >= pIn && anx <= pOut && Math.abs(ny) <= pH) {
+          // Solar panels: darker toward the shadowed (right) side, with a cell
+          // grid and a brighter frame edge.
+          const sun = nx < 0 ? 0.5 : 0.34;
+          const gu = ((anx - pIn) / 0.075) % 1;
+          const gw = ((ny + pH) / 0.075) % 1;
+          const grid = gu < 0.14 || gw < 0.14 ? 0.55 : 1;
+          const edge = anx > pOut - 0.02 || Math.abs(ny) > pH - 0.02;
+          v = edge ? 0.6 : sun * grid;
+          a = 1;
+        } else if (anx > hl && anx < pIn && Math.abs(ny) < 0.035) {
+          // Struts connecting the hull to each panel.
+          v = 0.5;
+          a = 1;
+        }
+        const o = (y * size + x) * 4;
+        const g = Math.round(Math.max(0, Math.min(1, v)) * 255);
+        img.data[o] = g;
+        img.data[o + 1] = g;
+        img.data[o + 2] = g;
+        img.data[o + 3] = Math.round(a * 255);
       }
     }
-    // Radial spokes from the hub out to the docking ring.
-    ctx.strokeStyle = "rgb(120,122,128)";
-    ctx.lineWidth = size * 0.03;
-    for (let s = 0; s < 6; s++) {
-      const a = (s / 6) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(m + Math.cos(a) * size * 0.12, m + Math.sin(a) * size * 0.12);
-      ctx.lineTo(m + Math.cos(a) * size * 0.4, m + Math.sin(a) * size * 0.4);
-      ctx.stroke();
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * An event anomaly: an irregular, wispy energy field rather than a clean star or
+ * ring (a tidy annulus read as a HUD element). A bright unstable core fades into
+ * fbm-warped tendrils, so it shimmers as an eldritch phenomenon when the sprite
+ * slowly rotates. Greyscale, per-pixel; the material tints it violet.
+ */
+export function anomalyTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(size, size);
+    const half = size / 2;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const nx = (x + 0.5 - half) / half;
+        const ny = (y + 0.5 - half) / half;
+        const d = Math.hypot(nx, ny);
+        const ang = Math.atan2(ny, nx);
+        const warp = fbm(nx * 2.2 + 3, ny * 2.2 - 2, 5); // 0..1 turbulence
+        const wisps = 0.5 + 0.5 * Math.sin(ang * 4 + warp * 6.283);
+        const core = Math.exp(-d * d * 6);
+        const field = Math.exp(-d * d * 2.2) * (0.3 + 0.9 * warp) * wisps;
+        let alpha = Math.min(1, core * 1.1 + field);
+        alpha *= Math.max(0, 1 - Math.max(0, (d - 0.9) / 0.1)); // hard fade at rim
+        const v = Math.min(1, 0.5 + core * 0.6 + wisps * 0.15);
+        const o = (y * size + x) * 4;
+        const g = Math.round(v * 255);
+        img.data[o] = g;
+        img.data[o + 1] = g;
+        img.data[o + 2] = g;
+        img.data[o + 3] = Math.round(Math.max(0, alpha) * 255);
+      }
     }
-    // Docking ring.
-    ctx.strokeStyle = "rgb(200,203,210)";
-    ctx.lineWidth = size * 0.075;
-    ctx.beginPath();
-    ctx.arc(m, m, size * 0.4, 0, Math.PI * 2);
-    ctx.stroke();
-    // Central hab core.
-    ctx.fillStyle = "rgb(176,179,184)";
-    ctx.beginPath();
-    ctx.arc(m, m, size * 0.16, 0, Math.PI * 2);
-    ctx.fill();
-    // Window lights catching the sun.
-    ctx.fillStyle = "rgb(255,252,240)";
-    for (const [wx, wy] of [
-      [-0.05, -0.04],
-      [0.04, 0.02],
-      [-0.01, 0.06],
-    ] as const) {
-      ctx.beginPath();
-      ctx.arc(m + wx * size, m + wy * size, size * 0.018, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    ctx.putImageData(img, 0, 0);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
