@@ -11,8 +11,20 @@ import {
 } from "../../content/pages/components/states";
 import { usePreferredTarget } from "../../play/config";
 import { awardMeta } from "../meta";
-import { isBattleNode, type RunNode } from "../model";
-import { moveTo, nextChoices, pendingNode } from "../progress";
+import {
+  isBattleNode,
+  type RogueliteRun,
+  type RunNode,
+  type RunNodeType,
+} from "../model";
+import {
+  deepestColumn,
+  hullLoss,
+  moveTo,
+  nextChoices,
+  pendingNode,
+  salvageReward,
+} from "../progress";
 import { RunMapView } from "../RunMapView";
 import { useRun, useRunMeta } from "../runs";
 import { EncounterOverlay } from "./components/EncounterOverlay";
@@ -172,15 +184,52 @@ export default function RunPage() {
           />
         )}
 
-        {ended && !active && (
-          <EndScreen
-            won={run.progress.status === "won"}
-            onClear={() => save(null)}
-          />
-        )}
+        {ended && !active && <EndScreen run={run} onClear={() => save(null)} />}
       </div>
     </div>
   );
+}
+
+const NODE_TITLE: Record<RunNodeType, string> = {
+  start: "Command",
+  battle: "Battle",
+  elite: "Elite garrison",
+  boss: "Sector warlord",
+  reward: "Salvage cache",
+  event: "Signal",
+  shop: "Depot",
+};
+
+/** A short stat preview for a node, so you can read what it holds before
+ * committing your course. */
+function previewRows(node: RunNode): [string, string][] {
+  if (node.battle) {
+    const b = node.battle;
+    return [
+      [
+        "Opposition",
+        `${b.enemyAiCount} × hostile${b.handicap > 0 ? ` (+${b.handicap}%)` : ""}`,
+      ],
+      ["Tech tier", `${b.techTier}`],
+      ["Health at risk", `-${hullLoss(node)}`],
+      ["Reward", `+${salvageReward(node)} salvage`],
+    ];
+  }
+  if (node.reward) {
+    const unlocks = node.reward.options.filter(
+      (o) => o.kind === "unlock",
+    ).length;
+    const perks = node.reward.options.length - unlocks;
+    return [["Choose one of", `${unlocks} unlock, ${perks} perk`]];
+  }
+  if (node.event) return [["A choice awaits", "no battle"]];
+  if (node.shop) {
+    return [
+      ["Offers", `${node.shop.offers.length}`],
+      ["Rest & repair", node.shop.restHull ? "available" : "—"],
+    ];
+  }
+  return [];
 }
 
 function InspectPanel({
@@ -195,21 +244,16 @@ function InspectPanel({
   onClose: () => void;
 }) {
   if (!node) return null;
+  const rows = previewRows(node);
   return (
     <div className="absolute right-3 top-3 z-10 flex w-72 flex-col gap-3 rounded-lg border border-border/50 bg-card/85 p-4 backdrop-blur-sm">
       <div className="flex items-start justify-between">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {node.type}
+            {NODE_TITLE[node.type]}
           </div>
           {node.battle && (
-            <div className="mt-1 text-sm">
-              <div className="truncate">{node.battle.mapName}</div>
-              <div className="text-xs text-muted-foreground">
-                {node.battle.enemyAiCount} × hostile · tier{" "}
-                {node.battle.techTier}
-              </div>
-            </div>
+            <div className="mt-1 truncate text-sm">{node.battle.mapName}</div>
           )}
         </div>
         <button
@@ -220,6 +264,16 @@ function InspectPanel({
           <X className="size-4" aria-hidden />
         </button>
       </div>
+      {rows.length > 0 && (
+        <dl className="flex flex-col gap-1 text-xs">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-2">
+              <dt className="text-muted-foreground">{label}</dt>
+              <dd className="text-right font-medium">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       {isChoice && (
         <Button size="sm" onClick={onEnter} className="w-full">
           Chart a course here
@@ -229,26 +283,55 @@ function InspectPanel({
   );
 }
 
-function EndScreen({ won, onClear }: { won: boolean; onClear: () => void }) {
+function EndScreen({
+  run,
+  onClear,
+}: {
+  run: RogueliteRun;
+  onClear: () => void;
+}) {
+  const won = run.progress.status === "won";
+  const depth = deepestColumn(run);
+  const maxCol = Math.max(...run.nodes.map((n) => n.col), 1);
+  const battlesWon = run.history.filter((h) => h.outcome === "victory").length;
+  const stats: [string, string][] = [
+    ["Depth reached", `${depth} / ${maxCol}`],
+    ["Battles won", `${battlesWon}`],
+    ["Units unlocked", `${run.progress.unlockedUnits.length}`],
+    ["Perks earned", `${run.progress.perks.length}`],
+    ["Salvage banked", `${run.progress.salvage}`],
+  ];
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/70 backdrop-blur-sm">
-      <div className="flex w-[26rem] max-w-full flex-col items-center gap-4 rounded-lg border border-border/50 bg-card/90 p-6 text-center">
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
+      <div className="flex w-[30rem] max-w-full flex-col items-center gap-5 rounded-xl border border-border/50 bg-card/95 p-7 text-center">
         <Trophy
-          className={`size-8 ${won ? "text-yellow-300" : "text-muted-foreground"}`}
+          className={`size-9 ${won ? "text-yellow-300" : "text-muted-foreground"}`}
           aria-hidden
         />
-        <h2
-          className={`text-2xl font-bold ${won ? "text-emerald-400" : "text-red-400"}`}
-        >
-          {won ? "Run complete" : "Run ended"}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {won
-            ? "The sector warlord is broken. The run is yours."
-            : "Your ship gave out. The run is over."}
-        </p>
-        <Link to="/runlite">
-          <Button onClick={onClear}>Back to runs</Button>
+        <div className="flex flex-col gap-1">
+          <h2
+            className={`text-2xl font-bold ${won ? "text-emerald-400" : "text-red-400"}`}
+          >
+            {won ? "Run complete" : "Run ended"}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {won
+              ? "The sector warlord is broken. The run is yours."
+              : "Your ship gave out. The run is over."}
+          </p>
+        </div>
+        <dl className="w-full divide-y divide-border/40 text-sm">
+          {stats.map(([label, value]) => (
+            <div key={label} className="flex justify-between py-2">
+              <dt className="text-muted-foreground">{label}</dt>
+              <dd className="font-semibold tabular-nums">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <Link to="/runlite" className="w-full">
+          <Button onClick={onClear} className="w-full">
+            Back to runs
+          </Button>
         </Link>
       </div>
     </div>
