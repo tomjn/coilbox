@@ -2,11 +2,7 @@ import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Bug, ExternalLink, Info, Star } from "lucide-react";
 import { useEffect, useState } from "react";
-
-const REPO = "tomjn/coilbox";
-const REPO_URL = `https://github.com/${REPO}`;
-const ISSUE_URL = `${REPO_URL}/issues/new/choose`;
-const API_URL = `https://api.github.com/repos/${REPO}`;
+import { API_URL, ISSUE_URL, REPO_URL } from "../errorReport";
 
 /** Compact star count: 1234 -> "1.2k", below 1000 shown as-is. */
 function formatStars(n: number): string {
