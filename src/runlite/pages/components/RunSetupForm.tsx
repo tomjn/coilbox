@@ -11,6 +11,7 @@ import {
 } from "../../../content/config";
 import { usePreferredTarget, useSkirmishAis } from "../../../play/config";
 import { GameSelectCard } from "../../../play/pages/components/GameSelectCard";
+import { getGameMatcher } from "../../../profile/profile";
 import {
   type GenBuildGraph,
   type GenerateRunOpts,
@@ -27,16 +28,33 @@ import { OptionSelect } from "./OptionSelect";
  * {@link GenerateRunOpts} from the installed game's maps, sides and build graph,
  * bakes a self-contained run and saves it, then calls `onStarted`.
  */
+/** Remembers the last game picked across runs (and the module-level default). */
+const LAST_GAME_KEY = "runlite:lastGame";
+
 export function RunSetupForm({ onStarted }: { onStarted: () => void }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { save } = useRun();
   const { meta } = useRunMeta();
 
-  const games = scan.data?.games ?? [];
+  // In a distribution profile filtered to a game, only that game is offered.
+  const matcher = getGameMatcher();
+  const allGames = scan.data?.games ?? [];
+  const games = useMemo(
+    () => (matcher ? allGames.filter((g) => matcher(g.name)) : allGames),
+    [allGames, matcher],
+  );
+  // A profile pinned to a single game hides the picker entirely.
+  const forcedSingleGame = !!matcher && games.length === 1;
   const maps = scan.data?.maps ?? [];
 
   const [gameName, setGameName] = useState("");
+  const selectGame = (name: string) => {
+    setGameName(name);
+    try {
+      localStorage.setItem(LAST_GAME_KEY, name);
+    } catch {}
+  };
   const [sideName, setSideName] = useState("");
   const [length, setLength] = useState<RunLength>("standard");
   const [difficulty, setDifficulty] = useState(2);
@@ -50,8 +68,17 @@ export function RunSetupForm({ onStarted }: { onStarted: () => void }) {
     target?.dataDir,
   );
 
+  // Default to the last game the player picked (if still installed/allowed),
+  // else the first available game.
   useEffect(() => {
-    if (!gameName && games.length > 0) setGameName(games[0].name);
+    if (gameName && games.some((g) => g.name === gameName)) return;
+    if (games.length === 0) return;
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem(LAST_GAME_KEY);
+    } catch {}
+    const pick = games.find((g) => g.name === last) ?? games[0];
+    setGameName(pick.name);
   }, [games, gameName]);
 
   const game = games.find((g) => g.name === gameName) ?? null;
@@ -129,15 +156,17 @@ export function RunSetupForm({ onStarted }: { onStarted: () => void }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Field label="Game">
-        <GameSelectCard
-          game={game}
-          games={games}
-          headers={gameHeaders}
-          gamesLoading={scan.loading}
-          onSelectGame={setGameName}
-        />
-      </Field>
+      {!forcedSingleGame && (
+        <Field label="Game">
+          <GameSelectCard
+            game={game}
+            games={games}
+            headers={gameHeaders}
+            gamesLoading={scan.loading}
+            onSelectGame={selectGame}
+          />
+        </Field>
+      )}
 
       {(sides.length > 0 || gameLoading) && (
         <Field label="Faction / side">

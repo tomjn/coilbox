@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { Trophy, X } from "lucide-react";
+import { ArrowLeft, Trophy, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { resolveGameByShortname } from "../../conquest/model";
@@ -136,9 +136,20 @@ export default function RunPage() {
         className="absolute inset-0"
       />
 
-      {/* HUD overlaid on the map, not stacked above it. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 p-4">
-        <RunHud run={run} arsenalTotal={arsenalTotal} />
+      {/* HUD overlaid on the map, not stacked above it. A back control sits to
+          the left of the gauges so a run is exitable even when the profile
+          hides the sidebar nav. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-stretch gap-3 p-4">
+        <Link
+          to="/runlite"
+          aria-label="Back to runs"
+          className="pointer-events-auto flex items-center justify-center rounded-md border border-border/50 bg-card/70 px-3 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-5" aria-hidden />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <RunHud run={run} arsenalTotal={arsenalTotal} />
+        </div>
       </div>
 
       <div className="pointer-events-none absolute inset-0 [&>*]:pointer-events-auto">
