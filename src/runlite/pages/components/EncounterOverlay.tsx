@@ -1,8 +1,9 @@
 import { Button } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
-import { ArrowLeft, Download, Loader2, Swords } from "lucide-react";
+import { Download, Loader2, Swords } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
+import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
 import { invalidateMapPreview, invalidateScans } from "../../../content/config";
 import { ErrorBanner } from "../../../content/pages/components/states";
 import {
@@ -51,14 +52,13 @@ export function EncounterOverlay({
         className="absolute inset-0 cursor-default"
       />
       <div className="relative flex w-[40rem] max-w-full flex-col gap-4 rounded-xl border border-border/50 bg-card/90 p-7 backdrop-blur-md">
+        {/* Its own box in the gutter to the card's left (not a header link), so
+            stepping back to the map is a separate, obvious target. */}
+        <BackToMapButton
+          onClick={onClose}
+          className="absolute right-full top-0 mr-4"
+        />
         <header className="flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex items-center gap-1 self-start text-xs text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-3.5" aria-hidden /> Back to map
-          </button>
           <h1 className="flex items-center gap-2 text-lg font-semibold">
             <Swords className="size-5 text-primary" aria-hidden />
             {kindLabel}
@@ -76,7 +76,7 @@ export function EncounterOverlay({
               <Row label="Tech tier" value={`${spec.techTier}`} />
             </dl>
             <p className="text-xs text-muted-foreground">
-              Defeat costs health, not the run — you retreat and press on.
+              Defeat costs health, not the warpath — you retreat and press on.
             </p>
             {enc.error && <ErrorBanner message={enc.error} />}
             {enc.noEngine ? (
@@ -156,7 +156,7 @@ export function EncounterOverlay({
                 onClose();
               }}
             >
-              Return to the run map
+              Return to the map
             </Button>
           </div>
         )}

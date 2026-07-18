@@ -1,12 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
-import {
-  ArrowLeft,
-  Download,
-  Loader2,
-  ShieldAlert,
-  Swords,
-} from "lucide-react";
+import { Download, Loader2, ShieldAlert, Swords } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { invalidateMapPreview, invalidateScans } from "../../../content/config";
@@ -20,6 +14,7 @@ import { factionSides } from "../../galaxy3d/factionShape";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../../model";
 import { difficultyHandicap, difficultyTable } from "../../rules";
 import { useConquestBattleRun } from "../../run";
+import { BackToMapButton } from "./BackToMapButton";
 import { FactionDot } from "./RunSetup";
 
 /**
@@ -57,15 +52,23 @@ export function BattleOverlay({
     // selectable while briefing) but lets the zoomed star show through. The card
     // sticks to the bottom so it doesn't cover the focused system.
     <div className="absolute inset-0 z-20 flex items-end justify-center p-4 pb-8">
-      <div className="flex w-[30rem] max-w-full flex-col gap-4 rounded-lg border border-border/50 bg-card/85 p-5 backdrop-blur-sm">
+      {/* Clicking the map (anywhere outside the card) dismisses the briefing,
+          matching the run map. Nothing has committed yet, so backing out is
+          free. */}
+      <button
+        type="button"
+        aria-label="Back to map"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default"
+      />
+      <div className="relative flex w-[30rem] max-w-full flex-col gap-4 rounded-lg border border-border/50 bg-card/85 p-5 backdrop-blur-sm">
+        {/* Its own box in the gutter to the card's left, matching the map's
+            top-left exit control. */}
+        <BackToMapButton
+          onClick={onClose}
+          className="absolute right-full top-0 mr-4"
+        />
         <header className="flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex items-center gap-1 self-start text-xs text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-3.5" aria-hidden /> {galaxy.title}
-          </button>
           <h1 className="flex items-center gap-2 text-lg font-semibold">
             {mode === "defend" ? (
               <ShieldAlert className="size-5 text-amber-400" aria-hidden />

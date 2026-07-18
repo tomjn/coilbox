@@ -329,6 +329,17 @@ function makeShop(
   used: Set<string>,
 ): ShopSpec {
   const offers = [];
+  // A guaranteed budget perk, listed first and priced below a single same-tier
+  // battle win (salvageReward ≈ 40 + tier*15) so a depot is never a dead stop:
+  // the fight leading in always affords at least this. Drawn a tier softer than
+  // the headline perk so the low price reads as a modest boon, not a discount.
+  offers.push({
+    cost: 20 + tier * 10,
+    option: {
+      kind: "perk",
+      perk: drawPerk(rng, Math.max(1, tier - 1)),
+    } as RewardOption,
+  });
   if (planner) {
     for (let i = 0; i < 2; i++) {
       const unlock = drawUnlock(rng, planner, tier, used);

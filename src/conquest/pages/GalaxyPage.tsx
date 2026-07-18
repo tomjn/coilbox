@@ -24,6 +24,7 @@ import { FOG_RANGE, withinJumps } from "../fog";
 import { type VoidBody, voidBodiesFor } from "../galaxy3d/bodies";
 import { factionSides } from "../galaxy3d/factionShape";
 import { GalaxyView, nodeBodyLabel } from "../galaxy3d/GalaxyView";
+import { galaxyPalette } from "../galaxy3d/palette";
 import { regenerateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../model";
 import {
@@ -34,6 +35,7 @@ import {
 } from "../model";
 import { mergeConquestNames } from "../names";
 import { attackableNodes } from "../rules";
+import { BackToMapButton } from "./components/BackToMapButton";
 import { BattleOverlay } from "./components/BattleOverlay";
 import { FactionDot, SidePicker } from "./components/RunSetup";
 
@@ -121,6 +123,20 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
     return withinJumps(galaxy, owned, FOG_RANGE);
   }, [galaxy, state, owners, playerFactionId]);
 
+  // Give each space galaxy its own backdrop palette (varied nebula + starfield
+  // tints) unless its theme already sets one — so a fresh galaxy reads as its
+  // own place instead of the single restrained default. Only the render doc is
+  // themed; all strategic logic keeps using `galaxy` (identical nodes/links).
+  const themedGalaxy = useMemo<GalaxyDoc>(() => {
+    if (galaxy.theme?.skin === "theatre") return galaxy;
+    if (galaxy.theme?.starPalette || galaxy.theme?.nebulaColors) return galaxy;
+    const p = galaxyPalette(galaxy.id);
+    return {
+      ...galaxy,
+      theme: { ...galaxy.theme, starPalette: p.stars, nebulaColors: p.nebula },
+    };
+  }, [galaxy]);
+
   const selected = galaxy.nodes.find((n) => n.id === selectedId);
 
   // The battle briefing now lives on the map (no separate screen): opening it
@@ -164,7 +180,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
       style={backdrop}
     >
       <GalaxyView
-        galaxy={galaxy}
+        galaxy={themedGalaxy}
         owners={owners}
         playerFactionId={playerFactionId}
         selectedId={selectedId}
@@ -221,6 +237,15 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
           </div>
         )}
       </div>
+
+      {/* A prominent step-back-to-map control on the left, opposite the
+          selection panel. The map itself also clears a selection on an
+          empty-space click. */}
+      {state && selected && state.status === "active" && !battleNodeId && (
+        <div className="absolute left-3 top-16 z-10">
+          <BackToMapButton onClick={() => setSelectedId(null)} />
+        </div>
+      )}
 
       {/* Right-hand selection panel (hidden while a battle briefing is open) */}
       {state && selected && state.status === "active" && !battleNodeId && (

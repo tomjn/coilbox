@@ -20,6 +20,7 @@ import {
 import {
   deepestColumn,
   hullLoss,
+  isResolved,
   nextChoices,
   salvageReward,
 } from "../progress";
@@ -81,10 +82,10 @@ export default function RunPage() {
   if (!run) {
     return (
       <div className="p-6">
-        <EmptyState label="No active run." />
+        <EmptyState label="No active warpath." />
         <div className="mt-4">
-          <Link to="/runlite">
-            <Button>Start a run</Button>
+          <Link to="/warpath">
+            <Button>Start a warpath</Button>
           </Link>
         </div>
       </div>
@@ -102,7 +103,16 @@ export default function RunPage() {
       setSelectedId(null);
       return;
     }
-    if (choiceIds.has(id)) {
+    // A depot you've already stepped into stays "open" until you leave it
+    // (buying/resting commits the move but doesn't resolve the node), so let
+    // re-clicking it reopen the actionable overlay — you can spend more, or
+    // reconsider after dismissing without having spent.
+    const node = run.nodes.find((n) => n.id === id);
+    const reopenableShop =
+      node?.type === "shop" &&
+      id === run.progress.currentNodeId &&
+      !isResolved(run, id);
+    if (choiceIds.has(id) || reopenableShop) {
       // Open this choice's overlay as a *preview* — nothing commits until it's
       // resolved (launch/take/choose), so backing out is free.
       setSelectedId(null);
@@ -144,13 +154,26 @@ export default function RunPage() {
           same column, so it shares the gauges' gap and never overlaps them. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4">
         <div className="flex items-stretch gap-3">
-          <Link
-            to="/runlite"
-            aria-label="Back to runs"
-            className="pointer-events-auto flex items-center justify-center rounded-md border border-border/50 bg-card/70 px-3 text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft className="size-5" aria-hidden />
-          </Link>
+          {selectedId && !active ? (
+            // A node is selected (read-only inspect): the left control steps
+            // back to the map, mirroring the exit button's box style.
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              aria-label="Back to map"
+              className="pointer-events-auto flex items-center justify-center rounded-md border border-border/50 bg-card/70 px-3 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="size-5" aria-hidden />
+            </button>
+          ) : (
+            <Link
+              to="/warpath"
+              aria-label="Back to warpath hub"
+              className="pointer-events-auto flex items-center justify-center rounded-md border border-border/50 bg-card/70 px-3 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="size-5" aria-hidden />
+            </Link>
+          )}
           <div className="min-w-0 flex-1">
             <RunHud run={run} arsenalTotal={arsenalTotal} />
           </div>
@@ -270,9 +293,16 @@ function previewRows(node: RunNode): [string, string][] {
   }
   if (node.event) return [["A choice awaits", "no battle"]];
   if (node.shop) {
+    const cheapest = Math.min(...node.shop.offers.map((o) => o.cost));
     return [
       ["Offers", `${node.shop.offers.length}`],
-      ["Rest & repair", node.shop.restHull ? "available" : "—"],
+      // Surface the price floor so you can weigh a depot against your salvage
+      // before charting a course to it — depots are rare, so a wasted visit hurts.
+      ["Cheapest", `${cheapest} salvage`],
+      [
+        "Rest & repair",
+        node.shop.restHull ? `+${node.shop.restHull} hull` : "—",
+      ],
     ];
   }
   return [];
@@ -385,12 +415,12 @@ function EndScreen({
           <h2
             className={`text-2xl font-bold ${won ? "text-emerald-400" : "text-red-400"}`}
           >
-            {won ? "Run complete" : "Run ended"}
+            {won ? "Warpath complete" : "Warpath ended"}
           </h2>
           <p className="text-sm text-muted-foreground">
             {won
-              ? "The sector warlord is broken. The run is yours."
-              : "Your ship gave out. The run is over."}
+              ? "The sector warlord is broken. The warpath is yours."
+              : "Your ship gave out. The warpath is over."}
           </p>
         </div>
         <dl className="w-full divide-y divide-border/40 text-sm">
@@ -401,9 +431,9 @@ function EndScreen({
             </div>
           ))}
         </dl>
-        <Link to="/runlite" className="w-full">
+        <Link to="/warpath" className="w-full">
           <Button onClick={onClear} className="w-full">
-            Back to runs
+            Back to warpath hub
           </Button>
         </Link>
       </div>

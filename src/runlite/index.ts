@@ -24,8 +24,8 @@ const runlitePlugin: FramePlugin = {
       items: [
         {
           id: "runlite.list",
-          label: "Run",
-          to: "/runlite",
+          label: "Warpath",
+          to: "/warpath",
           order: 3,
           icon: Swords,
         },
@@ -34,14 +34,14 @@ const runlitePlugin: FramePlugin = {
   ],
   routes: [
     {
-      path: "runlite",
+      path: "warpath",
       lazy: () => import("./pages/RunListPage"),
-      crumb: "Run",
+      crumb: "Warpath",
     },
     {
-      path: "runlite/active",
+      path: "warpath/active",
       lazy: () => import("./pages/RunPage"),
-      crumb: "Active run",
+      crumb: "Active warpath",
     },
   ],
 };

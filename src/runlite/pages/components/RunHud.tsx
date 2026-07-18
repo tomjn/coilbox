@@ -28,7 +28,7 @@ export function RunHud({
         icon={<Heart className="size-4 text-cyan-400" aria-hidden />}
         label="Health"
         value={`${p.hull} / ${p.maxHull}`}
-        help="Your run ends when this reaches zero. Losing a battle costs health — you retreat and press on — while events and depots can restore it."
+        help="Your warpath ends when this reaches zero. Losing a battle costs health — you retreat and press on — while events and depots can restore it."
       >
         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
           <div
@@ -41,7 +41,7 @@ export function RunHud({
         icon={<Layers className="size-4 text-amber-400" aria-hidden />}
         label="Depth"
         value={`${depth} / ${maxCol}`}
-        help="How far you've crossed the map. Reach and beat the warlord at the far end to win the run."
+        help="How far you've crossed the map. Reach and beat the warlord at the far end to win the warpath."
       />
       <Gauge
         icon={<Sparkles className="size-4 text-yellow-300" aria-hidden />}
