@@ -132,30 +132,34 @@ export default function RunPage() {
 
       {/* HUD overlaid on the map, not stacked above it. A back control sits to
           the left of the gauges so a run is exitable even when the profile
-          hides the sidebar nav. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-stretch gap-3 p-4">
-        <Link
-          to="/runlite"
-          aria-label="Back to runs"
-          className="pointer-events-auto flex items-center justify-center rounded-md border border-border/50 bg-card/70 px-3 text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-5" aria-hidden />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <RunHud run={run} arsenalTotal={arsenalTotal} />
+          hides the sidebar nav. The inspect panel flows below the gauges in the
+          same column, so it shares the gauges' gap and never overlaps them. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4">
+        <div className="flex items-stretch gap-3">
+          <Link
+            to="/runlite"
+            aria-label="Back to runs"
+            className="pointer-events-auto flex items-center justify-center rounded-md border border-border/50 bg-card/70 px-3 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-5" aria-hidden />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <RunHud run={run} arsenalTotal={arsenalTotal} />
+          </div>
         </div>
+        {selectedId && !active && (
+          <div className="flex justify-end">
+            <InspectPanel
+              node={run.nodes.find((n) => n.id === selectedId)}
+              isChoice={choiceIds.has(selectedId)}
+              onEnter={() => onSelect(selectedId)}
+              onClose={() => setSelectedId(null)}
+            />
+          </div>
+        )}
       </div>
 
       <div className="pointer-events-none absolute inset-0 [&>*]:pointer-events-auto">
-        {selectedId && !active && (
-          <InspectPanel
-            node={run.nodes.find((n) => n.id === selectedId)}
-            isChoice={choiceIds.has(selectedId)}
-            onEnter={() => onSelect(selectedId)}
-            onClose={() => setSelectedId(null)}
-          />
-        )}
-
         {active && isBattleNode(active.type) && (
           <EncounterOverlay
             run={run}
@@ -276,50 +280,53 @@ function InspectPanel({
   const rows = previewRows(node);
   const tint = NODE_TINT[node.type];
   return (
-    // Sits below the HUD gauges (top-24) so it never covers the Arsenal card,
-    // with a left edge + title tinted to the node's type colour.
-    <div
-      className="absolute right-3 top-24 z-10 flex w-72 flex-col gap-3 rounded-lg border border-l-2 border-border/50 bg-card/85 p-4 backdrop-blur-sm"
-      style={{ borderLeftColor: tint }}
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <div
-            className="text-[10px] font-semibold uppercase tracking-wider"
-            style={{ color: tint }}
-          >
-            {NODE_TITLE[node.type]}
-          </div>
-          {node.battle && (
-            <div className="mt-1 truncate text-sm">{node.battle.mapName}</div>
-          )}
-          <p className="mt-1 text-xs text-muted-foreground">
-            {NODE_DESC[node.type]}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          <X className="size-4" aria-hidden />
-        </button>
-      </div>
-      {rows.length > 0 && (
-        <dl className="flex flex-col gap-1 text-xs">
-          {rows.map(([label, value]) => (
-            <div key={label} className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">{label}</dt>
-              <dd className="text-right font-medium">{value}</dd>
+    // A subtle wash of the node's type colour over the card (no slop border).
+    <div className="pointer-events-auto relative flex w-72 flex-col overflow-hidden rounded-lg border border-border/50 bg-card/85 p-4 backdrop-blur-sm">
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{ backgroundColor: tint, opacity: 0.08 }}
+      />
+      <div className="relative flex flex-col gap-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <div
+              className="text-[10px] font-semibold uppercase tracking-wider"
+              style={{ color: tint }}
+            >
+              {NODE_TITLE[node.type]}
             </div>
-          ))}
-        </dl>
-      )}
-      {isChoice && (
-        <Button size="sm" onClick={onEnter} className="w-full">
-          Chart a course here
-        </Button>
-      )}
+            {node.battle && (
+              <div className="mt-1 truncate text-sm">{node.battle.mapName}</div>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              {NODE_DESC[node.type]}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+        </div>
+        {rows.length > 0 && (
+          <dl className="flex flex-col gap-1 text-xs">
+            {rows.map(([label, value]) => (
+              <div key={label} className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd className="text-right font-medium">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        {isChoice && (
+          <Button size="sm" onClick={onEnter} className="w-full">
+            Chart a course here
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
