@@ -338,11 +338,18 @@ export function accretionTexture(size: number): THREE.Texture {
     const outer = [176, 52, 20] as const;
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
-        const d = Math.hypot(x + 0.5 - half, y + 0.5 - half) / half;
+        const nx = (x + 0.5 - half) / half;
+        const ny = (y + 0.5 - half) / half;
+        const d = Math.hypot(nx, ny);
         // A gaussian band centred at ~0.52, with the hole cleared below ~0.2.
         const band = Math.exp(-((d - 0.52) ** 2) / (2 * 0.15 * 0.15));
         const hole = Math.min(1, Math.max(0, (d - 0.2) / 0.1));
-        const a = Math.min(1, band * hole);
+        // Faint angular flow (swirled by turbulence) so a slowly-rotated
+        // billboard shimmers as if the disc were orbiting.
+        const ang = Math.atan2(ny, nx);
+        const flow =
+          0.72 + 0.28 * Math.sin(ang * 3 + fbm(nx * 2 + 5, ny * 2, 6) * 6.283);
+        const a = Math.min(1, band * hole * flow);
         const t = Math.min(1, Math.max(0, (d - 0.34) / 0.4)); // 0 inner..1 outer
         const seg = t < 0.5 ? t * 2 : (t - 0.5) * 2;
         const lo = t < 0.5 ? inner : mid;

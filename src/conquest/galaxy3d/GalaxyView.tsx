@@ -1288,13 +1288,14 @@ export function GalaxyView({
     }
     const identityPulses: IdentityPulse[] = [];
 
-    // The warlord lair's motion: a black hole's disc / a fortress's ring spins,
-    // a hypergiant breathes. Driven by the loop when motion is on.
+    // The warlord lair's motion: a black hole's accretion disc shimmers (its
+    // billboard material slowly rotates), a hypergiant breathes. Driven by the
+    // loop when motion is on.
     interface WarlordAnim {
       i: number;
-      /** An object spun about Y (accretion disc / defensive ring). */
-      spin?: THREE.Object3D;
-      spinRate?: number;
+      /** A billboard disc material whose rotation shimmers (accretion disc). */
+      discMat?: THREE.SpriteMaterial;
+      discRate?: number;
       /** Sprites that breathe in scale + opacity (hypergiant). */
       pulse?: {
         sprite: THREE.Sprite;
@@ -1569,27 +1570,28 @@ export function GalaxyView({
         head.position.set(p[0], p[1], p[2]);
         registerIntro(head, base * 0.5, node.id);
         head.raycast = () => {};
-        // Accretion disc: a flat annulus in the galaxy plane, seen as an ellipse.
+        // Accretion disc: a BILLBOARD (not a flat plane). A flat plane looked
+        // wrong from the side and split into two side patches behind the core; a
+        // billboard reads as the same disc from every angle and its radial fade
+        // always stays inside the sprite (no square cut-offs). It shimmers by
+        // slowly rotating its material (the texture has a faint angular flow).
         const discTex = accretionTexture(256);
-        const discMat = new THREE.MeshBasicMaterial({
+        const discMat = new THREE.SpriteMaterial({
           map: discTex,
           transparent: true,
           opacity: 1,
           depthWrite: false,
-          side: THREE.DoubleSide,
           blending: THREE.AdditiveBlending,
         });
-        const discGeo = new THREE.PlaneGeometry(1, 1);
-        discGeo.rotateX(-Math.PI / 2);
-        disposables.push(discTex, discMat, discGeo);
-        const disc = new THREE.Mesh(discGeo, discMat);
-        disc.position.set(p[0], p[1] + 0.05, p[2]);
+        disposables.push(discTex, discMat);
+        const disc = new THREE.Sprite(discMat);
+        disc.position.set(p[0], p[1], p[2]);
+        registerIntro(disc, base * 1.4, `${node.id}-disc`);
         disc.raycast = () => {};
-        registerIntro(disc, base * 1.6, `${node.id}-disc`);
         scene.add(disc);
         extra = disc;
-        anim.spin = disc;
-        anim.spinRate = 1 / 4000;
+        anim.discMat = discMat;
+        anim.discRate = 0.00018;
         // Photon ring: a bright thin ring hugging the event horizon. Billboarded,
         // so it stays a circle around the dark sphere from any angle — the lensed
         // bright-rim look from Interstellar, without real lensing.
@@ -1673,7 +1675,7 @@ export function GalaxyView({
           { sprite: glow, mat: glowMat, base: glowScale },
         ];
       }
-      if (anim.spin || anim.pulse) warlordAnims.push(anim);
+      if (anim.discMat || anim.pulse) warlordAnims.push(anim);
 
       const ownRingMat = new THREE.MeshBasicMaterial({
         color: ownerColor(ownersRef.current[node.id] ?? node.owner),
@@ -3148,7 +3150,7 @@ export function GalaxyView({
             sp.mesh.rotation.y = sp.base + now * sp.rate;
           }
           for (const wa of warlordAnims) {
-            if (wa.spin) wa.spin.rotation.y = now * (wa.spinRate ?? 0);
+            if (wa.discMat) wa.discMat.rotation = now * (wa.discRate ?? 0);
             if (wa.pulse && !introActive) {
               const breathe = 1 + 0.06 * Math.sin(now / 900);
               for (const pr of wa.pulse)
