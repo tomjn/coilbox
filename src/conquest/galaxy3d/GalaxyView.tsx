@@ -27,7 +27,6 @@ import {
   gasGiantTexture,
   radialTexture,
   spikesTexture,
-  stationTexture,
 } from "./textures";
 
 /**
@@ -1205,16 +1204,23 @@ export function GalaxyView({
     const spikeTex = spikesTexture(256);
     const asteroidTex = asteroidTexture(128);
     const cometTailTex = cometTailTexture(256);
-    // Warpath identity bodies (created only if any node needs one). A station
-    // structure sprite and a soft annulus shared by the anomaly / beacon /
-    // warlord rings.
+    // Warpath identity textures (created only if any node needs one): the wispy
+    // anomaly field and a soft annulus (anomaly halo / gas-giant ring / black-hole
+    // photon ring). The ring-stations are real 3D geometry, not a texture.
     const anyIdentity = !!identities?.size;
-    const stationTex = anyIdentity ? stationTexture(128) : undefined;
     const anomalyTex = anyIdentity ? anomalyTexture(128) : undefined;
     const bodyRingTex = anyIdentity ? ringBurstTexture(128) : undefined;
-    if (stationTex) disposables.push(stationTex);
     if (anomalyTex) disposables.push(anomalyTex);
     if (bodyRingTex) disposables.push(bodyRingTex);
+    // A single directional key light + dim ambient so the lit 3D ring-stations
+    // shade and their specular sweeps as they spin (metal, not flat plastic).
+    // Only lit materials respond; every other object is unlit MeshBasic/Sprite,
+    // so conquest and the rest of the map are unchanged. Warpath-only.
+    if (anyIdentity) {
+      const key = new THREE.DirectionalLight(0xffffff, 1.6);
+      key.position.set(-0.6, 1, 0.4);
+      scene.add(key, new THREE.AmbientLight(0xffffff, 0.5));
+    }
     // Comet coma: a bright icy core fading through a soft dusty halo, so it
     // blends into the tail under additive blending (a comet is dust and ice,
     // not rock — no lit surface).
@@ -1297,6 +1303,11 @@ export function GalaxyView({
       base: number;
     }[] = [];
 
+    // Slowly-spinning 3D structures (the ring-stations): rotating a lit metal ring
+    // sweeps its specular highlight around, so it shimmers as metal rather than
+    // sitting flat. `base` is the node's fixed orientation; the loop adds time.
+    const spinners: { mesh: THREE.Object3D; base: number; rate: number }[] = [];
+
     // Intro warp-in: sprites pop from zero to their target scale (staggered by
     // node), lanes fade up, and the camera eases in. Only when motion is on.
     const factionOnlyRebuild =
@@ -1370,13 +1381,15 @@ export function GalaxyView({
     const WHITE = new THREE.Color(0xffffff);
 
     /**
-     * A built structure (depot ring-station, warlord fortress) drawn as a flat
-     * quad laid *in* the galaxy plane — not billboarded — so the tilted camera
-     * foreshortens it into a structure seen at an angle, reading as a
-     * megastructure rather than a face-on logo. A soft glow sits behind it in the
-     * corona slot; the flat mesh takes the spike slot (both accept an Object3D),
-     * and the star slot stays empty. Returns `false` if the station texture wasn't
-     * built (never for a real caller). Shared by the depot and the fortress.
+     * A built structure (depot ring-station, warlord fortress) as *real 3D
+     * geometry*, not a sprite: a metal torus ring (inside, outside and edges) with
+     * a central hub and structural spokes, lit by the scene's key light with a
+     * specular sheen so it reads as machined metal, and spun slowly so the
+     * highlight sweeps around it. Laid in the galaxy plane, so the tilted camera
+     * also foreshortens it. One warm light spec stands in for detail at this
+     * distance. The ring mesh (with the hub/spokes/spec as children sharing its
+     * material) takes the spike slot so fog/emphasis dim the whole thing; a soft
+     * glow sits in the corona slot; the star slot stays empty.
      */
     const buildStructureBody = (
       i: number,
@@ -1390,26 +1403,59 @@ export function GalaxyView({
         glowScale: number;
       },
     ): boolean => {
-      if (!stationTex) return false;
-      const geo = new THREE.PlaneGeometry(1, 1);
-      geo.rotateX(-Math.PI / 2); // lie flat in the galaxy plane
-      const meshMat = new THREE.MeshBasicMaterial({
-        map: stationTex,
+      // One shared metal material — specular, low-ish shininess for a broad sheen.
+      const metal = new THREE.MeshPhongMaterial({
         color: new THREE.Color(opts.tint),
+        specular: new THREE.Color(0xcdd4e0),
+        shininess: 55,
         transparent: true,
         opacity: 1,
-        depthWrite: false,
-        side: THREE.DoubleSide,
+        depthWrite: true,
       });
-      const mesh = new THREE.Mesh(geo, meshMat);
-      mesh.position.set(p[0], p[1] + 0.05, p[2]);
-      // A per-node spin about the vertical so docking arms point every which way.
-      mesh.rotation.y =
-        ((hashString(`${node.id}-rot`) % 100) / 100) * Math.PI * 2;
-      mesh.raycast = () => {};
-      registerIntro(mesh, starScale(i) * opts.scale, node.id);
-      disposables.push(geo, meshMat);
-      scene.add(mesh);
+      const torusGeo = new THREE.TorusGeometry(0.5, 0.11, 14, 48);
+      torusGeo.rotateX(Math.PI / 2); // lie flat in the galaxy plane
+      const ring = new THREE.Mesh(torusGeo, metal);
+      ring.raycast = () => {};
+      disposables.push(torusGeo, metal);
+
+      // Central hub + four structural spokes bridging hub to ring (children, so
+      // they share the metal, dim together and spin with the ring).
+      const hubGeo = new THREE.IcosahedronGeometry(0.16, 0);
+      const hub = new THREE.Mesh(hubGeo, metal);
+      hub.raycast = () => {};
+      ring.add(hub);
+      disposables.push(hubGeo);
+      const spokeGeo = new THREE.BoxGeometry(0.34, 0.05, 0.06);
+      spokeGeo.translate(0.33, 0, 0); // pivot at hub, reach out to the ring
+      disposables.push(spokeGeo);
+      for (let s = 0; s < 4; s++) {
+        const spoke = new THREE.Mesh(spokeGeo, metal);
+        spoke.rotation.y = (s / 4) * Math.PI * 2;
+        spoke.raycast = () => {};
+        ring.add(spoke);
+      }
+      // One warm light spec on the rim — no window detail at this distance.
+      const specMat = new THREE.SpriteMaterial({
+        map: coronaTex,
+        color: new THREE.Color(opts.glowColor),
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const spec = new THREE.Sprite(specMat);
+      spec.scale.setScalar(0.22);
+      spec.position.set(0.5, 0.06, 0);
+      spec.raycast = () => {};
+      ring.add(spec);
+      disposables.push(specMat);
+
+      ring.position.set(p[0], p[1] + 0.1, p[2]);
+      const base = ((hashString(`${node.id}-rot`) % 100) / 100) * Math.PI * 2;
+      ring.rotation.y = base;
+      registerIntro(ring, starScale(i) * opts.scale, node.id);
+      scene.add(ring);
+      spinners.push({ mesh: ring, base, rate: 1 / 6000 });
 
       const glowMat = new THREE.SpriteMaterial({
         map: coronaTex,
@@ -1442,7 +1488,7 @@ export function GalaxyView({
 
       starSprites.push(undefined);
       starMats.push(undefined);
-      spikeSprites.push(mesh);
+      spikeSprites.push(ring);
       coronaSprites.push(glow);
       ownerRingMats.push(ownRingMat);
       ownerRings.push(ownRing);
@@ -1530,6 +1576,25 @@ export function GalaxyView({
         extra = disc;
         anim.spin = disc;
         anim.spinRate = 1 / 4000;
+        // Photon ring: a bright thin ring hugging the event horizon. Billboarded,
+        // so it stays a circle around the dark sphere from any angle — the lensed
+        // bright-rim look from Interstellar, without real lensing.
+        if (bodyRingTex) {
+          const photonMat = new THREE.SpriteMaterial({
+            map: bodyRingTex,
+            color: new THREE.Color("#ffe6b0"),
+            transparent: true,
+            opacity: 0.95,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+          });
+          const photon = new THREE.Sprite(photonMat);
+          photon.position.set(p[0], p[1] + 0.02, p[2]);
+          registerIntro(photon, base * 1.45, `${node.id}-photon`);
+          photon.raycast = () => {};
+          disposables.push(photonMat);
+          scene.add(photon);
+        }
         glowMat = new THREE.SpriteMaterial({
           map: coronaTex,
           color: new THREE.Color("#ff7a2a"),
@@ -3064,6 +3129,10 @@ export function GalaxyView({
           }
           // Warlord lair: spin the accretion disc / defensive ring; breathe a
           // hypergiant (scale only, so fog/emphasis keep owning its opacity).
+          // Ring-stations spin slowly so their specular sweeps (metal shimmer).
+          for (const sp of spinners) {
+            sp.mesh.rotation.y = sp.base + now * sp.rate;
+          }
           for (const wa of warlordAnims) {
             if (wa.spin) wa.spin.rotation.y = now * (wa.spinRate ?? 0);
             if (wa.pulse && !introActive) {
