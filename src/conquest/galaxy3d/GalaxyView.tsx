@@ -25,6 +25,7 @@ import {
   asteroidTexture,
   cometTailTexture,
   gasGiantTexture,
+  greebleTexture,
   radialTexture,
   spikesTexture,
 } from "./textures";
@@ -1212,14 +1213,23 @@ export function GalaxyView({
     const bodyRingTex = anyIdentity ? ringBurstTexture(128) : undefined;
     if (anomalyTex) disposables.push(anomalyTex);
     if (bodyRingTex) disposables.push(bodyRingTex);
-    // A single directional key light + dim ambient so the lit 3D ring-stations
-    // shade and their specular sweeps as they spin (metal, not flat plastic).
+    // Greeble/panel detail tiled around the ring-stations (diffuse + bump).
+    const greebleTex = anyIdentity ? greebleTexture(256) : undefined;
+    if (greebleTex) {
+      greebleTex.wrapS = THREE.RepeatWrapping;
+      greebleTex.wrapT = THREE.RepeatWrapping;
+      greebleTex.repeat.set(7, 3);
+      disposables.push(greebleTex);
+    }
+    // A harsh directional key light + very low ambient so the 3D ring-stations
+    // shade hard (a real dark side and terminator, not an evenly-lit balloon) and
+    // their specular sweeps as they spin — machined metal, not smooth plastic.
     // Only lit materials respond; every other object is unlit MeshBasic/Sprite,
     // so conquest and the rest of the map are unchanged. Warpath-only.
     if (anyIdentity) {
-      const key = new THREE.DirectionalLight(0xffffff, 1.6);
+      const key = new THREE.DirectionalLight(0xffffff, 2.6);
       key.position.set(-0.6, 1, 0.4);
-      scene.add(key, new THREE.AmbientLight(0xffffff, 0.5));
+      scene.add(key, new THREE.AmbientLight(0xffffff, 0.12));
     }
     // Comet coma: a bright icy core fading through a soft dusty halo, so it
     // blends into the tail under additive blending (a comet is dust and ice,
@@ -1403,11 +1413,15 @@ export function GalaxyView({
         glowScale: number;
       },
     ): boolean => {
-      // One shared metal material — specular, low-ish shininess for a broad sheen.
+      // One shared metal material — greeble diffuse + bump so the surface is busy
+      // machined metal, with a tighter specular that catches on the relief.
       const metal = new THREE.MeshPhongMaterial({
         color: new THREE.Color(opts.tint),
-        specular: new THREE.Color(0xcdd4e0),
-        shininess: 55,
+        map: greebleTex,
+        bumpMap: greebleTex,
+        bumpScale: 0.6,
+        specular: new THREE.Color(0xb0b8c6),
+        shininess: 38,
         transparent: true,
         opacity: 1,
         depthWrite: true,
@@ -1517,11 +1531,11 @@ export function GalaxyView({
       // ring-station at large scale with an armoured red wash and a hot glow.
       if (variant === "warlord-fortress") {
         return buildStructureBody(i, node, p, {
-          scale: 3.0,
+          scale: 1.0,
           tint: "#c07a6a",
           glowColor: "#ff7a4a",
           glowOpacity: 0.4,
-          glowScale: 1.2,
+          glowScale: 0.6,
         });
       }
 
@@ -1553,7 +1567,7 @@ export function GalaxyView({
         });
         head = new THREE.Sprite(headMat);
         head.position.set(p[0], p[1], p[2]);
-        registerIntro(head, base * 0.9, node.id);
+        registerIntro(head, base * 0.5, node.id);
         head.raycast = () => {};
         // Accretion disc: a flat annulus in the galaxy plane, seen as an ellipse.
         const discTex = accretionTexture(256);
@@ -1571,7 +1585,7 @@ export function GalaxyView({
         const disc = new THREE.Mesh(discGeo, discMat);
         disc.position.set(p[0], p[1] + 0.05, p[2]);
         disc.raycast = () => {};
-        registerIntro(disc, base * 3.0, `${node.id}-disc`);
+        registerIntro(disc, base * 1.6, `${node.id}-disc`);
         scene.add(disc);
         extra = disc;
         anim.spin = disc;
@@ -1590,7 +1604,7 @@ export function GalaxyView({
           });
           const photon = new THREE.Sprite(photonMat);
           photon.position.set(p[0], p[1] + 0.02, p[2]);
-          registerIntro(photon, base * 1.45, `${node.id}-photon`);
+          registerIntro(photon, base * 0.78, `${node.id}-photon`);
           photon.raycast = () => {};
           disposables.push(photonMat);
           scene.add(photon);
@@ -1648,7 +1662,7 @@ export function GalaxyView({
       // The black hole's glow is small so it rims the disc; the hypergiant's is
       // broad so it reads as a swollen star.
       const glowScale =
-        coronaScale(i, false) * (variant === "warlord-blackhole" ? 0.55 : 1.4);
+        coronaScale(i, false) * (variant === "warlord-blackhole" ? 0.42 : 1.4);
       registerIntro(glow, glowScale, `${node.id}-corona`);
       glow.raycast = () => {};
 
@@ -1703,11 +1717,11 @@ export function GalaxyView({
       // billboarded body (which read as a logo).
       if (body === "station") {
         return buildStructureBody(i, node, p, {
-          scale: 1.9,
+          scale: 0.63,
           tint: "#c2c6ce",
           glowColor: "#7fe08a",
           glowOpacity: 0.22,
-          glowScale: 0.8,
+          glowScale: 0.45,
         });
       }
       // Per-kind recipe. `head` is the body in the star slot, `glow` a soft halo

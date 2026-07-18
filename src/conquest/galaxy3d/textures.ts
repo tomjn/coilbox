@@ -362,6 +362,60 @@ export function accretionTexture(size: number): THREE.Texture {
 }
 
 /**
+ * Greeble/panel detail for the metal ring-stations: blocky panels with darker
+ * seams, scattered raised/recessed greebles, and fine machined noise. Used as
+ * BOTH the diffuse detail and a bump map (tiled around the torus) so the surface
+ * reads as busy machined metal — the specular breaks up over relief instead of
+ * sliding across a smooth plastic donut. Greyscale, opaque, per-pixel.
+ */
+export function greebleTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(size, size);
+    // Deterministic per-panel pseudo-random (no RNG — reproducible).
+    const rnd = (a: number, b: number) => {
+      const s = Math.sin(a * 91.7 + b * 47.3) * 43758.5453;
+      return s - Math.floor(s);
+    };
+    const cols = 7;
+    const rows = 4;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const u = (x + 0.5) / size;
+        const v = (y + 0.5) / size;
+        const cx = Math.floor(u * cols);
+        const cy = Math.floor(v * rows);
+        let val = 0.62 + 0.28 * rnd(cx, cy);
+        // Seams between panels.
+        const fu = u * cols - cx;
+        const fv = v * rows - cy;
+        if (fu < 0.05 || fu > 0.95 || fv < 0.05 || fv > 0.95) val *= 0.5;
+        // A greeble block inside some panels, raised (bright) or recessed (dark).
+        const gb = rnd(cx + 3.1, cy + 1.7);
+        if (gb > 0.58 && fu > 0.25 && fu < 0.7 && fv > 0.3 && fv < 0.78) {
+          val *= gb > 0.8 ? 1.3 : 0.68;
+        }
+        // Fine machined grain.
+        val *= 0.9 + 0.16 * fbm(u * 40, v * 22, 4);
+        const o = (y * size + x) * 4;
+        const g = Math.round(Math.max(0, Math.min(1, val)) * 255);
+        img.data[o] = g;
+        img.data[o + 1] = g;
+        img.data[o + 2] = g;
+        img.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
  * An event anomaly: an irregular, wispy energy field rather than a clean star or
  * ring (a tidy annulus read as a HUD element). A bright unstable core fades into
  * fbm-warped tendrils, so it shimmers as an eldritch phenomenon when the sprite
