@@ -1370,6 +1370,88 @@ export function GalaxyView({
     const WHITE = new THREE.Color(0xffffff);
 
     /**
+     * A built structure (depot ring-station, warlord fortress) drawn as a flat
+     * quad laid *in* the galaxy plane — not billboarded — so the tilted camera
+     * foreshortens it into a structure seen at an angle, reading as a
+     * megastructure rather than a face-on logo. A soft glow sits behind it in the
+     * corona slot; the flat mesh takes the spike slot (both accept an Object3D),
+     * and the star slot stays empty. Returns `false` if the station texture wasn't
+     * built (never for a real caller). Shared by the depot and the fortress.
+     */
+    const buildStructureBody = (
+      i: number,
+      node: GalaxyNode,
+      p: WorldPos,
+      opts: {
+        scale: number;
+        tint: string;
+        glowColor: string;
+        glowOpacity: number;
+        glowScale: number;
+      },
+    ): boolean => {
+      if (!stationTex) return false;
+      const geo = new THREE.PlaneGeometry(1, 1);
+      geo.rotateX(-Math.PI / 2); // lie flat in the galaxy plane
+      const meshMat = new THREE.MeshBasicMaterial({
+        map: stationTex,
+        color: new THREE.Color(opts.tint),
+        transparent: true,
+        opacity: 1,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(geo, meshMat);
+      mesh.position.set(p[0], p[1] + 0.05, p[2]);
+      // A per-node spin about the vertical so docking arms point every which way.
+      mesh.rotation.y =
+        ((hashString(`${node.id}-rot`) % 100) / 100) * Math.PI * 2;
+      mesh.raycast = () => {};
+      registerIntro(mesh, starScale(i) * opts.scale, node.id);
+      disposables.push(geo, meshMat);
+      scene.add(mesh);
+
+      const glowMat = new THREE.SpriteMaterial({
+        map: coronaTex,
+        color: new THREE.Color(opts.glowColor),
+        transparent: true,
+        opacity: opts.glowOpacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const glow = new THREE.Sprite(glowMat);
+      glow.position.set(p[0], p[1], p[2]);
+      registerIntro(
+        glow,
+        coronaScale(i, false) * opts.glowScale,
+        `${node.id}-corona`,
+      );
+      glow.raycast = () => {};
+
+      const ownRingMat = new THREE.MeshBasicMaterial({
+        color: ownerColor(ownersRef.current[node.id] ?? node.owner),
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const ownRing = new THREE.Mesh(ringGeoFor(0), ownRingMat);
+      ownRing.rotation.x = -Math.PI / 2;
+      ownRing.position.set(p[0], p[1] - 0.4, p[2]);
+      ownRing.raycast = () => {};
+
+      starSprites.push(undefined);
+      starMats.push(undefined);
+      spikeSprites.push(mesh);
+      coronaSprites.push(glow);
+      ownerRingMats.push(ownRingMat);
+      ownerRings.push(ownRing);
+      disposables.push(glowMat, ownRingMat);
+      scene.add(glow, ownRing);
+      return true;
+    };
+
+    /**
      * Build the warlord's lair — the run's final node — in one of three per-run
      * forms: a stylised black hole (dark core + a flat accretion disc that
      * foreshortens into an ellipse, plus a gravitational glow; no lensing), a
@@ -1385,6 +1467,18 @@ export function GalaxyView({
       p: WorldPos,
       variant: NodeBodyKind,
     ): boolean => {
+      // A fortress is a built structure, not a star — the flat foreshortened
+      // ring-station at large scale with an armoured red wash and a hot glow.
+      if (variant === "warlord-fortress") {
+        return buildStructureBody(i, node, p, {
+          scale: 3.0,
+          tint: "#c07a6a",
+          glowColor: "#ff7a4a",
+          glowOpacity: 0.4,
+          glowScale: 1.2,
+        });
+      }
+
       const base = starScale(i);
       const anim: WarlordAnim = { i };
       let head: THREE.Sprite;
@@ -1393,10 +1487,14 @@ export function GalaxyView({
       let extra: THREE.Object3D | undefined;
 
       if (variant === "warlord-blackhole") {
+        // A solid black event horizon that occludes the sky, ringed by a bright
+        // accretion disc laid flat (so it foreshortens to an ellipse). The outer
+        // glow is kept small so it rims the disc instead of washing it into a
+        // fuzzy orange star.
         const coreTex = radialTexture(128, [
           [0, "#000000ff"],
-          [0.5, "#000000ff"],
-          [0.78, "#160b06e0"],
+          [0.62, "#000000ff"],
+          [0.85, "#0a0603f2"],
           [1, "#00000000"],
         ]);
         disposables.push(coreTex);
@@ -1409,14 +1507,14 @@ export function GalaxyView({
         });
         head = new THREE.Sprite(headMat);
         head.position.set(p[0], p[1], p[2]);
-        registerIntro(head, base * 0.55, node.id);
+        registerIntro(head, base * 0.9, node.id);
         head.raycast = () => {};
         // Accretion disc: a flat annulus in the galaxy plane, seen as an ellipse.
         const discTex = accretionTexture(256);
         const discMat = new THREE.MeshBasicMaterial({
           map: discTex,
           transparent: true,
-          opacity: 0.95,
+          opacity: 1,
           depthWrite: false,
           side: THREE.DoubleSide,
           blending: THREE.AdditiveBlending,
@@ -1427,7 +1525,7 @@ export function GalaxyView({
         const disc = new THREE.Mesh(discGeo, discMat);
         disc.position.set(p[0], p[1] + 0.05, p[2]);
         disc.raycast = () => {};
-        registerIntro(disc, base * 2.4, `${node.id}-disc`);
+        registerIntro(disc, base * 3.0, `${node.id}-disc`);
         scene.add(disc);
         extra = disc;
         anim.spin = disc;
@@ -1436,11 +1534,12 @@ export function GalaxyView({
           map: coronaTex,
           color: new THREE.Color("#ff7a2a"),
           transparent: true,
-          opacity: 0.5,
+          opacity: 0.32,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
-      } else if (variant === "warlord-hypergiant") {
+      } else {
+        // Hypergiant: a hot, swollen red star with violent spikes.
         const red = new THREE.Color("#ff3a1e");
         headMat = new THREE.SpriteMaterial({
           map: starTex,
@@ -1477,35 +1576,14 @@ export function GalaxyView({
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
-      } else {
-        // Fortress station: the lit satellite hull at large scale, armoured with
-        // a warning-red wash and a hot glow — no ring (that read as HUD).
-        const structTex = stationTexture(128);
-        disposables.push(structTex);
-        headMat = new THREE.SpriteMaterial({
-          map: structTex,
-          color: new THREE.Color("#c07a6a"),
-          transparent: true,
-          opacity: 1,
-          depthWrite: false,
-        });
-        head = new THREE.Sprite(headMat);
-        head.position.set(p[0], p[1], p[2]);
-        registerIntro(head, base * 1.5, node.id);
-        head.raycast = () => {};
-        glowMat = new THREE.SpriteMaterial({
-          map: coronaTex,
-          color: new THREE.Color("#ff7a4a"),
-          transparent: true,
-          opacity: 0.55,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        });
       }
 
       const glow = new THREE.Sprite(glowMat);
       glow.position.set(p[0], p[1], p[2]);
-      const glowScale = coronaScale(i, false) * 1.4;
+      // The black hole's glow is small so it rims the disc; the hypergiant's is
+      // broad so it reads as a swollen star.
+      const glowScale =
+        coronaScale(i, false) * (variant === "warlord-blackhole" ? 0.55 : 1.4);
       registerIntro(glow, glowScale, `${node.id}-corona`);
       glow.raycast = () => {};
 
@@ -1556,6 +1634,17 @@ export function GalaxyView({
       body: NodeBodyKind,
     ): boolean => {
       if (body.startsWith("warlord")) return buildWarlordBody(i, node, p, body);
+      // A depot is a built structure: a flat, foreshortened ring-station, not a
+      // billboarded body (which read as a logo).
+      if (body === "station") {
+        return buildStructureBody(i, node, p, {
+          scale: 1.9,
+          tint: "#c2c6ce",
+          glowColor: "#7fe08a",
+          glowOpacity: 0.22,
+          glowScale: 0.8,
+        });
+      }
       // Per-kind recipe. `head` is the body in the star slot, `glow` a soft halo
       // in the corona slot. No clean rings — a tidy annulus read as HUD; identity
       // instead comes from a lit/organic body plus the existing type ring. All
@@ -1567,13 +1656,7 @@ export function GalaxyView({
         pulse?: "anomaly" | "beacon";
       };
       let recipe: Recipe | undefined;
-      if (body === "station" && stationTex) {
-        recipe = {
-          head: { tex: stationTex, color: "#c2c6ce" },
-          headScale: 1.05,
-          glow: { color: "#7fe08a", opacity: 0.28, scale: 0.75 },
-        };
-      } else if (body === "wreck") {
+      if (body === "wreck") {
         recipe = {
           head: { tex: asteroidTex, color: "#4a453e" },
           headScale: 0.9,

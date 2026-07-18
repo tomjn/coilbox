@@ -362,11 +362,13 @@ export function accretionTexture(size: number): THREE.Texture {
 }
 
 /**
- * An orbital station: a lit satellite silhouette — a shaded cylindrical hab hull
- * with two solar-panel wings on struts. Shaded per-pixel from a fixed light
- * (like the asteroid) so it reads as a solid *object* catching the sun, not a
- * flat emblem; the earlier flat wheel-and-spokes read as a symbol. Greyscale
- * (the sprite material tints it metallic), dither-free, with a few window specks.
+ * An orbital ring-station, drawn *top-down* (a schematic plan view): a segmented
+ * metallic habitation ring with lit windows, structural spokes to a detailed
+ * central hub, and a pair of asymmetric docking arms so it isn't a perfect wheel.
+ * Meant to be laid flat in the galaxy plane, not billboarded — the tilted camera
+ * then foreshortens it into an orbital ring seen at an angle, which reads as a
+ * built megastructure rather than a face-on logo. Greyscale (the material tints
+ * it metallic); solid fills/strokes, so no gradient dither.
  */
 export function stationTexture(size: number): THREE.Texture {
   const canvas = document.createElement("canvas");
@@ -374,69 +376,97 @@ export function stationTexture(size: number): THREE.Texture {
   canvas.height = size;
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    const img = ctx.createImageData(size, size);
-    const half = size / 2;
-    const px = 1 / half;
-    // Light from upper-left (screen up = -y), matching the asteroid.
-    const L = [-0.5, -0.62, 0.6] as const;
-    const hl = 0.3; // hull half-length
-    const hr = 0.16; // hull radius
-    const pIn = 0.42; // panel inner / outer / half-height
-    const pOut = 0.9;
-    const pH = 0.23;
-    const windows = [
-      [-0.12, -0.03],
-      [0.02, 0.03],
-      [0.15, -0.02],
-    ] as const;
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const nx = (x + 0.5 - half) / half;
-        const ny = (y + 0.5 - half) / half;
-        const anx = Math.abs(nx);
-        let v = 0;
-        let a = 0;
-        // Hull: a horizontal capsule shaded as a lit cylinder (radial normal in
-        // the y/z plane along the body, spherical at the end caps).
-        const rx = anx > hl ? anx - hl : 0;
-        const sx = nx < 0 ? -rx : rx;
-        const rlen = Math.hypot(sx, ny);
-        if (rlen <= hr) {
-          const z = Math.sqrt(Math.max(0, 1 - (rlen / hr) ** 2));
-          const lam = Math.max(
-            0,
-            (sx / hr) * L[0] + (ny / hr) * L[1] + z * L[2],
-          );
-          v = 0.14 + 0.86 * lam;
-          // Window lights catching the sun on the lit face.
-          for (const [wx, wy] of windows) {
-            if (Math.hypot(nx - wx, ny - wy) < 0.03) v = Math.max(v, 0.95);
-          }
-          a = Math.min(1, (hr - rlen) / (1.2 * px));
-        } else if (anx >= pIn && anx <= pOut && Math.abs(ny) <= pH) {
-          // Solar panels: darker toward the shadowed (right) side, with a cell
-          // grid and a brighter frame edge.
-          const sun = nx < 0 ? 0.5 : 0.34;
-          const gu = ((anx - pIn) / 0.075) % 1;
-          const gw = ((ny + pH) / 0.075) % 1;
-          const grid = gu < 0.14 || gw < 0.14 ? 0.55 : 1;
-          const edge = anx > pOut - 0.02 || Math.abs(ny) > pH - 0.02;
-          v = edge ? 0.6 : sun * grid;
-          a = 1;
-        } else if (anx > hl && anx < pIn && Math.abs(ny) < 0.035) {
-          // Struts connecting the hull to each panel.
-          v = 0.5;
-          a = 1;
-        }
-        const o = (y * size + x) * 4;
-        const g = Math.round(Math.max(0, Math.min(1, v)) * 255);
-        img.data[o] = g;
-        img.data[o + 1] = g;
-        img.data[o + 2] = g;
-        img.data[o + 3] = Math.round(a * 255);
-      }
+    ctx.clearRect(0, 0, size, size);
+    const m = size / 2;
+    const R = size * 0.38; // ring centreline radius
+    const rw = size * 0.1; // ring width
+    // Deterministic per-panel value so the ring reads as discrete metal segments.
+    const panel = (k: number) => {
+      const s = Math.sin(k * 12.9898) * 43758.5453;
+      return 118 + Math.floor((s - Math.floor(s)) * 78);
+    };
+    // Habitation ring: a segmented annulus.
+    const segs = 30;
+    for (let k = 0; k < segs; k++) {
+      const a0 = (k / segs) * Math.PI * 2;
+      const a1 = ((k + 1) / segs) * Math.PI * 2;
+      const v = panel(k);
+      ctx.fillStyle = `rgb(${v},${v},${v + 4})`;
+      ctx.beginPath();
+      ctx.arc(m, m, R + rw / 2, a0, a1);
+      ctx.arc(m, m, R - rw / 2, a1, a0, true);
+      ctx.closePath();
+      ctx.fill();
     }
-    ctx.putImageData(img, 0, 0);
+    // Bright machined rims on both edges of the ring.
+    ctx.lineWidth = size * 0.009;
+    ctx.strokeStyle = "rgb(206,210,216)";
+    for (const rr of [R + rw / 2, R - rw / 2]) {
+      ctx.beginPath();
+      ctx.arc(m, m, rr, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // Window lights around the ring.
+    ctx.fillStyle = "rgb(255,246,214)";
+    for (let k = 0; k < 44; k++) {
+      const a = (k / 44) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(m + Math.cos(a) * R, m + Math.sin(a) * R, size * 0.0075, 0, 7);
+      ctx.fill();
+    }
+    // Structural spokes (trusses) from the hub out to the ring.
+    ctx.strokeStyle = "rgb(150,153,160)";
+    ctx.lineWidth = size * 0.032;
+    for (let s = 0; s < 4; s++) {
+      const a = (s / 4) * Math.PI * 2 + 0.3;
+      ctx.beginPath();
+      ctx.moveTo(m + Math.cos(a) * size * 0.13, m + Math.sin(a) * size * 0.13);
+      ctx.lineTo(
+        m + Math.cos(a) * (R - rw / 2),
+        m + Math.sin(a) * (R - rw / 2),
+      );
+      ctx.stroke();
+    }
+    // Central hub: concentric plates with a bright core light.
+    ctx.fillStyle = "rgb(120,123,130)";
+    ctx.beginPath();
+    ctx.arc(m, m, size * 0.135, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgb(184,187,194)";
+    ctx.lineWidth = size * 0.011;
+    ctx.beginPath();
+    ctx.arc(m, m, size * 0.135, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "rgb(168,171,178)";
+    ctx.beginPath();
+    ctx.arc(m, m, size * 0.065, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgb(255,240,200)";
+    ctx.beginPath();
+    ctx.arc(m, m, size * 0.02, 0, Math.PI * 2);
+    ctx.fill();
+    // Asymmetric docking arms reaching past the ring (break the wheel symmetry).
+    for (const arm of [
+      { a: 0.5, len: 0.17, w: 0.05 },
+      { a: 3.6, len: 0.12, w: 0.036 },
+    ]) {
+      ctx.save();
+      ctx.translate(m + Math.cos(arm.a) * R, m + Math.sin(arm.a) * R);
+      ctx.rotate(arm.a);
+      ctx.fillStyle = "rgb(140,143,150)";
+      ctx.fillRect(0, (-arm.w * size) / 2, arm.len * size, arm.w * size);
+      ctx.strokeStyle = "rgb(192,195,202)";
+      ctx.lineWidth = size * 0.007;
+      ctx.strokeRect(0, (-arm.w * size) / 2, arm.len * size, arm.w * size);
+      ctx.fillStyle = "rgb(108,111,118)";
+      ctx.fillRect(
+        arm.len * size,
+        -arm.w * size,
+        size * 0.022,
+        arm.w * size * 2,
+      );
+      ctx.restore();
+    }
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
