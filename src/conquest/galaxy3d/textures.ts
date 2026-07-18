@@ -262,6 +262,50 @@ export function asteroidTexture(size: number): THREE.Texture {
 }
 
 /**
+ * A warlord black hole's accretion disc: a hot annulus with a cleared hole in
+ * the middle (where the dark core sprite sits), computed per-pixel and dither-
+ * free. Colour is baked — a white-hot inner edge grading through orange to a
+ * deep-red outer rim — so a plane laid flat in the galaxy plane foreshortens
+ * into an ellipse under the tilted camera, no screen-space lensing needed.
+ */
+export function accretionTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(size, size);
+    const half = size / 2;
+    // White-hot inner -> orange mid -> deep-red outer, lerped by band radius.
+    const inner = [255, 244, 214] as const;
+    const mid = [255, 154, 60] as const;
+    const outer = [176, 52, 20] as const;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const d = Math.hypot(x + 0.5 - half, y + 0.5 - half) / half;
+        // A gaussian band centred at ~0.52, with the hole cleared below ~0.2.
+        const band = Math.exp(-((d - 0.52) ** 2) / (2 * 0.15 * 0.15));
+        const hole = Math.min(1, Math.max(0, (d - 0.2) / 0.1));
+        const a = Math.min(1, band * hole);
+        const t = Math.min(1, Math.max(0, (d - 0.34) / 0.4)); // 0 inner..1 outer
+        const seg = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+        const lo = t < 0.5 ? inner : mid;
+        const hi = t < 0.5 ? mid : outer;
+        const o = (y * size + x) * 4;
+        for (let c = 0; c < 3; c++) {
+          img.data[o + c] = Math.round(lo[c] + (hi[c] - lo[c]) * seg);
+        }
+        img.data[o + 3] = Math.round(a * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
  * An orbital station: a geometric, artificial silhouette — a central hab core,
  * a docking ring on radial spokes, and two solar-panel wings — so it reads as
  * *built structure*, not a fuzzy star. Drawn with solid fills/strokes (no

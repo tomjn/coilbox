@@ -20,6 +20,7 @@ import {
 } from "./layout";
 import { buildStarfield } from "./starfield";
 import {
+  accretionTexture,
   asteroidTexture,
   cometTailTexture,
   radialTexture,
@@ -1218,6 +1219,22 @@ export function GalaxyView({
     }
     const identityPulses: IdentityPulse[] = [];
 
+    // The warlord lair's motion: a black hole's disc / a fortress's ring spins,
+    // a hypergiant breathes. Driven by the loop when motion is on.
+    interface WarlordAnim {
+      i: number;
+      /** An object spun about Y (accretion disc / defensive ring). */
+      spin?: THREE.Object3D;
+      spinRate?: number;
+      /** Sprites that breathe in scale + opacity (hypergiant). */
+      pulse?: {
+        sprite: THREE.Sprite;
+        mat: THREE.SpriteMaterial;
+        base: number;
+      }[];
+    }
+    const warlordAnims: WarlordAnim[] = [];
+
     // Intro warp-in: sprites pop from zero to their target scale (staggered by
     // node), lanes fade up, and the camera eases in. Only when motion is on.
     const factionOnlyRebuild =
@@ -1291,6 +1308,194 @@ export function GalaxyView({
     const WHITE = new THREE.Color(0xffffff);
 
     /**
+     * Build the warlord's lair — the run's final node — in one of three per-run
+     * forms: a stylised black hole (dark core + a flat accretion disc that
+     * foreshortens into an ellipse, plus a gravitational glow; no lensing), a
+     * blood-red hypergiant (hot core, violent corona + spikes, slow breathing),
+     * or an armoured fortress station (metal hub + a spinning defensive ring).
+     * Reuses the star / corona / spike slots like the other bodies. Built once
+     * (a single boss node), so its bespoke textures live here, not in the shared
+     * block. Returns `true` — always handles the warlord kinds.
+     */
+    const buildWarlordBody = (
+      i: number,
+      node: GalaxyNode,
+      p: WorldPos,
+      variant: NodeBodyKind,
+    ): boolean => {
+      const base = starScale(i);
+      const anim: WarlordAnim = { i };
+      let head: THREE.Sprite;
+      let headMat: THREE.SpriteMaterial;
+      let glowMat: THREE.SpriteMaterial;
+      let extra: THREE.Object3D | undefined;
+
+      if (variant === "warlord-blackhole") {
+        const coreTex = radialTexture(128, [
+          [0, "#000000ff"],
+          [0.5, "#000000ff"],
+          [0.78, "#160b06e0"],
+          [1, "#00000000"],
+        ]);
+        disposables.push(coreTex);
+        headMat = new THREE.SpriteMaterial({
+          map: coreTex,
+          color: 0xffffff,
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+        });
+        head = new THREE.Sprite(headMat);
+        head.position.set(p[0], p[1], p[2]);
+        registerIntro(head, base * 0.55, node.id);
+        head.raycast = () => {};
+        // Accretion disc: a flat annulus in the galaxy plane, seen as an ellipse.
+        const discTex = accretionTexture(256);
+        const discMat = new THREE.MeshBasicMaterial({
+          map: discTex,
+          transparent: true,
+          opacity: 0.95,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+        });
+        const discGeo = new THREE.PlaneGeometry(1, 1);
+        discGeo.rotateX(-Math.PI / 2);
+        disposables.push(discTex, discMat, discGeo);
+        const disc = new THREE.Mesh(discGeo, discMat);
+        disc.position.set(p[0], p[1] + 0.05, p[2]);
+        disc.raycast = () => {};
+        registerIntro(disc, base * 2.4, `${node.id}-disc`);
+        scene.add(disc);
+        extra = disc;
+        anim.spin = disc;
+        anim.spinRate = 1 / 4000;
+        glowMat = new THREE.SpriteMaterial({
+          map: coronaTex,
+          color: new THREE.Color("#ff7a2a"),
+          transparent: true,
+          opacity: 0.5,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+      } else if (variant === "warlord-hypergiant") {
+        const red = new THREE.Color("#ff3a1e");
+        headMat = new THREE.SpriteMaterial({
+          map: starTex,
+          color: red.clone().lerp(WHITE, 0.3),
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+        });
+        head = new THREE.Sprite(headMat);
+        head.position.set(p[0], p[1], p[2]);
+        registerIntro(head, base * 1.2, node.id);
+        head.raycast = () => {};
+        const spikeMat = new THREE.SpriteMaterial({
+          map: spikeTex,
+          color: red.clone().lerp(WHITE, 0.35),
+          transparent: true,
+          opacity: 0.32,
+          rotation: ((hashString(`${node.id}-spin`) % 100) / 100 - 0.5) * 0.6,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const spikes = new THREE.Sprite(spikeMat);
+        spikes.position.set(p[0], p[1], p[2]);
+        registerIntro(spikes, base * 2.2, `${node.id}-spike`);
+        spikes.raycast = () => {};
+        disposables.push(spikeMat);
+        scene.add(spikes);
+        extra = spikes;
+        glowMat = new THREE.SpriteMaterial({
+          map: coronaTex,
+          color: red,
+          transparent: true,
+          opacity: 0.85,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+      } else {
+        // Fortress station: a big armoured hub with a spinning defensive ring.
+        const structTex = stationTexture(128);
+        const ringTex = ringBurstTexture(128);
+        disposables.push(structTex, ringTex);
+        headMat = new THREE.SpriteMaterial({
+          map: structTex,
+          color: new THREE.Color("#baa39c"),
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+        });
+        head = new THREE.Sprite(headMat);
+        head.position.set(p[0], p[1], p[2]);
+        registerIntro(head, base * 1.15, node.id);
+        head.raycast = () => {};
+        const ringMat = new THREE.SpriteMaterial({
+          map: ringTex,
+          color: new THREE.Color("#ff5a3c"),
+          transparent: true,
+          opacity: 0.7,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const ring = new THREE.Sprite(ringMat);
+        ring.position.set(p[0], p[1] + 0.12, p[2]);
+        registerIntro(ring, base * 1.8, `${node.id}-fring`);
+        ring.raycast = () => {};
+        disposables.push(ringMat);
+        scene.add(ring);
+        extra = ring;
+        anim.spin = ring;
+        anim.spinRate = -1 / 9000;
+        glowMat = new THREE.SpriteMaterial({
+          map: coronaTex,
+          color: new THREE.Color("#ff7a4a"),
+          transparent: true,
+          opacity: 0.55,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+      }
+
+      const glow = new THREE.Sprite(glowMat);
+      glow.position.set(p[0], p[1], p[2]);
+      const glowScale = coronaScale(i, false) * 1.4;
+      registerIntro(glow, glowScale, `${node.id}-corona`);
+      glow.raycast = () => {};
+
+      // A hypergiant breathes (scale only — opacity stays owned by fog/emphasis).
+      if (variant === "warlord-hypergiant") {
+        anim.pulse = [
+          { sprite: head, mat: headMat, base: base * 1.2 },
+          { sprite: glow, mat: glowMat, base: glowScale },
+        ];
+      }
+      if (anim.spin || anim.pulse) warlordAnims.push(anim);
+
+      const ownRingMat = new THREE.MeshBasicMaterial({
+        color: ownerColor(ownersRef.current[node.id] ?? node.owner),
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const ownRing = new THREE.Mesh(ringGeoFor(0), ownRingMat);
+      ownRing.rotation.x = -Math.PI / 2;
+      ownRing.position.set(p[0], p[1] - 0.4, p[2]);
+      ownRing.raycast = () => {};
+      starSprites.push(head);
+      starMats.push(headMat);
+      spikeSprites.push(extra);
+      coronaSprites.push(glow);
+      ownerRingMats.push(ownRingMat);
+      ownerRings.push(ownRing);
+      disposables.push(headMat, glowMat, ownRingMat);
+      scene.add(head, glow, ownRing);
+      return true;
+    };
+
+    /**
      * Build a warpath identity body for node `i`, reusing the star / corona /
      * spike slots (like the void branch) so intro, ownership rings, selection and
      * fog keep working. Cohesive palette: a station is metallic with a depot-teal
@@ -1305,6 +1510,7 @@ export function GalaxyView({
       p: WorldPos,
       body: NodeBodyKind,
     ): boolean => {
+      if (body.startsWith("warlord")) return buildWarlordBody(i, node, p, body);
       // Per-kind recipe. `head` is drawn in the star slot, `glow` in the corona
       // slot, and an optional `ring` (anomaly/beacon) in the spike slot, animated
       // by the loop. All colours stay within the grounded palette.
@@ -2562,6 +2768,16 @@ export function GalaxyView({
               const t = (now / 1600 + pu.phase) % 1;
               pu.ring.scale.setScalar(pu.baseScale * (0.55 + 0.9 * t));
               pu.ringMat.opacity = (1 - t) * 0.6 * dim;
+            }
+          }
+          // Warlord lair: spin the accretion disc / defensive ring; breathe a
+          // hypergiant (scale only, so fog/emphasis keep owning its opacity).
+          for (const wa of warlordAnims) {
+            if (wa.spin) wa.spin.rotation.y = now * (wa.spinRate ?? 0);
+            if (wa.pulse && !introActive) {
+              const breathe = 1 + 0.06 * Math.sin(now / 900);
+              for (const pr of wa.pulse)
+                pr.sprite.scale.setScalar(pr.base * breathe);
             }
           }
           if (sel.idx >= 0) {
