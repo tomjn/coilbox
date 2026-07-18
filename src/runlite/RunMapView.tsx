@@ -10,6 +10,7 @@ import {
   PLAYER_FACTION,
   runEmphasis,
   runOwners,
+  runPathLinks,
   runToGalaxyDoc,
 } from "./galaxyAdapter";
 import type { RogueliteRun } from "./model";
@@ -58,6 +59,12 @@ export function RunMapView({
     () => runEmphasis(run),
     [run.nodes, run.edges, run.progress.currentNodeId, run.progress.visited],
   );
+  // The path already travelled, highlighted green up to the current node.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on progress + graph, applied live by GalaxyView
+  const pathLinks = useMemo(
+    () => runPathLinks(run),
+    [run.nodes, run.edges, run.progress.visited],
+  );
 
   const spaceMaps = useKnownSpaceMaps();
   const reduceMotion = useReduceMotion();
@@ -70,6 +77,7 @@ export function RunMapView({
       owners={owners}
       emphasis={emphasis}
       laneFlow
+      pathLinks={pathLinks}
       playerFactionId={PLAYER_FACTION}
       selectedId={selectedId}
       onSelect={onSelect}

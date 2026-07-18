@@ -156,13 +156,36 @@ export function runOwners(run: RogueliteRun): Record<string, string> {
  * ahead stays more present than the spent path behind; forks you can no longer
  * reach fall right back. */
 export const RUN_DIM = {
-  /** A node you've already crossed — spent, behind you. */
-  done: 0.42,
+  /** A node you've already crossed — kept fairly bright: it's your history, and
+   * its check-mark should read clearly, not fade like the road not taken. */
+  done: 0.7,
   /** Reachable ahead but not an immediate choice — the road onward. */
-  future: 0.55,
+  future: 0.5,
   /** A branch you passed on / can no longer reach. */
   unreachable: 0.22,
 } as const;
+
+/** A link key matching GalaxyView's directed `[from, to]` lane order. */
+const linkKey = (a: string, b: string) => `${a} ${b}`;
+
+/**
+ * The links of the path actually taken: consecutive visited nodes by column
+ * (you occupy one node per column, so the visited set sorted by column *is* your
+ * route), for GalaxyView to highlight green. Robust to column-skipping edges —
+ * a pair is only highlighted if a real edge joins it.
+ */
+export function runPathLinks(run: RogueliteRun): Set<string> {
+  const edges = new Set(run.edges.map(([a, b]) => linkKey(a, b)));
+  const visited = run.nodes
+    .filter((n) => run.progress.visited.includes(n.id))
+    .sort((a, b) => a.col - b.col);
+  const out = new Set<string>();
+  for (let i = 0; i + 1 < visited.length; i++) {
+    const key = linkKey(visited[i].id, visited[i + 1].id);
+    if (edges.has(key)) out.add(key);
+  }
+  return out;
+}
 
 /** Every node reachable by following forward edges from `fromId` (inclusive). */
 export function forwardReachable(
