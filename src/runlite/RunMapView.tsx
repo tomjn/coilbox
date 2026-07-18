@@ -14,16 +14,15 @@ import type { RunEdge, RunNode, RunNodeType, RunSkin } from "./model";
 /**
  * The run map: a forward-column node graph rendered with the same three.js
  * conventions as the conquest galaxy view (tilted look-down, transparent
- * renderer, CSS2D labels, gated rAF, `disposables[]` teardown) but reusing only
- * galaxy3d's *pure* toolkit (`columnLayout`, `buildStarfield`, `radialTexture`)
- * rather than its `GalaxyDoc`-shaped monolith. Node tokens are tinted by type,
- * dimmed by state; lanes run forward. `galaxy` skin sits over a starfield;
- * `theatre` is the flat chart for terrestrial games.
+ * renderer, CSS2D labels, gated rAF, `disposables[]` teardown) reusing its pure
+ * toolkit (`columnLayout`, `buildStarfield`, `radialTexture`). Each node is a
+ * bright core over a soft type-tinted glow; a nebula wash + vignette (CSS behind
+ * the transparent canvas) supplies the atmosphere. `galaxy` sits over a
+ * starfield; `theatre` over a flat grid for terrestrial games.
  *
  * The graph is small and changes only between nodes, so prop changes rebuild the
- * scene (in the effect deps) instead of the ref-mutation machinery GalaxyView
- * needs for its live in-battle map. All game logic stays outside: this reports
- * clicks through `onSelect`.
+ * scene (in the effect deps). All game logic stays outside: clicks report
+ * through `onSelect`.
  */
 
 /** Per-type accent colour (matches docs/mockups/roguelite-run.html). */
@@ -54,11 +53,8 @@ export interface RunMapViewProps {
   nodes: RunNode[];
   edges: RunEdge[];
   skin: RunSkin;
-  /** The node the player occupies. */
   currentId: string;
-  /** Resolved nodes. */
   visited: string[];
-  /** Nodes selectable as the next step. */
   reachable: string[];
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
@@ -78,15 +74,14 @@ function stateOf(
   return "locked";
 }
 
-/** Token sprite scale by node type + state. */
+/** Core/glow world size by type + state. */
 function tokenScale(type: RunNodeType, state: NodeState): number {
-  const base = type === "boss" ? 9 : 7;
-  return base * (state === "current" ? 1.25 : state === "open" ? 1.1 : 1);
+  const base = type === "boss" ? 8 : type === "start" ? 6.5 : 5.5;
+  return base * (state === "current" ? 1.2 : state === "open" ? 1.05 : 0.92);
 }
 
-/** Token opacity by state (locked nodes are dim). */
 function stateOpacity(state: NodeState): number {
-  return state === "locked" ? 0.35 : state === "done" ? 0.7 : 1;
+  return state === "locked" ? 0.4 : state === "done" ? 0.75 : 1;
 }
 
 export function RunMapView({
@@ -102,7 +97,6 @@ export function RunMapView({
   className,
 }: RunMapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // Keep the latest onSelect without retriggering the build effect.
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
@@ -126,7 +120,6 @@ export function RunMapView({
     const bounds = playBounds(positions.values());
     const spanX = Math.max(1, bounds.maxX - bounds.minX);
     const spanZ = Math.max(1, bounds.maxZ - bounds.minZ);
-    const extent = Math.max(spanX, spanZ);
     const focus = new THREE.Vector3(
       (bounds.minX + bounds.maxX) / 2,
       0,
@@ -138,14 +131,35 @@ export function RunMapView({
     const nodeIds = nodes.map((n) => n.id);
     const at = (id: string): WorldPos => positions.get(id) ?? [0, 0, 0];
 
+    // Soft round sprite textures: a wide gentle glow and a tight bright core.
+    const glowTex = radialTexture(128, [
+      [0, "#ffffff"],
+      [0.25, "#ffffffcc"],
+      [1, "#00000000"],
+    ]);
+    const coreTex = radialTexture(128, [
+      [0, "#ffffff"],
+      [0.35, "#ffffff"],
+      [0.6, "#ffffff88"],
+      [1, "#00000000"],
+    ]);
+    const starTex = radialTexture(64, [
+      [0, "#ffffff"],
+      [0.4, "#ffffffcc"],
+      [1, "#00000000"],
+    ]);
+    disposables.push(glowTex, coreTex, starTex);
+
     /* ---------------------------- backdrop --------------------------------- */
 
     if (skin === "galaxy") {
+      // Round, additive stars (a mapped PointsMaterial — a bare one renders
+      // square quads).
       const sf = buildStarfield({
-        count: 900,
-        radius: extent * 2.4,
-        thickness: extent * 0.5,
-        yOffset: -extent * 0.5,
+        count: 1100,
+        radius: Math.max(spanX, spanZ) * 1.8,
+        thickness: spanZ * 0.9,
+        yOffset: -6,
         seed: `run-${nodeIds.join()}`,
         center: [focus.x, 0, focus.z],
       });
@@ -153,11 +167,12 @@ export function RunMapView({
       geo.setAttribute("position", new THREE.BufferAttribute(sf.positions, 3));
       geo.setAttribute("color", new THREE.BufferAttribute(sf.colors, 3));
       const mat = new THREE.PointsMaterial({
-        size: 0.9,
+        size: 1.1,
+        map: starTex,
         sizeAttenuation: true,
         vertexColors: true,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.95,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       });
@@ -165,9 +180,36 @@ export function RunMapView({
       points.raycast = () => {};
       scene.add(points);
       disposables.push(geo, mat);
+
+      // Nebula wash: a few big, faint, tinted glow sprites on the plane.
+      const nebula: [number, number, number][] = [
+        [0x1b3a6b, -spanX * 0.3, spanZ * 0.4],
+        [0x3a1533, spanX * 0.35, -spanZ * 0.3],
+        [0x0c3a37, spanX * 0.1, spanZ * 0.1],
+      ];
+      for (const [tint, dx, dz] of nebula) {
+        const nMat = new THREE.SpriteMaterial({
+          map: glowTex,
+          color: tint,
+          transparent: true,
+          opacity: 0.28,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        });
+        const neb = new THREE.Sprite(nMat);
+        neb.position.set(focus.x + dx, -4, focus.z + dz);
+        neb.scale.setScalar(Math.max(spanX, spanZ) * 0.9);
+        neb.raycast = () => {};
+        scene.add(neb);
+        disposables.push(nMat);
+      }
     } else {
-      // Theatre skin: a flat tactical grid instead of a starfield.
-      const grid = new THREE.GridHelper(extent * 2, 20, 0x2a3550, 0x182135);
+      const grid = new THREE.GridHelper(
+        Math.max(spanX, spanZ) * 2,
+        24,
+        0x2a3550,
+        0x172035,
+      );
       grid.position.set(focus.x, -0.5, focus.z);
       (grid.material as THREE.Material).transparent = true;
       (grid.material as THREE.Material).opacity = 0.5;
@@ -178,29 +220,28 @@ export function RunMapView({
 
     /* ------------------------------ lanes ---------------------------------- */
 
-    // Three style groups: done (amber), open (cyan, from the current node), base.
     const laneGroups: {
       state: "done" | "open" | "base";
       color: number;
       opacity: number;
       verts: number[];
     }[] = [
-      { state: "done", color: 0xffb64d, opacity: 0.9, verts: [] },
-      { state: "open", color: 0x4fe6d6, opacity: 0.85, verts: [] },
-      { state: "base", color: 0x46536e, opacity: 0.5, verts: [] },
+      { state: "done", color: 0xffb64d, opacity: 0.85, verts: [] },
+      { state: "open", color: 0x4fe6d6, opacity: 0.9, verts: [] },
+      { state: "base", color: 0x46536e, opacity: 0.4, verts: [] },
     ];
     for (const [a, b] of edges) {
       const pa = at(a);
       const pb = at(b);
-      const aResolved = visitedSet.has(a);
       const laneState =
-        aResolved && visitedSet.has(b)
+        visitedSet.has(a) && visitedSet.has(b)
           ? "done"
           : a === currentId && reachableSet.has(b)
             ? "open"
             : "base";
-      const group = laneGroups.find((g) => g.state === laneState);
-      group?.verts.push(pa[0], 0.1, pa[2], pb[0], 0.1, pb[2]);
+      laneGroups
+        .find((g) => g.state === laneState)
+        ?.verts.push(pa[0], 0.1, pa[2], pb[0], 0.1, pb[2]);
     }
     for (const g of laneGroups) {
       if (g.verts.length === 0) continue;
@@ -222,63 +263,78 @@ export function RunMapView({
 
     /* --------------------------- node tokens ------------------------------- */
 
-    const glowTex = radialTexture(64, [
-      [0, "#ffffff"],
-      [0.4, "#ffffff"],
-      [1, "#00000000"],
-    ]);
-    disposables.push(glowTex);
     const labelObjects: CSS2DObject[] = [];
-
     for (const node of nodes) {
       const p = at(node.id);
       const state = stateOf(node.id, currentId, visitedSet, reachableSet);
       const color = new THREE.Color(TYPE_COLOR[node.type]);
-      const mat = new THREE.SpriteMaterial({
+      const opacity = stateOpacity(state);
+      const s = tokenScale(node.type, state);
+
+      // Soft glow (type colour) behind a bright, near-white core.
+      const glowMat = new THREE.SpriteMaterial({
         map: glowTex,
         color,
         transparent: true,
-        opacity: stateOpacity(state),
+        opacity: 0.55 * opacity,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       });
-      const sprite = new THREE.Sprite(mat);
-      const s = tokenScale(node.type, state);
-      sprite.scale.setScalar(s);
-      sprite.position.set(p[0], 0.5, p[2]);
-      sprite.raycast = () => {};
-      scene.add(sprite);
-      disposables.push(mat);
+      const glow = new THREE.Sprite(glowMat);
+      glow.scale.setScalar(s * 2.1);
+      glow.position.set(p[0], 0.5, p[2]);
+      glow.raycast = () => {};
+      scene.add(glow);
+      disposables.push(glowMat);
 
-      // Selection/current ring.
+      const coreMat = new THREE.SpriteMaterial({
+        map: coreTex,
+        color: color.clone().lerp(new THREE.Color(0xffffff), 0.55),
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const core = new THREE.Sprite(coreMat);
+      core.scale.setScalar(s);
+      core.position.set(p[0], 0.55, p[2]);
+      core.raycast = () => {};
+      scene.add(core);
+      disposables.push(coreMat);
+
+      // Ring for the current node / selection.
       if (node.id === selectedId || state === "current") {
-        const ringGeo = new THREE.RingGeometry(s * 0.42, s * 0.5, 32);
+        const ringGeo = new THREE.RingGeometry(s * 0.62, s * 0.72, 40);
         const ringMat = new THREE.MeshBasicMaterial({
           color: node.id === selectedId ? 0xffffff : color,
           transparent: true,
-          opacity: 0.9,
+          opacity: 0.95,
           side: THREE.DoubleSide,
         });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = -Math.PI / 2;
-        ring.position.set(p[0], 0.2, p[2]);
+        ring.position.set(p[0], 0.25, p[2]);
         ring.raycast = () => {};
         scene.add(ring);
         disposables.push(ringGeo, ringMat);
       }
 
-      // CSS2D caption.
+      // Readable CSS2D caption: a chip, not bare text.
       const el = document.createElement("div");
       el.textContent = TYPE_LABEL[node.type];
-      el.style.cssText = `font:600 10px/1.2 system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#${color.getHexString()};opacity:${state === "locked" ? 0.4 : 0.9};white-space:nowrap;pointer-events:none;transform:translateY(${s * 0.6}px);text-shadow:0 1px 3px rgba(0,0,0,.8)`;
+      const labelColor = color
+        .clone()
+        .lerp(new THREE.Color(0xffffff), 0.4)
+        .getHexString();
+      el.style.cssText = `font:600 11px/1.3 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#${labelColor};opacity:${state === "locked" ? 0.5 : 1};white-space:nowrap;pointer-events:none;padding:1px 6px;border-radius:4px;background:rgba(6,9,16,.72);transform:translateY(${s * 3.2}px)`;
       const label = new CSS2DObject(el);
       label.position.set(p[0], 0.5, p[2]);
       scene.add(label);
       labelObjects.push(label);
     }
 
-    // Invisible pick mesh aligned to nodes (a generous, stable click target).
-    const pickGeo = new THREE.SphereGeometry(4, 8, 8);
+    // Invisible pick mesh aligned to nodes.
+    const pickGeo = new THREE.SphereGeometry(5, 8, 8);
     const pickMat = new THREE.MeshBasicMaterial({
       transparent: true,
       opacity: 0,
@@ -307,12 +363,25 @@ export function RunMapView({
 
     labelRenderer = new CSS2DRenderer();
     labelRenderer.domElement.style.cssText =
-      "position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0;";
+      "position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:1;";
     container.appendChild(labelRenderer.domElement);
 
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 3000);
-    // Look down the forward axis from behind and above, framing the whole run.
-    camera.position.set(focus.x, extent * 0.95, focus.z + extent * 0.75);
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 4000);
+
+    // Frame to fit the (wide) span rather than a single scalar: derive the
+    // distance that puts spanX inside the horizontal FOV and spanZ inside the
+    // vertical, whichever needs more room, with padding.
+    const w0 = container.clientWidth || 16;
+    const h0 = container.clientHeight || 9;
+    const vFov = THREE.MathUtils.degToRad(50);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * (w0 / h0));
+    const fitDist = Math.max(
+      spanX / 2 / Math.tan(hFov / 2),
+      spanZ / 2 / Math.tan(vFov / 2),
+    );
+    const dist = fitDist * 1.35 + 20;
+    // A gentle tilt: mostly looking down the forward plane from above/behind.
+    camera.position.set(focus.x, dist * 0.62, focus.z + dist * 0.62);
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(focus);
@@ -325,8 +394,8 @@ export function RunMapView({
       RIGHT: THREE.MOUSE.ROTATE,
     };
     controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
-    controls.minDistance = 20;
-    controls.maxDistance = extent * 2.5;
+    controls.minDistance = 15;
+    controls.maxDistance = dist * 2.2;
     controls.zoomToCursor = true;
     controls.enableDamping = !reduceMotion;
 
@@ -428,11 +497,21 @@ export function RunMapView({
     reduceMotion,
   ]);
 
+  // The nebula wash + vignette live in CSS behind the transparent canvas, the
+  // same atmospheric layering the mockup uses.
   return (
     <div
-      ref={containerRef}
       className={className}
-      style={{ position: "absolute", inset: 0 }}
-    />
+      style={{
+        position: "absolute",
+        inset: 0,
+        background:
+          "radial-gradient(60% 60% at 30% 20%, rgba(18,48,90,.35), transparent 60%)," +
+          "radial-gradient(50% 50% at 75% 80%, rgba(58,21,51,.3), transparent 60%)," +
+          "radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0,0,0,.6))",
+      }}
+    >
+      <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+    </div>
   );
 }
