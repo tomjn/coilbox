@@ -94,7 +94,8 @@ export interface GalaxyNode {
 
 /** Author-controlled presentation of the strategic map. */
 export interface GalaxyTheme {
-  /** `galaxy` (default) or `theatre` (flat map plane — reserved, not yet rendered). */
+  /** `galaxy` (default) or `theatre` (flat tactical chart; both fully rendered
+   * by the galaxy view, and reused by the roguelite run map). */
   skin?: "galaxy" | "theatre";
   /** Theatre plane texture / galaxy nebula backdrop. */
   backdrop?: ImageRef;

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-runlite-state-load"
+description = "Enables the runlite_state_load command without any pre-configured scope."
+commands.allow = ["runlite_state_load"]
+
+[[permission]]
+identifier = "deny-runlite-state-load"
+description = "Denies the runlite_state_load command without any pre-configured scope."
+commands.deny = ["runlite_state_load"]

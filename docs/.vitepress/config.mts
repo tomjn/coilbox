@@ -50,6 +50,7 @@ export default defineConfig({
         items: [
           { text: "Campaigns", link: "/campaigns" },
           { text: "Galactic conquest", link: "/conquest" },
+          { text: "Roguelite run", link: "/roguelite-run" },
         ],
       },
     ],

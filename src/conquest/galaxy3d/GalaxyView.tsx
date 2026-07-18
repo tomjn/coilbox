@@ -44,6 +44,20 @@ export interface GalaxyDisplay {
   performanceMode: boolean;
 }
 
+/**
+ * Per-node graded emphasis for the run map (see {@link GalaxyViewProps.emphasis}).
+ * A struct rather than a bare opacity so more emphasis dimensions (glow, tint,
+ * …) can be added later without churning the prop's type.
+ */
+export interface NodeEmphasis {
+  /** Opacity multiplier for the node and its lanes, 0..1. Absent means 1. */
+  opacity?: number;
+  /** A small glyph drawn over the node. `check` = a completed/crossed marker. */
+  marker?: "check";
+  /** Occasional ambient combat flashes over the node (upcoming battle sites). */
+  flash?: boolean;
+}
+
 interface GalaxyViewProps {
   galaxy: GalaxyDoc;
   /** nodeId -> faction id / neutral (from run state; doc owners for preview). */
@@ -59,6 +73,33 @@ interface GalaxyViewProps {
    * ghosts; lanes into the fog fade out.
    */
   visibleIds?: Set<string>;
+  /**
+   * Graded de-emphasis, distinct from fog: for each listed node id, the node
+   * (and lanes touching it) render at reduced opacity but stay fully present —
+   * ring, label and glow are kept, not hidden. `undefined`/absent means full
+   * brightness. An object per node (not a bare number) so future emphasis
+   * dimensions can be added without a new prop. Default-off; conquest omits it.
+   */
+  emphasis?: Map<string, NodeEmphasis>;
+  /**
+   * Run-map lane styling. When true, the player's *outgoing* frontier lanes
+   * (the choices ahead) render as solid directional routes with an
+   * outward-travelling pulse, and the incoming lane you already crossed is
+   * muted rather than dashed. Default `false` keeps conquest's contested dashes.
+   */
+  laneFlow?: boolean;
+  /**
+   * Directed link keys (`"from to"`) to draw as a highlighted route already
+   * travelled — the run's path taken, kept green and bright up to the current
+   * node. Only honoured with {@link laneFlow}. Default-off.
+   */
+  pathLinks?: Set<string>;
+  /**
+   * Fire a one-shot celebratory burst (shockwave + flare) on this node — e.g.
+   * the star of a battle just won. Set it to the node id to play; set back to
+   * null when done so the next win replays. No burst under reduce-motion.
+   */
+  burstNodeId?: string | null;
   /** Map spring-names known to be space maps; their nodes render as asteroids. */
   spaceMaps?: Set<string>;
   /**
@@ -72,6 +113,8 @@ interface GalaxyViewProps {
 }
 
 const NEUTRAL_COLOR = "#6b7280";
+/** The quiet blue-grey of an unowned lane (the base lane pair's colour). */
+const BASE_LANE_HEX = 0x93a7c8;
 
 /**
  * Stellar classes for the selectable stars. The star itself is coloured by
@@ -286,6 +329,88 @@ function filamentTexture(sigma: number): THREE.Texture {
 }
 
 /**
+ * A single soft chevron pointing toward +x, drawn white with a gaussian glow so
+ * it reads as a light arrowhead under additive blending. Used as travelling
+ * direction markers along the run's open routes (`laneFlow`).
+ */
+function chevronTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.clearRect(0, 0, size, size);
+    ctx.shadowColor = "#ffffff";
+    ctx.shadowBlur = size * 0.14;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = size * 0.16;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const m = size * 0.5;
+    const s = size * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(m - s * 0.5, m - s);
+    ctx.lineTo(m + s * 0.7, m); // tip toward +x
+    ctx.lineTo(m - s * 0.5, m + s);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * A soft glowing annulus — the expanding shockwave ring of a win burst.
+ */
+function ringBurstTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.clearRect(0, 0, size, size);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = size * 0.05;
+    ctx.shadowColor = "#ffe9b0";
+    ctx.shadowBlur = size * 0.1;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * A soft check-mark glyph on a transparent field, drawn white with a glow so it
+ * reads as a completed marker over a node under normal blending. Tinted per use.
+ */
+function checkTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.clearRect(0, 0, size, size);
+    ctx.shadowColor = "#000000";
+    ctx.shadowBlur = size * 0.1;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = size * 0.15;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(size * 0.26, size * 0.52);
+    ctx.lineTo(size * 0.44, size * 0.7);
+    ctx.lineTo(size * 0.76, size * 0.32);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
  * Procedural theatre-map chart: a dark slate plane with a faint grid and a
  * per-pixel vignette — the fallback when a theatre theme ships no backdrop.
  * Shared with the battle backdrop for theatre-skinned galaxies.
@@ -380,6 +505,10 @@ export function GalaxyView({
   incursion,
   onSelect,
   visibleIds,
+  emphasis,
+  laneFlow = false,
+  pathLinks,
+  burstNodeId,
   spaceMaps,
   focusNodeId,
   display,
@@ -392,6 +521,10 @@ export function GalaxyView({
   const selectedRef = useRef<string | null | undefined>(selectedId);
   const incursionRef = useRef(incursion);
   const visibleRef = useRef<Set<string> | undefined>(visibleIds);
+  const emphasisRef = useRef<Map<string, NodeEmphasis> | undefined>(emphasis);
+  const pathLinksRef = useRef<Set<string> | undefined>(pathLinks);
+  const burstRef = useRef<string | null | undefined>(burstNodeId);
+  const applyBurstRef = useRef<(() => void) | null>(null);
   const focusRef = useRef<string | null | undefined>(focusNodeId);
   const onSelectRef = useRef(onSelect);
   const applyOwnersRef = useRef<(() => void) | null>(null);
@@ -454,6 +587,14 @@ export function GalaxyView({
     // Fog of war: `undefined` visible set means no fog (show everything).
     const isVisible = (id: string): boolean =>
       !visibleRef.current || visibleRef.current.has(id);
+
+    // Graded emphasis: a node's opacity multiplier (1 when not listed / no map).
+    const dimOf = (id: string): number =>
+      emphasisRef.current?.get(id)?.opacity ?? 1;
+    // A lane is only as bright as its dimmer end, so a lane into a faded node
+    // fades with it.
+    const laneDim = (a: string, b: string): number =>
+      Math.min(dimOf(a), dimOf(b));
 
     /* ------------------------- decorative backdrop ------------------------- */
 
@@ -699,6 +840,10 @@ export function GalaxyView({
     }
 
     // A few soft nebula sprites tint the disc (skipped in performance mode).
+    // Runs (`laneFlow`) get a bolder, larger, more numerous swathe so each run's
+    // sky reads as its own place; conquest keeps the restrained haze — and,
+    // crucially, the non-bold path advances the seeded RNG in the exact same
+    // order as before, so conquest's nebula placement is unchanged.
     if (skin === "galaxy" && !performanceMode && effects) {
       const nebulaColors = galaxy.theme?.nebulaColors ?? [
         "#4756b8",
@@ -706,33 +851,43 @@ export function GalaxyView({
         "#2a6f8f",
       ];
       const nebulaRng = mulberry32(hashString(`${galaxy.id}-nebula`));
-      nebulaColors.slice(0, 4).forEach((color, i) => {
+      const bold = laneFlow;
+      const count = bold ? 13 : Math.min(4, nebulaColors.length);
+      for (let i = 0; i < count; i++) {
+        const color = nebulaColors[i % nebulaColors.length];
         const tex = radialTexture(128, [
           [0, `${color}ff`],
           [0.5, `${color}55`],
           [1, `${color}00`],
         ]);
+        // Only call the RNG for opacity in bold mode — else the sequence shifts
+        // and conquest's placement changes.
+        const opacity = bold ? 0.16 + nebulaRng() * 0.08 : 0.09;
         const mat = new THREE.SpriteMaterial({
           map: tex,
           transparent: true,
-          opacity: 0.09,
+          opacity,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
         disposables.push(tex, mat);
         const sprite = new THREE.Sprite(mat);
         const angle = nebulaRng() * Math.PI * 2 + i;
-        const dist = extent * (0.7 + nebulaRng() * 1.6);
+        // Bold (run) spreads clouds over a much wider disc and depth so the
+        // swathe fills the sky rather than hugging the play patch.
+        const dist =
+          extent * ((bold ? 0.3 : 0.7) + nebulaRng() * (bold ? 3.8 : 1.6));
         sprite.position.set(
           Math.cos(angle) * dist,
-          -14 - nebulaRng() * 8,
+          (bold ? 12 : -14) - nebulaRng() * (bold ? 90 : 8),
           Math.sin(angle) * dist,
         );
-        const scale = extent * (1.2 + nebulaRng() * 1.2);
+        const scale =
+          extent * ((bold ? 1.8 : 1.2) + nebulaRng() * (bold ? 2.8 : 1.2));
         sprite.scale.set(scale, scale * 0.6, 1);
         sprite.raycast = () => {};
         scene.add(sprite);
-      });
+      }
     }
 
     /* ----------------------------- play layer ------------------------------ */
@@ -817,8 +972,11 @@ export function GalaxyView({
       pair.core.geometry.dispose();
       pair.halo.geometry.dispose();
     };
+    // Vertex-coloured (not a flat material colour) so `emphasis` can dim
+    // individual segments; with no emphasis every segment is BASE_LANE_COLOR,
+    // byte-identical to the old flat look.
     const lanes = makeLanePair({
-      color: 0x93a7c8,
+      vertexColors: true,
       coreOpacity: 0.5,
       haloOpacity: 0.1,
     });
@@ -827,12 +985,90 @@ export function GalaxyView({
       coreOpacity: 0.75,
       haloOpacity: 0.16,
     });
-    // Contested routes: fine warm-gold dashes, NMS plotted-course style.
+    // Contested routes: fine warm-gold dashes, NMS plotted-course style. In
+    // `laneFlow` (run) mode the same pair is drawn *solid* instead — the run's
+    // open lanes are directional travel routes, not a contested battle line.
     const frontier = makeLanePair({
       color: 0xffcf8a,
       coreOpacity: 0.9,
       haloOpacity: 0.1,
     });
+    // The path already travelled (`pathLinks`, run mode): a bright green trail
+    // so you can always see the route you took.
+    const pathTaken = makeLanePair({
+      color: 0x46e08a,
+      coreOpacity: 0.85,
+      haloOpacity: 0.16,
+    });
+
+    // Directional route markers (`laneFlow` only): a run's connectors point
+    // from where you are to the choices ahead, so travelling chevrons make the
+    // direction explicit. A small pool of in-plane arrow quads (they hold a
+    // world heading as the camera orbits, unlike billboards), a brightness wave
+    // animated over them outward. Under reduce-motion they sit static — still
+    // reading as arrows pointing the way.
+    const flowEnabled = laneFlow;
+    const CHEVRONS_PER_ROUTE = 3;
+    const chevTex = flowEnabled ? chevronTexture(64) : undefined;
+    const chevGeo = flowEnabled ? new THREE.PlaneGeometry(2.4, 1.7) : undefined;
+    if (chevGeo) {
+      chevGeo.rotateX(-Math.PI / 2); // lie flat in the galaxy plane
+      disposables.push(chevGeo);
+    }
+    if (chevTex) disposables.push(chevTex);
+    interface Chevron {
+      mesh: THREE.Mesh;
+      mat: THREE.MeshBasicMaterial;
+      /** Position along its route, 0 (at you) .. 1 (at the choice). */
+      t: number;
+    }
+    const chevrons: Chevron[] = [];
+    // Grow the pool to `n` chevrons (created lazily; hidden ones stay parked).
+    const ensureChevrons = (n: number) => {
+      while (chevrons.length < n && chevGeo && chevTex) {
+        const mat = new THREE.MeshBasicMaterial({
+          map: chevTex,
+          color: 0xffe6b0,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+        });
+        const mesh = new THREE.Mesh(chevGeo, mat);
+        mesh.raycast = () => {};
+        mesh.visible = false;
+        scene.add(mesh);
+        disposables.push(mat);
+        chevrons.push({ mesh, mat, t: 0 });
+      }
+    };
+    // Lay chevrons out along the current open routes (called from applyOwners).
+    const layoutChevrons = (routes: LaneSeg[]) => {
+      if (!flowEnabled) return;
+      ensureChevrons(routes.length * CHEVRONS_PER_ROUTE);
+      let k = 0;
+      for (const [x1, y1, z1, x2, y2, z2] of routes) {
+        // The chevron's local +x is world +x; a Y-rotation of θ sends it to
+        // (cosθ, 0, -sinθ), so to aim it along (dx, dz) we need θ=atan2(-dz, dx).
+        const heading = Math.atan2(-(z2 - z1), x2 - x1);
+        for (let c = 0; c < CHEVRONS_PER_ROUTE; c++) {
+          // Space them across the middle of the lane, marching toward +choice.
+          const t = 0.28 + (c / (CHEVRONS_PER_ROUTE - 1)) * 0.44;
+          const chev = chevrons[k++];
+          chev.t = t;
+          chev.mesh.position.set(
+            x1 + (x2 - x1) * t,
+            y1 + (y2 - y1) * t + 0.12,
+            z1 + (z2 - z1) * t,
+          );
+          chev.mesh.rotation.y = heading;
+          chev.mesh.visible = true;
+          chev.mat.opacity = 0.55; // static base; the loop waves it when motion on
+        }
+      }
+      for (; k < chevrons.length; k++) chevrons[k].mesh.visible = false;
+    };
 
     // Node hit targets: one invisible InstancedMesh gives the raycaster a
     // generous, stable click area. The visible star is drawn by sprites — a
@@ -913,6 +1149,9 @@ export function GalaxyView({
       center: [number, number, number];
       radius: number;
       phase: number;
+      /** Pristine opacities, so emphasis can dim then restore exactly. */
+      starBase: number;
+      coronaBase: number;
     }
     const companions: Companion[] = [];
 
@@ -1244,14 +1483,170 @@ export function GalaxyView({
           center: [p[0], p[1], p[2]],
           radius,
           phase,
+          starBase: compStarMat.opacity,
+          coronaBase: compCoronaMat.opacity,
         });
       }
     });
 
+    // Pristine per-node glow opacities, captured now (before fog/emphasis run),
+    // so a de-emphasised node dims by a factor and restores to exactly its
+    // class-dependent brightness — corona/spike opacity is glow-dependent, not
+    // a constant.
+    const coronaBaseOp = coronaSprites.map(
+      (s) => (s?.material as THREE.SpriteMaterial | undefined)?.opacity ?? 1,
+    );
+    const spikeBaseOp = spikeSprites.map(
+      (s) =>
+        (s as { material?: { opacity?: number } } | undefined)?.material
+          ?.opacity ?? 1,
+    );
+
+    // "Done" markers (emphasis `marker: "check"`): a check glyph over a node.
+    // Created lazily per node the first time it needs one, so conquest — which
+    // never sets a marker — allocates nothing. One shared texture/material.
+    const checkSprites: (THREE.Sprite | undefined)[] = new Array(
+      galaxy.nodes.length,
+    ).fill(undefined);
+    let checkTex: THREE.Texture | undefined;
+    let checkMat: THREE.SpriteMaterial | undefined;
+    const ensureCheck = (i: number): THREE.Sprite | undefined => {
+      const existing = checkSprites[i];
+      if (existing) return existing;
+      const p = positions.get(galaxy.nodes[i].id);
+      if (!p) return undefined;
+      if (!checkTex) {
+        checkTex = checkTexture(64);
+        disposables.push(checkTex);
+      }
+      if (!checkMat) {
+        checkMat = new THREE.SpriteMaterial({
+          map: checkTex,
+          color: 0x8affc0,
+          transparent: true,
+          opacity: 0.95,
+          depthWrite: false,
+          depthTest: false, // always legible over the (dimmed) node
+        });
+        disposables.push(checkMat);
+      }
+      const sprite = new THREE.Sprite(checkMat);
+      sprite.position.set(p[0], p[1] + 0.3, p[2]);
+      sprite.scale.setScalar(galaxy.nodes[i].kind === "capital" ? 3.6 : 3.0);
+      sprite.renderOrder = 5;
+      sprite.raycast = () => {};
+      scene.add(sprite);
+      checkSprites[i] = sprite;
+      return sprite;
+    };
+
+    // Ambient combat flashes (emphasis `flash`): a small warm pop over upcoming
+    // battle sites every few seconds, staggered per node, faded by the node's
+    // own emphasis so distant fronts flicker fainter. Lazily created; the loop
+    // drives the pulse when motion is on (so reduce-motion stays still).
+    const flashSprites: (THREE.Sprite | undefined)[] = new Array(
+      galaxy.nodes.length,
+    ).fill(undefined);
+    const flashEnabled = new Set<number>();
+    const flashClock = galaxy.nodes.map((n) => ({
+      phase: (hashString(`${n.id}-fp`) % 1000) / 1000,
+      period: 2200 + (hashString(`${n.id}-fperiod`) % 1800),
+    }));
+    const FLASH_MS = 200;
+    let flashTex: THREE.Texture | undefined;
+    const ensureFlash = (i: number): THREE.Sprite | undefined => {
+      const existing = flashSprites[i];
+      if (existing) return existing;
+      const p = positions.get(galaxy.nodes[i].id);
+      if (!p) return undefined;
+      if (!flashTex) {
+        flashTex = radialTexture(64, [
+          [0, "#ffffffff"],
+          [0.3, "#ffd9a0cc"],
+          [0.7, "#ff883322"],
+          [1, "#ff880000"],
+        ]);
+        disposables.push(flashTex);
+      }
+      const mat = new THREE.SpriteMaterial({
+        map: flashTex,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+      });
+      disposables.push(mat);
+      // Offset off the star centre so it reads as a battlefront flash, not a
+      // second star.
+      const h = hashString(`${galaxy.nodes[i].id}-flashoff`);
+      const sprite = new THREE.Sprite(mat);
+      sprite.position.set(
+        p[0] + (((h % 100) / 100) * 2 - 1) * 0.7,
+        p[1] + 0.2,
+        p[2] + ((((h >> 7) % 100) / 100) * 2 - 1) * 0.7,
+      );
+      sprite.renderOrder = 4;
+      sprite.raycast = () => {};
+      sprite.visible = false;
+      scene.add(sprite);
+      flashSprites[i] = sprite;
+      return sprite;
+    };
+
+    // Win burst: a one-shot shockwave ring + flare on a node (the star just
+    // won). Two reused sprites, repositioned per burst; driven by the loop.
+    const burstFlareTex = radialTexture(128, [
+      [0, "#ffffffff"],
+      [0.3, "#fff3c8dd"],
+      [0.7, "#ffcf6633"],
+      [1, "#ffcf6600"],
+    ]);
+    const burstRingTex = ringBurstTexture(128);
+    disposables.push(burstFlareTex, burstRingTex);
+    const burstFlareMat = new THREE.SpriteMaterial({
+      map: burstFlareTex,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const burstRingMat = new THREE.SpriteMaterial({
+      map: burstRingTex,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+    });
+    disposables.push(burstFlareMat, burstRingMat);
+    const burstFlare = new THREE.Sprite(burstFlareMat);
+    const burstRing = new THREE.Sprite(burstRingMat);
+    for (const s of [burstFlare, burstRing]) {
+      s.visible = false;
+      s.raycast = () => {};
+      s.renderOrder = 6;
+      scene.add(s);
+    }
+    const BURST_MS = 1300;
+    let burstAnim: { t0: number } | null = null;
+    const applyBurst = () => {
+      const id = burstRef.current;
+      if (!id || reduceMotion) return; // no animated burst under reduce-motion
+      const p = positions.get(id);
+      if (!p) return;
+      const at: [number, number, number] = [p[0], p[1] + 0.3, p[2]];
+      burstFlare.position.set(...at);
+      burstRing.position.set(...at);
+      burstAnim = { t0: performance.now() };
+    };
+    applyBurstRef.current = applyBurst;
+
     // Fade the lanes up during the intro (their target opacities are captured
     // now, then restored as the intro clock advances).
     if (animateIntro) {
-      for (const pair of [lanes, factionLanes, frontier]) {
+      for (const pair of [lanes, factionLanes, frontier, pathTaken]) {
         for (const mesh of [pair.core, pair.halo]) {
           const mat = mesh.material as THREE.Material & { opacity: number };
           introLaneMats.push({ mat, target: mat.opacity });
@@ -1484,9 +1879,19 @@ export function GalaxyView({
       // dashed), same-owner (both ends one faction, drawn in its colour),
       // else the quiet neutral base.
       const baseSegs: LaneSeg[] = [];
+      const baseSegColors: THREE.Color[] = [];
       const factionSegs: LaneSeg[] = [];
       const factionSegColors: THREE.Color[] = [];
       const frontierSegs: LaneSeg[] = [];
+      const routeSegs: LaneSeg[] = [];
+      const pathSegs: LaneSeg[] = [];
+      // The quiet base lane, dimmed by whichever end is more faded.
+      const pushBase = (seg: LaneSeg, a: string, b: string) => {
+        baseSegs.push(seg);
+        baseSegColors.push(
+          new THREE.Color(BASE_LANE_HEX).multiplyScalar(laneDim(a, b)),
+        );
+      };
       for (const [a, b] of galaxy.links) {
         const seg = trimmedSeg(a, b);
         if (!seg) continue;
@@ -1496,25 +1901,47 @@ export function GalaxyView({
         const visB = isVisible(b);
         if (!visA && !visB) continue;
         if (!visA || !visB) {
-          baseSegs.push(seg);
+          pushBase(seg, a, b);
           continue;
         }
         const ownerA = current[a] ?? NEUTRAL;
         const ownerB = current[b] ?? NEUTRAL;
         const aPlayer = ownerA === playerFactionId;
         const bPlayer = ownerB === playerFactionId;
+        if (laneFlow) {
+          // Run lanes: the route already travelled is a bright green trail;
+          // forward lanes out of the current node (you -> a choice) are
+          // directional routes; everything else is quiet base, dimmed by
+          // emphasis. No faction-coloured lanes — a node's *type* is not an
+          // allegiance. `trimmedSeg(a, b)` runs source -> target, so the pulse
+          // flows outward.
+          if (pathLinksRef.current?.has(`${a} ${b}`)) pathSegs.push(seg);
+          else if (aPlayer && !bPlayer) routeSegs.push(seg);
+          else pushBase(seg, a, b);
+          continue;
+        }
         if (aPlayer !== bPlayer) {
           frontierSegs.push(seg);
         } else if (ownerA === ownerB && ownerA !== NEUTRAL) {
           factionSegs.push(seg);
-          factionSegColors.push(ownerColor(ownerA));
+          // clone: ownerColor returns the shared cached faction colour.
+          factionSegColors.push(
+            ownerColor(ownerA).clone().multiplyScalar(laneDim(a, b)),
+          );
         } else {
-          baseSegs.push(seg);
+          pushBase(seg, a, b);
         }
       }
-      setLanePair(lanes, baseSegs);
-      setLanePair(factionLanes, factionSegs, factionSegColors);
-      setLanePair(frontier, dashSegments(frontierSegs, 1.5, 1.2));
+      setLanePair(lanes, baseSegs, baseSegColors);
+      if (laneFlow) {
+        setLanePair(factionLanes, []); // runs have no shared-owner lanes
+        setLanePair(frontier, routeSegs); // solid, not dashed
+        setLanePair(pathTaken, pathSegs); // green trail behind you
+        layoutChevrons(routeSegs);
+      } else {
+        setLanePair(factionLanes, factionSegs, factionSegColors);
+        setLanePair(frontier, dashSegments(frontierSegs, 1.5, 1.2));
+      }
     };
     applyOwnersRef.current = applyOwners;
 
@@ -1530,7 +1957,8 @@ export function GalaxyView({
       );
       mat.color.copy(ownerColor(owner));
       mat.opacity =
-        owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75;
+        (owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75) *
+        dimOf(galaxy.nodes[i].id);
       // Theatre region markers fill with a dark shade of the owner colour.
       const disc = discMats[i];
       if (disc) {
@@ -1580,21 +2008,58 @@ export function GalaxyView({
       if (skin === "theatre") return; // theatre region markers have no fog styling
       galaxy.nodes.forEach((n, i) => {
         const vis = isVisible(n.id);
+        // Graded emphasis dims but keeps a node present (glow/ring/label stay);
+        // fog fully hides its glow, ring and label. The two compose (fog wins
+        // on hiding, emphasis scales what remains) but no caller uses both.
+        const factor = dimOf(n.id);
         const starMat = starMats[i];
-        if (starMat) starMat.opacity = vis ? 1 : FOG_DIM;
+        if (starMat) starMat.opacity = (vis ? 1 : FOG_DIM) * factor;
         const corona = coronaSprites[i];
-        if (corona) corona.visible = vis;
+        if (corona) {
+          corona.visible = vis;
+          (corona.material as THREE.SpriteMaterial).opacity =
+            coronaBaseOp[i] * factor;
+        }
         const spike = spikeSprites[i];
-        if (spike) spike.visible = vis;
+        if (spike) {
+          spike.visible = vis;
+          const sm = (spike as { material?: { opacity?: number } }).material;
+          if (sm) sm.opacity = spikeBaseOp[i] * factor;
+        }
         const ring = ownerRings[i];
-        if (ring) ring.visible = vis;
+        if (ring) ring.visible = vis; // ring opacity is set in styleRing
         const label = labelObjects[i];
-        if (label) label.visible = vis;
+        if (label) {
+          label.visible = vis;
+          (label.element as HTMLElement).style.opacity = String(factor);
+        }
+        // Completed marker: show a check over crossed nodes.
+        const marker = emphasisRef.current?.get(n.id)?.marker;
+        if (marker === "check" && vis) {
+          const cs = ensureCheck(i);
+          if (cs) cs.visible = true;
+        } else if (checkSprites[i]) {
+          (checkSprites[i] as THREE.Sprite).visible = false;
+        }
+        // Ambient combat flash: enabled here, pulsed in the animation loop.
+        if (emphasisRef.current?.get(n.id)?.flash && vis) {
+          ensureFlash(i);
+          flashEnabled.add(i);
+        } else {
+          flashEnabled.delete(i);
+          const fs = flashSprites[i];
+          if (fs) fs.visible = false;
+        }
       });
       for (const c of companions) {
-        const vis = isVisible(galaxy.nodes[c.i].id);
+        const id = galaxy.nodes[c.i].id;
+        const vis = isVisible(id);
+        const factor = dimOf(id);
         c.star.visible = vis;
         c.corona.visible = vis;
+        (c.star.material as THREE.SpriteMaterial).opacity = c.starBase * factor;
+        (c.corona.material as THREE.SpriteMaterial).opacity =
+          c.coronaBase * factor;
       }
     };
     applyVisibilityRef.current = applyVisibility;
@@ -1824,6 +2289,34 @@ export function GalaxyView({
 
         if (effects) {
           uTime.value = now / 1000;
+          // Directional route chevrons: a brightness wave that peaks at
+          // successively further markers over time, so it reads as light
+          // flowing outward toward the choices.
+          if (flowEnabled) {
+            for (const chev of chevrons) {
+              if (!chev.mesh.visible) continue;
+              chev.mat.opacity =
+                0.22 + 0.78 * (0.5 + 0.5 * Math.sin(now / 240 - chev.t * 7));
+            }
+          }
+          // Ambient combat flashes: a brief pop on a per-node cycle, faded by
+          // the node's emphasis so distant fronts flicker fainter.
+          for (const i of flashEnabled) {
+            const fs = flashSprites[i];
+            if (!fs) continue;
+            const { phase, period } = flashClock[i];
+            const local = (now + phase * period) % period;
+            if (local < FLASH_MS) {
+              const a = Math.sin((Math.PI * local) / FLASH_MS);
+              const capital = galaxy.nodes[i].kind === "capital";
+              fs.visible = true;
+              (fs.material as THREE.SpriteMaterial).opacity =
+                0.55 * a * dimOf(galaxy.nodes[i].id);
+              fs.scale.setScalar((2.0 + 1.4 * a) * (capital ? 1.3 : 1));
+            } else if (fs.visible) {
+              fs.visible = false;
+            }
+          }
           // Binary companions orbit their primary in the map plane.
           for (const c of companions) {
             const a = c.phase + now / 2600;
@@ -1850,6 +2343,24 @@ export function GalaxyView({
             }
           }
         }
+        // Win burst: shockwave ring expands and fades, flare spikes then dies.
+        if (burstAnim) {
+          const e = (now - burstAnim.t0) / BURST_MS;
+          if (e >= 1) {
+            burstAnim = null;
+            burstFlare.visible = false;
+            burstRing.visible = false;
+          } else {
+            burstFlare.visible = true;
+            burstRing.visible = true;
+            const flareIn = e < 0.12 ? e / 0.12 : 1;
+            burstFlareMat.opacity = flareIn * (1 - e) ** 1.5;
+            burstFlare.scale.setScalar(6 + 26 * easeOut(e));
+            burstRingMat.opacity = (1 - e) * 0.85;
+            burstRing.scale.setScalar(3 + 52 * easeOut(e));
+          }
+        }
+
         // Controls own the camera only in the free overview — not during the
         // intro, a focus ease, or while a node is focused (controls locked).
         if (!introActive && !focusAnim && !focusShown) {
@@ -1891,6 +2402,7 @@ export function GalaxyView({
       disposeLanePair(lanes);
       disposeLanePair(factionLanes);
       disposeLanePair(frontier);
+      disposeLanePair(pathTaken);
       for (const d of disposables) d.dispose();
       labelRenderer?.domElement.remove();
       if (renderer) {
@@ -1902,6 +2414,7 @@ export function GalaxyView({
       applySelectionRef.current = null;
       applyVisibilityRef.current = null;
       applyFocusRef.current = null;
+      applyBurstRef.current = null;
     };
   }, [
     galaxy,
@@ -1910,6 +2423,7 @@ export function GalaxyView({
     effects,
     performanceMode,
     spaceMaps,
+    laneFlow,
   ]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is
@@ -1918,10 +2432,12 @@ export function GalaxyView({
   useEffect(() => {
     ownersRef.current = owners;
     visibleRef.current = visibleIds;
+    emphasisRef.current = emphasis;
+    pathLinksRef.current = pathLinks;
     applyOwnersRef.current?.();
     applyVisibilityRef.current?.();
     if (reduceMotion) renderRef.current?.();
-  }, [owners, visibleIds, reduceMotion]);
+  }, [owners, visibleIds, emphasis, pathLinks, reduceMotion]);
 
   useEffect(() => {
     selectedRef.current = selectedId;
@@ -1934,6 +2450,11 @@ export function GalaxyView({
     focusRef.current = focusNodeId;
     applyFocusRef.current?.();
   }, [focusNodeId]);
+
+  useEffect(() => {
+    burstRef.current = burstNodeId;
+    applyBurstRef.current?.();
+  }, [burstNodeId]);
 
   // The caller's className must make this element positioned (e.g. `absolute
   // inset-0` or `relative h-96`) — the canvas and label layers inside anchor

@@ -110,6 +110,7 @@ fn main() {
     builder = builder.plugin(tauri_plugin_coilbox_play::init());
     builder = builder.plugin(tauri_plugin_coilbox_campaign::init());
     builder = builder.plugin(tauri_plugin_coilbox_conquest::init());
+    builder = builder.plugin(tauri_plugin_coilbox_runlite::init());
     builder = builder.plugin(tauri_plugin_coilbox_profile::init());
     builder = builder.plugin(tauri_plugin_coilbox_lobby_servers::init());
     builder = builder.plugin(tauri_plugin_coilbox_multiplayer::init());

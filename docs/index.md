@@ -88,5 +88,5 @@ Download and run the installer / AppImage from the [latest release](https://gith
 
 - [Portable mode](/portable-mode) — run Coilbox from a self-contained folder.
 - [Distribution profile](/distribution-profile) — reskin and narrow Coilbox for a specific game.
-- [Campaigns](/campaigns) and [Galactic conquest](/conquest) — the singleplayer game modes.
+- [Campaigns](/campaigns), [Galactic conquest](/conquest) and [Roguelite run](/roguelite-run) — the singleplayer game modes.
 - [Routes](/routes) — the app's screen map.

@@ -21,6 +21,7 @@ tauri-plugin-coilbox-unitsync = { path = "../crates/tauri-plugin-coilbox-unitsyn
 tauri-plugin-coilbox-play = { path = "../crates/tauri-plugin-coilbox-play" }
 tauri-plugin-coilbox-campaign = { path = "../crates/tauri-plugin-coilbox-campaign" }
 tauri-plugin-coilbox-conquest = { path = "../crates/tauri-plugin-coilbox-conquest" }
+tauri-plugin-coilbox-runlite = { path = "../crates/tauri-plugin-coilbox-runlite" }
 tauri-plugin-coilbox-profile = { path = "../crates/tauri-plugin-coilbox-profile" }
 tauri-plugin-coilbox-lobby-servers = { path = "../crates/tauri-plugin-coilbox-lobby-servers" }
 tauri-plugin-coilbox-multiplayer = { path = "../crates/tauri-plugin-coilbox-multiplayer" }

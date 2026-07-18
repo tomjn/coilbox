@@ -1,0 +1,10 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows the roguelite-run plugin's active-run and meta-progression storage commands."
+permissions = [
+  "allow-runlite-state-load",
+  "allow-runlite-state-save",
+  "allow-runlite-meta-load",
+  "allow-runlite-meta-save",
+]
