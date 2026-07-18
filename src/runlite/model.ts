@@ -613,17 +613,31 @@ export function reconcileRun(run: RogueliteRun): RogueliteRun {
   let status: RunStatus = p.status;
   if (hull <= 0) status = "lost";
 
+  // Invariant: the current node is always a resolved (visited) node — it's the
+  // last place you committed to. Older saves (or a mid-battle interruption)
+  // could point it at an unvisited node; heal it to the deepest visited node so
+  // the player isn't stranded.
+  let currentNodeId = p.currentNodeId;
+  if (!visited.includes(currentNodeId)) {
+    let deepest = run.nodes[0];
+    for (const n of run.nodes) {
+      if (visited.includes(n.id) && n.col >= (deepest?.col ?? -1)) deepest = n;
+    }
+    currentNodeId = deepest?.id ?? currentNodeId;
+  }
+
   if (
     hull === p.hull &&
     visited.length === p.visited.length &&
     unlockedUnits.length === p.unlockedUnits.length &&
-    status === p.status
+    status === p.status &&
+    currentNodeId === p.currentNodeId
   ) {
     return run;
   }
   return {
     ...run,
-    progress: { ...p, hull, visited, unlockedUnits, status },
+    progress: { ...p, hull, visited, unlockedUnits, status, currentNodeId },
   };
 }
 

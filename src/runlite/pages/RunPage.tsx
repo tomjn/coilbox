@@ -20,9 +20,7 @@ import {
 import {
   deepestColumn,
   hullLoss,
-  moveTo,
   nextChoices,
-  pendingNode,
   salvageReward,
 } from "../progress";
 import { RunMapView } from "../RunMapView";
@@ -67,12 +65,6 @@ export default function RunPage() {
   }, [run?.startUnit, dataset]);
 
   const choices = useMemo(() => (run ? nextChoices(run) : []), [run]);
-  const pending = useMemo(() => (run ? pendingNode(run) : null), [run]);
-
-  // A freshly-entered (unresolved) node auto-opens its overlay.
-  useEffect(() => {
-    if (pending) setActiveNodeId(pending.id);
-  }, [pending]);
 
   // When a run reaches won/lost, fold it into meta-progression once.
   useEffect(() => {
@@ -103,17 +95,19 @@ export default function RunPage() {
     : null;
   const ended = run.progress.status !== "active";
 
-  const onSelect = async (id: string | null) => {
+  const onSelect = (id: string | null) => {
     if (!id) {
       setSelectedId(null);
       return;
     }
     if (choiceIds.has(id)) {
-      // Move to this forward choice; its overlay opens once it's the pending
-      // (unresolved) current node.
-      await save(moveTo(run, id));
+      // Open this choice's overlay as a *preview* — nothing commits until it's
+      // resolved (launch/take/choose), so backing out is free.
+      setSelectedId(null);
       setActiveNodeId(id);
     } else {
+      // A visited or out-of-reach node: read-only inspect.
+      setActiveNodeId(null);
       setSelectedId(id);
     }
   };

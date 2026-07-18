@@ -11,10 +11,13 @@ import {
  * functions take a run + an action and return the next run (never mutating), so
  * every rule is unit-testable and the React layer stays a thin dispatcher.
  *
- * Progression model (Slay-the-Spire style): you occupy `currentNodeId`. A node
- * is *resolved* once it's in `visited`. When the current node is resolved you
- * may move to one of its forward successors (which becomes the new current,
- * unresolved, awaiting its own resolution). The start node is pre-resolved.
+ * Progression model (Slay-the-Spire style): `currentNodeId` is the last node you
+ * *committed* to — always a resolved node. Its forward successors are the
+ * choices ahead. *Opening* a choice's overlay is only a preview and moves
+ * nothing; the move commits (advancing `currentNodeId` to that node) only when
+ * you resolve it — launch the battle, take the reward, choose the event, or shop.
+ * So backing out of an overlay leaves you free to pick a different branch. The
+ * start node is pre-resolved.
  */
 
 function nodeById(run: RogueliteRun, id: string): RunNode | undefined {
@@ -34,38 +37,24 @@ export function isResolved(run: RogueliteRun, nodeId: string): boolean {
   return run.progress.visited.includes(nodeId);
 }
 
-/** The node currently awaiting resolution, or `null` if the current node is
- * already resolved (in which case the player is choosing where to go next). */
-export function pendingNode(run: RogueliteRun): RunNode | null {
-  const cur = run.progress.currentNodeId;
-  return isResolved(run, cur) ? null : (nodeById(run, cur) ?? null);
-}
-
-/** The forward choices available now: successors of the current node once it's
- * resolved, else none (the current node must be resolved first). Won/lost runs
- * offer nothing. */
+/** The forward choices available now: the current node's successors. Won/lost
+ * runs offer nothing. */
 export function nextChoices(run: RogueliteRun): RunNode[] {
   if (run.progress.status !== "active") return [];
-  const cur = run.progress.currentNodeId;
-  return isResolved(run, cur) ? successors(run, cur) : [];
+  return successors(run, run.progress.currentNodeId);
+}
+
+/** Whether the player may act on `nodeId` now: it's a forward choice of the
+ * current node (about to be committed), or the node already committed to (e.g.
+ * buying again at the shop you're standing in). */
+export function canActOn(run: RogueliteRun, nodeId: string): boolean {
+  if (nodeId === run.progress.currentNodeId) return true;
+  return successors(run, run.progress.currentNodeId).some(
+    (n) => n.id === nodeId,
+  );
 }
 
 const touch = (): string => new Date().toISOString();
-
-/** Move to a forward successor of the (resolved) current node. Rejected — a
- * no-op returning the same run — if `nodeId` isn't a legal current choice. */
-export function moveTo(
-  run: RogueliteRun,
-  nodeId: string,
-  now?: string,
-): RogueliteRun {
-  if (!nextChoices(run).some((n) => n.id === nodeId)) return run;
-  return {
-    ...run,
-    progress: { ...run.progress, currentNodeId: nodeId },
-    updatedAt: now ?? touch(),
-  };
-}
 
 // --- Battle resolution -----------------------------------------------------
 
@@ -111,10 +100,11 @@ export function resolveBattle(
 ): RogueliteRun {
   const node = nodeById(run, nodeId);
   if (!node || node.type === "start") return run;
-  if (isResolved(run, nodeId)) return run;
+  if (isResolved(run, nodeId) || !canActOn(run, nodeId)) return run;
 
   const p: RunProgress = { ...run.progress };
   p.visited = [...p.visited, nodeId];
+  p.currentNodeId = nodeId; // committing the move happens on resolution
 
   if (outcome === "victory") {
     p.salvage += salvageReward(node);
@@ -156,11 +146,14 @@ export function applyReward(
   now?: string,
 ): RogueliteRun {
   const node = nodeById(run, nodeId);
-  if (!node?.reward || isResolved(run, nodeId)) return run;
+  if (!node?.reward || isResolved(run, nodeId) || !canActOn(run, nodeId)) {
+    return run;
+  }
   const p: RunProgress = { ...run.progress };
   const option = node.reward.options[optionIndex];
   if (option) grantOption(p, option);
   p.visited = [...p.visited, nodeId];
+  p.currentNodeId = nodeId;
   return {
     ...run,
     progress: p,
@@ -177,7 +170,9 @@ export function applyEvent(
   now?: string,
 ): RogueliteRun {
   const node = nodeById(run, nodeId);
-  if (!node?.event || isResolved(run, nodeId)) return run;
+  if (!node?.event || isResolved(run, nodeId) || !canActOn(run, nodeId)) {
+    return run;
+  }
   const choice = node.event.choices[choiceIndex];
   const p: RunProgress = { ...run.progress };
   if (choice) {
@@ -190,6 +185,7 @@ export function applyEvent(
   }
   if (p.hull <= 0) p.status = "lost";
   p.visited = [...p.visited, nodeId];
+  p.currentNodeId = nodeId;
   return {
     ...run,
     progress: p,
@@ -208,10 +204,13 @@ export function buyOffer(
 ): RogueliteRun {
   const node = nodeById(run, nodeId);
   const offer = node?.shop?.offers[offerIndex];
-  if (!offer || run.progress.salvage < offer.cost) return run;
+  if (!offer || run.progress.salvage < offer.cost || !canActOn(run, nodeId)) {
+    return run;
+  }
   const p: RunProgress = {
     ...run.progress,
     salvage: run.progress.salvage - offer.cost,
+    currentNodeId: nodeId, // stepping into the depot commits the move
   };
   grantOption(p, offer.option);
   return { ...run, progress: p, updatedAt: now ?? touch() };
@@ -226,12 +225,14 @@ export function restAtShop(
   const node = nodeById(run, nodeId);
   const shop = node?.shop;
   if (!shop?.restHull || run.progress.hull >= run.progress.maxHull) return run;
+  if (!canActOn(run, nodeId)) return run;
   const cost = shop.restCost ?? 0;
   if (run.progress.salvage < cost) return run;
   const p: RunProgress = {
     ...run.progress,
     salvage: run.progress.salvage - cost,
     hull: clampHull(run.progress.hull + shop.restHull, run.progress.maxHull),
+    currentNodeId: nodeId,
   };
   return { ...run, progress: p, updatedAt: now ?? touch() };
 }
@@ -243,10 +244,14 @@ export function leaveNode(
   now?: string,
 ): RogueliteRun {
   const node = nodeById(run, nodeId);
-  if (!node || isResolved(run, nodeId)) return run;
+  if (!node || isResolved(run, nodeId) || !canActOn(run, nodeId)) return run;
   return {
     ...run,
-    progress: { ...run.progress, visited: [...run.progress.visited, nodeId] },
+    progress: {
+      ...run.progress,
+      visited: [...run.progress.visited, nodeId],
+      currentNodeId: nodeId,
+    },
     history: pushHistory(run, { nodeId, type: node.type }),
     updatedAt: now ?? touch(),
   };

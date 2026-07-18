@@ -4,12 +4,11 @@ import {
   applyEvent,
   applyReward,
   buyOffer,
+  canActOn,
   deepestColumn,
   hullLoss,
   leaveNode,
-  moveTo,
   nextChoices,
-  pendingNode,
   resolveBattle,
   restAtShop,
   salvageReward,
@@ -76,31 +75,37 @@ function run(): RogueliteRun {
 }
 
 describe("navigation", () => {
-  it("offers successors of the resolved current node", () => {
+  it("offers successors of the current node", () => {
     const r = run();
     expect(successors(r, "start").map((n) => n.id)).toEqual(["b1", "b2"]);
     expect(nextChoices(r).map((n) => n.id)).toEqual(["b1", "b2"]);
-    expect(pendingNode(r)).toBeNull();
   });
 
-  it("moving to a successor makes it the pending (unresolved) node", () => {
-    const r = moveTo(run(), "b1", "now");
-    expect(r.progress.currentNodeId).toBe("b1");
-    expect(pendingNode(r)?.id).toBe("b1");
-    // No further choices until b1 is resolved.
-    expect(nextChoices(r)).toEqual([]);
-  });
-
-  it("rejects an illegal move", () => {
+  it("canActOn only allows forward choices or the current node", () => {
     const r = run();
-    expect(moveTo(r, "boss")).toBe(r);
+    expect(canActOn(r, "b1")).toBe(true);
+    expect(canActOn(r, "b2")).toBe(true);
+    expect(canActOn(r, "start")).toBe(true); // the current node
+    expect(canActOn(r, "boss")).toBe(false); // two hops away
+  });
+
+  it("opening a choice does not move — only resolving commits", () => {
+    // Previewing a battle (no resolve) leaves you free to pick the other.
+    const r = run();
+    expect(r.progress.currentNodeId).toBe("start");
+    const afterWin = resolveBattle(r, "b1", "victory", "now");
+    expect(afterWin.progress.currentNodeId).toBe("b1");
+    // From the fresh run you could equally have committed to b2.
+    expect(
+      resolveBattle(run(), "b2", "victory", "now").progress.currentNodeId,
+    ).toBe("b2");
   });
 });
 
 describe("resolveBattle", () => {
-  it("victory banks salvage and marks the node visited", () => {
-    let r = moveTo(run(), "b1", "now");
-    r = resolveBattle(r, "b1", "victory", "now");
+  it("victory banks salvage, commits the move, marks the node visited", () => {
+    const r = resolveBattle(run(), "b1", "victory", "now");
+    expect(r.progress.currentNodeId).toBe("b1");
     expect(r.progress.visited).toContain("b1");
     expect(r.progress.salvage).toBe(salvageReward(r.nodes[1]));
     expect(r.progress.status).toBe("active");
@@ -108,29 +113,30 @@ describe("resolveBattle", () => {
     expect(nextChoices(r).map((n) => n.id)).toEqual(["boss"]);
   });
 
+  it("rejects resolving a node that isn't a current choice", () => {
+    const r = run();
+    expect(resolveBattle(r, "boss", "victory", "now")).toBe(r);
+  });
+
   it("defeat costs hull but still crosses the node (no soft-lock)", () => {
-    let r = moveTo(run(), "b1", "now");
-    const loss = hullLoss(r.nodes[1]);
-    r = resolveBattle(r, "b1", "defeat", "now");
+    const loss = hullLoss(run().nodes[1]);
+    const r = resolveBattle(run(), "b1", "defeat", "now");
     expect(r.progress.hull).toBe(30 - loss);
     expect(r.progress.visited).toContain("b1");
     expect(r.progress.status).toBe("active");
   });
 
   it("hull hitting zero ends the run", () => {
-    let r = run();
-    r.progress.hull = 5;
-    r = moveTo(r, "b1", "now");
-    r = resolveBattle(r, "b1", "defeat", "now");
+    const base = run();
+    base.progress.hull = 5;
+    const r = resolveBattle(base, "b1", "defeat", "now");
     expect(r.progress.hull).toBe(0);
     expect(r.progress.status).toBe("lost");
     expect(nextChoices(r)).toEqual([]);
   });
 
   it("winning the boss wins the run", () => {
-    let r = moveTo(run(), "b1", "now");
-    r = resolveBattle(r, "b1", "victory", "now");
-    r = moveTo(r, "boss", "now");
+    let r = resolveBattle(run(), "b1", "victory", "now");
     r = resolveBattle(r, "boss", "victory", "now");
     expect(r.progress.status).toBe("won");
   });
@@ -160,7 +166,8 @@ function nodeRun(node: RunNode, salvage = 100, hull = 50): RogueliteRun {
     nodes: [{ id: "start", type: "start", col: 0, row: 0 }, node],
     edges: [["start", node.id]],
     progress: {
-      currentNodeId: node.id,
+      // Standing at start; `node` is the forward choice being resolved.
+      currentNodeId: "start",
       visited: ["start"],
       hull,
       maxHull: 100,
@@ -309,9 +316,7 @@ describe("shop", () => {
 
 describe("deepestColumn", () => {
   it("reports the deepest visited column", () => {
-    let r = run();
-    r = moveTo(r, "b1", "now");
-    r = resolveBattle(r, "b1", "victory", "now");
+    const r = resolveBattle(run(), "b1", "victory", "now");
     expect(deepestColumn(r)).toBe(1);
   });
 });
