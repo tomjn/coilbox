@@ -21,7 +21,7 @@ export function RunHud({
     <div className="flex flex-wrap items-stretch gap-3">
       <Gauge
         icon={<Heart className="size-4 text-cyan-400" aria-hidden />}
-        label="Hull"
+        label="Health"
         value={`${p.hull} / ${p.maxHull}`}
       >
         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">

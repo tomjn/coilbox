@@ -67,7 +67,7 @@ export function EncounterOverlay({
               <Row label="Tech tier" value={`${spec.techTier}`} />
             </dl>
             <p className="text-xs text-muted-foreground">
-              Defeat costs hull, not the run — you retreat and press on.
+              Defeat costs health, not the run — you retreat and press on.
             </p>
             {enc.error && <ErrorBanner message={enc.error} />}
             {enc.noEngine ? (

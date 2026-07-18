@@ -245,7 +245,7 @@ function EndScreen({ won, onClear }: { won: boolean; onClear: () => void }) {
         <p className="text-sm text-muted-foreground">
           {won
             ? "The sector warlord is broken. The run is yours."
-            : "Your hull gave out. The run is over."}
+            : "Your ship gave out. The run is over."}
         </p>
         <Link to="/runlite">
           <Button onClick={onClear}>Back to runs</Button>

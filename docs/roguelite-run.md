@@ -1,6 +1,6 @@
 # Roguelite Run
 
-A **Roguelite Run** is a single-player play-mode that rides the galactic-conquest battle engine. You cross a forward-only node map once — fighting AI skirmishes, taking events, picking rewards and shopping — growing a run-scoped build until a boss ends it or your hull runs out. A run is short-lived and disposable: win or die, then start a fresh one. Winning or dying unlocks options for future runs.
+A **Roguelite Run** is a single-player play-mode that rides the galactic-conquest battle engine. You cross a forward-only node map once — fighting AI skirmishes, taking events, picking rewards and shopping — growing a run-scoped build until a boss ends it or your health runs out. A run is short-lived and disposable: win or die, then start a fresh one. Winning or dying unlocks options for future runs.
 
 Runs live under **Run** in the sidebar, next to Conquest. You can start one for any installed game with skirmish AIs.
 
@@ -14,7 +14,7 @@ Runs live under **Run** in the sidebar, next to Conquest. You can start one for 
 | **Faction / side** | The in-game side your commander plays (also the build tree the run unlocks). |
 | **Loadout** | A starting doctrine that pre-unlocks one of your commander's build branches. Only the default is available until you unlock more (see [Meta-progression](#meta-progression)). |
 | **Length** | Quick / Standard / Long — how many columns the map has. |
-| **Difficulty** | 1–5. Scales enemy count and handicap and lowers your starting hull. |
+| **Difficulty** | 1–5. Scales enemy count and handicap and lowers your starting health. |
 | **Map style** | **Galaxy** (a 3D starfield) or **Theatre** (a flat tactical chart) — pick theatre for a terrestrial game where a galaxy of stars makes no sense. |
 | **Ascension** | An extra difficulty tier on top, unlocked by winning (hidden until you have one). |
 | **Seed** | The number the whole run is rolled from. Reroll for a new run. |
@@ -23,12 +23,12 @@ Runs live under **Run** in the sidebar, next to Conquest. You can start one for 
 
 A run is a forward-only graph of columns. You occupy one node; once it's resolved you pick one of its forward neighbours and cross to it. Node types:
 
-- **Battle / Elite / Boss** — AI skirmishes launched exactly like any other. Elite is harder for a richer reward; the boss is the run's finale. Winning banks **Salvage**; losing costs **hull** (a retreat, not instant death — you press on) and the run ends only when hull hits zero.
+- **Battle / Elite / Boss** — AI skirmishes launched exactly like any other. Elite is harder for a richer reward; the boss is the run's finale. Winning banks **Salvage**; losing costs **health** (a retreat, not instant death — you press on) and the run ends only when health hits zero.
 - **Reward** — choose one of several: a unit-branch **unlock** or a personal **perk**.
-- **Event** — a text card with choices that mutate run state (gain a perk, trade hull, take salvage). No battle.
-- **Shop** — spend Salvage on unlocks and perks, and rest to repair hull.
+- **Event** — a text card with choices that mutate run state (gain a perk, trade health, take salvage). No battle.
+- **Shop** — spend Salvage on unlocks and perks, and rest to repair health.
 
-Coilbox reads the replay to detect each battle's result (or asks, if it can't). The hull pool also buffers that ambiguity — a mis-read result costs some hull, not the whole run. The run saves after every node, so you can leave and resume from **Run**.
+Coilbox reads the replay to detect each battle's result (or asks, if it can't). The health pool also buffers that ambiguity — a mis-read result costs some health, not the whole run. The run saves after every node, so you can leave and resume from **Run**.
 
 ## The build: unlocks as a shared ceiling
 
