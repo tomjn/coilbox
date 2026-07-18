@@ -1,15 +1,16 @@
 import { Button } from "@picoframe/frame";
-import { Dices, Gamepad2, Loader2, Play, Swords, Trash2 } from "lucide-react";
+import { Loader2, Play, Swords, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { cn } from "@/lib/utils";
 import {
+  useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
   useUnitsyncScan,
   useUnitsyncUnitDataset,
 } from "../../content/config";
 import { EmptyState } from "../../content/pages/components/states";
 import { usePreferredTarget, useSkirmishAis } from "../../play/config";
+import { GameSelectCard } from "../../play/pages/components/GameSelectCard";
 import {
   type GenBuildGraph,
   type GenerateRunOpts,
@@ -37,40 +38,26 @@ export default function RunListPage() {
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
 
-  const [shortname, setShortname] = useState("");
+  const [gameName, setGameName] = useState("");
   const [sideName, setSideName] = useState("");
   const [length, setLength] = useState<RunLength>("standard");
   const [difficulty, setDifficulty] = useState(2);
   const [ascension, setAscension] = useState(0);
   const [skin, setSkin] = useState<RunSkin>("galaxy");
   const [loadoutId, setLoadoutId] = useState("standard");
-  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9));
 
   const loadouts = unlockedLoadouts(meta);
+  const { headers: gameHeaders } = useUnitsyncGameHeaders(
+    target?.enginePath,
+    target?.dataDir,
+  );
 
   // Default to the first installed game once the scan lands.
   useEffect(() => {
-    if (!shortname && games.length > 0) {
-      setShortname(games[0].info.shortname ?? games[0].name);
-    }
-  }, [games, shortname]);
+    if (!gameName && games.length > 0) setGameName(games[0].name);
+  }, [games, gameName]);
 
-  // One option per game shortname — multiple installed versions collapse to a
-  // single entry (the run resolves the newest at battle time), so a game with
-  // two versions installed doesn't show up twice.
-  const gameOptions = useMemo(() => {
-    const seen = new Set<string>();
-    const opts: { value: string; label: string }[] = [];
-    for (const g of games) {
-      const value = g.info.shortname ?? g.name;
-      if (seen.has(value)) continue;
-      seen.add(value);
-      opts.push({ value, label: g.info.name ?? g.name });
-    }
-    return opts;
-  }, [games]);
-
-  const game = games.find((g) => (g.info.shortname ?? g.name) === shortname);
+  const game = games.find((g) => g.name === gameName) ?? null;
   const archive = game?.primaryArchive.name;
   const { info, loading: infoLoading } = useUnitsyncGameInfo(
     target?.enginePath,
@@ -126,11 +113,12 @@ export default function RunListPage() {
   const startRun = async () => {
     if (!game) return;
     const opts: GenerateRunOpts = {
-      seed,
+      // No seed field: a run is disposable and unshared, so each is fresh.
+      seed: Math.floor(Math.random() * 1e9),
       length,
       difficulty,
       ascension,
-      game: { shortname: shortname },
+      game: { shortname: game.info.shortname ?? game.name },
       factionId: "player",
       side: sideName || undefined,
       skin,
@@ -201,27 +189,13 @@ export default function RunListPage() {
 
       <div className="flex flex-col gap-4 rounded-lg border border-border/50 bg-card/50 p-5">
         <Field label="Game">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {gameOptions.map((g) => (
-              <button
-                key={g.value}
-                type="button"
-                onClick={() => setShortname(g.value)}
-                className={cn(
-                  "flex items-center gap-2 rounded-md border p-3 text-left transition-colors",
-                  g.value === shortname
-                    ? "border-primary bg-primary/10"
-                    : "border-border/60 bg-muted/20 hover:border-primary/60",
-                )}
-              >
-                <Gamepad2
-                  className="size-4 shrink-0 text-muted-foreground"
-                  aria-hidden
-                />
-                <span className="truncate text-sm font-medium">{g.label}</span>
-              </button>
-            ))}
-          </div>
+          <GameSelectCard
+            game={game}
+            games={games}
+            headers={gameHeaders}
+            gamesLoading={scan.loading}
+            onSelectGame={setGameName}
+          />
         </Field>
 
         {(sides.length > 0 || gameLoading) && (
@@ -299,21 +273,6 @@ export default function RunListPage() {
             </Field>
           )}
         </div>
-
-        <Field label="Seed">
-          <div className="flex items-center gap-2">
-            <span className="flex-1 truncate font-mono text-sm tabular-nums text-muted-foreground">
-              {seed}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSeed(Math.floor(Math.random() * 1e9))}
-            >
-              <Dices className="mr-1.5 size-4" aria-hidden /> Reroll
-            </Button>
-          </div>
-        </Field>
 
         <Button onClick={startRun} disabled={!canGenerate} className="w-full">
           {gameLoading ? (
