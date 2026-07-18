@@ -86,6 +86,12 @@ interface GalaxyViewProps {
    * muted rather than dashed. Default `false` keeps conquest's contested dashes.
    */
   laneFlow?: boolean;
+  /**
+   * Directed link keys (`"from to"`) to draw as a highlighted route already
+   * travelled — the run's path taken, kept green and bright up to the current
+   * node. Only honoured with {@link laneFlow}. Default-off.
+   */
+  pathLinks?: Set<string>;
   /** Map spring-names known to be space maps; their nodes render as asteroids. */
   spaceMaps?: Set<string>;
   /**
@@ -470,6 +476,7 @@ export function GalaxyView({
   visibleIds,
   emphasis,
   laneFlow = false,
+  pathLinks,
   spaceMaps,
   focusNodeId,
   display,
@@ -483,6 +490,7 @@ export function GalaxyView({
   const incursionRef = useRef(incursion);
   const visibleRef = useRef<Set<string> | undefined>(visibleIds);
   const emphasisRef = useRef<Map<string, NodeEmphasis> | undefined>(emphasis);
+  const pathLinksRef = useRef<Set<string> | undefined>(pathLinks);
   const focusRef = useRef<string | null | undefined>(focusNodeId);
   const onSelectRef = useRef(onSelect);
   const applyOwnersRef = useRef<(() => void) | null>(null);
@@ -810,7 +818,7 @@ export function GalaxyView({
       ];
       const nebulaRng = mulberry32(hashString(`${galaxy.id}-nebula`));
       const bold = laneFlow;
-      const count = bold ? 7 : Math.min(4, nebulaColors.length);
+      const count = bold ? 13 : Math.min(4, nebulaColors.length);
       for (let i = 0; i < count; i++) {
         const color = nebulaColors[i % nebulaColors.length];
         const tex = radialTexture(128, [
@@ -831,15 +839,17 @@ export function GalaxyView({
         disposables.push(tex, mat);
         const sprite = new THREE.Sprite(mat);
         const angle = nebulaRng() * Math.PI * 2 + i;
+        // Bold (run) spreads clouds over a much wider disc and depth so the
+        // swathe fills the sky rather than hugging the play patch.
         const dist =
-          extent * ((bold ? 1.0 : 0.7) + nebulaRng() * (bold ? 2.4 : 1.6));
+          extent * ((bold ? 0.3 : 0.7) + nebulaRng() * (bold ? 3.8 : 1.6));
         sprite.position.set(
           Math.cos(angle) * dist,
-          -14 - nebulaRng() * (bold ? 30 : 8),
+          (bold ? 12 : -14) - nebulaRng() * (bold ? 90 : 8),
           Math.sin(angle) * dist,
         );
         const scale =
-          extent * ((bold ? 2.0 : 1.2) + nebulaRng() * (bold ? 2.0 : 1.2));
+          extent * ((bold ? 1.8 : 1.2) + nebulaRng() * (bold ? 2.8 : 1.2));
         sprite.scale.set(scale, scale * 0.6, 1);
         sprite.raycast = () => {};
         scene.add(sprite);
@@ -948,6 +958,13 @@ export function GalaxyView({
       color: 0xffcf8a,
       coreOpacity: 0.9,
       haloOpacity: 0.1,
+    });
+    // The path already travelled (`pathLinks`, run mode): a bright green trail
+    // so you can always see the route you took.
+    const pathTaken = makeLanePair({
+      color: 0x46e08a,
+      coreOpacity: 0.85,
+      haloOpacity: 0.16,
     });
 
     // Directional route markers (`laneFlow` only): a run's connectors point
@@ -1492,7 +1509,7 @@ export function GalaxyView({
     // Fade the lanes up during the intro (their target opacities are captured
     // now, then restored as the intro clock advances).
     if (animateIntro) {
-      for (const pair of [lanes, factionLanes, frontier]) {
+      for (const pair of [lanes, factionLanes, frontier, pathTaken]) {
         for (const mesh of [pair.core, pair.halo]) {
           const mat = mesh.material as THREE.Material & { opacity: number };
           introLaneMats.push({ mat, target: mat.opacity });
@@ -1730,6 +1747,7 @@ export function GalaxyView({
       const factionSegColors: THREE.Color[] = [];
       const frontierSegs: LaneSeg[] = [];
       const routeSegs: LaneSeg[] = [];
+      const pathSegs: LaneSeg[] = [];
       // The quiet base lane, dimmed by whichever end is more faded.
       const pushBase = (seg: LaneSeg, a: string, b: string) => {
         baseSegs.push(seg);
@@ -1754,12 +1772,14 @@ export function GalaxyView({
         const aPlayer = ownerA === playerFactionId;
         const bPlayer = ownerB === playerFactionId;
         if (laneFlow) {
-          // Run: only forward lanes out of the current node (you -> a choice)
-          // are directional routes. `trimmedSeg(a, b)` runs source -> target, so
-          // the pulse flows outward. The lane you already crossed and every
-          // other lane stay quiet base, dimmed by emphasis — and crucially no
-          // faction-coloured lanes, since a node's *type* is not an allegiance.
-          if (aPlayer && !bPlayer) routeSegs.push(seg);
+          // Run lanes: the route already travelled is a bright green trail;
+          // forward lanes out of the current node (you -> a choice) are
+          // directional routes; everything else is quiet base, dimmed by
+          // emphasis. No faction-coloured lanes — a node's *type* is not an
+          // allegiance. `trimmedSeg(a, b)` runs source -> target, so the pulse
+          // flows outward.
+          if (pathLinksRef.current?.has(`${a} ${b}`)) pathSegs.push(seg);
+          else if (aPlayer && !bPlayer) routeSegs.push(seg);
           else pushBase(seg, a, b);
           continue;
         }
@@ -1779,6 +1799,7 @@ export function GalaxyView({
       if (laneFlow) {
         setLanePair(factionLanes, []); // runs have no shared-owner lanes
         setLanePair(frontier, routeSegs); // solid, not dashed
+        setLanePair(pathTaken, pathSegs); // green trail behind you
         layoutChevrons(routeSegs);
       } else {
         setLanePair(factionLanes, factionSegs, factionSegColors);
@@ -2199,6 +2220,7 @@ export function GalaxyView({
       disposeLanePair(lanes);
       disposeLanePair(factionLanes);
       disposeLanePair(frontier);
+      disposeLanePair(pathTaken);
       for (const d of disposables) d.dispose();
       labelRenderer?.domElement.remove();
       if (renderer) {
@@ -2228,10 +2250,11 @@ export function GalaxyView({
     ownersRef.current = owners;
     visibleRef.current = visibleIds;
     emphasisRef.current = emphasis;
+    pathLinksRef.current = pathLinks;
     applyOwnersRef.current?.();
     applyVisibilityRef.current?.();
     if (reduceMotion) renderRef.current?.();
-  }, [owners, visibleIds, emphasis, reduceMotion]);
+  }, [owners, visibleIds, emphasis, pathLinks, reduceMotion]);
 
   useEffect(() => {
     selectedRef.current = selectedId;
