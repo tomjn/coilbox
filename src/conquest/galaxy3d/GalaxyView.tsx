@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import {
   CSS2DObject,
   CSS2DRenderer,
 } from "three/addons/renderers/CSS2DRenderer.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { assetUrl } from "../../lib/assetUrl";
 import type { GalaxyDoc, GalaxyNode, Incursion } from "../model";
 import { NEUTRAL } from "../model";
@@ -1439,7 +1441,7 @@ export function GalaxyView({
         specular: new THREE.Color(0xdfe3ea),
         shininess: 70,
         envMap: envTex,
-        reflectivity: 0.32,
+        reflectivity: 0.42,
         combine: THREE.MixOperation,
       });
       // Opaque ring can't dim by opacity, so emphasis darkens its colour instead.
@@ -1454,79 +1456,162 @@ export function GalaxyView({
       });
       disposables.push(metal, panelMat);
 
-      // The station is a ring of chunky habitat modules connected end-to-end by
-      // docking tubes (like Interstellar's Endurance), around a compact darker
-      // central hub. Parented to a Group so every part scales, spins and occludes
-      // together.
-      const station = new THREE.Group();
-      const RING_R = 0.5;
-      const MODULES = 12;
-
-      // Modules: boxes oriented tangentially (long Z axis follows the circle) with
-      // small gaps bridged by docking tubes; per-module height/radial jitter for
-      // variety while the tangential length stays constant so they still connect.
-      const modGeo = new THREE.BoxGeometry(0.17, 0.15, 0.24);
-      disposables.push(modGeo);
-      const tubeGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.13, 8);
-      tubeGeo.rotateX(Math.PI / 2); // axis along local Z -> tangential when rotated
-      disposables.push(tubeGeo);
-      const spanelGeo = new THREE.BoxGeometry(0.15, 0.015, 0.13);
-      disposables.push(spanelGeo);
-      for (let s = 0; s < MODULES; s++) {
-        const a = (s / MODULES) * Math.PI * 2;
-        const mod = new THREE.Mesh(modGeo, metal);
-        mod.position.set(Math.cos(a) * RING_R, 0, Math.sin(a) * RING_R);
-        mod.rotation.y = a;
-        const j = (hashString(`${node.id}-mod${s}`) % 100) / 100;
-        mod.scale.set(0.9 + 0.25 * j, 0.8 + 0.5 * j, 1);
-        mod.raycast = () => {};
-        station.add(mod);
-        // Docking tube bridging to the next module (at the mid-angle).
-        const am = ((s + 0.5) / MODULES) * Math.PI * 2;
-        const tube = new THREE.Mesh(tubeGeo, metal);
-        tube.position.set(Math.cos(am) * RING_R, 0, Math.sin(am) * RING_R);
-        tube.rotation.y = am;
-        tube.raycast = () => {};
-        station.add(tube);
-        // A solar panel on every third module's outer face.
-        if (s % 3 === 1) {
-          const panel = new THREE.Mesh(spanelGeo, panelMat);
-          const pr = RING_R + 0.16;
-          panel.position.set(Math.cos(a) * pr, 0, Math.sin(a) * pr);
-          panel.rotation.y = a;
-          panel.raycast = () => {};
-          station.add(panel);
-        }
-      }
-
-      // Central hub: a compact, darker mechanical core, linked to the ring by a
-      // few thin arms.
+      // A darker material for mechanical detail (hub, docking caps, tanks, spine).
       const coreMat = new THREE.MeshPhongMaterial({
-        color: new THREE.Color(0x686c74),
+        color: new THREE.Color(0x6b6f78),
+        map: greebleTex,
+        bumpMap: greebleTex,
+        bumpScale: 0.3,
         specular: new THREE.Color(0xaab0bc),
-        shininess: 70,
+        shininess: 65,
         envMap: envTex,
-        reflectivity: 0.4,
+        reflectivity: 0.35,
+        combine: THREE.MixOperation,
       });
       disposables.push(coreMat);
-      const coreGeo = new THREE.CylinderGeometry(0.12, 0.14, 0.14, 12);
-      const core = new THREE.Mesh(coreGeo, coreMat);
-      core.raycast = () => {};
-      station.add(core);
-      const capGeo = new THREE.BoxGeometry(0.16, 0.1, 0.16);
-      const cap = new THREE.Mesh(capGeo, coreMat);
-      cap.position.y = 0.08;
-      cap.raycast = () => {};
-      station.add(cap);
-      disposables.push(coreGeo, capGeo);
-      const armGeo = new THREE.BoxGeometry(0.3, 0.04, 0.05);
-      armGeo.translate(0.32, 0, 0); // pivot at hub, reach out to the ring
-      disposables.push(armGeo);
-      for (let s = 0; s < 3; s++) {
-        const arm = new THREE.Mesh(armGeo, metal);
-        arm.rotation.y = (s / 3) * Math.PI * 2 + 0.4;
-        arm.raycast = () => {};
-        station.add(arm);
+
+      // The station is a detailed ring of habitat modules connected by docking
+      // tubes (Interstellar's Endurance) around a stepped central spine. Each
+      // module is a multi-part assembly; to keep a busy station cheap, every part
+      // is baked (cloned, transformed into station space) into three merged
+      // meshes — one per material — so the whole thing is only a few draw calls.
+      const station = new THREE.Group();
+      const RING_R = 0.52;
+      const MODULES = 12;
+      const metalParts: THREE.BufferGeometry[] = [];
+      const coreParts: THREE.BufferGeometry[] = [];
+      const panelParts: THREE.BufferGeometry[] = [];
+      const partM = new THREE.Matrix4();
+      const partLocal = new THREE.Matrix4();
+      const partQ = new THREE.Quaternion();
+      const partE = new THREE.Euler();
+      const partP = new THREE.Vector3();
+      const partS = new THREE.Vector3();
+      // Bake `geo` (non-indexed clone) into `arr`, at parent matrix `pm` then a
+      // local translate / Y-rotate / uniform-ish scale.
+      const part = (
+        arr: THREE.BufferGeometry[],
+        geo: THREE.BufferGeometry,
+        pm: THREE.Matrix4,
+        px: number,
+        py: number,
+        pz: number,
+        ry = 0,
+        sx = 1,
+        sy = 1,
+        sz = 1,
+      ) => {
+        partE.set(0, ry, 0);
+        partQ.setFromEuler(partE);
+        partLocal.compose(partP.set(px, py, pz), partQ, partS.set(sx, sy, sz));
+        partM.multiplyMatrices(pm, partLocal);
+        // A fresh, non-indexed copy every time (never mutate the shared base):
+        // toNonIndexed clones an indexed geo; clone() copies an already-unindexed
+        // one. Uniform non-indexing lets mergeGeometries combine them.
+        const g = geo.index ? geo.toNonIndexed() : geo.clone();
+        g.applyMatrix4(partM);
+        arr.push(g);
+      };
+
+      // Reusable base part geometries (cloned per placement, disposed at the end).
+      const bodyGeo = new RoundedBoxGeometry(0.19, 0.16, 0.26, 3, 0.04);
+      const deckGeo = new RoundedBoxGeometry(0.12, 0.08, 0.2, 2, 0.03);
+      const capGeo = new THREE.CylinderGeometry(0.055, 0.055, 0.07, 12);
+      capGeo.rotateX(Math.PI / 2); // axis along Z (tangential)
+      const tankGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.11, 8);
+      const antGeo = new THREE.BoxGeometry(0.012, 0.14, 0.012);
+      const spanelGeo = new RoundedBoxGeometry(0.18, 0.014, 0.13, 1, 0.012);
+      const strutGeo = new THREE.BoxGeometry(0.06, 0.025, 0.025);
+
+      const modMat = new THREE.Matrix4();
+      const modQ = new THREE.Quaternion();
+      const modE = new THREE.Euler();
+      const modP = new THREE.Vector3();
+      const modS = new THREE.Vector3();
+      for (let s = 0; s < MODULES; s++) {
+        const a = (s / MODULES) * Math.PI * 2;
+        const j = (hashString(`${node.id}-mod${s}`) % 100) / 100;
+        modE.set(0, a, 0);
+        modQ.setFromEuler(modE);
+        modMat.compose(
+          modP.set(Math.cos(a) * RING_R, 0, Math.sin(a) * RING_R),
+          modQ,
+          modS.set(1, 0.9 + 0.22 * j, 1),
+        );
+        // Main hull + a raised deck.
+        part(metalParts, bodyGeo, modMat, 0, 0, 0);
+        part(metalParts, deckGeo, modMat, 0, 0.09, 0.01);
+        // Docking caps at both tangential ends.
+        part(coreParts, capGeo, modMat, 0, 0, 0.15);
+        part(coreParts, capGeo, modMat, 0, 0, -0.15);
+        // Tanks + an antenna mast on top.
+        part(coreParts, tankGeo, modMat, 0.055, 0.085, -0.05);
+        part(coreParts, tankGeo, modMat, -0.05, 0.08, 0.055, 0, 0.8, 0.8, 0.8);
+        part(coreParts, antGeo, modMat, 0.02, 0.16, 0.07);
+        // Solar array on every third module (radially outward on a short strut).
+        if (s % 3 === 1) {
+          part(coreParts, strutGeo, modMat, 0.15, 0, 0);
+          part(panelParts, spanelGeo, modMat, 0.27, 0, 0);
+        }
+        // A stretched docking tube bridging to the next module.
+        const am = ((s + 0.5) / MODULES) * Math.PI * 2;
+        modE.set(0, am, 0);
+        modQ.setFromEuler(modE);
+        modMat.compose(
+          modP.set(Math.cos(am) * RING_R, 0, Math.sin(am) * RING_R),
+          modQ,
+          modS.set(1, 1, 1),
+        );
+        part(coreParts, capGeo, modMat, 0, 0, 0, 0, 0.9, 0.9, 1.7);
+      }
+
+      // Central hub: a stepped docking spine on a drum, with four arms to the ring.
+      const hubMat = new THREE.Matrix4();
+      const drumGeo = new THREE.CylinderGeometry(0.14, 0.16, 0.13, 16);
+      const spine1 = new THREE.CylinderGeometry(0.07, 0.09, 0.1, 12);
+      const spine2 = new THREE.CylinderGeometry(0.045, 0.06, 0.09, 12);
+      const spine3 = new THREE.CylinderGeometry(0.028, 0.04, 0.07, 10);
+      const hubArm = new THREE.BoxGeometry(0.34, 0.045, 0.05);
+      hubArm.translate(0.34, 0, 0);
+      part(coreParts, drumGeo, hubMat, 0, 0, 0);
+      part(coreParts, spine1, hubMat, 0, 0.1, 0);
+      part(coreParts, spine2, hubMat, 0, 0.19, 0);
+      part(coreParts, spine3, hubMat, 0, 0.27, 0);
+      for (let s = 0; s < 4; s++) {
+        part(metalParts, hubArm, hubMat, 0, 0, 0, (s / 4) * Math.PI * 2 + 0.4);
+      }
+
+      // Merge each material's parts into one mesh (a busy station = 3 draw calls).
+      const addMerged = (
+        parts: THREE.BufferGeometry[],
+        mat: THREE.Material,
+      ) => {
+        const merged = parts.length ? mergeGeometries(parts, false) : null;
+        for (const g of parts) g.dispose();
+        if (!merged) return;
+        disposables.push(merged);
+        const mesh = new THREE.Mesh(merged, mat);
+        mesh.raycast = () => {};
+        station.add(mesh);
+      };
+      addMerged(metalParts, metal);
+      addMerged(coreParts, coreMat);
+      addMerged(panelParts, panelMat);
+      for (const g of [
+        bodyGeo,
+        deckGeo,
+        capGeo,
+        tankGeo,
+        antGeo,
+        spanelGeo,
+        strutGeo,
+        drumGeo,
+        spine1,
+        spine2,
+        spine3,
+        hubArm,
+      ]) {
+        g.dispose();
       }
       // One warm light spec on the ring — no window detail at this distance.
       const specMat = new THREE.SpriteMaterial({

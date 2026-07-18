@@ -38,15 +38,21 @@ export function spaceEnvTexture(): THREE.Texture {
         const key2 = Math.exp(-(du2 * du2 + (v - 0.42) ** 2) * 70) * 0.4;
         // Faint galactic band near the horizon.
         const band = Math.exp(-((v - 0.5) ** 2) / (2 * 0.16 * 0.16)) * 0.1;
+        // A soft bright zenith (top of the sky) so top-facing surfaces reflect
+        // something toward a top-down camera — else the reflection never shows.
+        const zen = Math.exp(-(v * v) / (2 * 0.22 * 0.22)) * 0.5;
         const o = (y * w + x) * 4;
-        img.data[o] = Math.min(255, (0.02 + key * 1 + key2 * 0.6 + band) * 255);
+        img.data[o] = Math.min(
+          255,
+          (0.03 + key * 1 + key2 * 0.6 + band + zen) * 255,
+        );
         img.data[o + 1] = Math.min(
           255,
-          (0.02 + key * 0.92 + key2 * 0.8 + band * 0.9) * 255,
+          (0.03 + key * 0.92 + key2 * 0.8 + band * 0.9 + zen) * 255,
         );
         img.data[o + 2] = Math.min(
           255,
-          (0.035 + key * 0.72 + key2 + band * 1.1) * 255,
+          (0.045 + key * 0.72 + key2 + band * 1.1 + zen * 1.1) * 255,
         );
         img.data[o + 3] = 255;
       }
