@@ -101,22 +101,21 @@ describe("runIdentities", () => {
     // Sparse: a clear minority, but not none across 40 nodes.
     expect(stations.length).toBeGreaterThan(0);
     expect(stations.length).toBeLessThan(shops.length / 2);
-    // Any body assigned to a shop is the station body, nothing else.
+    // A shop body is either the ring-station or (testing) a dyson swarm.
     for (const s of shops) {
       const body = a.get(s.id)?.body;
-      if (body) expect(body).toBe("station");
+      if (body) expect(["station", "dyson-swarm"]).toContain(body);
     }
   });
 });
 
 describe("warlordBodyFor", () => {
-  it("is deterministic and cycles the three lairs", () => {
+  it("is deterministic and cycles the two lairs", () => {
     expect(warlordBodyFor(0)).toBe("warlord-blackhole");
     expect(warlordBodyFor(1)).toBe("warlord-hypergiant");
-    expect(warlordBodyFor(2)).toBe("warlord-fortress");
-    expect(warlordBodyFor(3)).toBe("warlord-blackhole");
+    expect(warlordBodyFor(2)).toBe("warlord-blackhole");
     // Negative seeds wrap cleanly, never undefined.
-    expect(warlordBodyFor(-1)).toBe("warlord-fortress");
+    expect(warlordBodyFor(-1)).toBe("warlord-hypergiant");
   });
 });
 

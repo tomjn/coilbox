@@ -213,6 +213,12 @@ const DANGER_TINT: Partial<Record<RunNodeType, string>> = {
  * depots/salvage/events stay plain stars and the special ones read as accents. */
 const BODY_CHANCE = 30;
 
+/** Chance (%) a depot reads as a dyson swarm rather than a ring-station, capped
+ * at {@link DYSON_CAP} per run so they stay a rare, striking sight. */
+const DYSON_DEPOT_CHANCE = 14;
+/** Most a single run will show (a swarm is a set-piece, not a common body). */
+const DYSON_CAP = 2;
+
 /**
  * Per-node visual identity for the warpath map (GalaxyView's `identities` prop,
  * warpath-only). The singular endpoints are always special — the start is an
@@ -223,6 +229,7 @@ const BODY_CHANCE = 30;
  */
 export function runIdentities(run: RogueliteRun): Map<string, NodeIdentity> {
   const out = new Map<string, NodeIdentity>();
+  let dysonCount = 0;
   for (const n of run.nodes) {
     if (n.type === "start") {
       out.set(n.id, { body: "beacon" });
@@ -237,6 +244,18 @@ export function runIdentities(run: RogueliteRun): Map<string, NodeIdentity> {
       out.set(n.id, { starTint: tint });
       continue;
     }
+    // A rare depot reads as a dyson swarm (a bright star cocooned in orbiting
+    // collector panels) instead of the ring-station — capped per run so it stays
+    // a set-piece.
+    if (
+      n.type === "shop" &&
+      dysonCount < DYSON_CAP &&
+      hashString(`${n.id}-dyson`) % 100 < DYSON_DEPOT_CHANCE
+    ) {
+      out.set(n.id, { body: "dyson-swarm" });
+      dysonCount++;
+      continue;
+    }
     const body = IDENTITY_BODY[n.type];
     if (body && hashString(`${n.id}-identity`) % 100 < BODY_CHANCE) {
       out.set(n.id, { body });
@@ -246,11 +265,11 @@ export function runIdentities(run: RogueliteRun): Map<string, NodeIdentity> {
 }
 
 /** The warlord's lair varies per run so no two warpaths end at the same sight:
- * a stylised black hole, a blood-red hypergiant, or an armoured fortress. */
+ * a stylised black hole or a blood-red hypergiant. (A fortress station was
+ * dropped — the finale shouldn't read as just another depot.) */
 const WARLORD_BODIES: NodeBodyKind[] = [
   "warlord-blackhole",
   "warlord-hypergiant",
-  "warlord-fortress",
 ];
 
 export function warlordBodyFor(seed: number): NodeBodyKind {

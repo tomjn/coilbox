@@ -80,6 +80,7 @@ export interface NodeEmphasis {
  */
 export type NodeBodyKind =
   | "station"
+  | "dyson-swarm"
   | "wreck"
   | "anomaly"
   | "beacon"
@@ -247,22 +248,29 @@ export function starSystemLabel(system: StarSystem): string {
  * star. The warlord's black hole is deliberately *not* here (boss-only). Rolled
  * on an independent `-exotic` hash, so no existing star assignment shifts.
  */
-export type ExoticClass = "pulsar" | "variable" | "gasgiant" | "carbon";
+export type ExoticClass =
+  | "pulsar"
+  | "variable"
+  | "gasgiant"
+  | "carbon"
+  | "dysonswarm";
 
 const EXOTIC_LABEL: Record<ExoticClass, string> = {
   pulsar: "pulsar",
   variable: "variable star",
   gasgiant: "ringed gas giant",
   carbon: "carbon star",
+  dysonswarm: "dyson swarm",
 };
 
-/** The exotic class for a node, or `undefined` for an ordinary star (~94%). */
+/** The exotic class for a node, or `undefined` for an ordinary star (~93%). */
 export function exoticClassFor(nodeId: string): ExoticClass | undefined {
   const h = hashString(`${nodeId}-exotic`) % 1000;
   if (h < 15) return "pulsar";
   if (h < 30) return "variable";
   if (h < 45) return "gasgiant";
   if (h < 60) return "carbon";
+  if (h < 70) return "dysonswarm"; // ~1%, a rare megastructure
   return undefined;
 }
 
@@ -724,6 +732,11 @@ export function GalaxyView({
       patchTwinkle(mat, uTime);
       disposables.push(geo, mat);
       const points = new THREE.Points(geo, mat);
+      // Background: the starfield is additive with depthWrite off, so without an
+      // explicit order a star nearer the camera than a body sorts AFTER it and
+      // paints over the (opaque) body. renderOrder -1 pins the whole starfield
+      // behind everything on the play plane, so solid bodies always occlude it.
+      points.renderOrder = -1;
       // Decoration never intercepts picking.
       points.raycast = () => {};
       return points;
@@ -1274,6 +1287,9 @@ export function GalaxyView({
       center: [number, number, number];
       radius: number;
       phase: number;
+      /** Per-node angular velocity (signed): magnitude varies the speed, sign
+       * the direction, so binaries don't all sweep in lockstep. */
+      omega: number;
       /** Pristine opacities, so emphasis can dim then restore exactly. */
       starBase: number;
       coronaBase: number;
@@ -1310,6 +1326,34 @@ export function GalaxyView({
       }[];
     }
     const warlordAnims: WarlordAnim[] = [];
+    // Node indices built as a warlord lair (any variant). The finale is never
+    // dimmed by graded emphasis — it's the run's destination beacon, so it stays
+    // fully opaque even while it's an unreached future node.
+    const warlordNodeIdx = new Set<number>();
+
+    // Dyson swarm motion: many small pentagonal collector panels orbit a yellow
+    // star on varied inclinations (a spherical swarm). Each panel faces the star
+    // — the loop shades it per frame so the star-facing (inner) side reads lit and
+    // the outward side dark, and orbits it around its own tilted plane.
+    interface DysonSat {
+      /** Orthonormal basis of this panel's orbital plane. */
+      e1: THREE.Vector3;
+      e2: THREE.Vector3;
+      radius: number;
+      phase: number;
+      /** Signed angular velocity (varies speed + direction per panel). */
+      speed: number;
+    }
+    interface DysonSwarm {
+      i: number;
+      center: THREE.Vector3;
+      /** All the panels as one instanced mesh (a single draw call). */
+      mesh: THREE.InstancedMesh;
+      sats: DysonSat[];
+      satSize: number;
+      warm: THREE.Color;
+    }
+    const dysonSwarms: DysonSwarm[] = [];
 
     // Exotic-star motion (shared across both modes): a pulsar twinkles fast, a
     // variable star's glow breathes slowly. Driven by the loop when motion is on.
@@ -1645,6 +1689,13 @@ export function GalaxyView({
       station.position.set(p[0], p[1] + 0.1, p[2]);
       const base = ((hashString(`${node.id}-rot`) % 100) / 100) * Math.PI * 2;
       station.rotation.y = base;
+      // A slight random tilt out of the flat plane (±~7.5°) so stations don't
+      // all lie perfectly level. The spinner only drives rotation.y, so this
+      // fixed tilt persists under the idle spin.
+      station.rotation.x =
+        ((hashString(`${node.id}-tiltx`) % 100) / 100 - 0.5) * 0.26;
+      station.rotation.z =
+        ((hashString(`${node.id}-tiltz`) % 100) / 100 - 0.5) * 0.26;
       registerIntro(station, starScale(i) * opts.scale, node.id);
       scene.add(station);
       spinners.push({ mesh: station, base, rate: 1 / 6000 });
@@ -1692,9 +1743,8 @@ export function GalaxyView({
     /**
      * Build the warlord's lair — the run's final node — in one of three per-run
      * forms: a stylised black hole (dark core + a flat accretion disc that
-     * foreshortens into an ellipse, plus a gravitational glow; no lensing), a
-     * blood-red hypergiant (hot core, violent corona + spikes, slow breathing),
-     * or an armoured fortress station (metal hub + a spinning defensive ring).
+     * foreshortens into an ellipse, plus a gravitational glow; no lensing) or a
+     * blood-red hypergiant (hot core, violent corona + spikes, slow breathing).
      * Reuses the star / corona / spike slots like the other bodies. Built once
      * (a single boss node), so its bespoke textures live here, not in the shared
      * block. Returns `true` — always handles the warlord kinds.
@@ -1705,18 +1755,7 @@ export function GalaxyView({
       p: WorldPos,
       variant: NodeBodyKind,
     ): boolean => {
-      // A fortress is a built structure, not a star — the flat foreshortened
-      // ring-station at large scale with an armoured red wash and a hot glow.
-      if (variant === "warlord-fortress") {
-        return buildStructureBody(i, node, p, {
-          scale: 0.8,
-          tint: "#c07a6a",
-          glowColor: "#ff7a4a",
-          glowOpacity: 0.4,
-          glowScale: 0.6,
-        });
-      }
-
+      warlordNodeIdx.add(i); // finale is always full-bright (see warlordNodeIdx)
       const base = starScale(i);
       const anim: WarlordAnim = { i };
       let head: THREE.Sprite;
@@ -1728,13 +1767,22 @@ export function GalaxyView({
         // A solid black event horizon that occludes the sky, ringed by a bright
         // accretion disc laid flat (so it foreshortens to an ellipse). The outer
         // glow is kept small so it rims the disc instead of washing it into a
-        // fuzzy orange star.
+        // fuzzy orange star. `bhShrink` scales every part of the lair together so
+        // the whole black hole reads smaller without changing its proportions.
+        const bhShrink = 0.72;
+        // Solid black out to ~0.92 of the sprite, a thin anti-aliased rim only.
+        // Sized (below) to fill right up to the accretion ring so no background
+        // (stars, nebula) bleeds through the event horizon.
         const coreTex = radialTexture(128, [
           [0, "#000000ff"],
-          [0.62, "#000000ff"],
-          [0.85, "#0a0603f2"],
+          [0.92, "#000000ff"],
           [1, "#00000000"],
         ]);
+        // Canvas sprites default to mipmapping; a mostly-transparent additive-
+        // adjacent quad then averages to a faint square at minified mips. Kill
+        // mips on the black-hole textures so no ghost square frames the horizon.
+        coreTex.generateMipmaps = false;
+        coreTex.minFilter = THREE.LinearFilter;
         disposables.push(coreTex);
         headMat = new THREE.SpriteMaterial({
           map: coreTex,
@@ -1745,7 +1793,15 @@ export function GalaxyView({
         });
         head = new THREE.Sprite(headMat);
         head.position.set(p[0], p[1], p[2]);
-        registerIntro(head, base * 0.5, node.id);
+        // Layer order (all coincident): corona glow (0) < core (1) < disc (2) <
+        // photon (3). The opaque core sits ABOVE the glow so it blacks out the
+        // orange the centred glow would otherwise wash across the middle, but
+        // BELOW the additive disc/photon so the bright ring still adds over it.
+        head.renderOrder = 1;
+        // The core is scaled to meet the accretion ring's inner edge (disc
+        // target * 0.46), so its opaque disc fills the dark interior right up to
+        // the golden ring without spilling past it.
+        registerIntro(head, base * 1.4 * bhShrink * 0.46, node.id);
         head.raycast = () => {};
         // Accretion disc: a BILLBOARD (not a flat plane). A flat plane looked
         // wrong from the side and split into two side patches behind the core; a
@@ -1753,6 +1809,8 @@ export function GalaxyView({
         // always stays inside the sprite (no square cut-offs). It shimmers by
         // slowly rotating its material (the texture has a faint angular flow).
         const discTex = accretionTexture(256);
+        discTex.generateMipmaps = false;
+        discTex.minFilter = THREE.LinearFilter;
         const discMat = new THREE.SpriteMaterial({
           map: discTex,
           transparent: true,
@@ -1763,7 +1821,8 @@ export function GalaxyView({
         disposables.push(discTex, discMat);
         const disc = new THREE.Sprite(discMat);
         disc.position.set(p[0], p[1], p[2]);
-        registerIntro(disc, base * 1.4, `${node.id}-disc`);
+        disc.renderOrder = 2;
+        registerIntro(disc, base * 1.4 * bhShrink, `${node.id}-disc`);
         disc.raycast = () => {};
         scene.add(disc);
         extra = disc;
@@ -1783,7 +1842,8 @@ export function GalaxyView({
           });
           const photon = new THREE.Sprite(photonMat);
           photon.position.set(p[0], p[1] + 0.02, p[2]);
-          registerIntro(photon, base * 0.78, `${node.id}-photon`);
+          photon.renderOrder = 3;
+          registerIntro(photon, base * 0.78 * bhShrink, `${node.id}-photon`);
           photon.raycast = () => {};
           disposables.push(photonMat);
           scene.add(photon);
@@ -1839,9 +1899,11 @@ export function GalaxyView({
       const glow = new THREE.Sprite(glowMat);
       glow.position.set(p[0], p[1], p[2]);
       // The black hole's glow is small so it rims the disc; the hypergiant's is
-      // broad so it reads as a swollen star.
+      // broad so it reads as a swollen star. The black hole's glow sits below the
+      // core (renderOrder) so the opaque horizon covers it in the centre.
       const glowScale =
-        coronaScale(i, false) * (variant === "warlord-blackhole" ? 0.42 : 1.4);
+        coronaScale(i, false) * (variant === "warlord-blackhole" ? 0.3 : 1.4);
+      if (variant === "warlord-blackhole") glow.renderOrder = 0;
       registerIntro(glow, glowScale, `${node.id}-corona`);
       glow.raycast = () => {};
 
@@ -1872,6 +1934,163 @@ export function GalaxyView({
       ownerRingMats.push(ownRingMat);
       ownerRings.push(ownRing);
       disposables.push(headMat, glowMat, ownRingMat);
+      // The black hole is busy enough on its own — the ownership pentagon reads
+      // as clutter cutting through the disc, so it's built (to keep the ring
+      // arrays index-aligned for selection/fog/owner logic) but never added to
+      // the scene: an off-scene mesh renders nothing while all the per-frame
+      // .visible/.scale/.geometry mutations against it stay harmless no-ops.
+      scene.add(head, glow);
+      if (variant !== "warlord-blackhole") scene.add(ownRing);
+      return true;
+    };
+
+    // Shared unit pentagon panel (normal +Z) for every dyson-swarm collector.
+    let dysonSatGeo: THREE.CircleGeometry | undefined;
+    const DYSON_Z = new THREE.Vector3(0, 0, 1);
+
+    /**
+     * Build a dyson-swarm megastructure: a warm yellow star ringed by many small
+     * pentagonal collector panels on varied orbital planes (a rough sphere, not a
+     * flat ring). Each panel stays broadside to the star; the loop shades it so
+     * its inner (star-facing) side reads lit and its outward side dark, and orbits
+     * it at a per-panel speed and direction. Reuses the star / corona / spike
+     * slots (the swarm group rides the spike slot) so intro, fog, ownership and
+     * selection all keep working. Shared by the rare exotic (both modes) and the
+     * warpath depot identity. Returns `true`.
+     */
+    const buildDysonSwarm = (
+      i: number,
+      node: GalaxyNode,
+      p: WorldPos,
+    ): boolean => {
+      // Dyson stars are never tiny — nobody englobes a dim dwarf. Floor the size
+      // so the host reads as a worthy, bright sun the swarm is worth building.
+      const base = Math.max(starScale(i), 5);
+      const warm = new THREE.Color("#ffd24a");
+      // Central star (star slot): a big, brilliant near-white-hot sun. Additive
+      // so it blooms bright against the dark sky (this is the whole reason the
+      // swarm exists — a powerful star worth harvesting).
+      const headMat = new THREE.SpriteMaterial({
+        map: starTex,
+        color: warm.clone().lerp(WHITE, 0.75),
+        transparent: true,
+        opacity: 1,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const head = new THREE.Sprite(headMat);
+      head.position.set(p[0], p[1], p[2]);
+      registerIntro(head, base * 1.05, node.id);
+      head.raycast = () => {};
+      // Corona (corona slot): a strong, wide warm halo so the star blazes through
+      // the swarm that partly obscures it.
+      const glowMat = new THREE.SpriteMaterial({
+        map: coronaTex,
+        color: new THREE.Color("#ffd98a"),
+        transparent: true,
+        opacity: 1,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const glow = new THREE.Sprite(glowMat);
+      glow.position.set(p[0], p[1], p[2]);
+      registerIntro(glow, coronaScale(i, false) * 1.35, `${node.id}-corona`);
+      glow.raycast = () => {};
+
+      // Swarm (spike slot): MANY small pentagon collectors as ONE InstancedMesh
+      // (a single draw call), so we can afford a dense shell that half-obscures
+      // the star. Each panel stays broadside to the sun; the loop shades and
+      // orbits them. The group's own scale carries the intro grow-in.
+      if (!dysonSatGeo) {
+        dysonSatGeo = new THREE.CircleGeometry(1, 5);
+        disposables.push(dysonSatGeo);
+      }
+      const count = performanceMode ? 420 : 800;
+      const satSize = base * 0.005;
+      const satMat = new THREE.MeshBasicMaterial({
+        side: THREE.DoubleSide,
+        transparent: true,
+        depthWrite: false,
+      });
+      const inst = new THREE.InstancedMesh(dysonSatGeo, satMat, count);
+      inst.position.set(p[0], p[1], p[2]);
+      inst.raycast = () => {};
+      const sats: DysonSat[] = [];
+      const seedV = new THREE.Vector3();
+      const m4 = new THREE.Matrix4();
+      const q = new THREE.Quaternion();
+      const posV = new THREE.Vector3();
+      const sclV = new THREE.Vector3(satSize, satSize, satSize);
+      const darkInit = warm.clone().multiplyScalar(0.3);
+      for (let s = 0; s < count; s++) {
+        // A random orbital plane: pick an axis, then two in-plane basis vectors.
+        const a1 =
+          ((hashString(`${node.id}-dsa${s}`) % 1000) / 1000) * Math.PI * 2;
+        const a2 = ((hashString(`${node.id}-dsb${s}`) % 1000) / 1000) * Math.PI;
+        const axis = new THREE.Vector3(
+          Math.sin(a2) * Math.cos(a1),
+          Math.cos(a2),
+          Math.sin(a2) * Math.sin(a1),
+        ).normalize();
+        seedV.set(0, 1, 0);
+        if (Math.abs(axis.y) > 0.9) seedV.set(1, 0, 0);
+        const e1 = new THREE.Vector3().crossVectors(axis, seedV).normalize();
+        const e2 = new THREE.Vector3().crossVectors(axis, e1).normalize();
+        // A compact shell (0.22..0.38 of the star size) pressed right up against
+        // the sun — a narrow radial band so the panels read as one tight swarm
+        // rather than a spread-out cloud.
+        const radius =
+          base *
+          (0.22 + ((hashString(`${node.id}-dsr${s}`) % 100) / 100) * 0.16);
+        const phase =
+          ((hashString(`${node.id}-dsp${s}`) % 1000) / 1000) * Math.PI * 2;
+        const speed =
+          (1 / 5200) *
+          (0.5 + ((hashString(`${node.id}-dss${s}`) % 100) / 100) * 1.0) *
+          (hashString(`${node.id}-dsd${s}`) % 2 === 0 ? 1 : -1);
+        // Initial pose (also the static look under reduce-motion).
+        posV
+          .copy(e1)
+          .multiplyScalar(Math.cos(phase))
+          .addScaledVector(e2, Math.sin(phase));
+        q.setFromUnitVectors(DYSON_Z, posV);
+        m4.compose(posV.multiplyScalar(radius), q, sclV);
+        inst.setMatrixAt(s, m4);
+        inst.setColorAt(s, darkInit);
+        sats.push({ e1, e2, radius, phase, speed });
+      }
+      inst.instanceMatrix.needsUpdate = true;
+      if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+      registerIntro(inst, 1, `${node.id}-swarm`);
+      scene.add(inst);
+      disposables.push(satMat, inst);
+      dysonSwarms.push({
+        i,
+        center: new THREE.Vector3(p[0], p[1], p[2]),
+        mesh: inst,
+        sats,
+        satSize,
+        warm,
+      });
+
+      const ownRingMat = new THREE.MeshBasicMaterial({
+        color: ownerColor(ownersRef.current[node.id] ?? node.owner),
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const ownRing = new THREE.Mesh(ringGeoFor(0), ownRingMat);
+      ownRing.rotation.x = -Math.PI / 2;
+      ownRing.position.set(p[0], p[1] - 0.4, p[2]);
+      ownRing.raycast = () => {};
+      starSprites.push(head);
+      starMats.push(headMat);
+      spikeSprites.push(inst);
+      coronaSprites.push(glow);
+      ownerRingMats.push(ownRingMat);
+      ownerRings.push(ownRing);
+      disposables.push(headMat, glowMat, ownRingMat);
       scene.add(head, glow, ownRing);
       return true;
     };
@@ -1892,6 +2111,7 @@ export function GalaxyView({
       body: NodeBodyKind,
     ): boolean => {
       if (body.startsWith("warlord")) return buildWarlordBody(i, node, p, body);
+      if (body === "dyson-swarm") return buildDysonSwarm(i, node, p);
       // A depot is a built structure: a flat, foreshortened ring-station, not a
       // billboarded body (which read as a logo).
       if (body === "station") {
@@ -1940,9 +2160,25 @@ export function GalaxyView({
       }
       if (!recipe) return false;
 
+      // Events (anomalies) jitter hue per node (~±18°) so they don't all read as
+      // one identical purple; wreck/beacon keep their fixed colour.
+      const hueShift =
+        body === "anomaly"
+          ? ((hashString(`${node.id}-hue`) % 100) / 100 - 0.5) * 0.1
+          : 0;
+      const headColor = new THREE.Color(recipe.head.color).offsetHSL(
+        hueShift,
+        0,
+        0,
+      );
+      const glowColor = new THREE.Color(recipe.glow.color).offsetHSL(
+        hueShift,
+        0,
+        0,
+      );
       const headMat = new THREE.SpriteMaterial({
         map: recipe.head.tex,
-        color: new THREE.Color(recipe.head.color),
+        color: headColor,
         transparent: true,
         opacity: 1,
         depthWrite: false,
@@ -1963,7 +2199,7 @@ export function GalaxyView({
 
       const glowMat = new THREE.SpriteMaterial({
         map: coronaTex,
-        color: new THREE.Color(recipe.glow.color),
+        color: glowColor,
         transparent: true,
         opacity: recipe.glow.opacity,
         blending: THREE.AdditiveBlending,
@@ -2023,23 +2259,14 @@ export function GalaxyView({
     };
 
     // Exotic textures are shared across both modes and created lazily on first
-    // use (conquest has no identity ring, so it can't borrow `bodyRingTex`).
+    // use.
     let gasGiantTex: THREE.Texture | undefined;
-    let exoticRingTex: THREE.Texture | undefined;
     const getGasGiantTex = () => {
       if (!gasGiantTex) {
         gasGiantTex = gasGiantTexture(128);
         disposables.push(gasGiantTex);
       }
       return gasGiantTex;
-    };
-    const getExoticRing = () => {
-      if (bodyRingTex) return bodyRingTex;
-      if (!exoticRingTex) {
-        exoticRingTex = ringBurstTexture(128);
-        disposables.push(exoticRingTex);
-      }
-      return exoticRingTex;
     };
 
     /**
@@ -2102,7 +2329,7 @@ export function GalaxyView({
         });
         pulsarTwinkles.push({ i, mat: headMat });
       } else {
-        // Ringed gas giant: a lit globe (normal blending) plus a flat ring.
+        // Gas giant: a lit globe (normal blending), no planetary ring.
         headMat = new THREE.SpriteMaterial({
           map: getGasGiantTex(),
           color: new THREE.Color("#d8b488"),
@@ -2115,21 +2342,6 @@ export function GalaxyView({
         head.position.set(p[0], p[1], p[2]);
         registerIntro(head, base * 1.0, node.id);
         head.raycast = () => {};
-        const ringMat = new THREE.SpriteMaterial({
-          map: getExoticRing(),
-          color: new THREE.Color("#e8d0a8"),
-          transparent: true,
-          opacity: 0.45,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        });
-        const ring = new THREE.Sprite(ringMat);
-        ring.position.set(p[0], p[1] + 0.1, p[2]);
-        registerIntro(ring, base * 1.9, `${node.id}-pring`);
-        ring.raycast = () => {};
-        disposables.push(ringMat);
-        scene.add(ring);
-        extra = ring;
         // A thin warm atmosphere haze rather than a stellar corona.
         glowMat = new THREE.SpriteMaterial({
           map: coronaTex,
@@ -2213,11 +2425,14 @@ export function GalaxyView({
       // slots so intro, ownership rings and selection keep working; skips the
       // binary companion. See `./bodies` for the pure asteroid/comet split.
       const isVoid = !!spaceMaps?.has(n.battle.mapName);
-      // Rare exotic star (shared with conquest): pulsar / gas giant fully replace
-      // the star; variable / carbon tweak the ordinary star below. Never for
-      // capitals (they read as important giants) or void asteroid fields.
+      // Rare exotic star (shared with conquest): pulsar / gas giant / dyson swarm
+      // fully replace the star; variable / carbon tweak the ordinary star below.
+      // Never for capitals (they read as important giants) or void asteroid fields.
       const exotic =
         n.kind === "capital" || isVoid ? undefined : exoticClassFor(n.id);
+      if (exotic === "dysonswarm" && buildDysonSwarm(i, n, p)) {
+        return;
+      }
       if (
         (exotic === "pulsar" || exotic === "gasgiant") &&
         buildExoticBody(i, n, p, exotic)
@@ -2255,7 +2470,7 @@ export function GalaxyView({
         );
         const star = new THREE.Sprite(starMat);
         star.position.set(p[0], p[1], p[2]);
-        registerIntro(star, starScale(i) * (isComet ? 1.05 : 0.95), n.id);
+        registerIntro(star, starScale(i) * (isComet ? 0.525 : 0.95), n.id);
         star.raycast = () => {};
         // Dust: a faint halo around an asteroid; a brighter icy aura around a
         // comet head that blends into its tail.
@@ -2271,7 +2486,7 @@ export function GalaxyView({
         corona.position.set(p[0], p[1], p[2]);
         registerIntro(
           corona,
-          coronaScale(i, false) * (isComet ? 1.0 : 0.6),
+          coronaScale(i, false) * (isComet ? 0.5 : 0.6),
           `${n.id}-corona`,
         );
         corona.raycast = () => {};
@@ -2301,7 +2516,7 @@ export function GalaxyView({
           tail.rotation.y =
             ((hashString(`${n.id}-tail`) % 100) / 100) * Math.PI * 2;
           tail.raycast = () => {};
-          registerIntro(tail, starScale(i) * 3.8, `${n.id}-tail`);
+          registerIntro(tail, starScale(i) * 1.9, `${n.id}-tail`);
           disposables.push(tailMat, tailGeo);
           scene.add(tail);
           spikes = tail;
@@ -2431,10 +2646,20 @@ export function GalaxyView({
         });
         const compStar = new THREE.Sprite(compStarMat);
         const compCorona = new THREE.Sprite(compCoronaMat);
-        // Tight orbits that scale gently with the primary — never far enough
-        // to crowd an adjacent system. Red dwarfs hug closer still.
+        // Orbit character, widely varied so binaries never sweep in lockstep:
+        // most are slow and wide, a minority (~18%) tight and fast. Direction is
+        // a balanced coin-flip on its own hash (a plain %2 skewed one way).
+        const t = (hashString(`${n.id}-orbit`) % 1000) / 1000;
+        const fast = t > 0.82;
+        const speedMul = fast
+          ? 2.4 + ((t - 0.82) / 0.18) * 2.6
+          : 0.16 + t * 0.5;
+        const dir = (hashString(`${n.id}-orbdir`) % 1000) / 1000 < 0.5 ? 1 : -1;
+        const omega = (1 / 2600) * speedMul * dir;
+        // Tight orbits scale gently with the primary; a fast partner hugs closer
+        // still (a tight, quick binary), and red dwarfs closest of all.
         const close = companion.name === "red dwarf" ? 0.6 : 1;
-        const radius = starScale(i) * 0.4 * close;
+        const radius = starScale(i) * 0.4 * close * (fast ? 0.5 : 1);
         const phase =
           ((hashString(`${n.id}-cphase`) % 100) / 100) * Math.PI * 2;
         const cx = p[0] + Math.cos(phase) * radius;
@@ -2458,6 +2683,7 @@ export function GalaxyView({
           center: [p[0], p[1], p[2]],
           radius,
           phase,
+          omega,
           starBase: compStarMat.opacity,
           coronaBase: compCoronaMat.opacity,
         });
@@ -2986,7 +3212,8 @@ export function GalaxyView({
         // Graded emphasis dims but keeps a node present (glow/ring/label stay);
         // fog fully hides its glow, ring and label. The two compose (fog wins
         // on hiding, emphasis scales what remains) but no caller uses both.
-        const factor = dimOf(n.id);
+        // The warlord finale never dims — it's the run's destination beacon.
+        const factor = warlordNodeIdx.has(i) ? 1 : dimOf(n.id);
         const starMat = starMats[i];
         if (starMat) starMat.opacity = (vis ? 1 : FOG_DIM) * factor;
         const corona = coronaSprites[i];
@@ -3037,8 +3264,10 @@ export function GalaxyView({
           c.coronaBase * factor;
       }
       // Opaque ring-stations dim by darkening their metal (they can't fade).
+      // The warlord fortress is exempt — the finale stays full-bright.
       for (const s of structureDims) {
-        s.color.copy(s.base).multiplyScalar(dimOf(galaxy.nodes[s.i].id));
+        const d = warlordNodeIdx.has(s.i) ? 1 : dimOf(galaxy.nodes[s.i].id);
+        s.color.copy(s.base).multiplyScalar(d);
       }
     };
     applyVisibilityRef.current = applyVisibility;
@@ -3298,11 +3527,61 @@ export function GalaxyView({
           }
           // Binary companions orbit their primary in the map plane.
           for (const c of companions) {
-            const a = c.phase + now / 2600;
+            const a = c.phase + now * c.omega;
             const x = c.center[0] + Math.cos(a) * c.radius;
             const z = c.center[2] + Math.sin(a) * c.radius;
             c.star.position.set(x, c.center[1], z);
             c.corona.position.set(x, c.center[1], z);
+          }
+          // Dyson swarms: orbit every collector on its tilted plane and shade it
+          // by view — the star-facing (inner) side reads bright, the outward side
+          // near-black, for a strong sun-lit shell. One instanced mesh per swarm.
+          if (dysonSwarms.length) {
+            const dsDir = new THREE.Vector3();
+            const dsPos = new THREE.Vector3();
+            const dsScl = new THREE.Vector3();
+            const dsQ = new THREE.Quaternion();
+            const dsM = new THREE.Matrix4();
+            const dsCol = new THREE.Color();
+            for (const sw of dysonSwarms) {
+              const dim = dimOf(galaxy.nodes[sw.i].id);
+              const mesh = sw.mesh;
+              const sats = sw.sats;
+              dsScl.setScalar(sw.satSize);
+              for (let s = 0; s < sats.length; s++) {
+                const st = sats[s];
+                const th = st.phase + now * st.speed;
+                const ct = Math.cos(th);
+                const sn = Math.sin(th);
+                // Unit offset direction on this panel's orbital plane.
+                const ux = st.e1.x * ct + st.e2.x * sn;
+                const uy = st.e1.y * ct + st.e2.y * sn;
+                const uz = st.e1.z * ct + st.e2.z * sn;
+                dsDir.set(ux, uy, uz);
+                dsQ.setFromUnitVectors(DYSON_Z, dsDir);
+                dsPos.copy(dsDir).multiplyScalar(st.radius);
+                dsM.compose(dsPos, dsQ, dsScl);
+                mesh.setMatrixAt(s, dsM);
+                // Lit when the inner normal (−offset) faces the camera. Sharp
+                // falloff + near-black dark side = strong inner/outer contrast.
+                const vx = camera.position.x - (sw.center.x + ux * st.radius);
+                const vy = camera.position.y - (sw.center.y + uy * st.radius);
+                const vz = camera.position.z - (sw.center.z + uz * st.radius);
+                const vlen = Math.hypot(vx, vy, vz) || 1;
+                const face = Math.max(0, (-ux * vx - uy * vy - uz * vz) / vlen);
+                const lit = face * face; // face^2
+                // The star-facing side blazes with reflected starlight (colour
+                // pushed white-hot and well past 1 so it clamps to a brilliant
+                // glint); the outward side falls to near-black. Huge contrast.
+                dsCol
+                  .copy(sw.warm)
+                  .lerp(WHITE, 0.3 + lit * 0.6)
+                  .multiplyScalar((0.015 + 3.4 * lit) * dim);
+                mesh.setColorAt(s, dsCol);
+              }
+              mesh.instanceMatrix.needsUpdate = true;
+              if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+            }
           }
           // Warpath identity rings: an anomaly slowly rotates and breathes; a
           // beacon pings outward on a repeating cycle. Faded by the node's own
