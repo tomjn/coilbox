@@ -1318,6 +1318,14 @@ export function GalaxyView({
     // sweeps its specular highlight around, so it shimmers as metal rather than
     // sitting flat. `base` is the node's fixed orientation; the loop adds time.
     const spinners: { mesh: THREE.Object3D; base: number; rate: number }[] = [];
+    // The ring-stations are OPAQUE (so they occlude the stars behind them), which
+    // means emphasis can't dim them by opacity — it darkens their metal colour
+    // instead. Each entry holds the shared metal colour + its full-bright base.
+    const structureDims: {
+      i: number;
+      color: THREE.Color;
+      base: THREE.Color;
+    }[] = [];
 
     // Intro warp-in: sprites pop from zero to their target scale (staggered by
     // node), lanes fade up, and the camera eases in. Only when motion is on.
@@ -1393,14 +1401,15 @@ export function GalaxyView({
 
     /**
      * A built structure (depot ring-station, warlord fortress) as *real 3D
-     * geometry*, not a sprite: a metal torus ring (inside, outside and edges) with
-     * a central hub and structural spokes, lit by the scene's key light with a
-     * specular sheen so it reads as machined metal, and spun slowly so the
-     * highlight sweeps around it. Laid in the galaxy plane, so the tilted camera
-     * also foreshortens it. One warm light spec stands in for detail at this
-     * distance. The ring mesh (with the hub/spokes/spec as children sharing its
-     * material) takes the spike slot so fog/emphasis dim the whole thing; a soft
-     * glow sits in the corona slot; the star slot stays empty.
+     * geometry*, not a sprite: an OPAQUE metal ring-station — an outer habitation
+     * ring with mounted pods, structural spokes to a central drum-and-dome hub, and
+     * two solar-panel wings — lit by the scene's key light with a specular sheen so
+     * it reads as machined metal, and spun slowly so the highlight sweeps around
+     * it. Opaque so it occludes the stars behind it. The ring (with all parts as
+     * children sharing its metal) takes the spike slot; a soft glow sits in the
+     * corona slot; the star slot stays empty. Emphasis dims it by darkening the
+     * metal colour (see `structureDims`), since an opaque mesh can't fade by
+     * opacity.
      */
     const buildStructureBody = (
       i: number,
@@ -1414,8 +1423,9 @@ export function GalaxyView({
         glowScale: number;
       },
     ): boolean => {
-      // One shared metal material — greeble diffuse + bump so the surface is busy
-      // machined metal, with a tighter specular that catches on the relief.
+      // OPAQUE so it occludes the stars behind it (a transparent mesh can't cull
+      // the additive starfield already drawn behind it). Greeble diffuse + bump so
+      // the surface is busy machined metal; a tighter specular catches the relief.
       const metal = new THREE.MeshPhongMaterial({
         color: new THREE.Color(opts.tint),
         map: greebleTex,
@@ -1423,31 +1433,73 @@ export function GalaxyView({
         bumpScale: 0.6,
         specular: new THREE.Color(0xb0b8c6),
         shininess: 38,
-        transparent: true,
-        opacity: 1,
-        depthWrite: true,
       });
-      const torusGeo = new THREE.TorusGeometry(0.5, 0.11, 14, 48);
+      // Opaque ring can't dim by opacity, so emphasis darkens its colour instead.
+      structureDims.push({ i, color: metal.color, base: metal.color.clone() });
+      // Dark solar-panel material.
+      const panelMat = new THREE.MeshPhongMaterial({
+        color: new THREE.Color(0x2a3450),
+        specular: new THREE.Color(0x556080),
+        shininess: 60,
+      });
+      disposables.push(metal, panelMat);
+
+      // Outer habitation ring.
+      const torusGeo = new THREE.TorusGeometry(0.5, 0.11, 16, 52);
       torusGeo.rotateX(Math.PI / 2); // lie flat in the galaxy plane
       const ring = new THREE.Mesh(torusGeo, metal);
       ring.raycast = () => {};
-      disposables.push(torusGeo, metal);
+      disposables.push(torusGeo);
 
-      // Central hub + four structural spokes bridging hub to ring (children, so
-      // they share the metal, dim together and spin with the ring).
-      const hubGeo = new THREE.IcosahedronGeometry(0.16, 0);
+      // Central hub: a wide shallow drum with a smaller dome on top. Everything
+      // below is a child of the ring, so it shares the metal, dims together, and
+      // spins with the ring.
+      const hubGeo = new THREE.CylinderGeometry(0.2, 0.24, 0.14, 20);
       const hub = new THREE.Mesh(hubGeo, metal);
       hub.raycast = () => {};
       ring.add(hub);
-      disposables.push(hubGeo);
-      const spokeGeo = new THREE.BoxGeometry(0.34, 0.05, 0.06);
+      const domeGeo = new THREE.CylinderGeometry(0.08, 0.14, 0.1, 16);
+      const dome = new THREE.Mesh(domeGeo, metal);
+      dome.position.y = 0.11;
+      dome.raycast = () => {};
+      ring.add(dome);
+      disposables.push(hubGeo, domeGeo);
+
+      // Structural spokes bridging hub to ring.
+      const spokeGeo = new THREE.BoxGeometry(0.34, 0.06, 0.07);
       spokeGeo.translate(0.33, 0, 0); // pivot at hub, reach out to the ring
       disposables.push(spokeGeo);
-      for (let s = 0; s < 4; s++) {
+      for (let s = 0; s < 6; s++) {
         const spoke = new THREE.Mesh(spokeGeo, metal);
-        spoke.rotation.y = (s / 4) * Math.PI * 2;
+        spoke.rotation.y = (s / 6) * Math.PI * 2;
         spoke.raycast = () => {};
         ring.add(spoke);
+      }
+      // Pods/modules mounted around the outer ring (like the reference's units).
+      const podGeo = new THREE.CylinderGeometry(0.06, 0.07, 0.16, 10);
+      disposables.push(podGeo);
+      for (let s = 0; s < 6; s++) {
+        const a = (s / 6) * Math.PI * 2 + Math.PI / 6;
+        const pod = new THREE.Mesh(podGeo, metal);
+        pod.position.set(Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5);
+        pod.raycast = () => {};
+        ring.add(pod);
+      }
+      // Two solar-panel wings on struts.
+      const strutGeo = new THREE.BoxGeometry(0.16, 0.03, 0.04);
+      strutGeo.translate(0.58, 0, 0);
+      const panelGeo = new THREE.BoxGeometry(0.24, 0.02, 0.16);
+      panelGeo.translate(0.78, 0, 0);
+      disposables.push(strutGeo, panelGeo);
+      for (const a of [Math.PI * 0.28, Math.PI * 1.15]) {
+        const strut = new THREE.Mesh(strutGeo, metal);
+        strut.rotation.y = a;
+        strut.raycast = () => {};
+        ring.add(strut);
+        const panel = new THREE.Mesh(panelGeo, panelMat);
+        panel.rotation.y = a;
+        panel.raycast = () => {};
+        ring.add(panel);
       }
       // One warm light spec on the rim — no window detail at this distance.
       const specMat = new THREE.SpriteMaterial({
@@ -1459,8 +1511,8 @@ export function GalaxyView({
         depthWrite: false,
       });
       const spec = new THREE.Sprite(specMat);
-      spec.scale.setScalar(0.22);
-      spec.position.set(0.5, 0.06, 0);
+      spec.scale.setScalar(0.2);
+      spec.position.set(0.5, 0.08, 0);
       spec.raycast = () => {};
       ring.add(spec);
       disposables.push(specMat);
@@ -2858,6 +2910,10 @@ export function GalaxyView({
         (c.star.material as THREE.SpriteMaterial).opacity = c.starBase * factor;
         (c.corona.material as THREE.SpriteMaterial).opacity =
           c.coronaBase * factor;
+      }
+      // Opaque ring-stations dim by darkening their metal (they can't fade).
+      for (const s of structureDims) {
+        s.color.copy(s.base).multiplyScalar(dimOf(galaxy.nodes[s.i].id));
       }
     };
     applyVisibilityRef.current = applyVisibility;
