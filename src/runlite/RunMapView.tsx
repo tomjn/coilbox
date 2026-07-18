@@ -6,7 +6,12 @@ import {
   usePerformanceMode,
   useReduceMotion,
 } from "../general/display";
-import { PLAYER_FACTION, runOwners, runToGalaxyDoc } from "./galaxyAdapter";
+import {
+  PLAYER_FACTION,
+  runEmphasis,
+  runOwners,
+  runToGalaxyDoc,
+} from "./galaxyAdapter";
 import type { RogueliteRun } from "./model";
 
 /**
@@ -46,6 +51,13 @@ export function RunMapView({
     () => runOwners(run),
     [run.nodes, run.progress.currentNodeId, run.progress.visited],
   );
+  // Graded de-emphasis: same live channel as owners, keyed on progress + the
+  // graph (edges decide what's still reachable).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on progress + graph, applied live by GalaxyView
+  const emphasis = useMemo(
+    () => runEmphasis(run),
+    [run.nodes, run.edges, run.progress.currentNodeId, run.progress.visited],
+  );
 
   const spaceMaps = useKnownSpaceMaps();
   const reduceMotion = useReduceMotion();
@@ -56,6 +68,7 @@ export function RunMapView({
     <GalaxyView
       galaxy={doc}
       owners={owners}
+      emphasis={emphasis}
       playerFactionId={PLAYER_FACTION}
       selectedId={selectedId}
       onSelect={onSelect}

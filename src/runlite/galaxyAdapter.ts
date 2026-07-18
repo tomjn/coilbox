@@ -1,5 +1,7 @@
+import type { NodeEmphasis } from "../conquest/galaxy3d/GalaxyView";
 import type { Faction, GalaxyDoc } from "../conquest/model";
 import type { RogueliteRun, RunNodeType } from "./model";
+import { successors } from "./progress";
 
 /**
  * Adapt a run into a conquest {@link GalaxyDoc} so the run map renders through
@@ -111,4 +113,66 @@ export function runOwners(run: RogueliteRun): Record<string, string> {
   }
   owners[run.progress.currentNodeId] = PLAYER_FACTION;
   return owners;
+}
+
+/** Opacity for each graded-emphasis tier (see {@link runEmphasis}). The path
+ * ahead stays more present than the spent path behind; forks you can no longer
+ * reach fall right back. */
+export const RUN_DIM = {
+  /** A node you've already crossed — spent, behind you. */
+  done: 0.42,
+  /** Reachable ahead but not an immediate choice — the road onward. */
+  future: 0.55,
+  /** A branch you passed on / can no longer reach. */
+  unreachable: 0.22,
+} as const;
+
+/** Every node reachable by following forward edges from `fromId` (inclusive). */
+export function forwardReachable(
+  run: RogueliteRun,
+  fromId: string,
+): Set<string> {
+  const adj = new Map<string, string[]>();
+  for (const [a, b] of run.edges) {
+    const list = adj.get(a);
+    if (list) list.push(b);
+    else adj.set(a, [b]);
+  }
+  const seen = new Set<string>([fromId]);
+  const queue = [fromId];
+  while (queue.length) {
+    const id = queue.shift() as string;
+    for (const nb of adj.get(id) ?? []) {
+      if (!seen.has(nb)) {
+        seen.add(nb);
+        queue.push(nb);
+      }
+    }
+  }
+  return seen;
+}
+
+/**
+ * Graded de-emphasis for the run map, complementing {@link runOwners}. The
+ * current node and its immediate choices stay full-bright (absent from the map);
+ * everything else fades by how it relates to *now*: the crossed path muted, the
+ * road ahead dimmed-but-clear, forks you can no longer take pushed right back.
+ * Feeds GalaxyView's `emphasis` prop.
+ */
+export function runEmphasis(run: RogueliteRun): Map<string, NodeEmphasis> {
+  const current = run.progress.currentNodeId;
+  const nextIds = new Set(successors(run, current).map((n) => n.id));
+  const reachable = forwardReachable(run, current);
+  const visited = new Set(run.progress.visited);
+  const emphasis = new Map<string, NodeEmphasis>();
+  for (const n of run.nodes) {
+    if (n.id === current || nextIds.has(n.id)) continue; // full brightness
+    const opacity = visited.has(n.id)
+      ? RUN_DIM.done
+      : reachable.has(n.id)
+        ? RUN_DIM.future
+        : RUN_DIM.unreachable;
+    emphasis.set(n.id, { opacity });
+  }
+  return emphasis;
 }
