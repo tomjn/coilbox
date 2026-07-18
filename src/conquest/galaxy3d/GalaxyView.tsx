@@ -27,6 +27,7 @@ import {
   gasGiantTexture,
   greebleTexture,
   radialTexture,
+  spaceEnvTexture,
   spikesTexture,
 } from "./textures";
 
@@ -1218,18 +1219,21 @@ export function GalaxyView({
     if (greebleTex) {
       greebleTex.wrapS = THREE.RepeatWrapping;
       greebleTex.wrapT = THREE.RepeatWrapping;
-      greebleTex.repeat.set(7, 3);
+      greebleTex.repeat.set(3, 2);
       disposables.push(greebleTex);
     }
-    // A harsh directional key light + very low ambient so the 3D ring-stations
-    // shade hard (a real dark side and terminator, not an evenly-lit balloon) and
-    // their specular sweeps as they spin — machined metal, not smooth plastic.
+    // Environment map the metal reflects, so it reads as machined metal (glinting
+    // on the sunward edges) rather than matte plastic-grey.
+    const envTex = anyIdentity ? spaceEnvTexture() : undefined;
+    if (envTex) disposables.push(envTex);
+    // A raking directional key light + very low ambient so the 3D ring-stations
+    // shade hard (a real dark side and terminator, not an evenly-lit balloon).
     // Only lit materials respond; every other object is unlit MeshBasic/Sprite,
     // so conquest and the rest of the map are unchanged. Warpath-only.
     if (anyIdentity) {
       const key = new THREE.DirectionalLight(0xffffff, 2.6);
-      key.position.set(-0.6, 1, 0.4);
-      scene.add(key, new THREE.AmbientLight(0xffffff, 0.12));
+      key.position.set(-0.85, 0.55, 0.35);
+      scene.add(key, new THREE.AmbientLight(0xffffff, 0.14));
     }
     // Comet coma: a bright icy core fading through a soft dusty halo, so it
     // blends into the tail under additive blending (a comet is dust and ice,
@@ -1431,17 +1435,22 @@ export function GalaxyView({
         color: new THREE.Color(opts.tint),
         map: greebleTex,
         bumpMap: greebleTex,
-        bumpScale: 0.6,
-        specular: new THREE.Color(0xb0b8c6),
-        shininess: 38,
+        bumpScale: 0.35,
+        specular: new THREE.Color(0xeef1f6),
+        shininess: 95,
+        envMap: envTex,
+        reflectivity: 0.55,
+        combine: THREE.MixOperation,
       });
       // Opaque ring can't dim by opacity, so emphasis darkens its colour instead.
       structureDims.push({ i, color: metal.color, base: metal.color.clone() });
-      // Dark solar-panel material.
+      // Dark, glossy solar-panel material (reflects the env too).
       const panelMat = new THREE.MeshPhongMaterial({
-        color: new THREE.Color(0x2a3450),
-        specular: new THREE.Color(0x556080),
-        shininess: 60,
+        color: new THREE.Color(0x223052),
+        specular: new THREE.Color(0x90a0c0),
+        shininess: 90,
+        envMap: envTex,
+        reflectivity: 0.4,
       });
       disposables.push(metal, panelMat);
 
@@ -1450,19 +1459,20 @@ export function GalaxyView({
       // occludes together.
       const station = new THREE.Group();
 
-      // Module ring: chunky boxes tiled tangentially so their long (Z) axis
-      // follows the circle, forming a segmented ring; per-module scale jitter
-      // makes it read as irregular built modules with gaps, not a smooth donut.
-      const modGeo = new THREE.BoxGeometry(0.16, 0.13, 0.26);
+      // Module ring: chunky boxes aligned RADIALLY (long X axis points at the
+      // hub), so each module faces the centre and they form a clean segmented
+      // ring; gentle per-module length/height jitter keeps it from looking
+      // machine-perfect without scattering them.
+      const modGeo = new THREE.BoxGeometry(0.26, 0.13, 0.18);
       disposables.push(modGeo);
       const MODULES = 12;
       for (let s = 0; s < MODULES; s++) {
         const a = (s / MODULES) * Math.PI * 2;
         const mod = new THREE.Mesh(modGeo, metal);
-        mod.position.set(Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5);
-        mod.rotation.y = a;
+        mod.position.set(Math.cos(a) * 0.48, 0, Math.sin(a) * 0.48);
+        mod.rotation.y = -a; // long axis radial -> module faces the hub
         const j = (hashString(`${node.id}-mod${s}`) % 100) / 100;
-        mod.scale.set(0.85 + 0.5 * j, 0.7 + 0.7 * j, 0.85 + 0.12 * j);
+        mod.scale.set(0.9 + 0.2 * j, 0.8 + 0.4 * j, 0.92 + 0.1 * j);
         mod.raycast = () => {};
         station.add(mod);
       }

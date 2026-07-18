@@ -8,6 +8,57 @@ import * as THREE from "three";
  * as coloured speckles on the stars. Pure maths has no dither.
  */
 
+/**
+ * A tiny equirectangular "space" environment map for the metal ring-stations to
+ * reflect: mostly dark, with one bright warm key highlight and a faint galactic
+ * band. Without something to reflect, metal in an unlit-background scene collapses
+ * to matte plastic; this gives it a glint on the sunward edges and a dark body —
+ * reading as machined metal. Returned with reflection mapping set.
+ */
+export function spaceEnvTexture(): THREE.Texture {
+  const w = 256;
+  const h = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const u = x / w;
+        const v = y / h;
+        // Bright warm key highlight (wrap u for seamless longitude).
+        let du = Math.abs(u - 0.32);
+        du = Math.min(du, 1 - du);
+        const key = Math.exp(-(du * du + (v - 0.3) ** 2) * 45);
+        // A small cool secondary highlight opposite it.
+        let du2 = Math.abs(u - 0.72);
+        du2 = Math.min(du2, 1 - du2);
+        const key2 = Math.exp(-(du2 * du2 + (v - 0.42) ** 2) * 70) * 0.4;
+        // Faint galactic band near the horizon.
+        const band = Math.exp(-((v - 0.5) ** 2) / (2 * 0.16 * 0.16)) * 0.1;
+        const o = (y * w + x) * 4;
+        img.data[o] = Math.min(255, (0.02 + key * 1 + key2 * 0.6 + band) * 255);
+        img.data[o + 1] = Math.min(
+          255,
+          (0.02 + key * 0.92 + key2 * 0.8 + band * 0.9) * 255,
+        );
+        img.data[o + 2] = Math.min(
+          255,
+          (0.035 + key * 0.72 + key2 + band * 1.1) * 255,
+        );
+        img.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 /** Parse `#rrggbb` / `#rrggbbaa` into 0-255 channels. */
 export function hexRgba(hex: string): [number, number, number, number] {
   const h = hex.replace("#", "");
