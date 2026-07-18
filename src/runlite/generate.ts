@@ -95,11 +95,6 @@ function isBossType(type: RunNodeType): boolean {
   return type === "boss";
 }
 
-/** Normalized cross-axis position of the `i`th of `n` nodes in a column. */
-function rowNorm(i: number, n: number): number {
-  return n > 1 ? i / (n - 1) : 0.5;
-}
-
 /**
  * Choose a map for an encounter, biased by depth: early columns draw from the
  * smaller maps, the boss from the largest. Maps are sorted by size; a windowed
@@ -374,9 +369,15 @@ function drawNodeType(rng: Rng, p: number): RunNodeType {
   return "battle";
 }
 
-/** Link two adjacent columns forward: each `from` reaches its 1-2 nearest-row
- * `to` nodes, and every `to` is guaranteed an incoming edge (no orphans). */
-function linkColumns(rng: Rng, from: RunNode[], to: RunNode[]): RunEdge[] {
+/**
+ * Link two adjacent columns forward with a *planar* (non-crossing) set of
+ * edges: every `to` gets an incoming edge from its proportionally-nearest
+ * `from`, and every `from` gets an outgoing edge to its proportional `to`.
+ * Because both mappings are monotonic (row order preserved on both sides), no
+ * two lanes ever cross — the map reads as clean forward columns instead of a
+ * tangle. Rows are index-ordered, so proportional index = order-preserving.
+ */
+function linkColumns(from: RunNode[], to: RunNode[]): RunEdge[] {
   const edges: RunEdge[] = [];
   const seen = new Set<string>();
   const add = (a: string, b: string) => {
@@ -386,38 +387,18 @@ function linkColumns(rng: Rng, from: RunNode[], to: RunNode[]): RunEdge[] {
       edges.push([a, b]);
     }
   };
-  const norm = (nodes: RunNode[], i: number) => rowNorm(i, nodes.length);
-  const hasIncoming = new Set<string>();
-
-  from.forEach((f, fi) => {
-    const fp = norm(from, fi);
-    const ranked = to
-      .map((t, ti) => ({ t, d: Math.abs(norm(to, ti) - fp) }))
-      .sort((a, b) => a.d - b.d);
-    const k = randInt(rng, 1, Math.min(2, to.length));
-    for (let i = 0; i < k; i++) {
-      add(f.id, ranked[i].t.id);
-      hasIncoming.add(ranked[i].t.id);
-    }
-  });
-
-  // Any `to` node nobody linked to gets an edge from its nearest `from`.
-  to.forEach((t, ti) => {
-    if (hasIncoming.has(t.id)) return;
-    const tp = norm(to, ti);
-    let best = from[0];
-    let bestD = Number.POSITIVE_INFINITY;
-    from.forEach((f, fi) => {
-      const d = Math.abs(norm(from, fi) - tp);
-      if (d < bestD) {
-        bestD = d;
-        best = f;
-      }
-    });
-    add(best.id, t.id);
-    hasIncoming.add(t.id);
-  });
-
+  const n = from.length;
+  const m = to.length;
+  // Each `to` gets its incoming from the proportional `from` (covers every to).
+  for (let j = 0; j < m; j++) {
+    const i = m <= 1 ? Math.floor(n / 2) : Math.round((j * (n - 1)) / (m - 1));
+    add(from[i].id, to[j].id);
+  }
+  // Each `from` gets an outgoing to the proportional `to` (covers every from).
+  for (let i = 0; i < n; i++) {
+    const j = n <= 1 ? Math.floor(m / 2) : Math.round((i * (m - 1)) / (n - 1));
+    add(from[i].id, to[j].id);
+  }
   return edges;
 }
 
@@ -480,7 +461,7 @@ export function generateRun(opts: GenerateRunOpts): RogueliteRun {
   // Edges: link every adjacent pair of columns forward.
   const edges: RunEdge[] = [];
   for (let c = 0; c < columns.length - 1; c++) {
-    edges.push(...linkColumns(rng, columns[c], columns[c + 1]));
+    edges.push(...linkColumns(columns[c], columns[c + 1]));
   }
 
   const nodes = columns.flat();

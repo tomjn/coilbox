@@ -58,10 +58,19 @@ export function runToGalaxyDoc(run: RogueliteRun): GalaxyDoc {
     })),
   ];
 
+  // Centre each column vertically so columns line up around the lane, instead
+  // of all starting at row 0 (which skews the connecting lanes and makes them
+  // cross). A column of k nodes spans rows centred on 0.
+  const perCol = new Map<number, number>();
+  for (const n of run.nodes) perCol.set(n.col, (perCol.get(n.col) ?? 0) + 1);
+
   const nodes = run.nodes.map((n) => ({
     id: n.id,
     name: TYPE_LABEL[n.type],
-    pos: [n.col, n.row] as [number, number],
+    pos: [n.col, n.row - ((perCol.get(n.col) ?? 1) - 1) / 2] as [
+      number,
+      number,
+    ],
     owner: typeFaction(n.type),
     // Start and boss are the run's endpoints — render them as giant stars.
     kind:
