@@ -262,6 +262,62 @@ export function asteroidTexture(size: number): THREE.Texture {
 }
 
 /**
+ * A ringed gas giant's globe: a smoothly-lit sphere banded by latitude with a
+ * little fbm swirl — gas, so no bump/craters and a soft limb, unlike the rocky
+ * asteroid. Greyscale and per-pixel (dither-free); the sprite material supplies
+ * the warm tint, and a separate flat ring quad completes the Saturn read.
+ */
+export function gasGiantTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(size, size);
+    const half = size / 2;
+    const px = 1 / half;
+    const L = [-0.55, -0.5, 0.66] as const;
+    const R = 0.94;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const nx = (x + 0.5 - half) / half;
+        const ny = (y + 0.5 - half) / half;
+        const d = Math.hypot(nx, ny);
+        let value = 0;
+        let alpha = 0;
+        if (d <= R) {
+          const zc = Math.sqrt(Math.max(0, 1 - (d / R) ** 2));
+          const lam = Math.max(
+            0,
+            (nx / R) * L[0] + (ny / R) * L[1] + zc * L[2],
+          );
+          // Latitude bands, warped by a little turbulence so they swirl.
+          const swirl = fbm(nx * 2.5, ny * 2.5, 7) * 0.5;
+          const band =
+            0.62 +
+            0.3 * Math.sin(ny * 9 + swirl * 4) +
+            0.08 * Math.sin(ny * 23);
+          let v = (0.12 + 0.9 * lam) * Math.max(0.4, Math.min(1, band));
+          v += (1 - zc) ** 3 * 0.05; // soft limb
+          value = Math.max(0, Math.min(1, v));
+          alpha = Math.max(0, Math.min(1, (R - d) / (1.5 * px)));
+        }
+        const o = (y * size + x) * 4;
+        const g = Math.round(value * 255);
+        img.data[o] = g;
+        img.data[o + 1] = g;
+        img.data[o + 2] = g;
+        img.data[o + 3] = Math.round(alpha * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
  * A warlord black hole's accretion disc: a hot annulus with a cleared hole in
  * the middle (where the dark core sprite sits), computed per-pixel and dither-
  * free. Colour is baked — a white-hot inner edge grading through orange to a

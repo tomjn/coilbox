@@ -23,6 +23,7 @@ import {
   accretionTexture,
   asteroidTexture,
   cometTailTexture,
+  gasGiantTexture,
   radialTexture,
   spikesTexture,
   stationTexture,
@@ -230,8 +231,35 @@ export function starSystemLabel(system: StarSystem): string {
 }
 
 /**
+ * Rare exotic stellar phenomena, shared across conquest and warpath so both skies
+ * gain a few unusual systems. Kept sparse (a few percent) and physically-grounded
+ * — a blue-white pulsar, a pulsing variable, a ringed gas giant, a dying carbon
+ * star. The warlord's black hole is deliberately *not* here (boss-only). Rolled
+ * on an independent `-exotic` hash, so no existing star assignment shifts.
+ */
+export type ExoticClass = "pulsar" | "variable" | "gasgiant" | "carbon";
+
+const EXOTIC_LABEL: Record<ExoticClass, string> = {
+  pulsar: "pulsar",
+  variable: "variable star",
+  gasgiant: "ringed gas giant",
+  carbon: "carbon star",
+};
+
+/** The exotic class for a node, or `undefined` for an ordinary star (~94%). */
+export function exoticClassFor(nodeId: string): ExoticClass | undefined {
+  const h = hashString(`${nodeId}-exotic`) % 1000;
+  if (h < 15) return "pulsar";
+  if (h < 30) return "variable";
+  if (h < 45) return "gasgiant";
+  if (h < 60) return "carbon";
+  return undefined;
+}
+
+/**
  * Selection-panel label for a node. `voidBody` (from the galaxy-wide
- * `voidBodiesFor`) is set for space-map nodes and undefined otherwise.
+ * `voidBodiesFor`) is set for space-map nodes and undefined otherwise. Non-void,
+ * non-capital nodes may be a rare exotic; otherwise the stellar-system name.
  */
 export function nodeBodyLabel(
   nodeId: string,
@@ -239,6 +267,10 @@ export function nodeBodyLabel(
   voidBody: VoidBody | undefined,
 ): string {
   if (voidBody) return bodyLabel(voidBody);
+  if (!capital) {
+    const exotic = exoticClassFor(nodeId);
+    if (exotic) return EXOTIC_LABEL[exotic];
+  }
   return starSystemLabel(starSystemFor(nodeId, capital));
 }
 
@@ -1235,6 +1267,15 @@ export function GalaxyView({
     }
     const warlordAnims: WarlordAnim[] = [];
 
+    // Exotic-star motion (shared across both modes): a pulsar twinkles fast, a
+    // variable star's glow breathes slowly. Driven by the loop when motion is on.
+    const pulsarTwinkles: { i: number; mat: THREE.SpriteMaterial }[] = [];
+    const variablePulses: {
+      i: number;
+      mat: THREE.SpriteMaterial;
+      base: number;
+    }[] = [];
+
     // Intro warp-in: sprites pop from zero to their target scale (staggered by
     // node), lanes fade up, and the camera eases in. Only when motion is on.
     const factionOnlyRebuild =
@@ -1642,6 +1683,156 @@ export function GalaxyView({
       return true;
     };
 
+    // Exotic textures are shared across both modes and created lazily on first
+    // use (conquest has no identity ring, so it can't borrow `bodyRingTex`).
+    let gasGiantTex: THREE.Texture | undefined;
+    let exoticRingTex: THREE.Texture | undefined;
+    const getGasGiantTex = () => {
+      if (!gasGiantTex) {
+        gasGiantTex = gasGiantTexture(128);
+        disposables.push(gasGiantTex);
+      }
+      return gasGiantTex;
+    };
+    const getExoticRing = () => {
+      if (bodyRingTex) return bodyRingTex;
+      if (!exoticRingTex) {
+        exoticRingTex = ringBurstTexture(128);
+        disposables.push(exoticRingTex);
+      }
+      return exoticRingTex;
+    };
+
+    /**
+     * Build a full-replacement exotic body (pulsar or ringed gas giant) in the
+     * star / corona / spike slots. The pulsar is a tiny blue-white core with
+     * bright beamed spikes and a fast twinkle; the gas giant a warm banded globe
+     * with a flat ring quad that foreshortens into an ellipse. Variable and carbon
+     * stars stay ordinary stars (handled in the normal branch) so they keep the
+     * corona/binary machinery. Returns `true` when it builds.
+     */
+    const buildExoticBody = (
+      i: number,
+      node: GalaxyNode,
+      p: WorldPos,
+      exotic: ExoticClass,
+    ): boolean => {
+      const base = starScale(i);
+      let head: THREE.Sprite;
+      let headMat: THREE.SpriteMaterial;
+      let glowMat: THREE.SpriteMaterial;
+      let extra: THREE.Object3D | undefined;
+
+      if (exotic === "pulsar") {
+        const blue = new THREE.Color("#cfe4ff");
+        headMat = new THREE.SpriteMaterial({
+          map: starTex,
+          color: blue.clone().lerp(WHITE, 0.55),
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+        });
+        head = new THREE.Sprite(headMat);
+        head.position.set(p[0], p[1], p[2]);
+        registerIntro(head, base * 0.55, node.id);
+        head.raycast = () => {};
+        // Bright beamed spikes — the pulsar's lighthouse look.
+        const spikeMat = new THREE.SpriteMaterial({
+          map: spikeTex,
+          color: blue.clone().lerp(WHITE, 0.5),
+          transparent: true,
+          opacity: 0.42,
+          rotation: ((hashString(`${node.id}-spin`) % 100) / 100 - 0.5) * 0.6,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const spikes = new THREE.Sprite(spikeMat);
+        spikes.position.set(p[0], p[1], p[2]);
+        registerIntro(spikes, base * 2.3, `${node.id}-spike`);
+        spikes.raycast = () => {};
+        disposables.push(spikeMat);
+        scene.add(spikes);
+        extra = spikes;
+        glowMat = new THREE.SpriteMaterial({
+          map: coronaTex,
+          color: blue,
+          transparent: true,
+          opacity: 0.55,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        pulsarTwinkles.push({ i, mat: headMat });
+      } else {
+        // Ringed gas giant: a lit globe (normal blending) plus a flat ring.
+        headMat = new THREE.SpriteMaterial({
+          map: getGasGiantTex(),
+          color: new THREE.Color("#d8b488"),
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+          rotation: ((hashString(`${node.id}-rock`) % 100) / 100) * Math.PI * 2,
+        });
+        head = new THREE.Sprite(headMat);
+        head.position.set(p[0], p[1], p[2]);
+        registerIntro(head, base * 1.0, node.id);
+        head.raycast = () => {};
+        const ringMat = new THREE.SpriteMaterial({
+          map: getExoticRing(),
+          color: new THREE.Color("#e8d0a8"),
+          transparent: true,
+          opacity: 0.45,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const ring = new THREE.Sprite(ringMat);
+        ring.position.set(p[0], p[1] + 0.1, p[2]);
+        registerIntro(ring, base * 1.9, `${node.id}-pring`);
+        ring.raycast = () => {};
+        disposables.push(ringMat);
+        scene.add(ring);
+        extra = ring;
+        // A thin warm atmosphere haze rather than a stellar corona.
+        glowMat = new THREE.SpriteMaterial({
+          map: coronaTex,
+          color: new THREE.Color("#c8a878"),
+          transparent: true,
+          opacity: 0.2,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+      }
+
+      const glow = new THREE.Sprite(glowMat);
+      glow.position.set(p[0], p[1], p[2]);
+      registerIntro(
+        glow,
+        coronaScale(i, false) * (exotic === "pulsar" ? 0.8 : 0.5),
+        `${node.id}-corona`,
+      );
+      glow.raycast = () => {};
+
+      const ownRingMat = new THREE.MeshBasicMaterial({
+        color: ownerColor(ownersRef.current[node.id] ?? node.owner),
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const ownRing = new THREE.Mesh(ringGeoFor(0), ownRingMat);
+      ownRing.rotation.x = -Math.PI / 2;
+      ownRing.position.set(p[0], p[1] - 0.4, p[2]);
+      ownRing.raycast = () => {};
+      starSprites.push(head);
+      starMats.push(headMat);
+      spikeSprites.push(extra);
+      coronaSprites.push(glow);
+      ownerRingMats.push(ownRingMat);
+      ownerRings.push(ownRing);
+      disposables.push(headMat, glowMat, ownRingMat);
+      scene.add(head, glow, ownRing);
+      return true;
+    };
+
     galaxy.nodes.forEach((n, i) => {
       const p = positions.get(n.id);
       if (!p) {
@@ -1683,6 +1874,17 @@ export function GalaxyView({
       // slots so intro, ownership rings and selection keep working; skips the
       // binary companion. See `./bodies` for the pure asteroid/comet split.
       const isVoid = !!spaceMaps?.has(n.battle.mapName);
+      // Rare exotic star (shared with conquest): pulsar / gas giant fully replace
+      // the star; variable / carbon tweak the ordinary star below. Never for
+      // capitals (they read as important giants) or void asteroid fields.
+      const exotic =
+        n.kind === "capital" || isVoid ? undefined : exoticClassFor(n.id);
+      if (
+        (exotic === "pulsar" || exotic === "gasgiant") &&
+        buildExoticBody(i, n, p, exotic)
+      ) {
+        return;
+      }
       if (isVoid) {
         const body = voidBodies.get(n.id) ?? "asteroid";
         const isComet = body === "comet";
@@ -1794,6 +1996,9 @@ export function GalaxyView({
       if (identity?.starTint) {
         stellar.lerp(new THREE.Color(identity.starTint), 0.55);
       }
+      // Carbon (dying) star: a deep, sooty red. A variable star keeps its class
+      // colour but its glow breathes (registered after the corona is built).
+      if (exotic === "carbon") stellar.set("#c81e08");
       // Normal blending (not additive): the hot core is near-opaque, so the
       // decorative starfield behind a node can't shine through it. Dwarfs
       // keep their saturation; hot stars blow out toward white (type.tint).
@@ -1841,6 +2046,9 @@ export function GalaxyView({
       corona.position.set(p[0], p[1], p[2]);
       registerIntro(corona, coronaScale(i, false), `${n.id}-corona`);
       corona.raycast = () => {};
+      if (exotic === "variable") {
+        variablePulses.push({ i, mat: coronaMat, base: coronaMat.opacity });
+      }
       // Ownership lives on the ring alone (saturated faction colour).
       const ringMat = new THREE.MeshBasicMaterial({
         color: ownerColor(ownersRef.current[n.id] ?? n.owner),
@@ -2779,6 +2987,19 @@ export function GalaxyView({
               for (const pr of wa.pulse)
                 pr.sprite.scale.setScalar(pr.base * breathe);
             }
+          }
+          // Exotic stars (shared): pulsars flicker fast, variable stars' glows
+          // breathe. Both fade by the node's own emphasis.
+          for (const pt of pulsarTwinkles) {
+            pt.mat.opacity =
+              (0.45 + 0.55 * (0.5 + 0.5 * Math.sin(now / 120))) *
+              dimOf(galaxy.nodes[pt.i].id);
+          }
+          for (const vp of variablePulses) {
+            vp.mat.opacity =
+              vp.base *
+              (0.55 + 0.45 * Math.sin(now / 1100)) *
+              dimOf(galaxy.nodes[vp.i].id);
           }
           if (sel.idx >= 0) {
             const ring = ownerRings[sel.idx];
