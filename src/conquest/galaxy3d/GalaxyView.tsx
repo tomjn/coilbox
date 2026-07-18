@@ -77,6 +77,13 @@ interface GalaxyViewProps {
    * dimensions can be added without a new prop. Default-off; conquest omits it.
    */
   emphasis?: Map<string, NodeEmphasis>;
+  /**
+   * Run-map lane styling. When true, the player's *outgoing* frontier lanes
+   * (the choices ahead) render as solid directional routes with an
+   * outward-travelling pulse, and the incoming lane you already crossed is
+   * muted rather than dashed. Default `false` keeps conquest's contested dashes.
+   */
+  laneFlow?: boolean;
   /** Map spring-names known to be space maps; their nodes render as asteroids. */
   spaceMaps?: Set<string>;
   /**
@@ -306,6 +313,37 @@ function filamentTexture(sigma: number): THREE.Texture {
 }
 
 /**
+ * A single soft chevron pointing toward +x, drawn white with a gaussian glow so
+ * it reads as a light arrowhead under additive blending. Used as travelling
+ * direction markers along the run's open routes (`laneFlow`).
+ */
+function chevronTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.clearRect(0, 0, size, size);
+    ctx.shadowColor = "#ffffff";
+    ctx.shadowBlur = size * 0.14;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = size * 0.16;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const m = size * 0.5;
+    const s = size * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(m - s * 0.5, m - s);
+    ctx.lineTo(m + s * 0.7, m); // tip toward +x
+    ctx.lineTo(m - s * 0.5, m + s);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
  * Procedural theatre-map chart: a dark slate plane with a faint grid and a
  * per-pixel vignette — the fallback when a theatre theme ships no backdrop.
  * Shared with the battle backdrop for theatre-skinned galaxies.
@@ -401,6 +439,7 @@ export function GalaxyView({
   onSelect,
   visibleIds,
   emphasis,
+  laneFlow = false,
   spaceMaps,
   focusNodeId,
   display,
@@ -860,12 +899,83 @@ export function GalaxyView({
       coreOpacity: 0.75,
       haloOpacity: 0.16,
     });
-    // Contested routes: fine warm-gold dashes, NMS plotted-course style.
+    // Contested routes: fine warm-gold dashes, NMS plotted-course style. In
+    // `laneFlow` (run) mode the same pair is drawn *solid* instead — the run's
+    // open lanes are directional travel routes, not a contested battle line.
     const frontier = makeLanePair({
       color: 0xffcf8a,
       coreOpacity: 0.9,
       haloOpacity: 0.1,
     });
+
+    // Directional route markers (`laneFlow` only): a run's connectors point
+    // from where you are to the choices ahead, so travelling chevrons make the
+    // direction explicit. A small pool of in-plane arrow quads (they hold a
+    // world heading as the camera orbits, unlike billboards), a brightness wave
+    // animated over them outward. Under reduce-motion they sit static — still
+    // reading as arrows pointing the way.
+    const flowEnabled = laneFlow;
+    const CHEVRONS_PER_ROUTE = 3;
+    const chevTex = flowEnabled ? chevronTexture(64) : undefined;
+    const chevGeo = flowEnabled ? new THREE.PlaneGeometry(2.4, 1.7) : undefined;
+    if (chevGeo) {
+      chevGeo.rotateX(-Math.PI / 2); // lie flat in the galaxy plane
+      disposables.push(chevGeo);
+    }
+    if (chevTex) disposables.push(chevTex);
+    interface Chevron {
+      mesh: THREE.Mesh;
+      mat: THREE.MeshBasicMaterial;
+      /** Position along its route, 0 (at you) .. 1 (at the choice). */
+      t: number;
+    }
+    const chevrons: Chevron[] = [];
+    // Grow the pool to `n` chevrons (created lazily; hidden ones stay parked).
+    const ensureChevrons = (n: number) => {
+      while (chevrons.length < n && chevGeo && chevTex) {
+        const mat = new THREE.MeshBasicMaterial({
+          map: chevTex,
+          color: 0xffe6b0,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+        });
+        const mesh = new THREE.Mesh(chevGeo, mat);
+        mesh.raycast = () => {};
+        mesh.visible = false;
+        scene.add(mesh);
+        disposables.push(mat);
+        chevrons.push({ mesh, mat, t: 0 });
+      }
+    };
+    // Lay chevrons out along the current open routes (called from applyOwners).
+    const layoutChevrons = (routes: LaneSeg[]) => {
+      if (!flowEnabled) return;
+      ensureChevrons(routes.length * CHEVRONS_PER_ROUTE);
+      let k = 0;
+      for (const [x1, y1, z1, x2, y2, z2] of routes) {
+        // The chevron's local +x is world +x; a Y-rotation of θ sends it to
+        // (cosθ, 0, -sinθ), so to aim it along (dx, dz) we need θ=atan2(-dz, dx).
+        const heading = Math.atan2(-(z2 - z1), x2 - x1);
+        for (let c = 0; c < CHEVRONS_PER_ROUTE; c++) {
+          // Space them across the middle of the lane, marching toward +choice.
+          const t = 0.28 + (c / (CHEVRONS_PER_ROUTE - 1)) * 0.44;
+          const chev = chevrons[k++];
+          chev.t = t;
+          chev.mesh.position.set(
+            x1 + (x2 - x1) * t,
+            y1 + (y2 - y1) * t + 0.12,
+            z1 + (z2 - z1) * t,
+          );
+          chev.mesh.rotation.y = heading;
+          chev.mesh.visible = true;
+          chev.mat.opacity = 0.55; // static base; the loop waves it when motion on
+        }
+      }
+      for (; k < chevrons.length; k++) chevrons[k].mesh.visible = false;
+    };
 
     // Node hit targets: one invisible InstancedMesh gives the raycaster a
     // generous, stable click area. The visible star is drawn by sprites — a
@@ -1539,6 +1649,7 @@ export function GalaxyView({
       const factionSegs: LaneSeg[] = [];
       const factionSegColors: THREE.Color[] = [];
       const frontierSegs: LaneSeg[] = [];
+      const routeSegs: LaneSeg[] = [];
       // The quiet base lane, dimmed by whichever end is more faded.
       const pushBase = (seg: LaneSeg, a: string, b: string) => {
         baseSegs.push(seg);
@@ -1562,6 +1673,16 @@ export function GalaxyView({
         const ownerB = current[b] ?? NEUTRAL;
         const aPlayer = ownerA === playerFactionId;
         const bPlayer = ownerB === playerFactionId;
+        if (laneFlow) {
+          // Run: only forward lanes out of the current node (you -> a choice)
+          // are directional routes. `trimmedSeg(a, b)` runs source -> target, so
+          // the pulse flows outward. The lane you already crossed and every
+          // other lane stay quiet base, dimmed by emphasis — and crucially no
+          // faction-coloured lanes, since a node's *type* is not an allegiance.
+          if (aPlayer && !bPlayer) routeSegs.push(seg);
+          else pushBase(seg, a, b);
+          continue;
+        }
         if (aPlayer !== bPlayer) {
           frontierSegs.push(seg);
         } else if (ownerA === ownerB && ownerA !== NEUTRAL) {
@@ -1575,8 +1696,14 @@ export function GalaxyView({
         }
       }
       setLanePair(lanes, baseSegs, baseSegColors);
-      setLanePair(factionLanes, factionSegs, factionSegColors);
-      setLanePair(frontier, dashSegments(frontierSegs, 1.5, 1.2));
+      if (laneFlow) {
+        setLanePair(factionLanes, []); // runs have no shared-owner lanes
+        setLanePair(frontier, routeSegs); // solid, not dashed
+        layoutChevrons(routeSegs);
+      } else {
+        setLanePair(factionLanes, factionSegs, factionSegColors);
+        setLanePair(frontier, dashSegments(frontierSegs, 1.5, 1.2));
+      }
     };
     applyOwnersRef.current = applyOwners;
 
@@ -1907,6 +2034,16 @@ export function GalaxyView({
 
         if (effects) {
           uTime.value = now / 1000;
+          // Directional route chevrons: a brightness wave that peaks at
+          // successively further markers over time, so it reads as light
+          // flowing outward toward the choices.
+          if (flowEnabled) {
+            for (const chev of chevrons) {
+              if (!chev.mesh.visible) continue;
+              chev.mat.opacity =
+                0.22 + 0.78 * (0.5 + 0.5 * Math.sin(now / 240 - chev.t * 7));
+            }
+          }
           // Binary companions orbit their primary in the map plane.
           for (const c of companions) {
             const a = c.phase + now / 2600;
@@ -1993,6 +2130,7 @@ export function GalaxyView({
     effects,
     performanceMode,
     spaceMaps,
+    laneFlow,
   ]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is
