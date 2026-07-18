@@ -44,7 +44,7 @@ export function RunMapView({
   // biome-ignore lint/correctness/useExhaustiveDependencies: deliberately keyed on the run's structure, not the whole run, so advancing doesn't rebuild the scene
   const doc = useMemo(
     () => runToGalaxyDoc(run),
-    [run.nodes, run.edges, run.settings.skin],
+    [run.nodes, run.edges, run.settings.skin, run.settings.seed],
   );
   // biome-ignore lint/correctness/useExhaustiveDependencies: owners depend only on progress moving, applied live by GalaxyView
   const owners = useMemo(

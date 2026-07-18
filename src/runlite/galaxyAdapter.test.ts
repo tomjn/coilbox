@@ -89,8 +89,9 @@ describe("runEmphasis", () => {
     // boss is the only choice now -> bright.
     expect(e.has("boss")).toBe(false);
     expect(e.has("b1")).toBe(false); // current
-    // start is behind you -> muted.
+    // start is behind you -> muted and marked done.
     expect(e.get("start")?.opacity).toBe(RUN_DIM.done);
+    expect(e.get("start")?.marker).toBe("check");
     // b2 (the fork you passed on) is unreachable now -> greatly dimmed.
     expect(e.get("b2")?.opacity).toBe(RUN_DIM.unreachable);
   });

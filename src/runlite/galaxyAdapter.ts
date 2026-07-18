@@ -41,6 +41,33 @@ const TYPE_LABEL: Record<RunNodeType, string> = {
 
 const RUN_TYPES = Object.keys(TYPE_COLOR) as RunNodeType[];
 
+/**
+ * Curated per-run backdrop palettes. A run picks one by its seed so every run
+ * reads as its own place - a bold nebula swathe plus matching starfield tints,
+ * far more distinct than conquest's restrained default. `nebula` drives
+ * GalaxyView's nebula-swathe layer (only rendered when present); `stars` tints
+ * the decorative starfield.
+ */
+const RUN_PALETTES: { nebula: string[]; stars: string[] }[] = [
+  { nebula: ["#ff5a3c", "#ff9d4d", "#7a1f12"], stars: ["#ffd9a0", "#ffb877"] },
+  { nebula: ["#2ad2ff", "#4f7bff", "#0e3a5c"], stars: ["#cfeaff", "#a0c8ff"] },
+  { nebula: ["#b06bff", "#ff5ea8", "#3a1a5c"], stars: ["#e6ccff", "#ffc0e0"] },
+  { nebula: ["#3ce08a", "#2ad2ff", "#123a2a"], stars: ["#c8ffe0", "#a0ffd0"] },
+  { nebula: ["#ffcf5c", "#ff8c3a", "#5c3a12"], stars: ["#fff0c0", "#ffd9a0"] },
+  { nebula: ["#ff6b8a", "#ff4f4f", "#5c1224"], stars: ["#ffd0da", "#ffb0c0"] },
+];
+
+/** The backdrop palette for a run, chosen deterministically from its seed. */
+export function runPalette(seed: number): {
+  nebula: string[];
+  stars: string[];
+} {
+  const i =
+    ((Math.trunc(seed) % RUN_PALETTES.length) + RUN_PALETTES.length) %
+    RUN_PALETTES.length;
+  return RUN_PALETTES[i];
+}
+
 /** The faction id the run is "played as" (the current node), so the galaxy
  * view frames it and highlights its outgoing lanes. */
 export const PLAYER_FACTION = "you";
@@ -87,9 +114,13 @@ export function runToGalaxyDoc(run: RogueliteRun): GalaxyDoc {
 
   const links = run.edges.map(([a, b]) => [a, b] as [string, string]);
 
+  const palette = runPalette(run.settings.seed);
+
   return {
     schemaVersion: 1,
-    id: "run",
+    // Seed the id: GalaxyView hashes it for the backdrop (core direction, dust,
+    // nebula placement), so this is what makes each run's sky its own.
+    id: `run-${run.settings.seed}`,
     type: "conquest-galaxy",
     title: "Run",
     description: "",
@@ -98,7 +129,11 @@ export function runToGalaxyDoc(run: RogueliteRun): GalaxyDoc {
     factions,
     nodes,
     links,
-    theme: { skin: run.settings.skin },
+    theme: {
+      skin: run.settings.skin,
+      starPalette: palette.stars,
+      nebulaColors: palette.nebula,
+    },
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
   };
@@ -169,12 +204,14 @@ export function runEmphasis(run: RogueliteRun): Map<string, NodeEmphasis> {
   const emphasis = new Map<string, NodeEmphasis>();
   for (const n of run.nodes) {
     if (n.id === current || nextIds.has(n.id)) continue; // full brightness
-    const opacity = visited.has(n.id)
-      ? RUN_DIM.done
-      : reachable.has(n.id)
-        ? RUN_DIM.future
-        : RUN_DIM.unreachable;
-    emphasis.set(n.id, { opacity });
+    if (visited.has(n.id)) {
+      // Crossed: muted and marked done with a check.
+      emphasis.set(n.id, { opacity: RUN_DIM.done, marker: "check" });
+    } else {
+      emphasis.set(n.id, {
+        opacity: reachable.has(n.id) ? RUN_DIM.future : RUN_DIM.unreachable,
+      });
+    }
   }
   return emphasis;
 }
