@@ -200,6 +200,8 @@ describe("applyReward", () => {
     const next = applyReward(r, "rw", 0, "now");
     expect(next.progress.unlockedUnits).toEqual(["com", "vplant", "tank"]);
     expect(next.progress.visited).toContain("rw");
+    // The chosen option is recorded so a resolved node can show what was taken.
+    expect(next.history.at(-1)?.note).toBe("Unlocked V");
   });
 
   it("perk option banks a perk", () => {
@@ -237,6 +239,7 @@ describe("applyEvent", () => {
     expect(next.progress.salvage).toBe(150);
     expect(next.progress.hull).toBe(40);
     expect(next.progress.visited).toContain("ev");
+    expect(next.history.at(-1)?.note).toBe("Strip");
   });
 
   it("clamps hull and can end the run", () => {

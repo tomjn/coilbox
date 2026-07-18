@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { ArrowLeft, Trophy, X } from "lucide-react";
+import { ArrowLeft, Check, Trophy, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { resolveGameByShortname } from "../../conquest/model";
@@ -152,6 +152,10 @@ export default function RunPage() {
             <InspectPanel
               node={run.nodes.find((n) => n.id === selectedId)}
               isChoice={choiceIds.has(selectedId)}
+              chosen={run.history
+                .filter((h) => h.nodeId === selectedId && h.note)
+                .at(-1)
+                ?.note?.trim()}
               onEnter={() => onSelect(selectedId)}
               onClose={() => setSelectedId(null)}
             />
@@ -212,7 +216,7 @@ const NODE_TITLE: Record<RunNodeType, string> = {
 /** Per-type accent colour, matching the node tokens on the map. */
 const NODE_TINT: Record<RunNodeType, string> = {
   start: "#4fe6d6",
-  battle: "#c3d0e6",
+  battle: "#e0473a",
   elite: "#ffb64d",
   event: "#b98cff",
   reward: "#ffcf5c",
@@ -268,11 +272,14 @@ function previewRows(node: RunNode): [string, string][] {
 function InspectPanel({
   node,
   isChoice,
+  chosen,
   onEnter,
   onClose,
 }: {
   node: RunNode | undefined;
   isChoice: boolean;
+  /** For a resolved node, what the player took here (from run history). */
+  chosen?: string;
   onEnter: () => void;
   onClose: () => void;
 }) {
@@ -320,6 +327,15 @@ function InspectPanel({
               </div>
             ))}
           </dl>
+        )}
+        {chosen && (
+          <div
+            className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs"
+            style={{ backgroundColor: tint, color: "#0b0e14" }}
+          >
+            <Check className="size-3.5 shrink-0" aria-hidden />
+            <span className="font-semibold">{chosen}</span>
+          </div>
         )}
         {isChoice && (
           <Button size="sm" onClick={onEnter} className="w-full">

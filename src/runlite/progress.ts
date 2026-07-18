@@ -157,9 +157,21 @@ export function applyReward(
   return {
     ...run,
     progress: p,
-    history: pushHistory(run, { nodeId, type: node.type }),
+    history: pushHistory(run, {
+      nodeId,
+      type: node.type,
+      note: option ? rewardOptionLabel(option) : undefined,
+    }),
     updatedAt: now ?? touch(),
   };
+}
+
+/** A short human label for a taken reward/shop option (recorded in history so a
+ * resolved node can show what you chose). */
+export function rewardOptionLabel(option: RewardOption): string {
+  return option.kind === "unlock"
+    ? `Unlocked ${option.unitName}`
+    : `Perk: ${option.perk.label}`;
 }
 
 /** Take one choice at an event node, applying its effects, then resolve it. */
@@ -189,7 +201,7 @@ export function applyEvent(
   return {
     ...run,
     progress: p,
-    history: pushHistory(run, { nodeId, type: node.type }),
+    history: pushHistory(run, { nodeId, type: node.type, note: choice?.label }),
     updatedAt: now ?? touch(),
   };
 }
