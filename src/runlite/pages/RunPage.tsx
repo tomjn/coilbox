@@ -205,6 +205,30 @@ const NODE_TITLE: Record<RunNodeType, string> = {
   shop: "Depot",
 };
 
+/** Per-type accent colour, matching the node tokens on the map. */
+const NODE_TINT: Record<RunNodeType, string> = {
+  start: "#4fe6d6",
+  battle: "#c3d0e6",
+  elite: "#ffb64d",
+  event: "#b98cff",
+  reward: "#ffcf5c",
+  shop: "#7fe08a",
+  boss: "#ff5468",
+};
+
+const NODE_DESC: Record<RunNodeType, string> = {
+  start:
+    "Your commander deploys here. Chart a course onward toward the warlord.",
+  battle:
+    "A hostile garrison. Win to bank salvage; lose and you retreat, scarred.",
+  elite: "A veteran garrison — tougher, but the salvage is richer.",
+  boss: "The sector warlord. Break it to win the run.",
+  reward:
+    "Recover a schematic to widen the arsenal, or a field upgrade for yourself.",
+  event: "A choice on the wire — no battle.",
+  shop: "Spend salvage on unlocks, perks, and repairs.",
+};
+
 /** A short stat preview for a node, so you can read what it holds before
  * committing your course. */
 function previewRows(node: RunNode): [string, string][] {
@@ -250,16 +274,28 @@ function InspectPanel({
 }) {
   if (!node) return null;
   const rows = previewRows(node);
+  const tint = NODE_TINT[node.type];
   return (
-    <div className="absolute right-3 top-3 z-10 flex w-72 flex-col gap-3 rounded-lg border border-border/50 bg-card/85 p-4 backdrop-blur-sm">
+    // Sits below the HUD gauges (top-24) so it never covers the Arsenal card,
+    // with a left edge + title tinted to the node's type colour.
+    <div
+      className="absolute right-3 top-24 z-10 flex w-72 flex-col gap-3 rounded-lg border border-l-2 border-border/50 bg-card/85 p-4 backdrop-blur-sm"
+      style={{ borderLeftColor: tint }}
+    >
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div
+            className="text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: tint }}
+          >
             {NODE_TITLE[node.type]}
           </div>
           {node.battle && (
             <div className="mt-1 truncate text-sm">{node.battle.mapName}</div>
           )}
+          <p className="mt-1 text-xs text-muted-foreground">
+            {NODE_DESC[node.type]}
+          </p>
         </div>
         <button
           type="button"
