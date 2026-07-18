@@ -1470,8 +1470,8 @@ export function GalaxyView({
       });
       disposables.push(coreMat);
 
-      // The station is a detailed ring of habitat modules connected by docking
-      // tubes (Interstellar's Endurance) around a stepped central spine. Each
+      // The station is a detailed ring of habitat modules aligned radially (each
+      // faces the central hub), linked to a stepped central spine by struts. Each
       // module is a multi-part assembly; to keep a busy station cheap, every part
       // is baked (cloned, transformed into station space) into three merged
       // meshes — one per material — so the whole thing is only a few draw calls.
@@ -1513,15 +1513,17 @@ export function GalaxyView({
         arr.push(g);
       };
 
-      // Reusable base part geometries (cloned per placement, disposed at the end).
-      const bodyGeo = new RoundedBoxGeometry(0.19, 0.16, 0.26, 3, 0.04);
-      const deckGeo = new RoundedBoxGeometry(0.12, 0.08, 0.2, 2, 0.03);
-      const capGeo = new THREE.CylinderGeometry(0.055, 0.055, 0.07, 12);
-      capGeo.rotateX(Math.PI / 2); // axis along Z (tangential)
-      const tankGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.11, 8);
-      const antGeo = new THREE.BoxGeometry(0.012, 0.14, 0.012);
-      const spanelGeo = new RoundedBoxGeometry(0.18, 0.014, 0.13, 1, 0.012);
+      // Reusable base part geometries. Modules are RADIAL (long X axis points at
+      // the hub), so the hull is long in X and the caps' axis is along X.
+      const bodyGeo = new RoundedBoxGeometry(0.28, 0.15, 0.17, 3, 0.035);
+      const deckGeo = new RoundedBoxGeometry(0.18, 0.07, 0.11, 2, 0.025);
+      const capGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.06, 12);
+      capGeo.rotateZ(Math.PI / 2); // axis along X (radial)
+      const tankGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.1, 8);
+      const antGeo = new THREE.BoxGeometry(0.012, 0.13, 0.012);
+      const spanelGeo = new RoundedBoxGeometry(0.12, 0.014, 0.16, 1, 0.012);
       const strutGeo = new THREE.BoxGeometry(0.06, 0.025, 0.025);
+      const connGeo = new THREE.BoxGeometry(0.22, 0.035, 0.045); // hub<->module
 
       const modMat = new THREE.Matrix4();
       const modQ = new THREE.Quaternion();
@@ -1531,55 +1533,44 @@ export function GalaxyView({
       for (let s = 0; s < MODULES; s++) {
         const a = (s / MODULES) * Math.PI * 2;
         const j = (hashString(`${node.id}-mod${s}`) % 100) / 100;
-        modE.set(0, a, 0);
+        // rotation.y = -a aligns the module's long +X axis with the radius, so
+        // every module faces the centre (using +a would mirror half the ring).
+        modE.set(0, -a, 0);
         modQ.setFromEuler(modE);
         modMat.compose(
           modP.set(Math.cos(a) * RING_R, 0, Math.sin(a) * RING_R),
           modQ,
-          modS.set(1, 0.9 + 0.22 * j, 1),
+          modS.set(1, 0.9 + 0.2 * j, 1),
         );
-        // Main hull + a raised deck.
+        // Hull + raised deck (long axis radial).
         part(metalParts, bodyGeo, modMat, 0, 0, 0);
-        part(metalParts, deckGeo, modMat, 0, 0.09, 0.01);
-        // Docking caps at both tangential ends.
-        part(coreParts, capGeo, modMat, 0, 0, 0.15);
-        part(coreParts, capGeo, modMat, 0, 0, -0.15);
-        // Tanks + an antenna mast on top.
-        part(coreParts, tankGeo, modMat, 0.055, 0.085, -0.05);
-        part(coreParts, tankGeo, modMat, -0.05, 0.08, 0.055, 0, 0.8, 0.8, 0.8);
-        part(coreParts, antGeo, modMat, 0.02, 0.16, 0.07);
-        // Solar array on every third module (radially outward on a short strut).
+        part(metalParts, deckGeo, modMat, 0.01, 0.085, 0);
+        // Docking caps at the inner and outer radial ends.
+        part(coreParts, capGeo, modMat, 0.16, 0, 0);
+        part(coreParts, capGeo, modMat, -0.16, 0, 0);
+        // Tanks on the tangential sides + an antenna mast.
+        part(coreParts, tankGeo, modMat, 0.02, 0.075, 0.06);
+        part(coreParts, tankGeo, modMat, -0.02, 0.07, -0.06, 0, 0.8, 0.8, 0.8);
+        part(coreParts, antGeo, modMat, -0.05, 0.14, 0.03);
+        // Strut linking the module's inner end back to the hub.
+        part(coreParts, connGeo, modMat, -0.26, 0, 0);
+        // Solar array on every third module, radially outward.
         if (s % 3 === 1) {
-          part(coreParts, strutGeo, modMat, 0.15, 0, 0);
-          part(panelParts, spanelGeo, modMat, 0.27, 0, 0);
+          part(coreParts, strutGeo, modMat, 0.19, 0, 0);
+          part(panelParts, spanelGeo, modMat, 0.3, 0, 0);
         }
-        // A stretched docking tube bridging to the next module.
-        const am = ((s + 0.5) / MODULES) * Math.PI * 2;
-        modE.set(0, am, 0);
-        modQ.setFromEuler(modE);
-        modMat.compose(
-          modP.set(Math.cos(am) * RING_R, 0, Math.sin(am) * RING_R),
-          modQ,
-          modS.set(1, 1, 1),
-        );
-        part(coreParts, capGeo, modMat, 0, 0, 0, 0, 0.9, 0.9, 1.7);
       }
 
-      // Central hub: a stepped docking spine on a drum, with four arms to the ring.
+      // Central hub: a stepped docking spine on a drum (the module struts join it).
       const hubMat = new THREE.Matrix4();
       const drumGeo = new THREE.CylinderGeometry(0.14, 0.16, 0.13, 16);
       const spine1 = new THREE.CylinderGeometry(0.07, 0.09, 0.1, 12);
       const spine2 = new THREE.CylinderGeometry(0.045, 0.06, 0.09, 12);
       const spine3 = new THREE.CylinderGeometry(0.028, 0.04, 0.07, 10);
-      const hubArm = new THREE.BoxGeometry(0.34, 0.045, 0.05);
-      hubArm.translate(0.34, 0, 0);
       part(coreParts, drumGeo, hubMat, 0, 0, 0);
       part(coreParts, spine1, hubMat, 0, 0.1, 0);
       part(coreParts, spine2, hubMat, 0, 0.19, 0);
       part(coreParts, spine3, hubMat, 0, 0.27, 0);
-      for (let s = 0; s < 4; s++) {
-        part(metalParts, hubArm, hubMat, 0, 0, 0, (s / 4) * Math.PI * 2 + 0.4);
-      }
 
       // Merge each material's parts into one mesh (a busy station = 3 draw calls).
       const addMerged = (
@@ -1605,11 +1596,11 @@ export function GalaxyView({
         antGeo,
         spanelGeo,
         strutGeo,
+        connGeo,
         drumGeo,
         spine1,
         spine2,
         spine3,
-        hubArm,
       ]) {
         g.dispose();
       }
