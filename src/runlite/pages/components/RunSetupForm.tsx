@@ -279,7 +279,7 @@ export function RunSetupForm({ onStarted }: { onStarted: () => void }) {
           </>
         ) : (
           <>
-            <Swords className="mr-1.5 size-4" aria-hidden /> Begin run
+            <Swords className="mr-1.5 size-4" aria-hidden /> Begin warpath
           </>
         )}
       </Button>

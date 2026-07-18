@@ -122,7 +122,7 @@ export function runToGalaxyDoc(run: RogueliteRun): GalaxyDoc {
     // nebula placement), so this is what makes each run's sky its own.
     id: `run-${run.settings.seed}`,
     type: "conquest-galaxy",
-    title: "Run",
+    title: "Warpath",
     description: "",
     game: run.settings.game,
     playerFactionId: PLAYER_FACTION,
@@ -159,10 +159,12 @@ export const RUN_DIM = {
   /** A node you've already crossed — kept fairly bright: it's your history, and
    * its check-mark should read clearly, not fade like the road not taken. */
   done: 0.7,
-  /** Reachable ahead but not an immediate choice — the road onward. */
-  future: 0.5,
-  /** A branch you passed on / can no longer reach. */
-  unreachable: 0.22,
+  /** Reachable ahead but not an immediate choice — the road onward. Kept clearly
+   * present so the branches still open to you read as live possibilities. */
+  future: 0.62,
+  /** A branch you passed on / can no longer reach — pushed well back so a dead
+   * fork never competes with a path you can still take. */
+  unreachable: 0.12,
 } as const;
 
 /** A link key matching GalaxyView's directed `[from, to]` lane order. */

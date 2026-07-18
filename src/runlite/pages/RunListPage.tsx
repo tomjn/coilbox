@@ -23,13 +23,13 @@ export default function RunListPage() {
 
   const openSetup = () =>
     drawer.open({
-      title: "New run",
+      title: "New warpath",
       width: "30rem",
       content: (
         <RunSetupForm
           onStarted={() => {
             drawer.close();
-            navigate("/runlite/active");
+            navigate("/warpath/active");
           }}
         />
       ),
@@ -40,17 +40,17 @@ export default function RunListPage() {
       <header className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 text-lg font-semibold">
-            <Swords className="size-5 text-primary" aria-hidden /> Roguelite Run
+            <Swords className="size-5 text-primary" aria-hidden /> Warpath
           </h1>
           <p className="max-w-xl text-sm text-muted-foreground">
             Cross a forward-only map once — fight, take rewards, grow your
             build, and reach the warlord before your health runs out. Win or
-            die, then run again.
+            die, then set out again.
           </p>
         </div>
         {hasGames && (
           <Button onClick={openSetup} className="shrink-0">
-            <Swords className="mr-1.5 size-4" aria-hidden /> New run
+            <Swords className="mr-1.5 size-4" aria-hidden /> New warpath
           </Button>
         )}
       </header>
@@ -71,11 +71,11 @@ export default function RunListPage() {
           game={activeRun.settings.game.shortname}
           health={`${activeRun.progress.hull}/${activeRun.progress.maxHull}`}
           status={activeRun.progress.status}
-          onResume={() => navigate("/runlite/active")}
+          onResume={() => navigate("/warpath/active")}
           onAbandon={() => save(null)}
         />
       ) : (
-        <EmptyState label="No run in progress. Start a new run to begin." />
+        <EmptyState label="No warpath in progress. Start a new warpath to begin." />
       )}
     </div>
   );
@@ -96,10 +96,10 @@ function ActiveRunCard({
 }) {
   const label =
     status === "won"
-      ? "Run complete"
+      ? "Warpath complete"
       : status === "lost"
-        ? "Run ended"
-        : "Run in progress";
+        ? "Warpath ended"
+        : "Warpath in progress";
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
       <div>

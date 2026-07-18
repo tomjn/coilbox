@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Gift, Sparkles, Store } from "lucide-react";
+import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
 import type { RewardOption, RogueliteRun, RunNode } from "../../model";
 import {
   applyEvent,
@@ -34,6 +35,12 @@ function Overlay({
         className="absolute inset-0 cursor-default"
       />
       <div className="relative flex w-[42rem] max-w-full flex-col gap-4 rounded-lg border border-border/50 bg-card/90 p-6">
+        {/* Its own box in the gutter to the card's left, matching the map's
+            top-left exit control. */}
+        <BackToMapButton
+          onClick={onClose}
+          className="absolute right-full top-0 mr-4"
+        />
         <header className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 text-lg font-semibold">
             {icon}
@@ -125,7 +132,7 @@ export function RewardOverlay({
         onClick={skip}
         className="self-center text-xs text-muted-foreground underline-offset-2 hover:underline"
       >
-        Leave it — bank the run
+        Leave it — press on
       </button>
     </Overlay>
   );
@@ -196,11 +203,19 @@ export function ShopOverlay({
     !!shop?.restHull &&
     run.progress.hull < run.progress.maxHull &&
     salvage >= (shop.restCost ?? 0);
+  const offers = shop?.offers ?? [];
+  const cheapest = offers.length
+    ? Math.min(...offers.map((o) => o.cost))
+    : Number.POSITIVE_INFINITY;
+  // Whether any purchasable item (not the repair) is within budget, so the
+  // depot can say so plainly instead of leaving you to discover it button by
+  // button.
+  const canAffordAny = salvage >= cheapest;
   return (
     <Overlay
       icon={<Store className="size-5 text-emerald-400" aria-hidden />}
       title="Salvage depot"
-      lede={`Salvage: ${salvage}`}
+      lede={`Salvage: ${salvage} · cheapest ${cheapest} salvage`}
       onClose={onClose}
     >
       <div className="flex flex-col gap-2">
@@ -252,6 +267,15 @@ export function ShopOverlay({
           </div>
         )}
       </div>
+      {!canAffordAny && (
+        <p className="text-center text-xs text-muted-foreground">
+          Nothing here is within budget yet
+          {canRest
+            ? " — patch up and press on"
+            : " — press on and win more salvage"}
+          .
+        </p>
+      )}
       <Button className="self-center" variant="ghost" onClick={leave}>
         Leave the depot
       </Button>
