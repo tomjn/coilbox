@@ -1471,7 +1471,8 @@ export function GalaxyView({
       disposables.push(coreMat);
 
       // The station is a detailed ring of habitat modules aligned radially (each
-      // faces the central hub), linked to a stepped central spine by struts. Each
+      // faces the central hub); neighbouring modules are joined by docking tubes
+      // into a ring, with just four spokes to a stepped central spine. Each
       // module is a multi-part assembly; to keep a busy station cheap, every part
       // is baked (cloned, transformed into station space) into three merged
       // meshes — one per material — so the whole thing is only a few draw calls.
@@ -1523,7 +1524,12 @@ export function GalaxyView({
       const antGeo = new THREE.BoxGeometry(0.012, 0.13, 0.012);
       const spanelGeo = new RoundedBoxGeometry(0.12, 0.014, 0.16, 1, 0.012);
       const strutGeo = new THREE.BoxGeometry(0.06, 0.025, 0.025);
-      const connGeo = new THREE.BoxGeometry(0.22, 0.035, 0.045); // hub<->module
+      // Docking tube linking neighbouring modules (axis Z -> tangential once the
+      // placement rotates it), and a stouter spoke from the hub to the ring.
+      const tubeGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8);
+      tubeGeo.rotateX(Math.PI / 2);
+      const spokeGeo = new THREE.BoxGeometry(0.28, 0.05, 0.06);
+      spokeGeo.translate(0.28, 0, 0); // pivot at hub, reach out to the ring
 
       const modMat = new THREE.Matrix4();
       const modQ = new THREE.Quaternion();
@@ -1552,16 +1558,26 @@ export function GalaxyView({
         part(coreParts, tankGeo, modMat, 0.02, 0.075, 0.06);
         part(coreParts, tankGeo, modMat, -0.02, 0.07, -0.06, 0, 0.8, 0.8, 0.8);
         part(coreParts, antGeo, modMat, -0.05, 0.14, 0.03);
-        // Strut linking the module's inner end back to the hub.
-        part(coreParts, connGeo, modMat, -0.26, 0, 0);
         // Solar array on every third module, radially outward.
         if (s % 3 === 1) {
           part(coreParts, strutGeo, modMat, 0.19, 0, 0);
           part(panelParts, spanelGeo, modMat, 0.3, 0, 0);
         }
+        // Docking tube joining this module to its neighbour (at the mid-angle),
+        // so the modules form a connected ring rather than 12 hub spokes.
+        const am = ((s + 0.5) / MODULES) * Math.PI * 2;
+        modE.set(0, am, 0);
+        modQ.setFromEuler(modE);
+        modMat.compose(
+          modP.set(Math.cos(am) * RING_R, 0, Math.sin(am) * RING_R),
+          modQ,
+          modS.set(1, 1, 1),
+        );
+        part(coreParts, tubeGeo, modMat, 0, 0, 0);
       }
 
-      // Central hub: a stepped docking spine on a drum (the module struts join it).
+      // Central hub: a stepped docking spine on a drum, reached by just four
+      // spokes (not one per module).
       const hubMat = new THREE.Matrix4();
       const drumGeo = new THREE.CylinderGeometry(0.14, 0.16, 0.13, 16);
       const spine1 = new THREE.CylinderGeometry(0.07, 0.09, 0.1, 12);
@@ -1571,6 +1587,11 @@ export function GalaxyView({
       part(coreParts, spine1, hubMat, 0, 0.1, 0);
       part(coreParts, spine2, hubMat, 0, 0.19, 0);
       part(coreParts, spine3, hubMat, 0, 0.27, 0);
+      for (let s = 0; s < 4; s++) {
+        // Align each spoke with a module (every third), pointing radially out.
+        const a = ((s * 3) / MODULES) * Math.PI * 2;
+        part(metalParts, spokeGeo, hubMat, 0, 0, 0, -a);
+      }
 
       // Merge each material's parts into one mesh (a busy station = 3 draw calls).
       const addMerged = (
@@ -1596,7 +1617,8 @@ export function GalaxyView({
         antGeo,
         spanelGeo,
         strutGeo,
-        connGeo,
+        tubeGeo,
+        spokeGeo,
         drumGeo,
         spine1,
         spine2,
