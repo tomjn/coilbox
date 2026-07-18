@@ -1,7 +1,8 @@
 import { Button } from "@picoframe/frame";
-import { Dices, Loader2, Play, Swords, Trash2 } from "lucide-react";
+import { Dices, Gamepad2, Loader2, Play, Swords, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { cn } from "@/lib/utils";
 import {
   useUnitsyncGameInfo,
   useUnitsyncScan,
@@ -142,7 +143,23 @@ export default function RunListPage() {
     navigate("/runlite/active");
   };
 
-  if (target && scan.data && games.length === 0) {
+  // The initial scan can take a moment; don't leave the form blank and inert.
+  if (!scan.data) {
+    return (
+      <div className="p-6">
+        {target ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Scanning installed games…
+          </div>
+        ) : (
+          <EmptyState label="Install an engine first (Content → Engines)." />
+        )}
+      </div>
+    );
+  }
+
+  if (games.length === 0) {
     return (
       <div className="p-6">
         <EmptyState label="No games installed. Add one from Content → Games." />
@@ -158,7 +175,7 @@ export default function RunListPage() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Cross a forward-only map once — fight, take rewards, grow your build,
-          and reach the warlord before your hull runs out.
+          and reach the warlord before your health runs out.
         </p>
       </header>
 
@@ -167,7 +184,7 @@ export default function RunListPage() {
           <div>
             <div className="font-medium">Run in progress</div>
             <div className="text-xs text-muted-foreground">
-              {activeRun.settings.game.shortname} · hull{" "}
+              {activeRun.settings.game.shortname} · health{" "}
               {activeRun.progress.hull}/{activeRun.progress.maxHull}
             </div>
           </div>
@@ -184,12 +201,27 @@ export default function RunListPage() {
 
       <div className="flex flex-col gap-4 rounded-lg border border-border/50 bg-card/50 p-5">
         <Field label="Game">
-          <OptionSelect
-            value={shortname}
-            onValueChange={setShortname}
-            options={gameOptions}
-            placeholder="Select a game"
-          />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {gameOptions.map((g) => (
+              <button
+                key={g.value}
+                type="button"
+                onClick={() => setShortname(g.value)}
+                className={cn(
+                  "flex items-center gap-2 rounded-md border p-3 text-left transition-colors",
+                  g.value === shortname
+                    ? "border-primary bg-primary/10"
+                    : "border-border/60 bg-muted/20 hover:border-primary/60",
+                )}
+              >
+                <Gamepad2
+                  className="size-4 shrink-0 text-muted-foreground"
+                  aria-hidden
+                />
+                <span className="truncate text-sm font-medium">{g.label}</span>
+              </button>
+            ))}
+          </div>
         </Field>
 
         {(sides.length > 0 || gameLoading) && (
