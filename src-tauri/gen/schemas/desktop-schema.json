@@ -2073,6 +2073,60 @@
           "markdownDescription": "Denies the profile_pages command without any pre-configured scope."
         },
         {
+          "description": "Allows the roguelite-run plugin's active-run and meta-progression storage commands.\n#### This default permission set includes:\n\n- `allow-runlite-state-load`\n- `allow-runlite-state-save`\n- `allow-runlite-meta-load`\n- `allow-runlite-meta-save`",
+          "type": "string",
+          "const": "coilbox-runlite:default",
+          "markdownDescription": "Allows the roguelite-run plugin's active-run and meta-progression storage commands.\n#### This default permission set includes:\n\n- `allow-runlite-state-load`\n- `allow-runlite-state-save`\n- `allow-runlite-meta-load`\n- `allow-runlite-meta-save`"
+        },
+        {
+          "description": "Enables the runlite_meta_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-runlite:allow-runlite-meta-load",
+          "markdownDescription": "Enables the runlite_meta_load command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the runlite_meta_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-runlite:allow-runlite-meta-save",
+          "markdownDescription": "Enables the runlite_meta_save command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the runlite_state_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-runlite:allow-runlite-state-load",
+          "markdownDescription": "Enables the runlite_state_load command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the runlite_state_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-runlite:allow-runlite-state-save",
+          "markdownDescription": "Enables the runlite_state_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the runlite_meta_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-runlite:deny-runlite-meta-load",
+          "markdownDescription": "Denies the runlite_meta_load command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the runlite_meta_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-runlite:deny-runlite-meta-save",
+          "markdownDescription": "Denies the runlite_meta_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the runlite_state_load command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-runlite:deny-runlite-state-load",
+          "markdownDescription": "Denies the runlite_state_load command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the runlite_state_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-runlite:deny-runlite-state-save",
+          "markdownDescription": "Denies the runlite_state_save command without any pre-configured scope."
+        },
+        {
           "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL, results dir, import/export).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`\n- `allow-us-results-dir`\n- `allow-us-export-report`\n- `allow-us-import-report`",
           "type": "string",
           "const": "coilbox-uberstress:default",
