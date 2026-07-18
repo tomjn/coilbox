@@ -24,11 +24,14 @@ export function EncounterOverlay({
   node,
   onResolved,
   onClose,
+  onCelebrate,
 }: {
   run: RogueliteRun;
   node: RunNode;
   onResolved: (next: RogueliteRun) => Promise<void>;
   onClose: () => void;
+  /** Called when leaving the map after a victory, to fire the win burst. */
+  onCelebrate?: () => void;
 }) {
   const enc = useRunEncounter(run, node, onResolved);
   const spec = node.battle;
@@ -147,7 +150,14 @@ export function EncounterOverlay({
                 Result detected from the replay.
               </p>
             )}
-            <Button onClick={onClose}>Return to the run map</Button>
+            <Button
+              onClick={() => {
+                if (enc.phase === "victory") onCelebrate?.();
+                onClose();
+              }}
+            >
+              Return to the run map
+            </Button>
           </div>
         )}
       </div>

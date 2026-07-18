@@ -33,6 +33,7 @@ export function RunMapView({
   selectedId,
   onSelect,
   focusId,
+  burstNodeId,
   className,
 }: {
   run: RogueliteRun;
@@ -40,6 +41,8 @@ export function RunMapView({
   onSelect?: (id: string | null) => void;
   /** Zoom/centre the camera on this node (the briefed one); null frames all. */
   focusId?: string | null;
+  /** Fire a one-shot win burst on this node (e.g. a battle just won). */
+  burstNodeId?: string | null;
   className?: string;
 }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: deliberately keyed on the run's structure, not the whole run, so advancing doesn't rebuild the scene
@@ -78,6 +81,7 @@ export function RunMapView({
       emphasis={emphasis}
       laneFlow
       pathLinks={pathLinks}
+      burstNodeId={burstNodeId}
       playerFactionId={PLAYER_FACTION}
       selectedId={selectedId}
       onSelect={onSelect}

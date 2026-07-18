@@ -45,6 +45,8 @@ export default function RunPage() {
   const { meta, save: saveMeta } = useRunMeta();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  // The node id to celebrate with a win burst (cleared after the burst plays).
+  const [burstId, setBurstId] = useState<string | null>(null);
   // Guard so a finished run awards meta-progression exactly once.
   const awardedRef = useRef<string | null>(null);
 
@@ -116,6 +118,11 @@ export default function RunPage() {
   const applyAndSave = async (next: typeof run) => {
     await save(next);
   };
+  // Fire a one-shot win burst on a node, then clear so it can replay next win.
+  const celebrate = (id: string) => {
+    setBurstId(id);
+    window.setTimeout(() => setBurstId(null), 1600);
+  };
 
   // Centre the camera on the node being briefed; else frame the whole run.
   const focusId = active ? active.id : null;
@@ -127,6 +134,7 @@ export default function RunPage() {
         selectedId={selectedId}
         onSelect={onSelect}
         focusId={focusId}
+        burstNodeId={burstId}
         className="absolute inset-0"
       />
 
@@ -170,6 +178,7 @@ export default function RunPage() {
             node={active}
             onResolved={applyAndSave}
             onClose={closeOverlay}
+            onCelebrate={() => celebrate(active.id)}
           />
         )}
         {active?.type === "reward" && (

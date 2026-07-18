@@ -94,6 +94,12 @@ interface GalaxyViewProps {
    * node. Only honoured with {@link laneFlow}. Default-off.
    */
   pathLinks?: Set<string>;
+  /**
+   * Fire a one-shot celebratory burst (shockwave + flare) on this node — e.g.
+   * the star of a battle just won. Set it to the node id to play; set back to
+   * null when done so the next win replays. No burst under reduce-motion.
+   */
+  burstNodeId?: string | null;
   /** Map spring-names known to be space maps; their nodes render as asteroids. */
   spaceMaps?: Set<string>;
   /**
@@ -354,6 +360,29 @@ function chevronTexture(size: number): THREE.Texture {
 }
 
 /**
+ * A soft glowing annulus — the expanding shockwave ring of a win burst.
+ */
+function ringBurstTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.clearRect(0, 0, size, size);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = size * 0.05;
+    ctx.shadowColor = "#ffe9b0";
+    ctx.shadowBlur = size * 0.1;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
  * A soft check-mark glyph on a transparent field, drawn white with a glow so it
  * reads as a completed marker over a node under normal blending. Tinted per use.
  */
@@ -479,6 +508,7 @@ export function GalaxyView({
   emphasis,
   laneFlow = false,
   pathLinks,
+  burstNodeId,
   spaceMaps,
   focusNodeId,
   display,
@@ -493,6 +523,8 @@ export function GalaxyView({
   const visibleRef = useRef<Set<string> | undefined>(visibleIds);
   const emphasisRef = useRef<Map<string, NodeEmphasis> | undefined>(emphasis);
   const pathLinksRef = useRef<Set<string> | undefined>(pathLinks);
+  const burstRef = useRef<string | null | undefined>(burstNodeId);
+  const applyBurstRef = useRef<(() => void) | null>(null);
   const focusRef = useRef<string | null | undefined>(focusNodeId);
   const onSelectRef = useRef(onSelect);
   const applyOwnersRef = useRef<(() => void) | null>(null);
@@ -1562,6 +1594,55 @@ export function GalaxyView({
       return sprite;
     };
 
+    // Win burst: a one-shot shockwave ring + flare on a node (the star just
+    // won). Two reused sprites, repositioned per burst; driven by the loop.
+    const burstFlareTex = radialTexture(128, [
+      [0, "#ffffffff"],
+      [0.3, "#fff3c8dd"],
+      [0.7, "#ffcf6633"],
+      [1, "#ffcf6600"],
+    ]);
+    const burstRingTex = ringBurstTexture(128);
+    disposables.push(burstFlareTex, burstRingTex);
+    const burstFlareMat = new THREE.SpriteMaterial({
+      map: burstFlareTex,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const burstRingMat = new THREE.SpriteMaterial({
+      map: burstRingTex,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+    });
+    disposables.push(burstFlareMat, burstRingMat);
+    const burstFlare = new THREE.Sprite(burstFlareMat);
+    const burstRing = new THREE.Sprite(burstRingMat);
+    for (const s of [burstFlare, burstRing]) {
+      s.visible = false;
+      s.raycast = () => {};
+      s.renderOrder = 6;
+      scene.add(s);
+    }
+    const BURST_MS = 1300;
+    let burstAnim: { t0: number } | null = null;
+    const applyBurst = () => {
+      const id = burstRef.current;
+      if (!id || reduceMotion) return; // no animated burst under reduce-motion
+      const p = positions.get(id);
+      if (!p) return;
+      const at: [number, number, number] = [p[0], p[1] + 0.3, p[2]];
+      burstFlare.position.set(...at);
+      burstRing.position.set(...at);
+      burstAnim = { t0: performance.now() };
+    };
+    applyBurstRef.current = applyBurst;
+
     // Fade the lanes up during the intro (their target opacities are captured
     // now, then restored as the intro clock advances).
     if (animateIntro) {
@@ -2262,6 +2343,24 @@ export function GalaxyView({
             }
           }
         }
+        // Win burst: shockwave ring expands and fades, flare spikes then dies.
+        if (burstAnim) {
+          const e = (now - burstAnim.t0) / BURST_MS;
+          if (e >= 1) {
+            burstAnim = null;
+            burstFlare.visible = false;
+            burstRing.visible = false;
+          } else {
+            burstFlare.visible = true;
+            burstRing.visible = true;
+            const flareIn = e < 0.12 ? e / 0.12 : 1;
+            burstFlareMat.opacity = flareIn * (1 - e) ** 1.5;
+            burstFlare.scale.setScalar(6 + 26 * easeOut(e));
+            burstRingMat.opacity = (1 - e) * 0.85;
+            burstRing.scale.setScalar(3 + 52 * easeOut(e));
+          }
+        }
+
         // Controls own the camera only in the free overview — not during the
         // intro, a focus ease, or while a node is focused (controls locked).
         if (!introActive && !focusAnim && !focusShown) {
@@ -2315,6 +2414,7 @@ export function GalaxyView({
       applySelectionRef.current = null;
       applyVisibilityRef.current = null;
       applyFocusRef.current = null;
+      applyBurstRef.current = null;
     };
   }, [
     galaxy,
@@ -2350,6 +2450,11 @@ export function GalaxyView({
     focusRef.current = focusNodeId;
     applyFocusRef.current?.();
   }, [focusNodeId]);
+
+  useEffect(() => {
+    burstRef.current = burstNodeId;
+    applyBurstRef.current?.();
+  }, [burstNodeId]);
 
   // The caller's className must make this element positioned (e.g. `absolute
   // inset-0` or `relative h-96`) — the canvas and label layers inside anchor
