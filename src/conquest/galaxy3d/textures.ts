@@ -116,6 +116,12 @@ export function radialTexture(
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  // No mipmaps: a mostly-transparent radial glow averages to a faint non-zero
+  // fill at minified mip levels, which reads as a square (the sprite quad's
+  // bounds) over any non-black background. Linear filtering of the base level
+  // keeps the glow soft without that ghost square.
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
   return tex;
 }
 
