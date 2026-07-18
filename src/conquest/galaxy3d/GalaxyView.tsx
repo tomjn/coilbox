@@ -146,6 +146,12 @@ interface GalaxyViewProps {
    */
   identities?: Map<string, NodeIdentity>;
   /**
+   * Warpath-only: redden and darken the nebula toward the warlord (the far
+   * column), so the sky grows more ominous with map depth. Applied at build time
+   * from each cloud's world-X. Default `false`; conquest keeps its even haze.
+   */
+  depthMood?: boolean;
+  /**
    * Zoom the camera in on a node (e.g. the system being fought over) and lock
    * user controls; `null`/undefined eases back to the framed overview. Driven
    * live, no scene rebuild.
@@ -585,6 +591,7 @@ export function GalaxyView({
   burstNodeId,
   spaceMaps,
   identities,
+  depthMood = false,
   focusNodeId,
   display,
   className,
@@ -985,6 +992,17 @@ export function GalaxyView({
         sprite.scale.set(scale, scale * 0.6, 1);
         sprite.raycast = () => {};
         scene.add(sprite);
+        // Depth mood (warpath): clouds toward the warlord (higher world-X, the
+        // far column) tint deep red — a cool cloud goes dark-muddy, so it both
+        // reddens and darkens as the run nears its end. Colour-only, so the
+        // lightning flicker (which restores opacity to base) doesn't undo it.
+        if (depthMood) {
+          const moodT = Math.min(
+            1,
+            Math.max(0, 0.5 + sprite.position.x / extent),
+          );
+          mat.color.lerp(new THREE.Color("#b81e10"), 0.65 * moodT);
+        }
         // Sheet-lightning flicker: phase/period from an independent hash (never
         // the nebula RNG, which must keep its sequence so placement is stable).
         nebulaFlashes.push({
@@ -3213,6 +3231,7 @@ export function GalaxyView({
     spaceMaps,
     laneFlow,
     identities,
+    depthMood,
   ]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is

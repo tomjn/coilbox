@@ -89,6 +89,7 @@ export function RunMapView({
       owners={owners}
       emphasis={emphasis}
       identities={identities}
+      depthMood
       laneFlow
       pathLinks={pathLinks}
       burstNodeId={burstNodeId}
