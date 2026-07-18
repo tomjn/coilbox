@@ -44,6 +44,16 @@ export interface GalaxyDisplay {
   performanceMode: boolean;
 }
 
+/**
+ * Per-node graded emphasis for the run map (see {@link GalaxyViewProps.emphasis}).
+ * A struct rather than a bare opacity so more emphasis dimensions (glow, tint,
+ * …) can be added later without churning the prop's type.
+ */
+export interface NodeEmphasis {
+  /** Opacity multiplier for the node and its lanes, 0..1. Absent means 1. */
+  opacity?: number;
+}
+
 interface GalaxyViewProps {
   galaxy: GalaxyDoc;
   /** nodeId -> faction id / neutral (from run state; doc owners for preview). */
@@ -59,6 +69,14 @@ interface GalaxyViewProps {
    * ghosts; lanes into the fog fade out.
    */
   visibleIds?: Set<string>;
+  /**
+   * Graded de-emphasis, distinct from fog: for each listed node id, the node
+   * (and lanes touching it) render at reduced opacity but stay fully present —
+   * ring, label and glow are kept, not hidden. `undefined`/absent means full
+   * brightness. An object per node (not a bare number) so future emphasis
+   * dimensions can be added without a new prop. Default-off; conquest omits it.
+   */
+  emphasis?: Map<string, NodeEmphasis>;
   /** Map spring-names known to be space maps; their nodes render as asteroids. */
   spaceMaps?: Set<string>;
   /**
@@ -72,6 +90,8 @@ interface GalaxyViewProps {
 }
 
 const NEUTRAL_COLOR = "#6b7280";
+/** The quiet blue-grey of an unowned lane (the base lane pair's colour). */
+const BASE_LANE_HEX = 0x93a7c8;
 
 /**
  * Stellar classes for the selectable stars. The star itself is coloured by
@@ -380,6 +400,7 @@ export function GalaxyView({
   incursion,
   onSelect,
   visibleIds,
+  emphasis,
   spaceMaps,
   focusNodeId,
   display,
@@ -392,6 +413,7 @@ export function GalaxyView({
   const selectedRef = useRef<string | null | undefined>(selectedId);
   const incursionRef = useRef(incursion);
   const visibleRef = useRef<Set<string> | undefined>(visibleIds);
+  const emphasisRef = useRef<Map<string, NodeEmphasis> | undefined>(emphasis);
   const focusRef = useRef<string | null | undefined>(focusNodeId);
   const onSelectRef = useRef(onSelect);
   const applyOwnersRef = useRef<(() => void) | null>(null);
@@ -454,6 +476,14 @@ export function GalaxyView({
     // Fog of war: `undefined` visible set means no fog (show everything).
     const isVisible = (id: string): boolean =>
       !visibleRef.current || visibleRef.current.has(id);
+
+    // Graded emphasis: a node's opacity multiplier (1 when not listed / no map).
+    const dimOf = (id: string): number =>
+      emphasisRef.current?.get(id)?.opacity ?? 1;
+    // A lane is only as bright as its dimmer end, so a lane into a faded node
+    // fades with it.
+    const laneDim = (a: string, b: string): number =>
+      Math.min(dimOf(a), dimOf(b));
 
     /* ------------------------- decorative backdrop ------------------------- */
 
@@ -817,8 +847,11 @@ export function GalaxyView({
       pair.core.geometry.dispose();
       pair.halo.geometry.dispose();
     };
+    // Vertex-coloured (not a flat material colour) so `emphasis` can dim
+    // individual segments; with no emphasis every segment is BASE_LANE_COLOR,
+    // byte-identical to the old flat look.
     const lanes = makeLanePair({
-      color: 0x93a7c8,
+      vertexColors: true,
       coreOpacity: 0.5,
       haloOpacity: 0.1,
     });
@@ -913,6 +946,9 @@ export function GalaxyView({
       center: [number, number, number];
       radius: number;
       phase: number;
+      /** Pristine opacities, so emphasis can dim then restore exactly. */
+      starBase: number;
+      coronaBase: number;
     }
     const companions: Companion[] = [];
 
@@ -1244,9 +1280,24 @@ export function GalaxyView({
           center: [p[0], p[1], p[2]],
           radius,
           phase,
+          starBase: compStarMat.opacity,
+          coronaBase: compCoronaMat.opacity,
         });
       }
     });
+
+    // Pristine per-node glow opacities, captured now (before fog/emphasis run),
+    // so a de-emphasised node dims by a factor and restores to exactly its
+    // class-dependent brightness — corona/spike opacity is glow-dependent, not
+    // a constant.
+    const coronaBaseOp = coronaSprites.map(
+      (s) => (s?.material as THREE.SpriteMaterial | undefined)?.opacity ?? 1,
+    );
+    const spikeBaseOp = spikeSprites.map(
+      (s) =>
+        (s as { material?: { opacity?: number } } | undefined)?.material
+          ?.opacity ?? 1,
+    );
 
     // Fade the lanes up during the intro (their target opacities are captured
     // now, then restored as the intro clock advances).
@@ -1484,9 +1535,17 @@ export function GalaxyView({
       // dashed), same-owner (both ends one faction, drawn in its colour),
       // else the quiet neutral base.
       const baseSegs: LaneSeg[] = [];
+      const baseSegColors: THREE.Color[] = [];
       const factionSegs: LaneSeg[] = [];
       const factionSegColors: THREE.Color[] = [];
       const frontierSegs: LaneSeg[] = [];
+      // The quiet base lane, dimmed by whichever end is more faded.
+      const pushBase = (seg: LaneSeg, a: string, b: string) => {
+        baseSegs.push(seg);
+        baseSegColors.push(
+          new THREE.Color(BASE_LANE_HEX).multiplyScalar(laneDim(a, b)),
+        );
+      };
       for (const [a, b] of galaxy.links) {
         const seg = trimmedSeg(a, b);
         if (!seg) continue;
@@ -1496,7 +1555,7 @@ export function GalaxyView({
         const visB = isVisible(b);
         if (!visA && !visB) continue;
         if (!visA || !visB) {
-          baseSegs.push(seg);
+          pushBase(seg, a, b);
           continue;
         }
         const ownerA = current[a] ?? NEUTRAL;
@@ -1507,12 +1566,15 @@ export function GalaxyView({
           frontierSegs.push(seg);
         } else if (ownerA === ownerB && ownerA !== NEUTRAL) {
           factionSegs.push(seg);
-          factionSegColors.push(ownerColor(ownerA));
+          // clone: ownerColor returns the shared cached faction colour.
+          factionSegColors.push(
+            ownerColor(ownerA).clone().multiplyScalar(laneDim(a, b)),
+          );
         } else {
-          baseSegs.push(seg);
+          pushBase(seg, a, b);
         }
       }
-      setLanePair(lanes, baseSegs);
+      setLanePair(lanes, baseSegs, baseSegColors);
       setLanePair(factionLanes, factionSegs, factionSegColors);
       setLanePair(frontier, dashSegments(frontierSegs, 1.5, 1.2));
     };
@@ -1530,7 +1592,8 @@ export function GalaxyView({
       );
       mat.color.copy(ownerColor(owner));
       mat.opacity =
-        owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75;
+        (owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75) *
+        dimOf(galaxy.nodes[i].id);
       // Theatre region markers fill with a dark shade of the owner colour.
       const disc = discMats[i];
       if (disc) {
@@ -1580,21 +1643,41 @@ export function GalaxyView({
       if (skin === "theatre") return; // theatre region markers have no fog styling
       galaxy.nodes.forEach((n, i) => {
         const vis = isVisible(n.id);
+        // Graded emphasis dims but keeps a node present (glow/ring/label stay);
+        // fog fully hides its glow, ring and label. The two compose (fog wins
+        // on hiding, emphasis scales what remains) but no caller uses both.
+        const factor = dimOf(n.id);
         const starMat = starMats[i];
-        if (starMat) starMat.opacity = vis ? 1 : FOG_DIM;
+        if (starMat) starMat.opacity = (vis ? 1 : FOG_DIM) * factor;
         const corona = coronaSprites[i];
-        if (corona) corona.visible = vis;
+        if (corona) {
+          corona.visible = vis;
+          (corona.material as THREE.SpriteMaterial).opacity =
+            coronaBaseOp[i] * factor;
+        }
         const spike = spikeSprites[i];
-        if (spike) spike.visible = vis;
+        if (spike) {
+          spike.visible = vis;
+          const sm = (spike as { material?: { opacity?: number } }).material;
+          if (sm) sm.opacity = spikeBaseOp[i] * factor;
+        }
         const ring = ownerRings[i];
-        if (ring) ring.visible = vis;
+        if (ring) ring.visible = vis; // ring opacity is set in styleRing
         const label = labelObjects[i];
-        if (label) label.visible = vis;
+        if (label) {
+          label.visible = vis;
+          (label.element as HTMLElement).style.opacity = String(factor);
+        }
       });
       for (const c of companions) {
-        const vis = isVisible(galaxy.nodes[c.i].id);
+        const id = galaxy.nodes[c.i].id;
+        const vis = isVisible(id);
+        const factor = dimOf(id);
         c.star.visible = vis;
         c.corona.visible = vis;
+        (c.star.material as THREE.SpriteMaterial).opacity = c.starBase * factor;
+        (c.corona.material as THREE.SpriteMaterial).opacity =
+          c.coronaBase * factor;
       }
     };
     applyVisibilityRef.current = applyVisibility;
@@ -1918,10 +2001,11 @@ export function GalaxyView({
   useEffect(() => {
     ownersRef.current = owners;
     visibleRef.current = visibleIds;
+    emphasisRef.current = emphasis;
     applyOwnersRef.current?.();
     applyVisibilityRef.current?.();
     if (reduceMotion) renderRef.current?.();
-  }, [owners, visibleIds, reduceMotion]);
+  }, [owners, visibleIds, emphasis, reduceMotion]);
 
   useEffect(() => {
     selectedRef.current = selectedId;
