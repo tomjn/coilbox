@@ -41,14 +41,20 @@ export function EncounterOverlay({
 
   return (
     <div className="absolute inset-0 z-20 flex items-end justify-center p-4 pb-10">
-      <div className="flex w-[40rem] max-w-full flex-col gap-4 rounded-xl border border-border/50 bg-card/90 p-7 backdrop-blur-md">
+      <button
+        type="button"
+        aria-label="Back to map"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default"
+      />
+      <div className="relative flex w-[40rem] max-w-full flex-col gap-4 rounded-xl border border-border/50 bg-card/90 p-7 backdrop-blur-md">
         <header className="flex flex-col gap-1">
           <button
             type="button"
             onClick={onClose}
             className="flex items-center gap-1 self-start text-xs text-muted-foreground hover:text-foreground"
           >
-            <ArrowLeft className="size-3.5" aria-hidden /> Run map
+            <ArrowLeft className="size-3.5" aria-hidden /> Back to map
           </button>
           <h1 className="flex items-center gap-2 text-lg font-semibold">
             <Swords className="size-5 text-primary" aria-hidden />

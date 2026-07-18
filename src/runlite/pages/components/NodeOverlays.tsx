@@ -11,21 +11,29 @@ import {
 
 type Apply = (next: RogueliteRun) => void | Promise<void>;
 
-/** Shared overlay chrome. */
+/** Shared overlay chrome. Clicking the backdrop dismisses it. */
 function Overlay({
   icon,
   title,
   lede,
+  onClose,
   children,
 }: {
   icon: React.ReactNode;
   title: string;
   lede?: string;
+  onClose: () => void;
   children: React.ReactNode;
 }) {
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 p-4 backdrop-blur-sm">
-      <div className="flex w-[42rem] max-w-full flex-col gap-4 rounded-lg border border-border/50 bg-card/90 p-6">
+      <button
+        type="button"
+        aria-label="Back to map"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default"
+      />
+      <div className="relative flex w-[42rem] max-w-full flex-col gap-4 rounded-lg border border-border/50 bg-card/90 p-6">
         <header className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 text-lg font-semibold">
             {icon}
@@ -87,6 +95,7 @@ export function RewardOverlay({
       icon={<Gift className="size-5 text-yellow-300" aria-hidden />}
       title={node.reward?.title ?? "Salvage cache"}
       lede="Take a schematic to widen the arsenal, or a field upgrade for your command alone."
+      onClose={onClose}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {options.map((o, i) => {
@@ -143,6 +152,7 @@ export function EventOverlay({
       icon={<Sparkles className="size-5 text-violet-400" aria-hidden />}
       title={ev?.title ?? "Signal"}
       lede={ev?.body}
+      onClose={onClose}
     >
       <div className="flex flex-col gap-2">
         {(ev?.choices ?? []).map((c, i) => (
@@ -191,6 +201,7 @@ export function ShopOverlay({
       icon={<Store className="size-5 text-emerald-400" aria-hidden />}
       title="Salvage depot"
       lede={`Salvage: ${salvage}`}
+      onClose={onClose}
     >
       <div className="flex flex-col gap-2">
         {(shop?.offers ?? []).map((offer, i) => {
