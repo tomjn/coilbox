@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { resolveBattle } from "./progress";
 import { forwardReachable, RUN_DIM, runEmphasis } from "./galaxyAdapter";
 import type { RogueliteRun } from "./model";
+import { resolveBattle } from "./progress";
 
 // start -> {b1, b2} -> boss (a diamond).
 function run(): RogueliteRun {

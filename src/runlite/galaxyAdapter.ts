@@ -19,7 +19,9 @@ import { successors } from "./progress";
 
 const TYPE_COLOR: Record<RunNodeType, string> = {
   start: "#4fe6d6",
-  battle: "#c3d0e6",
+  // Battles read as danger — a clear red, distinct from the boss's pink and
+  // elite's orange.
+  battle: "#e0473a",
   elite: "#ffb64d",
   event: "#b98cff",
   reward: "#ffcf5c",

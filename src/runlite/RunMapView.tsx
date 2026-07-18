@@ -69,6 +69,7 @@ export function RunMapView({
       galaxy={doc}
       owners={owners}
       emphasis={emphasis}
+      laneFlow
       playerFactionId={PLAYER_FACTION}
       selectedId={selectedId}
       onSelect={onSelect}
