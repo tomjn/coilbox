@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { forwardReachable, RUN_DIM, runEmphasis } from "./galaxyAdapter";
-import type { RogueliteRun } from "./model";
+import {
+  forwardReachable,
+  RUN_DIM,
+  runEmphasis,
+  runIdentities,
+  warlordBodyFor,
+} from "./galaxyAdapter";
+import type { RogueliteRun, RunNode } from "./model";
 import { resolveBattle } from "./progress";
 
 // start -> {b1, b2} -> boss (a diamond).
@@ -62,6 +68,57 @@ function run(): RogueliteRun {
     updatedAt: "t",
   };
 }
+
+describe("runIdentities", () => {
+  it("always marks the start a beacon and the warlord its lair", () => {
+    const ids = runIdentities(run());
+    expect(ids.get("start")).toEqual({ body: "beacon" });
+    expect(ids.get("boss")?.body).toBe(warlordBodyFor(1));
+    expect(ids.get("boss")?.body).toMatch(/^warlord-/);
+  });
+
+  it("danger-tints battle and elite sites but gives them no body", () => {
+    const ids = runIdentities(run());
+    expect(ids.get("b1")).toEqual({ starTint: "#e0473a" });
+    expect(ids.get("b2")?.body).toBeUndefined();
+    expect(ids.get("b2")?.starTint).toBe("#e0473a");
+  });
+
+  it("gives service nodes a sparse, deterministic special body", () => {
+    // A wide column of shops: only a seeded minority should read as stations.
+    const shops: RunNode[] = Array.from({ length: 40 }, (_, i) => ({
+      id: `shop-${i}`,
+      type: "shop" as const,
+      col: 1,
+      row: i,
+    }));
+    const r: RogueliteRun = { ...run(), nodes: [run().nodes[0], ...shops] };
+    const a = runIdentities(r);
+    const b = runIdentities(r);
+    const stations = shops.filter((s) => a.get(s.id)?.body === "station");
+    // Deterministic (same run -> same identities).
+    for (const s of shops) expect(a.get(s.id)).toEqual(b.get(s.id));
+    // Sparse: a clear minority, but not none across 40 nodes.
+    expect(stations.length).toBeGreaterThan(0);
+    expect(stations.length).toBeLessThan(shops.length / 2);
+    // Any body assigned to a shop is the station body, nothing else.
+    for (const s of shops) {
+      const body = a.get(s.id)?.body;
+      if (body) expect(body).toBe("station");
+    }
+  });
+});
+
+describe("warlordBodyFor", () => {
+  it("is deterministic and cycles the three lairs", () => {
+    expect(warlordBodyFor(0)).toBe("warlord-blackhole");
+    expect(warlordBodyFor(1)).toBe("warlord-hypergiant");
+    expect(warlordBodyFor(2)).toBe("warlord-fortress");
+    expect(warlordBodyFor(3)).toBe("warlord-blackhole");
+    // Negative seeds wrap cleanly, never undefined.
+    expect(warlordBodyFor(-1)).toBe("warlord-fortress");
+  });
+});
 
 describe("forwardReachable", () => {
   it("collects the node and all its forward descendants", () => {

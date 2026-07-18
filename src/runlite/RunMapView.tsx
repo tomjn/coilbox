@@ -9,6 +9,7 @@ import {
 import {
   PLAYER_FACTION,
   runEmphasis,
+  runIdentities,
   runOwners,
   runPathLinks,
   runToGalaxyDoc,
@@ -50,6 +51,14 @@ export function RunMapView({
     () => runToGalaxyDoc(run),
     [run.nodes, run.edges, run.settings.skin, run.settings.seed],
   );
+  // Per-node identity bodies (station/wreck/anomaly/beacon/warlord) + battle
+  // danger-tints. Derived from the run's stable structure, so it's a build-time
+  // prop — a new map rebuilds the scene, which only happens when the graph does.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the graph + seed, both stable across moves
+  const identities = useMemo(
+    () => runIdentities(run),
+    [run.nodes, run.settings.seed],
+  );
   // biome-ignore lint/correctness/useExhaustiveDependencies: owners depend only on progress moving, applied live by GalaxyView
   const owners = useMemo(
     () => runOwners(run),
@@ -79,6 +88,7 @@ export function RunMapView({
       galaxy={doc}
       owners={owners}
       emphasis={emphasis}
+      identities={identities}
       laneFlow
       pathLinks={pathLinks}
       burstNodeId={burstNodeId}

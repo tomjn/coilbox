@@ -6,18 +6,25 @@ import {
   CSS2DRenderer,
 } from "three/addons/renderers/CSS2DRenderer.js";
 import { assetUrl } from "../../lib/assetUrl";
-import type { GalaxyDoc, Incursion } from "../model";
+import type { GalaxyDoc, GalaxyNode, Incursion } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
 import { bodyLabel, type VoidBody, voidBodiesFor } from "./bodies";
 import { factionSides } from "./factionShape";
-import { hashString, layoutNodes, playBounds, playExtentFor } from "./layout";
+import {
+  hashString,
+  layoutNodes,
+  playBounds,
+  playExtentFor,
+  type WorldPos,
+} from "./layout";
 import { buildStarfield } from "./starfield";
 import {
   asteroidTexture,
   cometTailTexture,
   radialTexture,
   spikesTexture,
+  stationTexture,
 } from "./textures";
 
 /**
@@ -56,6 +63,32 @@ export interface NodeEmphasis {
   marker?: "check";
   /** Occasional ambient combat flashes over the node (upcoming battle sites). */
   flash?: boolean;
+}
+
+/**
+ * Warpath-only per-node identity (see {@link GalaxyViewProps.identities}). Some
+ * run nodes read as a distinct body — a depot station, a salvage wreck, an event
+ * anomaly, the start beacon, or the warlord's lair — instead of a plain star;
+ * others keep their star tinted toward a danger hue. Default-off, so conquest —
+ * which omits the prop — is unchanged.
+ */
+export type NodeBodyKind =
+  | "station"
+  | "wreck"
+  | "anomaly"
+  | "beacon"
+  | "warlord-blackhole"
+  | "warlord-hypergiant"
+  | "warlord-fortress";
+
+export interface NodeIdentity {
+  /** Replace the node's star with a special body. */
+  body?: NodeBodyKind;
+  /**
+   * Nudge the (still-stellar) star toward this `#rrggbb` — danger red for battle
+   * sites. Kept subtle and stellar-plausible by the caller.
+   */
+  starTint?: string;
 }
 
 interface GalaxyViewProps {
@@ -102,6 +135,14 @@ interface GalaxyViewProps {
   burstNodeId?: string | null;
   /** Map spring-names known to be space maps; their nodes render as asteroids. */
   spaceMaps?: Set<string>;
+  /**
+   * Warpath-only per-node identity: special bodies (station / wreck / anomaly /
+   * beacon / warlord) and danger star-tints, keyed by node id. Applied at build
+   * time (a new map rebuilds the scene, like `galaxy`), since it derives from the
+   * run's stable structure. Default-off; conquest omits it so its sky is
+   * byte-identical.
+   */
+  identities?: Map<string, NodeIdentity>;
   /**
    * Zoom the camera in on a node (e.g. the system being fought over) and lock
    * user controls; `null`/undefined eases back to the framed overview. Driven
@@ -510,6 +551,7 @@ export function GalaxyView({
   pathLinks,
   burstNodeId,
   spaceMaps,
+  identities,
   focusNodeId,
   display,
   className,
@@ -1112,6 +1154,14 @@ export function GalaxyView({
     const spikeTex = spikesTexture(256);
     const asteroidTex = asteroidTexture(128);
     const cometTailTex = cometTailTexture(256);
+    // Warpath identity bodies (created only if any node needs one). A station
+    // structure sprite and a soft annulus shared by the anomaly / beacon /
+    // warlord rings.
+    const anyIdentity = !!identities?.size;
+    const stationTex = anyIdentity ? stationTexture(128) : undefined;
+    const bodyRingTex = anyIdentity ? ringBurstTexture(128) : undefined;
+    if (stationTex) disposables.push(stationTex);
+    if (bodyRingTex) disposables.push(bodyRingTex);
     // Comet coma: a bright icy core fading through a soft dusty halo, so it
     // blends into the tail under additive blending (a comet is dust and ice,
     // not rock — no lit surface).
@@ -1154,6 +1204,19 @@ export function GalaxyView({
       coronaBase: number;
     }
     const companions: Companion[] = [];
+
+    // Warpath identity bodies that animate: an anomaly's slow-rotating ring, a
+    // beacon's expanding ping. Driven by the loop when motion is on; static
+    // otherwise. Node index carries the emphasis dimming.
+    interface IdentityPulse {
+      i: number;
+      kind: "anomaly" | "beacon";
+      ring: THREE.Sprite;
+      ringMat: THREE.SpriteMaterial;
+      baseScale: number;
+      phase: number;
+    }
+    const identityPulses: IdentityPulse[] = [];
 
     // Intro warp-in: sprites pop from zero to their target scale (staggered by
     // node), lanes fade up, and the camera eases in. Only when motion is on.
@@ -1226,6 +1289,153 @@ export function GalaxyView({
     );
 
     const WHITE = new THREE.Color(0xffffff);
+
+    /**
+     * Build a warpath identity body for node `i`, reusing the star / corona /
+     * spike slots (like the void branch) so intro, ownership rings, selection and
+     * fog keep working. Cohesive palette: a station is metallic with a depot-teal
+     * running-light, a wreck sooty carbon with a dim distress ember, an anomaly an
+     * eerie violet phenomenon, a beacon a friendly cyan pulse. Returns `false` for
+     * a kind it doesn't build (warlord lairs — handled elsewhere) so the caller
+     * falls through to a normal star. Never runs for theatre / void nodes.
+     */
+    const buildIdentityBody = (
+      i: number,
+      node: GalaxyNode,
+      p: WorldPos,
+      body: NodeBodyKind,
+    ): boolean => {
+      // Per-kind recipe. `head` is drawn in the star slot, `glow` in the corona
+      // slot, and an optional `ring` (anomaly/beacon) in the spike slot, animated
+      // by the loop. All colours stay within the grounded palette.
+      type Recipe = {
+        head: { tex: THREE.Texture; color: string; additive?: boolean };
+        headScale: number;
+        glow: { color: string; opacity: number; scale: number };
+        ring?: { color: string; opacity: number; scale: number };
+        pulse?: "anomaly" | "beacon";
+      };
+      let recipe: Recipe | undefined;
+      if (body === "station" && stationTex) {
+        recipe = {
+          head: { tex: stationTex, color: "#b8bcc4" },
+          headScale: 0.9,
+          glow: { color: "#7fe08a", opacity: 0.3, scale: 0.7 },
+        };
+      } else if (body === "wreck") {
+        recipe = {
+          head: { tex: asteroidTex, color: "#4a453e" },
+          headScale: 0.9,
+          glow: { color: "#8a3320", opacity: 0.35, scale: 0.6 },
+        };
+      } else if (body === "anomaly" && bodyRingTex) {
+        recipe = {
+          head: { tex: starTex, color: "#d9b8ff", additive: true },
+          headScale: 0.75,
+          glow: { color: "#b98cff", opacity: 0.6, scale: 0.95 },
+          ring: { color: "#c9a8ff", opacity: 0.5, scale: 1.6 },
+          pulse: "anomaly",
+        };
+      } else if (body === "beacon" && bodyRingTex) {
+        recipe = {
+          head: { tex: starTex, color: "#d6fff8" },
+          headScale: 0.85,
+          glow: { color: "#4fe6d6", opacity: 0.55, scale: 1.1 },
+          ring: { color: "#7ff0e4", opacity: 0.5, scale: 1.4 },
+          pulse: "beacon",
+        };
+      }
+      if (!recipe) return false;
+
+      const headMat = new THREE.SpriteMaterial({
+        map: recipe.head.tex,
+        color: new THREE.Color(recipe.head.color),
+        transparent: true,
+        opacity: 1,
+        depthWrite: false,
+        blending: recipe.head.additive
+          ? THREE.AdditiveBlending
+          : THREE.NormalBlending,
+        // A wreck reuses the lit asteroid; spin it per node so no two align.
+        rotation:
+          body === "wreck"
+            ? ((hashString(`${node.id}-rock`) % 100) / 100) * Math.PI * 2
+            : 0,
+      });
+      const head = new THREE.Sprite(headMat);
+      head.position.set(p[0], p[1], p[2]);
+      registerIntro(head, starScale(i) * recipe.headScale, node.id);
+      head.raycast = () => {};
+
+      const glowMat = new THREE.SpriteMaterial({
+        map: coronaTex,
+        color: new THREE.Color(recipe.glow.color),
+        transparent: true,
+        opacity: recipe.glow.opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const glow = new THREE.Sprite(glowMat);
+      glow.position.set(p[0], p[1], p[2]);
+      registerIntro(
+        glow,
+        coronaScale(i, false) * recipe.glow.scale,
+        `${node.id}-corona`,
+      );
+      glow.raycast = () => {};
+
+      let spikes: THREE.Object3D | undefined;
+      if (recipe.ring && bodyRingTex) {
+        const ringMat = new THREE.SpriteMaterial({
+          map: bodyRingTex,
+          color: new THREE.Color(recipe.ring.color),
+          transparent: true,
+          opacity: recipe.ring.opacity,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const ring = new THREE.Sprite(ringMat);
+        ring.position.set(p[0], p[1] + 0.15, p[2]);
+        const ringScale = starScale(i) * recipe.ring.scale;
+        registerIntro(ring, ringScale, `${node.id}-idring`);
+        ring.raycast = () => {};
+        disposables.push(ringMat);
+        scene.add(ring);
+        spikes = ring;
+        if (recipe.pulse) {
+          identityPulses.push({
+            i,
+            kind: recipe.pulse,
+            ring,
+            ringMat,
+            baseScale: ringScale,
+            phase: (hashString(`${node.id}-idpulse`) % 100) / 100,
+          });
+        }
+      }
+
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: ownerColor(ownersRef.current[node.id] ?? node.owner),
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const ring = new THREE.Mesh(ringGeoFor(0), ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(p[0], p[1] - 0.4, p[2]);
+      ring.raycast = () => {};
+      starSprites.push(head);
+      starMats.push(headMat);
+      spikeSprites.push(spikes);
+      coronaSprites.push(glow);
+      ownerRingMats.push(ringMat);
+      ownerRings.push(ring);
+      disposables.push(headMat, glowMat, ringMat);
+      scene.add(head, glow, ring);
+      return true;
+    };
+
     galaxy.nodes.forEach((n, i) => {
       const p = positions.get(n.id);
       if (!p) {
@@ -1256,6 +1466,12 @@ export function GalaxyView({
         return;
       }
       discMats.push(undefined);
+      // Warpath node-identity: a run node may read as a built/void body (station,
+      // wreck, anomaly, beacon) rather than a star. Takes precedence over the
+      // voidwater asteroid and reuses the same slots. A `starTint`-only identity
+      // (battle danger red) keeps the star and is applied in the normal branch.
+      const identity = identities?.get(n.id);
+      if (identity?.body && buildIdentityBody(i, n, p, identity.body)) return;
       // Space maps (voidwater) read as asteroid fields, not star systems — a
       // rare comet variant gets a trailing tail. Reuses the star/corona/spike
       // slots so intro, ownership rings and selection keep working; skips the
@@ -1366,6 +1582,12 @@ export function GalaxyView({
       }
       const type = nodeType[i];
       const stellar = new THREE.Color(type.color);
+      // Danger tint (battle/elite): pull the star toward a hot red so the site
+      // reads as hostile while staying a plausible star colour. The corona and
+      // spikes below inherit `stellar`, so the whole system reddens together.
+      if (identity?.starTint) {
+        stellar.lerp(new THREE.Color(identity.starTint), 0.55);
+      }
       // Normal blending (not additive): the hot core is near-opaque, so the
       // decorative starfield behind a node can't shine through it. Dwarfs
       // keep their saturation; hot stars blow out toward white (type.tint).
@@ -2325,6 +2547,23 @@ export function GalaxyView({
             c.star.position.set(x, c.center[1], z);
             c.corona.position.set(x, c.center[1], z);
           }
+          // Warpath identity rings: an anomaly slowly rotates and breathes; a
+          // beacon pings outward on a repeating cycle. Faded by the node's own
+          // emphasis so a distant one is subtler.
+          for (const pu of identityPulses) {
+            const dim = dimOf(galaxy.nodes[pu.i].id);
+            if (pu.kind === "anomaly") {
+              pu.ringMat.rotation = now / 3000 + pu.phase * 6.283;
+              const breathe =
+                0.5 + 0.5 * Math.sin(now / 700 + pu.phase * 6.283);
+              pu.ringMat.opacity = (0.28 + 0.32 * breathe) * dim;
+              pu.ring.scale.setScalar(pu.baseScale * (0.94 + 0.1 * breathe));
+            } else {
+              const t = (now / 1600 + pu.phase) % 1;
+              pu.ring.scale.setScalar(pu.baseScale * (0.55 + 0.9 * t));
+              pu.ringMat.opacity = (1 - t) * 0.6 * dim;
+            }
+          }
           if (sel.idx >= 0) {
             const ring = ownerRings[sel.idx];
             const mat = ownerRingMats[sel.idx];
@@ -2424,6 +2663,7 @@ export function GalaxyView({
     performanceMode,
     spaceMaps,
     laneFlow,
+    identities,
   ]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is

@@ -262,6 +262,87 @@ export function asteroidTexture(size: number): THREE.Texture {
 }
 
 /**
+ * An orbital station: a geometric, artificial silhouette — a central hab core,
+ * a docking ring on radial spokes, and two solar-panel wings — so it reads as
+ * *built structure*, not a fuzzy star. Drawn with solid fills/strokes (no
+ * gradients, so no WebKit dither) in greyscale; the sprite material supplies the
+ * metallic tint, with a couple of near-white window specks catching the light.
+ */
+export function stationTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.clearRect(0, 0, size, size);
+    const m = size / 2;
+    // Solar-panel wings: dark framed rectangles reaching past the ring, drawn
+    // first so the hub structure overlaps them.
+    ctx.fillStyle = "rgb(70,70,74)";
+    ctx.strokeStyle = "rgb(150,150,156)";
+    ctx.lineWidth = size * 0.012;
+    for (const dir of [-1, 1]) {
+      const px = m + dir * size * 0.34;
+      ctx.fillRect(
+        px - size * 0.11,
+        m - size * 0.075,
+        size * 0.22,
+        size * 0.15,
+      );
+      ctx.strokeRect(
+        px - size * 0.11,
+        m - size * 0.075,
+        size * 0.22,
+        size * 0.15,
+      );
+      // Cell divisions.
+      for (let k = 1; k < 3; k++) {
+        const x = px - size * 0.11 + (size * 0.22 * k) / 3;
+        ctx.beginPath();
+        ctx.moveTo(x, m - size * 0.075);
+        ctx.lineTo(x, m + size * 0.075);
+        ctx.stroke();
+      }
+    }
+    // Radial spokes from the hub out to the docking ring.
+    ctx.strokeStyle = "rgb(120,122,128)";
+    ctx.lineWidth = size * 0.03;
+    for (let s = 0; s < 6; s++) {
+      const a = (s / 6) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(m + Math.cos(a) * size * 0.12, m + Math.sin(a) * size * 0.12);
+      ctx.lineTo(m + Math.cos(a) * size * 0.4, m + Math.sin(a) * size * 0.4);
+      ctx.stroke();
+    }
+    // Docking ring.
+    ctx.strokeStyle = "rgb(200,203,210)";
+    ctx.lineWidth = size * 0.075;
+    ctx.beginPath();
+    ctx.arc(m, m, size * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+    // Central hab core.
+    ctx.fillStyle = "rgb(176,179,184)";
+    ctx.beginPath();
+    ctx.arc(m, m, size * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+    // Window lights catching the sun.
+    ctx.fillStyle = "rgb(255,252,240)";
+    for (const [wx, wy] of [
+      [-0.05, -0.04],
+      [0.04, 0.02],
+      [-0.01, 0.06],
+    ] as const) {
+      ctx.beginPath();
+      ctx.arc(m + wx * size, m + wy * size, size * 0.018, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
  * A comet tail: a soft teardrop that fades along +x, so a sprite rotated by the
  * node hash streaks away from the head. Greyscale; the material tints it.
  */
