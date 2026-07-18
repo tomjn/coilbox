@@ -52,6 +52,8 @@ export interface GalaxyDisplay {
 export interface NodeEmphasis {
   /** Opacity multiplier for the node and its lanes, 0..1. Absent means 1. */
   opacity?: number;
+  /** A small glyph drawn over the node. `check` = a completed/crossed marker. */
+  marker?: "check";
 }
 
 interface GalaxyViewProps {
@@ -336,6 +338,34 @@ function chevronTexture(size: number): THREE.Texture {
     ctx.moveTo(m - s * 0.5, m - s);
     ctx.lineTo(m + s * 0.7, m); // tip toward +x
     ctx.lineTo(m - s * 0.5, m + s);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * A soft check-mark glyph on a transparent field, drawn white with a glow so it
+ * reads as a completed marker over a node under normal blending. Tinted per use.
+ */
+function checkTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.clearRect(0, 0, size, size);
+    ctx.shadowColor = "#000000";
+    ctx.shadowBlur = size * 0.1;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = size * 0.15;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(size * 0.26, size * 0.52);
+    ctx.lineTo(size * 0.44, size * 0.7);
+    ctx.lineTo(size * 0.76, size * 0.32);
     ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(canvas);
@@ -768,6 +798,10 @@ export function GalaxyView({
     }
 
     // A few soft nebula sprites tint the disc (skipped in performance mode).
+    // Runs (`laneFlow`) get a bolder, larger, more numerous swathe so each run's
+    // sky reads as its own place; conquest keeps the restrained haze — and,
+    // crucially, the non-bold path advances the seeded RNG in the exact same
+    // order as before, so conquest's nebula placement is unchanged.
     if (skin === "galaxy" && !performanceMode && effects) {
       const nebulaColors = galaxy.theme?.nebulaColors ?? [
         "#4756b8",
@@ -775,33 +809,41 @@ export function GalaxyView({
         "#2a6f8f",
       ];
       const nebulaRng = mulberry32(hashString(`${galaxy.id}-nebula`));
-      nebulaColors.slice(0, 4).forEach((color, i) => {
+      const bold = laneFlow;
+      const count = bold ? 7 : Math.min(4, nebulaColors.length);
+      for (let i = 0; i < count; i++) {
+        const color = nebulaColors[i % nebulaColors.length];
         const tex = radialTexture(128, [
           [0, `${color}ff`],
           [0.5, `${color}55`],
           [1, `${color}00`],
         ]);
+        // Only call the RNG for opacity in bold mode — else the sequence shifts
+        // and conquest's placement changes.
+        const opacity = bold ? 0.16 + nebulaRng() * 0.08 : 0.09;
         const mat = new THREE.SpriteMaterial({
           map: tex,
           transparent: true,
-          opacity: 0.09,
+          opacity,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
         disposables.push(tex, mat);
         const sprite = new THREE.Sprite(mat);
         const angle = nebulaRng() * Math.PI * 2 + i;
-        const dist = extent * (0.7 + nebulaRng() * 1.6);
+        const dist =
+          extent * ((bold ? 1.0 : 0.7) + nebulaRng() * (bold ? 2.4 : 1.6));
         sprite.position.set(
           Math.cos(angle) * dist,
-          -14 - nebulaRng() * 8,
+          -14 - nebulaRng() * (bold ? 30 : 8),
           Math.sin(angle) * dist,
         );
-        const scale = extent * (1.2 + nebulaRng() * 1.2);
+        const scale =
+          extent * ((bold ? 2.0 : 1.2) + nebulaRng() * (bold ? 2.0 : 1.2));
         sprite.scale.set(scale, scale * 0.6, 1);
         sprite.raycast = () => {};
         scene.add(sprite);
-      });
+      }
     }
 
     /* ----------------------------- play layer ------------------------------ */
@@ -1409,6 +1451,44 @@ export function GalaxyView({
           ?.opacity ?? 1,
     );
 
+    // "Done" markers (emphasis `marker: "check"`): a check glyph over a node.
+    // Created lazily per node the first time it needs one, so conquest — which
+    // never sets a marker — allocates nothing. One shared texture/material.
+    const checkSprites: (THREE.Sprite | undefined)[] = new Array(
+      galaxy.nodes.length,
+    ).fill(undefined);
+    let checkTex: THREE.Texture | undefined;
+    let checkMat: THREE.SpriteMaterial | undefined;
+    const ensureCheck = (i: number): THREE.Sprite | undefined => {
+      const existing = checkSprites[i];
+      if (existing) return existing;
+      const p = positions.get(galaxy.nodes[i].id);
+      if (!p) return undefined;
+      if (!checkTex) {
+        checkTex = checkTexture(64);
+        disposables.push(checkTex);
+      }
+      if (!checkMat) {
+        checkMat = new THREE.SpriteMaterial({
+          map: checkTex,
+          color: 0x8affc0,
+          transparent: true,
+          opacity: 0.95,
+          depthWrite: false,
+          depthTest: false, // always legible over the (dimmed) node
+        });
+        disposables.push(checkMat);
+      }
+      const sprite = new THREE.Sprite(checkMat);
+      sprite.position.set(p[0], p[1] + 0.3, p[2]);
+      sprite.scale.setScalar(galaxy.nodes[i].kind === "capital" ? 3.6 : 3.0);
+      sprite.renderOrder = 5;
+      sprite.raycast = () => {};
+      scene.add(sprite);
+      checkSprites[i] = sprite;
+      return sprite;
+    };
+
     // Fade the lanes up during the intro (their target opacities are captured
     // now, then restored as the intro clock advances).
     if (animateIntro) {
@@ -1794,6 +1874,14 @@ export function GalaxyView({
         if (label) {
           label.visible = vis;
           (label.element as HTMLElement).style.opacity = String(factor);
+        }
+        // Completed marker: show a check over crossed nodes.
+        const marker = emphasisRef.current?.get(n.id)?.marker;
+        if (marker === "check" && vis) {
+          const cs = ensureCheck(i);
+          if (cs) cs.visible = true;
+        } else if (checkSprites[i]) {
+          (checkSprites[i] as THREE.Sprite).visible = false;
         }
       });
       for (const c of companions) {
