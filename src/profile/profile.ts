@@ -199,6 +199,13 @@ export interface Profile {
   hideSettings?: string[];
   /** Preset filter narrowing battle/game lists to one game. */
   gameFilter?: GameFilter;
+  /**
+   * Faction emblems, keyed by side name (case-insensitive, e.g. `arm`, `Armada`).
+   * Each value is a `.coilbox`-relative path, `data:` URI, or `http(s)` URL. A hard
+   * override: a distributor's faction art here wins over the game's own sidepics
+   * and the branding catalog, so a white-label build fully controls faction art.
+   */
+  factionLogos?: Record<string, string>;
   /** Branded landing page shown in place of the default launcher. */
   welcome?: WelcomeConfig;
   /**
