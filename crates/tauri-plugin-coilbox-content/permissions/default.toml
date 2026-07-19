@@ -23,6 +23,8 @@ permissions = [
   "allow-content-config-backup",
   "allow-content-config-restore",
   "allow-content-config-delete-profile",
+  "allow-content-warm-rapid-pool",
+  "allow-content-prune-rapid-pool",
   "allow-branding-catalog",
   "allow-branding-image",
 ]

@@ -24,6 +24,8 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-config-backup`
 - `allow-content-config-restore`
 - `allow-content-config-delete-profile`
+- `allow-content-warm-rapid-pool`
+- `allow-content-prune-rapid-pool`
 - `allow-branding-catalog`
 - `allow-branding-image`
 
@@ -455,6 +457,32 @@ Denies the content_open_path command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-content:allow-content-prune-rapid-pool`
+
+</td>
+<td>
+
+Enables the content_prune_rapid_pool command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-prune-rapid-pool`
+
+</td>
+<td>
+
+Denies the content_prune_rapid_pool command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-content:allow-content-recreate-root`
 
 </td>
@@ -604,6 +632,32 @@ Enables the content_verify_engine command without any pre-configured scope.
 <td>
 
 Denies the content_verify_engine command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-warm-rapid-pool`
+
+</td>
+<td>
+
+Enables the content_warm_rapid_pool command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-warm-rapid-pool`
+
+</td>
+<td>
+
+Denies the content_warm_rapid_pool command without any pre-configured scope.
 
 </td>
 </tr>
