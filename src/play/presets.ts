@@ -1,5 +1,5 @@
 import { useSetting } from "@picoframe/frame";
-import type { SkirmishDraft } from "./drafts";
+import type { BattleRestrictions, SkirmishDraft } from "./drafts";
 
 /**
  * Named singleplayer (skirmish) presets: saved snapshots of a full setup (game,
@@ -87,6 +87,27 @@ export function parsePresetJson(
     mapName: d.mapName,
     startPosType: d.startPosType,
     modOptionValues: d.modOptionValues as SkirmishDraft["modOptionValues"],
+    restrictions: parseRestrictions(d.restrictions),
     name: typeof d.name === "string" ? d.name : undefined,
   };
+}
+
+/**
+ * Validate the optional restrictions blob from imported preset JSON, dropping any
+ * malformed field (untrusted input). Returns undefined when nothing valid remains,
+ * so a preset without restrictions never gains an empty object.
+ */
+function parseRestrictions(value: unknown): BattleRestrictions | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const r = value as Record<string, unknown>;
+  const out: BattleRestrictions = {};
+  if (
+    Array.isArray(r.disabledUnits) &&
+    r.disabledUnits.every((u) => typeof u === "string")
+  )
+    out.disabledUnits = r.disabledUnits as string[];
+  if (typeof r.advantage === "number") out.advantage = r.advantage;
+  if (typeof r.incomeMultiplier === "number")
+    out.incomeMultiplier = r.incomeMultiplier;
+  return Object.keys(out).length > 0 ? out : undefined;
 }

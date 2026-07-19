@@ -15,6 +15,7 @@ export type { Participant, Rgb } from "./participants";
 export {
   aiByline,
   aiKey,
+  applyRestrictions,
   defaultAi,
   hexToRgb,
   initialParticipants,
