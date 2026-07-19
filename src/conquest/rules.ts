@@ -1,6 +1,17 @@
 import { expandRevealed } from "./fog";
-import type { ConquestState, GalaxyDoc, GalaxyNode } from "./model";
-import { DEFAULT_AGGRESSION, DEFAULT_GRACE_TURNS, HISTORY_CAP } from "./model";
+import type {
+  ConquestState,
+  GalaxyDoc,
+  GalaxyNode,
+  Incursion,
+  TurnEvent,
+} from "./model";
+import {
+  DEFAULT_AGGRESSION,
+  DEFAULT_GRACE_TURNS,
+  HISTORY_CAP,
+  NEUTRAL,
+} from "./model";
 import { mulberry32, type Rng } from "./rng";
 
 /**
@@ -8,10 +19,19 @@ import { mulberry32, type Rng } from "./rng";
  * territory bookkeeping is directly unit-testable (no React / frame imports).
  * Every transition returns a fresh state, never mutating its input.
  *
- * The v1 loop: one battle per turn (attack an adjacent node or defend an
- * incursion), then a seeded enemy phase that may open at most one incursion
- * globally. Ignoring an incursion for `graceTurns` turns forfeits the node.
+ * The loop: the player fights one battle per turn (attack an adjacent node or
+ * defend an incursion), or waits; then a seeded enemy round runs, in which each
+ * living enemy faction takes one action — expanding into a neutral system,
+ * warring a rival, or opening an incursion against a player frontier. AI-vs-AI
+ * and AI-vs-neutral resolve immediately by relative-strength odds; an unanswered
+ * incursion auto-resolves by the same odds when its grace runs out.
  */
+
+/** A neutral node defends with this fraction of a faction's per-node strength. */
+export const NEUTRAL_GARRISON = 1.5;
+/** Capitals are picked as targets less often (harder, later) and defend harder. */
+const CAPITAL_PICK_WEIGHT = 0.35;
+const CAPITAL_DEFENCE = 2;
 
 /** Undirected adjacency map from the galaxy's links. */
 export function adjacency(galaxy: GalaxyDoc): Map<string, string[]> {
@@ -100,6 +120,69 @@ export function evaluateStatus(
   return "active";
 }
 
+/** Total strength of a faction: the sum of `1 + difficulty` over its systems. */
+export function factionStrength(
+  galaxy: GalaxyDoc,
+  state: ConquestState,
+  factionId: string,
+): number {
+  let strength = 0;
+  for (const n of galaxy.nodes) {
+    if (state.owners[n.id] === factionId) strength += 1 + n.difficulty;
+  }
+  return strength;
+}
+
+/**
+ * Probability an attacker takes `nodeId`: `atk / (atk + def)`. The defender's
+ * whole faction strength backs each of its systems (so strong powers resist),
+ * plus the contested node's own value as a local garrison (doubled for a
+ * capital); a neutral node defends with a fixed garrison fraction only.
+ */
+export function winOdds(
+  galaxy: GalaxyDoc,
+  state: ConquestState,
+  attackerId: string,
+  nodeId: string,
+): number {
+  const node = galaxy.nodes.find((n) => n.id === nodeId);
+  if (!node) return 0;
+  const defenderId = state.owners[nodeId];
+  const atk = factionStrength(galaxy, state, attackerId);
+  const local =
+    (1 + node.difficulty) * (node.kind === "capital" ? CAPITAL_DEFENCE : 1);
+  const def =
+    defenderId === NEUTRAL
+      ? NEUTRAL_GARRISON * local
+      : factionStrength(galaxy, state, defenderId) + local;
+  return atk + def <= 0 ? 0 : atk / (atk + def);
+}
+
+/** Nodes adjacent to `factionId` territory that it does not already own. */
+export function expansionTargets(
+  galaxy: GalaxyDoc,
+  state: ConquestState,
+  factionId: string,
+): GalaxyNode[] {
+  const adj = adjacency(galaxy);
+  return galaxy.nodes.filter(
+    (n) =>
+      state.owners[n.id] !== factionId &&
+      (adj.get(n.id) ?? []).some((m) => state.owners[m] === factionId),
+  );
+}
+
+/** Roll one auto-resolved attack against a node. */
+function resolveAttack(
+  galaxy: GalaxyDoc,
+  state: ConquestState,
+  attackerId: string,
+  nodeId: string,
+  rng: Rng,
+): boolean {
+  return rng() < winOdds(galaxy, state, attackerId, nodeId);
+}
+
 /**
  * Record a resolved battle: flip ownership per the v1 rules, clear a defended
  * incursion, tick the turn, append history and re-evaluate status. A cancelled
@@ -114,21 +197,21 @@ export function applyBattleOutcome(
   now: string = new Date().toISOString(),
 ): ConquestState {
   const owners = { ...state.owners };
-  let incursion = state.incursion;
+  let incursions = state.incursions;
   if (mode === "attack") {
     if (outcome === "victory") owners[nodeId] = state.playerFactionId;
     // A lost attack costs nothing but the turn.
   } else {
-    if (outcome === "defeat" && incursion) {
-      owners[nodeId] = incursion.factionId;
-    }
-    incursion = undefined;
+    const inc = state.incursions.find((i) => i.nodeId === nodeId);
+    if (outcome === "defeat" && inc) owners[nodeId] = inc.factionId;
+    // Either way the defended incursion is now resolved; others still stand.
+    incursions = state.incursions.filter((i) => i.nodeId !== nodeId);
   }
   const next: ConquestState = {
     ...state,
     turn: state.turn + 1,
     owners,
-    incursion,
+    incursions,
     history: [
       ...state.history,
       { turn: state.turn, nodeId, mode, outcome },
@@ -139,58 +222,87 @@ export function applyBattleOutcome(
 }
 
 /**
- * If the active incursion's grace has run out, the node falls without a
- * battle. Trading space for tempo is allowed; ignoring a threat has a real,
- * bounded cost.
+ * Resolve every incursion whose grace has run out: each auto-resolves by the
+ * same relative-strength odds as any AI attack (so a strong system may still
+ * hold), and drops from the list either way. Unexpired incursions are kept.
+ * Returns the new state and the captures made, for the recap.
  */
 export function applyExpiry(
   galaxy: GalaxyDoc,
   state: ConquestState,
+  rng: Rng,
   now: string = new Date().toISOString(),
-): ConquestState {
-  const inc = state.incursion;
-  if (!inc || state.turn < inc.expiresOnTurn) return state;
-  const next: ConquestState = {
-    ...state,
-    owners: { ...state.owners, [inc.nodeId]: inc.factionId },
-    incursion: undefined,
-    updatedAt: now,
+): { state: ConquestState; events: TurnEvent[] } {
+  if (state.status !== "active" || state.incursions.length === 0) {
+    return { state, events: [] };
+  }
+  const owners = { ...state.owners };
+  const remaining: Incursion[] = [];
+  const events: TurnEvent[] = [];
+  for (const inc of state.incursions) {
+    if (state.turn < inc.expiresOnTurn) {
+      remaining.push(inc);
+      continue;
+    }
+    if (
+      resolveAttack(
+        galaxy,
+        { ...state, owners },
+        inc.factionId,
+        inc.nodeId,
+        rng,
+      )
+    ) {
+      const from = owners[inc.nodeId];
+      owners[inc.nodeId] = inc.factionId;
+      events.push({ factionId: inc.factionId, nodeId: inc.nodeId, from });
+    }
+  }
+  return {
+    state: { ...state, owners, incursions: remaining, updatedAt: now },
+    events,
   };
-  return { ...next, status: evaluateStatus(galaxy, next) };
 }
 
 /**
- * The seeded enemy phase, run after every resolved battle. At most one
- * incursion exists globally (v1 keeps the pressure legible); while one is
- * active the phase is skipped. Each surviving enemy faction (doc order) rolls
- * against its `aggression`; the first success opens an incursion against a
- * player frontier node, weighted away from the player's capital unless it is
- * the only reachable target.
+ * The seeded enemy round: each living enemy faction (doc order) takes one
+ * action. It weighs its frontier by `winOdds * value`, scaling attacks on a
+ * rival or the player by its `aggression` (peaceful factions still creep into
+ * neutrals) and capitals down, then draws one target. A neutral/rival target
+ * auto-resolves immediately; a player target opens an incursion (advance
+ * warning) it doesn't already hold. Returns the new state and its captures.
  */
-export function enemyPhase(
+export function enemyRound(
   galaxy: GalaxyDoc,
   state: ConquestState,
   rng: Rng,
   now: string = new Date().toISOString(),
-): ConquestState {
-  if (state.status !== "active" || state.incursion) return state;
+): { state: ConquestState; events: TurnEvent[] } {
+  if (state.status !== "active") return { state, events: [] };
+  const player = state.playerFactionId;
   const graceTurns = galaxy.rules?.graceTurns ?? DEFAULT_GRACE_TURNS;
-  const playerCapital = capitalOf(galaxy, state.playerFactionId);
+  const owners = { ...state.owners };
+  const incursions = [...state.incursions];
+  const events: TurnEvent[] = [];
 
   for (const faction of galaxy.factions) {
-    if (faction.id === state.playerFactionId) continue;
-    const alive = Object.values(state.owners).some((o) => o === faction.id);
-    if (!alive) continue;
-    if (rng() >= (faction.aggression ?? DEFAULT_AGGRESSION)) continue;
-
-    const targets = frontierNodes(galaxy, state, faction.id);
+    if (faction.id === player) continue;
+    const live = { ...state, owners, incursions };
+    if (!Object.values(owners).some((o) => o === faction.id)) continue;
+    const targets = expansionTargets(galaxy, live, faction.id);
     if (targets.length === 0) continue;
-    const weights = targets.map((n) =>
-      playerCapital && n.id === playerCapital.id && targets.length > 1
-        ? 0.25
-        : 1,
-    );
+    const aggression = faction.aggression ?? DEFAULT_AGGRESSION;
+
+    const weights = targets.map((n) => {
+      const value = 1 + n.difficulty;
+      const capital = n.kind === "capital" ? CAPITAL_PICK_WEIGHT : 1;
+      const hostile = owners[n.id] !== NEUTRAL ? aggression : 1;
+      return (
+        winOdds(galaxy, live, faction.id, n.id) * value * capital * hostile
+      );
+    });
     const total = weights.reduce((a, b) => a + b, 0);
+    if (total <= 0) continue;
     let roll = rng() * total;
     let target = targets[targets.length - 1];
     for (let i = 0; i < targets.length; i++) {
@@ -200,47 +312,54 @@ export function enemyPhase(
         break;
       }
     }
-    return {
-      ...state,
-      incursion: {
-        nodeId: target.id,
-        factionId: faction.id,
-        expiresOnTurn: state.turn + graceTurns,
-      },
-      updatedAt: now,
-    };
+
+    if (owners[target.id] === player) {
+      if (!incursions.some((i) => i.nodeId === target.id)) {
+        incursions.push({
+          nodeId: target.id,
+          factionId: faction.id,
+          expiresOnTurn: state.turn + graceTurns,
+        });
+      }
+    } else if (resolveAttack(galaxy, live, faction.id, target.id, rng)) {
+      const from = owners[target.id];
+      owners[target.id] = faction.id;
+      events.push({ factionId: faction.id, nodeId: target.id, from });
+    }
   }
-  return state;
+  return {
+    state: { ...state, owners, incursions, updatedAt: now },
+    events,
+  };
 }
 
-/** The deterministic RNG for a given turn's enemy phase. */
+/** The deterministic RNG for a given turn's enemy round. */
 export function turnRng(state: ConquestState): Rng {
-  // Mix the turn in so each phase draws a fresh, reproducible stream.
+  // Mix the turn in so each turn draws a fresh, reproducible stream.
   return mulberry32((state.seed ^ (state.turn * 0x9e3779b9)) >>> 0);
 }
 
 /**
- * The full post-battle pipeline: outcome -> enemy phase -> expiry -> status.
- * One call in the run hook keeps the ordering in one tested place.
+ * The post-turn pipeline shared by fighting and waiting: due incursions expire,
+ * the enemy round runs, fog widens, status is re-evaluated. `state` must have
+ * its turn already advanced. One seeded RNG stream covers the whole turn.
  */
-export function advanceAfterBattle(
+function resolveTurn(
   galaxy: GalaxyDoc,
   state: ConquestState,
-  nodeId: string,
-  mode: "attack" | "defend",
-  outcome: "victory" | "defeat",
-  now: string = new Date().toISOString(),
+  now: string,
 ): ConquestState {
-  let next = applyBattleOutcome(galaxy, state, nodeId, mode, outcome, now);
-  if (next.status !== "active") return next;
-  // Expiry first: an incursion opened before this battle may have just run
-  // out; only then may a new one open.
-  next = applyExpiry(galaxy, next, now);
-  if (next.status !== "active") return next;
-  next = enemyPhase(galaxy, next, turnRng(next), now);
-  // Fog of war: a captured system widens what you can see. Expanded once here
-  // (covers outcome + expiry) since every earlier return is a terminal state
-  // the map reveals in full anyway.
+  if (state.status !== "active") return { ...state, lastRound: [] };
+  const rng = turnRng(state);
+  const expiry = applyExpiry(galaxy, state, rng, now);
+  let next = expiry.state;
+  const events = [...expiry.events];
+  if (evaluateStatus(galaxy, next) === "active") {
+    const round = enemyRound(galaxy, next, rng, now);
+    next = round.state;
+    events.push(...round.events);
+  }
+  next = { ...next, lastRound: events };
   if (galaxy.rules?.fogOfWar) {
     next = {
       ...next,
@@ -252,5 +371,47 @@ export function advanceAfterBattle(
       ),
     };
   }
-  return next;
+  return { ...next, status: evaluateStatus(galaxy, next) };
+}
+
+/**
+ * The full post-battle pipeline: player outcome, then the shared post-turn
+ * resolution (expiry -> enemy round -> fog -> status).
+ */
+export function advanceAfterBattle(
+  galaxy: GalaxyDoc,
+  state: ConquestState,
+  nodeId: string,
+  mode: "attack" | "defend",
+  outcome: "victory" | "defeat",
+  now: string = new Date().toISOString(),
+): ConquestState {
+  const afterBattle = applyBattleOutcome(
+    galaxy,
+    state,
+    nodeId,
+    mode,
+    outcome,
+    now,
+  );
+  return resolveTurn(galaxy, afterBattle, now);
+}
+
+/**
+ * Advance the galaxy one turn without a player battle ("Hold position"): the
+ * world moves — enemies expand, rivals fight, incursions age — while the player
+ * holds. No-op on a finished run.
+ */
+export function advanceTurn(
+  galaxy: GalaxyDoc,
+  state: ConquestState,
+  now: string = new Date().toISOString(),
+): ConquestState {
+  if (state.status !== "active") return state;
+  const ticked: ConquestState = {
+    ...state,
+    turn: state.turn + 1,
+    updatedAt: now,
+  };
+  return resolveTurn(galaxy, ticked, now);
 }

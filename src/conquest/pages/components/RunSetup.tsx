@@ -1,3 +1,6 @@
+import { useEffect } from "react";
+import { FactionLogo } from "@/factions/FactionLogo";
+import { useFactionLogos } from "@/factions/logos";
 import { useUnitsyncGameInfo } from "../../../content/config";
 import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
 import { shapeClipPath } from "../../galaxy3d/factionShape";
@@ -42,15 +45,37 @@ export function SidePicker({
 }) {
   const { info } = useUnitsyncGameInfo(enginePath, dataDir, gameArchive);
   const sides = info?.sides ?? [];
+  const logos = useFactionLogos({
+    enginePath,
+    dataDir,
+    gameArchive,
+    sideNames: sides.map((s) => s.name),
+    size: 18,
+  });
+  // Default to the first real side rather than a bare "engine default" — the
+  // engine default *is* the first side, so show it selected by name.
+  useEffect(() => {
+    if (!value && sides.length > 0) onChange(sides[0].name);
+  }, [value, sides, onChange]);
   if (sides.length < 2) return null;
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium">Side</span>
+      <span className="font-display text-[10px] font-medium uppercase tracking-[0.2em] text-cyan-400/80">
+        Side
+      </span>
       <OptionSelect
         value={value}
         onValueChange={onChange}
-        placeholder={`Engine default (${sides[0]?.name ?? "first side"})`}
-        options={sides.map((s) => ({ value: s.name, label: s.name }))}
+        options={sides.map((s) => {
+          const logo = logos[s.name.toLowerCase()];
+          return {
+            value: s.name,
+            label: s.name,
+            icon: logo ? (
+              <FactionLogo logo={logo} sideName={s.name} size={16} />
+            ) : undefined,
+          };
+        })}
         size="sm"
       />
     </div>

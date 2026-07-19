@@ -37,29 +37,44 @@ const VALUE: Record<HudAccent, string> = {
 
 /**
  * A translucent card with L-shaped corner accents (top-left + bottom-right),
- * echoing the mockup's console framing. `accent` colours the corners.
+ * echoing the mockup's console framing. `accent` colours the corners from the
+ * semantic palette; `accentColor` overrides that with an arbitrary CSS colour
+ * (e.g. the owning faction's colour), taking precedence when set.
  */
 export function BracketFrame({
   accent = "neutral",
+  accentColor,
   className,
   children,
 }: {
   accent?: HudAccent;
+  accentColor?: string;
   className?: string;
   children: ReactNode;
 }) {
-  const corner = BRACKET[accent];
+  const corner = accentColor ? "" : BRACKET[accent];
+  const cornerStyle = accentColor ? { borderColor: accentColor } : undefined;
+  // The corner accents are absolutely positioned, so the frame must establish a
+  // positioning context. Add `relative` only when the caller hasn't set its own
+  // position — otherwise Tailwind's `.relative` would override a caller's
+  // `absolute`/`fixed` (they share specificity; `.relative` is emitted later),
+  // dropping a self-positioned panel out of place.
+  const positioned = /(?:^|\s)(?:absolute|fixed|sticky|relative)(?:\s|$)/.test(
+    className ?? "",
+  );
   return (
     <div
-      className={`relative rounded-md border border-border/50 bg-card/70 ${className ?? ""}`}
+      className={`${positioned ? "" : "relative"} rounded-md border border-border/50 bg-card/70 ${className ?? ""}`}
     >
       <span
         aria-hidden
         className={`pointer-events-none absolute left-0 top-0 size-2.5 rounded-tl-md border-l-2 border-t-2 ${corner}`}
+        style={cornerStyle}
       />
       <span
         aria-hidden
         className={`pointer-events-none absolute bottom-0 right-0 size-2.5 rounded-br-md border-b-2 border-r-2 ${corner}`}
+        style={cornerStyle}
       />
       {children}
     </div>

@@ -163,6 +163,15 @@ export interface BattleRecord {
   outcome: "victory" | "defeat";
 }
 
+/** One ownership change made by the enemy round, for the "Last turn" recap. */
+export interface TurnEvent {
+  /** The faction that captured the node. */
+  factionId: string;
+  nodeId: string;
+  /** Previous owner: a faction id or {@link NEUTRAL}. */
+  from: string;
+}
+
 /** Persistent state of one conquest run, stored apart from the (possibly
  * read-only bundled) galaxy document. */
 export interface ConquestState {
@@ -180,10 +189,15 @@ export interface ConquestState {
    * monotonically (see `../fog`); absent/ignored when fog is off.
    */
   revealed?: string[];
-  incursion?: Incursion;
+  /** Active enemy threats against player systems (advance warnings the player
+   * may defend before {@link Incursion.expiresOnTurn}). Several may be open at
+   * once. */
+  incursions: Incursion[];
   status: "active" | "won" | "lost";
   /** Most recent battles, oldest first (capped, see {@link HISTORY_CAP}). */
   history: BattleRecord[];
+  /** Captures made by the most recent enemy round, for the map recap. */
+  lastRound?: TurnEvent[];
   updatedAt: string;
 }
 
@@ -526,6 +540,7 @@ export function newConquestState(
     revealed: galaxy.rules?.fogOfWar
       ? expandRevealed(galaxy, owners, playerFactionId)
       : undefined,
+    incursions: [],
     status: "active",
     history: [],
     updatedAt: now,
@@ -554,12 +569,15 @@ export function reconcileState(
   const playerFactionId = factionIds.has(state.playerFactionId)
     ? state.playerFactionId
     : galaxy.playerFactionId;
-  const incursion =
-    state.incursion &&
-    owners[state.incursion.nodeId] === playerFactionId &&
-    factionIds.has(state.incursion.factionId)
-      ? state.incursion
-      : undefined;
+  // Migrate a pre-existing singular `incursion` save into the `incursions`
+  // array, then keep only those still valid (target still player-owned, faction
+  // still present).
+  const legacy = state as ConquestState & { incursion?: Incursion };
+  const incursions = (
+    state.incursions ?? (legacy.incursion ? [legacy.incursion] : [])
+  ).filter(
+    (i) => owners[i.nodeId] === playerFactionId && factionIds.has(i.factionId),
+  );
   // Fog of war: drop revealed ids for nodes that vanished, and seed a missing
   // set from current territory so a save from before fog was enabled (or a
   // corrupted one) heals into a sensible starting view.
@@ -569,7 +587,8 @@ export function reconcileState(
     const prev = (state.revealed ?? []).filter((id) => nodeIds.has(id));
     revealed = expandRevealed(galaxy, owners, playerFactionId, prev);
   }
-  return { ...state, owners, playerFactionId, revealed, incursion };
+  const { incursion: _legacy, ...rest } = legacy;
+  return { ...rest, owners, playerFactionId, revealed, incursions };
 }
 
 /**

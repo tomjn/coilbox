@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
 import { resolveGameByShortname } from "../../conquest/model";
+import { BracketFrame } from "../../conquest/pages/components/hudChrome";
 import { buildEdgeMap, reachableFrom } from "../../content/buildTree";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../../content/config";
 import {
@@ -347,7 +348,7 @@ function InspectPanel({
   const tint = NODE_TINT[node.type];
   return (
     // A subtle wash of the node's type colour over the card (no slop border).
-    <div className="pointer-events-auto relative flex w-72 flex-col overflow-hidden rounded-lg border border-border/50 bg-card/85 p-4 backdrop-blur-sm">
+    <BracketFrame className="pointer-events-auto flex w-72 flex-col overflow-hidden p-4 backdrop-blur-sm">
       <span
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -357,7 +358,7 @@ function InspectPanel({
         <div className="flex items-start justify-between">
           <div>
             <div
-              className="text-[10px] font-semibold uppercase tracking-wider"
+              className="font-display text-[10px] font-semibold uppercase tracking-wider"
               style={{ color: tint }}
             >
               {NODE_TITLE[node.type]}
@@ -402,7 +403,7 @@ function InspectPanel({
           </Button>
         )}
       </div>
-    </div>
+    </BracketFrame>
   );
 }
 
@@ -426,14 +427,14 @@ function EndScreen({
   ];
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
-      <div className="flex w-[30rem] max-w-full flex-col items-center gap-5 rounded-xl border border-border/50 bg-card/95 p-7 text-center">
+      <BracketFrame className="flex w-[30rem] max-w-full flex-col items-center gap-5 p-7 text-center">
         <Trophy
           className={`size-9 ${won ? "text-yellow-300" : "text-muted-foreground"}`}
           aria-hidden
         />
         <div className="flex flex-col gap-1">
           <h2
-            className={`text-2xl font-bold ${won ? "text-emerald-400" : "text-red-400"}`}
+            className={`font-display text-2xl font-bold uppercase tracking-wide ${won ? "text-emerald-400" : "text-red-400"}`}
           >
             {won ? "Warpath complete" : "Warpath ended"}
           </h2>
@@ -456,7 +457,7 @@ function EndScreen({
             Back to warpath hub
           </Button>
         </Link>
-      </div>
+      </BracketFrame>
     </div>
   );
 }

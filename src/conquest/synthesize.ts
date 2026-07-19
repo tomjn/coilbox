@@ -33,7 +33,9 @@ function opposingFaction(
   mode: "attack" | "defend",
 ): Faction | undefined {
   const id =
-    mode === "defend" ? state.incursion?.factionId : state.owners[node.id];
+    mode === "defend"
+      ? state.incursions.find((i) => i.nodeId === node.id)?.factionId
+      : state.owners[node.id];
   return galaxy.factions.find((f) => f.id === id);
 }
 
