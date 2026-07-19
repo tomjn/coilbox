@@ -32,6 +32,24 @@ export function disabledUnitsFor(
 }
 
 /**
+ * Sum a perk list into its two team levers: `advantage` (an `Advantage` fraction
+ * addend) and `income` (an `IncomeMultiplier` addend). Pure — shared by the live
+ * launch (`applyPerks`) and the preset snapshot so both compute the same totals.
+ */
+export function perkTotals(perks: Perk[]): {
+  advantage: number;
+  income: number;
+} {
+  let advantage = 0;
+  let income = 0;
+  for (const p of perks) {
+    if (p.kind === "advantage") advantage += p.value;
+    else if (p.kind === "income") income += p.value;
+  }
+  return { advantage, income };
+}
+
+/**
  * Apply the run's accumulated personal perks to the player's team in a built
  * {@link BattleConfig}. Perks are the *asymmetric* power the engine does support
  * per team: `advantage` sums into the team's `Advantage` fraction,
@@ -42,12 +60,7 @@ export function disabledUnitsFor(
 export function applyPerks(config: BattleConfig, perks: Perk[]): BattleConfig {
   const team = config.teams[0];
   if (!team) return config;
-  let advantage = 0;
-  let income = 0;
-  for (const p of perks) {
-    if (p.kind === "advantage") advantage += p.value;
-    else if (p.kind === "income") income += p.value;
-  }
+  const { advantage, income } = perkTotals(perks);
   if (advantage > 0) {
     team.advantage = (team.advantage ?? 0) + advantage;
   }

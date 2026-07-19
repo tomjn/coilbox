@@ -1,6 +1,7 @@
 import { isBlackHex, pickTeamColorHex } from "@/lib/teamColor";
 import type { SkirmishAi } from "../content/bindings";
 import type { BattleConfig } from "./bindings";
+import type { BattleRestrictions } from "./drafts";
 
 /**
  * The pure participant model and its derivation to an engine `BattleConfig`,
@@ -277,4 +278,26 @@ export function toBattleConfig(opts: {
         ? Object.fromEntries(disabledUnits.map((name) => [name, 0]))
         : undefined,
   };
+}
+
+/**
+ * Re-apply a captured battle's personal levers onto a built config's player team
+ * (team 0 = "you"). Mirrors warpath's `applyPerks`: `advantage` adds to the team's
+ * `Advantage` fraction (default 0), `incomeMultiplier` to its `IncomeMultiplier`
+ * (default 1). Disabled units are handled by `toBattleConfig`'s own param, so this
+ * only touches the two team levers a preset can't express through participants.
+ * Mutates and returns `config` for chaining; a config with no teams is untouched.
+ */
+export function applyRestrictions(
+  config: BattleConfig,
+  restrictions?: BattleRestrictions,
+): BattleConfig {
+  const team = config.teams[0];
+  if (!restrictions || !team) return config;
+  if (restrictions.advantage)
+    team.advantage = (team.advantage ?? 0) + restrictions.advantage;
+  if (restrictions.incomeMultiplier)
+    team.incomeMultiplier =
+      (team.incomeMultiplier ?? 1) + restrictions.incomeMultiplier;
+  return config;
 }

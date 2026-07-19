@@ -38,6 +38,7 @@ export default defineConfig({
       {
         text: "Guides",
         items: [
+          { text: "Battle presets", link: "/presets" },
           { text: "Portable mode", link: "/portable-mode" },
           { text: "Distribution profile", link: "/distribution-profile" },
           { text: "Branding catalog", link: "/branding-catalog" },

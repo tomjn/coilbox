@@ -11,6 +11,7 @@ import {
   dlDownloadMap,
 } from "../../../downloads/bindings";
 import { usePreferredTarget } from "../../../play/config";
+import { SaveAsPresetButton } from "../../../play/pages/components/SaveAsPresetButton";
 import type { RogueliteRun, RunNode } from "../../model";
 import { useRunEncounter } from "../../runlite-run";
 
@@ -58,6 +59,18 @@ export function EncounterOverlay({
           onClick={onClose}
           className="absolute right-full top-0 mr-4"
         />
+        {/* Its own gutter box beneath the back arrow — save this fight as a
+            skirmish preset to replay later. Prefers the exact draft last launched
+            (so an outcome save captures the fight as fought, with its restrictions
+            and perks), else the live briefing snapshot. */}
+        {enc.installedGame && (
+          <SaveAsPresetButton
+            appearance="gutter"
+            getDraft={() => enc.lastSnapshot ?? enc.snapshot()}
+            defaultName={`${kindLabel} — ${spec?.mapName ?? "battle"}`}
+            className="absolute right-full top-16 mr-4"
+          />
+        )}
         <header className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 text-lg font-semibold">
             <Swords className="size-5 text-primary" aria-hidden />

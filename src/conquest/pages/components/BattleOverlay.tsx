@@ -17,6 +17,7 @@ import {
   dlDownloadMap,
 } from "../../../downloads/bindings";
 import { usePreferredTarget } from "../../../play/config";
+import { SaveAsPresetButton } from "../../../play/pages/components/SaveAsPresetButton";
 import { factionSides } from "../../galaxy3d/factionShape";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../../model";
 import { resolveGameByShortname } from "../../model";
@@ -99,6 +100,18 @@ export function BattleOverlay({
           onClick={onClose}
           className="absolute right-full top-0 mr-4"
         />
+        {/* Its own gutter box beneath the back arrow — save this fight as a
+            skirmish preset to replay later. Prefers the exact draft last launched
+            (so an outcome save captures the fight as fought, not the node's
+            now-advanced next matchup), else the live briefing snapshot. */}
+        {run.installedGame && (
+          <SaveAsPresetButton
+            appearance="gutter"
+            getDraft={() => run.lastSnapshot ?? run.snapshot()}
+            defaultName={`${node.name} vs ${enemyFaction?.name ?? "garrison"}`}
+            className="absolute right-full top-16 mr-4"
+          />
+        )}
         <header className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 text-lg font-semibold">
             {mode === "defend" ? (

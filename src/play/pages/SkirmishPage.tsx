@@ -17,6 +17,7 @@ import type { BattleConfig } from "../bindings";
 import { playExportPreset, playImportPreset } from "../bindings";
 import {
   aiKey,
+  applyRestrictions,
   defaultAi,
   initialParticipants,
   makeAiParticipant,
@@ -28,7 +29,7 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "../config";
-import { useSkirmishDraft } from "../drafts";
+import { type BattleRestrictions, useSkirmishDraft } from "../drafts";
 import { effectiveOptions } from "../modOptions";
 import { usePlay } from "../PlayProvider";
 import {
@@ -41,6 +42,20 @@ import { GameSelectCard } from "./components/GameSelectCard";
 import { MapCard } from "./components/MapCard";
 import { ParticipantsTable } from "./components/ParticipantsTable";
 import { PresetsDrawer } from "./components/PresetsDrawer";
+
+/** A human summary of a loaded preset's faithful-replay restrictions, for the
+ * banner that makes an otherwise-invisible disabled-unit/perk set visible. */
+function restrictionSummary(r: BattleRestrictions): string {
+  const parts: string[] = [];
+  const units = r.disabledUnits?.length ?? 0;
+  if (units > 0) parts.push(`${units} unit${units === 1 ? "" : "s"} disabled`);
+  if (r.advantage) parts.push(`+${Math.round(r.advantage * 100)}% advantage`);
+  if (r.incomeMultiplier)
+    parts.push(`+${Math.round(r.incomeMultiplier * 100)}% income`);
+  return parts.length > 0
+    ? `Restricted battle — ${parts.join(" · ")}`
+    : "Restricted battle";
+}
 
 /** Basic singleplayer (skirmish) launcher: pick a game, map and opponents, then
  * launch the engine. Uses the preferred engine silently (no picker). */
@@ -66,6 +81,12 @@ export default function SkirmishPage() {
   const [modOptionValues, setModOptionValues] = useState<
     Record<string, string>
   >(() => draft.modOptionValues);
+  // Faithful-replay restrictions carried by a loaded conquest/warpath/MP preset
+  // (disabled units + team-0 perks). Undefined for a hand-built skirmish. Held here
+  // so `buildConfig` re-applies them on launch and the banner can show/clear them.
+  const [restrictions, setRestrictions] = useState<
+    BattleRestrictions | undefined
+  >(() => draft.restrictions);
   const [error, setError] = useState<string | null>(null);
 
   const [presetsOpen, setPresetsOpen] = useState(false);
@@ -183,6 +204,7 @@ export default function SkirmishPage() {
         mapName,
         startPosType,
         modOptionValues,
+        restrictions,
       });
     }, 400);
     return () => clearTimeout(id);
@@ -192,6 +214,7 @@ export default function SkirmishPage() {
     mapName,
     startPosType,
     modOptionValues,
+    restrictions,
     setDraft,
   ]);
 
@@ -241,13 +264,19 @@ export default function SkirmishPage() {
   // or map isn't selected yet. Shared by launch and export so they never drift.
   function buildConfig(): BattleConfig | null {
     if (!selectedGame || !selectedMap) return null;
-    return toBattleConfig({
-      participants,
-      mapName: selectedMap.name,
-      gameType: selectedGame.name,
-      startPosType,
-      modOptions: effectiveOptions(modOptions, modOptionValues),
-    });
+    // Disabled units render into `[RESTRICT]` via `toBattleConfig`; the team-0
+    // perk levers are re-applied afterwards. Both no-op for a hand-built setup.
+    return applyRestrictions(
+      toBattleConfig({
+        participants,
+        mapName: selectedMap.name,
+        gameType: selectedGame.name,
+        startPosType,
+        modOptions: effectiveOptions(modOptions, modOptionValues),
+        disabledUnits: restrictions?.disabledUnits,
+      }),
+      restrictions,
+    );
   }
 
   async function onStart() {
@@ -276,6 +305,7 @@ export default function SkirmishPage() {
       mapName,
       startPosType,
       modOptionValues,
+      restrictions,
     });
 
   const loadPreset = (p: SkirmishPreset) => {
@@ -291,6 +321,7 @@ export default function SkirmishPage() {
     setMapName(p.mapName);
     setStartPosType(p.startPosType);
     setModOptionValues(p.modOptionValues);
+    setRestrictions(p.restrictions);
     touchPreset(p.id);
   };
 
@@ -407,6 +438,21 @@ export default function SkirmishPage() {
 
       <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,14rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,17rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="flex flex-col gap-5">
+          {restrictions && (
+            <Alert className="p-3">
+              <AlertDescription className="flex items-center justify-between gap-3 text-sm">
+                <span>{restrictionSummary(restrictions)}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={running}
+                  onClick={() => setRestrictions(undefined)}
+                >
+                  Clear
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
           <ParticipantsTable
             participants={participants}
             sides={sides}

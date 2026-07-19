@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { isBlackHex } from "@/lib/teamColor";
+import type { BattleConfig } from "./bindings";
 import {
   aiByline,
+  applyRestrictions,
   initialParticipants,
   makeAiParticipant,
   PALETTE,
@@ -119,6 +121,37 @@ describe("toBattleConfig AI blocks", () => {
         host: 0,
       },
     ]);
+  });
+});
+
+describe("applyRestrictions", () => {
+  const cfg = (): BattleConfig =>
+    toBattleConfig({
+      participants: [you(PALETTE[0]), ai("a", PALETTE[1])],
+      mapName: "m",
+      gameType: "g",
+      startPosType: 0,
+      modOptions: {},
+    });
+
+  it("adds advantage and income onto the player team (team 0)", () => {
+    const out = applyRestrictions(cfg(), {
+      advantage: 0.1,
+      incomeMultiplier: 0.2,
+    });
+    expect(out.teams[0].advantage).toBeCloseTo(0.1, 5);
+    expect(out.teams[0].incomeMultiplier).toBeCloseTo(1.2, 5);
+  });
+
+  it("leaves the config untouched when there are no restrictions", () => {
+    const out = applyRestrictions(cfg(), undefined);
+    expect(out.teams[0].advantage).toBeUndefined();
+    expect(out.teams[0].incomeMultiplier).toBeUndefined();
+  });
+
+  it("is a no-op on a team-less config", () => {
+    const empty = { ...cfg(), teams: [] };
+    expect(() => applyRestrictions(empty, { advantage: 0.5 })).not.toThrow();
   });
 });
 
