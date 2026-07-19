@@ -39,6 +39,7 @@ import { mergeConquestNames } from "../names";
 import { attackableNodes } from "../rules";
 import { BackToMapButton } from "./components/BackToMapButton";
 import { BattleOverlay } from "./components/BattleOverlay";
+import { BracketFrame } from "./components/hudChrome";
 import { FactionDot, SidePicker } from "./components/RunSetup";
 
 /**
@@ -204,18 +205,18 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
 
       {/* Top status bar */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-3">
-        <div className="pointer-events-auto flex items-center gap-3 px-1">
+        <BracketFrame className="pointer-events-auto flex items-center gap-3 px-3 py-2">
           <Link
             to="/conquest"
-            className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground"
+            className="flex items-center gap-1 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" aria-hidden /> Conquest
           </Link>
-          <span className="text-sm font-semibold uppercase tracking-wider">
+          <span className="font-display text-sm font-semibold uppercase tracking-wide text-foreground">
             {galaxy.title}
           </span>
           {state && (
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">
+            <span className="rounded border border-border/60 px-1.5 py-0.5 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               Turn {state.turn}
             </span>
           )}
@@ -226,7 +227,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
               visible={visibleIds}
             />
           )}
-        </div>
+        </BracketFrame>
         {state?.incursion && state.status === "active" && (
           <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-950/70 px-3 py-2 text-xs text-amber-200 backdrop-blur-sm">
             <ShieldAlert className="size-4 animate-pulse" aria-hidden />
@@ -341,9 +342,13 @@ function TerritoryTally({
         >
           <FactionDot color={f.color} sides={factionSides(galaxy, f.id)} />
           {f.id === state.playerFactionId && (
-            <span className="uppercase tracking-wide text-[10px]">You</span>
+            <span className="font-display text-[10px] uppercase tracking-[0.18em]">
+              You
+            </span>
           )}
-          {counts.get(f.id) ?? 0}
+          <span className="font-mono tabular-nums">
+            {counts.get(f.id) ?? 0}
+          </span>
         </span>
       ))}
       {(counts.get(NEUTRAL) ?? 0) > 0 && (
