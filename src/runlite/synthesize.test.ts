@@ -11,6 +11,7 @@ function run(): RogueliteRun {
   return {
     schemaVersion: 1,
     type: "roguelite-run",
+    name: "Test Reach",
     settings: {
       seed: 1,
       length: "standard",

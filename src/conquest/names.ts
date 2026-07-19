@@ -1,4 +1,4 @@
-import { pick, type Rng, shuffled } from "./rng";
+import { mulberry32, pick, type Rng, shuffled } from "./rng";
 
 /**
  * Naming and faction flavour for procedural galaxies. Kept apart from the
@@ -398,4 +398,43 @@ export function factionSpecs(
     });
   }
   return out;
+}
+
+/** Place-nouns for a warpath's sector name (paired with a {@link FACTION_ADJ}
+ * adjective, e.g. "Crimson Reach"). Distinct from {@link FACTION_NOUN}, which
+ * names polities rather than regions of space. */
+const SECTOR_NOUN = [
+  "Reach",
+  "Expanse",
+  "Rift",
+  "Verge",
+  "Marches",
+  "Belt",
+  "Drift",
+  "Frontier",
+  "Waste",
+  "Sprawl",
+  "Divide",
+  "Gulf",
+  "Span",
+  "Fringe",
+  "Corridor",
+  "Deep",
+];
+
+/** A single evocative "&lt;adjective&gt; &lt;place-noun&gt;" sector name (e.g.
+ * "Obsidian Rift"), drawn from the given rng. */
+export function sectorName(rng: Rng): string {
+  return `${pick(rng, FACTION_ADJ)} ${pick(rng, SECTOR_NOUN)}`;
+}
+
+/**
+ * The sector name for a run seed, derived on a *separate* rng stream (the seed
+ * XORed with a fixed salt) so naming never perturbs the main run generator's
+ * draw sequence. Deterministic from the seed alone, so a run loaded from disk
+ * and a freshly generated one always agree — letting a nameless save be
+ * backfilled without storing anything.
+ */
+export function sectorNameForSeed(seed: number): string {
+  return sectorName(mulberry32((seed ^ 0x5ec70d5) >>> 0));
 }

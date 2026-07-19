@@ -21,6 +21,18 @@ import {
  * mirror lets saves build on the latest value without waiting for a React
  * flush, so two quick saves can't clobber each other.
  */
+/**
+ * Session cache of loaded runs, kept warm by {@link useRuns}. Mirrors conquest's
+ * `getCachedGalaxy`: it exists for non-React callers that need a run now —
+ * chiefly the breadcrumb `crumb` resolver, which can't use hooks.
+ */
+let cache: Record<string, RogueliteRun> = {};
+
+/** Synchronous best-effort read of a loaded run from the session cache. */
+export function getCachedRun(id: string): RogueliteRun | undefined {
+  return cache[id];
+}
+
 export function useRuns() {
   const [runs, setRuns] = useState<Record<string, RogueliteRun>>({});
   const [loading, setLoading] = useState(true);
@@ -34,6 +46,7 @@ export function useRuns() {
       const { json } = await runliteStateLoad({});
       const { runs: parsed } = parseRunStateFile(json);
       runsRef.current = parsed;
+      cache = parsed;
       setRuns(parsed);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -44,6 +57,7 @@ export function useRuns() {
 
   const persist = useCallback(async (next: Record<string, RogueliteRun>) => {
     runsRef.current = next;
+    cache = next;
     setRuns(next);
     await runliteStateSave({
       json: JSON.stringify({ schemaVersion: 1, runs: next }),

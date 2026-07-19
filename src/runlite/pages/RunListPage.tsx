@@ -1,5 +1,5 @@
 import { Button, useDrawer } from "@picoframe/frame";
-import { Loader2, Play, Swords, Trash2 } from "lucide-react";
+import { Loader2, Play, Rocket, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
@@ -46,7 +46,7 @@ export default function RunListPage() {
       <header className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 text-lg font-semibold">
-            <Swords className="size-5 text-primary" aria-hidden /> Warpath
+            <Rocket className="size-5 text-primary" aria-hidden /> Warpath
           </h1>
           <p className="max-w-xl text-sm text-muted-foreground">
             Cross a forward-only map once — fight, take rewards, grow your
@@ -56,7 +56,7 @@ export default function RunListPage() {
         </div>
         {hasGames && (
           <Button onClick={openSetup} className="shrink-0">
-            <Swords className="mr-1.5 size-4" aria-hidden /> New warpath
+            <Rocket className="mr-1.5 size-4" aria-hidden /> New warpath
           </Button>
         )}
       </header>
@@ -138,9 +138,9 @@ function RunCard({
           />
         )}
         <div>
-          <div className="font-medium">{label}</div>
+          <div className="font-medium">{run.name}</div>
           <div className="text-xs text-muted-foreground">
-            {run.settings.game.shortname} · health {hull}/{maxHull}
+            {label} · {run.settings.game.shortname} · health {hull}/{maxHull}
           </div>
         </div>
       </div>

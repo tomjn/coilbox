@@ -11,6 +11,7 @@ function baseRun(): RogueliteRun {
   return {
     schemaVersion: 1,
     type: "roguelite-run",
+    name: "Test Reach",
     settings: {
       seed: 42,
       length: "standard",
@@ -70,6 +71,21 @@ describe("parseRunJson", () => {
     ]);
     expect(parsed?.settings.game.shortname).toBe("ba");
     expect(parsed?.progress.currentNodeId).toBe("n0");
+  });
+
+  it("keeps a stored name and backfills a stable one for older saves", () => {
+    const run = baseRun();
+    // A save that carries a name round-trips it unchanged.
+    expect(parseRunJson(JSON.stringify(run))?.name).toBe("Test Reach");
+
+    // A save predating the field gets a name derived from its seed — and the
+    // same seed always yields the same name (so reloads are stable).
+    const legacy = baseRun() as Partial<RogueliteRun>;
+    delete legacy.name;
+    const a = parseRunJson(JSON.stringify(legacy));
+    const b = parseRunJson(JSON.stringify(legacy));
+    expect(a?.name).toBeTruthy();
+    expect(a?.name).toBe(b?.name);
   });
 
   it("rejects a non-run document", () => {

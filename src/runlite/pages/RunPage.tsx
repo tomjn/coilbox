@@ -165,6 +165,9 @@ export default function RunPage() {
           hides the sidebar nav. The inspect panel flows below the gauges in the
           same column, so it shares the gauges' gap and never overlaps them. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4">
+        <div className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300/90 drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
+          {run.name}
+        </div>
         <div className="flex items-stretch gap-3">
           {selectedId && !active ? (
             // A node is selected (read-only inspect): the left control steps

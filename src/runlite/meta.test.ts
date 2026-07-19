@@ -6,6 +6,7 @@ function run(status: "won" | "lost", ascension = 0, deepest = 4): RogueliteRun {
   return {
     schemaVersion: 1,
     type: "roguelite-run",
+    name: "Test Reach",
     settings: {
       seed: 1,
       length: "standard",
