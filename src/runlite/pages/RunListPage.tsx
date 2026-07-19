@@ -1,6 +1,10 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Loader2, Play, Swords, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { FactionLogo } from "@/factions/FactionLogo";
+import type { FactionLogoSrc } from "@/factions/fallback";
+import { useFactionLogo } from "@/factions/logos";
+import { resolveGameByShortname } from "../../conquest/model";
 import { useUnitsyncScan } from "../../content/config";
 import { EmptyState } from "../../content/pages/components/states";
 import { usePreferredTarget } from "../../play/config";
@@ -20,6 +24,21 @@ export default function RunListPage() {
   const { run: activeRun, save } = useRun();
 
   const hasGames = (scan.data?.games.length ?? 0) > 0;
+
+  // The active run's chosen faction emblem (by its in-game side), shown on the card.
+  const runGame = activeRun
+    ? resolveGameByShortname(activeRun.settings.game, scan.data?.games ?? [])
+    : null;
+  const runLogo = useFactionLogo(
+    {
+      game: runGame ?? undefined,
+      enginePath: target?.enginePath,
+      dataDir: target?.dataDir,
+      gameArchive: runGame?.primaryArchive.name,
+      size: 32,
+    },
+    activeRun?.settings.side,
+  );
 
   const openSetup = () =>
     drawer.open({
@@ -69,6 +88,8 @@ export default function RunListPage() {
       ) : activeRun ? (
         <ActiveRunCard
           game={activeRun.settings.game.shortname}
+          side={activeRun.settings.side}
+          logo={runLogo}
           health={`${activeRun.progress.hull}/${activeRun.progress.maxHull}`}
           status={activeRun.progress.status}
           onResume={() => navigate("/warpath/active")}
@@ -83,12 +104,16 @@ export default function RunListPage() {
 
 function ActiveRunCard({
   game,
+  side,
+  logo,
   health,
   status,
   onResume,
   onAbandon,
 }: {
   game: string;
+  side?: string;
+  logo?: FactionLogoSrc;
   health: string;
   status: "active" | "won" | "lost";
   onResume: () => void;
@@ -102,10 +127,20 @@ function ActiveRunCard({
         : "Warpath in progress";
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
-      <div>
-        <div className="font-medium">{label}</div>
-        <div className="text-xs text-muted-foreground">
-          {game} · health {health}
+      <div className="flex items-center gap-3">
+        {logo && (
+          <FactionLogo
+            logo={logo}
+            sideName={side}
+            size={32}
+            className="text-primary"
+          />
+        )}
+        <div>
+          <div className="font-medium">{label}</div>
+          <div className="text-xs text-muted-foreground">
+            {game} · health {health}
+          </div>
         </div>
       </div>
       <div className="flex gap-2">

@@ -3,6 +3,8 @@ import { Loader2, Swords } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { FactionLogo } from "@/factions/FactionLogo";
+import { useFactionLogos } from "@/factions/logos";
 import {
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
@@ -97,6 +99,13 @@ export function RunSetupForm({ onStarted }: { onStarted: () => void }) {
   const { ais } = useSkirmishAis(target?.enginePath, target?.dataDir, archive);
 
   const sides = info?.sides ?? [];
+  const factionLogos = useFactionLogos({
+    game: game ?? undefined,
+    enginePath: target?.enginePath,
+    dataDir: target?.dataDir,
+    gameArchive: archive,
+    sideNames: sides.map((s) => s.name),
+  });
   useEffect(() => {
     if (sides.length > 0 && !sides.some((s) => s.name === sideName)) {
       setSideName(sides[0].name);
@@ -188,7 +197,16 @@ export function RunSetupForm({ onStarted }: { onStarted: () => void }) {
                   value={s.name}
                   className={toggleItem}
                 >
-                  {s.name}
+                  <span className="flex items-center gap-1.5">
+                    {factionLogos[s.name.toLowerCase()] && (
+                      <FactionLogo
+                        logo={factionLogos[s.name.toLowerCase()]}
+                        sideName={s.name}
+                        size={16}
+                      />
+                    )}
+                    {s.name}
+                  </span>
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>

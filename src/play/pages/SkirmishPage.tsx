@@ -11,6 +11,7 @@ import {
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { useFactionLogos } from "@/factions/logos";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import type { BattleConfig } from "../bindings";
 import { playExportPreset, playImportPreset } from "../bindings";
@@ -101,6 +102,13 @@ export default function SkirmishPage() {
   const [lastAi, setLastAi] = useLastAi();
   const minimap = useUnitsyncMinimap(enginePath, dataDir, selectedMap?.name);
   const sides = gameInfo.info?.sides ?? [];
+  const factionLogos = useFactionLogos({
+    game: selectedGame ?? undefined,
+    enginePath,
+    dataDir,
+    gameArchive,
+    sideNames: sides.map((s) => s.name),
+  });
   const modOptions = gameInfo.info?.options ?? [];
 
   // Default the game/map selections to the first available once a scan lands.
@@ -402,6 +410,7 @@ export default function SkirmishPage() {
           <ParticipantsTable
             participants={participants}
             sides={sides}
+            factionLogos={factionLogos}
             ais={ais}
             disabled={running}
             onUpdate={updateParticipant}

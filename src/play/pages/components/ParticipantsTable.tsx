@@ -18,6 +18,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Side, SkirmishAi } from "@/content/bindings";
+import { FactionLogo } from "@/factions/FactionLogo";
+import type { FactionLogoSrc } from "@/factions/fallback";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { aiByline, hexToRgb, type Participant, rgbToHex } from "../../config";
 
@@ -38,6 +40,7 @@ const aiLabel = (a: { name?: string; shortName: string }) =>
 export function ParticipantsTable({
   participants,
   sides,
+  factionLogos,
   ais,
   disabled,
   onUpdate,
@@ -46,6 +49,8 @@ export function ParticipantsTable({
 }: {
   participants: Participant[];
   sides: Side[];
+  /** Resolved faction emblems, keyed by lowercased side name (may be empty). */
+  factionLogos?: Record<string, FactionLogoSrc>;
   ais: SkirmishAi[];
   disabled?: boolean;
   onUpdate: (id: string, patch: Partial<Participant>) => void;
@@ -60,7 +65,16 @@ export function ParticipantsTable({
     teamByI.push(isSpec ? null : team++);
   }
 
-  const sideOptions = sides.map((s) => ({ value: s.name, label: s.name }));
+  const sideOptions = sides.map((s) => {
+    const logo = factionLogos?.[s.name.toLowerCase()];
+    return {
+      value: s.name,
+      label: s.name,
+      icon: logo ? (
+        <FactionLogo logo={logo} sideName={s.name} size={16} />
+      ) : undefined,
+    };
+  });
   // Offer allies up to the participant count so any FFA/teams split is reachable.
   const allyOptions = participants.map((_, i) => ({
     value: String(i),

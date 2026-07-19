@@ -1,5 +1,7 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { useMemo } from "react";
+import { FactionLogo } from "@/factions/FactionLogo";
+import type { FactionLogoSrc } from "@/factions/fallback";
 import type {
   Side,
   UnitBuildpicsResult,
@@ -32,12 +34,14 @@ export function FactionBuildButton({
   ctx,
   side,
   icon,
+  logo,
   unitLabel,
   count,
 }: {
   ctx: BuildContext;
   side: Side;
   icon?: string;
+  logo?: FactionLogoSrc;
   unitLabel?: string;
   count: number;
 }) {
@@ -75,7 +79,10 @@ export function FactionBuildButton({
             className="h-16 w-16 shrink-0 rounded object-contain"
           />
         )}
-        <span className="font-medium">{side.name}</span>
+        <span className="flex items-center gap-2 font-medium">
+          {logo && <FactionLogo logo={logo} sideName={side.name} size={20} />}
+          {side.name}
+        </span>
       </span>
       <span className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground">
         {count > 0 && <span>{count} units</span>}
@@ -94,6 +101,7 @@ export function FactionBuildList({
   sides,
   units,
   buildpics,
+  factionLogos,
 }: {
   enginePath: string;
   dataDir: string;
@@ -102,6 +110,8 @@ export function FactionBuildList({
   sides: Side[];
   units: UnitDatasetEntry[];
   buildpics: UnitBuildpicsResult | null;
+  /** Resolved faction emblems, keyed by lowercased side name (may be empty). */
+  factionLogos?: Record<string, FactionLogoSrc>;
 }) {
   const ctx: BuildContext = {
     enginePath,
@@ -136,6 +146,7 @@ export function FactionBuildList({
               ctx={ctx}
               side={s}
               icon={icon}
+              logo={factionLogos?.[s.name.toLowerCase()]}
               unitLabel={unitLabel}
               count={counts.get(s.name) ?? 0}
             />

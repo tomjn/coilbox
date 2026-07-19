@@ -3,7 +3,14 @@ import { Channel } from "@tauri-apps/api/core";
 import { Download, Loader2, ShieldAlert, Swords } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { invalidateMapPreview, invalidateScans } from "../../../content/config";
+import { FactionLogo } from "@/factions/FactionLogo";
+import type { FactionLogoSrc } from "@/factions/fallback";
+import { useFactionLogos } from "@/factions/logos";
+import {
+  invalidateMapPreview,
+  invalidateScans,
+  useUnitsyncScan,
+} from "../../../content/config";
 import { ErrorBanner } from "../../../content/pages/components/states";
 import {
   type DownloadProgress,
@@ -12,6 +19,7 @@ import {
 import { usePreferredTarget } from "../../../play/config";
 import { factionSides } from "../../galaxy3d/factionShape";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../../model";
+import { resolveGameByShortname } from "../../model";
 import { difficultyHandicap, difficultyTable } from "../../rules";
 import { useConquestBattleRun } from "../../run";
 import { BackToMapButton } from "./BackToMapButton";
@@ -46,6 +54,29 @@ export function BattleOverlay({
   const enemyCount =
     node.battle.enemyAiCount ?? difficultyTable(node.difficulty);
   const handicap = node.battle.handicap ?? difficultyHandicap(node.difficulty);
+
+  // Faction emblems for the briefing rows (chosen faction + opposition), by side.
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const installedGame = resolveGameByShortname(
+    galaxy.game,
+    scan.data?.games ?? [],
+  );
+  const factionLogos = useFactionLogos({
+    game: installedGame ?? undefined,
+    enginePath: target?.enginePath,
+    dataDir: target?.dataDir,
+    gameArchive: installedGame?.primaryArchive.name,
+    sideNames: [state.playerSide, enemyFaction?.side].filter(
+      (s): s is string => !!s,
+    ),
+  });
+  const playerLogo = state.playerSide
+    ? factionLogos[state.playerSide.toLowerCase()]
+    : undefined;
+  const enemyLogo = enemyFaction?.side
+    ? factionLogos[enemyFaction.side.toLowerCase()]
+    : undefined;
 
   return (
     // A transparent full-bleed layer captures clicks (so the map beneath isn't
@@ -93,6 +124,8 @@ export function BattleOverlay({
             enemySides={
               enemyFaction ? factionSides(galaxy, enemyFaction.id) : 0
             }
+            enemyLogo={enemyLogo}
+            playerLogo={playerLogo}
             enemyCount={enemyCount}
             handicap={handicap}
             run={run}
@@ -148,6 +181,8 @@ function Briefing({
   enemyName,
   enemyColor,
   enemySides,
+  enemyLogo,
+  playerLogo,
   enemyCount,
   handicap,
   run,
@@ -159,6 +194,8 @@ function Briefing({
   enemyName?: string;
   enemyColor?: string;
   enemySides?: number;
+  enemyLogo?: FactionLogoSrc;
+  playerLogo?: FactionLogoSrc;
   enemyCount: number;
   handicap: number;
   run: ReturnType<typeof useConquestBattleRun>;
@@ -176,7 +213,11 @@ function Briefing({
         <div className="flex justify-between gap-2">
           <dt className="text-muted-foreground">Opposition</dt>
           <dd className="flex items-center gap-1.5">
-            <FactionDot color={enemyColor ?? "#6b7280"} sides={enemySides} />
+            {enemyLogo ? (
+              <FactionLogo logo={enemyLogo} sideName={enemyName} size={16} />
+            ) : (
+              <FactionDot color={enemyColor ?? "#6b7280"} sides={enemySides} />
+            )}
             {enemyCount} × {enemyName ?? "garrison"}
             {handicap > 0 ? ` (+${handicap}%)` : ""}
           </dd>
@@ -185,10 +226,18 @@ function Briefing({
           <div className="flex justify-between gap-2">
             <dt className="text-muted-foreground">Fighting for</dt>
             <dd className="flex items-center gap-1.5">
-              <FactionDot
-                color={playerFaction.color}
-                sides={factionSides(galaxy, playerFaction.id)}
-              />
+              {playerLogo ? (
+                <FactionLogo
+                  logo={playerLogo}
+                  sideName={state.playerSide}
+                  size={16}
+                />
+              ) : (
+                <FactionDot
+                  color={playerFaction.color}
+                  sides={factionSides(galaxy, playerFaction.id)}
+                />
+              )}
               {playerFaction.name}
               {state.playerSide ? ` · ${state.playerSide}` : ""}
             </dd>

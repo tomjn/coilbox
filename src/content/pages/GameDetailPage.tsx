@@ -3,6 +3,7 @@ import { FolderOpen } from "lucide-react";
 import { useMemo } from "react";
 import { useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFactionLogos } from "@/factions/logos";
 import { type Archive, contentOpenPath } from "../bindings";
 import { useBrandingEntry } from "../branding";
 import {
@@ -78,6 +79,14 @@ export default function GameDetailPage() {
     game?.primaryArchive.name,
   );
   const brand = useBrandingEntry(game);
+  const factionLogos = useFactionLogos({
+    game,
+    enginePath: selected?.enginePath,
+    dataDir: selected?.rootPath,
+    gameArchive: game?.primaryArchive.name,
+    sideNames: gameInfo?.sides.map((s) => s.name) ?? [],
+    size: 20,
+  });
 
   if (error && !data)
     return (
@@ -168,6 +177,7 @@ export default function GameDetailPage() {
               sides={gameInfo.sides}
               units={dataset?.units ?? []}
               buildpics={buildpics}
+              factionLogos={factionLogos}
             />
           )}
         </section>

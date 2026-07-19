@@ -4,6 +4,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { FactionLogo } from "@/factions/FactionLogo";
+import type { FactionLogoSrc } from "@/factions/fallback";
 import type { RogueliteRun } from "../../model";
 
 /** Top HUD: health, depth, salvage, and the shared arsenal ceiling, each with a
@@ -11,9 +13,14 @@ import type { RogueliteRun } from "../../model";
 export function RunHud({
   run,
   arsenalTotal,
+  logo,
+  side,
 }: {
   run: RogueliteRun;
   arsenalTotal?: number;
+  /** The run's chosen faction emblem, shown as a leading tile when resolved. */
+  logo?: FactionLogoSrc;
+  side?: string;
 }) {
   const p = run.progress;
   const maxCol = Math.max(...run.nodes.map((n) => n.col), 1);
@@ -24,6 +31,11 @@ export function RunHud({
   const hullPct = Math.round((p.hull / p.maxHull) * 100);
   return (
     <div className="flex flex-wrap items-stretch gap-3">
+      {logo && (
+        <div className="flex min-w-[4rem] items-center justify-center rounded-md border border-border/50 bg-card/70 px-3 py-2 text-foreground">
+          <FactionLogo logo={logo} sideName={side} size={32} />
+        </div>
+      )}
       <Gauge
         icon={<Heart className="size-4 text-cyan-400" aria-hidden />}
         label="Health"

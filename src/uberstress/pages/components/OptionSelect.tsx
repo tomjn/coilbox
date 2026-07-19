@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Select,
   SelectContent,
@@ -24,7 +25,14 @@ export function OptionSelect({
 }: {
   value: string;
   onValueChange: (value: string) => void;
-  options: { value: string; label: string; description?: string }[];
+  options: {
+    value: string;
+    label: string;
+    description?: string;
+    /** Optional leading glyph (e.g. a faction emblem). Rendered inside the item's
+     * `ItemText`, so Radix mirrors it into the trigger's selected value too. */
+    icon?: ReactNode;
+  }[];
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -38,7 +46,14 @@ export function OptionSelect({
       <SelectContent>
         {options.map((o) => (
           <SelectItem key={o.value} value={o.value} description={o.description}>
-            {o.label}
+            {o.icon ? (
+              <span className="flex items-center gap-2">
+                {o.icon}
+                {o.label}
+              </span>
+            ) : (
+              o.label
+            )}
           </SelectItem>
         ))}
       </SelectContent>
