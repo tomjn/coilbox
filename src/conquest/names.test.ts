@@ -5,6 +5,8 @@ import {
   makeStarNamer,
   mergeConquestNames,
   resolveConquestNames,
+  sectorName,
+  sectorNameForSeed,
   toRoman,
 } from "./names";
 import { mulberry32 } from "./rng";
@@ -153,5 +155,18 @@ describe("factionSpecs", () => {
     const names = resolveConquestNames({ factionNames: ["Red", "Blue"] });
     const specs = factionSpecs(mulberry32(3), names, 2);
     expect(specs.map((s) => s.name)).toEqual(["Red", "Blue"]);
+  });
+});
+
+describe("sectorName", () => {
+  it("composes an adjective + place-noun", () => {
+    expect(sectorName(mulberry32(1))).toMatch(/^\S+ \S+$/);
+  });
+
+  it("is deterministic from a seed and independent of the main stream", () => {
+    // Same seed -> same name, always.
+    expect(sectorNameForSeed(42)).toBe(sectorNameForSeed(42));
+    // Different seeds generally differ (spot-check a couple).
+    expect(sectorNameForSeed(1)).not.toBe(sectorNameForSeed(999));
   });
 });

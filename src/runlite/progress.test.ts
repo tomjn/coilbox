@@ -19,6 +19,7 @@ function run(): RogueliteRun {
   return {
     schemaVersion: 1,
     type: "roguelite-run",
+    name: "Test Reach",
     settings: {
       seed: 1,
       length: "standard",
@@ -154,6 +155,7 @@ function nodeRun(node: RunNode, salvage = 100, hull = 50): RogueliteRun {
   return {
     schemaVersion: 1,
     type: "roguelite-run",
+    name: "Test Reach",
     settings: {
       seed: 1,
       length: "standard",

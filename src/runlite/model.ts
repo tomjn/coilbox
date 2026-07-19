@@ -1,6 +1,7 @@
 import type { MapDownloadHint } from "../campaign/model";
 import { parseMapDownload } from "../campaign/model";
 import type { GameRef } from "../conquest/model";
+import { sectorNameForSeed } from "../conquest/names";
 
 /**
  * Roguelite-run schema — the single source of truth for the shape of an active
@@ -210,6 +211,10 @@ export const HISTORY_CAP = 200;
 export interface RogueliteRun {
   schemaVersion: 1;
   type: "roguelite-run";
+  /** Evocative sector name shown in the breadcrumb + hub list. Derived from the
+   * seed (see {@link sectorNameForSeed}), so it's stable and backfilled for
+   * saves that predate the field. */
+  name: string;
   settings: RunSettings;
   /** The game's build-tree root, resolved at generation for the disabled-set
    * computation. Absent if the dataset was unavailable (perk-only rewards). */
@@ -587,6 +592,12 @@ export function parseRunJson(json: string): RogueliteRun | null {
   return {
     schemaVersion: 1,
     type: "roguelite-run",
+    // Backfill a stable name for saves that predate the field (derived from the
+    // seed, so it matches a freshly generated run of the same seed).
+    name:
+      typeof data.name === "string" && data.name !== ""
+        ? data.name
+        : sectorNameForSeed(settings.seed),
     settings,
     startUnit:
       typeof data.startUnit === "string" && data.startUnit !== ""

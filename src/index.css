@@ -4,6 +4,14 @@
 @import "@picoframe/frame/theme.css";
 /* Country flag sprites (fi fi-xx) for lobby user/battle lists — see multiplayer/UserBadges. */
 @import "flag-icons/css/flag-icons.min.css";
+/* Oxanium: a self-hosted display face for the conquest/warpath "command console"
+   chrome only. Bundled (offline-safe, no CDN) like flag-icons above. Exposed as a
+   `font-display` utility via the theme token below; the app-wide default font is
+   left untouched, so only elements that opt in with `font-display` change. */
+@import "@fontsource-variable/oxanium";
+@theme {
+  --font-display: "Oxanium Variable", ui-sans-serif, system-ui, sans-serif;
+}
 
 html,
 body,

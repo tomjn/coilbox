@@ -1,5 +1,6 @@
 import type { MapDownloadHint } from "../campaign/model";
 import type { GameRef } from "../conquest/model";
+import { sectorNameForSeed } from "../conquest/names";
 import { mulberry32, pick, type Rng, randInt } from "../conquest/rng";
 import { buildBuildGraph } from "../content/buildTree";
 import type {
@@ -501,6 +502,7 @@ export function generateRun(opts: GenerateRunOpts): RogueliteRun {
   return {
     schemaVersion: 1,
     type: "roguelite-run",
+    name: sectorNameForSeed(opts.seed),
     settings: {
       seed: opts.seed,
       length: opts.length,

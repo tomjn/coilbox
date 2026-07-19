@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Swords } from "lucide-react";
+import { Rocket } from "lucide-react";
+import { getCachedRun } from "./runs";
 
 /**
  * The single-player roguelite Run plugin's frontend half — a forward-only node
@@ -27,7 +28,7 @@ const runlitePlugin: FramePlugin = {
           label: "Warpath",
           to: "/warpath",
           order: 3,
-          icon: Swords,
+          icon: Rocket,
         },
       ],
     },
@@ -41,7 +42,8 @@ const runlitePlugin: FramePlugin = {
     {
       path: "warpath/:runId",
       lazy: () => import("./pages/RunPage"),
-      crumb: "Active warpath",
+      crumb: (c) =>
+        (c.params.runId && getCachedRun(c.params.runId)?.name) || "Warpath",
     },
   ],
 };
