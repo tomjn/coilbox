@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { conquestList, conquestStateLoad, conquestStateSave } from "./bindings";
 import {
   type ConquestState,
@@ -123,59 +123,113 @@ export function getCachedGalaxy(id: string): LoadedGalaxy | undefined {
 const emptyStateFile: ConquestStateFile = { schemaVersion: 1, conquests: {} };
 
 /**
- * Load / save wrappers around the run-state commands. State is stored
- * separately from galaxy documents so bundled (read-only) galaxies still track
- * runs. Each galaxy's saved state is healed against its (possibly updated)
- * document via {@link reconcileState} on read.
+ * Shared run-state cache + listeners, so a save in one consumer (chiefly the
+ * battle overlay's `useConquestBattleRun`) is seen immediately by every other
+ * mounted {@link useConquestState} — above all the map. Without this each hook
+ * call held its own `useState` copy, so a resolved battle updated the overlay's
+ * copy and disk but left the map rendering the pre-battle turn/owners until a
+ * remount. Mirrors the galaxy-list cache above.
+ */
+let stateCache: ConquestStateFile | null = null;
+const stateListeners = new Set<(file: ConquestStateFile) => void>();
+
+/** Read + parse the run-state file from disk (empty on parse failure). */
+async function fetchStateFile(): Promise<ConquestStateFile> {
+  const { json } = await conquestStateLoad({});
+  try {
+    return JSON.parse(json) as ConquestStateFile;
+  } catch {
+    return emptyStateFile;
+  }
+}
+
+/** Re-read the run-state file, refresh the shared cache, and notify consumers. */
+export async function refreshConquestState(): Promise<ConquestStateFile> {
+  const file = await fetchStateFile();
+  stateCache = file;
+  for (const l of stateListeners) l(file);
+  return file;
+}
+
+/**
+ * Persist one galaxy's run state (or remove it with `undefined`), updating the
+ * shared cache and pushing it to every consumer so the map re-renders at once.
+ * Builds on the latest cache, so two quick saves don't clobber each other.
+ */
+async function saveConquestState(
+  galaxyId: string,
+  state: ConquestState | undefined,
+): Promise<void> {
+  const conquests = { ...(stateCache ?? emptyStateFile).conquests };
+  if (state) {
+    conquests[galaxyId] = state;
+  } else {
+    delete conquests[galaxyId];
+  }
+  const next: ConquestStateFile = { schemaVersion: 1, conquests };
+  stateCache = next;
+  for (const l of stateListeners) l(next);
+  await conquestStateSave({ json: JSON.stringify(next) });
+}
+
+/**
+ * Load / save wrappers around the run-state commands, backed by the shared
+ * cache above. State is stored separately from galaxy documents so bundled
+ * (read-only) galaxies still track runs. Each galaxy's saved state is healed
+ * against its (possibly updated) document via {@link reconcileState} on read.
  */
 export function useConquestState() {
-  const [file, setFile] = useState<ConquestStateFile>(emptyStateFile);
-  const [loading, setLoading] = useState(true);
+  const [file, setFile] = useState<ConquestStateFile>(
+    stateCache ?? emptyStateFile,
+  );
+  const [loading, setLoading] = useState(stateCache === null);
   const [error, setError] = useState<string | null>(null);
-  // Ref mirror so saveFor can build "latest + this change" without waiting on
-  // a state flush (two quick saves must not clobber each other).
-  const fileRef = useRef(file);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { json } = await conquestStateLoad({});
-      let parsed = emptyStateFile;
-      try {
-        parsed = JSON.parse(json) as ConquestStateFile;
-      } catch {
-        parsed = emptyStateFile;
-      }
-      fileRef.current = parsed;
-      setFile(parsed);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  // Stay in lockstep with saves/refreshes from any other consumer.
+  useEffect(() => {
+    const listener = (f: ConquestStateFile) => setFile(f);
+    stateListeners.add(listener);
+    return () => {
+      stateListeners.delete(listener);
+    };
   }, []);
 
-  /** Persist one galaxy's run state (or remove it with `undefined`). */
-  const saveFor = useCallback(
-    async (galaxyId: string, state: ConquestState | undefined) => {
-      const conquests = { ...fileRef.current.conquests };
-      if (state) {
-        conquests[galaxyId] = state;
-      } else {
-        delete conquests[galaxyId];
-      }
-      const next: ConquestStateFile = { schemaVersion: 1, conquests };
-      fileRef.current = next;
-      setFile(next);
-      await conquestStateSave({ json: JSON.stringify(next) });
-    },
-    [],
-  );
-
+  // First mount: serve the cache, else load once from disk.
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (stateCache) {
+      setFile(stateCache);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    fetchStateFile()
+      .then((f) => {
+        stateCache = f;
+        if (!cancelled) {
+          setFile(f);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const refresh = useCallback(async () => {
+    setError(null);
+    try {
+      await refreshConquestState();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
 
   /** A galaxy's saved run, healed against the current document. */
   const stateFor = useCallback(
@@ -186,5 +240,12 @@ export function useConquestState() {
     [file],
   );
 
-  return { file, loading, error, refresh, saveFor, stateFor };
+  return {
+    file,
+    loading,
+    error,
+    refresh,
+    saveFor: saveConquestState,
+    stateFor,
+  };
 }

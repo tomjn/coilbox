@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Gift, Sparkles, Store } from "lucide-react";
 import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
+import { BracketFrame } from "../../../conquest/pages/components/hudChrome";
 import type { RewardOption, RogueliteRun, RunNode } from "../../model";
 import {
   applyEvent,
@@ -34,7 +35,7 @@ function Overlay({
         onClick={onClose}
         className="absolute inset-0 cursor-default"
       />
-      <div className="relative flex w-[42rem] max-w-full flex-col gap-4 rounded-lg border border-border/50 bg-card/90 p-6">
+      <BracketFrame className="flex w-[42rem] max-w-full flex-col gap-4 p-6">
         {/* Its own box in the gutter to the card's left, matching the map's
             top-left exit control. */}
         <BackToMapButton
@@ -42,14 +43,14 @@ function Overlay({
           className="absolute right-full top-0 mr-4"
         />
         <header className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2 text-lg font-semibold">
+          <h1 className="flex items-center gap-2 font-display text-lg font-semibold uppercase tracking-wide">
             {icon}
             {title}
           </h1>
           {lede && <p className="text-sm text-muted-foreground">{lede}</p>}
         </header>
         {children}
-      </div>
+      </BracketFrame>
     </div>
   );
 }

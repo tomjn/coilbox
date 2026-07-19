@@ -1,11 +1,19 @@
 import { Button } from "@picoframe/frame";
-import { ArrowLeft, Dices, Loader2, ShieldAlert, Swords } from "lucide-react";
+import {
+  ArrowLeft,
+  Dices,
+  Hourglass,
+  Loader2,
+  ShieldAlert,
+  Swords,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
+import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogos } from "@/factions/logos";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
-import { useUnitsyncScan } from "../../content/config";
+import { useUnitsyncGameInfo, useUnitsyncScan } from "../../content/config";
 import { useKnownSpaceMaps } from "../../content/mapAppearanceCache";
 import {
   EmptyState,
@@ -22,13 +30,14 @@ import { usePreferredTarget, useSkirmishAis } from "../../play/config";
 import { getProfile } from "../../profile/profile";
 import { conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
+import { factionFocusNode } from "../focusTarget";
 import { FOG_RANGE, withinJumps } from "../fog";
 import { type VoidBody, voidBodiesFor } from "../galaxy3d/bodies";
 import { factionSides } from "../galaxy3d/factionShape";
 import { GalaxyView, nodeBodyLabel } from "../galaxy3d/GalaxyView";
 import { galaxyPalette } from "../galaxy3d/palette";
 import { regenerateGalaxy } from "../generate";
-import type { ConquestState, GalaxyDoc, GalaxyNode } from "../model";
+import type { ConquestState, GalaxyDoc, GalaxyNode, TurnEvent } from "../model";
 import {
   NEUTRAL,
   newConquestState,
@@ -36,8 +45,7 @@ import {
   resolveGameByShortname,
 } from "../model";
 import { mergeConquestNames } from "../names";
-import { attackableNodes } from "../rules";
-import { BackToMapButton } from "./components/BackToMapButton";
+import { advanceTurn, attackableNodes } from "../rules";
 import { BattleOverlay } from "./components/BattleOverlay";
 import { BracketFrame } from "./components/hudChrome";
 import { FactionDot, SidePicker } from "./components/RunSetup";
@@ -111,6 +119,30 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
     return new Set(attackableNodes(galaxy, state).map((n) => n.id));
   }, [galaxy, state]);
 
+  // Faction emblems for the header cards: resolve each side's logo from the
+  // installed game (archive Sidepics / catalog / bundled vector), tinted per
+  // faction so two factions on the same game side stay distinct. Served from
+  // the shared scan cache, so this doesn't re-scan when the setup panel already
+  // did (see useUnitsyncScan).
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const installedGame = resolveGameByShortname(
+    galaxy.game,
+    scan.data?.games ?? [],
+  );
+  const factionLogos = useFactionLogos({
+    game: installedGame ?? undefined,
+    enginePath: target?.enginePath,
+    dataDir: target?.dataDir,
+    gameArchive: installedGame?.primaryArchive.name,
+    sideNames: galaxy.factions.map((f) => f.side ?? "").filter(Boolean),
+    size: 20,
+  });
+
+  // A faction header card flies the camera to that faction's territory; another
+  // map interaction (selecting a node / clicking empty space) releases it.
+  const [factionFocus, setFactionFocus] = useState<string | null>(null);
+
   // Fog of war: the systems the player can see. Undefined = no fog (show all),
   // which is also how a finished run reveals the whole map. During setup (no
   // state) preview visibility around the faction being previewed.
@@ -148,8 +180,16 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   const battleNode = battleNodeId
     ? galaxy.nodes.find((n) => n.id === battleNodeId)
     : undefined;
-  const battleMode: "attack" | "defend" =
-    state?.incursion?.nodeId === battleNodeId ? "defend" : "attack";
+  const battleMode: "attack" | "defend" = state?.incursions.some(
+    (i) => i.nodeId === battleNodeId,
+  )
+    ? "defend"
+    : "attack";
+  // The soonest-expiring incursion drives the single 3D warning marker; the
+  // header lists them all.
+  const primaryIncursion = state?.incursions
+    .slice()
+    .sort((a, b) => a.expiresOnTurn - b.expiresOnTurn)[0];
 
   // Space skins get a soft two-tone nebula wash behind the (transparent) GL
   // canvas; a theatre map keeps the flat backdrop.
@@ -187,11 +227,15 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
         owners={owners}
         playerFactionId={playerFactionId}
         selectedId={selectedId}
-        incursion={state?.incursion}
-        onSelect={setSelectedId}
+        incursion={primaryIncursion}
+        onSelect={(id) => {
+          setSelectedId(id);
+          setFactionFocus(null);
+        }}
         visibleIds={visibleIds}
         spaceMaps={spaceMaps}
-        focusNodeId={battleNodeId}
+        focusNodeId={battleNodeId ?? factionFocus}
+        focusBiasX={state ? 0 : 0.13}
         display={{ reduceMotion, effects, performanceMode }}
         className="absolute inset-0"
       />
@@ -203,54 +247,107 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
         className="pointer-events-none absolute inset-x-0 top-0 z-[9] h-28 bg-gradient-to-b from-background/85 via-background/25 to-transparent"
       />
 
-      {/* Top status bar */}
+      {/* Top status bar: a row of separate console cards. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-3">
-        <BracketFrame className="pointer-events-auto flex items-center gap-3 px-3 py-2">
-          <Link
-            to="/conquest"
-            className="flex items-center gap-1 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft className="size-3.5" aria-hidden /> Conquest
-          </Link>
-          <span className="font-display text-sm font-semibold uppercase tracking-wide text-foreground">
-            {galaxy.title}
-          </span>
-          {state && (
-            <span className="rounded border border-border/60 px-1.5 py-0.5 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              Turn {state.turn}
+        <div className="flex flex-wrap items-stretch gap-2">
+          {/* Back to Conquest — arrow only, its own card. */}
+          <BracketFrame className="pointer-events-auto flex items-stretch">
+            <Link
+              to="/conquest"
+              aria-label="Conquest"
+              className="flex items-center justify-center px-3 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="size-5" aria-hidden />
+            </Link>
+          </BracketFrame>
+          {/* Galaxy title. */}
+          <BracketFrame className="pointer-events-auto flex items-center px-3 py-2">
+            <span className="font-display text-sm font-semibold uppercase tracking-wide text-foreground">
+              {galaxy.title}
             </span>
+          </BracketFrame>
+          {/* Turn — its own card with a large number, sized to content. */}
+          {state && (
+            <BracketFrame className="pointer-events-auto flex flex-col justify-center px-3 py-1.5">
+              <span className="font-display text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Turn
+              </span>
+              <span className="font-display text-xl font-semibold uppercase leading-none tracking-wide tabular-nums text-foreground">
+                {state.turn}
+              </span>
+            </BracketFrame>
           )}
+          {/* One clickable card per faction — click flies the camera to their
+              territory (capital, or nearest system they still hold). */}
           {state && (
             <TerritoryTally
               galaxy={galaxy}
               state={state}
               visible={visibleIds}
+              logos={factionLogos}
+              onFocusFaction={(fid) => {
+                const targetId = factionFocusNode(galaxy, state.owners, fid);
+                setSelectedId(null);
+                setFactionFocus((cur) =>
+                  targetId && cur !== targetId ? targetId : null,
+                );
+              }}
             />
           )}
-        </BracketFrame>
-        {state?.incursion && state.status === "active" && (
-          <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-950/70 px-3 py-2 text-xs text-amber-200 backdrop-blur-sm">
-            <ShieldAlert className="size-4 animate-pulse" aria-hidden />
-            Incursion at{" "}
-            {galaxy.nodes.find((n) => n.id === state.incursion?.nodeId)?.name ??
-              "?"}{" "}
-            — falls in {Math.max(0, state.incursion.expiresOnTurn - state.turn)}{" "}
-            turn
-            {state.incursion.expiresOnTurn - state.turn === 1 ? "" : "s"}
+          {/* Advance the galaxy a turn without fighting — the world moves while
+              you hold. */}
+          {state && state.status === "active" && (
+            <BracketFrame className="pointer-events-auto flex items-stretch">
+              <button
+                type="button"
+                onClick={() => saveFor(galaxy.id, advanceTurn(galaxy, state))}
+                className="flex items-center gap-1.5 px-2.5 py-2 font-display text-[11px] uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Hourglass className="size-3.5" aria-hidden /> Hold
+              </button>
+            </BracketFrame>
+          )}
+        </div>
+        {state && state.status === "active" && state.incursions.length > 0 && (
+          <div className="flex flex-col items-end gap-2">
+            {state.incursions
+              .slice()
+              .sort((a, b) => a.expiresOnTurn - b.expiresOnTurn)
+              .map((inc) => {
+                const left = Math.max(0, inc.expiresOnTurn - state.turn);
+                return (
+                  <BracketFrame
+                    key={inc.nodeId}
+                    accent="amber"
+                    className="pointer-events-auto"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFactionFocus(null);
+                        setSelectedId(inc.nodeId);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 text-xs text-amber-200 transition-colors hover:text-amber-100"
+                    >
+                      <ShieldAlert
+                        className="size-4 animate-pulse"
+                        aria-hidden
+                      />
+                      Incursion at{" "}
+                      {galaxy.nodes.find((n) => n.id === inc.nodeId)?.name ??
+                        "?"}{" "}
+                      — falls in {left} turn{left === 1 ? "" : "s"}
+                    </button>
+                  </BracketFrame>
+                );
+              })}
           </div>
         )}
       </div>
 
-      {/* A prominent step-back-to-map control on the left, opposite the
-          selection panel. The map itself also clears a selection on an
-          empty-space click. */}
-      {state && selected && state.status === "active" && !battleNodeId && (
-        <div className="absolute left-3 top-16 z-10">
-          <BackToMapButton onClick={() => setSelectedId(null)} />
-        </div>
-      )}
-
-      {/* Right-hand selection panel (hidden while a battle briefing is open) */}
+      {/* Right-hand selection panel (hidden while a battle briefing is open).
+          Its own close button (and clicking empty space) clears the selection —
+          no separate back-arrow control needed. */}
       {state && selected && state.status === "active" && !battleNodeId && (
         <SelectionPanel
           galaxy={galaxy}
@@ -302,7 +399,14 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
         />
       )}
 
-      {galaxy.theme?.skin !== "theatre" && <MapLegend />}
+      {/* What the galaxy did on the last enemy round. */}
+      {state &&
+        state.status === "active" &&
+        !battleNodeId &&
+        state.lastRound &&
+        state.lastRound.length > 0 && (
+          <TurnRecap galaxy={galaxy} events={state.lastRound} />
+        )}
 
       <p className="pointer-events-none absolute bottom-2 left-3 z-10 text-[11px] text-muted-foreground/70">
         drag to pan · scroll to zoom · right-drag to tilt
@@ -311,16 +415,61 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   );
 }
 
-/** Per-faction node counts as coloured dots in the status bar. Under fog only
- * revealed systems are counted, so the tally never leaks enemy positions. */
+/** A compact "Last turn" panel listing the enemy round's captures, so the
+ * living galaxy's moves are legible. Names resolve from the doc; a capture from
+ * NEUTRAL reads as a claim, a capture from a faction as a conquest. */
+function TurnRecap({
+  galaxy,
+  events,
+}: {
+  galaxy: GalaxyDoc;
+  events: TurnEvent[];
+}) {
+  const nodeName = (id: string) =>
+    galaxy.nodes.find((n) => n.id === id)?.name ?? "?";
+  const factionName = (id: string) =>
+    id === NEUTRAL
+      ? "neutral space"
+      : (galaxy.factions.find((f) => f.id === id)?.name ?? id);
+  return (
+    <div className="pointer-events-none absolute bottom-9 left-3 z-10 flex max-w-xs flex-col gap-1 rounded-md bg-background/40 px-2.5 py-2 backdrop-blur-sm">
+      <span className="font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        Last turn
+      </span>
+      {events.slice(0, 5).map((e) => (
+        <span
+          key={`${e.factionId}-${e.nodeId}`}
+          className="text-[11px] text-foreground/85"
+        >
+          {factionName(e.factionId)} took {nodeName(e.nodeId)}
+          {e.from !== NEUTRAL ? ` from ${factionName(e.from)}` : ""}
+        </span>
+      ))}
+      {events.length > 5 && (
+        <span className="text-[10px] text-muted-foreground">
+          +{events.length - 5} more
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** One console card per faction — emblem (tinted to the faction colour), name
+ * and node count — plus a neutral card. Clicking a faction card flies the camera
+ * to their territory. Under fog only revealed systems are counted, so the tally
+ * never leaks enemy positions. Emitted as siblings into the status-bar row. */
 function TerritoryTally({
   galaxy,
   state,
   visible,
+  logos,
+  onFocusFaction,
 }: {
   galaxy: GalaxyDoc;
   state: ConquestState;
   visible?: Set<string>;
+  logos: Record<string, FactionLogoSrc>;
+  onFocusFaction: (factionId: string) => void;
 }) {
   const counts = new Map<string, number>();
   for (const n of galaxy.nodes) {
@@ -329,85 +478,65 @@ function TerritoryTally({
     counts.set(o, (counts.get(o) ?? 0) + 1);
   }
   return (
-    <span className="flex items-center gap-2.5">
-      {galaxy.factions.map((f) => (
-        <span
-          key={f.id}
-          className={`flex items-center gap-1 text-xs ${
-            f.id === state.playerFactionId
-              ? "font-medium text-foreground"
-              : "text-muted-foreground"
-          }`}
-          title={f.name}
-        >
-          <FactionDot color={f.color} sides={factionSides(galaxy, f.id)} />
-          {f.id === state.playerFactionId && (
-            <span className="font-display text-[10px] uppercase tracking-[0.18em]">
-              You
-            </span>
-          )}
-          <span className="font-mono tabular-nums">
-            {counts.get(f.id) ?? 0}
-          </span>
-        </span>
-      ))}
+    <>
+      {galaxy.factions.map((f) => {
+        const isPlayer = f.id === state.playerFactionId;
+        const logo = f.side ? logos[f.side.toLowerCase()] : undefined;
+        return (
+          <BracketFrame
+            key={f.id}
+            accent={isPlayer ? "teal" : "neutral"}
+            className="pointer-events-auto flex items-stretch"
+          >
+            <button
+              type="button"
+              onClick={() => onFocusFaction(f.id)}
+              className="flex items-center gap-1.5 px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {logo ? (
+                <FactionLogo
+                  logo={logo}
+                  sideName={f.side}
+                  tint={f.color}
+                  size={18}
+                />
+              ) : (
+                <FactionDot
+                  color={f.color}
+                  sides={factionSides(galaxy, f.id)}
+                />
+              )}
+              <span
+                className={`font-display text-[11px] uppercase tracking-wide ${
+                  isPlayer ? "text-foreground" : ""
+                }`}
+              >
+                {f.name}
+              </span>
+              {isPlayer && (
+                <span className="font-display text-[9px] uppercase tracking-[0.18em] text-cyan-400/90">
+                  You
+                </span>
+              )}
+              <span className="font-mono tabular-nums text-foreground">
+                {counts.get(f.id) ?? 0}
+              </span>
+            </button>
+          </BracketFrame>
+        );
+      })}
       {(counts.get(NEUTRAL) ?? 0) > 0 && (
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        <BracketFrame className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs text-muted-foreground">
           <FactionDot color="#6b7280" />
-          {counts.get(NEUTRAL)}
-        </span>
-      )}
-    </span>
-  );
-}
-
-/** Compact key for the map symbols the territory tally doesn't cover. */
-function MapLegend() {
-  const rows = [
-    {
-      key: "capital",
-      glyph: (
-        <span className="size-2 rounded-full bg-foreground/70 shadow-[0_0_0_1.5px_rgba(226,232,240,0.35)]" />
-      ),
-      label: "Capital",
-    },
-    {
-      key: "contested",
-      glyph: (
-        <span className="w-4 border-t-2 border-dashed border-amber-400/80" />
-      ),
-      label: "Contested lane",
-    },
-    {
-      key: "incursion",
-      glyph: <span className="size-2 rounded-full bg-amber-400" />,
-      label: "Incursion",
-    },
-    {
-      key: "neutral",
-      glyph: (
-        <span
-          className="size-2 rounded-full"
-          style={{ backgroundColor: "#6b7280" }}
-        />
-      ),
-      label: "Neutral",
-    },
-  ];
-  return (
-    <div className="pointer-events-none absolute bottom-2 right-3 z-10 flex flex-col gap-1.5 rounded-md bg-background/35 px-2.5 py-2 backdrop-blur-sm">
-      {rows.map((r) => (
-        <span
-          key={r.key}
-          className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground"
-        >
-          <span className="flex h-2 w-4 items-center justify-center">
-            {r.glyph}
+          <span className="font-display text-[11px] uppercase tracking-wide">
+            Neutral
           </span>
-          {r.label}
-        </span>
-      ))}
-    </div>
+          <span className="font-mono tabular-nums text-foreground">
+            {counts.get(NEUTRAL)}
+          </span>
+        </BracketFrame>
+      )}
+    </>
   );
 }
 
@@ -450,13 +579,18 @@ function SelectionPanel({
   const owner = state.owners[node.id] ?? NEUTRAL;
   const faction = galaxy.factions.find((f) => f.id === owner);
   const isPlayers = owner === state.playerFactionId;
-  const underIncursion = state.incursion?.nodeId === node.id;
+  const underIncursion = state.incursions.some((i) => i.nodeId === node.id);
 
   return (
-    <aside className="absolute right-3 top-16 z-10 flex w-72 flex-col gap-3 rounded-lg border border-border/50 bg-card/85 p-4 backdrop-blur-sm">
+    <BracketFrame
+      accentColor={faction?.color}
+      className="pointer-events-auto absolute right-3 top-16 z-10 flex w-72 flex-col gap-3 p-4 backdrop-blur-sm"
+    >
       <header className="flex items-start justify-between gap-2">
         <div className="flex flex-col gap-0.5">
-          <h2 className="text-sm font-semibold">{node.name}</h2>
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wide">
+            {node.name}
+          </h2>
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <FactionDot
               color={faction?.color ?? "#6b7280"}
@@ -477,13 +611,17 @@ function SelectionPanel({
       </header>
       <dl className="flex flex-col gap-1.5 text-xs">
         <div className="flex items-center justify-between">
-          <dt className="text-muted-foreground">Difficulty</dt>
+          <dt className="font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Difficulty
+          </dt>
           <dd>
             <DifficultyPips value={node.difficulty} />
           </dd>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <dt className="text-muted-foreground">Battlefield</dt>
+          <dt className="font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Battlefield
+          </dt>
           <dd className="truncate">{node.battle.mapName}</dd>
         </div>
       </dl>
@@ -508,7 +646,7 @@ function SelectionPanel({
           Out of reach — capture an adjacent system first.
         </p>
       )}
-    </aside>
+    </BracketFrame>
   );
 }
 
@@ -544,6 +682,27 @@ function RunSetupPanel({
     gameArchive: installedGame?.primaryArchive.name,
     sideNames: choices.map((f) => f.side ?? "").filter(Boolean),
   });
+
+  // The player plays the side their chosen faction *is*, not a free-floating
+  // pick — that let you e.g. play the blue "Arm" faction as Core. Canonicalise
+  // the faction's side to the game's actual side name (case-insensitive) so the
+  // engine gets a valid side; fall back to the manual picker only when the
+  // faction carries no side.
+  const { info: gameInfo } = useUnitsyncGameInfo(
+    target?.enginePath,
+    target?.dataDir,
+    installedGame?.primaryArchive.name,
+  );
+  const chosenFaction = choices.find((f) => f.id === faction);
+  const chosenSide = chosenFaction?.side
+    ? ((gameInfo?.sides ?? []).find(
+        (s) => s.name.toLowerCase() === chosenFaction.side?.toLowerCase(),
+      )?.name ?? chosenFaction.side)
+    : undefined;
+  const chosenSideLogo = chosenSide
+    ? factionLogos[chosenSide.toLowerCase()]
+    : undefined;
+  const effectiveSide = chosenSide || side || undefined;
 
   // Reroll in place: same knobs (persisted on the doc), fresh seed, content
   // environment (maps/AIs/names) re-resolved from what's installed right now.
@@ -591,29 +750,44 @@ function RunSetupPanel({
   };
 
   return (
-    <div className="absolute right-3 top-16 z-10 flex max-h-[calc(100%-5rem)] w-[22rem] max-w-[90%] flex-col gap-3 overflow-auto rounded-lg border border-border/50 bg-card/90 p-4 backdrop-blur-sm">
-      <h2 className="text-sm font-semibold">Begin conquest</h2>
-      <p className="text-xs text-muted-foreground">{galaxy.description}</p>
+    <BracketFrame
+      accent="teal"
+      className="pointer-events-auto absolute right-3 top-16 z-10 flex max-h-[calc(100%-5rem)] w-[22rem] max-w-[90%] flex-col gap-4 overflow-auto p-4 backdrop-blur-sm"
+    >
+      <header className="flex flex-col gap-1 border-b border-border/40 pb-3">
+        <span className="font-display text-[10px] font-medium uppercase tracking-[0.24em] text-cyan-400/90">
+          New campaign
+        </span>
+        <h2 className="font-display text-2xl font-bold uppercase leading-none tracking-wide text-foreground">
+          Begin conquest
+        </h2>
+        <p className="pt-0.5 text-xs text-muted-foreground">
+          {galaxy.description}
+        </p>
+      </header>
       {choices.length > 1 && (
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium">Play as</span>
+          <span className="font-display text-[10px] font-medium uppercase tracking-[0.2em] text-cyan-400/80">
+            Play as
+          </span>
           <div className="flex flex-wrap gap-1.5">
             {choices.map((f) => (
               <button
                 key={f.id}
                 type="button"
                 onClick={() => onFaction(f.id)}
-                className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors ${
+                className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-display text-[11px] uppercase tracking-wide transition-colors ${
                   faction === f.id
-                    ? "border-primary bg-primary/15"
-                    : "border-border/50 hover:border-border"
+                    ? "border-cyan-400/70 bg-cyan-400/10 text-foreground"
+                    : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
                 }`}
               >
                 {f.side && factionLogos[f.side.toLowerCase()] ? (
                   <FactionLogo
                     logo={factionLogos[f.side.toLowerCase()]}
                     sideName={f.side}
-                    size={16}
+                    tint={f.color}
+                    size={18}
                   />
                 ) : (
                   <FactionDot
@@ -627,13 +801,41 @@ function RunSetupPanel({
           </div>
         </div>
       )}
-      <SidePicker
-        enginePath={target?.enginePath}
-        dataDir={target?.dataDir}
-        gameArchive={installedGame?.primaryArchive.name}
-        value={side}
-        onChange={setSide}
-      />
+      {chosenSide ? (
+        <div className="flex flex-col gap-1.5">
+          <span className="font-display text-[10px] font-medium uppercase tracking-[0.2em] text-cyan-400/80">
+            Side
+          </span>
+          <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/20 px-2.5 py-2">
+            {chosenSideLogo ? (
+              <FactionLogo
+                logo={chosenSideLogo}
+                sideName={chosenSide}
+                tint={chosenFaction?.color}
+                size={20}
+              />
+            ) : (
+              chosenFaction && (
+                <FactionDot
+                  color={chosenFaction.color}
+                  sides={factionSides(galaxy, chosenFaction.id)}
+                />
+              )
+            )}
+            <span className="font-display text-xs uppercase tracking-wide text-foreground">
+              {chosenSide}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <SidePicker
+          enginePath={target?.enginePath}
+          dataDir={target?.dataDir}
+          gameArchive={installedGame?.primaryArchive.name}
+          value={side}
+          onChange={setSide}
+        />
+      )}
       {canRegenerate && (
         <Button
           variant="outline"
@@ -646,18 +848,25 @@ function RunSetupPanel({
       )}
       <Button
         disabled={busy || regenBusy}
+        className="font-display uppercase tracking-wide"
         onClick={async () => {
           setBusy(true);
           try {
-            await onStart(side || undefined);
+            await onStart(effectiveSide);
           } finally {
             setBusy(false);
           }
         }}
       >
-        {busy ? "Starting…" : "Start conquest"}
+        {busy ? (
+          "Starting…"
+        ) : (
+          <>
+            <Swords className="mr-1.5 size-4" aria-hidden /> Start conquest
+          </>
+        )}
       </Button>
-    </div>
+    </BracketFrame>
   );
 }
 
@@ -675,9 +884,9 @@ function EndScreen({
   const victories = state.history.filter((h) => h.outcome === "victory").length;
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 backdrop-blur-sm">
-      <div className="flex w-[26rem] max-w-[90%] flex-col items-center gap-3 rounded-lg border border-border/50 bg-card/95 p-6 text-center">
+      <BracketFrame className="flex w-[26rem] max-w-[90%] flex-col items-center gap-3 p-6 text-center">
         <h2
-          className={`text-2xl font-bold ${won ? "text-emerald-400" : "text-red-400"}`}
+          className={`font-display text-2xl font-bold uppercase tracking-wide ${won ? "text-emerald-400" : "text-red-400"}`}
         >
           {won ? "Galaxy conquered" : "Conquest lost"}
         </h2>
@@ -697,7 +906,7 @@ function EndScreen({
         <p className="text-xs text-muted-foreground/70">
           Starting again resets {galaxy.title} with a new seed.
         </p>
-      </div>
+      </BracketFrame>
     </div>
   );
 }

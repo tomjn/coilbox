@@ -190,7 +190,7 @@ describe("reconcileState", () => {
       { playerFactionId: "e", seed: 1 },
       "t0",
     );
-    state.incursion = { nodeId: "a", factionId: "e", expiresOnTurn: 2 };
+    state.incursions = [{ nodeId: "a", factionId: "e", expiresOnTurn: 2 }];
     const smaller = galaxy({
       factions: doc.factions,
       playerFactionId: "p",
@@ -201,7 +201,22 @@ describe("reconcileState", () => {
     });
     expect(healed.playerFactionId).toBe("p");
     // Incursion node "a" is owned by "p" in the healed map, so it survives.
-    expect(healed.incursion).toBeDefined();
+    expect(healed.incursions).toHaveLength(1);
+  });
+
+  it("migrates a legacy singular incursion into the array", () => {
+    const doc = galaxy();
+    const state = newConquestState(doc, { seed: 1 }, "t0");
+    // An old save that predates the incursions array.
+    const legacy = {
+      ...state,
+      incursions: undefined,
+      incursion: { nodeId: "a", factionId: "e", expiresOnTurn: 2 },
+    } as unknown as Parameters<typeof reconcileState>[1];
+    const healed = reconcileState(doc, legacy);
+    expect(healed.incursions).toEqual([
+      { nodeId: "a", factionId: "e", expiresOnTurn: 2 },
+    ]);
   });
 });
 

@@ -4,6 +4,7 @@ import { Download, Loader2, Swords } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
+import { BracketFrame } from "../../../conquest/pages/components/hudChrome";
 import { invalidateMapPreview, invalidateScans } from "../../../content/config";
 import { ErrorBanner } from "../../../content/pages/components/states";
 import {
@@ -52,7 +53,7 @@ export function EncounterOverlay({
         onClick={onClose}
         className="absolute inset-0 cursor-default"
       />
-      <div className="relative flex w-[40rem] max-w-full flex-col gap-4 rounded-xl border border-border/50 bg-card/90 p-7 backdrop-blur-md">
+      <BracketFrame className="flex w-[40rem] max-w-full flex-col gap-4 p-7 backdrop-blur-md">
         {/* Its own box in the gutter to the card's left (not a header link), so
             stepping back to the map is a separate, obvious target. */}
         <BackToMapButton
@@ -72,7 +73,7 @@ export function EncounterOverlay({
           />
         )}
         <header className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2 text-lg font-semibold">
+          <h1 className="flex items-center gap-2 font-display text-lg font-semibold uppercase tracking-wide">
             <Swords className="size-5 text-primary" aria-hidden />
             {kindLabel}
           </h1>
@@ -149,7 +150,7 @@ export function EncounterOverlay({
         {(enc.phase === "victory" || enc.phase === "defeat") && (
           <div className="flex flex-col items-center gap-3 text-center">
             <h2
-              className={`text-2xl font-bold ${enc.phase === "victory" ? "text-emerald-400" : "text-red-400"}`}
+              className={`font-display text-2xl font-bold uppercase tracking-wide ${enc.phase === "victory" ? "text-emerald-400" : "text-red-400"}`}
             >
               {enc.phase === "victory" ? "Victory" : "Defeat"}
             </h2>
@@ -173,7 +174,7 @@ export function EncounterOverlay({
             </Button>
           </div>
         )}
-      </div>
+      </BracketFrame>
     </div>
   );
 }
@@ -181,7 +182,9 @@ export function EncounterOverlay({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-2">
-      <dt className="text-muted-foreground">{label}</dt>
+      <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </dt>
       <dd className="truncate">{value}</dd>
     </div>
   );

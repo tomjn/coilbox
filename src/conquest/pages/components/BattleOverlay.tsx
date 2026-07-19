@@ -24,6 +24,7 @@ import { resolveGameByShortname } from "../../model";
 import { difficultyHandicap, difficultyTable } from "../../rules";
 import { useConquestBattleRun } from "../../run";
 import { BackToMapButton } from "./BackToMapButton";
+import { BracketFrame } from "./hudChrome";
 import { FactionDot } from "./RunSetup";
 
 /**
@@ -50,7 +51,9 @@ export function BattleOverlay({
   const run = useConquestBattleRun(galaxy, state, node, mode);
 
   const enemyFactionId =
-    mode === "defend" ? state.incursion?.factionId : state.owners[node.id];
+    mode === "defend"
+      ? state.incursions.find((i) => i.nodeId === node.id)?.factionId
+      : state.owners[node.id];
   const enemyFaction = galaxy.factions.find((f) => f.id === enemyFactionId);
   const enemyCount =
     node.battle.enemyAiCount ?? difficultyTable(node.difficulty);
@@ -93,7 +96,7 @@ export function BattleOverlay({
         onClick={onClose}
         className="absolute inset-0 cursor-default"
       />
-      <div className="relative flex w-[30rem] max-w-full flex-col gap-4 rounded-lg border border-border/50 bg-card/85 p-5 backdrop-blur-sm">
+      <BracketFrame className="flex w-[30rem] max-w-full flex-col gap-4 p-5 backdrop-blur-sm">
         {/* Its own box in the gutter to the card's left, matching the map's
             top-left exit control. */}
         <BackToMapButton
@@ -113,7 +116,7 @@ export function BattleOverlay({
           />
         )}
         <header className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2 text-lg font-semibold">
+          <h1 className="flex items-center gap-2 font-display text-lg font-semibold uppercase tracking-wide">
             {mode === "defend" ? (
               <ShieldAlert className="size-5 text-amber-400" aria-hidden />
             ) : (
@@ -181,7 +184,7 @@ export function BattleOverlay({
             onContinue={onClose}
           />
         )}
-      </div>
+      </BracketFrame>
     </div>
   );
 }
@@ -220,11 +223,15 @@ function Briefing({
     <div className="flex flex-col gap-3">
       <dl className="flex flex-col gap-1.5 text-sm">
         <div className="flex justify-between gap-2">
-          <dt className="text-muted-foreground">Battlefield</dt>
+          <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Battlefield
+          </dt>
           <dd className="truncate">{node.battle.mapName}</dd>
         </div>
         <div className="flex justify-between gap-2">
-          <dt className="text-muted-foreground">Opposition</dt>
+          <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Opposition
+          </dt>
           <dd className="flex items-center gap-1.5">
             {enemyLogo ? (
               <FactionLogo logo={enemyLogo} sideName={enemyName} size={16} />
@@ -237,7 +244,9 @@ function Briefing({
         </div>
         {playerFaction && (
           <div className="flex justify-between gap-2">
-            <dt className="text-muted-foreground">Fighting for</dt>
+            <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Fighting for
+            </dt>
             <dd className="flex items-center gap-1.5">
               {playerLogo ? (
                 <FactionLogo
@@ -397,11 +406,11 @@ function Outcome({
     : mode === "attack"
       ? `The assault on ${node.name} failed. Your territory holds.`
       : `${node.name} has fallen.`;
-  const newIncursion = resolved?.incursion;
+  const hasIncursion = (resolved?.incursions.length ?? 0) > 0;
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       <h2
-        className={`text-2xl font-bold ${won ? "text-emerald-400" : "text-red-400"}`}
+        className={`font-display text-2xl font-bold uppercase tracking-wide ${won ? "text-emerald-400" : "text-red-400"}`}
       >
         {won ? "Victory" : "Defeat"}
       </h2>
@@ -414,7 +423,7 @@ function Outcome({
       {resolved?.status === "lost" && (
         <p className="text-sm text-red-300">Your capital is lost.</p>
       )}
-      {resolved?.status === "active" && newIncursion && (
+      {resolved?.status === "active" && hasIncursion && (
         <p className="flex items-center gap-1.5 text-sm text-amber-300">
           <ShieldAlert className="size-4" aria-hidden />
           Enemy incursion detected — check the galaxy map.

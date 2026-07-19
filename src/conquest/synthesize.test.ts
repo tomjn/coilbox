@@ -117,7 +117,7 @@ describe("synthesizeBattle", () => {
   it("defends against the incursion's faction on the defended map", () => {
     const g = galaxy();
     const s = newConquestState(g, { seed: 1 }, "t0");
-    s.incursion = { nodeId: "a", factionId: "e", expiresOnTurn: 2 };
+    s.incursions = [{ nodeId: "a", factionId: "e", expiresOnTurn: 2 }];
     const draft = synthesizeBattle(g, s, "a", "defend", opts);
     expect(draft?.mapName).toBe("Home");
     expect(draft?.participants[1]?.name).toBe("Enemy 1");

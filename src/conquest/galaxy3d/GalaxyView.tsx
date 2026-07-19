@@ -162,6 +162,13 @@ interface GalaxyViewProps {
    * live, no scene rebuild.
    */
   focusNodeId?: string | null;
+  /**
+   * Shift the framed centre rightward by this fraction of the scene extent, so
+   * the previewed faction lands in the visible area to the *left* of an
+   * overlay panel (e.g. the run-setup panel pinned to the right) instead of
+   * dead-centre behind it. Applied at build/re-frame time.
+   */
+  focusBiasX?: number;
   display?: Partial<GalaxyDisplay>;
   className?: string;
 }
@@ -605,6 +612,7 @@ export function GalaxyView({
   identities,
   depthMood = false,
   focusNodeId,
+  focusBiasX = 0,
   display,
   className,
 }: GalaxyViewProps) {
@@ -2978,6 +2986,10 @@ export function GalaxyView({
         count++;
       }
       if (count > 0) focus.set(sx / count, 0, sz / count);
+      // Bias the framed centre right so the faction sits left of a right-hand
+      // overlay panel (the camera looks down +Z with world +X → screen right,
+      // so moving the target right pushes the content left on screen).
+      focus.x += extent * focusBiasX;
     }
 
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2500);
@@ -3404,9 +3416,17 @@ export function GalaxyView({
       // No change (e.g. the mount-time effect firing with no focus) must not
       // spawn an ease that fights the intro.
       if (!immediate && id === focusShown) return;
-      const goal = focusGoal(id);
       focusShown = id;
-      if (controls) controls.enabled = !id;
+      // Releasing focus (a node was selected, or empty space clicked): unlock
+      // controls and STAY at the current pose. Flying back to the framed
+      // overview here read as "undoing" the fly-in the user just triggered.
+      if (!id) {
+        focusAnim = null;
+        if (controls) controls.enabled = true;
+        return;
+      }
+      const goal = focusGoal(id);
+      if (controls) controls.enabled = false;
       if (immediate || reduceMotion) {
         controls?.target.copy(goal.target);
         camera.position.copy(goal.pos);
@@ -3731,6 +3751,7 @@ export function GalaxyView({
     laneFlow,
     identities,
     depthMood,
+    focusBiasX,
   ]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is
