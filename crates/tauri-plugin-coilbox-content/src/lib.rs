@@ -14,6 +14,7 @@ mod demo;
 mod engine;
 mod model;
 mod paths;
+mod rapid_pool;
 mod savegame;
 mod scan;
 mod settings_backup;
@@ -1010,6 +1011,33 @@ async fn content_config_delete_profile<R: Runtime>(
     }
 }
 
+/// `content_warm_rapid_pool` — background-read every `packages/*.sdp` manifest
+/// across the given roots into the OS page cache so the engine's first rapid-tag
+/// resolution is warm. Manifests only; returns a cache-warm summary.
+#[tauri::command]
+async fn content_warm_rapid_pool(roots: Vec<String>) -> Result<CliResult, ()> {
+    let paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
+    match tauri::async_runtime::spawn_blocking(move || rapid_pool::warm(&paths)).await {
+        Ok(summary) => Ok(CliResult::ok(json!({ "summary": summary }))),
+        Err(e) => Ok(CliResult::err(format!("warm task failed: {e}"))),
+    }
+}
+
+/// `content_prune_rapid_pool` — reclaim orphaned rapid pool data under `root`
+/// (pool blobs referenced by no on-disk `.sdp`, plus `*.incomplete` leftovers).
+/// `apply=false` is a dry run that computes the summary without deleting.
+#[tauri::command]
+async fn content_prune_rapid_pool(root: String, apply: bool) -> Result<CliResult, ()> {
+    let res =
+        tauri::async_runtime::spawn_blocking(move || rapid_pool::prune(Path::new(&root), apply))
+            .await;
+    match res {
+        Ok(Ok(summary)) => Ok(CliResult::ok(json!({ "summary": summary }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("prune task failed: {e}"))),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -1035,6 +1063,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_config_backup,
             content_config_restore,
             content_config_delete_profile,
+            content_warm_rapid_pool,
+            content_prune_rapid_pool,
             branding_catalog,
             branding_image
         ])

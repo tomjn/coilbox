@@ -149,6 +149,51 @@ export const contentOpenPath = defineCommand<{ path: string }, unknown>(
 );
 
 /* -------------------------------------------------------------------------- *
+ * Rapid pool housekeeping — background cache-warming and orphan pruning of the
+ * `packages/`+`pool/` rapid store (client-side only, no protocol involvement).
+ * -------------------------------------------------------------------------- */
+
+/** How many `.sdp` manifests were read into the page cache, and their byte size. */
+export interface WarmSummary {
+  packages: number;
+  bytes: number;
+}
+
+/** What a prune removed (or, on a dry run, would remove). */
+export interface PruneSummary {
+  /** True when the files were actually deleted (`false` for a dry run). */
+  applied: boolean;
+  /** Orphaned pool blobs (referenced by no on-disk `.sdp`). */
+  blobs: number;
+  blobBytes: number;
+  /** Leftover `*.incomplete` temp files under `packages/`/`pool/`. */
+  incompletes: number;
+  incompleteBytes: number;
+  /** `.sdp` files that failed to parse (corrupt/zero-byte). */
+  unreadableSdp: number;
+}
+
+/**
+ * Background-warm the rapid pool cache: read each root's `packages/*.sdp`
+ * manifests into the OS page cache so the engine's first rapid-tag resolution is
+ * warm. Manifests only (never the multi-GB pool blobs); safe to fire-and-forget.
+ */
+export const contentWarmRapidPool = defineCommand<
+  { roots: string[] },
+  { summary: WarmSummary }
+>("coilbox-content", "content_warm_rapid_pool");
+
+/**
+ * Reclaim orphaned rapid pool data under a single root: pool blobs referenced by
+ * no on-disk `.sdp`, plus `*.incomplete` leftovers. `apply: false` is a dry run
+ * that reports what would be removed without deleting anything.
+ */
+export const contentPruneRapidPool = defineCommand<
+  { root: string; apply: boolean },
+  { summary: PruneSummary }
+>("coilbox-content", "content_prune_rapid_pool");
+
+/* -------------------------------------------------------------------------- *
  * Replays — demo files in a root's `demos/`/`replays/` folder. Listing is cheap
  * fs metadata; decoding reads the demo's native header + start-script and shells
  * out to `demotool` (in the engine folder) for the winning ally-teams.

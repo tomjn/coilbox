@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-prune-rapid-pool"
+description = "Enables the content_prune_rapid_pool command without any pre-configured scope."
+commands.allow = ["content_prune_rapid_pool"]
+
+[[permission]]
+identifier = "deny-content-prune-rapid-pool"
+description = "Denies the content_prune_rapid_pool command without any pre-configured scope."
+commands.deny = ["content_prune_rapid_pool"]

@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { FolderOpen, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { ContentRoot } from "../../bindings";
+import { ReclaimSpaceButton } from "./ReclaimSpaceButton";
 import { StatusBadge } from "./StatusBadge";
 
 function fmtTime(ms?: number): string {
@@ -23,12 +24,18 @@ function Stat({ label, value }: { label: string; value: number }) {
 export function RootCard({
   root,
   busy,
+  canPrune,
+  pruneBlockReason,
   onRescan,
   onRemove,
   onOpen,
 }: {
   root: ContentRoot;
   busy: boolean;
+  /** Whether the rapid-pool prune action is allowed (no in-flight downloads). */
+  canPrune: boolean;
+  /** Why pruning is blocked, shown as the disabled button's tooltip. */
+  pruneBlockReason?: string;
   onRescan: (path: string) => void;
   onRemove: (path: string) => void;
   onOpen: (path: string) => void;
@@ -105,6 +112,13 @@ export function RootCard({
             )}
             Re-scan
           </Button>
+          {root.exists && (
+            <ReclaimSpaceButton
+              rootPath={root.path}
+              canPrune={canPrune}
+              blockReason={pruneBlockReason}
+            />
+          )}
           {isManual && (
             <Button
               type="button"

@@ -23,6 +23,8 @@ const COMMANDS: &[&str] = &[
     "content_config_backup",
     "content_config_restore",
     "content_config_delete_profile",
+    "content_warm_rapid_pool",
+    "content_prune_rapid_pool",
     "branding_catalog",
     "branding_image",
 ];

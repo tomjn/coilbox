@@ -615,10 +615,10 @@
           "markdownDescription": "Denies the conquest_state_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`",
+          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-content-warm-rapid-pool`\n- `allow-content-prune-rapid-pool`\n- `allow-branding-catalog`\n- `allow-branding-image`",
           "type": "string",
           "const": "coilbox-content:default",
-          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-branding-catalog`\n- `allow-branding-image`"
+          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-content-warm-rapid-pool`\n- `allow-content-prune-rapid-pool`\n- `allow-branding-catalog`\n- `allow-branding-image`"
         },
         {
           "description": "Enables the branding_catalog command without any pre-configured scope.",
@@ -717,6 +717,12 @@
           "markdownDescription": "Enables the content_open_path command without any pre-configured scope."
         },
         {
+          "description": "Enables the content_prune_rapid_pool command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-prune-rapid-pool",
+          "markdownDescription": "Enables the content_prune_rapid_pool command without any pre-configured scope."
+        },
+        {
           "description": "Enables the content_recreate_root command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-content:allow-content-recreate-root",
@@ -751,6 +757,12 @@
           "type": "string",
           "const": "coilbox-content:allow-content-verify-engine",
           "markdownDescription": "Enables the content_verify_engine command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_warm_rapid_pool command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-warm-rapid-pool",
+          "markdownDescription": "Enables the content_warm_rapid_pool command without any pre-configured scope."
         },
         {
           "description": "Denies the branding_catalog command without any pre-configured scope.",
@@ -849,6 +861,12 @@
           "markdownDescription": "Denies the content_open_path command without any pre-configured scope."
         },
         {
+          "description": "Denies the content_prune_rapid_pool command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-prune-rapid-pool",
+          "markdownDescription": "Denies the content_prune_rapid_pool command without any pre-configured scope."
+        },
+        {
           "description": "Denies the content_recreate_root command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-content:deny-content-recreate-root",
@@ -883,6 +901,12 @@
           "type": "string",
           "const": "coilbox-content:deny-content-verify-engine",
           "markdownDescription": "Denies the content_verify_engine command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_warm_rapid_pool command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-warm-rapid-pool",
+          "markdownDescription": "Denies the content_warm_rapid_pool command without any pre-configured scope."
         },
         {
           "description": "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads).\n#### This default permission set includes:\n\n- `allow-dl-version`\n- `allow-dl-cancel`\n- `allow-dl-repos`\n- `allow-dl-versions`\n- `allow-dl-download`\n- `allow-dl-springfiles-list`\n- `allow-dl-springfiles-engines`\n- `allow-dl-bar-maps`\n- `allow-dl-hakora-maps`\n- `allow-dl-download-map`\n- `allow-dl-download-file`\n- `allow-dl-recoil-engines`\n- `allow-dl-github-latest-release`\n- `allow-dl-github-release-archives`\n- `allow-dl-download-engine-recoil`\n- `allow-dl-download-engine-spring`\n- `allow-dl-installed-content`\n- `allow-dl-set-engine-dirs`\n- `allow-dl-path-writable`",

@@ -11,6 +11,7 @@ import {
 } from "react";
 import { contentRescan } from "../content/bindings";
 import { invalidateScans } from "../content/config";
+import { warmAllRoots } from "../content/rapidPoolWarm";
 import {
   type DownloadProgress,
   dlCancel,
@@ -165,6 +166,9 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       switch (item.kind) {
         case "rapid":
           await dlDownload({ ...item.args, opId: item.id, onProgress });
+          // The freshly-written `.sdp` is now on disk; warm it into the page
+          // cache so the first launch/join after this download is quicker.
+          warmAllRoots().catch(() => {});
           return;
         case "map":
           await dlDownloadMap({ ...item.args, opId: item.id, onProgress });
