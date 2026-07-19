@@ -13,11 +13,11 @@ mod sidecar;
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
-    build_config_args, build_config_set_args, build_game_args, build_game_headers_args,
-    build_heightmap_args, build_lua_args, build_lua_repl_args, build_map_info_args,
-    build_map_skybox_args, build_metalmap_args, build_minimap_args, build_skirmish_ai_args,
-    build_thumbnails_args, build_unit_buildpics_args, build_unit_dataset_args, find_unitsync,
-    resolve_sidecar,
+    build_config_args, build_config_set_args, build_faction_logos_args, build_game_args,
+    build_game_headers_args, build_heightmap_args, build_lua_args, build_lua_repl_args,
+    build_map_info_args, build_map_skybox_args, build_metalmap_args, build_minimap_args,
+    build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
+    build_unit_dataset_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -77,6 +77,7 @@ const HEADER_CACHE_SUBDIR: &str = "coilbox-unitsync-headers";
 
 /// Subdirectory of the app cache dir holding resolved unit build-icon `data:` URLs.
 const BUILDPIC_CACHE_SUBDIR: &str = "coilbox-unitsync-buildpics";
+const FACTION_LOGO_CACHE_SUBDIR: &str = "coilbox-unitsync-faction-logos";
 const INFO_CACHE_SUBDIR: &str = "coilbox-unitsync-info";
 
 /// The on-disk PNG cache directory for minimaps/thumbnails, under the app cache
@@ -102,6 +103,14 @@ fn buildpic_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(BUILDPIC_CACHE_SUBDIR))
+}
+
+/// The on-disk faction-logo cache directory, under the app cache dir. `None` when
+/// the platform can't resolve a cache dir (caching is then skipped).
+fn faction_logo_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    coilbox_portable::cache_dir(app)
+        .ok()
+        .map(|d| d.join(FACTION_LOGO_CACHE_SUBDIR))
 }
 
 /// The on-disk game/map info-blob cache directory, under the app cache dir.
@@ -469,6 +478,34 @@ async fn unitsync_unit_buildpics<R: Runtime>(
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit buildpics", None).await)
 }
 
+/// `unitsync_faction_logos` — resolve each side's `Sidepics/<side>` faction emblem
+/// for a game in one session. `sides` are the side names (from `unitsync_game_info`).
+/// Disk-cached under the app cache dir, keyed on cheap file identity. Returns
+/// `{ logos: [{ side, dataUri, maxDim }], errors }`.
+#[tauri::command]
+async fn unitsync_faction_logos<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    game_archive: String,
+    sides: Vec<String>,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let cache_dir = faction_logo_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_faction_logos_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &game_archive,
+        &sides,
+        cache_dir.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "faction logos", None).await)
+}
+
 /// `unitsync_unit_dataset` — load one game's archives to read its reusable unit
 /// graph (every unit plus the internal names it can build, `buildoptions`). Feeds
 /// the per-faction build-tree viewer and unit include/exclude filters. Fetched on
@@ -764,6 +801,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_thumbnails,
             unitsync_game_info,
             unitsync_unit_buildpics,
+            unitsync_faction_logos,
             unitsync_unit_dataset,
             unitsync_map_info,
             unitsync_map_skybox,

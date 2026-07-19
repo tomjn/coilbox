@@ -471,6 +471,35 @@ export const unitsyncUnitBuildpics = defineCommand<
   UnitBuildpicsResult
 >("coilbox-unitsync", "unitsync_unit_buildpics");
 
+/** One side's resolved faction emblem: a PNG `data:` URL plus the source image's
+ * longest pixel side (so callers can prefer a crisper image over a 16px upscale). */
+export interface FactionLogoEntry {
+  side: string;
+  dataUri: string;
+  maxDim: number;
+}
+
+export interface FactionLogosResult {
+  /** One entry per side whose `Sidepics/<side>` emblem resolved. */
+  logos: FactionLogoEntry[];
+  errors: string[];
+}
+
+/**
+ * Resolve a game's per-side faction emblems from its `Sidepics/<side>` folder —
+ * lazy, since it mounts the game's archive set. `sides` are the side names (from
+ * {@link unitsyncGameInfo}).
+ */
+export const unitsyncFactionLogos = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    gameArchive: string;
+    sides: string[];
+  },
+  FactionLogosResult
+>("coilbox-unitsync", "unitsync_faction_logos");
+
 /** One unit in the reusable unit dataset: its names plus the internal names of the
  * units it can build (`buildoptions`, lowercased). */
 export interface UnitDatasetEntry {

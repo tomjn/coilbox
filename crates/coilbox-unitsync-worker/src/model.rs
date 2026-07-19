@@ -362,6 +362,26 @@ pub struct UnitBuildpicsOutput {
     pub errors: Vec<String>,
 }
 
+/// One side's resolved faction emblem: a PNG `data:` URL plus the source image's
+/// longest pixel side. The dimension lets the UI demote a tiny (16px) archive
+/// sidepic below a crisper curated (catalog/profile) image instead of upscaling it.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FactionLogoEntry {
+    pub side: String,
+    pub data_uri: String,
+    pub max_dim: u32,
+}
+
+/// Output of `--faction-logos`: each requested side whose `Sidepics/<side>` emblem
+/// resolved, plus any diagnostics. Sides with no usable image are simply absent.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FactionLogosOutput {
+    pub logos: Vec<FactionLogoEntry>,
+    pub errors: Vec<String>,
+}
+
 /// Output of the lazy `--map --map-info` mode: one map's options + any
 /// diagnostics attributed while reading them (requires mounting the map
 /// archive, so it's fetched on demand, not during the enumeration scan).

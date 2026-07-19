@@ -11,6 +11,7 @@ Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-i
 - `allow-unitsync-thumbnails`
 - `allow-unitsync-game-info`
 - `allow-unitsync-unit-buildpics`
+- `allow-unitsync-faction-logos`
 - `allow-unitsync-unit-dataset`
 - `allow-unitsync-map-info`
 - `allow-unitsync-map-skybox`
@@ -186,6 +187,32 @@ Enables the unitsync_engine_config_set command without any pre-configured scope.
 <td>
 
 Denies the unitsync_engine_config_set command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:allow-unitsync-faction-logos`
+
+</td>
+<td>
+
+Enables the unitsync_faction_logos command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-unitsync:deny-unitsync-faction-logos`
+
+</td>
+<td>
+
+Denies the unitsync_faction_logos command without any pre-configured scope.
 
 </td>
 </tr>

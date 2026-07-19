@@ -17,6 +17,7 @@ mod archive;
 mod buildpic;
 mod config;
 mod dataset;
+mod factionlogo;
 mod ffi;
 mod game;
 mod heightmap;
@@ -71,6 +72,10 @@ struct Args {
     /// `buildoptions` edges), for the build-tree viewer and unit filters.
     unit_dataset: bool,
     units: Vec<String>,
+    /// `--faction-logos`: resolve `Sidepics/<side>` emblems for `--game`, for the
+    /// side names listed in `--sides` (comma-separated).
+    faction_logos: bool,
+    sides: Vec<String>,
     /// `--lua`: run a Lua snippet through the parser against `--archive`, reading
     /// the script from `--source-file`.
     lua: bool,
@@ -215,6 +220,26 @@ fn run() -> i32 {
             }
             Err(_) => {
                 buildpic::emit_error("worker panicked while resolving unit build pics".into());
+                1
+            }
+        };
+    }
+
+    // Faction logos: resolve each side's `Sidepics/<side>` emblem for one game in
+    // one Init, disk-cached like build pics. Keys off --game, so checked before the
+    // --game modes.
+    if args.faction_logos {
+        let game_archive = args.game.clone().unwrap_or_default();
+        let sides = args.sides.clone();
+        return match std::panic::catch_unwind(|| {
+            factionlogo::render(&args.lib, &game_archive, &sides, cache_dir)
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                factionlogo::emit_error("worker panicked while resolving faction logos".into());
                 1
             }
         };
@@ -488,6 +513,8 @@ fn parse_args() -> Result<Args, String> {
     let mut unit_buildpics = false;
     let mut unit_dataset = false;
     let mut units: Vec<String> = Vec::new();
+    let mut faction_logos = false;
+    let mut sides: Vec<String> = Vec::new();
     let mut lua = false;
     let mut source_file = None;
     let mut chunks_file = None;
@@ -536,6 +563,19 @@ fn parse_args() -> Result<Args, String> {
                     })
                     .unwrap_or_default()
             }
+            "--faction-logos" => faction_logos = true,
+            "--sides" => {
+                sides = it
+                    .next()
+                    .map(|s| {
+                        s.split(',')
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty())
+                            .map(str::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            }
             "--lua" => lua = true,
             "--source-file" => source_file = it.next(),
             "--chunks-file" => chunks_file = it.next(),
@@ -570,6 +610,8 @@ fn parse_args() -> Result<Args, String> {
         unit_buildpics,
         unit_dataset,
         units,
+        faction_logos,
+        sides,
         lua,
         source_file,
         chunks_file,

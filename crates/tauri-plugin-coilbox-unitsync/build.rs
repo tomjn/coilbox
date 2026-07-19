@@ -10,6 +10,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_thumbnails",
     "unitsync_game_info",
     "unitsync_unit_buildpics",
+    "unitsync_faction_logos",
     "unitsync_unit_dataset",
     "unitsync_map_info",
     "unitsync_map_skybox",
