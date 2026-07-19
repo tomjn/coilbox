@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BattleConfig } from "../play/bindings";
-import { applyPerks, disabledUnitsFor } from "./build";
+import { applyPerks, disabledUnitsFor, perkTotals } from "./build";
 import type { Perk, RogueliteRun } from "./model";
 
 const EDGES = new Map<string, string[]>([
@@ -100,5 +100,21 @@ describe("applyPerks", () => {
     const cfg = applyPerks(config(), []);
     expect(cfg.teams[0].advantage).toBeUndefined();
     expect(cfg.teams[0].incomeMultiplier).toBeUndefined();
+  });
+});
+
+describe("perkTotals", () => {
+  it("sums advantage and income across a perk list", () => {
+    const totals = perkTotals([
+      { kind: "advantage", value: 0.1, label: "a" },
+      { kind: "advantage", value: 0.05, label: "b" },
+      { kind: "income", value: 0.2, label: "c" },
+    ]);
+    expect(totals.advantage).toBeCloseTo(0.15, 5);
+    expect(totals.income).toBeCloseTo(0.2, 5);
+  });
+
+  it("returns zeroes for an empty list", () => {
+    expect(perkTotals([])).toEqual({ advantage: 0, income: 0 });
   });
 });

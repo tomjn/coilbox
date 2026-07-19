@@ -19,6 +19,7 @@ import {
   pickNewestReplay,
   resultFromDemoInfo,
 } from "../play/detect";
+import type { SkirmishDraft } from "../play/drafts";
 import { usePlay } from "../play/PlayProvider";
 import { useConquestState } from "./conquests";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "./model";
@@ -120,6 +121,10 @@ export function useConquestBattleRun(
   // The state as it was AFTER the battle resolved (for the result screens —
   // the hook's `state` prop refreshes underneath once saved).
   const [resolved, setResolved] = useState<ConquestState | null>(null);
+  // The exact draft last launched, so saving a preset from the *outcome* screen
+  // captures the fight as fought — the conquest advances ownership on resolve, so a
+  // fresh `snapshot()` would describe the node's next (possibly neutral) matchup.
+  const [lastSnapshot, setLastSnapshot] = useState<SkirmishDraft | null>(null);
 
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
@@ -182,22 +187,36 @@ export function useConquestBattleRun(
     [galaxy, state, node, mode, saveFor],
   );
 
-  const start = useCallback(async () => {
-    if (!target || !state || !node || !installedGame) return;
+  // The node battle as a launchable skirmish snapshot: the synthesized roster plus
+  // the node's disabled-unit restrictions, so "Save as preset" and the live launch
+  // below capture exactly the same fight. Conquest has no per-team perks.
+  const snapshot = useCallback((): SkirmishDraft | null => {
+    if (!state || !node || !installedGame) return null;
     const draft = synthesizeBattle(galaxy, state, node.id, mode, {
       playerName: PLAYER_NAME,
       gameName: installedGame.name,
       ais,
       aiConfig,
     });
+    if (!draft) return null;
+    const disabledUnits = node.battle.disabledUnits;
+    return disabledUnits && disabledUnits.length > 0
+      ? { ...draft, restrictions: { disabledUnits } }
+      : draft;
+  }, [galaxy, state, node, mode, installedGame, ais, aiConfig]);
+
+  const start = useCallback(async () => {
+    if (!target || !state || !node || !installedGame) return;
+    const draft = snapshot();
     if (!draft) return;
+    setLastSnapshot(draft);
     const config: BattleConfig = toBattleConfig({
       participants: draft.participants,
       mapName: draft.mapName,
       gameType: draft.gameName,
       startPosType: draft.startPosType,
       modOptions: draft.modOptionValues,
-      disabledUnits: node.battle.disabledUnits,
+      disabledUnits: draft.restrictions?.disabledUnits,
     });
     setError(null);
     // Snapshot the replays that exist before the engine runs; a failure here
@@ -235,18 +254,7 @@ export function useConquestBattleRun(
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [
-    target,
-    state,
-    node,
-    installedGame,
-    galaxy,
-    mode,
-    ais,
-    aiConfig,
-    launch,
-    applyResult,
-  ]);
+  }, [target, state, node, installedGame, snapshot, launch, applyResult]);
 
   const recordVictory = useCallback(
     () => applyResult("victory", false),
@@ -271,6 +279,8 @@ export function useConquestBattleRun(
     installedGame,
     ais,
     start,
+    snapshot,
+    lastSnapshot,
     recordVictory,
     recordDefeat,
     /** Force a rescan so a just-installed game/map clears `missing`. */

@@ -11,6 +11,7 @@ import { useUnitsyncScan, useUnitsyncUnitDataset } from "../content/config";
 import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
 import {
+  applyRestrictions,
   toBattleConfig,
   usePreferredTarget,
   useSkirmishAis,
@@ -21,8 +22,9 @@ import {
   pickNewestReplay,
   resultFromDemoInfo,
 } from "../play/detect";
+import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
 import { usePlay } from "../play/PlayProvider";
-import { applyPerks, disabledUnitsFor } from "./build";
+import { disabledUnitsFor, perkTotals } from "./build";
 import type { RogueliteRun, RunNode } from "./model";
 import { resolveBattle } from "./progress";
 import { synthesizeEncounter } from "./synthesize";
@@ -107,6 +109,10 @@ export function useRunEncounter(
   const [saving, setSaving] = useState(false);
   const [autoDetected, setAutoDetected] = useState(false);
   const [resolved, setResolved] = useState<RogueliteRun | null>(null);
+  // The exact draft last launched, so saving a preset from the *outcome* screen
+  // captures the fight as fought — the run's progress (unlocks/perks) has already
+  // advanced by then, so a fresh `snapshot()` would describe a different battle.
+  const [lastSnapshot, setLastSnapshot] = useState<SkirmishDraft | null>(null);
 
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
@@ -174,28 +180,47 @@ export function useRunEncounter(
     [run, node, onResolved],
   );
 
-  const start = useCallback(async () => {
-    if (!target || !node || !installedGame) return;
+  // The encounter as a launchable skirmish snapshot: the synthesized roster plus
+  // the run's faithful-replay restrictions (shared tech ceiling + personal perks),
+  // so "Save as preset" and the live launch below capture exactly the same fight.
+  const snapshot = useCallback((): SkirmishDraft | null => {
+    if (!node || !installedGame) return null;
     const draft = synthesizeEncounter(run, node, {
       playerName: PLAYER_NAME,
       gameName: installedGame.name,
       ais,
       aiConfig,
     });
-    if (!draft) return;
+    if (!draft) return null;
     const edges = dataset
       ? buildEdgeMap(dataset.units)
       : new Map<string, string[]>();
-    const config: BattleConfig = applyPerks(
+    const disabledUnits = disabledUnitsFor(run, edges);
+    const { advantage, income } = perkTotals(run.progress.perks);
+    const restrictions: BattleRestrictions = {};
+    if (disabledUnits.length > 0) restrictions.disabledUnits = disabledUnits;
+    if (advantage > 0) restrictions.advantage = advantage;
+    if (income > 0) restrictions.incomeMultiplier = income;
+    return Object.keys(restrictions).length > 0
+      ? { ...draft, restrictions }
+      : draft;
+  }, [node, installedGame, run, ais, aiConfig, dataset]);
+
+  const start = useCallback(async () => {
+    if (!target || !node || !installedGame) return;
+    const draft = snapshot();
+    if (!draft) return;
+    setLastSnapshot(draft);
+    const config: BattleConfig = applyRestrictions(
       toBattleConfig({
         participants: draft.participants,
         mapName: draft.mapName,
         gameType: draft.gameName,
         startPosType: draft.startPosType,
         modOptions: draft.modOptionValues,
-        disabledUnits: disabledUnitsFor(run, edges),
+        disabledUnits: draft.restrictions?.disabledUnits,
       }),
-      run.progress.perks,
+      draft.restrictions,
     );
     setError(null);
     let beforePaths: Set<string> | null = null;
@@ -230,17 +255,7 @@ export function useRunEncounter(
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [
-    target,
-    node,
-    installedGame,
-    run,
-    ais,
-    aiConfig,
-    dataset,
-    launch,
-    applyResult,
-  ]);
+  }, [target, node, installedGame, snapshot, launch, applyResult]);
 
   const recordVictory = useCallback(
     () => applyResult("victory", false),
@@ -265,6 +280,8 @@ export function useRunEncounter(
     installedGame,
     ais,
     start,
+    snapshot,
+    lastSnapshot,
     recordVictory,
     recordDefeat,
     recheck: () => scan.run(true),
