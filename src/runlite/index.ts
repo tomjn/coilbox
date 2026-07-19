@@ -39,7 +39,7 @@ const runlitePlugin: FramePlugin = {
       crumb: "Warpath",
     },
     {
-      path: "warpath/active",
+      path: "warpath/:runId",
       lazy: () => import("./pages/RunPage"),
       crumb: "Active warpath",
     },

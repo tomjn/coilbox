@@ -1,12 +1,13 @@
 //! Single-player roguelite-run storage plugin (Rust half). A run is a
 //! forward-only node graph crossed once on top of the conquest battle engine;
-//! this crate persists the *one* active run and the persistent
-//! meta-progression, staying schema-agnostic — both are opaque JSON strings the
-//! frontend owns and validates (see `src/runlite/model.ts`).
+//! this crate persists the active runs and the persistent meta-progression,
+//! staying schema-agnostic — both are opaque JSON strings the frontend owns and
+//! validates (see `src/runlite/model.ts`).
 //!
 //! On-disk layout under `<data_dir>/runlite/`:
-//!   - `run.json` the single active run (a fresh run replaces it; abandoning or
-//!     completing clears it)
+//!   - `run.json` the active runs, keyed by id (starting a warpath adds one;
+//!     abandoning or clearing removes it). Runs for different games/factions
+//!     coexist.
 //!   - `meta.json` persistent between-run unlocks (loadouts, event pools,
 //!     ascension tiers)
 //!
@@ -25,10 +26,10 @@ use tauri::{
     AppHandle, Runtime,
 };
 
-/// Empty run-state document returned when `run.json` doesn't exist yet. `run:
-/// null` means "no active run". Mirrors the frontend `RunStateFile` schema so
-/// it parses unconditionally.
-const DEFAULT_STATE: &str = r#"{"schemaVersion":1,"run":null}"#;
+/// Empty run-state document returned when `run.json` doesn't exist yet. An empty
+/// `runs` map means "no active runs". Mirrors the frontend `RunStateFile` schema
+/// so it parses unconditionally.
+const DEFAULT_STATE: &str = r#"{"schemaVersion":1,"runs":{}}"#;
 
 /// Empty meta document returned when `meta.json` doesn't exist yet. Mirrors the
 /// frontend `RogueliteMeta` schema.
@@ -122,7 +123,8 @@ mod tests {
     fn default_state_is_valid_json() {
         let parsed: serde_json::Value = serde_json::from_str(DEFAULT_STATE).unwrap();
         assert_eq!(parsed["schemaVersion"], 1);
-        assert!(parsed["run"].is_null());
+        assert!(parsed["runs"].is_object());
+        assert_eq!(parsed["runs"].as_object().unwrap().len(), 0);
     }
 
     #[test]

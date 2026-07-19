@@ -1,7 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { ArrowLeft, Check, Trophy, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
 import { resolveGameByShortname } from "../../conquest/model";
 import { buildEdgeMap, reachableFrom } from "../../content/buildTree";
@@ -43,7 +43,8 @@ import { RunHud } from "./components/RunHud";
  * transitions — this page is a dispatcher.
  */
 export default function RunPage() {
-  const { run, loading, save } = useRun();
+  const { runId } = useParams();
+  const { run, loading, save } = useRun(runId);
   const { meta, save: saveMeta } = useRunMeta();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);

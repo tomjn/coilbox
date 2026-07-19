@@ -222,10 +222,15 @@ export interface RogueliteRun {
   updatedAt: string;
 }
 
-/** The single active-run state document (mirrors the plugin default). */
+/**
+ * The active-runs state document: many runs keyed by an opaque id, so warpaths
+ * for different games/factions coexist instead of overwriting one another
+ * (mirroring conquest, which keys many runs by galaxy id). Identity lives in the
+ * map key, not on the run, so the run schema is unchanged.
+ */
 export interface RunStateFile {
   schemaVersion: 1;
-  run: RogueliteRun | null;
+  runs: Record<string, RogueliteRun>;
 }
 
 /** Persistent between-run unlocks. "Options, not raw power." */
@@ -247,7 +252,7 @@ export interface RunStats {
   deepest: number;
 }
 
-export const emptyStateFile: RunStateFile = { schemaVersion: 1, run: null };
+export const emptyStateFile: RunStateFile = { schemaVersion: 1, runs: {} };
 
 export const emptyMeta: RogueliteMeta = {
   schemaVersion: 1,
@@ -639,6 +644,46 @@ export function reconcileRun(run: RogueliteRun): RogueliteRun {
     ...run,
     progress: { ...p, hull, visited, unlockedUnits, status, currentNodeId },
   };
+}
+
+/**
+ * Parse the run-state document into a map of healed runs keyed by id, skipping
+ * any that fail {@link parseRunJson} validation. Migrates the legacy single-run
+ * shape (`{ run: <run> }`, at most one) into a one-entry map so an in-flight run
+ * saved before multi-run support isn't lost. Always returns a usable file, even
+ * from garbage input.
+ */
+export function parseRunStateFile(json: string): RunStateFile {
+  let data: unknown;
+  try {
+    data = JSON.parse(json);
+  } catch {
+    return { schemaVersion: 1, runs: {} };
+  }
+  if (!isRecord(data)) return { schemaVersion: 1, runs: {} };
+
+  const runs: Record<string, RogueliteRun> = {};
+
+  // Current shape: a keyed map of runs.
+  if (isRecord(data.runs)) {
+    for (const [id, raw] of Object.entries(data.runs)) {
+      if (!id) continue;
+      const parsed = parseRunJson(JSON.stringify(raw));
+      if (parsed) runs[id] = reconcileRun(parsed);
+    }
+  }
+
+  // Legacy migration: a single `run` from before multi-run storage. A stable id
+  // (seed + creation time) keeps the key identical across reloads.
+  if (Object.keys(runs).length === 0 && isRecord(data.run)) {
+    const parsed = parseRunJson(JSON.stringify(data.run));
+    if (parsed) {
+      runs[`run-${parsed.settings.seed}-${parsed.createdAt}`] =
+        reconcileRun(parsed);
+    }
+  }
+
+  return { schemaVersion: 1, runs };
 }
 
 /** Parse the raw JSON of the meta document, falling back to an empty meta. */
