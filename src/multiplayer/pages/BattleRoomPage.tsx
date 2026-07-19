@@ -3,6 +3,8 @@ import { Bookmark, Gamepad2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useFactionLogos } from "@/factions/logos";
+import { useSkirmishAis } from "@/play/config";
+import { SaveAsPresetButton } from "@/play/pages/components/SaveAsPresetButton";
 import { AutohostControls } from "../battle/AutohostControls";
 import { BattleChatCard } from "../battle/BattleChatCard";
 import { BattleGameCard } from "../battle/BattleGameCard";
@@ -15,6 +17,7 @@ import { battleOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import { StartPosOptions } from "../battle/StartPosOptions";
+import { battleToSkirmishDraft } from "../battle/toSkirmish";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
 import { useBattleRoom } from "../battle/useBattleRoom";
 import { VotePanel } from "../battle/VotePanel";
@@ -40,6 +43,13 @@ function BattleRoomPage() {
   const navigate = useNavigate();
   const presets = useBattlePresets();
   const [presetsOpen, setPresetsOpen] = useState(false);
+  // The game's skirmish AIs, so saving this battle as a skirmish preset can resolve
+  // each bot's `aiDll` to a real AI reference (and convert human opponents to one).
+  const { ais: skirmishAis } = useSkirmishAis(
+    room.enginePath,
+    room.dataDir,
+    room.localGame?.primaryArchive.name,
+  );
 
   // Per-game default preset: when we host a game that has a default preset set,
   // apply its options once. Guarded by a ref keyed on the battle + game so it seeds
@@ -205,6 +215,24 @@ function BattleRoomPage() {
             dataDir={room.dataDir}
             game={room.localGame}
             gameName={battle.modname}
+          />
+          {/* Save the whole battle as a replayable singleplayer skirmish (other
+              humans become AIs). Distinct from the host-only "Option presets" below,
+              which stores only mod/map options. */}
+          <SaveAsPresetButton
+            getDraft={() =>
+              battleToSkirmishDraft({
+                battle,
+                me: room.me,
+                sides: room.sides,
+                ais: skirmishAis,
+              })
+            }
+            defaultName={battle.title || `Battle ${battle.id}`}
+            variant="outline"
+            size="sm"
+            className="w-full"
+            label="Save as skirmish preset"
           />
           <StartPosOptions
             battle={battle}
