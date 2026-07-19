@@ -131,6 +131,21 @@ describe("generateRun", () => {
     }
   });
 
+  it("never links two depots back-to-back", () => {
+    for (const seed of [1, 7, 42, 99, 2026, 314, 271, 161]) {
+      for (const length of ["quick", "standard", "long"] as const) {
+        const run = generateRun(opts({ seed, length }));
+        const type = new Map(run.nodes.map((n) => [n.id, n.type]));
+        for (const [a, b] of run.edges) {
+          expect(
+            !(type.get(a) === "shop" && type.get(b) === "shop"),
+            `depot->depot edge ${a}->${b} (seed ${seed}, ${length})`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
   it("all edges ascend columns (forward-only DAG)", () => {
     const run = generateRun(opts());
     const col = new Map(run.nodes.map((n) => [n.id, n.col]));

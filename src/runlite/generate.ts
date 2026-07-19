@@ -362,15 +362,17 @@ function makeShop(
 // Node-type distribution + graph construction.
 // ---------------------------------------------------------------------------
 
-/** Weighted node-type draw for a middle column at depth fraction `p`. */
-function drawNodeType(rng: Rng, p: number): RunNodeType {
+/** Weighted node-type draw for a middle column at depth fraction `p`. When
+ * `allowShop` is false the shop weight is dropped, so a column adjacent to one
+ * that already has a depot never rolls another (no depot→depot on any path). */
+function drawNodeType(rng: Rng, p: number, allowShop = true): RunNodeType {
   // Weights shift from battle/shop-heavy early to elite/reward-heavy late.
   const weights: [RunNodeType, number][] = [
     ["battle", 6 - Math.round(p * 3)],
     ["elite", Math.round(p * 4)],
     ["event", 3],
     ["reward", 2 + Math.round(p * 2)],
-    ["shop", 2],
+    ["shop", allowShop ? 2 : 0],
   ];
   const total = weights.reduce((s, [, w]) => s + Math.max(0, w), 0);
   let r = rng() * total;
@@ -430,18 +432,24 @@ export function generateRun(opts: GenerateRunOpts): RogueliteRun {
   // Column 0: the start.
   columns.push([{ id: "start", type: "start", col: 0, row: 0 }]);
 
-  // Middle columns 1..cols-2.
+  // Middle columns 1..cols-2. Track whether the previous column placed a depot
+  // so the next never does — no two depots are ever reachable back-to-back.
+  let prevColHadShop = false;
   for (let c = 1; c <= cols - 2; c++) {
     const p = c / (cols - 1);
     const count = randInt(rng, 2, 4);
     const nodes: RunNode[] = [];
+    // The penultimate column force-places a depot (the pre-boss rest), so the
+    // column right before it must stay depot-free too.
+    const nextForcesShop = c === cols - 3;
+    const allowShop = !prevColHadShop && !nextForcesShop;
     for (let i = 0; i < count; i++) {
       // The first fight column is all battles; the penultimate column always
       // offers a shop (a rest before the boss) in its first slot.
       let type: RunNodeType;
       if (c === 1) type = "battle";
       else if (c === cols - 2 && i === 0) type = "shop";
-      else type = drawNodeType(rng, p);
+      else type = drawNodeType(rng, p, allowShop);
 
       const tier = techTierForCol(c, cols);
       const node: RunNode = { id: `c${c}n${i}`, type, col: c, row: i };
@@ -456,6 +464,7 @@ export function generateRun(opts: GenerateRunOpts): RogueliteRun {
       }
       nodes.push(node);
     }
+    prevColHadShop = nodes.some((n) => n.type === "shop");
     columns.push(nodes);
   }
 
