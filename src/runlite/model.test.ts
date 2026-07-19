@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseRunJson,
   parseRunMeta,
+  parseRunStateFile,
   type RogueliteRun,
   reconcileRun,
 } from "./model";
@@ -132,6 +133,45 @@ describe("reconcileRun", () => {
   it("is a no-op for a clean run", () => {
     const run = baseRun();
     expect(reconcileRun(run)).toBe(run);
+  });
+});
+
+describe("parseRunStateFile", () => {
+  it("reads a keyed map of runs, healing each", () => {
+    const a = baseRun();
+    const b = baseRun();
+    b.progress.hull = 500; // out of range -> healed to maxHull on read
+    const file = parseRunStateFile(
+      JSON.stringify({ schemaVersion: 1, runs: { alpha: a, beta: b } }),
+    );
+    expect(Object.keys(file.runs).sort()).toEqual(["alpha", "beta"]);
+    expect(file.runs.beta.progress.hull).toBe(100);
+  });
+
+  it("skips runs that fail validation", () => {
+    const file = parseRunStateFile(
+      JSON.stringify({
+        schemaVersion: 1,
+        runs: { good: baseRun(), bad: { type: "roguelite-run" } },
+      }),
+    );
+    expect(Object.keys(file.runs)).toEqual(["good"]);
+  });
+
+  it("migrates a legacy single-run document into a one-entry map", () => {
+    const file = parseRunStateFile(
+      JSON.stringify({ schemaVersion: 1, run: baseRun() }),
+    );
+    const ids = Object.keys(file.runs);
+    expect(ids).toHaveLength(1);
+    expect(file.runs[ids[0]].settings.seed).toBe(42);
+  });
+
+  it("returns an empty map for a null legacy run and for garbage", () => {
+    expect(
+      parseRunStateFile(JSON.stringify({ schemaVersion: 1, run: null })).runs,
+    ).toEqual({});
+    expect(parseRunStateFile("not json").runs).toEqual({});
   });
 });
 

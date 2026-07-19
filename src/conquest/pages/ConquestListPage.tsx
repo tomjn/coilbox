@@ -32,7 +32,7 @@ import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
  */
 export default function ConquestListPage() {
   const { galaxies, loading, error } = useGalaxies();
-  const { file } = useConquestState();
+  const { file, saveFor } = useConquestState();
   const drawer = useDrawer();
   const navigate = useNavigate();
 
@@ -122,6 +122,7 @@ export default function ConquestListPage() {
                       galaxy={galaxy}
                       bundled={source === "bundled"}
                       state={file.conquests[galaxy.id]}
+                      onAbandon={() => saveFor(galaxy.id, undefined)}
                     />
                   </li>
                 ))}
@@ -166,10 +167,13 @@ function GalaxyCard({
   galaxy,
   bundled,
   state,
+  onAbandon,
 }: {
   galaxy: GalaxyDoc;
   bundled: boolean;
   state: ConquestState | undefined;
+  /** Present for in-progress cards: clears the run state, keeping the galaxy. */
+  onAbandon?: () => void;
 }) {
   const { refresh } = useGalaxies();
   // The player's chosen faction emblem (by its in-game side), shown in place of the
@@ -246,19 +250,32 @@ function GalaxyCard({
           aria-hidden
         />
       </Link>
-      {!bundled && !state && (
+      {state && onAbandon ? (
         <Button
           variant="ghost"
           size="icon"
-          aria-label={`Delete ${galaxy.title}`}
-          onClick={async () => {
-            await conquestDelete({ id: galaxy.id });
-            await refreshGalaxies();
-            refresh();
-          }}
+          aria-label={`Abandon ${galaxy.title}`}
+          title="Abandon this campaign"
+          onClick={onAbandon}
         >
           <Trash2 className="size-4 text-muted-foreground" aria-hidden />
         </Button>
+      ) : (
+        !bundled &&
+        !state && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Delete ${galaxy.title}`}
+            onClick={async () => {
+              await conquestDelete({ id: galaxy.id });
+              await refreshGalaxies();
+              refresh();
+            }}
+          >
+            <Trash2 className="size-4 text-muted-foreground" aria-hidden />
+          </Button>
+        )
       )}
     </Card>
   );

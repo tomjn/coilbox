@@ -7,41 +7,34 @@ import {
 } from "./bindings";
 import {
   emptyMeta,
-  parseRunJson,
   parseRunMeta,
+  parseRunStateFile,
   type RogueliteMeta,
   type RogueliteRun,
-  reconcileRun,
 } from "./model";
 
 /**
- * Load / save the single active run. Unlike conquest (which keys many runs by
- * galaxy id), a roguelite has at most one run in flight, so the state document
- * is just that run or `null`. The saved blob is healed via {@link reconcileRun}
- * on read. A ref mirror lets `save` build on the latest value without waiting
- * for a React flush, so two quick saves can't clobber each other.
+ * Load / save the keyed collection of active runs. Each warpath persists under
+ * its own id (mirroring conquest, which keys many runs by galaxy id), so runs
+ * for different games/factions coexist instead of overwriting each other. The
+ * saved blob is parsed and healed via {@link parseRunStateFile} on read. A ref
+ * mirror lets saves build on the latest value without waiting for a React
+ * flush, so two quick saves can't clobber each other.
  */
-export function useRun() {
-  const [run, setRun] = useState<RogueliteRun | null>(null);
+export function useRuns() {
+  const [runs, setRuns] = useState<Record<string, RogueliteRun>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const runRef = useRef<RogueliteRun | null>(null);
+  const runsRef = useRef<Record<string, RogueliteRun>>({});
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const { json } = await runliteStateLoad({});
-      let parsed: RogueliteRun | null = null;
-      try {
-        const data = JSON.parse(json) as { run?: unknown };
-        if (data.run) parsed = parseRunJson(JSON.stringify(data.run));
-      } catch {
-        parsed = null;
-      }
-      const healed = parsed ? reconcileRun(parsed) : null;
-      runRef.current = healed;
-      setRun(healed);
+      const { runs: parsed } = parseRunStateFile(json);
+      runsRef.current = parsed;
+      setRuns(parsed);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -49,18 +42,56 @@ export function useRun() {
     }
   }, []);
 
-  /** Persist the active run (or clear it with `null`). */
-  const save = useCallback(async (next: RogueliteRun | null) => {
-    runRef.current = next;
-    setRun(next);
+  const persist = useCallback(async (next: Record<string, RogueliteRun>) => {
+    runsRef.current = next;
+    setRuns(next);
     await runliteStateSave({
-      json: JSON.stringify({ schemaVersion: 1, run: next }),
+      json: JSON.stringify({ schemaVersion: 1, runs: next }),
     });
   }, []);
+
+  /** Add or replace a run under `id`, preserving every other run. */
+  const saveRun = useCallback(
+    async (id: string, run: RogueliteRun) => {
+      await persist({ ...runsRef.current, [id]: run });
+    },
+    [persist],
+  );
+
+  /** Remove a run (abandon), preserving every other run. */
+  const deleteRun = useCallback(
+    async (id: string) => {
+      const next = { ...runsRef.current };
+      delete next[id];
+      await persist(next);
+    },
+    [persist],
+  );
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  return { runs, loading, error, refresh, saveRun, deleteRun };
+}
+
+/**
+ * Single-run view by id: the run (or `null`) plus a `save` that writes it back
+ * into the keyed collection, or clears just that run with `null`. Keeps the
+ * active-run page's `save(next)` / `save(null)` shape unchanged.
+ */
+export function useRun(id: string | undefined) {
+  const { runs, loading, error, refresh, saveRun, deleteRun } = useRuns();
+  const run = id ? (runs[id] ?? null) : null;
+
+  const save = useCallback(
+    async (next: RogueliteRun | null) => {
+      if (!id) return;
+      if (next) await saveRun(id, next);
+      else await deleteRun(id);
+    },
+    [id, saveRun, deleteRun],
+  );
 
   return { run, loading, error, refresh, save };
 }

@@ -22,7 +22,7 @@ import {
 } from "../../generate";
 import { loadoutById, unlockedLoadouts } from "../../meta";
 import type { RunLength, RunSkin } from "../../model";
-import { useRun, useRunMeta } from "../../runs";
+import { useRunMeta, useRuns } from "../../runs";
 import { OptionSelect } from "./OptionSelect";
 
 /**
@@ -33,10 +33,14 @@ import { OptionSelect } from "./OptionSelect";
 /** Remembers the last game picked across runs (and the module-level default). */
 const LAST_GAME_KEY = "runlite:lastGame";
 
-export function RunSetupForm({ onStarted }: { onStarted: () => void }) {
+export function RunSetupForm({
+  onStarted,
+}: {
+  onStarted: (id: string) => void;
+}) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const { save } = useRun();
+  const { saveRun } = useRuns();
   const { meta } = useRunMeta();
 
   // In a distribution profile filtered to a game, only that game is offered.
@@ -156,8 +160,9 @@ export function RunSetupForm({ onStarted }: { onStarted: () => void }) {
       enemyAiKey,
       loadoutBranch: loadoutById(loadoutId).branchIndex,
     };
-    await save(generateRun(opts));
-    onStarted();
+    const id = `run-${crypto.randomUUID()}`;
+    await saveRun(id, generateRun(opts));
+    onStarted(id);
   };
 
   const toggleItem =

@@ -2,43 +2,30 @@ import { Button, useDrawer } from "@picoframe/frame";
 import { Loader2, Play, Swords, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
-import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogo } from "@/factions/logos";
 import { resolveGameByShortname } from "../../conquest/model";
 import { useUnitsyncScan } from "../../content/config";
 import { EmptyState } from "../../content/pages/components/states";
 import { usePreferredTarget } from "../../play/config";
-import { useRun } from "../runs";
+import type { RogueliteRun } from "../model";
+import { useRuns } from "../runs";
 import { RunSetupForm } from "./components/RunSetupForm";
 
 /**
- * The Run hub: the active run (resume/abandon) plus a "New run" button that
- * opens the setup in a right-hand drawer — mirroring the Conquest list + its
- * "Generate a galaxy" drawer.
+ * The Warpath hub: every run in flight (resume/abandon), plus a "New warpath"
+ * button that opens the setup in a right-hand drawer. Runs are keyed by id, so
+ * warpaths for different games/factions coexist here — mirroring the Conquest
+ * list + its "Generate a galaxy" drawer.
  */
 export default function RunListPage() {
   const navigate = useNavigate();
   const drawer = useDrawer();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const { run: activeRun, save } = useRun();
+  const { runs, deleteRun } = useRuns();
 
   const hasGames = (scan.data?.games.length ?? 0) > 0;
-
-  // The active run's chosen faction emblem (by its in-game side), shown on the card.
-  const runGame = activeRun
-    ? resolveGameByShortname(activeRun.settings.game, scan.data?.games ?? [])
-    : null;
-  const runLogo = useFactionLogo(
-    {
-      game: runGame ?? undefined,
-      enginePath: target?.enginePath,
-      dataDir: target?.dataDir,
-      gameArchive: runGame?.primaryArchive.name,
-      size: 32,
-    },
-    activeRun?.settings.side,
-  );
+  const runEntries = Object.entries(runs);
 
   const openSetup = () =>
     drawer.open({
@@ -46,9 +33,9 @@ export default function RunListPage() {
       width: "30rem",
       content: (
         <RunSetupForm
-          onStarted={() => {
+          onStarted={(id) => {
             drawer.close();
-            navigate("/warpath/active");
+            navigate(`/warpath/${encodeURIComponent(id)}`);
           }}
         />
       ),
@@ -85,16 +72,18 @@ export default function RunListPage() {
         )
       ) : !hasGames ? (
         <EmptyState label="No games installed. Add one from Content → Games." />
-      ) : activeRun ? (
-        <ActiveRunCard
-          game={activeRun.settings.game.shortname}
-          side={activeRun.settings.side}
-          logo={runLogo}
-          health={`${activeRun.progress.hull}/${activeRun.progress.maxHull}`}
-          status={activeRun.progress.status}
-          onResume={() => navigate("/warpath/active")}
-          onAbandon={() => save(null)}
-        />
+      ) : runEntries.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {runEntries.map(([id, run]) => (
+            <li key={id}>
+              <RunCard
+                run={run}
+                onResume={() => navigate(`/warpath/${encodeURIComponent(id)}`)}
+                onAbandon={() => deleteRun(id)}
+              />
+            </li>
+          ))}
+        </ul>
       ) : (
         <EmptyState label="No warpath in progress. Start a new warpath to begin." />
       )}
@@ -102,36 +91,48 @@ export default function RunListPage() {
   );
 }
 
-function ActiveRunCard({
-  game,
-  side,
-  logo,
-  health,
-  status,
+/** One run in the hub, resolving its own faction emblem from the chosen side. */
+function RunCard({
+  run,
   onResume,
   onAbandon,
 }: {
-  game: string;
-  side?: string;
-  logo?: FactionLogoSrc;
-  health: string;
-  status: "active" | "won" | "lost";
+  run: RogueliteRun;
   onResume: () => void;
   onAbandon: () => void;
 }) {
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const game = resolveGameByShortname(
+    run.settings.game,
+    scan.data?.games ?? [],
+  );
+  const logo = useFactionLogo(
+    {
+      game: game ?? undefined,
+      enginePath: target?.enginePath,
+      dataDir: target?.dataDir,
+      gameArchive: game?.primaryArchive.name,
+      size: 32,
+    },
+    run.settings.side,
+  );
+
+  const { status, hull, maxHull } = run.progress;
   const label =
     status === "won"
       ? "Warpath complete"
       : status === "lost"
         ? "Warpath ended"
         : "Warpath in progress";
+
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
       <div className="flex items-center gap-3">
         {logo && (
           <FactionLogo
             logo={logo}
-            sideName={side}
+            sideName={run.settings.side}
             size={32}
             className="text-primary"
           />
@@ -139,7 +140,7 @@ function ActiveRunCard({
         <div>
           <div className="font-medium">{label}</div>
           <div className="text-xs text-muted-foreground">
-            {game} · health {health}
+            {run.settings.game.shortname} · health {hull}/{maxHull}
           </div>
         </div>
       </div>
