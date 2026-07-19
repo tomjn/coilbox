@@ -9,6 +9,7 @@ import {
   targetsFromState,
   useContentPrefs,
 } from "./config";
+import { warmAllRoots } from "./rapidPoolWarm";
 
 /**
  * App-launch warm-up for the Content plugin. Mounted as the plugin's `Provider`,
@@ -52,6 +53,9 @@ export default function ContentStartupProvider({
       // Lists are ready now; thumbnails render in the background and must not
       // gate the grid.
       primeThumbnails(target.enginePath, target.rootPath).catch(() => {});
+      // Warm the rapid pool (read `.sdp` manifests into the page cache) so the
+      // engine's first rapid-tag resolution is warm. Fire-and-forget.
+      warmAllRoots(state).catch(() => {});
     } catch {
       // The failure is recorded in the shared scan-error cache and surfaced by
       // the content page the user opens — nothing to show here.
