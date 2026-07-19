@@ -1,6 +1,6 @@
 import { Button, Input } from "@picoframe/frame";
 import { Bookmark } from "lucide-react";
-import { type ComponentProps, useRef, useState } from "react";
+import { type ComponentProps, useState } from "react";
 import {
   Popover,
   PopoverContent,
@@ -8,20 +8,22 @@ import {
 } from "@/components/ui/popover";
 import { notify } from "@/notify/notify";
 import type { SkirmishDraft } from "../../drafts";
-import { useSkirmishPresets } from "../../presets";
+import { presetMatchesDraft, useSkirmishPresets } from "../../presets";
 
 /**
  * A self-contained "Save as preset" control shared by every battle surface
  * (multiplayer room, conquest overlay, warpath overlay). It opens a small popover
  * to name the preset, then saves the captured `SkirmishDraft` into the singleplayer
  * presets library (`play.presets`) so the battle can be replayed from the Skirmish
- * page later. `getDraft` is called at save time (not on render) so the snapshot
- * reflects the battle as it stands when the user commits.
+ * page later. `getDraft` is called on render (to decide the "already saved" cue) and
+ * again at save time so the committed snapshot reflects the battle as it then stands.
  *
  * Two looks: the default labelled `button`, and a `gutter` icon box that matches
- * `BackToMapButton` for the map overlays. Either way the bookmark **fills** once
- * saved, and resets when `defaultName` changes (a different battle), so the player
- * can see this fight is already kept and needn't re-save it.
+ * `BackToMapButton` for the map overlays. Either way the bookmark **fills** when a
+ * saved preset already captures this exact battle (matched on the draft content, not
+ * the name the user gave it), so the player can see this fight is already kept and
+ * needn't re-save it. The cue is derived from the saved presets, not local state, so
+ * it survives leaving and re-entering the battle overlay.
  */
 export function SaveAsPresetButton({
   getDraft,
@@ -45,19 +47,17 @@ export function SaveAsPresetButton({
   className?: string;
   label?: string;
 }) {
-  const { savePreset } = useSkirmishPresets();
+  const { presets, savePreset } = useSkirmishPresets();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [saved, setSaved] = useState(false);
 
-  // A different battle (new default name) is a fresh thing to save, so the filled
-  // "already saved" cue resets — React's set-state-during-render pattern for
-  // prop-derived state, which needs no effect.
-  const prevName = useRef(defaultName);
-  if (prevName.current !== defaultName) {
-    prevName.current = defaultName;
-    setSaved(false);
-  }
+  // "Already saved" is derived from the presets library, not local state, so the
+  // filled cue reflects reality across mounts (leaving and re-entering the overlay)
+  // and different fights: it's true when a saved preset captures this exact battle,
+  // whatever name it was given. `getDraft` returns null when the battle can't be
+  // captured yet (e.g. game not installed), in which case nothing is saved.
+  const draft = getDraft();
+  const saved = draft ? presetMatchesDraft(presets, draft) : false;
 
   // Seed the name from the default each time the popover opens, so a re-open after
   // an edit starts fresh rather than keeping the last aborted text.
@@ -80,7 +80,6 @@ export function SaveAsPresetButton({
       return;
     }
     savePreset(trimmed, draft);
-    setSaved(true);
     notify({
       title: "Saved to Singleplayer presets",
       body: `"${trimmed}" — replay it from Singleplayer → Presets.`,
