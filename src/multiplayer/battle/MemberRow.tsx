@@ -8,7 +8,7 @@ import {
   UserX,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import {
   Popover,
   PopoverContent,
@@ -75,7 +75,7 @@ export function MemberRow({
   showActions: boolean;
   /** Briefly highlight this row because the player just launched the game. */
   flashIngame?: boolean;
-  sideOptions: { value: string; label: string }[];
+  sideOptions: { value: string; label: string; icon?: ReactNode }[];
   teamOptions: { value: string; label: string }[];
   allyOptions: { value: string; label: string }[];
   onSide: (side: number) => void;
@@ -172,10 +172,15 @@ export function MemberRow({
             onValueChange={(v) => onSide(Number(v))}
           />
         ) : (
-          <span className="text-sm">
-            {sideOptions.find((o) => o.value === String(row.side))?.label ??
-              "–"}
-          </span>
+          (() => {
+            const opt = sideOptions.find((o) => o.value === String(row.side));
+            return (
+              <span className="flex items-center gap-1.5 text-sm">
+                {opt?.icon}
+                {opt?.label ?? "–"}
+              </span>
+            );
+          })()
         )}
       </TableCell>
 

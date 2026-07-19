@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { FactionLogo } from "@/factions/FactionLogo";
+import { useFactionLogo } from "@/factions/logos";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
 import {
@@ -18,7 +20,7 @@ import { conquestDelete, conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { type GenerateOptions, generateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc } from "../model";
-import { compareGameVersions } from "../model";
+import { compareGameVersions, resolveGameByShortname } from "../model";
 import { mergeConquestNames } from "../names";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
 
@@ -170,6 +172,24 @@ function GalaxyCard({
   state: ConquestState | undefined;
 }) {
   const { refresh } = useGalaxies();
+  // The player's chosen faction emblem (by its in-game side), shown in place of the
+  // generic orbit glyph. Resolved per card — hooks are shared/cached per target.
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const installedGame = resolveGameByShortname(
+    galaxy.game,
+    scan.data?.games ?? [],
+  );
+  const playerLogo = useFactionLogo(
+    {
+      game: installedGame ?? undefined,
+      enginePath: target?.enginePath,
+      dataDir: target?.dataDir,
+      gameArchive: installedGame?.primaryArchive.name,
+      size: 24,
+    },
+    state?.playerSide,
+  );
   const statusLabel =
     state?.status === "won"
       ? "Victory"
@@ -186,7 +206,15 @@ function GalaxyCard({
         className="flex min-w-0 flex-1 items-center gap-3"
       >
         <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted">
-          <Orbit className="size-5 text-muted-foreground" aria-hidden />
+          {playerLogo ? (
+            <FactionLogo
+              logo={playerLogo}
+              sideName={state?.playerSide}
+              size={24}
+            />
+          ) : (
+            <Orbit className="size-5 text-muted-foreground" aria-hidden />
+          )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center gap-2">

@@ -2,6 +2,8 @@ import { Button } from "@picoframe/frame";
 import { ArrowLeft, Dices, Loader2, ShieldAlert, Swords } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
+import { FactionLogo } from "@/factions/FactionLogo";
+import { useFactionLogos } from "@/factions/logos";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
 import { useKnownSpaceMaps } from "../../content/mapAppearanceCache";
@@ -530,6 +532,13 @@ function RunSetupPanel({
     galaxy.game,
     scan.data?.games ?? [],
   );
+  const factionLogos = useFactionLogos({
+    game: installedGame ?? undefined,
+    enginePath: target?.enginePath,
+    dataDir: target?.dataDir,
+    gameArchive: installedGame?.primaryArchive.name,
+    sideNames: choices.map((f) => f.side ?? "").filter(Boolean),
+  });
 
   // Reroll in place: same knobs (persisted on the doc), fresh seed, content
   // environment (maps/AIs/names) re-resolved from what's installed right now.
@@ -595,10 +604,18 @@ function RunSetupPanel({
                     : "border-border/50 hover:border-border"
                 }`}
               >
-                <FactionDot
-                  color={f.color}
-                  sides={factionSides(galaxy, f.id)}
-                />
+                {f.side && factionLogos[f.side.toLowerCase()] ? (
+                  <FactionLogo
+                    logo={factionLogos[f.side.toLowerCase()]}
+                    sideName={f.side}
+                    size={16}
+                  />
+                ) : (
+                  <FactionDot
+                    color={f.color}
+                    sides={factionSides(galaxy, f.id)}
+                  />
+                )}
                 {f.name}
               </button>
             ))}

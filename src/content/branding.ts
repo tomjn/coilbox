@@ -39,6 +39,12 @@ export interface BrandingEntry {
   title?: string;
   banner?: string[];
   logo?: string[];
+  /**
+   * Per-side faction emblems, keyed by side name (case-insensitive, e.g. `arm`,
+   * `Armada`). Each value is a fallback URL list (first that resolves wins).
+   * Curated art here is preferred over a game's own tiny 16px `Sidepics/` emblem.
+   */
+  factionLogos?: Record<string, string[]>;
   screenshots?: BrandingScreenshot[];
   videos?: BrandingVideo[];
   links?: BrandingLink[];
@@ -373,6 +379,26 @@ export function useBrandingEntry(
 }
 
 const imageCache = new Map<string, Promise<ImageResult>>();
+
+/**
+ * Promise form of {@link useBrandingImage} for imperative resolvers (e.g. the
+ * faction-logo layer, which resolves many sides in one effect and can't call a
+ * hook per side). Shares the same session cache. Resolves to the cached `data:`
+ * URL or `undefined`. `reencode=false` preserves original bytes (logos).
+ */
+export function resolveBrandingImage(
+  urls?: string[],
+  reencode = false,
+): Promise<string | undefined> {
+  if (!urls?.length) return Promise.resolve(undefined);
+  const key = `${reencode ? "j" : "r"}\n${urls.join("\n")}`;
+  let promise = imageCache.get(key);
+  if (!promise) {
+    promise = brandingImageCmd({ urls, reencode });
+    imageCache.set(key, promise);
+  }
+  return promise.then((r) => r.dataUrl ?? undefined).catch(() => undefined);
+}
 
 /**
  * Resolve the first working URL to a cached `data:` URL via the Rust proxy (fetch

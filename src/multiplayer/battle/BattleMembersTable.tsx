@@ -9,6 +9,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Side } from "@/content/bindings";
+import { FactionLogo } from "@/factions/FactionLogo";
+import type { FactionLogoSrc } from "@/factions/fallback";
 import { aiByline } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { useMultiplayer } from "../store";
@@ -26,6 +28,7 @@ const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 export function BattleMembersTable({
   rows,
   sides,
+  factionLogos,
   maxSlots,
   selfHost,
   canAddBot,
@@ -39,6 +42,8 @@ export function BattleMembersTable({
 }: {
   rows: Row[];
   sides: Side[];
+  /** Resolved faction emblems, keyed by lowercased side name (may be empty). */
+  factionLogos?: Record<string, FactionLogoSrc>;
   /** Upper bound for the team/ally pickers (typically the battle's maxPlayers). */
   maxSlots: number;
   /** When true, the viewer hosts this battle and may force/kick other members. */
@@ -85,10 +90,16 @@ export function BattleMembersTable({
   const showActions = selfHost || ownsABot;
 
   const slots = Math.max(2, Math.min(maxSlots || 0, 16));
-  const sideOptions = sides.map((s: Side, i) => ({
-    value: String(i),
-    label: s.name,
-  }));
+  const sideOptions = sides.map((s: Side, i) => {
+    const logo = factionLogos?.[s.name.toLowerCase()];
+    return {
+      value: String(i),
+      label: s.name,
+      icon: logo ? (
+        <FactionLogo logo={logo} sideName={s.name} size={16} />
+      ) : undefined,
+    };
+  });
   const teamOptions = range(slots).map((i) => ({
     value: String(i),
     label: String(i + 1),

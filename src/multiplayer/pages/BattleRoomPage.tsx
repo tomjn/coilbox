@@ -2,6 +2,7 @@ import { Button, NavGate } from "@picoframe/frame";
 import { Bookmark, Gamepad2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { useFactionLogos } from "@/factions/logos";
 import { AutohostControls } from "../battle/AutohostControls";
 import { BattleChatCard } from "../battle/BattleChatCard";
 import { BattleGameCard } from "../battle/BattleGameCard";
@@ -28,6 +29,13 @@ import { useMpRevealed } from "../store";
  */
 function BattleRoomPage() {
   const room = useBattleRoom();
+  const factionLogos = useFactionLogos({
+    game: room.localGame,
+    enginePath: room.enginePath,
+    dataDir: room.dataDir,
+    gameArchive: room.localGame?.primaryArchive.name,
+    sideNames: room.sides.map((s) => s.name),
+  });
   const launch = useBattleLaunch(room.serverKey, room.target, room.selfHost);
   const navigate = useNavigate();
   const presets = useBattlePresets();
@@ -157,6 +165,7 @@ function BattleRoomPage() {
           <BattleMembersTable
             rows={room.rows}
             sides={room.sides}
+            factionLogos={factionLogos}
             maxSlots={battle.maxPlayers}
             selfHost={room.selfHost}
             canAddBot={room.canAddBot}

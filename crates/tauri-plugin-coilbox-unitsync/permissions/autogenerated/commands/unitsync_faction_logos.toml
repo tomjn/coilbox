@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-unitsync-faction-logos"
+description = "Enables the unitsync_faction_logos command without any pre-configured scope."
+commands.allow = ["unitsync_faction_logos"]
+
+[[permission]]
+identifier = "deny-unitsync-faction-logos"
+description = "Denies the unitsync_faction_logos command without any pre-configured scope."
+commands.deny = ["unitsync_faction_logos"]

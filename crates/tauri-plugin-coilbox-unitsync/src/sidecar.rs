@@ -111,6 +111,25 @@ pub fn build_unit_buildpics_args(
     args
 }
 
+/// Build args for `--faction-logos` mode: the game whose `Sidepics/<side>` emblems
+/// to resolve, the comma-joined side names, and the optional on-disk cache dir.
+pub fn build_faction_logos_args(
+    lib: &str,
+    datadir: &str,
+    game: &str,
+    sides: &[String],
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--faction-logos".into());
+    args.push("--game".into());
+    args.push(game.into());
+    args.push("--sides".into());
+    args.push(sides.join(","));
+    push_cache_dir(&mut args, cache_dir);
+    args
+}
+
 /// Build args for `--unit-dataset` mode: the game whose unit graph (units +
 /// `buildoptions` edges) to read, plus the optional on-disk info-blob cache dir.
 pub fn build_unit_dataset_args(

@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { ArrowLeft, Check, Trophy, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
+import { useFactionLogo } from "@/factions/logos";
 import { resolveGameByShortname } from "../../conquest/model";
 import { buildEdgeMap, reachableFrom } from "../../content/buildTree";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../../content/config";
@@ -61,6 +62,16 @@ export default function RunPage() {
     target?.enginePath,
     target?.dataDir,
     game?.primaryArchive.name,
+  );
+  const factionLogo = useFactionLogo(
+    {
+      game: game ?? undefined,
+      enginePath: target?.enginePath,
+      dataDir: target?.dataDir,
+      gameArchive: game?.primaryArchive.name,
+      size: 32,
+    },
+    run?.settings.side,
   );
   const arsenalTotal = useMemo(() => {
     if (!run?.startUnit || !dataset) return undefined;
@@ -175,7 +186,12 @@ export default function RunPage() {
             </Link>
           )}
           <div className="min-w-0 flex-1">
-            <RunHud run={run} arsenalTotal={arsenalTotal} />
+            <RunHud
+              run={run}
+              arsenalTotal={arsenalTotal}
+              logo={factionLogo}
+              side={run.settings.side}
+            />
           </div>
         </div>
         {selectedId && !active && (

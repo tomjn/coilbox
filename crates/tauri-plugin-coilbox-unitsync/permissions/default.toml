@@ -10,6 +10,7 @@ permissions = [
   "allow-unitsync-thumbnails",
   "allow-unitsync-game-info",
   "allow-unitsync-unit-buildpics",
+  "allow-unitsync-faction-logos",
   "allow-unitsync-unit-dataset",
   "allow-unitsync-map-info",
   "allow-unitsync-map-skybox",
