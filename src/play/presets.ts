@@ -55,6 +55,61 @@ export function useSkirmishPresets() {
 }
 
 /**
+ * Canonicalize a value for stable structural comparison: object keys are sorted
+ * recursively (so field/key order never affects the result) while arrays keep
+ * their order (participant order and the disabled-unit list are meaningful).
+ */
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.keys(obj)
+        .sort()
+        .map((k) => [k, canonical(obj[k])]),
+    );
+  }
+  return value;
+}
+
+/**
+ * A stable content key identifying the *battle* a draft launches, ignoring
+ * session-volatile identity. Preset id/name/timestamps aren't part of the draft,
+ * and each participant's `id` is dropped because it's a per-session counter
+ * (`rl0`, `p3`, …) that differs every time the same encounter is synthesized —
+ * keeping it would make an already-saved battle never match itself after a reload.
+ * Absent restrictions normalize to `null` so a draft with none matches another
+ * with none.
+ */
+function draftKey(draft: SkirmishDraft): string {
+  const participants = draft.participants.map(({ id: _id, ...rest }) => rest);
+  return JSON.stringify(
+    canonical({
+      participants,
+      gameName: draft.gameName,
+      mapName: draft.mapName,
+      startPosType: draft.startPosType,
+      modOptionValues: draft.modOptionValues,
+      restrictions: draft.restrictions ?? null,
+    }),
+  );
+}
+
+/**
+ * True when the saved-presets list already holds a preset capturing the same
+ * battle as `draft`. Lets a battle surface show its "already saved" cue from the
+ * durable presets store rather than transient component state, so the cue is
+ * correct after leaving and re-entering the screen.
+ */
+export function presetMatchesDraft(
+  presets: SkirmishPreset[],
+  draft: SkirmishDraft,
+): boolean {
+  const key = draftKey(draft);
+  return presets.some((p) => draftKey(p) === key);
+}
+
+/**
  * Parse the raw JSON of an imported preset file into a `SkirmishDraft` (plus its
  * original name), or `null` if the shape doesn't match — an imported file is
  * untrusted input, so validate the five draft fields before adopting it. Identity
