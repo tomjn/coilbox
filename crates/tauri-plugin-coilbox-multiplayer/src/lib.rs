@@ -13,8 +13,9 @@ mod conn;
 mod dmlog;
 mod tls;
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Mutex, MutexGuard};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
 
 use coilbox_lobby_protocol::{
     command, default_battle_status, password_hash, team_color_rgb, BattleStatus, ClientStatus,
@@ -28,6 +29,19 @@ use tauri::{
     plugin::{Builder, TauriPlugin},
     Manager, Runtime, State,
 };
+use tls::ConnectError;
+use tokio_util::sync::CancellationToken;
+
+/// Hard ceiling on a single connect attempt (TCP + STLS + TLS handshake). A stuck
+/// server otherwise leaves the UI parked on "Connecting…" indefinitely; past this
+/// the attempt self-aborts even if the user never hits Cancel.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Cancellation tokens for connects still in their TCP/TLS handshake, so not yet in
+/// the live [`Registry`]. Keyed by the same `serverKey`. [`open_and_spawn`] inserts
+/// one on entry and removes it once the handshake resolves; `mp_cancel_connect`
+/// fires it to abandon a stuck connect that `mp_disconnect` can't reach yet.
+pub(crate) type PendingConnects = Arc<Mutex<HashMap<String, CancellationToken>>>;
 
 /// Lock a mutex, recovering the guard if a previous holder panicked and poisoned
 /// it. All 35 `mp_*` commands and the connection task share the registry/state/
@@ -96,6 +110,7 @@ fn set_intended_battle_status(
 async fn open_and_spawn<R: Runtime>(
     app: &tauri::AppHandle<R>,
     registry: &Registry,
+    pending: &PendingConnects,
     server_key: String,
     host: String,
     port: u16,
@@ -118,9 +133,39 @@ async fn open_and_spawn<R: Runtime>(
     let dm_log = dmlog::DmLog::new(&dm_dir, &server_key);
     let chan_log = dmlog::DmLog::new(&chan_dir, &server_key);
 
-    let stream = match tls::connect_stream(&host, port, tls, allow_self_signed).await {
+    // Publish a cancel token before the (potentially stalling) handshake so
+    // `mp_cancel_connect` can abort it, and always retract it once the connect
+    // resolves — success, failure, timeout, or cancel — so a later reconnect under
+    // the same key starts clean. A pre-existing entry means a connect is already in
+    // flight for this key; refuse rather than clobber its token.
+    let token = CancellationToken::new();
+    {
+        let mut map = lock_or_recover(pending);
+        if map.contains_key(&server_key) {
+            return CliResult::err(format!("already connecting: {server_key}"));
+        }
+        map.insert(server_key.clone(), token.clone());
+    }
+    let result = tls::connect_stream_cancellable(
+        &host,
+        port,
+        tls,
+        allow_self_signed,
+        CONNECT_TIMEOUT,
+        &token,
+    )
+    .await;
+    lock_or_recover(pending).remove(&server_key);
+    let stream = match result {
         Ok(s) => s,
-        Err(e) => return CliResult::err(e),
+        Err(ConnectError::Cancelled) => return CliResult::err("connection cancelled"),
+        Err(ConnectError::TimedOut) => {
+            return CliResult::err(format!(
+                "connection timed out after {}s",
+                CONNECT_TIMEOUT.as_secs()
+            ))
+        }
+        Err(ConnectError::Failed(e)) => return CliResult::err(e),
     };
 
     let login_cfg = LoginConfig {
@@ -156,6 +201,7 @@ async fn open_and_spawn<R: Runtime>(
 async fn mp_connect<R: Runtime>(
     app: tauri::AppHandle<R>,
     registry: State<'_, Registry>,
+    pending: State<'_, PendingConnects>,
     server_key: String,
     host: String,
     port: u16,
@@ -169,6 +215,7 @@ async fn mp_connect<R: Runtime>(
     Ok(open_and_spawn(
         &app,
         registry.inner(),
+        pending.inner(),
         server_key,
         host,
         port,
@@ -193,6 +240,7 @@ async fn mp_connect<R: Runtime>(
 async fn mp_register<R: Runtime>(
     app: tauri::AppHandle<R>,
     registry: State<'_, Registry>,
+    pending: State<'_, PendingConnects>,
     server_key: String,
     host: String,
     port: u16,
@@ -207,6 +255,7 @@ async fn mp_register<R: Runtime>(
     Ok(open_and_spawn(
         &app,
         registry.inner(),
+        pending.inner(),
         server_key,
         host,
         port,
@@ -252,6 +301,22 @@ fn mp_disconnect(registry: State<'_, Registry>, server_key: String) -> CliResult
             CliResult::ok(json!({ "disconnected": true }))
         }
         None => CliResult::ok(json!({ "disconnected": false })),
+    }
+}
+
+/// `mp_cancel_connect` — abort a connect that is still mid-handshake (before it
+/// registers as a live connection, which is when `mp_disconnect` takes over). Fires
+/// the pending cancel token; `open_and_spawn` then unwinds with "connection
+/// cancelled" and never spawns a task, leaving no lingering socket. Idempotent: a
+/// no-op if the connect already completed or was already cancelled.
+#[tauri::command]
+fn mp_cancel_connect(pending: State<'_, PendingConnects>, server_key: String) -> CliResult {
+    match lock_or_recover(&pending).remove(&server_key) {
+        Some(token) => {
+            token.cancel();
+            CliResult::ok(json!({ "cancelled": true }))
+        }
+        None => CliResult::ok(json!({ "cancelled": false })),
     }
 }
 
@@ -1292,6 +1357,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-multiplayer")
         .setup(|app, _api| {
             app.manage(Registry::default());
+            app.manage(PendingConnects::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1299,6 +1365,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_register,
             mp_confirm_agreement,
             mp_disconnect,
+            mp_cancel_connect,
             mp_reattach,
             mp_active_keys,
             mp_snapshot,

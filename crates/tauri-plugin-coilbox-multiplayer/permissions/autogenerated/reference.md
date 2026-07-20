@@ -8,6 +8,7 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-register`
 - `allow-mp-confirm-agreement`
 - `allow-mp-disconnect`
+- `allow-mp-cancel-connect`
 - `allow-mp-reattach`
 - `allow-mp-active-keys`
 - `allow-mp-snapshot`
@@ -189,6 +190,32 @@ Enables the mp_build_host_config command without any pre-configured scope.
 <td>
 
 Denies the mp_build_host_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-cancel-connect`
+
+</td>
+<td>
+
+Enables the mp_cancel_connect command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-cancel-connect`
+
+</td>
+<td>
+
+Denies the mp_cancel_connect command without any pre-configured scope.
 
 </td>
 </tr>

@@ -8,10 +8,12 @@
 //! already-secured stream and never has to special-case the handshake.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
+use tokio_util::sync::CancellationToken;
 
 /// A boxed, object-safe duplex byte stream. Both the plain-TCP and the TLS cases
 /// erase to this so `conn.rs` can frame either identically. tokio provides the
@@ -70,6 +72,45 @@ pub async fn connect_stream(
         .await
         .map_err(|e| format!("TLS handshake failed: {e}"))?;
     Ok(Box::new(tls_stream))
+}
+
+/// Why an in-flight connect ended without a stream. `Cancelled` and `TimedOut` are
+/// the two abandon paths this issue adds; `Failed` carries the underlying
+/// connect/handshake error string for the ordinary failure case.
+pub enum ConnectError {
+    /// The caller fired the [`CancellationToken`] (user hit Cancel).
+    Cancelled,
+    /// The connect exceeded its budget without resolving (stuck handshake).
+    TimedOut,
+    /// The connect/STLS/TLS attempt itself failed; message is user-facing.
+    Failed(String),
+}
+
+/// [`connect_stream`] with two escape hatches so a stuck handshake can't hang
+/// forever: a hard `timeout` backstop and a `cancel` token the frontend can fire to
+/// abandon the attempt immediately. The `select!` is `biased` toward the token so an
+/// already-fired cancel wins deterministically over a connect that resolves in the
+/// same poll. Dropping the connect future here tears down the half-open socket/TLS
+/// state, which is what makes the cancel a real teardown rather than a visual one.
+pub async fn connect_stream_cancellable(
+    host: &str,
+    port: u16,
+    tls: bool,
+    allow_self_signed: bool,
+    timeout: Duration,
+    cancel: &CancellationToken,
+) -> Result<Box<dyn AsyncReadWrite>, ConnectError> {
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => Err(ConnectError::Cancelled),
+        res = tokio::time::timeout(timeout, connect_stream(host, port, tls, allow_self_signed)) => {
+            match res {
+                Ok(Ok(stream)) => Ok(stream),
+                Ok(Err(e)) => Err(ConnectError::Failed(e)),
+                Err(_elapsed) => Err(ConnectError::TimedOut),
+            }
+        }
+    }
 }
 
 /// Build the rustls client config. Normally we verify against the webpki root
@@ -138,5 +179,80 @@ impl rustls::client::danger::ServerCertVerifier for NoVerify {
 
     fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
         self.0.signature_verification_algorithms.supported_schemes()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::net::TcpListener;
+
+    /// A listener that accepts one connection and then goes silent forever, so a
+    /// `tls` connect stalls on the STLS greeting read (never the TLS handshake) —
+    /// the same shape as a real slow/broken server. Returns the bound port.
+    async fn stalled_server() -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let _held = listener.accept().await; // hold the socket open, say nothing
+            std::future::pending::<()>().await;
+        });
+        port
+    }
+
+    #[tokio::test]
+    async fn connect_times_out_on_a_stalled_handshake() {
+        let port = stalled_server().await;
+        let token = CancellationToken::new();
+        let res = connect_stream_cancellable(
+            "127.0.0.1",
+            port,
+            true,
+            true,
+            Duration::from_millis(150),
+            &token,
+        )
+        .await;
+        assert!(matches!(res, Err(ConnectError::TimedOut)));
+    }
+
+    #[tokio::test]
+    async fn cancel_aborts_an_in_flight_connect_before_the_timeout() {
+        let port = stalled_server().await;
+        let token = CancellationToken::new();
+        let fire = token.clone();
+        // Cancel once the connect is surely parked on the greeting read; a 30s
+        // timeout guarantees the token, not the backstop, is what ends it.
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            fire.cancel();
+        });
+        let res = connect_stream_cancellable(
+            "127.0.0.1",
+            port,
+            true,
+            true,
+            Duration::from_secs(30),
+            &token,
+        )
+        .await;
+        assert!(matches!(res, Err(ConnectError::Cancelled)));
+    }
+
+    #[tokio::test]
+    async fn an_already_cancelled_token_wins_immediately() {
+        let port = stalled_server().await;
+        let token = CancellationToken::new();
+        token.cancel();
+        let res = connect_stream_cancellable(
+            "127.0.0.1",
+            port,
+            true,
+            true,
+            Duration::from_secs(30),
+            &token,
+        )
+        .await;
+        assert!(matches!(res, Err(ConnectError::Cancelled)));
     }
 }
