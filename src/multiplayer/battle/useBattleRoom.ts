@@ -31,6 +31,7 @@ import {
   mpSetStartRect,
   mpSetStatus,
   mpUpdateBattleInfo,
+  mpUpdateBot,
 } from "../bindings";
 import { useMultiplayer } from "../store";
 import { battleOptionTags, canEditBattleOptions } from "./battleOptions";
@@ -48,6 +49,12 @@ import { diffRestrictTags } from "./restrictTags";
 
 /** Format a rejected command for the action-error banner (matches useBattleLaunch). */
 const mpErr = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** Coalesce rapid colour-picker drags into one lobby command (trailing value
+ *  wins). The native `<input type="color">` fires onChange per drag value; sending
+ *  each straight to the wire floods MYBATTLESTATUS/FORCETEAMCOLOR and trips an
+ *  autohost's flood protection (players were getting banned mid-drag). */
+const COLOR_DEBOUNCE_MS = 400;
 
 /**
  * The battle room's single data+action hook. It reads the current battle out of
@@ -163,6 +170,11 @@ export interface BattleRoomView {
     forceSpectator: (user: string) => void;
     kick: (user: string) => void;
     removeBot: (name: string) => void;
+    /** Change a bot we own/host (team/ally) via UPDATEBOT; colour stays read-only. */
+    updateBot: (
+      name: string,
+      patch: { teamId?: number; ally?: number },
+    ) => void;
   };
   /** AIs the host can add as bots (host only): the game's own AIs — native engine
    *  AIs and/or its Lua AIs — or the engine's natives when the game declares none. */
@@ -290,6 +302,32 @@ export function useBattleRoom(): BattleRoomView {
   // omits `color` never reverts to 0 while our colour echo is still in flight —
   // the bug behind "always black". Seeded by the assign-on-join effect below.
   const intendedColorRef = useRef(0);
+
+  // Debounce colour sends per target so dragging the OS colour picker coalesces to
+  // one command (see COLOR_DEBOUNCE_MS). Keyed by target ("self", a forced member)
+  // so recolouring two members concurrently doesn't cancel each other.
+  const colorTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
+  const debounceColor = useCallback((key: string, send: () => void) => {
+    const timers = colorTimers.current;
+    const pending = timers.get(key);
+    if (pending) clearTimeout(pending);
+    timers.set(
+      key,
+      setTimeout(() => {
+        timers.delete(key);
+        send();
+      }, COLOR_DEBOUNCE_MS),
+    );
+  }, []);
+  useEffect(() => {
+    const timers = colorTimers.current;
+    return () => {
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
+    };
+  }, []);
 
   // Merge a patch over our current battle status and push it (MYBATTLESTATUS).
   // `color` is the `0xBBGGRR` int; `??` preserves current values for anything the
@@ -436,12 +474,16 @@ export function useBattleRoom(): BattleRoomView {
           );
       },
       forceColor: (user: string, hex: string) => {
+        // Debounced like our own colour: a host dragging the picker over another
+        // member's swatch would otherwise flood FORCETEAMCOLOR just the same.
         if (activeKey)
-          mpForceColor({
-            serverKey: activeKey,
-            username: user,
-            color: hexToColorInt(hex),
-          }).then(clearErr, setErr);
+          debounceColor(`force:${user}`, () =>
+            mpForceColor({
+              serverKey: activeKey,
+              username: user,
+              color: hexToColorInt(hex),
+            }).then(clearErr, setErr),
+          );
       },
       forceSpectator: (user: string) => {
         if (activeKey)
@@ -461,8 +503,29 @@ export function useBattleRoom(): BattleRoomView {
         if (activeKey)
           mpRemoveBot({ serverKey: activeKey, name }).then(clearErr, setErr);
       },
+      // Change a bot we own/host: team or ally. UPDATEBOT carries the bot's whole
+      // battle status, so we resend the unchanged fields from its current status
+      // (colour stays read-only for bots — no second drag-flood surface).
+      updateBot: (name: string, patch: { teamId?: number; ally?: number }) => {
+        if (!activeKey || !battle) return;
+        const bot = battle.bots[name];
+        if (!bot) return;
+        const bs = bot.battleStatus;
+        mpUpdateBot({
+          serverKey: activeKey,
+          name,
+          ready: bs.ready,
+          teamId: patch.teamId ?? bs.teamId,
+          ally: patch.ally ?? bs.ally,
+          mode: bs.mode,
+          handicap: bs.handicap,
+          sync: bs.sync,
+          side: bs.side,
+          color: bot.teamColor,
+        }).then(clearErr, setErr);
+      },
     }),
-    [activeKey, setErr, clearErr],
+    [activeKey, battle, debounceColor, setErr, clearErr],
   );
 
   // Add a native AI bot on the first free team/ally, with a fresh colour and a name
@@ -702,12 +765,16 @@ export function useBattleRoom(): BattleRoomView {
     setTeam: (teamId) => pushStatus({ teamId }),
     setAlly: (ally) => pushStatus({ ally }),
     setColor: (hex) => {
-      setSavedColor(hex);
-      // Track the deliberate pick so a manual black survives the assign-on-join
-      // effect and the pushStatus fill-in (a user-chosen black is real; a 0 default
-      // isn't). hex -> lobby 0xBBGGRR int only.
+      // Track the deliberate pick immediately so a manual black survives the
+      // assign-on-join effect and the pushStatus fill-in (a user-chosen black is
+      // real; a 0 default isn't). hex -> lobby 0xBBGGRR int only.
       intendedColorRef.current = hexToColorInt(hex);
-      pushStatus({ color: intendedColorRef.current });
+      // Debounce the persisted write + status push: the OS colour picker fires
+      // onChange per drag value, and one MYBATTLESTATUS each floods autohosts.
+      debounceColor("self", () => {
+        setSavedColor(hex);
+        pushStatus({ color: hexToColorInt(hex) });
+      });
     },
     setIngame,
     hostControls,
