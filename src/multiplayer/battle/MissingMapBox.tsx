@@ -17,9 +17,12 @@ import { downloadMapAnySource } from "./downloadMap";
 export function MissingMapBox({
   mapName,
   onRescan,
+  previewUrl,
 }: {
   mapName: string;
   onRescan: () => Promise<void>;
+  /** Remote map preview shown behind the controls while the map isn't installed. */
+  previewUrl?: string;
 }) {
   const writePath = useWriteRootPath();
   const [downloading, setDownloading] = useState(false);
@@ -55,32 +58,50 @@ export function MissingMapBox({
   }
 
   return (
-    <div className="flex w-full flex-col items-center gap-2 text-center">
-      <span className="text-xs font-medium text-muted-foreground">
-        Map not installed
-      </span>
-      {downloading && progress ? (
-        <ProgressBar progress={progress} className="w-full" />
-      ) : (
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button size="sm" disabled={downloading} onClick={downloadMap}>
-            <Download className="size-4" />
-            {downloading ? "Downloading…" : "Download"}
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={rescanning || downloading}
-            onClick={rescan}
-          >
-            <RefreshCw
-              className={rescanning ? "size-4 animate-spin" : "size-4"}
-            />
-            Rescan
-          </Button>
-        </div>
+    <>
+      {previewUrl && (
+        // Covers the whole minimap box (absolute → the positioned MinimapPreview
+        // frame). Pointer-transparent so the controls above stay interactive.
+        <img
+          src={previewUrl}
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute inset-0 size-full object-cover"
+        />
       )}
-      {error && <span className="text-xs text-destructive">{error}</span>}
-    </div>
+      <div
+        className={
+          previewUrl
+            ? "relative flex w-full max-w-56 flex-col items-center gap-2 rounded-md bg-background/75 p-3 text-center backdrop-blur-sm"
+            : "flex w-full flex-col items-center gap-2 text-center"
+        }
+      >
+        <span className="text-xs font-medium text-muted-foreground">
+          Map not installed
+        </span>
+        {downloading && progress ? (
+          <ProgressBar progress={progress} className="w-full" />
+        ) : (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button size="sm" disabled={downloading} onClick={downloadMap}>
+              <Download className="size-4" />
+              {downloading ? "Downloading…" : "Download"}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={rescanning || downloading}
+              onClick={rescan}
+            >
+              <RefreshCw
+                className={rescanning ? "size-4 animate-spin" : "size-4"}
+              />
+              Rescan
+            </Button>
+          </div>
+        )}
+        {error && <span className="text-xs text-destructive">{error}</span>}
+      </div>
+    </>
   );
 }

@@ -9,6 +9,7 @@ import {
   useUnitsyncMinimap,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { useBarMapPreview } from "@/downloads/config";
 import { MapCard } from "@/play/pages/components/MapCard";
 import type { Battle, StartRect } from "../bindings";
 import { allyLetter, hexToI32, type MemberRow, readableText } from "./config";
@@ -66,6 +67,11 @@ export function BattleMapCard({
 }) {
   const minimap = useUnitsyncMinimap(enginePath, dataDir, battle.map);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
+
+  // When the map isn't installed, unitsync can't render a minimap, so fall back to
+  // BAR's remote preview thumbnail (keyed by the battle's springName) behind the
+  // download controls instead of a blank box. Only fetched while the map is missing.
+  const remotePreview = useBarMapPreview(mapMissing ? battle.map : undefined);
 
   // Terrain overlay toggle: reuse the content-side metal/height infomap renders on
   // the battle minimap so hosts/players can read terrain when placing start boxes.
@@ -208,7 +214,11 @@ export function BattleMapCard({
         }
         placeholder={
           mapMissing ? (
-            <MissingMapBox mapName={battle.map} onRescan={onRescan} />
+            <MissingMapBox
+              mapName={battle.map}
+              onRescan={onRescan}
+              previewUrl={remotePreview}
+            />
           ) : undefined
         }
       />
