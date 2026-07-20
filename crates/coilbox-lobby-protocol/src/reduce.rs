@@ -960,14 +960,23 @@ fn reduce_battle_chat(
     now_ms: u64,
 ) -> Vec<Delta> {
     // SPADS runs `!`-command votes as battle chat from the autohost. Recognise
-    // those lines (only from a bot sender, only while we're in a battle) and fold
-    // them into `current_vote` so the room can show a one-click vote panel. Gating
-    // on the bot flag stops a human parroting the line from spoofing a panel;
-    // unrecognised lines leave the vote untouched, so chat is never disturbed.
-    let from_bot = state.users.get(&username).is_some_and(|u| u.status.bot);
-    if from_bot && state.current_battle.is_some() {
-        if let Some(line) = parse_vote_line(&message) {
-            apply_vote_line(state, line, now_ms);
+    // those lines while we're in a battle and fold them into `current_vote` so the
+    // room can show a one-click vote panel. Accept them from the battle's host (the
+    // autohost) or a bot-flagged sender — a human parroting the line still can't
+    // spoof a panel. Gating on the host identity (not the bot flag alone) matters
+    // because not every lobby server flags its autohost account as a bot, yet the
+    // vote lines always come from the host; unrecognised lines leave the vote
+    // untouched, so chat is never disturbed.
+    if let Some(battle_id) = state.current_battle {
+        let is_host = state
+            .battles
+            .get(&battle_id)
+            .is_some_and(|b| b.host == username);
+        let from_bot = state.users.get(&username).is_some_and(|u| u.status.bot);
+        if is_host || from_bot {
+            if let Some(line) = parse_vote_line(&message) {
+                apply_vote_line(state, line, now_ms);
+            }
         }
     }
     let channel = state
@@ -1770,6 +1779,39 @@ mod tests {
             ),
         );
         assert!(s.current_vote.is_none());
+    }
+
+    #[test]
+    fn unflagged_host_vote_line_opens_vote() {
+        // Not every lobby server flags its autohost account as a bot, but the vote
+        // lines still come from the battle host — recognise them by host identity.
+        let mut s = LobbyState::new();
+        s.my_username = Some("me".into());
+        s.users.insert(
+            "AutoHost".into(),
+            User {
+                name: "AutoHost".into(),
+                ..Default::default()
+            },
+        );
+        s.battles.insert(
+            1,
+            Battle {
+                id: 1,
+                host: "AutoHost".into(),
+                ..Default::default()
+            },
+        );
+        s.current_battle = Some(1);
+        reduce(
+            &mut s,
+            parse_line(
+                "SAIDBATTLE AutoHost Bob called a vote for command \"set map Red Comet\" [!vote y, !vote n, !vote b]",
+            ),
+        );
+        let v = s.current_vote.expect("vote opened from unflagged host");
+        assert_eq!(v.subject, "set map Red Comet");
+        assert_eq!(v.caller, "Bob");
     }
 
     #[test]
