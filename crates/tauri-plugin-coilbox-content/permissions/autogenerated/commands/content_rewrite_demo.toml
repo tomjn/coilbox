@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-rewrite-demo"
+description = "Enables the content_rewrite_demo command without any pre-configured scope."
+commands.allow = ["content_rewrite_demo"]
+
+[[permission]]
+identifier = "deny-content-rewrite-demo"
+description = "Denies the content_rewrite_demo command without any pre-configured scope."
+commands.deny = ["content_rewrite_demo"]

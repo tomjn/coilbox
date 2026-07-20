@@ -227,6 +227,200 @@ fn hex_at(buf: &[u8], off: usize, len: usize) -> String {
         .collect()
 }
 
+// ---- rewrite ("jailbreak" onto a different game build) ----------------------
+
+/// Rewrite a **copy** of `src` so its embedded start-script `gametype` becomes
+/// `new_gametype` (and, when given, the header engine `versionString` becomes
+/// `new_engine_version`), returning the path of the new file.
+///
+/// The engine binds a replay to a game purely by the `gametype` name string (no
+/// archive checksum lives in the header — the game is resolved by name at
+/// playback), so swapping that string redirects the replay onto whatever local
+/// archive carries the new name. The demo stream is copied verbatim; only the
+/// `scriptSize` header field (and optionally `versionString`) changes.
+///
+/// **The source is never modified or overwritten.** The destination is derived
+/// here — callers cannot supply it — is guaranteed to be a different, not-yet-
+/// existing path, and is written atomically (temp file + rename) so a failed
+/// write cannot clobber anything.
+pub fn rewrite_demo(
+    src: &Path,
+    new_gametype: &str,
+    new_engine_version: Option<&str>,
+) -> Result<PathBuf, String> {
+    let (bytes, gzip) = read_all_maybe_gzip(src)?;
+    if bytes.len() < MIN_HEADER || &bytes[..MAGIC.len()] != MAGIC {
+        return Err("not a Spring demo file (bad magic)".into());
+    }
+    let header_size = i32_at(&bytes, OFF_HEADER_SIZE)?.max(0) as usize;
+    let script_size = i32_at(&bytes, OFF_SCRIPT_SIZE)?.max(0) as usize;
+    // Our header edits (scriptSize @304, versionString @24) must land inside the
+    // copied header, not spill into the script.
+    if header_size < MIN_HEADER {
+        return Err("demo header is too small".into());
+    }
+    let script_end = header_size
+        .checked_add(script_size)
+        .filter(|&e| e <= bytes.len())
+        .ok_or("demo header reports an invalid script size")?;
+
+    let script = String::from_utf8_lossy(&bytes[header_size..script_end]).into_owned();
+    let new_script = replace_gametype(&script, new_gametype)?.into_bytes();
+
+    // Rebuild: header | new script | demo stream (unchanged tail).
+    let mut out = Vec::with_capacity(header_size + new_script.len() + (bytes.len() - script_end));
+    out.extend_from_slice(&bytes[..header_size]);
+    out.extend_from_slice(&new_script);
+    out.extend_from_slice(&bytes[script_end..]);
+
+    // Only scriptSize changes; every other header field is a size/count that the
+    // shifted tail preserves.
+    let new_size =
+        i32::try_from(new_script.len()).map_err(|_| "rewritten start-script too large")?;
+    put_i32_at(&mut out, OFF_SCRIPT_SIZE, new_size);
+    if let Some(ver) = new_engine_version {
+        put_cstr_at(&mut out, OFF_VERSION_STRING, 256, ver);
+    }
+
+    let payload = if gzip {
+        use std::io::Write;
+        let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        enc.write_all(&out).map_err(|e| format!("gzip demo: {e}"))?;
+        enc.finish().map_err(|e| format!("gzip demo: {e}"))?
+    } else {
+        out
+    };
+
+    let dst = derive_jailbreak_path(src, gzip)?;
+    if same_path(src, &dst) {
+        return Err("refusing to write over the source demo".into());
+    }
+    atomic_write(&dst, &payload)?;
+    Ok(dst)
+}
+
+/// Read the whole demo into memory, gunzipping when it starts with the gzip magic
+/// (`1f 8b`). Returns the decompressed bytes and whether the source was gzipped
+/// (so the rewrite re-emits the same container).
+fn read_all_maybe_gzip(demo: &Path) -> Result<(Vec<u8>, bool), String> {
+    let raw = std::fs::read(demo).map_err(|e| format!("read demo: {e}"))?;
+    if raw.len() >= 2 && raw[0] == 0x1f && raw[1] == 0x8b {
+        let mut out = Vec::new();
+        GzDecoder::new(&raw[..])
+            .read_to_end(&mut out)
+            .map_err(|e| format!("gunzip demo: {e}"))?;
+        Ok((out, true))
+    } else {
+        Ok((raw, false))
+    }
+}
+
+fn put_i32_at(buf: &mut [u8], off: usize, v: i32) {
+    buf[off..off + 4].copy_from_slice(&v.to_le_bytes());
+}
+
+/// Overwrite a fixed-width, NUL-terminated C-string field in place (truncating to
+/// keep a terminator; no length shift, so no header offsets move).
+fn put_cstr_at(buf: &mut [u8], off: usize, len: usize, s: &str) {
+    let field = &mut buf[off..off + len];
+    field.fill(0);
+    let src = s.as_bytes();
+    let n = src.len().min(len - 1);
+    field[..n].copy_from_slice(&src[..n]);
+}
+
+/// Replace the value of the (case-insensitive) `gametype` key in a start-script,
+/// keeping everything else byte-for-byte. Errors if no `gametype` key is present.
+fn replace_gametype(script: &str, new_value: &str) -> Result<String, String> {
+    let lower = script.to_ascii_lowercase();
+    let bytes = script.as_bytes();
+    let mut from = 0usize;
+    while let Some(rel) = lower[from..].find("gametype") {
+        let k = from + rel;
+        // Only a real key: the previous non-space char is a separator (or start).
+        let at_key_start = script[..k]
+            .rfind(|c: char| !c.is_whitespace())
+            .map(|p| matches!(bytes[p], b';' | b'{' | b'}'))
+            .unwrap_or(true);
+        let mut j = k + "gametype".len();
+        while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+            j += 1;
+        }
+        if at_key_start && j < bytes.len() && bytes[j] == b'=' {
+            let val_start = j + 1;
+            let val_end = script[val_start..]
+                .find(';')
+                .map(|p| val_start + p)
+                .unwrap_or(script.len());
+            let mut out = String::with_capacity(script.len() + new_value.len());
+            out.push_str(&script[..val_start]);
+            out.push_str(new_value);
+            out.push_str(&script[val_end..]);
+            return Ok(out);
+        }
+        from = k + "gametype".len();
+    }
+    Err("start-script has no gametype key to rewrite".into())
+}
+
+/// A fresh sibling path for the rewritten demo that does not yet exist, keeping
+/// the source's container extension (`.sdfz` gzip / `.sdf` raw).
+fn derive_jailbreak_path(src: &Path, gzip: bool) -> Result<PathBuf, String> {
+    let dir = src.parent().unwrap_or_else(|| Path::new("."));
+    let stem = src
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(strip_demo_ext)
+        .ok_or("source demo has no filename")?;
+    let ext = if gzip { "sdfz" } else { "sdf" };
+    for n in 1..1000 {
+        let name = if n == 1 {
+            format!("{stem}.jailbreak.{ext}")
+        } else {
+            format!("{stem}.jailbreak-{n}.{ext}")
+        };
+        let cand = dir.join(name);
+        if !cand.exists() {
+            return Ok(cand);
+        }
+    }
+    Err("too many existing jailbreak copies".into())
+}
+
+/// Strip a trailing `.sdfz`/`.sdf` (case-insensitive) from a filename.
+fn strip_demo_ext(name: &str) -> String {
+    let lower = name.to_ascii_lowercase();
+    for ext in DEMO_EXTS {
+        if lower.ends_with(ext) {
+            return name[..name.len() - ext.len()].to_string();
+        }
+    }
+    name.to_string()
+}
+
+/// Whether two paths refer to the same file, preferring canonical comparison (so
+/// symlinks / `..` spellings can't slip past) and falling back to raw equality
+/// when a path doesn't yet exist.
+fn same_path(a: &Path, b: &Path) -> bool {
+    match (a.canonicalize(), b.canonicalize()) {
+        (Ok(ca), Ok(cb)) => ca == cb,
+        _ => a == b,
+    }
+}
+
+/// Write `bytes` to `dst` atomically: a temp file in the same directory, then a
+/// rename over the (non-existent) destination.
+fn atomic_write(dst: &Path, bytes: &[u8]) -> Result<(), String> {
+    let dir = dst.parent().unwrap_or_else(|| Path::new("."));
+    let fname = dst.file_name().and_then(|n| n.to_str()).unwrap_or("demo");
+    let tmp = dir.join(format!(".{fname}.tmp"));
+    std::fs::write(&tmp, bytes).map_err(|e| format!("write demo: {e}"))?;
+    std::fs::rename(&tmp, dst).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("finalize demo: {e}")
+    })
+}
+
 // ---- TDF start-script parsing ----------------------------------------------
 
 /// A TDF section: scalar `key=value;` pairs plus nested `[name]{...}` children.
@@ -870,6 +1064,65 @@ mod tests {
         assert_eq!(min, Some(25.0));
         assert_eq!(avg, Some(25.0));
         assert_eq!(max, Some(25.0));
+    }
+
+    #[test]
+    fn replace_gametype_swaps_only_the_value() {
+        let s = "[game]\n{\ngametype=Old Name-123;\nmapname=Foo;\n}\n";
+        let out = replace_gametype(s, "New Build").unwrap();
+        assert!(out.contains("gametype=New Build;"));
+        assert!(out.contains("mapname=Foo;"));
+        assert!(!out.contains("Old Name-123"));
+        // Also handle the generated-script capitalisation (`GameType`).
+        assert!(replace_gametype("[GAME]{GameType=x;}", "y")
+            .unwrap()
+            .contains("GameType=y;"));
+        // No key -> error, not a silent no-op.
+        assert!(replace_gametype("[game]{mapname=x;}", "y").is_err());
+    }
+
+    #[test]
+    fn rewrite_redirects_gametype_and_never_touches_source() {
+        // header + script + a fake demo-stream tail we expect to survive verbatim.
+        let mut demo = build_demo(SCRIPT, false);
+        let tail: &[u8] = b"\x00\x01\x02DEMO-STREAM-TAIL\xff\xfe";
+        demo.extend_from_slice(tail);
+        let src = write_tmp("jb_src.sdf", &demo);
+        let before = std::fs::read(&src).unwrap();
+
+        let dst = rewrite_demo(&src, "Beyond All Reason LOCAL-GIT", None).unwrap();
+        assert_ne!(dst, src);
+        // Source is byte-for-byte untouched.
+        assert_eq!(std::fs::read(&src).unwrap(), before);
+
+        let out = std::fs::read(&dst).unwrap(); // raw .sdf, no gzip
+        let hs = i32::from_le_bytes(
+            out[OFF_HEADER_SIZE..OFF_HEADER_SIZE + 4]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        let ss = i32::from_le_bytes(
+            out[OFF_SCRIPT_SIZE..OFF_SCRIPT_SIZE + 4]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        let script = std::str::from_utf8(&out[hs..hs + ss]).unwrap();
+        assert!(script.contains("gametype=Beyond All Reason LOCAL-GIT;"));
+        assert!(!script.contains("test-30018"));
+        assert!(script.contains("mapname=Valles Marineris 2.6.1")); // map untouched
+        assert_eq!(&out[hs + ss..], tail); // stream tail byte-identical
+        let _ = std::fs::remove_file(&dst);
+    }
+
+    #[test]
+    fn rewrite_stamps_engine_version_and_round_trips_gzip() {
+        let src = write_tmp("jb_ver.sdfz", &build_demo(SCRIPT, true));
+        let dst = rewrite_demo(&src, "Some Game 1.0", Some("2025.06.19")).unwrap();
+        // dst is gzip (.sdfz) and re-reads cleanly with the new fields.
+        let raw = read_header_and_script(&dst).unwrap();
+        assert_eq!(raw.engine_version, "2025.06.19");
+        assert!(raw.script.contains("gametype=Some Game 1.0;"));
+        let _ = std::fs::remove_file(&dst);
     }
 
     #[test]
