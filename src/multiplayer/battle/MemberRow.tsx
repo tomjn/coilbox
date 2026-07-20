@@ -93,10 +93,14 @@ export function MemberRow({
         ? "You"
         : "Player";
 
-  // Team/ally/colour are settable either by us on our own row (MYBATTLESTATUS) or
-  // by the host on another HUMAN's row (FORCE*). Bots expose only removal (their
-  // status would need UPDATEBOT), so they aren't status-editable here.
-  const canEditStatus = editable || (!!control && row.kind === "human");
+  // Colour is settable by us on our own row (MYBATTLESTATUS) or by the host on
+  // another HUMAN's row (FORCETEAMCOLOR). Bots keep a read-only swatch: a bot
+  // colour input would be a second colour-picker drag surface (flood risk), and
+  // colour isn't what the host needs to change on a bot.
+  const canEditColor = editable || (!!control && row.kind === "human");
+  // Team/ally are settable on any controlled row — humans via FORCE*, bots via
+  // UPDATEBOT (both routed through `control`); discrete dropdowns, no flood risk.
+  const canEditTeamAlly = editable || !!control;
   const setTeam = (v: number) =>
     editable ? onTeam(v) : control?.onForceTeam(v);
   const setAlly = (v: number) =>
@@ -125,7 +129,7 @@ export function MemberRow({
 
       <TableCell className="px-3 py-2">
         <div className="flex items-center gap-2.5">
-          {canEditStatus ? (
+          {canEditColor ? (
             <input
               type="color"
               aria-label={`${row.name} colour`}
@@ -187,7 +191,7 @@ export function MemberRow({
       <TableCell className="px-3 py-2">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
-        ) : canEditStatus ? (
+        ) : canEditTeamAlly ? (
           <OptionSelect
             value={String(row.teamId)}
             size="sm"
@@ -205,7 +209,7 @@ export function MemberRow({
       <TableCell className="px-3 py-2">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
-        ) : canEditStatus ? (
+        ) : canEditTeamAlly ? (
           <OptionSelect
             value={String(row.ally)}
             size="sm"

@@ -57,6 +57,10 @@ export function BattleMembersTable({
     forceSpectator: (user: string) => void;
     kick: (user: string) => void;
     removeBot: (name: string) => void;
+    updateBot: (
+      name: string,
+      patch: { teamId?: number; ally?: number },
+    ) => void;
   };
   /** AIs addable as bots — native engine AIs and the game's own Lua AIs. */
   addableAis: {
@@ -142,7 +146,8 @@ export function BattleMembersTable({
           <TableBody>
             {rows.map((row) => {
               // The host controls other members: humans get force/kick, bots get
-              // removal only (MemberRow ignores the force handlers for bots). Our
+              // team/ally edits (UPDATEBOT) plus removal — MemberRow keeps a bot's
+              // colour read-only, so onForceColor/onForceSpectator stay no-ops. Our
               // own row stays the self-editable path. Outside a battle we host, we
               // still control the bots we added.
               let control: MemberControls | null = null;
@@ -157,8 +162,10 @@ export function BattleMembersTable({
               } else if (row.kind === "bot" && (selfHost || row.owner === me)) {
                 const noop = () => {};
                 control = {
-                  onForceTeam: noop,
-                  onForceAlly: noop,
+                  onForceTeam: (t) =>
+                    hostControls.updateBot(row.name, { teamId: t }),
+                  onForceAlly: (a) =>
+                    hostControls.updateBot(row.name, { ally: a }),
                   onForceColor: noop,
                   onForceSpectator: noop,
                   onKick: () => hostControls.removeBot(row.name),

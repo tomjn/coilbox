@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ContentState } from "../content/bindings";
 import { contentStateLoad } from "../content/bindings";
 import { getProfileRoot } from "../profile/profile";
-import { dlSetEngineDirs } from "./bindings";
+import { dlBarMaps, dlSetEngineDirs } from "./bindings";
 import { healWriteRoot, packageDirOf } from "./writeRoot";
 
 /** A user-configured rapid master. `url` is the base; `dl_repos` appends `/repos.gz`. */
@@ -129,4 +129,56 @@ export function useWriteRootPath(): string | undefined {
       .catch(() => setPath(undefined));
   }, [cfg.writeRootId, setCfg]);
   return path;
+}
+
+// The BAR maps-metadata list keyed springName -> preview thumbnail URL, fetched
+// once per session. The list is large and near-static, so we memoise the promise
+// and share it across every caller; a failed load resets so a later mount retries.
+let barPreviewsPromise: Promise<Map<string, string>> | null = null;
+function loadBarMapPreviews(): Promise<Map<string, string>> {
+  if (!barPreviewsPromise) {
+    barPreviewsPromise = dlBarMaps(undefined)
+      .then(({ maps }) => {
+        const index = new Map<string, string>();
+        for (const m of maps) {
+          if (m.images?.preview) index.set(m.springName, m.images.preview);
+        }
+        return index;
+      })
+      .catch((e) => {
+        barPreviewsPromise = null;
+        throw e;
+      });
+  }
+  return barPreviewsPromise;
+}
+
+/**
+ * Resolve a map's remote preview thumbnail (BAR maps-metadata `images.preview`) by
+ * springName, or `undefined` while loading or when the map isn't in the list. Used
+ * as a fallback picture when a battle's map isn't installed and unitsync has no
+ * local minimap to render. Pass `undefined` to skip the fetch entirely.
+ */
+export function useBarMapPreview(
+  springName: string | undefined,
+): string | undefined {
+  const [url, setUrl] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!springName) {
+      setUrl(undefined);
+      return;
+    }
+    let live = true;
+    loadBarMapPreviews()
+      .then((index) => {
+        if (live) setUrl(index.get(springName));
+      })
+      .catch(() => {
+        if (live) setUrl(undefined);
+      });
+    return () => {
+      live = false;
+    };
+  }, [springName]);
+  return url;
 }
