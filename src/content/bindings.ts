@@ -311,6 +311,17 @@ export const contentDemoChat = defineCommand<
   { messages: ChatLine[] }
 >("coilbox-content", "content_demo_chat");
 
+/**
+ * Write a "jailbroken" **copy** of a replay whose embedded `gametype` is
+ * `targetGametype` (and, when `engineVersion` is set, whose header engine version
+ * is restamped), so the engine loads a different local game build when the copy
+ * is watched. Returns the new sibling `path`; the source demo is never modified.
+ */
+export const contentRewriteDemo = defineCommand<
+  { replayPath: string; targetGametype: string; engineVersion?: string },
+  { path: string }
+>("coilbox-content", "content_rewrite_demo");
+
 /* -------------------------------------------------------------------------- *
  * Savegames — singleplayer saves in a root's `Saves/` folder. Listing is cheap fs
  * metadata plus a best-effort map/game read from the save's embedded start-script.

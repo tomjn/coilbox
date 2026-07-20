@@ -41,6 +41,7 @@ import {
   useUnitsyncMinimap,
 } from "../config";
 import { useReplayUserState } from "../replayUserState";
+import { JailbreakPanel } from "./components/JailbreakPanel";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
 import { WatchButton } from "./components/WatchButton";
 
@@ -613,10 +614,21 @@ export default function ReplayDetailPage() {
           </div>
         </div>
         {replay && info && (
-          <WatchButton
-            replayPath={replay.path}
-            engineVersion={info.engineVersion}
-          />
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <WatchButton
+              replayPath={replay.path}
+              engineVersion={info.engineVersion}
+            />
+            {selected && (
+              <JailbreakPanel
+                replayPath={replay.path}
+                recordedGametype={info.gameType}
+                recordedEngineVersion={info.engineVersion}
+                enginePath={selected.enginePath}
+                dataDir={selected.rootPath}
+              />
+            )}
+          </div>
         )}
       </header>
 
