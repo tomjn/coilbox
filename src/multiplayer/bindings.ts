@@ -294,6 +294,16 @@ export const mpDisconnect = defineCommand<
 >("coilbox-multiplayer", "mp_disconnect");
 
 /**
+ * Abort a connect still mid-handshake (before it becomes a live connection).
+ * Fires the pending cancel token so the in-flight `mpConnect` rejects promptly and
+ * no socket lingers. A no-op if the connect already completed.
+ */
+export const mpCancelConnect = defineCommand<
+  { serverKey: string },
+  { cancelled: boolean }
+>("coilbox-multiplayer", "mp_cancel_connect");
+
+/**
  * Re-adopt a still-live connection after a webview reload: swap in a fresh event
  * `Channel`. The backend replays `Connected` + the current phase over it, then the
  * caller pulls `mpSnapshot` to refill its mirror.

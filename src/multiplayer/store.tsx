@@ -23,6 +23,7 @@ import {
   type LobbyState,
   type LoginPhase,
   mpActiveKeys,
+  mpCancelConnect,
   mpConfirmAgreement,
   mpConnect,
   mpDisconnect,
@@ -268,6 +269,9 @@ interface MultiplayerContextValue {
     email?: string,
   ) => Promise<void>;
   disconnect: () => Promise<void>;
+  /** Abort a connect still in progress (the "Connecting…" state), returning to
+   * disconnected without an error or an auto-reconnect. */
+  cancelConnect: () => Promise<void>;
   /**
    * The connection currently parked awaiting agreement acceptance / an emailed
    * verification code (its `serverKey` and the server's agreement `text`, which
@@ -647,6 +651,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // `true` while a user-initiated disconnect/cancel is in flight, so its clean
   // `disconnected` event isn't mistaken for an unexpected drop. Reset on connect.
   const intentionalRef = useRef(false);
+  // The serverKey of a connect still in its handshake (before it registers as a
+  // live connection), so `cancelConnect` knows which pending connect to abort.
+  // Cleared once the connect resolves either way.
+  const connectingKeyRef = useRef<string | null>(null);
   // `true` once a session reached `ready`; only then is a drop worth reconnecting
   // (excludes login-denied / initial-connect failures, which never logged in).
   const loggedInRef = useRef(false);
@@ -845,6 +853,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       loggedInRef.current = false;
       reconnectCtxRef.current = { server, username };
       const serverKey = serverKeyFor(server, username);
+      connectingKeyRef.current = serverKey;
       try {
         const cred = await lsGetCredential({ serverId: server.id, username });
         if (!cred.secret) {
@@ -871,7 +880,17 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "snapshot", state: snap.state });
         setActiveKey(serverKey);
         setLoginPopoverOpen(false);
+      } catch (e) {
+        // A user cancel aborts the in-flight connect, so `mpConnect` rejects by
+        // design: swallow it, clear the mirror, and leave the UI disconnected
+        // rather than surfacing it as a login error or triggering a reconnect.
+        if (intentionalRef.current) {
+          dispatch({ type: "reset" });
+          return;
+        }
+        throw e;
       } finally {
+        connectingKeyRef.current = null;
         setBusy(false);
       }
     },
@@ -1066,6 +1085,17 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     await mpDisconnect({ serverKey }).catch(() => {});
   }, [pendingAgreement]);
 
+  // Abort a connect that is still mid-handshake (the "Connecting…" state). Marks
+  // the abort intentional and stops any reconnect loop before firing the backend
+  // cancel, so the resulting `mpConnect` rejection unwinds cleanly to disconnected
+  // without an error toast or an auto-reconnect. Safe to call with nothing pending.
+  const cancelConnect = useCallback(async () => {
+    intentionalRef.current = true;
+    stopReconnect();
+    const serverKey = connectingKeyRef.current;
+    if (serverKey) await mpCancelConnect({ serverKey }).catch(() => {});
+  }, [stopReconnect]);
+
   const disconnect = useCallback(async () => {
     // Mark intentional and kill any reconnect loop before the guard, so a manual
     // "log out" can't be mistaken for a drop even mid-reconnect (no active key).
@@ -1122,6 +1152,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         connect,
         register,
         disconnect,
+        cancelConnect,
         pendingAgreement,
         submitAgreementCode,
         cancelAgreement,

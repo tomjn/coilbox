@@ -94,8 +94,15 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   const [accountsCfg] = useLobbyAccounts();
   const [customCfg] = useCustomServers();
   const accounts = accountsCfg.accounts;
-  const { mirror, activeKey, revealed, busy, connect, disconnect } =
-    useMultiplayer();
+  const {
+    mirror,
+    activeKey,
+    revealed,
+    busy,
+    connect,
+    disconnect,
+    cancelConnect,
+  } = useMultiplayer();
 
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<LobbyAccount | null>(null);
@@ -179,6 +186,10 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           <p className="text-sm font-medium">Connecting…</p>
           <p className="text-xs text-muted-foreground">{label}</p>
         </div>
+        <Button onClick={() => void cancelConnect()} className="h-8 w-full">
+          Cancel
+        </Button>
+        {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
     );
   }
