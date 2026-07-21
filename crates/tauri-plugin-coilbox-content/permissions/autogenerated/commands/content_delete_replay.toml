@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-delete-replay"
+description = "Enables the content_delete_replay command without any pre-configured scope."
+commands.allow = ["content_delete_replay"]
+
+[[permission]]
+identifier = "deny-content-delete-replay"
+description = "Denies the content_delete_replay command without any pre-configured scope."
+commands.deny = ["content_delete_replay"]

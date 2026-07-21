@@ -898,6 +898,25 @@ async fn content_delete_save(path: String) -> Result<CliResult, ()> {
     }
 }
 
+/// `content_delete_replay` — delete one replay file. `path` must be a `.sdfz`/`.sdf`
+/// path from `content_list_replays` (guarded against deleting anything else).
+#[tauri::command]
+async fn content_delete_replay(path: String) -> Result<CliResult, ()> {
+    let p = PathBuf::from(&path);
+    let ok_ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("sdfz") || e.eq_ignore_ascii_case("sdf"))
+        .unwrap_or(false);
+    if !ok_ext {
+        return Ok(CliResult::err("not a replay file".to_string()));
+    }
+    match std::fs::remove_file(&p) {
+        Ok(()) => Ok(CliResult::ok(json!({ "ok": true }))),
+        Err(e) => Ok(CliResult::err(format!("delete failed: {e}"))),
+    }
+}
+
 /// `branding_catalog` — fetch the remote branding catalog JSON, disk-cache it, and
 /// fall back to the cache then the bundled seed on network failure. Returns the
 /// raw JSON text; the frontend parses/matches it (Rust stays schema-agnostic).
@@ -1082,6 +1101,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_demo_info,
             content_demo_chat,
             content_rewrite_demo,
+            content_delete_replay,
             content_list_saves,
             content_delete_save,
             content_config_profiles,

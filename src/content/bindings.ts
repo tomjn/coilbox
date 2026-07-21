@@ -330,6 +330,12 @@ export const contentRewriteDemo = defineCommand<
   { path: string }
 >("coilbox-content", "content_rewrite_demo");
 
+/** Delete a replay file. `path` must be a `.sdfz`/`.sdf` from `content_list_replays`. */
+export const contentDeleteReplay = defineCommand<
+  { path: string },
+  { ok: boolean }
+>("coilbox-content", "content_delete_replay");
+
 /* -------------------------------------------------------------------------- *
  * Savegames — singleplayer saves in a root's `Saves/` folder. Listing is cheap fs
  * metadata plus a best-effort map/game read from the save's embedded start-script.
