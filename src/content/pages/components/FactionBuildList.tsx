@@ -7,6 +7,7 @@ import type {
   UnitBuildpicsResult,
   UnitDatasetEntry,
 } from "../../bindings";
+import type { BrandingEntry } from "../../branding";
 import { buildEdgeMap, reachableCounts } from "../../buildTree";
 import { BuildTreeDrawer } from "./BuildTreeDrawer";
 
@@ -29,6 +30,8 @@ interface BuildContext {
   units: UnitDatasetEntry[];
   /** Resolved faction emblems, keyed by lowercased side name (may be omitted). */
   factionLogos?: Record<string, FactionLogoSrc>;
+  /** Resolved catalog entry, for the drawer's HTML export branded wrapper. */
+  branding?: BrandingEntry | null;
 }
 
 /** One faction: a button that opens the build-tree drawer starting on that side. */
@@ -63,6 +66,8 @@ export function FactionBuildButton({
           units={ctx.units}
           initialSide={side.name}
           factionLogos={ctx.factionLogos}
+          gameName={ctx.gameName}
+          branding={ctx.branding}
         />
       ),
     });
@@ -105,6 +110,7 @@ export function FactionBuildList({
   units,
   buildpics,
   factionLogos,
+  branding,
 }: {
   enginePath: string;
   dataDir: string;
@@ -115,6 +121,8 @@ export function FactionBuildList({
   buildpics: UnitBuildpicsResult | null;
   /** Resolved faction emblems, keyed by lowercased side name (may be empty). */
   factionLogos?: Record<string, FactionLogoSrc>;
+  /** Resolved catalog entry, for the drawer's HTML export branded wrapper. */
+  branding?: BrandingEntry | null;
 }) {
   const ctx: BuildContext = {
     enginePath,
@@ -124,6 +132,7 @@ export function FactionBuildList({
     sides,
     units,
     factionLogos,
+    branding,
   };
   // Units reachable from each faction's commander via buildoptions. Omitted (and the
   // button left inert) when the dataset is still loading or the game exposes no

@@ -103,6 +103,7 @@ export function BuildTreeEmbed({
         sides={gameInfo.sides}
         units={dataset?.units ?? []}
         initialSide={gameInfo.sides[0]?.name ?? ""}
+        gameName={game.name}
       />
     </div>
   );

@@ -18,12 +18,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import type { Side, UnitDatasetEntry } from "../../bindings";
+import type { BrandingEntry } from "../../branding";
 import {
   buildBuildGraph,
   buildEdgeMap,
   focusNeighbours,
 } from "../../buildTree";
 import { useUnitsyncUnitBuildpics } from "../../config";
+import { BuildTreeExportButton } from "./BuildTreeExportButton";
 import { layoutBuildTree } from "./buildTreeLayout";
 
 /** Data carried on each build-tree node: the unit's label + icon, and flags that
@@ -136,6 +138,8 @@ export function BuildTreeDrawer({
   units,
   initialSide,
   factionLogos,
+  gameName,
+  branding,
 }: {
   enginePath: string;
   dataDir: string;
@@ -145,6 +149,10 @@ export function BuildTreeDrawer({
   initialSide: string;
   /** Resolved faction emblems, keyed by lowercased side name (may be omitted). */
   factionLogos?: Record<string, FactionLogoSrc>;
+  /** Game name — enables the "Export HTML" header button when provided. */
+  gameName?: string;
+  /** Resolved catalog entry, for the export's branded wrapper (null = neutral). */
+  branding?: BrandingEntry | null;
 }) {
   const [activeName, setActiveName] = useState(initialSide);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -385,26 +393,47 @@ export function BuildTreeDrawer({
     <div className="flex h-full min-h-0 flex-col gap-3">
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, non-user CSS to animate React Flow edge paths (inline edge transition doesn't take) */}
       <style dangerouslySetInnerHTML={{ __html: EDGE_TRANSITION_CSS }} />
-      {sides.length > 1 && (
-        <Tabs value={active?.name ?? activeName} onValueChange={selectFaction}>
-          <TabsList className="h-auto flex-wrap gap-1.5">
-            {sides.map((s) => {
-              const logo = factionLogos?.[s.name.toLowerCase()];
-              return (
-                <TabsTrigger
-                  key={s.name}
-                  value={s.name}
-                  className="flex-none gap-1.5"
-                >
-                  {logo && (
-                    <FactionLogo logo={logo} sideName={s.name} size={14} />
-                  )}
-                  {s.name}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
+      {(sides.length > 1 || gameName) && (
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          {sides.length > 1 ? (
+            <Tabs
+              value={active?.name ?? activeName}
+              onValueChange={selectFaction}
+            >
+              <TabsList className="h-auto flex-wrap gap-1.5">
+                {sides.map((s) => {
+                  const logo = factionLogos?.[s.name.toLowerCase()];
+                  return (
+                    <TabsTrigger
+                      key={s.name}
+                      value={s.name}
+                      className="flex-none gap-1.5"
+                    >
+                      {logo && (
+                        <FactionLogo logo={logo} sideName={s.name} size={14} />
+                      )}
+                      {s.name}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </Tabs>
+          ) : (
+            <span />
+          )}
+          {gameName && reachableCount > 0 && (
+            <BuildTreeExportButton
+              enginePath={enginePath}
+              dataDir={dataDir}
+              gameArchive={gameArchive}
+              gameName={gameName}
+              sides={sides}
+              units={units}
+              activeSide={active?.name ?? activeName}
+              branding={branding}
+            />
+          )}
+        </div>
       )}
 
       {reachableCount === 0 ? (
