@@ -844,7 +844,7 @@ async fn content_demo_chat(engine_path: String, replay_path: String) -> Result<C
     }
 }
 
-/// `content_rewrite_demo` — write a "jailbroken" **copy** of a replay whose
+/// `content_rewrite_demo` — write a "remixed" **copy** of a replay whose
 /// embedded `gametype` is `targetGametype` (and, when `engineVersion` is given,
 /// whose header engine version is restamped), so the engine loads a different
 /// local game build when the copy is watched. Returns the new sibling path; the

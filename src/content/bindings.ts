@@ -220,6 +220,8 @@ export interface ReplayFile {
   skillMin?: number;
   skillAvg?: number;
   skillMax?: number;
+  /** True when this file is a coilbox remix (rewritten to run on a local build). */
+  remixed?: boolean;
 }
 
 /** One player/spectator from a demo, with side + ally-team resolved from their team. */
@@ -274,6 +276,10 @@ export interface DemoInfo {
   numAllyTeams: number;
   allyTeams: AllyTeamInfo[];
   players: ReplayPlayer[];
+  /** True when this file is a coilbox remix (rewritten to run on a local build). */
+  remixed?: boolean;
+  /** For a remix, the gametype it was originally recorded on. */
+  sourceGametype?: string;
 }
 
 /** List replays in a content root's `demos/`/`replays/` (cheap; newest first). */
@@ -312,7 +318,7 @@ export const contentDemoChat = defineCommand<
 >("coilbox-content", "content_demo_chat");
 
 /**
- * Write a "jailbroken" **copy** of a replay whose embedded `gametype` is
+ * Write a "remixed" **copy** of a replay whose embedded `gametype` is
  * `targetGametype` (and, when `engineVersion` is set, whose header engine version
  * is restamped), so the engine loads a different local game build when the copy
  * is watched. Returns the new sibling `path`; the source demo is never modified.
