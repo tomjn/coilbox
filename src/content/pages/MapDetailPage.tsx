@@ -1,7 +1,19 @@
-import { ArrowLeft, ImageOff } from "lucide-react";
-import { Link, useParams } from "react-router";
+import { Button } from "@picoframe/frame";
+import {
+  ArrowLeft,
+  Clapperboard,
+  ImageOff,
+  PackageOpen,
+  Play,
+  Swords,
+} from "lucide-react";
+import { useState } from "react";
+import { Link, useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAdvancedMode } from "@/general/advanced";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
+import { unitsyncArchiveTree } from "../bindings";
 import {
   classifyArchive,
   useScanTargetSelection,
@@ -11,6 +23,7 @@ import {
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
+import { usePlayMap } from "../usePlayMap";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { mapSizeLabel } from "./components/MapThumb";
 import { OptionsList } from "./components/OptionsList";
@@ -28,6 +41,10 @@ const HEADLINE_KEYS = new Set(["name", "description"]);
 export default function MapDetailPage() {
   const { name } = useParams();
   const decoded = name ? decodeURIComponent(name) : "";
+  const navigate = useNavigate();
+  const playMap = usePlayMap();
+  const advanced = useAdvancedMode();
+  const [decompiling, setDecompiling] = useState(false);
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
     selected?.enginePath,
@@ -89,6 +106,34 @@ export default function MapDetailPage() {
   // true shape and `object-fill` stretches the square source back into it).
   const ratio = map.width && map.height ? map.width / map.height : 1;
 
+  // Resolve the map's backing archive to its on-disk path and hand it to mapconv
+  // decompile. The scan reports map archives by a versioned display name (no path),
+  // so ask the archive-tree command — it turns that name into the real `.sd7`/
+  // `.sdz`/`.sdd` file the decompiler opens.
+  const archiveName = map.archives[0]?.name;
+  const openInDecompile = async () => {
+    if (!selected || !archiveName) return;
+    setDecompiling(true);
+    try {
+      const tree = await unitsyncArchiveTree({
+        enginePath: selected.enginePath,
+        dataDir: selected.rootPath,
+        archive: archiveName,
+      });
+      if (tree.archivePath) {
+        navigate("/mapconv/decompile", {
+          state: { inputPath: tree.archivePath },
+        });
+      } else {
+        toast.error("Couldn't locate this map's archive on disk.");
+      }
+    } catch {
+      toast.error("Couldn't open this map in mapconv.");
+    } finally {
+      setDecompiling(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-5 p-4">
       <header className="flex flex-col gap-1">
@@ -112,6 +157,42 @@ export default function MapDetailPage() {
           </p>
         )}
       </header>
+
+      <section className="flex flex-wrap gap-2">
+        <Button size="sm" className="gap-1.5" onClick={() => playMap(map.name)}>
+          <Play className="size-4" /> Play this map
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          onClick={() => navigate("/battles", { state: { hostMap: map.name } })}
+        >
+          <Swords className="size-4" /> Host a battle here
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          onClick={() =>
+            navigate(`/content/replays?map=${encodeURIComponent(map.name)}`)
+          }
+        >
+          <Clapperboard className="size-4" /> Replays on this map
+        </Button>
+        {advanced && archiveName && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={openInDecompile}
+            disabled={decompiling}
+          >
+            <PackageOpen className="size-4" />
+            {decompiling ? "Opening…" : "Open in mapconv decompile"}
+          </Button>
+        )}
+      </section>
 
       {mapInfo.info?.warnings?.length ? (
         <WarningBanner warnings={mapInfo.info.warnings} noun="map" />
