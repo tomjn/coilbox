@@ -17,6 +17,11 @@ import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   type DownloadProgress,
   dlDownload,
   dlDownloadMap,
@@ -34,7 +39,11 @@ import type {
   ReplayPlayer,
   StartBox,
 } from "../bindings";
-import { type ChatLine, contentDemoChat } from "../bindings";
+import {
+  type ChatLine,
+  contentDeleteReplay,
+  contentDemoChat,
+} from "../bindings";
 import {
   invalidateMapPreview,
   useDemoInfo,
@@ -560,6 +569,77 @@ function ReplayChat({
   );
 }
 
+/** Delete a replay after a confirm (irreversible), then hand back to `onDeleted`. */
+function DeleteReplayButton({
+  replayPath,
+  onDeleted,
+}: {
+  replayPath: string;
+  onDeleted: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function del() {
+    setPending(true);
+    setError(null);
+    try {
+      await contentDeleteReplay({ path: replayPath });
+      setOpen(false);
+      onDeleted();
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="secondary" className="gap-1.5">
+          <Trash2 className="size-4" /> Delete
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="flex w-72 flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-medium">Delete this replay?</h3>
+          <p className="text-xs text-muted-foreground">
+            The file is permanently removed from your demos folder — this can't
+            be undone.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpen(false)}
+            disabled={pending}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={del}
+            disabled={pending}
+            className="gap-1.5"
+          >
+            {pending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Trash2 className="size-4" />
+            )}
+            Delete
+          </Button>
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /** One replay: decoded metadata, players, and a preview of the map it was on. */
 export default function ReplayDetailPage() {
   const { name } = useParams();
@@ -593,6 +673,11 @@ export default function ReplayDetailPage() {
     toast.success("Remix created", {
       description: "Opened the remixed replay — use Watch to run it.",
     });
+  };
+
+  const onDeleted = () => {
+    navigate("/content/replays");
+    toast.success("Replay deleted");
   };
 
   if (listLoading && !replay)
@@ -662,14 +747,10 @@ export default function ReplayDetailPage() {
           // Destructive + secondary actions first; the primary CTA (Watch) sits
           // last so it lands in the top-right corner.
           <div className="flex shrink-0 items-start gap-2">
-            <Button
-              variant="secondary"
-              disabled
-              title="Coming soon"
-              className="gap-1.5"
-            >
-              <Trash2 className="size-4" /> Delete
-            </Button>
+            <DeleteReplayButton
+              replayPath={replay.path}
+              onDeleted={onDeleted}
+            />
             {/* No remixing a remix — its detail links back to the original instead. */}
             {selected && !info.remixed && (
               <RemixPanel
