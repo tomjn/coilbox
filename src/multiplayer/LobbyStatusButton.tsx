@@ -1,5 +1,5 @@
-import { Button } from "@picoframe/frame";
-import { Loader2, Plus, UserPlus, Users } from "lucide-react";
+import { Button, useSetting } from "@picoframe/frame";
+import { Loader2, Plus, RefreshCw, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import {
@@ -11,8 +11,10 @@ import { cn } from "@/lib/utils";
 import {
   allServers,
   type LobbyAccount,
+  resolveLastLogin,
   resolveServer,
   useCustomServers,
+  useLastLogin,
   useLobbyAccounts,
 } from "../lobby-servers/config";
 import { RegisterForm } from "../lobby-servers/RegisterForm";
@@ -104,9 +106,20 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     cancelConnect,
   } = useMultiplayer();
 
+  const [lastLogin] = useLastLogin();
+  const [autoConnect] = useSetting<boolean>("multiplayer.autoConnect", false);
+
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<LobbyAccount | null>(null);
   const [registering, setRegistering] = useState(false);
+
+  // A one-click "reconnect" shortcut to the last-used account, shown only when
+  // startup auto-connect is off (with it on, the boot connect already ran). Resolved
+  // against the profile-filtered catalog, so a profile-disallowed server won't offer
+  // it. Falls back to the plain account list below when there's no valid last login.
+  const reconnect = autoConnect
+    ? null
+    : resolveLastLogin(lastLogin, accounts, allServers(customCfg.servers));
 
   async function connectTo(account: LobbyAccount) {
     setError(null);
@@ -199,6 +212,16 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
       <p className="px-2 pb-1 text-sm font-medium">
         {revealed ? "Reconnect to multiplayer" : "Connect to multiplayer"}
       </p>
+      {reconnect && (
+        <Button
+          onClick={() => void connectTo(reconnect.account)}
+          disabled={busy}
+          className="mb-1 h-9 justify-start gap-2"
+        >
+          <RefreshCw className="size-4" />
+          Reconnect as {reconnect.account.username || "last account"}
+        </Button>
+      )}
       {accounts.map((a) => {
         const server = resolveServer(a.serverId, customCfg.servers);
         return (

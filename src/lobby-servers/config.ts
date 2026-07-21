@@ -187,3 +187,56 @@ export const defaultAccounts: AccountsConfig = { accounts: [] };
 export function useLobbyAccounts() {
   return useSetting<AccountsConfig>("lobbyServers.accounts", defaultAccounts);
 }
+
+/**
+ * The account last connected with (by `{serverId, username}`, not the account id so
+ * it survives an account being re-created). Written on every successful connect;
+ * read at startup by the opt-in auto-connect and by the login popover's one-click
+ * reconnect. `null` until the first-ever successful connect.
+ */
+export interface LastLogin {
+  serverId: string;
+  username: string;
+}
+
+/** The last-used login, persisted under `lobbyServers.lastLogin` (null until first connect). */
+export function useLastLogin() {
+  return useSetting<LastLogin | null>("lobbyServers.lastLogin", null);
+}
+
+/**
+ * Resolve a {@link LastLogin} to the account + server it names, or null. Pure. Returns
+ * null when there is no last login, the account no longer exists, or its server isn't
+ * in `servers` — which is how the distribution profile is respected: pass the
+ * profile-filtered catalog (`allServers`) as `servers` and a profile-disallowed
+ * server simply won't match, so it's never auto-connected.
+ */
+export function resolveLastLogin(
+  lastLogin: LastLogin | null,
+  accounts: LobbyAccount[],
+  servers: LobbyServer[],
+): { account: LobbyAccount; server: LobbyServer } | null {
+  if (!lastLogin) return null;
+  const account = accounts.find(
+    (a) =>
+      a.serverId === lastLogin.serverId && a.username === lastLogin.username,
+  );
+  if (!account) return null;
+  const server = servers.find((s) => s.id === account.serverId);
+  if (!server) return null;
+  return { account, server };
+}
+
+/**
+ * The account to auto-connect at startup, or null when auto-connect is off or the
+ * last login can't be resolved (see {@link resolveLastLogin}). Pure so the boot-seed
+ * decision is unit-testable without a live store.
+ */
+export function autoConnectTarget(
+  enabled: boolean,
+  lastLogin: LastLogin | null,
+  accounts: LobbyAccount[],
+  servers: LobbyServer[],
+): { account: LobbyAccount; server: LobbyServer } | null {
+  return enabled ? resolveLastLogin(lastLogin, accounts, servers) : null;
+}

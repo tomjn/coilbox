@@ -17,8 +17,10 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import type { ProfileLobby } from "../profile/profile";
 import {
   allServers,
+  autoConnectTarget,
   BUILTIN_SERVERS,
   buildCatalog,
+  type LobbyAccount,
   type LobbyServer,
   OFFICIAL_ID,
   resolveProfileServerRules,
@@ -156,5 +158,40 @@ describe("buildCatalog", () => {
     const out = buildCatalog([], rules);
     expect(out.filter((s) => s.id === "recoil-official")).toHaveLength(1);
     expect(out[0]).toMatchObject({ id: "recoil-official", official: true });
+  });
+});
+
+describe("autoConnectTarget", () => {
+  const account: LobbyAccount = {
+    id: "acc-1",
+    serverId: "bar",
+    username: "player",
+  };
+  const servers = allServers([]);
+  const lastLogin = { serverId: "bar", username: "player" };
+
+  it("returns the account + server when enabled and the last login resolves", () => {
+    const t = autoConnectTarget(true, lastLogin, [account], servers);
+    expect(t?.account).toBe(account);
+    expect(t?.server.id).toBe("bar");
+  });
+
+  it("returns null when auto-connect is off", () => {
+    expect(autoConnectTarget(false, lastLogin, [account], servers)).toBeNull();
+  });
+
+  it("returns null when there is no last login", () => {
+    expect(autoConnectTarget(true, null, [account], servers)).toBeNull();
+  });
+
+  it("returns null when the account no longer exists", () => {
+    expect(autoConnectTarget(true, lastLogin, [], servers)).toBeNull();
+  });
+
+  it("returns null when the profile catalog disallows the server", () => {
+    // The account/last-login name `bar`, but the profile-filtered catalog only
+    // offers `techa`, so the disallowed server never resolves and never connects.
+    const narrowed = buildCatalog([], { presets: ["techa"] });
+    expect(autoConnectTarget(true, lastLogin, [account], narrowed)).toBeNull();
   });
 });
