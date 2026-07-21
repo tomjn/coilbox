@@ -25,13 +25,11 @@ const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
  */
 export function JailbreakPanel({
   replayPath,
-  recordedGametype,
   recordedEngineVersion,
   enginePath,
   dataDir,
 }: {
   replayPath: string;
-  recordedGametype: string;
   recordedEngineVersion: string;
   enginePath: string;
   dataDir: string;
@@ -51,7 +49,6 @@ export function JailbreakPanel({
         {open && (
           <JailbreakForm
             replayPath={replayPath}
-            recordedGametype={recordedGametype}
             recordedEngineVersion={recordedEngineVersion}
             enginePath={enginePath}
             dataDir={dataDir}
@@ -65,14 +62,12 @@ export function JailbreakPanel({
 
 function JailbreakForm({
   replayPath,
-  recordedGametype,
   recordedEngineVersion,
   enginePath,
   dataDir,
   onLaunched,
 }: {
   replayPath: string;
-  recordedGametype: string;
   recordedEngineVersion: string;
   enginePath: string;
   dataDir: string;
@@ -133,13 +128,10 @@ function JailbreakForm({
       <div className="flex flex-col gap-1">
         <h3 className="text-sm font-medium">Run on a local build</h3>
         <p className="text-xs text-muted-foreground">
-          Rewrites a copy of this replay to load a locally installed game
-          instead of{" "}
-          <span className="break-all font-mono text-foreground">
-            {recordedGametype || "its recorded game"}
-          </span>
-          . A desync during playback usually means your build differs from the
-          recording. The original replay is left untouched.
+          Rewrites a copy of this replay to load a locally installed game in
+          place of the one it was recorded on. A desync during playback usually
+          means your build differs from the recording. The original replay is
+          left untouched.
         </p>
       </div>
 
@@ -167,21 +159,24 @@ function JailbreakForm({
       </div>
 
       {engineVersion && (
-        <div className="flex items-start gap-2 text-xs">
+        <div className="flex items-start gap-2">
           <Checkbox
             id="jailbreak-stamp-version"
             checked={stampVersion}
             onCheckedChange={(v) => setStampVersion(v === true)}
             className="mt-0.5"
           />
-          <Label
-            htmlFor="jailbreak-stamp-version"
-            className="text-xs font-normal leading-snug"
-          >
-            Also stamp engine version to{" "}
-            <span className="font-mono">{engineVersion}</span> — only needed on
-            a release engine.
-          </Label>
+          <div className="flex flex-col gap-0.5">
+            <Label
+              htmlFor="jailbreak-stamp-version"
+              className="text-xs font-normal"
+            >
+              Also stamp the engine version
+            </Label>
+            <span className="text-xs text-muted-foreground">
+              Only needed to watch on a release engine.
+            </span>
+          </div>
         </div>
       )}
 

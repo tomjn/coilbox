@@ -622,7 +622,6 @@ export default function ReplayDetailPage() {
             {selected && (
               <JailbreakPanel
                 replayPath={replay.path}
-                recordedGametype={info.gameType}
                 recordedEngineVersion={info.engineVersion}
                 enginePath={selected.enginePath}
                 dataDir={selected.rootPath}
