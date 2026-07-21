@@ -28,6 +28,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-config-delete-profile`
 - `allow-content-warm-rapid-pool`
 - `allow-content-prune-rapid-pool`
+- `allow-content-reclaim-caches`
 - `allow-branding-catalog`
 - `allow-branding-image`
 
@@ -504,6 +505,32 @@ Enables the content_prune_rapid_pool command without any pre-configured scope.
 <td>
 
 Denies the content_prune_rapid_pool command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-reclaim-caches`
+
+</td>
+<td>
+
+Enables the content_reclaim_caches command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-reclaim-caches`
+
+</td>
+<td>
+
+Denies the content_reclaim_caches command without any pre-configured scope.
 
 </td>
 </tr>

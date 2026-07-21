@@ -27,6 +27,7 @@ permissions = [
   "allow-content-config-delete-profile",
   "allow-content-warm-rapid-pool",
   "allow-content-prune-rapid-pool",
+  "allow-content-reclaim-caches",
   "allow-branding-catalog",
   "allow-branding-image",
 ]
