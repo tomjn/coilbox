@@ -598,7 +598,7 @@ function DeleteReplayButton({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="secondary" className="gap-1.5">
+        <Button variant="outline" className="gap-1.5">
           <Trash2 className="size-4" /> Delete
         </Button>
       </PopoverTrigger>

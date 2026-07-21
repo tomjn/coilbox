@@ -1222,6 +1222,16 @@ mod tests {
         assert_eq!(m.source.as_deref(), Some("Beyond All Reason test-30018"));
         assert_eq!(m.origin.as_deref(), Some("jb_src.sdf"));
 
+        // End-to-end: the decoded DemoInfo carries the fields the UI reads, and they
+        // serialize with the camelCase keys the frontend expects.
+        let raw = read_header_and_script(&dst).unwrap();
+        let info = build_demo_info(raw, &game, None);
+        assert!(info.remixed);
+        assert_eq!(info.origin_filename.as_deref(), Some("jb_src.sdf"));
+        let js = serde_json::to_string(&info).unwrap();
+        assert!(js.contains("\"remixed\":true"), "{js}");
+        assert!(js.contains("\"originFilename\":\"jb_src.sdf\""), "{js}");
+
         let _ = std::fs::remove_file(&dst);
     }
 
