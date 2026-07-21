@@ -10,6 +10,7 @@ import {
   useScanTargetSelection,
   useUnitsyncThumbnails,
 } from "../config";
+import { computeReplayFilterVisibility } from "../replayFilterVisibility";
 import { useReplayUserState } from "../replayUserState";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
@@ -103,6 +104,10 @@ export default function ReplaysPage() {
     "content.replayFilters.watchedOnly",
     false,
   );
+  const [remixedOnly, setRemixedOnly] = useSetting(
+    "content.replayFilters.remixedOnly",
+    false,
+  );
   const [tagFilter, setTagFilter] = useSetting("content.replayFilters.tag", "");
   const userState = useReplayUserState();
   const tagOptions = useMemo(
@@ -113,6 +118,15 @@ export default function ReplaysPage() {
     [userState],
   );
 
+  // Which toggle filters could match anything, so a filter that can only ever
+  // return an empty list (e.g. watched-only before the user has watched
+  // anything) doesn't show at all. Computed from `replays` — the unfiltered
+  // library — so toggling one filter never hides another filter's control.
+  const filterVisibility = useMemo(
+    () => computeReplayFilterVisibility(replays, userState.get),
+    [replays, userState],
+  );
+
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     return replays.filter((r) => {
@@ -120,10 +134,19 @@ export default function ReplaysPage() {
       if (mapFilter && r.mapName !== mapFilter) return false;
       const us = userState.get(r.filename);
       if (watchedOnly && !us.watched) return false;
+      if (remixedOnly && !r.remixed) return false;
       if (tagFilter && !(us.tags ?? []).includes(tagFilter)) return false;
       return true;
     });
-  }, [replays, filter, mapFilter, watchedOnly, tagFilter, userState]);
+  }, [
+    replays,
+    filter,
+    mapFilter,
+    watchedOnly,
+    remixedOnly,
+    tagFilter,
+    userState,
+  ]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -194,15 +217,28 @@ export default function ReplaysPage() {
                 Map: {mapFilter} <X className="size-3.5" />
               </Button>
             )}
-            <Button
-              variant={watchedOnly ? "default" : "outline"}
-              size="sm"
-              onClick={() => setWatchedOnly(!watchedOnly)}
-              aria-pressed={watchedOnly}
-              className="gap-1.5"
-            >
-              <Eye className="size-4" /> Watched
-            </Button>
+            {filterVisibility.watched && (
+              <Button
+                variant={watchedOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setWatchedOnly(!watchedOnly)}
+                aria-pressed={watchedOnly}
+                className="gap-1.5"
+              >
+                <Eye className="size-4" /> Watched
+              </Button>
+            )}
+            {filterVisibility.remixed && (
+              <Button
+                variant={remixedOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setRemixedOnly(!remixedOnly)}
+                aria-pressed={remixedOnly}
+                className="gap-1.5"
+              >
+                <Code2 className="size-4" /> Remixed
+              </Button>
+            )}
             {tagOptions.length > 1 && (
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <Tag className="size-4" />
