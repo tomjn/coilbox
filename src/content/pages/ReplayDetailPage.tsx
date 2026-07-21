@@ -2,16 +2,18 @@ import { Button, Input } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
+  Code2,
   Download,
   Eye,
   ImageOff,
   Loader2,
   MessageSquare,
+  Trash2,
   Trophy,
   X,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import {
   type DownloadProgress,
@@ -24,6 +26,7 @@ import {
   ProgressBar,
 } from "../../downloads/pages/components/ProgressBar";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
+import { useReplayTarget } from "../../play/config";
 import type {
   AllyTeamInfo,
   DemoInfo,
@@ -41,7 +44,7 @@ import {
   useUnitsyncMinimap,
 } from "../config";
 import { useReplayUserState } from "../replayUserState";
-import { JailbreakPanel } from "./components/JailbreakPanel";
+import { RemixPanel } from "./components/RemixPanel";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
 import { WatchButton } from "./components/WatchButton";
 
@@ -560,16 +563,31 @@ function ReplayChat({
 export default function ReplayDetailPage() {
   const { name } = useParams();
   const filename = name ? decodeURIComponent(name) : "";
+  const navigate = useNavigate();
   const { selected } = useScanTargetSelection();
-  const { replays, loading: listLoading } = useReplays(selected?.rootPath);
+  const {
+    replays,
+    loading: listLoading,
+    refresh,
+  } = useReplays(selected?.rootPath);
   const replay = replays.find((r) => r.filename === filename);
   const { info, loading, error } = useDemoInfo(
     selected?.enginePath,
     replay?.path,
   );
+  // Drives the engine-mismatch "may not sync" hint under the header.
+  const { resolved } = useReplayTarget(info?.engineVersion ?? "");
 
   // Remount the preview after a successful map download so it refetches.
   const [previewNonce, setPreviewNonce] = useState(0);
+
+  // After a remix, pull the new copy into the list, then open its detail page —
+  // so the user lands on the remix (where Watch lives) instead of re-triggering it.
+  const onRemixed = async (newPath: string) => {
+    await refresh();
+    const newName = newPath.split(/[\\/]/).pop();
+    if (newName) navigate(`/content/replays/${encodeURIComponent(newName)}`);
+  };
 
   if (listLoading && !replay)
     return <DetailLoading backTo="/content/replays" />;
@@ -579,6 +597,9 @@ export default function ReplayDetailPage() {
   const metaRows: [string, string][] = info
     ? [
         ["Game", info.gameType || "—"],
+        ...(info.remixed && info.sourceGametype
+          ? ([["Remixed from", info.sourceGametype]] as [string, string][])
+          : []),
         ["Engine", info.engineVersion || "—"],
         [
           "Played",
@@ -600,33 +621,52 @@ export default function ReplayDetailPage() {
           >
             <ArrowLeft className="size-3.5" /> Replays
           </Link>
-          <h1 className="break-words text-lg font-semibold">
-            {info?.mapName || filename}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="break-words text-lg font-semibold">
+              {info?.mapName || filename}
+            </h1>
+            {info?.remixed && (
+              <Badge
+                variant="ghost"
+                className="shrink-0 gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[11px] font-medium text-primary"
+              >
+                <Code2 className="size-3" /> Remix
+              </Badge>
+            )}
+          </div>
           <p className="break-all font-mono text-xs text-muted-foreground">
             {filename}
           </p>
-          {/* Delete lands in a later iteration. */}
-          <div className="mt-2">
-            <Button disabled title="Coming soon">
-              Delete
-            </Button>
-          </div>
+          {info && resolved && !resolved.matched && (
+            <p className="max-w-md text-xs text-amber-600 dark:text-amber-400">
+              Recorded on {info.engineVersion || "an unknown engine"}; watching
+              with {resolved.target.engineVersion} — may not sync.
+            </p>
+          )}
         </div>
         {replay && info && (
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <WatchButton
-              replayPath={replay.path}
-              engineVersion={info.engineVersion}
-            />
+          <div className="flex shrink-0 items-start gap-2">
             {selected && (
-              <JailbreakPanel
+              <RemixPanel
                 replayPath={replay.path}
                 recordedEngineVersion={info.engineVersion}
                 enginePath={selected.enginePath}
                 dataDir={selected.rootPath}
+                onRemixed={onRemixed}
               />
             )}
+            <WatchButton
+              replayPath={replay.path}
+              engineVersion={info.engineVersion}
+            />
+            <Button
+              variant="secondary"
+              disabled
+              title="Coming soon"
+              className="gap-1.5"
+            >
+              <Trash2 className="size-4" /> Delete
+            </Button>
           </div>
         )}
       </header>

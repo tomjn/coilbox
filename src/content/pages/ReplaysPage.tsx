@@ -1,7 +1,8 @@
 import { Button } from "@picoframe/frame";
-import { Eye, Tag } from "lucide-react";
+import { Code2, Eye, Tag } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
+import { Badge } from "@/components/ui/badge";
 import { formatBytes } from "../../downloads/pages/components/ProgressBar";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import {
@@ -223,12 +224,23 @@ export default function ReplaysPage() {
                     />
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-                    <span
-                      className="truncate text-sm font-medium"
-                      title={r.mapName ?? r.filename}
-                    >
-                      {r.mapName ?? r.filename}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="truncate text-sm font-medium"
+                        title={r.mapName ?? r.filename}
+                      >
+                        {r.mapName ?? r.filename}
+                      </span>
+                      {r.remixed && (
+                        <Badge
+                          variant="ghost"
+                          className="shrink-0 gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                          title="A coilbox remix — rewritten to run on a local build"
+                        >
+                          <Code2 className="size-2.5" /> Remix
+                        </Badge>
+                      )}
+                    </div>
                     <span className="truncate text-xs text-muted-foreground">
                       {meta.join(" · ")}
                     </span>
