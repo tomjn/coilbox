@@ -27,6 +27,8 @@ interface BuildContext {
   gameName: string;
   sides: Side[];
   units: UnitDatasetEntry[];
+  /** Resolved faction emblems, keyed by lowercased side name (may be omitted). */
+  factionLogos?: Record<string, FactionLogoSrc>;
 }
 
 /** One faction: a button that opens the build-tree drawer starting on that side. */
@@ -60,6 +62,7 @@ export function FactionBuildButton({
           sides={ctx.sides}
           units={ctx.units}
           initialSide={side.name}
+          factionLogos={ctx.factionLogos}
         />
       ),
     });
@@ -120,6 +123,7 @@ export function FactionBuildList({
     gameName,
     sides,
     units,
+    factionLogos,
   };
   // Units reachable from each faction's commander via buildoptions. Omitted (and the
   // button left inert) when the dataset is still loading or the game exposes no
