@@ -645,7 +645,17 @@ export default function ReplayDetailPage() {
           )}
         </div>
         {replay && info && (
+          // Destructive + secondary actions first; the primary CTA (Watch) sits
+          // last so it lands in the top-right corner.
           <div className="flex shrink-0 items-start gap-2">
+            <Button
+              variant="secondary"
+              disabled
+              title="Coming soon"
+              className="gap-1.5"
+            >
+              <Trash2 className="size-4" /> Delete
+            </Button>
             {selected && (
               <RemixPanel
                 replayPath={replay.path}
@@ -659,14 +669,6 @@ export default function ReplayDetailPage() {
               replayPath={replay.path}
               engineVersion={info.engineVersion}
             />
-            <Button
-              variant="secondary"
-              disabled
-              title="Coming soon"
-              className="gap-1.5"
-            >
-              <Trash2 className="size-4" /> Delete
-            </Button>
           </div>
         )}
       </header>
