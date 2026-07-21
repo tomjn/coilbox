@@ -6,7 +6,7 @@ import { useFactionLogo } from "@/factions/logos";
 import { resolveGameByShortname } from "../../conquest/model";
 import { useUnitsyncScan } from "../../content/config";
 import { EmptyState } from "../../content/pages/components/states";
-import { usePreferredTarget } from "../../play/config";
+import { usePlayReadiness, usePreferredTarget } from "../../play/config";
 import type { RogueliteRun } from "../model";
 import { useRuns } from "../runs";
 import { RunSetupForm } from "./components/RunSetupForm";
@@ -24,7 +24,9 @@ export default function RunListPage() {
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { runs, deleteRun } = useRuns();
 
-  const hasGames = (scan.data?.games.length ?? 0) > 0;
+  // Shared with the sidebar nav badge (issue #419) via `usePlayReadiness`, so
+  // the two never disagree on whether a game is installed.
+  const { hasGames } = usePlayReadiness();
   const runEntries = Object.entries(runs);
 
   const openSetup = () =>
