@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
   type DownloadProgress,
@@ -586,7 +587,12 @@ export default function ReplayDetailPage() {
   const onRemixed = async (newPath: string) => {
     await refresh();
     const newName = newPath.split(/[\\/]/).pop();
-    if (newName) navigate(`/content/replays/${encodeURIComponent(newName)}`);
+    if (!newName) return;
+    navigate(`/content/replays/${encodeURIComponent(newName)}`);
+    // Flag the navigation so the jump to a different file isn't a surprise.
+    toast.success("Remix created", {
+      description: "Opened the remixed replay — use Watch to run it.",
+    });
   };
 
   if (listLoading && !replay)
@@ -637,6 +643,14 @@ export default function ReplayDetailPage() {
           <p className="break-all font-mono text-xs text-muted-foreground">
             {filename}
           </p>
+          {info?.remixed && info.originFilename && (
+            <Link
+              to={`/content/replays/${encodeURIComponent(info.originFilename)}`}
+              className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <ArrowLeft className="size-3.5" /> Back to original replay
+            </Link>
+          )}
           {info && resolved && !resolved.matched && (
             <p className="max-w-md text-xs text-amber-600 dark:text-amber-400">
               Recorded on {info.engineVersion || "an unknown engine"}; watching
@@ -656,7 +670,8 @@ export default function ReplayDetailPage() {
             >
               <Trash2 className="size-4" /> Delete
             </Button>
-            {selected && (
+            {/* No remixing a remix — its detail links back to the original instead. */}
+            {selected && !info.remixed && (
               <RemixPanel
                 replayPath={replay.path}
                 recordedEngineVersion={info.engineVersion}
