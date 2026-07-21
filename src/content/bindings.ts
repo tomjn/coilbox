@@ -193,6 +193,35 @@ export const contentPruneRapidPool = defineCommand<
   { summary: PruneSummary }
 >("coilbox-content", "content_prune_rapid_pool");
 
+/** One cache dir's size (and, when applied, clearance). */
+export interface CacheEntry {
+  /** On-disk subdir name (stable id). */
+  name: string;
+  /** Human-readable label. */
+  label: string;
+  bytes: number;
+  files: number;
+}
+
+/** What reclaiming the generated-image / info caches covers (or, on a dry run, would). */
+export interface CacheReclaimSummary {
+  /** True when the caches were actually cleared (`false` for a dry run). */
+  applied: boolean;
+  caches: CacheEntry[];
+  totalBytes: number;
+  totalFiles: number;
+}
+
+/**
+ * Size (and, when `apply: true`, clear) the app's grow-only generated-image / info
+ * caches under the app cache dir. `apply: false` is a dry run that reports per-cache
+ * sizes without deleting. Every cache regenerates on demand, so clearing is safe.
+ */
+export const contentReclaimCaches = defineCommand<
+  { apply: boolean },
+  { summary: CacheReclaimSummary }
+>("coilbox-content", "content_reclaim_caches");
+
 /* -------------------------------------------------------------------------- *
  * Replays — demo files in a root's `demos/`/`replays/` folder. Listing is cheap
  * fs metadata; decoding reads the demo's native header + start-script and shells
