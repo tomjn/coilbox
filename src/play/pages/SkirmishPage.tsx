@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Bookmark, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -418,7 +419,13 @@ export default function SkirmishPage() {
       {!target && !scan.loading && (
         <p className="rounded-md border border-border/50 bg-card p-3 text-sm text-muted-foreground">
           No engine found. Add a content folder with an engine in{" "}
-          <span className="font-medium">Settings → Content Folders</span> first.
+          <Link
+            className="font-medium underline underline-offset-4"
+            to="/settings/content-folders"
+          >
+            Settings → Content Folders
+          </Link>{" "}
+          first.
         </p>
       )}
 

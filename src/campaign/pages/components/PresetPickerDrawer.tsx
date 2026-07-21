@@ -1,5 +1,6 @@
 import { Input, useDrawer } from "@picoframe/frame";
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 import type { SkirmishPreset } from "@/play/presets";
 
 /**
@@ -27,8 +28,14 @@ export function PresetPickerDrawer({
     return (
       <p className="text-sm text-muted-foreground">
         No skirmish presets yet. Set up a game on the{" "}
-        <span className="font-medium">Play → Singleplayer</span> screen and save
-        it as a preset, then attach it here as a mission.
+        <Link
+          className="font-medium underline underline-offset-4"
+          to="/play/skirmish"
+          onClick={() => drawer.close()}
+        >
+          Play → Singleplayer
+        </Link>{" "}
+        screen and save it as a preset, then attach it here as a mission.
       </p>
     );
   }

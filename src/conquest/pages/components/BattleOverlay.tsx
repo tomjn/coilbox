@@ -286,7 +286,11 @@ function Briefing({
 
       {run.noEngine ? (
         <p className="text-sm text-muted-foreground">
-          Install an engine first (Content → Engines).
+          Install an engine first (
+          <Link className="underline underline-offset-4" to="/settings/engines">
+            Settings → Engines
+          </Link>
+          ).
         </p>
       ) : run.missing ? (
         <RequirementGate node={node} run={run} />

@@ -279,7 +279,13 @@ function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
     return (
       <p className="rounded-md border border-border/50 bg-background/60 p-3 text-sm text-muted-foreground">
         No engine found. Add a content folder with an engine in{" "}
-        <span className="font-medium">Settings → Content Folders</span> first.
+        <Link
+          className="font-medium underline underline-offset-4"
+          to="/settings/content-folders"
+        >
+          Settings → Content Folders
+        </Link>{" "}
+        first.
       </p>
     );
   }

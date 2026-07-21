@@ -1,5 +1,6 @@
-import { Button, Input, useDrawer } from "@picoframe/frame";
+import { Button, buttonVariants, cn, Input, useDrawer } from "@picoframe/frame";
 import { ChevronRight, Dices, Orbit, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Card } from "@/components/ui/card";
@@ -97,12 +98,22 @@ export default function ConquestListPage() {
                 : "Install an engine and at least one game, then return here to generate a galaxy for it."}
             </p>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => navigate("/downloads/games")}
-          >
-            Browse games to download
-          </Button>
+          <div className="flex gap-2">
+            {!target && (
+              <Link
+                to="/settings/engines"
+                className={cn(buttonVariants({ variant: "outline" }))}
+              >
+                Install an engine
+              </Link>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => navigate("/downloads/games")}
+            >
+              Browse games to download
+            </Button>
+          </div>
         </div>
       ) : loading ? (
         <SkeletonList />
@@ -444,15 +455,34 @@ function GenerateGalaxyForm({
       return null;
     }
   }, [genOptions, selected, maps]);
-  const blocked = !target
-    ? "Install an engine first (Content → Engines)."
-    : scan.data && (scan.data.games.length === 0 || gameChoices.length === 0)
-      ? "Install a game first (Content → Games)."
-      : selected && ais.length === 0
-        ? "This game has no skirmish AIs to fight against."
-        : maps.length === 0 && scan.data
-          ? "Install at least one map first (Content → Maps)."
-          : null;
+  const blocked: ReactNode = !target ? (
+    <>
+      Install an engine first (
+      <Link className="underline underline-offset-4" to="/settings/engines">
+        Settings → Engines
+      </Link>
+      ).
+    </>
+  ) : scan.data &&
+    (scan.data.games.length === 0 || gameChoices.length === 0) ? (
+    <>
+      Install a game first (
+      <Link className="underline underline-offset-4" to="/content/games">
+        Content → Games
+      </Link>
+      ).
+    </>
+  ) : selected && ais.length === 0 ? (
+    "This game has no skirmish AIs to fight against."
+  ) : maps.length === 0 && scan.data ? (
+    <>
+      Install at least one map first (
+      <Link className="underline underline-offset-4" to="/content/maps">
+        Content → Maps
+      </Link>
+      ).
+    </>
+  ) : null;
 
   const create = async () => {
     if (!selected) return;

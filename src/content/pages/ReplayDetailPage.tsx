@@ -353,7 +353,14 @@ function ReplayMapPreview({
       )}
       {!writePath && !downloading && (
         <p className="text-xs text-muted-foreground">
-          Set a download folder in Downloads settings first.
+          Set a download folder in{" "}
+          <Link
+            className="underline underline-offset-4"
+            to="/settings/downloads"
+          >
+            Downloads settings
+          </Link>{" "}
+          first.
         </p>
       )}
       {dlError && <ErrorBanner message={dlError} />}

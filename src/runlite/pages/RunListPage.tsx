@@ -1,6 +1,6 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Loader2, Play, Rocket, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
 import { resolveGameByShortname } from "../../conquest/model";
@@ -68,10 +68,36 @@ export default function RunListPage() {
             Scanning installed games…
           </div>
         ) : (
-          <EmptyState label="Install an engine first (Content → Engines)." />
+          <EmptyState
+            label={
+              <>
+                Install an engine first (
+                <Link
+                  className="underline underline-offset-4"
+                  to="/settings/engines"
+                >
+                  Settings → Engines
+                </Link>
+                ).
+              </>
+            }
+          />
         )
       ) : !hasGames ? (
-        <EmptyState label="No games installed. Add one from Content → Games." />
+        <EmptyState
+          label={
+            <>
+              No games installed. Add one from{" "}
+              <Link
+                className="underline underline-offset-4"
+                to="/content/games"
+              >
+                Content → Games
+              </Link>
+              .
+            </>
+          }
+        />
       ) : runEntries.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {runEntries.map(([id, run]) => (

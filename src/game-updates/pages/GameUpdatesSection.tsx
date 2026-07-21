@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import Markdown from "react-markdown";
+import { Link } from "react-router";
 import { useWriteRootPath } from "../../downloads/config";
 import { ProgressBar } from "../../downloads/pages/components/ProgressBar";
 import { useGameUpdates } from "../GameUpdatesProvider";
@@ -53,7 +54,14 @@ export default function GameUpdatesSection() {
 
       {!writePath && (
         <p className="text-sm text-muted-foreground">
-          Set a download folder in Downloads settings to enable updates.
+          Set a download folder in{" "}
+          <Link
+            className="underline underline-offset-4"
+            to="/settings/downloads"
+          >
+            Downloads settings
+          </Link>{" "}
+          to enable updates.
         </p>
       )}
 

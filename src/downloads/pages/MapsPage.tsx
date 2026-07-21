@@ -8,6 +8,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -373,8 +374,14 @@ export default function MapsPage() {
         </div>
         {!writePath && (
           <p className="text-xs text-muted-foreground">
-            No download folder set — pick one in Downloads settings so maps land
-            where the engine can find them.
+            No download folder set — pick one in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/downloads"
+            >
+              Downloads settings
+            </Link>{" "}
+            so maps land where the engine can find them.
           </p>
         )}
       </header>

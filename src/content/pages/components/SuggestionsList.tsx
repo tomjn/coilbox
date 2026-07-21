@@ -2,6 +2,7 @@ import { Button, cn } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router";
 import {
   type DownloadProgress,
   dlDownload,
@@ -146,7 +147,14 @@ export function SuggestionsList({
         </h2>
         {!writePath && (
           <p className="text-xs text-muted-foreground">
-            Set a download folder in Downloads settings to enable downloads.
+            Set a download folder in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/downloads"
+            >
+              Downloads settings
+            </Link>{" "}
+            to enable downloads.
           </p>
         )}
       </div>

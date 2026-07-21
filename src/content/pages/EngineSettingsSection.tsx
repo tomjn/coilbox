@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import type { EngineConfigSetting, EngineConfigWriteResult } from "../bindings";
@@ -80,7 +81,27 @@ export default function EngineSettingsSection() {
       {busy ? (
         <SkeletonList />
       ) : targets.length === 0 ? (
-        <EmptyState label="No engines found in your content folders — add a content folder or install an engine to read its settings." />
+        <EmptyState
+          label={
+            <>
+              No engines found in your content folders — add a folder in{" "}
+              <Link
+                to="/settings/content-folders"
+                className="underline underline-offset-4"
+              >
+                Content Folders
+              </Link>{" "}
+              or install one from{" "}
+              <Link
+                to="/settings/engines"
+                className="underline underline-offset-4"
+              >
+                Engines
+              </Link>
+              .
+            </>
+          }
+        />
       ) : settings.length === 0 ? (
         <EmptyState
           label={
