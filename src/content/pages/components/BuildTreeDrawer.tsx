@@ -14,6 +14,8 @@ import {
 import "@xyflow/react/dist/style.css";
 import { type CSSProperties, useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FactionLogo } from "@/factions/FactionLogo";
+import type { FactionLogoSrc } from "@/factions/fallback";
 import type { Side, UnitDatasetEntry } from "../../bindings";
 import { buildBuildGraph, buildEdgeMap } from "../../buildTree";
 import { useUnitsyncUnitBuildpics } from "../../config";
@@ -128,6 +130,7 @@ export function BuildTreeDrawer({
   sides,
   units,
   initialSide,
+  factionLogos,
 }: {
   enginePath: string;
   dataDir: string;
@@ -135,6 +138,8 @@ export function BuildTreeDrawer({
   sides: Side[];
   units: UnitDatasetEntry[];
   initialSide: string;
+  /** Resolved faction emblems, keyed by lowercased side name (may be omitted). */
+  factionLogos?: Record<string, FactionLogoSrc>;
 }) {
   const [activeName, setActiveName] = useState(initialSide);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -337,11 +342,21 @@ export function BuildTreeDrawer({
       {sides.length > 1 && (
         <Tabs value={active?.name ?? activeName} onValueChange={setActiveName}>
           <TabsList className="h-auto flex-wrap gap-1.5">
-            {sides.map((s) => (
-              <TabsTrigger key={s.name} value={s.name} className="flex-none">
-                {s.name}
-              </TabsTrigger>
-            ))}
+            {sides.map((s) => {
+              const logo = factionLogos?.[s.name.toLowerCase()];
+              return (
+                <TabsTrigger
+                  key={s.name}
+                  value={s.name}
+                  className="flex-none gap-1.5"
+                >
+                  {logo && (
+                    <FactionLogo logo={logo} sideName={s.name} size={14} />
+                  )}
+                  {s.name}
+                </TabsTrigger>
+              );
+            })}
           </TabsList>
         </Tabs>
       )}
