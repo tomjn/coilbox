@@ -1,3 +1,5 @@
+import { Button } from "@picoframe/frame";
+import { Play } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { dlInstalledContent } from "../../downloads/bindings";
@@ -8,6 +10,7 @@ import {
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "../config";
+import { usePlayMap } from "../usePlayMap";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
 import { MapThumb, mapSizeLabel } from "./components/MapThumb";
@@ -47,6 +50,7 @@ export default function MapsPage() {
     selected?.enginePath,
     selected?.rootPath,
   );
+  const playMap = usePlayMap();
 
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name-asc");
@@ -163,30 +167,39 @@ export default function MapsPage() {
             return (
               <li
                 key={m.name}
-                className="overflow-hidden rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/50 hover:shadow-md [contain-intrinsic-size:13rem] [content-visibility:auto]"
+                className="group relative overflow-hidden rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/50 hover:shadow-md [contain-intrinsic-size:13rem] [content-visibility:auto]"
               >
-                <Link to={`/content/maps/${encodeURIComponent(m.name)}`}>
-                  <MapThumb
-                    dataUrl={thumb?.dataUrl}
-                    width={m.width}
-                    height={m.height}
-                    alt={`Minimap of ${m.name}`}
-                    loading={thumbsLoading && !thumb}
-                  />
-                  <div className="flex flex-col gap-0.5 p-2">
-                    <div className="flex items-center gap-1">
-                      <p
-                        className="truncate text-sm font-medium"
-                        title={m.name}
-                      >
-                        {m.name}
-                      </p>
-                    </div>
+                <MapThumb
+                  dataUrl={thumb?.dataUrl}
+                  width={m.width}
+                  height={m.height}
+                  alt={`Minimap of ${m.name}`}
+                  loading={thumbsLoading && !thumb}
+                />
+                {/* Stretched link: anywhere but the Play button opens the map detail. */}
+                <Link
+                  to={`/content/maps/${encodeURIComponent(m.name)}`}
+                  aria-label={m.name}
+                  className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                />
+                <div className="flex items-center justify-between gap-2 p-2">
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <p className="truncate text-sm font-medium" title={m.name}>
+                      {m.name}
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">
                       {[size, archiveLabel].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                </Link>
+                  <Button
+                    size="sm"
+                    aria-label="Play"
+                    className="pointer-events-auto relative z-10 shrink-0"
+                    onClick={() => playMap(m.name)}
+                  >
+                    <Play className="size-4 fill-current" />
+                  </Button>
+                </div>
               </li>
             );
           })}
