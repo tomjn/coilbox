@@ -29,6 +29,8 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-warm-rapid-pool`
 - `allow-content-prune-rapid-pool`
 - `allow-content-reclaim-caches`
+- `allow-content-export-build-tree-html`
+- `allow-content-export-build-tree-zip`
 - `allow-branding-catalog`
 - `allow-branding-image`
 
@@ -375,6 +377,58 @@ Enables the content_demo_info command without any pre-configured scope.
 <td>
 
 Denies the content_demo_info command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-export-build-tree-html`
+
+</td>
+<td>
+
+Enables the content_export_build_tree_html command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-export-build-tree-html`
+
+</td>
+<td>
+
+Denies the content_export_build_tree_html command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-export-build-tree-zip`
+
+</td>
+<td>
+
+Enables the content_export_build_tree_zip command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-export-build-tree-zip`
+
+</td>
+<td>
+
+Denies the content_export_build_tree_zip command without any pre-configured scope.
 
 </td>
 </tr>

@@ -28,6 +28,8 @@ permissions = [
   "allow-content-warm-rapid-pool",
   "allow-content-prune-rapid-pool",
   "allow-content-reclaim-caches",
+  "allow-content-export-build-tree-html",
+  "allow-content-export-build-tree-zip",
   "allow-branding-catalog",
   "allow-branding-image",
 ]
