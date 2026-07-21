@@ -10,14 +10,19 @@ import {
   type NodeProps,
   Position,
   ReactFlow,
+  useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { type CSSProperties, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import type { Side, UnitDatasetEntry } from "../../bindings";
-import { buildBuildGraph, buildEdgeMap } from "../../buildTree";
+import {
+  buildBuildGraph,
+  buildEdgeMap,
+  focusNeighbours,
+} from "../../buildTree";
 import { useUnitsyncUnitBuildpics } from "../../config";
 import { layoutBuildTree } from "./buildTreeLayout";
 
@@ -143,7 +148,29 @@ export function BuildTreeDrawer({
 }) {
   const [activeName, setActiveName] = useState(initialSide);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  // Click-to-focus: a single unit whose neighbours (builds + built-by) replace
+  // the full tree. One value, not a stack — so each click replaces the focus and
+  // a background click always exits to the full tree, never a previous focus.
+  const [focusedUnit, setFocusedUnit] = useState<string | null>(null);
   const active = sides.find((s) => s.name === activeName) ?? sides[0];
+
+  // Switching faction resets the view: a focus/hover from another tree is
+  // meaningless in a new one.
+  const selectFaction = (name: string) => {
+    setActiveName(name);
+    setFocusedUnit(null);
+    setHoveredId(null);
+  };
+
+  // Escape clears the focus (keyboard path back to the full tree).
+  useEffect(() => {
+    if (focusedUnit == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFocusedUnit(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focusedUnit]);
 
   const edges = useMemo(() => buildEdgeMap(units), [units]);
   // Internal name (lowercased) -> friendly name, for node labels.
@@ -245,33 +272,47 @@ export function BuildTreeDrawer({
     return m;
   }, [laidOut]);
 
-  // Inject resolved icons/labels, and dim nodes not connected to the hovered one.
+  // The focus subset (unit + what it builds + what builds it) when a unit is
+  // clicked, else null for the full tree. Membership drives which nodes/edges
+  // render; the focus set is already intersected with the reachable node set.
+  const focusSet = useMemo(
+    () => (focusedUnit ? focusNeighbours(focusedUnit, edges) : null),
+    [focusedUnit, edges],
+  );
+  // A focused unit acts as a persistent hover for edge colour + handle reveal, so
+  // its builds read green and its builders yellow even without hovering.
+  const emphasisId = hoveredId ?? focusedUnit;
+
+  // Inject resolved icons/labels, filter to the focus subset when focused, and
+  // dim nodes not connected to the hovered one.
   const nodes = useMemo(
     () =>
-      laidOut.nodes.map((n) => {
-        const display = buildpics?.units[n.id];
-        const prev = n.data as UnitNodeData;
-        const dimmed =
-          hoveredId != null &&
-          n.id !== hoveredId &&
-          !adjacency.get(hoveredId)?.has(n.id);
-        return {
-          ...n,
-          data: {
-            label: display?.name ?? prev.label,
-            icon: display?.icon,
-            isBuilder: prev.isBuilder,
-            isStart: prev.isStart,
-            isMobile: prev.isMobile,
-            hovered: n.id === hoveredId,
-          },
-          style: {
-            opacity: dimmed ? 0.18 : 1,
-            transition: `opacity ${HOVER_MS}ms`,
-          },
-        };
-      }),
-    [laidOut, buildpics, hoveredId, adjacency],
+      laidOut.nodes
+        .filter((n) => !focusSet || focusSet.has(n.id))
+        .map((n) => {
+          const display = buildpics?.units[n.id];
+          const prev = n.data as UnitNodeData;
+          const dimmed =
+            hoveredId != null &&
+            n.id !== hoveredId &&
+            !adjacency.get(hoveredId)?.has(n.id);
+          return {
+            ...n,
+            data: {
+              label: display?.name ?? prev.label,
+              icon: display?.icon,
+              isBuilder: prev.isBuilder,
+              isStart: prev.isStart,
+              isMobile: prev.isMobile,
+              hovered: n.id === emphasisId,
+            },
+            style: {
+              opacity: dimmed ? 0.18 : 1,
+              transition: `opacity ${HOVER_MS}ms`,
+            },
+          };
+        }),
+    [laidOut, buildpics, hoveredId, emphasisId, focusSet, adjacency],
   );
 
   // Style edges: solid backbone vs faint dashed extras. On hover, the hovered
@@ -280,59 +321,64 @@ export function BuildTreeDrawer({
   // transition on the edge path.
   const styledEdges = useMemo(
     () =>
-      laidOut.edgeDefs.map((e) => {
-        const extra = (e.data as { extra?: boolean } | undefined)?.extra;
-        const builds = hoveredId != null && e.source === hoveredId; // outgoing
-        const builtBy = hoveredId != null && e.target === hoveredId; // incoming
-        const incident = builds || builtBy;
-        let style: CSSProperties;
-        if (hoveredId != null && !incident) {
-          style = {
-            stroke: EDGE_COLOR,
-            strokeWidth: 1,
-            opacity: 0.05,
-            ...(extra ? { strokeDasharray: "4 4" } : {}),
+      laidOut.edgeDefs
+        .filter(
+          (e) =>
+            !focusSet || (focusSet.has(e.source) && focusSet.has(e.target)),
+        )
+        .map((e) => {
+          const extra = (e.data as { extra?: boolean } | undefined)?.extra;
+          const builds = emphasisId != null && e.source === emphasisId; // outgoing
+          const builtBy = emphasisId != null && e.target === emphasisId; // incoming
+          const incident = builds || builtBy;
+          let style: CSSProperties;
+          if (hoveredId != null && !incident) {
+            style = {
+              stroke: EDGE_COLOR,
+              strokeWidth: 1,
+              opacity: 0.05,
+              ...(extra ? { strokeDasharray: "4 4" } : {}),
+            };
+          } else if (incident) {
+            style = {
+              stroke: builds ? EDGE_BUILDS : EDGE_BUILT_BY,
+              strokeWidth: 2.5,
+              opacity: 1,
+              // Keep secondary (extra) edges dashed even when highlighted, so the
+              // tree-vs-extra distinction survives hover.
+              ...(extra ? { strokeDasharray: "6 4" } : {}),
+            };
+          } else {
+            // Resting edges stay quiet so the grid blocks read cleanly despite the
+            // unavoidable overlap of a hub's many connections; hover makes the
+            // relevant ones pop.
+            style = extra
+              ? {
+                  stroke: EDGE_COLOR,
+                  strokeWidth: 1,
+                  opacity: 0.12,
+                  strokeDasharray: "4 4",
+                }
+              : { stroke: EDGE_COLOR, strokeWidth: 1.5, opacity: 0.4 };
+          }
+          // NB: the fade comes from a CSS rule on `.react-flow__edge-path`
+          // (EDGE_TRANSITION_CSS), not inline — and no per-hover zIndex change,
+          // which would re-parent the edge into another SVG layer and kill it.
+          // On hover, a directional arrow at the target end shows build direction.
+          return {
+            ...e,
+            style,
+            markerEnd: incident
+              ? {
+                  type: MarkerType.ArrowClosed,
+                  width: 16,
+                  height: 16,
+                  color: builds ? EDGE_BUILDS : EDGE_BUILT_BY,
+                }
+              : undefined,
           };
-        } else if (incident) {
-          style = {
-            stroke: builds ? EDGE_BUILDS : EDGE_BUILT_BY,
-            strokeWidth: 2.5,
-            opacity: 1,
-            // Keep secondary (extra) edges dashed even when highlighted, so the
-            // tree-vs-extra distinction survives hover.
-            ...(extra ? { strokeDasharray: "6 4" } : {}),
-          };
-        } else {
-          // Resting edges stay quiet so the grid blocks read cleanly despite the
-          // unavoidable overlap of a hub's many connections; hover makes the
-          // relevant ones pop.
-          style = extra
-            ? {
-                stroke: EDGE_COLOR,
-                strokeWidth: 1,
-                opacity: 0.12,
-                strokeDasharray: "4 4",
-              }
-            : { stroke: EDGE_COLOR, strokeWidth: 1.5, opacity: 0.4 };
-        }
-        // NB: the fade comes from a CSS rule on `.react-flow__edge-path`
-        // (EDGE_TRANSITION_CSS), not inline — and no per-hover zIndex change,
-        // which would re-parent the edge into another SVG layer and kill it.
-        // On hover, a directional arrow at the target end shows build direction.
-        return {
-          ...e,
-          style,
-          markerEnd: incident
-            ? {
-                type: MarkerType.ArrowClosed,
-                width: 16,
-                height: 16,
-                color: builds ? EDGE_BUILDS : EDGE_BUILT_BY,
-              }
-            : undefined,
-        };
-      }),
-    [laidOut, hoveredId],
+        }),
+    [laidOut, emphasisId, hoveredId, focusSet],
   );
 
   return (
@@ -340,7 +386,7 @@ export function BuildTreeDrawer({
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, non-user CSS to animate React Flow edge paths (inline edge transition doesn't take) */}
       <style dangerouslySetInnerHTML={{ __html: EDGE_TRANSITION_CSS }} />
       {sides.length > 1 && (
-        <Tabs value={active?.name ?? activeName} onValueChange={setActiveName}>
+        <Tabs value={active?.name ?? activeName} onValueChange={selectFaction}>
           <TabsList className="h-auto flex-wrap gap-1.5">
             {sides.map((s) => {
               const logo = factionLogos?.[s.name.toLowerCase()];
@@ -380,6 +426,11 @@ export function BuildTreeDrawer({
               nodeTypes={nodeTypes}
               onNodeMouseEnter={(_, node) => setHoveredId(node.id)}
               onNodeMouseLeave={() => setHoveredId(null)}
+              // Click a unit to focus its neighbours (replace, never nest); click
+              // the empty pane to exit back to the full tree. React Flow fires
+              // these on separate targets, so a node click never also clears.
+              onNodeClick={(_, node) => setFocusedUnit(node.id)}
+              onPaneClick={() => setFocusedUnit(null)}
               // Read-only view: no editing, connecting, or selecting.
               nodesDraggable={false}
               nodesConnectable={false}
@@ -395,6 +446,7 @@ export function BuildTreeDrawer({
               maxZoom={1.5}
               proOptions={{ hideAttribution: true }}
             >
+              <FocusRefit dep={`${activeName}:${focusedUnit ?? ""}`} />
               <Background />
               <Controls showInteractive={false} />
               <MiniMap
@@ -430,6 +482,24 @@ export function BuildTreeDrawer({
       )}
     </div>
   );
+}
+
+/**
+ * Refits the viewport whenever `dep` (the active faction + focused unit) changes,
+ * so a focus subset — or the restored full tree — lands centred and framed.
+ * Rendered inside ReactFlow so it can reach the flow store; renders nothing.
+ */
+function FocusRefit({ dep }: { dep: string }) {
+  const { fitView } = useReactFlow();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refit is keyed on the focus/faction `dep` only, not on the recreated `fitView`
+  useEffect(() => {
+    // Defer a frame so the filtered node set is committed before we frame it.
+    const raf = requestAnimationFrame(() =>
+      fitView({ padding: 0.15, minZoom: 0.08, maxZoom: 1, duration: 400 }),
+    );
+    return () => cancelAnimationFrame(raf);
+  }, [dep]);
+  return null;
 }
 
 /** Colour/line key for the build graph, shown above the canvas. */

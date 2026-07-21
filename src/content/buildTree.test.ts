@@ -3,6 +3,7 @@ import type { UnitDatasetEntry } from "./bindings";
 import {
   buildBuildGraph,
   buildEdgeMap,
+  focusNeighbours,
   reachableCounts,
   reachableFrom,
 } from "./buildTree";
@@ -113,6 +114,70 @@ describe("buildBuildGraph", () => {
     // The cycle back-edge (con->fac) survives as an extra, not a tree edge.
     expect(extraEdges).toContainEqual({ parent: "con", child: "fac" });
     expect(buildBuildGraph("nope", edges).order).toEqual([]);
+  });
+});
+
+describe("focusNeighbours", () => {
+  it("returns the unit plus its forward builds and reverse builders", () => {
+    const edges = buildEdgeMap([
+      unit("com", ["conveh", "solar"]),
+      unit("conveh", ["solar", "advveh"]),
+      unit("solar"),
+      unit("advveh"),
+    ]);
+    // solar is built by com and conveh (reverse); it builds nothing (forward).
+    expect([...focusNeighbours("solar", edges)].sort()).toEqual([
+      "com",
+      "conveh",
+      "solar",
+    ]);
+    // conveh builds solar+advveh (forward) and is built by com (reverse).
+    expect([...focusNeighbours("conveh", edges)].sort()).toEqual([
+      "advveh",
+      "com",
+      "conveh",
+      "solar",
+    ]);
+  });
+
+  it("is direct-only — does not expand transitively", () => {
+    const edges = buildEdgeMap([
+      unit("com", ["fac"]),
+      unit("fac", ["con"]),
+      unit("con", ["bot"]),
+      unit("bot"),
+    ]);
+    // Focusing fac reaches com (reverse) and con (forward), but NOT bot
+    // (con's build option, two hops away) nor com's other ancestors.
+    expect([...focusNeighbours("fac", edges)].sort()).toEqual([
+      "com",
+      "con",
+      "fac",
+    ]);
+  });
+
+  it("returns just the unit when it has no neighbours", () => {
+    const edges = buildEdgeMap([unit("com", ["lonely"]), unit("lonely")]);
+    // lonely builds nothing; drop com so it has no builder either.
+    const isolated = buildEdgeMap([unit("lonely")]);
+    expect([...focusNeighbours("lonely", isolated)]).toEqual(["lonely"]);
+    // With com present, lonely gains com as a reverse builder.
+    expect([...focusNeighbours("lonely", edges)].sort()).toEqual([
+      "com",
+      "lonely",
+    ]);
+  });
+
+  it("matches case-insensitively and drops dangling options", () => {
+    const edges = buildEdgeMap([unit("Com", ["Ghost", "Real"]), unit("Real")]);
+    // Ghost has no node, so it is not a forward neighbour of com.
+    expect([...focusNeighbours("com", edges)].sort()).toEqual(["com", "real"]);
+  });
+
+  it("returns empty for a missing or absent focus unit", () => {
+    const edges = buildEdgeMap([unit("com", ["a"]), unit("a")]);
+    expect(focusNeighbours(undefined, edges).size).toBe(0);
+    expect(focusNeighbours("nope", edges).size).toBe(0);
   });
 });
 

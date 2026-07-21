@@ -49,6 +49,34 @@ export function reachableFrom(
   return seen;
 }
 
+/**
+ * The build-tree focus set for `focused`: the unit itself, its build options
+ * (what it builds, forward) and its builders (units whose build options include
+ * it, reverse). One hop only — deliberately not transitive. Dangling options with
+ * no matching node are dropped, matching `reachableFrom`. Returns just `{focused}`
+ * when it has no neighbours, and an empty set when `focused` is falsy or absent
+ * from the graph. Pure lookup over the existing edge map — a single focused unit
+ * with no history, so a re-focus replaces rather than nests by construction.
+ */
+export function focusNeighbours(
+  focused: string | undefined,
+  edges: Map<string, string[]>,
+): Set<string> {
+  const target = focused?.toLowerCase();
+  const set = new Set<string>();
+  if (!target || !edges.has(target)) return set;
+  set.add(target);
+  // Forward: what the focused unit builds.
+  for (const opt of edges.get(target) ?? []) {
+    if (edges.has(opt)) set.add(opt);
+  }
+  // Reverse: units whose build options include the focused unit.
+  for (const [name, options] of edges) {
+    if (options.includes(target)) set.add(name);
+  }
+  return set;
+}
+
 /** One parent->child edge of the build graph. */
 export interface TreeEdge {
   parent: string;
