@@ -10,6 +10,7 @@
 //! Results use the [`CliResult`] envelope, matching every other picoframe plugin.
 
 mod branding;
+mod build_tree_export;
 mod caches;
 mod demo;
 mod engine;
@@ -918,6 +919,33 @@ async fn content_delete_replay(path: String) -> Result<CliResult, ()> {
     }
 }
 
+/// `content_export_build_tree_html` — write a single self-contained build-tree
+/// export HTML file (built entirely by the frontend) to a caller-chosen path.
+/// Opaque: the frontend owns the markup and picks the destination via the save
+/// dialog (mirrors `campaign_export`).
+#[tauri::command]
+async fn content_export_build_tree_html(dest: String, html: String) -> Result<CliResult, ()> {
+    Ok(match build_tree_export::write_html(&dest, &html) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e),
+    })
+}
+
+/// `content_export_build_tree_zip` — assemble the build-tree export zip
+/// (`index.html` + `images/` + `assets/`) at a caller-chosen path from the file
+/// set the frontend serialized. Image bytes arrive base64-encoded and are decoded
+/// here; text files (html/css/js) are written UTF-8.
+#[tauri::command]
+async fn content_export_build_tree_zip(
+    dest: String,
+    files: Vec<build_tree_export::ExportFile>,
+) -> Result<CliResult, ()> {
+    Ok(match build_tree_export::write_zip(&dest, &files) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e),
+    })
+}
+
 /// `branding_catalog` — fetch the remote branding catalog JSON, disk-cache it, and
 /// fall back to the cache then the bundled seed on network failure. Returns the
 /// raw JSON text; the frontend parses/matches it (Rust stays schema-agnostic).
@@ -1132,6 +1160,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_warm_rapid_pool,
             content_prune_rapid_pool,
             content_reclaim_caches,
+            content_export_build_tree_html,
+            content_export_build_tree_zip,
             branding_catalog,
             branding_image
         ])

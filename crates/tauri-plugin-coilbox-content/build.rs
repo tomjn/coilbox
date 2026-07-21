@@ -28,6 +28,8 @@ const COMMANDS: &[&str] = &[
     "content_warm_rapid_pool",
     "content_prune_rapid_pool",
     "content_reclaim_caches",
+    "content_export_build_tree_html",
+    "content_export_build_tree_zip",
     "branding_catalog",
     "branding_image",
 ];

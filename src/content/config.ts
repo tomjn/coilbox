@@ -31,6 +31,7 @@ import {
   type StartPos,
   type UnitBuildpicsResult,
   type UnitDatasetResult,
+  type UnitDisplay,
   unitsyncArchiveFile,
   unitsyncArchiveTree,
   unitsyncCancel,
@@ -643,6 +644,41 @@ export function useUnitsyncUnitBuildpics(
   }, [enginePath, dataDir, gameArchive, unitsKey]);
 
   return data;
+}
+
+/**
+ * Gather resolved build pics for an export: merge every cached buildpics entry
+ * for this game (whatever the open drawer already fetched across factions), then
+ * make a single unitsync call for any units still missing a pic so an
+ * all-factions export is complete even for tabs the user never opened. Seeds the
+ * shared cache. Returns an id -> display map; units that resolve to nothing are
+ * simply absent (the exporter renders a "no pic" placeholder).
+ */
+export async function gatherExportPics(
+  enginePath: string,
+  dataDir: string,
+  gameArchive: string,
+  unitIds: string[],
+): Promise<Record<string, UnitDisplay>> {
+  const prefix = `${dataDir}::${enginePath}::${gameArchive}::`;
+  const merged: Record<string, UnitDisplay> = {};
+  for (const [key, res] of buildpicsCache) {
+    if (!key.startsWith(prefix)) continue;
+    for (const [id, display] of Object.entries(res.units)) merged[id] = display;
+  }
+  const missing = unitIds.filter((id) => !merged[id]);
+  if (missing.length > 0) {
+    const res = await unitsyncUnitBuildpics({
+      enginePath,
+      dataDir,
+      gameArchive,
+      units: missing,
+    });
+    const key = `${prefix}${missing.slice().sort().join(",")}`;
+    buildpicsCache.set(key, res);
+    for (const [id, display] of Object.entries(res.units)) merged[id] = display;
+  }
+  return merged;
 }
 
 /** Session cache of map info, keyed by `dataDir::enginePath::mapName`. */

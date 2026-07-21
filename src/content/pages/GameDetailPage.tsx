@@ -178,6 +178,7 @@ export default function GameDetailPage() {
               units={dataset?.units ?? []}
               buildpics={buildpics}
               factionLogos={factionLogos}
+              branding={brand}
             />
           )}
         </section>
