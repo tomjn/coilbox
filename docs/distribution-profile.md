@@ -325,10 +325,14 @@ Instead of inlining the markup, point `html`/`css` at a **file** in your `.coilb
 - `css` — injected alongside the HTML. Inline, or a `@.coilbox/<path>.css` reference.
 - **Local media**: reference files bundled in your `.coilbox/` folder by relative path, and Coilbox resolves them at load time — in both the HTML and the CSS. So `<img src="images/logo.webp">`, `background: url(images/hero.gif)`, and even `@font-face { src: url(fonts/brand.woff2) }` all pull from `.coilbox/images/…`, `.coilbox/fonts/…`, etc. Images, animated GIFs, audio (`<audio src="…">`), video (`<video>`) and web fonts are supported. Absolute URLs (`https:`, `data:`) and app-absolute paths (`/…`) are left untouched, so remote `https` images still work directly with no embedding.
 - **In-app links**: because Coilbox uses hash routing, an `<a href="#/play/skirmish">` navigates inside the app without a reload. Useful routes include `#/play/skirmish`, `#/content/maps`, `#/content/replays`, `#/battles`, `#/settings` — the full list is in **[routes.md](routes.md)**.
-- **Quit action**: the welcome HTML can't run JavaScript, but any element carrying `data-coilbox-action="quit"` closes Coilbox when clicked — the one interactive hook available. Use it to add your own exit control to a branded landing page (handy for fullscreen builds). This works regardless of the [`quit`](#quit-boolean) flag.
+- **Actions**: the welcome HTML can't run JavaScript, but any element carrying a `data-coilbox-action` attribute is wired to a built-in action when clicked — the interactive hook available without scripting.
+  - `data-coilbox-action="quit"` closes Coilbox. Use it to add your own exit control to a branded landing page (handy for fullscreen builds). This works regardless of the [`quit`](#quit-boolean) flag.
+  - `data-coilbox-action="navigate"` goes to an in-app route named in a `data-coilbox-route` attribute (or the element's `href`), using the same `@route/<path>` / `.md` / `/path` scheme as [custom pages](#pages-array) — so `@route/singleplayer` and `/downloads/games` both resolve to the same route a page link would. A route that doesn't resolve is ignored (no crash). This makes a "Play now" button possible on the welcome screen from any element, not just an `<a href="#/…">`.
 
   ```json
-  { "html": "<button data-coilbox-action=\"quit\">Exit</button>" }
+  {
+    "html": "<button data-coilbox-action=\"quit\">Exit</button> <button data-coilbox-action=\"navigate\" data-coilbox-route=\"@route/singleplayer\">Play now</button>"
+  }
   ```
 
 The HTML is trusted (it ships inside your distribution): apart from rewriting relative asset URLs (above), it is injected as-is, so only put content you control in it.
