@@ -95,12 +95,11 @@ function BattlesPage() {
     return ids;
   }, [all, users]);
 
-  // `key` is supplied by the row's password popover for passworded battles.
+  // `key` is supplied by the row's password popover for passworded battles. A
+  // battle in progress is joined the same way — the server places a late joiner as
+  // a spectator, and the room auto-launches the engine to watch the running game.
   async function onJoin(b: Battle, key?: string) {
     if (!activeKey) return;
-    // A battle already in progress can't be joined (the row disables its Join,
-    // but guard here too so the minimap/title click path is covered).
-    if (inProgressIds.has(b.id)) return;
     clearJoinError();
     joiningRef.current = true;
     try {

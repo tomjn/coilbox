@@ -103,7 +103,8 @@ function BattleGroup({
   collapsed: boolean;
   onToggle: () => void;
   rowProps: RowProps;
-  /** Every battle in this group is running (host in-game); block joining. */
+  /** Every battle in this group is running (host in-game); rows offer "Watch
+   * live" (spectator join) instead of "Join". */
   inProgress?: boolean;
 }) {
   if (battles.length === 0) return null;
