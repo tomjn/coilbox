@@ -37,11 +37,17 @@ const DEFAULT_HOST_PORT = 8452;
 export function HostBattlePopover({
   disabled,
   onHost,
+  initialMap,
+  autoOpen,
 }: {
   disabled: boolean;
   onHost: (args: OpenBattleArgs) => void;
+  /** Preselect this map (e.g. from a content map detail's "Host a battle here"). */
+  initialMap?: string;
+  /** Open the popover on mount — paired with `initialMap` for the same jump. */
+  autoOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!autoOpen);
   const { target } = usePreferredTarget();
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
@@ -68,7 +74,7 @@ export function HostBattlePopover({
 
   const [title, setTitle] = useState("");
   const [gameName, setGameName] = useState("");
-  const [mapName, setMapName] = useState("");
+  const [mapName, setMapName] = useState(initialMap ?? "");
   const [maxPlayers, setMaxPlayers] = useState(16);
   const [port, setPort] = useState(DEFAULT_HOST_PORT);
   const [password, setPassword] = useState("");
