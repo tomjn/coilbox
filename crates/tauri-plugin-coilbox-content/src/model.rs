@@ -243,6 +243,10 @@ pub struct DemoInfo {
     /// was pointed at a local build).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_gametype: Option<String>,
+    /// For a remix, the filename of the original replay it was made from, so the UI
+    /// can link back to it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub origin_filename: Option<String>,
 }
 
 pub const SCHEMA_VERSION: u32 = 1;

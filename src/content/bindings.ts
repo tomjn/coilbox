@@ -280,6 +280,8 @@ export interface DemoInfo {
   remixed?: boolean;
   /** For a remix, the gametype it was originally recorded on. */
   sourceGametype?: string;
+  /** For a remix, the filename of the original replay it was made from. */
+  originFilename?: string;
 }
 
 /** List replays in a content root's `demos/`/`replays/` (cheap; newest first). */

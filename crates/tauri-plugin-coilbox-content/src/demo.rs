@@ -266,14 +266,22 @@ pub fn rewrite_demo(
         .ok_or("demo header reports an invalid script size")?;
 
     let script = String::from_utf8_lossy(&bytes[header_size..script_end]).into_owned();
-    // Record the gametype the replay was originally recorded on, so the UI can show
-    // what this remix came from, then swap it and stamp the remix marker.
-    let source_gametype = find_game(&parse_tdf(&script))
-        .get("gametype")
+    let game_sec = find_game(&parse_tdf(&script));
+    // Don't remix a remix: the marker chain (and the "back to original" link) only
+    // make sense one level deep — point people at the original instead.
+    if read_remix_marker(&game_sec).remixed {
+        return Err("this replay is already a remix — remix the original instead".into());
+    }
+    // Record the gametype the replay was recorded on and the source filename, so the
+    // remix can show what it came from and link back, then swap + stamp the marker.
+    let source_gametype = game_sec.get("gametype").unwrap_or("").to_string();
+    let origin = src
+        .file_name()
+        .and_then(|n| n.to_str())
         .unwrap_or("")
         .to_string();
     let swapped = replace_gametype(&script, new_gametype)?;
-    let new_script = inject_remix_marker(&swapped, &source_gametype).into_bytes();
+    let new_script = inject_remix_marker(&swapped, &source_gametype, &origin).into_bytes();
 
     // Rebuild: header | new script | demo stream (unchanged tail).
     let mut out = Vec::with_capacity(header_size + new_script.len() + (bytes.len() - script_end));
@@ -313,10 +321,13 @@ pub fn rewrite_demo(
 const REMIX_SECTION: &str = "coilbox";
 
 /// Inject (replacing any prior copy) a `[coilbox]` marker as the first child of
-/// `[game]`, recording that this is a remix and the gametype it came from.
-fn inject_remix_marker(script: &str, source_gametype: &str) -> String {
+/// `[game]`, recording that this is a remix, the gametype it came from, and the
+/// original replay's filename.
+fn inject_remix_marker(script: &str, source_gametype: &str, origin_filename: &str) -> String {
     let script = strip_remix_marker(script);
-    let block = format!("[{REMIX_SECTION}]\n{{\nremix=1;\nsource={source_gametype};\n}}\n");
+    let block = format!(
+        "[{REMIX_SECTION}]\n{{\nremix=1;\nsource={source_gametype};\norigin={origin_filename};\n}}\n"
+    );
     match script.find('{') {
         // Right after `[game]`'s opening brace, so it sits alongside [modoptions] etc.
         Some(brace) => {
@@ -357,18 +368,27 @@ fn strip_remix_marker(script: &str) -> String {
     out
 }
 
-/// Read the `[coilbox]` remix marker from a parsed `[game]` section: whether it's a
-/// remix, and the gametype it was recorded on.
-fn read_remix_marker(game: &Section) -> (bool, Option<String>) {
+/// The `[coilbox]` remix marker read back from a start-script.
+#[derive(Default, PartialEq, Debug)]
+struct RemixMarker {
+    remixed: bool,
+    /// The gametype the replay was originally recorded on.
+    source: Option<String>,
+    /// The original replay's filename.
+    origin: Option<String>,
+}
+
+/// Read the `[coilbox]` remix marker from a parsed `[game]` section.
+fn read_remix_marker(game: &Section) -> RemixMarker {
     let Some(marker) = game.child(REMIX_SECTION) else {
-        return (false, None);
+        return RemixMarker::default();
     };
-    let remixed = marker.get("remix") == Some("1");
-    let source = marker
-        .get("source")
-        .filter(|s| !s.is_empty())
-        .map(str::to_string);
-    (remixed, source)
+    let non_empty = |k: &str| marker.get(k).filter(|s| !s.is_empty()).map(str::to_string);
+    RemixMarker {
+        remixed: marker.get("remix") == Some("1"),
+        source: non_empty("source"),
+        origin: non_empty("origin"),
+    }
 }
 
 /// Read the whole demo into memory, gunzipping when it starts with the gzip magic
@@ -709,7 +729,7 @@ fn build_demo_info(raw: RawDemo, game: &Section, winners: Option<Vec<u32>>) -> D
         });
     }
 
-    let (remixed, source_gametype) = read_remix_marker(game);
+    let marker = read_remix_marker(game);
 
     DemoInfo {
         engine_version: raw.engine_version,
@@ -725,8 +745,9 @@ fn build_demo_info(raw: RawDemo, game: &Section, winners: Option<Vec<u32>>) -> D
         num_ally_teams,
         ally_teams,
         players,
-        remixed,
-        source_gametype,
+        remixed: marker.remixed,
+        source_gametype: marker.source,
+        origin_filename: marker.origin,
     }
 }
 
@@ -1187,34 +1208,47 @@ mod tests {
         // The gametype line itself no longer names the original build...
         let gt_line = script.lines().find(|l| l.starts_with("gametype=")).unwrap();
         assert!(!gt_line.contains("test-30018"));
-        // ...but the remix marker records where it came from.
+        // ...but the remix marker records where it came from + its origin file.
         assert!(script.contains("[coilbox]"));
         assert!(script.contains("source=Beyond All Reason test-30018;"));
+        assert!(script.contains("origin=jb_src.sdf;"));
         assert!(script.contains("mapname=Valles Marineris 2.6.1")); // map untouched
         assert_eq!(&out[hs + ss..], tail); // stream tail byte-identical
 
-        // Re-reading detects the remix + its source gametype.
+        // Re-reading detects the remix, its source gametype, and its origin file.
         let game = find_game(&parse_tdf(script));
-        let (remixed, source) = read_remix_marker(&game);
-        assert!(remixed);
-        assert_eq!(source.as_deref(), Some("Beyond All Reason test-30018"));
+        let m = read_remix_marker(&game);
+        assert!(m.remixed);
+        assert_eq!(m.source.as_deref(), Some("Beyond All Reason test-30018"));
+        assert_eq!(m.origin.as_deref(), Some("jb_src.sdf"));
 
         let _ = std::fs::remove_file(&dst);
     }
 
     #[test]
-    fn remix_marker_is_not_duplicated_on_re_remix() {
+    fn remix_marker_is_not_duplicated_on_re_stamp() {
         let s = "[game]\n{\ngametype=A;\nmapname=M;\n}\n";
-        let once = inject_remix_marker(s, "A");
-        let twice = inject_remix_marker(&once, "B");
+        let once = inject_remix_marker(s, "A", "one.sdfz");
+        let twice = inject_remix_marker(&once, "B", "two.sdfz");
         assert_eq!(twice.matches("[coilbox]").count(), 1);
-        let game = find_game(&parse_tdf(&twice));
-        let (remixed, source) = read_remix_marker(&game);
-        assert!(remixed);
-        assert_eq!(source.as_deref(), Some("B"));
+        let m = read_remix_marker(&find_game(&parse_tdf(&twice)));
+        assert!(m.remixed);
+        assert_eq!(m.source.as_deref(), Some("B"));
+        assert_eq!(m.origin.as_deref(), Some("two.sdfz"));
         // Non-remixed scripts read as not-remixed.
-        let plain = find_game(&parse_tdf(s));
-        assert_eq!(read_remix_marker(&plain), (false, None));
+        assert_eq!(
+            read_remix_marker(&find_game(&parse_tdf(s))),
+            RemixMarker::default()
+        );
+    }
+
+    #[test]
+    fn rewrite_refuses_to_remix_a_remix() {
+        // A demo whose script already carries the remix marker.
+        let script = inject_remix_marker(SCRIPT, "Beyond All Reason test-30018", "orig.sdfz");
+        let src = write_tmp("already.remix.sdf", &build_demo(&script, false));
+        let err = rewrite_demo(&src, "Some Other Build", None).unwrap_err();
+        assert!(err.contains("already a remix"), "got: {err}");
     }
 
     #[test]
