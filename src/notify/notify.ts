@@ -1,6 +1,7 @@
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import { toast } from "sonner";
+import { recordNotification } from "./history";
 import { getOsEnabled, getPermGranted } from "./prefs";
 import { route } from "./route";
 
@@ -11,6 +12,8 @@ export interface NotifyInput {
   title: string;
   body?: string;
   level?: NotifyLevel;
+  /** Optional in-app route the topbar history entry links to when clicked. */
+  to?: string;
 }
 
 function showToast({ title, body, level = "info" }: NotifyInput): void {
@@ -28,6 +31,10 @@ function showToast({ title, body, level = "info" }: NotifyInput): void {
  * bindings) can fire-and-forget.
  */
 export async function notify(input: NotifyInput): Promise<void> {
+  // Single interception point: every notification, whatever channel it takes,
+  // is recorded so the topbar bell can surface it after the toast has gone.
+  recordNotification(input);
+
   let focused = true;
   try {
     focused = await getCurrentWindow().isFocused();
