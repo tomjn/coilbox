@@ -12,8 +12,13 @@ import {
 } from "react";
 import { lsGetCredential } from "../lobby-servers/bindings";
 import {
+  allServers,
+  autoConnectTarget,
   type LobbyServer,
   profileOfficialServer,
+  useCustomServers,
+  useLastLogin,
+  useLobbyAccounts,
 } from "../lobby-servers/config";
 import { notify } from "../notify/notify";
 import {
@@ -648,6 +653,33 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     autoRejoinRef.current = autoRejoin;
   }, [autoRejoin]);
 
+  // Startup auto-connect (issue #404, opt-in, default off) + one-click reconnect.
+  // The last-used login is written on every successful connect and read once at
+  // boot. The decision inputs are mirrored into a ref so the once-only boot effect
+  // can read the hydrated values without re-running when they change.
+  const [autoConnect] = useSetting<boolean>("multiplayer.autoConnect", false);
+  const [lastLogin, setLastLogin] = useLastLogin();
+  const [accountsCfg] = useLobbyAccounts();
+  const [customCfg] = useCustomServers();
+  const setLastLoginRef = useRef(setLastLogin);
+  useEffect(() => {
+    setLastLoginRef.current = setLastLogin;
+  }, [setLastLogin]);
+  const bootRef = useRef({
+    autoConnect,
+    lastLogin,
+    accounts: accountsCfg.accounts,
+    custom: customCfg.servers,
+  });
+  useEffect(() => {
+    bootRef.current = {
+      autoConnect,
+      lastLogin,
+      accounts: accountsCfg.accounts,
+      custom: customCfg.servers,
+    };
+  }, [autoConnect, lastLogin, accountsCfg.accounts, customCfg.servers]);
+
   // `true` while a user-initiated disconnect/cancel is in flight, so its clean
   // `disconnected` event isn't mistaken for an unexpected drop. Reset on connect.
   const intentionalRef = useRef(false);
@@ -880,6 +912,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "snapshot", state: snap.state });
         setActiveKey(serverKey);
         setLoginPopoverOpen(false);
+        // Remember this login as the last used, so opt-in auto-connect and the
+        // one-click reconnect row can seed it next launch. Keyed by id+username so
+        // it survives the account being re-created (not by the volatile account id).
+        setLastLoginRef.current({ serverId: server.id, username });
       } catch (e) {
         // A user cancel aborts the in-flight connect, so `mpConnect` rejects by
         // design: swallow it, clear the mirror, and leave the UI disconnected
@@ -1129,17 +1165,38 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       try {
         const { keys } = await mpActiveKeys({});
         const serverKey = keys[0];
-        if (!serverKey) return;
-        const onEvent = openChannel(serverKey);
-        await mpReattach({ serverKey, onEvent });
-        const snap = await mpSnapshot({ serverKey });
-        dispatch({ type: "snapshot", state: snap.state });
-        setActiveKey(serverKey);
+        if (serverKey) {
+          const onEvent = openChannel(serverKey);
+          await mpReattach({ serverKey, onEvent });
+          const snap = await mpSnapshot({ serverKey });
+          dispatch({ type: "snapshot", state: snap.state });
+          setActiveKey(serverKey);
+          return;
+        }
       } catch {
-        // No live connection to re-adopt; stay disconnected.
+        // No live connection to re-adopt; fall through to opt-in auto-connect.
       }
+      // Fresh launch with nothing to reattach: if the user opted in and the last
+      // login still resolves against the profile-filtered catalog, seed the same
+      // connect path a manual login / mid-session reconnect uses. A single attempt,
+      // failing quietly (one notification) so a bad boot never blocks the app.
+      const b = bootRef.current;
+      const target = autoConnectTarget(
+        b.autoConnect,
+        b.lastLogin,
+        b.accounts,
+        allServers(b.custom),
+      );
+      if (!target) return;
+      connect(target.server, target.account.username).catch(() => {
+        void notify({
+          title: "Couldn't connect to multiplayer",
+          body: "Log in from the topbar when you're ready.",
+          level: "error",
+        });
+      });
     })();
-  }, [openChannel]);
+  }, [openChannel, connect]);
 
   return (
     <MultiplayerContext.Provider
