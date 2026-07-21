@@ -18,6 +18,8 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-list-replays`
 - `allow-content-demo-info`
 - `allow-content-demo-chat`
+- `allow-content-rewrite-demo`
+- `allow-content-delete-replay`
 - `allow-content-list-saves`
 - `allow-content-delete-save`
 - `allow-content-config-profiles`
@@ -268,6 +270,32 @@ Enables the content_create_standard_root command without any pre-configured scop
 <td>
 
 Denies the content_create_standard_root command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-delete-replay`
+
+</td>
+<td>
+
+Enables the content_delete_replay command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-delete-replay`
+
+</td>
+<td>
+
+Denies the content_delete_replay command without any pre-configured scope.
 
 </td>
 </tr>
@@ -554,6 +582,32 @@ Enables the content_rescan command without any pre-configured scope.
 <td>
 
 Denies the content_rescan command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-rewrite-demo`
+
+</td>
+<td>
+
+Enables the content_rewrite_demo command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-rewrite-demo`
+
+</td>
+<td>
+
+Denies the content_rewrite_demo command without any pre-configured scope.
 
 </td>
 </tr>

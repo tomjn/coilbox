@@ -220,6 +220,8 @@ export interface ReplayFile {
   skillMin?: number;
   skillAvg?: number;
   skillMax?: number;
+  /** True when this file is a coilbox remix (rewritten to run on a local build). */
+  remixed?: boolean;
 }
 
 /** One player/spectator from a demo, with side + ally-team resolved from their team. */
@@ -274,6 +276,12 @@ export interface DemoInfo {
   numAllyTeams: number;
   allyTeams: AllyTeamInfo[];
   players: ReplayPlayer[];
+  /** True when this file is a coilbox remix (rewritten to run on a local build). */
+  remixed?: boolean;
+  /** For a remix, the gametype it was originally recorded on. */
+  sourceGametype?: string;
+  /** For a remix, the filename of the original replay it was made from. */
+  originFilename?: string;
 }
 
 /** List replays in a content root's `demos/`/`replays/` (cheap; newest first). */
@@ -310,6 +318,23 @@ export const contentDemoChat = defineCommand<
   { enginePath: string; replayPath: string },
   { messages: ChatLine[] }
 >("coilbox-content", "content_demo_chat");
+
+/**
+ * Write a "remixed" **copy** of a replay whose embedded `gametype` is
+ * `targetGametype` (and, when `engineVersion` is set, whose header engine version
+ * is restamped), so the engine loads a different local game build when the copy
+ * is watched. Returns the new sibling `path`; the source demo is never modified.
+ */
+export const contentRewriteDemo = defineCommand<
+  { replayPath: string; targetGametype: string; engineVersion?: string },
+  { path: string }
+>("coilbox-content", "content_rewrite_demo");
+
+/** Delete a replay file. `path` must be a `.sdfz`/`.sdf` from `content_list_replays`. */
+export const contentDeleteReplay = defineCommand<
+  { path: string },
+  { ok: boolean }
+>("coilbox-content", "content_delete_replay");
 
 /* -------------------------------------------------------------------------- *
  * Savegames — singleplayer saves in a root's `Saves/` folder. Listing is cheap fs

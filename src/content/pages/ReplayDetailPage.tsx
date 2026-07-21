@@ -2,17 +2,25 @@ import { Button, Input } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
+  Code2,
   Download,
   Eye,
   ImageOff,
   Loader2,
   MessageSquare,
+  Trash2,
   Trophy,
   X,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   type DownloadProgress,
   dlDownload,
@@ -24,13 +32,18 @@ import {
   ProgressBar,
 } from "../../downloads/pages/components/ProgressBar";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
+import { useReplayTarget } from "../../play/config";
 import type {
   AllyTeamInfo,
   DemoInfo,
   ReplayPlayer,
   StartBox,
 } from "../bindings";
-import { type ChatLine, contentDemoChat } from "../bindings";
+import {
+  type ChatLine,
+  contentDeleteReplay,
+  contentDemoChat,
+} from "../bindings";
 import {
   invalidateMapPreview,
   useDemoInfo,
@@ -41,6 +54,7 @@ import {
   useUnitsyncMinimap,
 } from "../config";
 import { useReplayUserState } from "../replayUserState";
+import { RemixPanel } from "./components/RemixPanel";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
 import { WatchButton } from "./components/WatchButton";
 
@@ -555,20 +569,116 @@ function ReplayChat({
   );
 }
 
+/** Delete a replay after a confirm (irreversible), then hand back to `onDeleted`. */
+function DeleteReplayButton({
+  replayPath,
+  onDeleted,
+}: {
+  replayPath: string;
+  onDeleted: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function del() {
+    setPending(true);
+    setError(null);
+    try {
+      await contentDeleteReplay({ path: replayPath });
+      setOpen(false);
+      onDeleted();
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="gap-1.5">
+          <Trash2 className="size-4" /> Delete
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="flex w-72 flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-medium">Delete this replay?</h3>
+          <p className="text-xs text-muted-foreground">
+            The file is permanently removed from your demos folder — this can't
+            be undone.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpen(false)}
+            disabled={pending}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={del}
+            disabled={pending}
+            className="gap-1.5"
+          >
+            {pending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Trash2 className="size-4" />
+            )}
+            Delete
+          </Button>
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /** One replay: decoded metadata, players, and a preview of the map it was on. */
 export default function ReplayDetailPage() {
   const { name } = useParams();
   const filename = name ? decodeURIComponent(name) : "";
+  const navigate = useNavigate();
   const { selected } = useScanTargetSelection();
-  const { replays, loading: listLoading } = useReplays(selected?.rootPath);
+  const {
+    replays,
+    loading: listLoading,
+    refresh,
+  } = useReplays(selected?.rootPath);
   const replay = replays.find((r) => r.filename === filename);
   const { info, loading, error } = useDemoInfo(
     selected?.enginePath,
     replay?.path,
   );
+  // Drives the engine-mismatch "may not sync" hint under the header.
+  const { resolved } = useReplayTarget(info?.engineVersion ?? "");
 
   // Remount the preview after a successful map download so it refetches.
   const [previewNonce, setPreviewNonce] = useState(0);
+
+  // After a remix, pull the new copy into the list, then open its detail page —
+  // so the user lands on the remix (where Watch lives) instead of re-triggering it.
+  const onRemixed = async (newPath: string) => {
+    await refresh();
+    const newName = newPath.split(/[\\/]/).pop();
+    if (!newName) return;
+    navigate(`/content/replays/${encodeURIComponent(newName)}`);
+    // Flag the navigation so the jump to a different file isn't a surprise.
+    toast.success("Remix created", {
+      description: "Opened the remixed replay — use Watch to run it.",
+    });
+  };
+
+  const onDeleted = () => {
+    navigate("/content/replays");
+    toast.success("Replay deleted");
+  };
 
   if (listLoading && !replay)
     return <DetailLoading backTo="/content/replays" />;
@@ -578,6 +688,9 @@ export default function ReplayDetailPage() {
   const metaRows: [string, string][] = info
     ? [
         ["Game", info.gameType || "—"],
+        ...(info.remixed && info.sourceGametype
+          ? ([["Remixed from", info.sourceGametype]] as [string, string][])
+          : []),
         ["Engine", info.engineVersion || "—"],
         [
           "Played",
@@ -599,24 +712,60 @@ export default function ReplayDetailPage() {
           >
             <ArrowLeft className="size-3.5" /> Replays
           </Link>
-          <h1 className="break-words text-lg font-semibold">
-            {info?.mapName || filename}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="break-words text-lg font-semibold">
+              {info?.mapName || filename}
+            </h1>
+            {info?.remixed && (
+              <Badge
+                variant="ghost"
+                className="shrink-0 gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[11px] font-medium text-primary"
+              >
+                <Code2 className="size-3" /> Remix
+              </Badge>
+            )}
+          </div>
           <p className="break-all font-mono text-xs text-muted-foreground">
             {filename}
           </p>
-          {/* Delete lands in a later iteration. */}
-          <div className="mt-2">
-            <Button disabled title="Coming soon">
-              Delete
-            </Button>
-          </div>
+          {info?.remixed && info.originFilename && (
+            <Link
+              to={`/content/replays/${encodeURIComponent(info.originFilename)}`}
+              className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <ArrowLeft className="size-3.5" /> Back to original replay
+            </Link>
+          )}
+          {info && resolved && !resolved.matched && (
+            <p className="max-w-md text-xs text-amber-600 dark:text-amber-400">
+              Recorded on {info.engineVersion || "an unknown engine"}; watching
+              with {resolved.target.engineVersion} — may not sync.
+            </p>
+          )}
         </div>
         {replay && info && (
-          <WatchButton
-            replayPath={replay.path}
-            engineVersion={info.engineVersion}
-          />
+          // Destructive + secondary actions first; the primary CTA (Watch) sits
+          // last so it lands in the top-right corner.
+          <div className="flex shrink-0 items-start gap-2">
+            <DeleteReplayButton
+              replayPath={replay.path}
+              onDeleted={onDeleted}
+            />
+            {/* No remixing a remix — its detail links back to the original instead. */}
+            {selected && !info.remixed && (
+              <RemixPanel
+                replayPath={replay.path}
+                recordedEngineVersion={info.engineVersion}
+                enginePath={selected.enginePath}
+                dataDir={selected.rootPath}
+                onRemixed={onRemixed}
+              />
+            )}
+            <WatchButton
+              replayPath={replay.path}
+              engineVersion={info.engineVersion}
+            />
+          </div>
         )}
       </header>
 

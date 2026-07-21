@@ -135,6 +135,9 @@ pub struct ReplayFile {
     pub skill_avg: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skill_max: Option<f32>,
+    /// True when this file carries coilbox's remix marker — a copy rewritten to run
+    /// on a different local build, not an engine-recorded demo.
+    pub remixed: bool,
 }
 
 /// One chat/system line from a demo's network stream (via `demotool --dump`).
@@ -233,6 +236,17 @@ pub struct DemoInfo {
     pub num_ally_teams: u32,
     pub ally_teams: Vec<AllyTeamInfo>,
     pub players: Vec<PlayerInfo>,
+    /// True when this file carries coilbox's remix marker (a rewritten copy, not an
+    /// engine-recorded demo).
+    pub remixed: bool,
+    /// For a remix, the `gametype` the replay was originally recorded on (before it
+    /// was pointed at a local build).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_gametype: Option<String>,
+    /// For a remix, the filename of the original replay it was made from, so the UI
+    /// can link back to it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub origin_filename: Option<String>,
 }
 
 pub const SCHEMA_VERSION: u32 = 1;

@@ -844,6 +844,30 @@ async fn content_demo_chat(engine_path: String, replay_path: String) -> Result<C
     }
 }
 
+/// `content_rewrite_demo` — write a "remixed" **copy** of a replay whose
+/// embedded `gametype` is `targetGametype` (and, when `engineVersion` is given,
+/// whose header engine version is restamped), so the engine loads a different
+/// local game build when the copy is watched. Returns the new sibling path; the
+/// source is never modified (see `demo::rewrite_demo`). `replayPath` is an
+/// absolute demo path from `content_list_replays`.
+#[tauri::command]
+async fn content_rewrite_demo(
+    replay_path: String,
+    target_gametype: String,
+    engine_version: Option<String>,
+) -> Result<CliResult, ()> {
+    let src = PathBuf::from(&replay_path);
+    match tauri::async_runtime::spawn_blocking(move || {
+        demo::rewrite_demo(&src, &target_gametype, engine_version.as_deref())
+    })
+    .await
+    {
+        Ok(Ok(path)) => Ok(CliResult::ok(json!({ "path": path.to_string_lossy() }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("rewrite demo task failed: {e}"))),
+    }
+}
+
 /// `content_list_saves` — list singleplayer savegames under `<root>/Saves` (fast
 /// fs metadata + a best-effort map/game read). `root` is a `ContentRoot.path`.
 #[tauri::command]
@@ -867,6 +891,25 @@ async fn content_delete_save(path: String) -> Result<CliResult, ()> {
         .unwrap_or(false);
     if !ok_ext {
         return Ok(CliResult::err("not a savegame file".to_string()));
+    }
+    match std::fs::remove_file(&p) {
+        Ok(()) => Ok(CliResult::ok(json!({ "ok": true }))),
+        Err(e) => Ok(CliResult::err(format!("delete failed: {e}"))),
+    }
+}
+
+/// `content_delete_replay` — delete one replay file. `path` must be a `.sdfz`/`.sdf`
+/// path from `content_list_replays` (guarded against deleting anything else).
+#[tauri::command]
+async fn content_delete_replay(path: String) -> Result<CliResult, ()> {
+    let p = PathBuf::from(&path);
+    let ok_ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("sdfz") || e.eq_ignore_ascii_case("sdf"))
+        .unwrap_or(false);
+    if !ok_ext {
+        return Ok(CliResult::err("not a replay file".to_string()));
     }
     match std::fs::remove_file(&p) {
         Ok(()) => Ok(CliResult::ok(json!({ "ok": true }))),
@@ -1057,6 +1100,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_list_replays,
             content_demo_info,
             content_demo_chat,
+            content_rewrite_demo,
+            content_delete_replay,
             content_list_saves,
             content_delete_save,
             content_config_profiles,

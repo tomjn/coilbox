@@ -64,12 +64,6 @@ export function WatchButton({
         <Play className="size-4 fill-current" />
         {pending ? "Watching…" : "Watch"}
       </Button>
-      {resolved && !resolved.matched && (
-        <p className="max-w-xs text-right text-xs text-amber-600 dark:text-amber-400">
-          Recorded on {engineVersion || "an unknown engine"}; watching with{" "}
-          {resolved.target.engineVersion} — may not sync.
-        </p>
-      )}
       {error && (
         <p className="max-w-xs text-right text-xs text-destructive">{error}</p>
       )}
