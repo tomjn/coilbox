@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
+import { useNavigate } from "react-router";
 import { quitApp } from "../general/quit";
 import { getProfile, getResolvedWelcome } from "./profile";
+import { resolveWelcomeAction } from "./welcomeActions";
 import { rewriteBrandedCss, rewriteBrandedHtml } from "./welcomeAssets";
 
 /**
@@ -14,9 +16,10 @@ import { rewriteBrandedCss, rewriteBrandedHtml } from "./welcomeAssets";
  * home override otherwise), so this component always has content to show.
  *
  * Because the HTML can't run JavaScript, the one interactive hook an author gets is
- * the `data-coilbox-action` attribute: a delegated click handler on the container
- * reads it off the nearest ancestor of the click target. Currently only "quit" is
- * understood, letting an author's own button/link close the app.
+ * the `data-coilbox-action` attribute: a delegated click handler on the container reads
+ * it off the nearest ancestor of the click target. "quit" closes the app; "navigate"
+ * goes to an in-app route named in `data-coilbox-route` (or the element's `href`) using
+ * the same `@route/` scheme as custom markdown pages (see `resolveWelcomeAction`).
  */
 export default function BrandedWelcome() {
   const welcome = getProfile().welcome;
@@ -37,21 +40,30 @@ export default function BrandedWelcome() {
   );
   // Delegated listener attached to the injected-HTML container (not a JSX `onClick`,
   // which would trip a11y lints on a static div): a bubbled click on any element
-  // carrying `data-coilbox-action="quit"` closes the app.
+  // carrying `data-coilbox-action` dispatches the resolved action (quit or navigate).
   const ref = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const onClick = (e: Event) => {
-      const target = (e.target as HTMLElement).closest("[data-coilbox-action]");
-      if (target?.getAttribute("data-coilbox-action") === "quit") {
-        e.preventDefault();
-        quitApp();
-      }
+      const marker = (e.target as HTMLElement).closest("[data-coilbox-action]");
+      if (!marker) return;
+      const action = resolveWelcomeAction(
+        marker.getAttribute("data-coilbox-action"),
+        marker.getAttribute("data-coilbox-route") ??
+          marker.getAttribute("href"),
+      );
+      if (!action) return;
+      // Prevent the default so an `<a href="@route/...">` marker can't send the webview
+      // to a bogus URL; the resolved action drives the app instead.
+      e.preventDefault();
+      if (action.kind === "quit") quitApp();
+      else navigate(action.to);
     };
     el.addEventListener("click", onClick);
     return () => el.removeEventListener("click", onClick);
-  }, []);
+  }, [navigate]);
 
   if (!welcome) return null;
   return (
