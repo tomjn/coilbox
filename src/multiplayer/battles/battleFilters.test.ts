@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Battle, MemberStatus } from "../bindings";
 import {
   type BattleFilters,
+  battleRowAction,
   filterSortBattles,
   occupancy,
 } from "./battleFilters";
@@ -59,6 +60,46 @@ describe("occupancy", () => {
     // `host in members` check would wrongly treat the host as already present.
     expect(occupancy(mk({ host: "constructor", members: {} }))).toBe(1);
     expect(occupancy(mk({ host: "toString", members: { alice: M } }))).toBe(2);
+  });
+});
+
+describe("battleRowAction", () => {
+  it("offers Join on an open, joinable battle", () => {
+    const a = battleRowAction(mk({}), { canJoin: true, inProgress: false });
+    expect(a).toEqual({ kind: "join", label: "Join", disabled: false });
+  });
+
+  it("disables Join when a full open battle", () => {
+    const a = battleRowAction(mk({ maxPlayers: 2, members: { x: M } }), {
+      canJoin: true,
+      inProgress: false,
+    });
+    expect(a.kind).toBe("join");
+    expect(a.disabled).toBe(true);
+  });
+
+  it("disables Join when not joinable", () => {
+    const a = battleRowAction(mk({}), { canJoin: false, inProgress: false });
+    expect(a.disabled).toBe(true);
+  });
+
+  it("offers Watch live on a running battle", () => {
+    const a = battleRowAction(mk({}), { canJoin: true, inProgress: true });
+    expect(a).toEqual({ kind: "watch", label: "Watch live", disabled: false });
+  });
+
+  it("watches a full running battle: spectators don't need a player slot", () => {
+    const a = battleRowAction(mk({ maxPlayers: 2, members: { x: M } }), {
+      canJoin: true,
+      inProgress: true,
+    });
+    expect(a.kind).toBe("watch");
+    expect(a.disabled).toBe(false);
+  });
+
+  it("disables Watch live when not joinable", () => {
+    const a = battleRowAction(mk({}), { canJoin: false, inProgress: true });
+    expect(a.disabled).toBe(true);
   });
 });
 
