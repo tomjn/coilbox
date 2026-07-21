@@ -1,7 +1,7 @@
 import { Button } from "@picoframe/frame";
-import { Code2, Eye, Tag } from "lucide-react";
+import { Code2, Eye, Tag, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { formatBytes } from "../../downloads/pages/components/ProgressBar";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
@@ -76,6 +76,20 @@ export default function ReplaysPage() {
     selected?.rootPath,
   );
 
+  // A content map detail's "Replays on this map" links here with `?map=<name>`,
+  // scoping the list to that map. Clearable via the chip below (drops the param).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mapFilter = searchParams.get("map") ?? "";
+  const clearMapFilter = () => {
+    setSearchParams(
+      (prev) => {
+        prev.delete("map");
+        return prev;
+      },
+      { replace: true },
+    );
+  };
+
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("date-desc");
   const [watchedOnly, setWatchedOnly] = useState(false);
@@ -93,12 +107,13 @@ export default function ReplaysPage() {
     const q = filter.trim().toLowerCase();
     return replays.filter((r) => {
       if (q && !r.filename.toLowerCase().includes(q)) return false;
+      if (mapFilter && r.mapName !== mapFilter) return false;
       const us = userState.get(r.filename);
       if (watchedOnly && !us.watched) return false;
       if (tagFilter && !(us.tags ?? []).includes(tagFilter)) return false;
       return true;
     });
-  }, [replays, filter, watchedOnly, tagFilter, userState]);
+  }, [replays, filter, mapFilter, watchedOnly, tagFilter, userState]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -158,6 +173,17 @@ export default function ReplaysPage() {
             noun="replays"
           />
           <div className="flex flex-wrap items-center gap-2">
+            {mapFilter && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={clearMapFilter}
+                className="gap-1.5"
+                title="Clear the map filter"
+              >
+                Map: {mapFilter} <X className="size-3.5" />
+              </Button>
+            )}
             <Button
               variant={watchedOnly ? "default" : "outline"}
               size="sm"
@@ -190,7 +216,13 @@ export default function ReplaysPage() {
       ) : replays.length === 0 ? (
         <EmptyState label="No replays found. Watch a game, or place .sdfz files in your demos folder." />
       ) : sorted.length === 0 ? (
-        <EmptyState label={`No replays match “${filter.trim()}”.`} />
+        <EmptyState
+          label={
+            mapFilter
+              ? `No replays on “${mapFilter}”.`
+              : `No replays match “${filter.trim()}”.`
+          }
+        />
       ) : (
         <ul className="flex flex-col gap-2">
           {sorted.map((r) => {
