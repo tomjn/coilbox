@@ -1,7 +1,5 @@
 import { useSetting } from "@picoframe/frame";
-import { Compass } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router";
 import { Card } from "@/components/ui/card";
 import { dlInstalledContent } from "../../../downloads/bindings";
 import {
@@ -10,7 +8,6 @@ import {
 } from "../../../downloads/config";
 import { MapPacksBanner } from "../../../downloads/pages/components/MapPacksBanner";
 import { usePreferredTarget } from "../../../play/config";
-import { isProfileHidden } from "../../../profile/hidden";
 import { getGameMatcher } from "../../../profile/profile";
 import {
   filterUninstalledGames,
@@ -95,13 +92,7 @@ export function GetStartedCard() {
     installed.maps.size === 0
       ? filterUninstalledMaps(suggestedMaps, installed.maps, [])
       : [];
-  if (games.length === 0 && maps.length === 0) {
-    // The full card only self-hides once something is actually installed
-    // (hasGames or a map on disk) — an empty catalog/scope with nothing
-    // installed yet should stay silent rather than open a dead-end door.
-    const hasContent = hasGames || installed.maps.size > 0;
-    return hasContent ? <BrowseMoreDoor /> : null;
-  }
+  if (games.length === 0 && maps.length === 0) return null;
 
   return (
     <Card className="gap-4 rounded-lg border-border p-4 shadow-none">
@@ -143,27 +134,5 @@ export function GetStartedCard() {
         </>
       )}
     </Card>
-  );
-}
-
-/**
- * Compact door shown once the full card self-hides because something is already
- * installed — otherwise a day-one player who grabs one game has no way back to a
- * second game or the map packs short of finding Content/Downloads unaided. Routes
- * to the games downloads page (which itself links on to maps), or straight to maps
- * when a distribution profile hides game downloads (e.g. a single-game bundle).
- */
-function BrowseMoreDoor() {
-  const gamesHidden = isProfileHidden("downloads.games");
-  return (
-    <Link
-      to={gamesHidden ? "/downloads/maps" : "/downloads/games"}
-      className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:border-border hover:bg-accent/50 focus-visible:border-primary focus-visible:outline-none"
-    >
-      <Compass className="size-4 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 flex-1 text-muted-foreground">
-        Browse more games and maps
-      </span>
-    </Link>
   );
 }
