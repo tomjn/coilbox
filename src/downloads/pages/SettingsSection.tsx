@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { FolderDown, Plus, Server, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { type ContentRoot, contentStateLoad } from "../../content/bindings";
 import { useDownloadsConfig } from "../config";
 import { Field } from "./components/Field";
@@ -103,12 +104,26 @@ export default function DownloadsSettings() {
         </h2>
         <p className="text-xs text-muted-foreground">
           The content folder downloads are written into. Detected folders come
-          from the Content Folders settings; pick one so games, maps, and
-          engines land where the engine can find them.
+          from the{" "}
+          <Link
+            className="underline underline-offset-4"
+            to="/settings/content-folders"
+          >
+            Content Folders settings
+          </Link>
+          ; pick one so games, maps, and engines land where the engine can find
+          them.
         </p>
         {roots.length === 0 ? (
           <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-            No content folders detected yet. Add or scan one in Content Folders.
+            No content folders detected yet. Add or scan one in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/content-folders"
+            >
+              Content Folders
+            </Link>
+            .
           </p>
         ) : (
           <Field label="Write to" className="max-w-md">

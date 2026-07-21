@@ -9,6 +9,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   dlRepos,
@@ -152,7 +153,14 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
       <div className="flex items-center gap-2 border-b border-border px-6 py-4">
         {cfg.rapidRepos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No rapid repositories configured. Add one in Downloads settings.
+            No rapid repositories configured. Add one in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/downloads"
+            >
+              Downloads settings
+            </Link>
+            .
           </p>
         ) : (
           <>

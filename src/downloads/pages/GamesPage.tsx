@@ -8,6 +8,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -243,8 +244,14 @@ export default function GamesPage() {
         </div>
         {!writePath && (
           <p className="text-xs text-muted-foreground">
-            Set a download folder in Downloads settings to enable game
-            downloads.
+            Set a download folder in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/downloads"
+            >
+              Downloads settings
+            </Link>{" "}
+            to enable game downloads.
           </p>
         )}
       </header>

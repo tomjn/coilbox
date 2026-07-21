@@ -95,7 +95,14 @@ export function EncounterOverlay({
             {enc.error && <ErrorBanner message={enc.error} />}
             {enc.noEngine ? (
               <p className="text-sm text-muted-foreground">
-                Install an engine first (Content → Engines).
+                Install an engine first (
+                <Link
+                  className="underline underline-offset-4"
+                  to="/settings/engines"
+                >
+                  Settings → Engines
+                </Link>
+                ).
               </p>
             ) : enc.missing ? (
               <RequirementGate node={node} enc={enc} />

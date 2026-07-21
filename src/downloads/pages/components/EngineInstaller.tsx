@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { dlRecoilEngines, dlSpringfilesEngines } from "../../bindings";
 import { useWriteRootPath } from "../../config";
@@ -121,8 +122,11 @@ export function EngineInstaller() {
       <h2 className="text-sm font-semibold">Download an engine</h2>
       <p className="text-xs text-muted-foreground">
         Installs an engine matching this platform into the configured content
-        folder's <code>engine/</code> directory (set the destination in
-        Downloads settings).
+        folder's <code>engine/</code> directory (set the destination in{" "}
+        <Link className="underline underline-offset-4" to="/settings/downloads">
+          Downloads settings
+        </Link>
+        ).
       </p>
       <OptionSelect
         value={source}
@@ -135,8 +139,14 @@ export function EngineInstaller() {
       />
       {!writePath && (
         <p className="text-xs text-muted-foreground">
-          No download destination set — choose a content folder in Downloads
-          settings to enable engine downloads.
+          No download destination set — choose a content folder in{" "}
+          <Link
+            className="underline underline-offset-4"
+            to="/settings/downloads"
+          >
+            Downloads settings
+          </Link>{" "}
+          to enable engine downloads.
         </p>
       )}
 

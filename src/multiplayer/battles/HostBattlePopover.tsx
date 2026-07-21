@@ -1,5 +1,6 @@
 import { Button, Input } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
@@ -172,7 +173,12 @@ export function HostBattlePopover({
           {noEngine ? (
             <p className="text-sm text-muted-foreground">
               No engine found. Add a content folder with an engine in{" "}
-              <span className="font-medium">Settings → Content Folders</span>{" "}
+              <Link
+                className="font-medium underline underline-offset-4"
+                to="/settings/content-folders"
+              >
+                Settings → Content Folders
+              </Link>{" "}
               first.
             </p>
           ) : (

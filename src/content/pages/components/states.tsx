@@ -6,6 +6,7 @@ import {
   Inbox,
   TriangleAlert,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -110,7 +111,7 @@ export function SkeletonList() {
 }
 
 /** Empty result state. */
-export function EmptyState({ label }: { label: string }) {
+export function EmptyState({ label }: { label: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
       <Inbox className="size-6 text-muted-foreground" />
