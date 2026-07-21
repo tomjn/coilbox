@@ -1,18 +1,16 @@
 import { Button, NavGate } from "@picoframe/frame";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useScanTargetSelection } from "../../content/config";
 import { getGameMatcher } from "../../profile/profile";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
 import { BattleList } from "../battles/BattleList";
-import {
-  type BattleFilters,
-  filterSortBattles,
-} from "../battles/battleFilters";
+import { filterSortBattles } from "../battles/battleFilters";
 import {
   HostBattlePopover,
   type OpenBattleArgs,
 } from "../battles/HostBattlePopover";
+import { useBattleFilters } from "../battles/useBattleFilters";
 import {
   type Battle,
   mpJoinBattle,
@@ -38,14 +36,7 @@ function BattlesPage() {
     clearJoinError,
     openLoginPopover,
   } = useMultiplayer();
-  const [filters, setFilters] = useState<BattleFilters>({
-    search: "",
-    hideEmpty: false,
-    hideLockedPassworded: false,
-    hideFull: false,
-    sortKey: "players",
-    sortDir: "desc",
-  });
+  const [filters, setFilters] = useBattleFilters();
 
   const all = useMemo(
     () => Object.values(mirror.state?.battles ?? {}),

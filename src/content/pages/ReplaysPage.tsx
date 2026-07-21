@@ -1,6 +1,6 @@
-import { Button } from "@picoframe/frame";
+import { Button, useSetting } from "@picoframe/frame";
 import { Code2, Eye, Tag, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { formatBytes } from "../../downloads/pages/components/ProgressBar";
@@ -90,10 +90,20 @@ export default function ReplaysPage() {
     );
   };
 
-  const [filter, setFilter] = useState("");
-  const [sort, setSort] = useState<SortKey>("date-desc");
-  const [watchedOnly, setWatchedOnly] = useState(false);
-  const [tagFilter, setTagFilter] = useState("");
+  // Search/sort/watched/tag persist through the frame settings store (like the
+  // skirmish draft) so a regular's usual view survives a restart. The `map`
+  // query param above is a separate, unpersisted mechanism (a content map
+  // detail link scoping the list) and is untouched by this.
+  const [filter, setFilter] = useSetting("content.replayFilters.search", "");
+  const [sort, setSort] = useSetting<SortKey>(
+    "content.replayFilters.sort",
+    "date-desc",
+  );
+  const [watchedOnly, setWatchedOnly] = useSetting(
+    "content.replayFilters.watchedOnly",
+    false,
+  );
+  const [tagFilter, setTagFilter] = useSetting("content.replayFilters.tag", "");
   const userState = useReplayUserState();
   const tagOptions = useMemo(
     () => [
@@ -187,7 +197,7 @@ export default function ReplaysPage() {
             <Button
               variant={watchedOnly ? "default" : "outline"}
               size="sm"
-              onClick={() => setWatchedOnly((v) => !v)}
+              onClick={() => setWatchedOnly(!watchedOnly)}
               aria-pressed={watchedOnly}
               className="gap-1.5"
             >
