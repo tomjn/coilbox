@@ -14,7 +14,7 @@ import {
   Square,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { versionLabel } from "@/lib/utils";
 import {
@@ -71,10 +71,16 @@ export default function DecompilePage() {
   const [draft, setDraft] = useDecompileDraft();
   const { upsertProject } = useMapProjects();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Seed from the persisted draft so the input + result panel (with its
-  // path-driven preview) survive navigation and restarts.
-  const [inputPath, setInputPath] = useState(() => draft.inputPath);
+  // A `map detail → "Open in mapconv decompile"` navigation carries the map's
+  // archive path; seed the input from it, else fall back to the persisted draft
+  // so the panel and its path-driven preview survive navigation and restarts.
+  const seededInput = (location.state as { inputPath?: string } | null)
+    ?.inputPath;
+  const [inputPath, setInputPath] = useState(
+    () => seededInput ?? draft.inputPath,
+  );
   const [running, setRunning] = useState(false);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
   const [result, setResult] = useState<Result | null>(() => draft.result);

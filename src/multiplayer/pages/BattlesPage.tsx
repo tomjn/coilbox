@@ -1,6 +1,6 @@
 import { Button, NavGate } from "@picoframe/frame";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useScanTargetSelection } from "../../content/config";
 import { getGameMatcher } from "../../profile/profile";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
@@ -66,6 +66,11 @@ function BattlesPage() {
 
   // Selected engine + content root for rendering local minimaps in the rows.
   const { selected } = useScanTargetSelection();
+
+  // A content map detail's "Host a battle here" navigates here with the map name;
+  // preselect it in the host popover and open it on arrival.
+  const location = useLocation();
+  const hostMap = (location.state as { hostMap?: string } | null)?.hostMap;
 
   const navigate = useNavigate();
   const ready = mirror.phase === "ready";
@@ -157,7 +162,12 @@ function BattlesPage() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <HostBattlePopover disabled={!canJoin} onHost={onHost} />
+          <HostBattlePopover
+            disabled={!canJoin}
+            onHost={onHost}
+            initialMap={hostMap}
+            autoOpen={!!hostMap}
+          />
           <BattleFilterPopover filters={filters} setFilters={setFilters} />
         </div>
       </header>
