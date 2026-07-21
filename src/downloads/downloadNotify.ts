@@ -35,6 +35,7 @@ export function withDownloadNotify<A, D>(
         title: "Download complete",
         body: safeLabel(label, args),
         level: "success",
+        to: "/downloads",
       });
       return result;
     } catch (e) {
@@ -43,6 +44,7 @@ export function withDownloadNotify<A, D>(
           title: "Download failed",
           body: safeLabel(label, args),
           level: "error",
+          to: "/downloads",
         });
       }
       throw e;

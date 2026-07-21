@@ -62,6 +62,7 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
           title: "Update available",
           body: `Coilbox ${found.version} is ready to install.`,
           level: "info",
+          to: "/settings/updates",
         });
       }
       setLastChecked(Date.now());
