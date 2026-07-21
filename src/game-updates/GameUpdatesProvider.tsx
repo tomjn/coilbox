@@ -130,6 +130,7 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
         title: "Game update available",
         body: "A newer game version is available to download.",
         level: "info",
+        to: "/settings/game-updates",
       });
     }
     if (!updateAvailable) notifiedRef.current = false;

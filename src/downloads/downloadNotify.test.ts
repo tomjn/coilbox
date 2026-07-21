@@ -13,7 +13,11 @@ describe("withDownloadNotify", () => {
     const wrapped = withDownloadNotify(inner, (a: { tag: string }) => a.tag);
     await expect(wrapped({ tag: "byar:test" })).resolves.toEqual({ ok: 1 });
     expect(notify).toHaveBeenCalledWith(
-      expect.objectContaining({ level: "success", body: "byar:test" }),
+      expect.objectContaining({
+        level: "success",
+        body: "byar:test",
+        to: "/downloads",
+      }),
     );
   });
 
@@ -23,7 +27,11 @@ describe("withDownloadNotify", () => {
     const wrapped = withDownloadNotify(inner, (a: { tag: string }) => a.tag);
     await expect(wrapped({ tag: "byar:test" })).rejects.toThrow("disk full");
     expect(notify).toHaveBeenCalledWith(
-      expect.objectContaining({ level: "error", body: "byar:test" }),
+      expect.objectContaining({
+        level: "error",
+        body: "byar:test",
+        to: "/downloads",
+      }),
     );
   });
 
