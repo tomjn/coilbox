@@ -5,7 +5,11 @@ import {
   type SkirmishAisResult,
   unitsyncSkirmishAis,
 } from "../content/bindings";
-import { useContentState, usePreferredEngine } from "../content/config";
+import {
+  useContentState,
+  usePreferredEngine,
+  useUnitsyncScan,
+} from "../content/config";
 import { compareEngineVersions } from "../content/engineVersion";
 
 export type { Participant, Rgb } from "./participants";
@@ -84,6 +88,34 @@ export function usePreferredTarget(): {
     if (r) target = build(r.path, r.engines[0]);
   }
   return { target, loading, error };
+}
+
+/**
+ * Whether the play modes that generate their own content (Conquest, Warpath)
+ * have what they need to run: a preferred engine, and at least one installed
+ * game (a unitsync question, not a file count — rapid installs live in
+ * packages/pool rather than as an archive in games/). This is the single
+ * source of truth `ConquestListPage`, `RunListPage` and the sidebar nav badge
+ * (issue #419) all read, so the empty-state guidance and the nav marker never
+ * disagree.
+ *
+ * `loading` covers both "resolving the preferred engine" and "engine resolved,
+ * scan not back yet" so callers can hold off rendering a verdict until the
+ * first scan settles, avoiding a flash of "needs a game" before it's known.
+ */
+export function usePlayReadiness(): {
+  ready: boolean;
+  loading: boolean;
+  target: PlayTarget | null;
+  hasGames: boolean;
+} {
+  const { target, loading: targetLoading } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const scanResolved = scan.data != null;
+  const hasGames = (scan.data?.games.length ?? 0) > 0;
+  const needsGame = !target || (scanResolved && !hasGames);
+  const loading = targetLoading || (!!target && !scanResolved);
+  return { ready: !needsGame, loading, target, hasGames };
 }
 
 /** A resolved replay launch target plus whether its engine exactly matches the

@@ -14,7 +14,11 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
-import { usePreferredTarget, useSkirmishAis } from "../../play/config";
+import {
+  usePlayReadiness,
+  usePreferredTarget,
+  useSkirmishAis,
+} from "../../play/config";
 import { getGameMatcher, getProfile } from "../../profile/profile";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import { conquestDelete, conquestSave } from "../bindings";
@@ -38,13 +42,11 @@ export default function ConquestListPage() {
   const navigate = useNavigate();
 
   // unitsync is the source of truth for "is a game available", not a file count:
-  // rapid installs (BAR et al.) live in packages/pool, not games/*.sd7. Until the
-  // scan resolves we keep showing the normal UI so guidance never flashes.
-  const { target } = usePreferredTarget();
-  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const scanResolved = scan.data != null;
-  const hasGames = (scan.data?.games.length ?? 0) > 0;
-  const needsGame = !target || (scanResolved && !hasGames);
+  // rapid installs (BAR et al.) live in packages/pool, not games/*.sd7. Shared
+  // with the sidebar nav badge (issue #419) via `usePlayReadiness`, so the two
+  // never disagree.
+  const { target, ready } = usePlayReadiness();
+  const needsGame = !ready;
 
   const runs = galaxies.filter((g) => file.conquests[g.galaxy.id]);
   const unstarted = galaxies.filter((g) => !file.conquests[g.galaxy.id]);
