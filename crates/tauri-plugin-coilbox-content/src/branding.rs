@@ -6,7 +6,35 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
+
+/// How long a negative image marker (`.none`) is trusted before we retry the host.
+/// Without this a transiently-down image host would be cached as permanently
+/// missing until a version-salt bump.
+const NEGATIVE_MARKER_TTL: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// How long a disk-cached catalog is served without hitting the network. A fresh
+/// cache short-circuits the fetch (fast, and bounds how stale offline data can be);
+/// once stale we refetch and only fall back to the stale copy when offline.
+const CATALOG_TTL: Duration = Duration::from_secs(6 * 60 * 60);
+
+/// True when a file modified at `modified` is older than `ttl` relative to `now`.
+/// A modification time in the future (clock skew) counts as fresh.
+fn is_stale(modified: SystemTime, now: SystemTime, ttl: Duration) -> bool {
+    now.duration_since(modified)
+        .map(|age| age > ttl)
+        .unwrap_or(false)
+}
+
+/// True when the file at `path` is missing/unreadable or older than `ttl`. An
+/// unreadable stat is treated as stale so we err towards refetching.
+fn path_is_stale(path: &Path, ttl: Duration) -> bool {
+    match std::fs::metadata(path).and_then(|m| m.modified()) {
+        Ok(modified) => is_stale(modified, SystemTime::now(), ttl),
+        Err(_) => true,
+    }
+}
 
 /// Stable filesystem-safe key for a URL (hex of the std hasher). Used to name the
 /// per-URL image cache files; a changed catalog URL naturally misses and refetches.
@@ -152,6 +180,19 @@ pub(crate) async fn resolve_catalog(
     cache_file: Option<PathBuf>,
     seed_file: Option<PathBuf>,
 ) -> CatalogResult {
+    // A fresh (within-TTL) disk cache is served without a network round-trip: this
+    // bounds how stale offline data can be and skips a redundant fetch each launch.
+    if let Some(f) = &cache_file {
+        if !path_is_stale(f, CATALOG_TTL) {
+            if let Ok(text) = std::fs::read_to_string(f) {
+                return CatalogResult {
+                    json: text,
+                    source: "cache".into(),
+                    errors: vec![],
+                };
+            }
+        }
+    }
     match fetch_catalog_text(url).await {
         Ok(text) => {
             if let Some(f) = &cache_file {
@@ -213,7 +254,9 @@ pub(crate) async fn resolve_image(
             if let Ok(text) = std::fs::read_to_string(pos) {
                 return Some(text);
             }
-            if neg.exists() {
+            // A negative marker only suppresses refetch until it expires, so a
+            // temporarily-down host is retried rather than cached as missing forever.
+            if neg.exists() && !path_is_stale(neg, NEGATIVE_MARKER_TTL) {
                 continue;
             }
         }
@@ -352,6 +395,26 @@ mod tests {
             }
         }
         out
+    }
+
+    #[test]
+    fn is_stale_respects_the_ttl_boundary() {
+        let now = SystemTime::now();
+        let ttl = Duration::from_secs(3600);
+        // written just now -> fresh
+        assert!(!is_stale(now, now, ttl));
+        // within the window -> fresh
+        assert!(!is_stale(now - Duration::from_secs(1800), now, ttl));
+        // past the window -> stale
+        assert!(is_stale(now - Duration::from_secs(7200), now, ttl));
+        // a future mtime (clock skew) counts as fresh, never stale
+        assert!(!is_stale(now + Duration::from_secs(60), now, ttl));
+    }
+
+    #[test]
+    fn path_is_stale_when_file_is_missing() {
+        let missing = std::path::Path::new("/no/such/branding/cache/file.none");
+        assert!(path_is_stale(missing, Duration::from_secs(3600)));
     }
 
     #[test]
