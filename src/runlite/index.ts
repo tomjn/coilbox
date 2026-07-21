@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Rocket } from "lucide-react";
+import { NeedsGameNavBadge } from "../play/navBadges";
 import { getCachedRun } from "./runs";
 
 /**
@@ -12,7 +13,8 @@ import { getCachedRun } from "./runs";
  * The Run item joins the existing **Play** group (nav groups merge by id),
  * always visible for the same reason conquest is: the procedural generator works
  * for any game with skirmish AIs, and availability is a unitsync question the
- * page answers itself.
+ * page answers itself. Per #419, it carries a "Needs a game" badge in that
+ * state — visible but not gated — via `NeedsGameNavBadge`.
  */
 const runlitePlugin: FramePlugin = {
   id: "runlite",
@@ -29,6 +31,7 @@ const runlitePlugin: FramePlugin = {
           to: "/warpath",
           order: 3,
           icon: Rocket,
+          badge: NeedsGameNavBadge,
         },
       ],
     },

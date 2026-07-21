@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Orbit } from "lucide-react";
+import { NeedsGameNavBadge } from "../play/navBadges";
 import { getCachedGalaxy } from "./conquests";
 
 /**
@@ -14,7 +15,9 @@ import { getCachedGalaxy } from "./conquests";
  * any game with skirmish AIs, and whether a game is actually available is a
  * unitsync question the page answers itself (with guidance when none is found).
  * A file-count nav gate would wrongly hide it for rapid installs, which land in
- * `packages/`+`pool/` rather than as an archive in `games/`.
+ * `packages/`+`pool/` rather than as an archive in `games/`. Per #419, it does
+ * carry a "Needs a game" badge in that state — visible but not gated — via
+ * `NeedsGameNavBadge`.
  */
 
 const conquestPlugin: FramePlugin = {
@@ -32,6 +35,7 @@ const conquestPlugin: FramePlugin = {
           to: "/conquest",
           order: 2,
           icon: Orbit,
+          badge: NeedsGameNavBadge,
         },
       ],
     },
