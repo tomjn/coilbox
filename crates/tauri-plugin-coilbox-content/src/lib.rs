@@ -10,6 +10,7 @@
 //! Results use the [`CliResult`] envelope, matching every other picoframe plugin.
 
 mod branding;
+mod caches;
 mod demo;
 mod engine;
 mod model;
@@ -1081,6 +1082,26 @@ async fn content_prune_rapid_pool(root: String, apply: bool) -> Result<CliResult
     }
 }
 
+/// `content_reclaim_caches` — size (and, when `apply`, clear) the app's grow-only
+/// generated-image / info caches under the app cache dir. `apply=false` is a dry
+/// run that reports per-cache sizes without deleting. Every cache regenerates on
+/// demand, so clearing is always safe.
+#[tauri::command]
+async fn content_reclaim_caches<R: Runtime>(
+    app: AppHandle<R>,
+    apply: Option<bool>,
+) -> Result<CliResult, ()> {
+    let cache_root = match coilbox_portable::cache_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let apply = apply.unwrap_or(false);
+    match tauri::async_runtime::spawn_blocking(move || caches::reclaim(&cache_root, apply)).await {
+        Ok(summary) => Ok(CliResult::ok(json!({ "summary": summary }))),
+        Err(e) => Ok(CliResult::err(format!("reclaim task failed: {e}"))),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -1110,6 +1131,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_config_delete_profile,
             content_warm_rapid_pool,
             content_prune_rapid_pool,
+            content_reclaim_caches,
             branding_catalog,
             branding_image
         ])
