@@ -48,6 +48,10 @@ export default function LobbyServersSettings() {
     "multiplayer.autoRejoin",
     true,
   );
+  const [autoConnect, setAutoConnect] = useSetting<boolean>(
+    "multiplayer.autoConnect",
+    false,
+  );
 
   const servers = allServers(customCfg.servers);
 
@@ -122,7 +126,13 @@ export default function LobbyServersSettings() {
         <h2 className={H2_CLASS}>
           <RefreshCw size={15} /> Connection
         </h2>
-        <div className="rounded-md border border-border p-3">
+        <div className="space-y-3 rounded-md border border-border p-3">
+          <CheckField
+            label="Connect automatically on startup"
+            hint="When Coilbox starts, log in to your last-used account without opening the topbar."
+            checked={autoConnect}
+            onChange={setAutoConnect}
+          />
           <CheckField
             label="Reconnect automatically"
             hint="If the server drops the connection, rejoin your channels and last battle automatically."
