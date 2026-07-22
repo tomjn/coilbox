@@ -1,4 +1,6 @@
-import { Package } from "lucide-react";
+import { Button } from "@picoframe/frame";
+import { ClipboardCheck, Package } from "lucide-react";
+import { useState } from "react";
 import HealthChecklist from "./HealthChecklist";
 import { getProfile, getProfileSource } from "./profile";
 
@@ -20,7 +22,7 @@ export default function ProfileSettings() {
         <p className="text-sm text-muted-foreground">
           No distribution profile loaded — standard Coilbox.
         </p>
-        <HealthChecklist />
+        <ProfileValidation />
       </div>
     );
   }
@@ -67,8 +69,34 @@ export default function ProfileSettings() {
           />
         </dl>
       </section>
-      <HealthChecklist />
+      <ProfileValidation />
     </div>
+  );
+}
+
+/**
+ * On-demand profile validation. A "Validate profile" button runs the health checks
+ * against the current profile and reveals the results inline — including the no-op
+ * advisories (a `hide`/`hideSettings` id that matches nothing, an unknown link icon,
+ * a zero-match game filter) that otherwise fail silently. Remounting the checklist on
+ * each click (via the `run` key) re-runs it, so it doubles as a manual refresh.
+ */
+function ProfileValidation() {
+  const [run, setRun] = useState(0);
+  return (
+    <section className="space-y-3">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        onClick={() => setRun((n) => n + 1)}
+      >
+        <ClipboardCheck size={15} aria-hidden />
+        {run === 0 ? "Validate profile" : "Re-run validation"}
+      </Button>
+      {run > 0 && <HealthChecklist key={run} />}
+    </section>
   );
 }
 
