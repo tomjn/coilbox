@@ -155,16 +155,16 @@ export function ParticipantsTable({
             <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
               Player
             </TableHead>
-            <TableHead className="px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+            <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
               Faction
             </TableHead>
-            <TableHead className="px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+            <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
               Team
             </TableHead>
-            <TableHead className="px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+            <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
               Ally
             </TableHead>
-            <TableHead className="px-3 pb-2 pt-3" />
+            <TableHead className="pb-2 pl-1 pr-2 pt-3" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -284,7 +284,7 @@ export function ParticipantsTable({
                   </div>
                 </TableCell>
 
-                <TableCell className="px-3 py-2">
+                <TableCell className="px-2 py-2">
                   {p.kind === "you" && p.spectator ? (
                     <span className="text-xs text-muted-foreground">–</span>
                   ) : sharer ? (
@@ -310,7 +310,7 @@ export function ParticipantsTable({
                   )}
                 </TableCell>
 
-                <TableCell className="px-3 py-2">
+                <TableCell className="px-2 py-2">
                   {teamIdx === undefined ? (
                     <span className="text-xs text-muted-foreground">–</span>
                   ) : (
@@ -337,7 +337,7 @@ export function ParticipantsTable({
                   )}
                 </TableCell>
 
-                <TableCell className="px-3 py-2">
+                <TableCell className="px-2 py-2">
                   {p.kind === "you" && p.spectator ? (
                     <span className="text-xs text-muted-foreground">–</span>
                   ) : sharer ? null : (
@@ -354,11 +354,12 @@ export function ParticipantsTable({
                   )}
                 </TableCell>
 
-                <TableCell className="px-3 py-2 text-right">
+                <TableCell className="py-2 pl-1 pr-2 text-right">
                   {p.kind === "you" ? null : (
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="size-8"
                       aria-label={`Remove ${p.name}`}
                       disabled={disabled}
                       onClick={() => onRemove(p.id)}
