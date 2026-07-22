@@ -9,11 +9,19 @@ import {
   XCircle,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
@@ -60,6 +68,7 @@ export function MemberRow({
   row,
   editable,
   control,
+  sharedWith,
   showActions,
   flashIngame,
   sideOptions,
@@ -75,11 +84,22 @@ export function MemberRow({
   row: Row;
   editable: boolean;
   control?: MemberControls | null;
+  /** The earlier row leading this row's team, when the team is shared. The row
+   * then shows a branch glyph and Co-player badge instead of colour/side/ally —
+   * display-only; the member's own wire state is untouched and the team picker
+   * stays live so they can leave. */
+  sharedWith?: Row;
   showActions: boolean;
   /** Briefly highlight this row because the player just launched the game. */
   flashIngame?: boolean;
   sideOptions: { value: string; label: string; icon?: ReactNode }[];
-  teamOptions: { value: string; label: string }[];
+  teamOptions: {
+    value: string;
+    label: string;
+    description?: string;
+    /** Dropdown-only leading glyph (a team colour swatch). */
+    icon?: ReactNode;
+  }[];
   allyOptions: { value: string; label: string }[];
   /** Current private note on this player ("" for none), and its setter. Humans
    * only, and never on our own row — see `notes.ts` (issue #341). */
@@ -114,6 +134,9 @@ export function MemberRow({
     editable ? onAlly(v) : control?.onForceAlly(v);
   const setColor = (hex: string) =>
     editable ? onColor(hex) : control?.onForceColor(hex);
+  const sharedTitle = sharedWith
+    ? `Shares a team with ${sharedWith.name} — team settings come from the first member`
+    : undefined;
 
   return (
     <TableRow
@@ -136,7 +159,20 @@ export function MemberRow({
 
       <TableCell className="px-3 py-2">
         <div className="flex items-center gap-2.5">
-          {canEditColor ? (
+          {sharedWith ? (
+            // A file-explorer-style branch in the team (leader's) colour,
+            // marking this row as a member of the team led above it.
+            <span
+              aria-hidden
+              title={sharedTitle}
+              className="flex size-6 shrink-0 items-start justify-center"
+            >
+              <span
+                className="h-4 w-3 translate-x-1.5 rounded-bl-md border-b-2 border-l-2"
+                style={{ borderColor: sharedWith.colorHex }}
+              />
+            </span>
+          ) : canEditColor ? (
             <input
               type="color"
               aria-label={`${row.name} colour`}
@@ -176,9 +212,20 @@ export function MemberRow({
         </div>
       </TableCell>
 
-      <TableCell className="px-3 py-2">
+      <TableCell className="px-2 py-2">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
+        ) : sharedWith ? (
+          <Badge
+            variant="outline"
+            title={sharedTitle}
+            style={{
+              color: sharedWith.colorHex,
+              borderColor: sharedWith.colorHex,
+            }}
+          >
+            Co-player
+          </Badge>
         ) : editable ? (
           <OptionSelect
             value={String(row.side)}
@@ -201,17 +248,30 @@ export function MemberRow({
         )}
       </TableCell>
 
-      <TableCell className="px-3 py-2">
+      <TableCell className="px-2 py-2">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
         ) : canEditTeamAlly ? (
-          <OptionSelect
+          <Select
             value={String(row.teamId)}
-            size="sm"
-            className="w-20"
-            options={teamOptions}
             onValueChange={(v) => setTeam(Number(v))}
-          />
+          >
+            <SelectTrigger size="sm" className="w-16">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {teamOptions.map((o) => (
+                <SelectItem
+                  key={o.value}
+                  value={o.value}
+                  description={o.description}
+                  icon={o.icon}
+                >
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : (
           <span className="inline-flex h-8 min-w-8 items-center justify-center rounded border border-border/60 bg-muted/40 px-2 text-xs">
             {row.teamId + 1}
@@ -219,10 +279,10 @@ export function MemberRow({
         )}
       </TableCell>
 
-      <TableCell className="px-3 py-2">
+      <TableCell className="px-2 py-2">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
-        ) : canEditTeamAlly ? (
+        ) : sharedWith ? null : canEditTeamAlly ? (
           <OptionSelect
             value={String(row.ally)}
             size="sm"
