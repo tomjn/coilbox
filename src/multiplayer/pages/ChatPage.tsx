@@ -47,6 +47,7 @@ import {
 } from "../friends";
 import { useIgnoreActions } from "../ignore";
 import { canChannelModerate, chanServInfo } from "../moderation";
+import { useNoteActions } from "../notes";
 import { useMpRevealed, useMultiplayer } from "../store";
 
 /**
@@ -86,6 +87,11 @@ function ChatPage() {
   // messages (see `useConversation`) and syncs with the server's ignore list where
   // supported; the member panel and DM header expose it.
   const { has: ignoredNow, toggle: toggleIgnore } = useIgnoreActions(activeKey);
+
+  // Private, client-side per-player notes (issue #341) — never sent to the
+  // server, keyed on account id with a name fallback. The member panel exposes
+  // add/edit/clear; the tooltip surfaces an existing note.
+  const { get: getNote, set: setNote } = useNoteActions(activeKey);
 
   // In a battle, tint messages by each player's team colour. The `teamColor` int
   // is `0xBBGGRR` (red is the low byte), matching the protocol's team_color_rgb.
@@ -411,6 +417,8 @@ function ChatPage() {
             presenceFor={presenceFor}
             isIgnored={ignoredNow}
             onToggleIgnore={toggleIgnore}
+            noteFor={(u) => getNote(u.userId, u.name)}
+            onSetNote={(u, text) => setNote(u.userId, u.name, text)}
             renderActions={renderMemberActions}
           />
         )}
