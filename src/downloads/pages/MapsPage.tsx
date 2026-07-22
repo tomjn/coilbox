@@ -28,6 +28,7 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../DownloadQueueProvider";
+import { CachedThumb } from "./components/CachedThumb";
 import { MapPacksBanner } from "./components/MapPacksBanner";
 import { OptionSelect } from "./components/OptionSelect";
 import { EmptyState, errMessage } from "./components/states";
@@ -428,16 +429,17 @@ export default function MapsPage() {
                       otherwise lets a non-16:9 minimap's intrinsic size drive the
                       height, giving ragged cards. */}
                   <div className="relative flex aspect-video items-center justify-center overflow-hidden bg-muted">
-                    {it.thumb ? (
-                      <img
-                        src={it.thumb}
-                        alt=""
-                        loading="lazy"
-                        className="absolute inset-0 h-full w-full object-cover"
-                      />
-                    ) : (
-                      <MapIcon size={28} className="text-muted-foreground/40" />
-                    )}
+                    <CachedThumb
+                      url={it.thumb}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                      fallback={
+                        <MapIcon
+                          size={28}
+                          className="text-muted-foreground/40"
+                        />
+                      }
+                    />
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
                     <div className="min-w-0">
