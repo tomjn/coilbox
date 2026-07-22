@@ -2,6 +2,7 @@ import { Button, cn } from "@picoframe/frame";
 import { UserCheck, UserX } from "lucide-react";
 import type { ReactNode } from "react";
 import type { User } from "../bindings";
+import { NoteButton } from "../NoteButton";
 import { CountryFlag, RankBadge } from "../UserBadges";
 import { PRESENCE_META, type Presence } from "./presence";
 
@@ -17,6 +18,8 @@ export function MemberList({
   presenceFor,
   isIgnored,
   onToggleIgnore,
+  noteFor,
+  onSetNote,
   renderActions,
 }: {
   members: User[];
@@ -31,6 +34,12 @@ export function MemberList({
   isIgnored?: (username: string) => boolean;
   /** Toggle a member on/off the ignore list. Renders a per-row ignore button. */
   onToggleIgnore?: (username: string) => void;
+  /** Current private note for a member ("" for none). Given the full `User` so
+   * callers can key it on account id rather than name (issue #341). Renders a
+   * per-row note button when provided. */
+  noteFor?: (user: User) => string;
+  /** Save (or, given "", clear) a member's private note. */
+  onSetNote?: (user: User, text: string) => void;
   /** Optional trailing per-member control (e.g. a moderation menu). Returns a node
    * to render at the end of the row, or null/undefined to render nothing for it. */
   renderActions?: (username: string) => ReactNode;
@@ -50,6 +59,7 @@ export function MemberList({
           const meta = presence ? PRESENCE_META[presence] : null;
           const color = colorFor?.(u.name);
           const ignored = isIgnored?.(u.name) ?? false;
+          const note = noteFor?.(u) ?? "";
           const row = (
             <span
               className={cn("flex items-center gap-2", ignored && "opacity-50")}
@@ -65,7 +75,9 @@ export function MemberList({
                   <span aria-hidden className="size-2.5 shrink-0" />
                 ))}
               <CountryFlag country={u.country} />
-              <span className="truncate">{u.name}</span>
+              <span className="truncate" title={note || undefined}>
+                {u.name}
+              </span>
               <RankBadge rank={u.status.rank} />
               {meta && (
                 <span
@@ -95,6 +107,13 @@ export function MemberList({
                 <span className="block min-w-0 flex-1 px-2 py-1.5 text-sm">
                   {row}
                 </span>
+              )}
+              {onSetNote && (
+                <NoteButton
+                  name={u.name}
+                  note={note}
+                  onSave={(text) => onSetNote(u, text)}
+                />
               )}
               {onToggleIgnore && (
                 <Button

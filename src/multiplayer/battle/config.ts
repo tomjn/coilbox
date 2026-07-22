@@ -117,6 +117,9 @@ export interface MemberRow {
   country?: string;
   /** Humans only: server rank 0-7 (from ClientStatus), when known. */
   rank?: number;
+  /** Humans only: stable account id (from `User.userId`), when known. Used to
+   * key client-local per-player notes so they survive a nick change. */
+  userId?: string;
   /** Bots only: the AI dll and its owning player. */
   aiDll?: string;
   owner?: string;
@@ -167,6 +170,7 @@ export function membersToRows(
         }),
         country: u?.country,
         rank: u?.status.rank,
+        userId: u?.userId,
       };
     });
   const bots = Object.entries(battle.bots)

@@ -17,6 +17,7 @@ import {
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { NoteButton } from "../NoteButton";
 import { CountryFlag, RankBadge } from "../UserBadges";
 import { allyLetter, type MemberRow as Row } from "./config";
 
@@ -64,6 +65,8 @@ export function MemberRow({
   sideOptions,
   teamOptions,
   allyOptions,
+  note,
+  onSetNote,
   onSide,
   onTeam,
   onAlly,
@@ -78,6 +81,10 @@ export function MemberRow({
   sideOptions: { value: string; label: string; icon?: ReactNode }[];
   teamOptions: { value: string; label: string }[];
   allyOptions: { value: string; label: string }[];
+  /** Current private note on this player ("" for none), and its setter. Humans
+   * only, and never on our own row — see `notes.ts` (issue #341). */
+  note?: string;
+  onSetNote?: (text: string) => void;
   onSide: (side: number) => void;
   onTeam: (teamId: number) => void;
   onAlly: (ally: number) => void;
@@ -151,7 +158,10 @@ export function MemberRow({
                 <BotIcon className="size-3.5 text-muted-foreground" />
               )}
               {row.country && <CountryFlag country={row.country} />}
-              <span className={cn("truncate", row.self && "font-medium")}>
+              <span
+                className={cn("truncate", row.self && "font-medium")}
+                title={note || undefined}
+              >
                 {row.name}
               </span>
               {row.rank != null && <RankBadge rank={row.rank} />}
@@ -160,6 +170,9 @@ export function MemberRow({
               {subtitle}
             </span>
           </div>
+          {onSetNote && (
+            <NoteButton name={row.name} note={note ?? ""} onSave={onSetNote} />
+          )}
         </div>
       </TableCell>
 
