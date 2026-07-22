@@ -48,6 +48,18 @@ export interface HealthInputs {
   writeRootPath: string | undefined;
   campaignFailures: CampaignFailure[];
   writable: { writeRoot?: WritableResult; dataDir?: WritableResult };
+  /** The profile's `hide` list (nav ids the bundler wants hidden). */
+  hide: string[];
+  /** Nav ids that actually opt into hiding — the set `hide` can affect. */
+  hideableNavIds: string[];
+  /** The profile's `hideSettings` list (settings-section ids to hide). */
+  hideSettings: string[];
+  /** Every settings-section id present in the app — the set `hideSettings` can affect. */
+  settingsIds: string[];
+  /** Non-empty `icon` names configured on the profile's links. */
+  linkIcons: string[];
+  /** The curated icon names links resolve against; others fall back to a generic glyph. */
+  validIconNames: string[];
 }
 
 /** Strip the trailing `.coilbox` segment to get the app dir the package sits in. */
@@ -76,6 +88,91 @@ function countFilterMatches(
     return names.includes(lower) || (re?.test(g) ?? false);
   }).length;
   return { count };
+}
+
+/**
+ * Warn when a `hide` id matches no hideable nav item. Hiding is opt-in per nav item
+ * (`isProfileHidden(id)`), so any other id — a typo, or a real-but-not-hideable item —
+ * silently does nothing. Returns `null` when the profile hides nothing (no row, no
+ * noise); "ok" when every id is hideable; "warn" naming each id that matches nothing.
+ */
+export function checkHideIds(
+  hide: string[],
+  hideable: string[],
+): HealthCheck | null {
+  if (hide.length === 0) return null;
+  const unknown = hide.filter((id) => !hideable.includes(id));
+  if (unknown.length === 0) {
+    return {
+      id: "hide",
+      status: "ok",
+      label: `Hide list: ${hide.length} id(s), all match a hideable feature`,
+    };
+  }
+  return {
+    id: "hide",
+    status: "warn",
+    label: `${unknown.length} hide id(s) match nothing`,
+    hint: `${unknown
+      .map((id) => `hide id '${id}' matches nothing`)
+      .join("; ")}. Hideable ids: ${hideable.join(", ")}.`,
+  };
+}
+
+/**
+ * Warn when a `hideSettings` id matches no settings section. Every section id is
+ * hideable, so this only catches typos / stale ids. Same shape as {@link checkHideIds}.
+ */
+export function checkHideSettingsIds(
+  hideSettings: string[],
+  settingsIds: string[],
+): HealthCheck | null {
+  if (hideSettings.length === 0) return null;
+  const unknown = hideSettings.filter((id) => !settingsIds.includes(id));
+  if (unknown.length === 0) {
+    return {
+      id: "hideSettings",
+      status: "ok",
+      label: `Hide settings: ${hideSettings.length} id(s), all match a section`,
+    };
+  }
+  return {
+    id: "hideSettings",
+    status: "warn",
+    label: `${unknown.length} hideSettings id(s) match nothing`,
+    hint: `${unknown
+      .map((id) => `hideSettings id '${id}' matches nothing`)
+      .join("; ")}. Section ids: ${settingsIds.join(", ")}.`,
+  };
+}
+
+/**
+ * Warn when a link's `icon` isn't a curated name. An unknown icon silently falls back
+ * to a generic glyph, so a typo looks like it worked. Compared case-insensitively, to
+ * match how `resolveLinkIcon` looks the name up. `null` when no link sets an icon.
+ */
+export function checkLinkIcons(
+  icons: string[],
+  valid: string[],
+): HealthCheck | null {
+  if (icons.length === 0) return null;
+  const validLower = valid.map((n) => n.toLowerCase());
+  const unknown = icons.filter((n) => !validLower.includes(n.toLowerCase()));
+  if (unknown.length === 0) {
+    return {
+      id: "linkIcons",
+      status: "ok",
+      label: `Link icons: ${icons.length} set, all recognised`,
+    };
+  }
+  return {
+    id: "linkIcons",
+    status: "warn",
+    label: `${unknown.length} link icon(s) unknown`,
+    hint: `${unknown
+      .map((n) => `link icon '${n}' is unknown — falls back to a generic icon`)
+      .join("; ")}.`,
+  };
 }
 
 export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
@@ -298,6 +395,16 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
             },
       );
     }
+  }
+
+  // 9-11. Profile no-op advisories: configured values that silently do nothing.
+  // Each returns null (no row) when its part of the profile is empty.
+  for (const c of [
+    checkHideIds(i.hide, i.hideableNavIds),
+    checkHideSettingsIds(i.hideSettings, i.settingsIds),
+    checkLinkIcons(i.linkIcons, i.validIconNames),
+  ]) {
+    if (c) checks.push(c);
   }
 
   return checks;

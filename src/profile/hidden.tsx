@@ -15,6 +15,21 @@ import { getProfile } from "./profile";
  */
 
 /**
+ * Nav ids that opt into profile hiding via `isProfileHidden(id)`. Hiding is opt-in
+ * per nav item, with no central registry, so this is the authoritative set the
+ * profile's `hide` list can actually affect — anything else is a silent no-op. The
+ * on-demand profile validation checks `hide` against this.
+ *
+ * KEEP IN SYNC with the `isProfileHidden(...)` call sites (see `content/index.ts`
+ * and `downloads/index.ts`): add an id here whenever a nav item opts into hiding.
+ */
+export const HIDEABLE_NAV_IDS: string[] = [
+  "content.games",
+  "downloads.browse",
+  "downloads.games",
+];
+
+/**
  * Is this nav item hidden by the active profile? `false` for every id when no
  * profile is loaded. Safe to call inside a nav item's `useVisible` — it reads a
  * static module value, so it needn't (and doesn't) use React state.
