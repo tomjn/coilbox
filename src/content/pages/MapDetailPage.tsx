@@ -13,6 +13,11 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdvancedMode } from "@/general/advanced";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
+import {
+  MapLayerToggle,
+  MapOverlayImage,
+  useMapOverlayLayer,
+} from "../../play/pages/components/MapOverlay";
 import { unitsyncArchiveTree } from "../bindings";
 import {
   classifyArchive,
@@ -66,6 +71,11 @@ export default function MapDetailPage() {
     decoded,
   );
   const skybox = useUnitsyncMapSkybox(
+    selected?.enginePath,
+    selected?.rootPath,
+    decoded,
+  );
+  const overlay = useMapOverlayLayer(
     selected?.enginePath,
     selected?.rootPath,
     decoded,
@@ -199,12 +209,17 @@ export default function MapDetailPage() {
       ) : null}
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">
-          Preview
-          {minimap.startPositions.length > 0
-            ? ` · ${minimap.startPositions.length} start positions`
-            : ""}
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-medium">
+            Preview
+            {minimap.startPositions.length > 0
+              ? ` · ${minimap.startPositions.length} start positions`
+              : ""}
+          </h2>
+          {minimap.dataUrl && (
+            <MapLayerToggle layer={overlay.layer} onChange={overlay.setLayer} />
+          )}
+        </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
             {minimap.loading ? (
@@ -229,8 +244,13 @@ export default function MapDetailPage() {
                 <img
                   src={minimap.dataUrl}
                   alt={`Minimap of ${map.name}`}
-                  className="absolute inset-0 size-full object-fill"
+                  className={`absolute inset-0 size-full object-fill${
+                    overlay.overlayUrl ? " brightness-[0.55]" : ""
+                  }`}
                 />
+                {overlay.overlayUrl && (
+                  <MapOverlayImage src={overlay.overlayUrl} />
+                )}
                 {markers.map((m, i) => (
                   <span
                     key={m.key}
