@@ -83,6 +83,15 @@ export function ParticipantsTable({
     return (idx !== undefined && byId.get(leaderIdByTeam[idx])) || p;
   };
   const activeCount = teamIndexById.size;
+  // Display order groups rows by effective team so a reassignment (and the
+  // compaction it triggers) reads at a glance; a spectating "you" sinks to the
+  // bottom. Display-only — the model keeps its row order (participants[0] is
+  // always "you"), which team leadership and legacy row-order teams rely on.
+  const displayOrder = [...participants].sort(
+    (a, b) =>
+      (teamIndexById.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+      (teamIndexById.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+  );
 
   // Random sits first so any row (not just newly added AIs) can roll a faction;
   // it resolves to a concrete side per-participant at launch.
@@ -138,7 +147,7 @@ export function ParticipantsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {participants.map((p) => {
+          {displayOrder.map((p) => {
             const teamIdx = teamIndexById.get(p.id);
             const leader = leaderOf(p);
             // A non-leader row sharing a team: its team-level settings (colour,
