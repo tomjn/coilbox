@@ -10,6 +10,14 @@ import type { BattleRestrictions } from "./drafts";
  * hooks live in `./config`, which re-exports everything here.
  */
 
+/**
+ * Sentinel `side` value meaning "roll a concrete side at launch". Distinct from
+ * `""` (engine default = first side): a Random row shows as Random in the picker
+ * and is resolved to an actual side per-AI at the launch boundary by
+ * `resolveRandomSides`. Prefixed to never collide with a real faction name.
+ */
+export const RANDOM_SIDE = "__random__";
+
 /** Encode an AI reference to the persisted key (`kind:shortName`). */
 export const aiKey = (a: { kind: string; shortName: string }) =>
   `${a.kind}:${a.shortName}`;
@@ -81,7 +89,10 @@ export interface Participant {
   name: string;
   /** Selected AI (for `kind === "ai"`); absent = an empty/open slot. */
   ai?: { shortName: string; kind: "native" | "lua"; name?: string };
-  /** Faction/side name; empty means "engine default (first side)". */
+  /**
+   * Faction/side name. Empty means "engine default (first side)";
+   * `RANDOM_SIDE` means "roll a concrete side at launch" (see `resolveRandomSides`).
+   */
   side: string;
   color: Rgb;
   allyTeam: number;
@@ -120,12 +131,12 @@ export function initialParticipants(): Participant[] {
 
 /**
  * Build a fresh AI opponent, cycling the colour palette and numbering by count.
- * `defaultSide` is the game's first faction, chosen up-front so a new row never
- * shows a meaningless "default" faction.
+ * `defaultSide` defaults to `RANDOM_SIDE` so a newly added bot rolls a faction at
+ * launch rather than always taking the game's first side (issue #332).
  */
 export function makeAiParticipant(
   existing: Participant[],
-  defaultSide = "",
+  defaultSide: string = RANDOM_SIDE,
   ai?: Participant["ai"],
 ): Participant {
   const aiCount = existing.filter((p) => p.kind === "ai").length;
@@ -177,6 +188,33 @@ export function sanitizeColors(
     used.push(pick);
     changed = true;
     return { ...p, color: hexToRgb(pick) };
+  });
+  return changed ? next : participants;
+}
+
+/**
+ * Resolve every `RANDOM_SIDE` participant to a concrete side, rolling
+ * independently per row so a table of Random bots gets varied factions. Kept pure
+ * by injecting `roll` (a 0..1 source, `Math.random` by default); the launch path
+ * supplies the randomness, so the participant model itself stays deterministic.
+ *
+ * Rows on a concrete side or on `""` (engine default) are left untouched. A single
+ * side always resolves to that one; an empty sides list falls back to `""` (engine
+ * default) so the sentinel never leaks into the start script and nothing crashes
+ * before a game has scanned. Returns the same array reference when no row rolled.
+ */
+export function resolveRandomSides(
+  participants: Participant[],
+  sides: { name: string }[],
+  roll: () => number = Math.random,
+): Participant[] {
+  let changed = false;
+  const next = participants.map((p) => {
+    if (p.side !== RANDOM_SIDE) return p;
+    changed = true;
+    if (sides.length === 0) return { ...p, side: "" };
+    const idx = Math.min(sides.length - 1, Math.floor(roll() * sides.length));
+    return { ...p, side: sides[idx].name };
   });
   return changed ? next : participants;
 }

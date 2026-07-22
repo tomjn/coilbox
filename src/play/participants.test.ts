@@ -8,6 +8,8 @@ import {
   makeAiParticipant,
   PALETTE,
   type Participant,
+  RANDOM_SIDE,
+  resolveRandomSides,
   rgbToHex,
   sanitizeColors,
   toBattleConfig,
@@ -45,6 +47,67 @@ describe("makeAiParticipant colours", () => {
       seen.add(hex);
       ps = [...ps, next];
     }
+  });
+});
+
+describe("makeAiParticipant default side", () => {
+  it("defaults a newly added AI to Random", () => {
+    const p = makeAiParticipant(initialParticipants());
+    expect(p.side).toBe(RANDOM_SIDE);
+  });
+
+  it("honours an explicit side when given one", () => {
+    const p = makeAiParticipant(initialParticipants(), "Armada");
+    expect(p.side).toBe("Armada");
+  });
+});
+
+describe("resolveRandomSides", () => {
+  const sides = [{ name: "Armada" }, { name: "Cortex" }, { name: "Legion" }];
+  const randomAi = (id: string): Participant => ({
+    ...ai(id, PALETTE[1]),
+    side: RANDOM_SIDE,
+  });
+
+  it("resolves a Random row to a concrete side via the injected roll", () => {
+    // roll 0.5 * 3 = 1.5 -> floor 1 -> the second side.
+    const out = resolveRandomSides([randomAi("a")], sides, () => 0.5);
+    expect(out[0].side).toBe("Cortex");
+  });
+
+  it("rolls each Random AI independently", () => {
+    const rolls = [0, 0.99]; // -> Armada, then Legion
+    let i = 0;
+    const out = resolveRandomSides(
+      [randomAi("a"), randomAi("b")],
+      sides,
+      () => rolls[i++],
+    );
+    expect(out.map((p) => p.side)).toEqual(["Armada", "Legion"]);
+  });
+
+  it("resolves to the only side when the game has a single side", () => {
+    const out = resolveRandomSides(
+      [randomAi("a")],
+      [{ name: "Solo" }],
+      () => 0.9,
+    );
+    expect(out[0].side).toBe("Solo");
+  });
+
+  it("falls back to engine default when the sides list is empty", () => {
+    const out = resolveRandomSides([randomAi("a")], []);
+    expect(out[0].side).toBe("");
+  });
+
+  it("clamps a roll of exactly 1 to the last side", () => {
+    const out = resolveRandomSides([randomAi("a")], sides, () => 1);
+    expect(out[0].side).toBe("Legion");
+  });
+
+  it("leaves concrete and engine-default rows untouched, returning the same reference", () => {
+    const ps = [you(PALETTE[0]), { ...ai("a", PALETTE[1]), side: "Armada" }];
+    expect(resolveRandomSides(ps, sides)).toBe(ps);
   });
 });
 

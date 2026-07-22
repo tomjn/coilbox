@@ -23,6 +23,8 @@ import {
   initialParticipants,
   makeAiParticipant,
   type Participant,
+  RANDOM_SIDE,
+  resolveRandomSides,
   rgbToHex,
   sanitizeColors,
   toBattleConfig,
@@ -174,6 +176,8 @@ export default function SkirmishPage() {
     setParticipants((ps) => {
       let changed = false;
       const next = ps.map((p) => {
+        // Keep the Random sentinel — it resolves to a real side at launch.
+        if (p.side === RANDOM_SIDE) return p;
         if (!valid.has(p.side)) {
           changed = true;
           return { ...p, side: sides[0].name };
@@ -266,18 +270,22 @@ export default function SkirmishPage() {
   const addAi = () =>
     setParticipants((ps) => [
       ...ps,
-      makeAiParticipant(ps, sides[0]?.name ?? "", defaultAi(lastAi, ais)),
+      makeAiParticipant(ps, RANDOM_SIDE, defaultAi(lastAi, ais)),
     ]);
 
   // Derive the engine `BattleConfig` from the current setup, or null if a game
   // or map isn't selected yet. Shared by launch and export so they never drift.
   function buildConfig(): BattleConfig | null {
     if (!selectedGame || !selectedMap) return null;
+    // Roll each Random-faction bot to a concrete side here, at the impure launch
+    // boundary, so the start script gets a real side and each Random AI rolls
+    // independently. The participant model stays free of randomness (issue #332).
+    const resolved = resolveRandomSides(participants, sides);
     // Disabled units render into `[RESTRICT]` via `toBattleConfig`; the team-0
     // perk levers are re-applied afterwards. Both no-op for a hand-built setup.
     return applyRestrictions(
       toBattleConfig({
-        participants,
+        participants: resolved,
         mapName: selectedMap.name,
         gameType: selectedGame.name,
         startPosType,
