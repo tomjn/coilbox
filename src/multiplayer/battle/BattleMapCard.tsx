@@ -39,8 +39,8 @@ export function BattleMapCard({
   startPosType,
   selfHost,
   canEditBoxes,
+  activeAlly,
   onSetBox,
-  onClearBox,
   onSuggestMap,
   onChangeMap,
   onRescan,
@@ -59,10 +59,10 @@ export function BattleMapCard({
   selfHost: boolean;
   /** Host may draw/clear boxes (host privilege AND choose-in-game mode). */
   canEditBoxes: boolean;
+  /** The ally (0-based) the next drawn box belongs to (`useStartBoxAllies`). */
+  activeAlly: number;
   /** Commit one ally's box (0-based) on drag release. */
   onSetBox: (ally: number, rect: StartRect) => void;
-  /** Clear one ally's box (0-based). */
-  onClearBox: (ally: number) => void;
   onSuggestMap: (name: string) => void;
   onChangeMap: (name: string, maphash: number) => void;
   onRescan: () => Promise<void>;
@@ -123,23 +123,6 @@ export function BattleMapCard({
   const showBoxes = boxMode && Object.keys(battle.startRects).length > 0;
   const startPositions = boxMode ? [] : minimap.startPositions;
 
-  // Box-editing UI (host only). The ally the next drawn box belongs to defaults to
-  // the lowest ally without a box; the host can pick another from the roster's
-  // allies (plus any ally that already has a box).
-  const allySet = new Set<number>();
-  for (const k of Object.keys(allyColors)) allySet.add(Number(k));
-  for (const k of Object.keys(battle.startRects)) allySet.add(Number(k));
-  const sortedAllies = [...allySet].sort((a, b) => a - b);
-  const allyList = sortedAllies.length > 0 ? sortedAllies : [0, 1];
-  const [pickedAlly, setPickedAlly] = useState<number | null>(null);
-  const activeAlly =
-    pickedAlly ??
-    allyList.find((a) => !battle.startRects[String(a)]) ??
-    allyList[0];
-  const clearAll = () => {
-    for (const k of Object.keys(battle.startRects)) onClearBox(Number(k));
-  };
-
   // Synthesize a bare map so the card still shows the battle's map name when it
   // isn't installed locally (the minimap then falls back to "No minimap").
   const displayMap: MapItem = localMap ?? {
@@ -147,9 +130,6 @@ export function BattleMapCard({
     archives: [],
     info: {},
   };
-
-  const hasBoxes = Object.keys(battle.startRects).length > 0;
-  const activeHasBox = !!battle.startRects[String(activeAlly)];
 
   return (
     <div className="space-y-2">
@@ -210,53 +190,6 @@ export function BattleMapCard({
       />
 
       {canOverlay && <MapLayerToggle layer={layer} onChange={setLayer} />}
-
-      {canEditBoxes && (
-        <div className="space-y-2 rounded-lg border border-border/50 bg-card p-3 text-xs">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold">Start boxes</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={!hasBoxes}
-              onClick={clearAll}
-            >
-              Clear all
-            </Button>
-          </div>
-          <p className="text-muted-foreground">
-            Drag on the map to draw ally {allyLetter(activeAlly)}'s box; drag a
-            box to move it, its handles to resize.
-          </p>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {allyList.map((a) => {
-              const color = allyColors[a] ?? "#e5e7eb";
-              const active = a === activeAlly;
-              return (
-                <button
-                  key={a}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setPickedAlly(a)}
-                  className={`flex size-6 items-center justify-center rounded font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "ring-2 ring-foreground" : "opacity-70 hover:opacity-100"}`}
-                  style={{ background: color, color: readableText(color) }}
-                  title={`Ally ${allyLetter(a)}${battle.startRects[String(a)] ? " (has box)" : ""}`}
-                >
-                  {allyLetter(a)}
-                </button>
-              );
-            })}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!activeHasBox}
-            onClick={() => onClearBox(activeAlly)}
-          >
-            Clear ally {allyLetter(activeAlly)}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
