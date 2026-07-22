@@ -381,6 +381,18 @@ export function useBrandingEntry(
 const imageCache = new Map<string, Promise<ImageResult>>();
 
 /**
+ * Session-cache key for an image request. Encodes the re-encode variant (`j` =
+ * JPEG re-encode, `r` = raw) then the ordered URL list, so two calls share a
+ * cache entry iff they would resolve identically. Empty string for no URLs (the
+ * caller then renders nothing). Self-contained so the hook's effect can depend on
+ * the key alone.
+ */
+export function imageCacheKey(urls?: string[], reencode = false): string {
+  if (!urls?.length) return "";
+  return `${reencode ? "j" : "r"}\n${urls.join("\n")}`;
+}
+
+/**
  * Promise form of {@link useBrandingImage} for imperative resolvers (e.g. the
  * faction-logo layer, which resolves many sides in one effect and can't call a
  * hook per side). Shares the same session cache. Resolves to the cached `data:`
@@ -391,7 +403,7 @@ export function resolveBrandingImage(
   reencode = false,
 ): Promise<string | undefined> {
   if (!urls?.length) return Promise.resolve(undefined);
-  const key = `${reencode ? "j" : "r"}\n${urls.join("\n")}`;
+  const key = imageCacheKey(urls, reencode);
   let promise = imageCache.get(key);
   if (!promise) {
     promise = brandingImageCmd({ urls, reencode });
@@ -412,7 +424,7 @@ export function useBrandingImage(
   urls?: string[],
   reencode = false,
 ): string | undefined {
-  const key = urls?.length ? `${reencode ? "j" : "r"}\n${urls.join("\n")}` : "";
+  const key = imageCacheKey(urls, reencode);
   const [dataUrl, setDataUrl] = useState<string | undefined>(undefined);
   useEffect(() => {
     if (!key) {
@@ -441,3 +453,13 @@ export function useBrandingImage(
   }, [key]);
   return dataUrl;
 }
+
+/**
+ * Generalised name for {@link useBrandingImage}: fetch any remote artwork URL once
+ * through the Rust image proxy and serve the cached `data:` URL thereafter (shared
+ * `coilbox-branding-images` disk cache, `.none` negative-marker TTL, reclaim). Used
+ * by the download browsers so their catalog/CDN thumbnails aren't refetched every
+ * visit and still render offline from cache. Kept as an alias (not a copy) so there
+ * is one fetch/cache pipeline.
+ */
+export const useCachedImage = useBrandingImage;

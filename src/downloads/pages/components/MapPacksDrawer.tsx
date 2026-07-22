@@ -19,6 +19,7 @@ import {
   packSummary,
   suggestedMapToInput,
 } from "../../mapLists";
+import { CachedThumb } from "./CachedThumb";
 
 /**
  * A right-hand slide-in sheet for browsing curated map packs. Two levels: a list
@@ -263,15 +264,12 @@ function MapRow({
   return (
     <li className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-2">
       <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded bg-muted/40">
-        {thumb ? (
-          <img
-            src={thumb}
-            alt={`Minimap of ${map.title}`}
-            className="size-full object-cover"
-          />
-        ) : (
-          <ImageOff className="size-4 text-muted-foreground" />
-        )}
+        <CachedThumb
+          url={thumb}
+          alt={`Minimap of ${map.title}`}
+          className="size-full object-cover"
+          fallback={<ImageOff className="size-4 text-muted-foreground" />}
+        />
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{map.title}</p>
