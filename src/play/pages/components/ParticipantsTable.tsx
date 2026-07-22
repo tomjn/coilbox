@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Dices, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -119,10 +120,24 @@ export function ParticipantsTable({
   }));
   // Offer team slots up to the active count: enough for full FFA, and picking a
   // taken number is how two rows come to share a team (shared unit control).
-  const teamOptions = Array.from({ length: activeCount }, (_, i) => ({
-    value: String(i),
-    label: String(i + 1),
-  }));
+  // Existing teams show their (leader's) colour so "join the red team" reads
+  // directly; a not-yet-used slot gets a hollow dot.
+  const teamOptions = Array.from({ length: activeCount }, (_, i) => {
+    const teamLeader = byId.get(leaderIdByTeam[i]);
+    return {
+      value: String(i),
+      label: String(i + 1),
+      icon: (
+        <span
+          aria-hidden
+          className="size-3 shrink-0 rounded-sm border border-white/25"
+          style={
+            teamLeader ? { background: rgbToHex(teamLeader.color) } : undefined
+          }
+        />
+      ),
+    };
+  });
   const nativeAis = ais.filter((a) => a.kind === "native");
   const luaAis = ais.filter((a) => a.kind === "lua");
 
@@ -266,7 +281,11 @@ export function ParticipantsTable({
                 <TableCell className="px-3 py-2">
                   {p.kind === "you" && p.spectator ? (
                     <span className="text-xs text-muted-foreground">–</span>
-                  ) : sharer ? null : (
+                  ) : sharer ? (
+                    <Badge variant="outline" title={sharedTitle}>
+                      Co-player
+                    </Badge>
+                  ) : (
                     <OptionSelect
                       value={p.side}
                       size="sm"
@@ -285,7 +304,7 @@ export function ParticipantsTable({
                     <OptionSelect
                       value={String(teamIdx)}
                       size="sm"
-                      className="w-16"
+                      className="w-20"
                       disabled={disabled}
                       options={teamOptions}
                       onValueChange={(v) => onSetTeam(p.id, Number(v))}
