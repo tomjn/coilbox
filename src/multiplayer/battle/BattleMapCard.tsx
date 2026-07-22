@@ -1,16 +1,18 @@
 import { Button } from "@picoframe/frame";
 import { useEffect, useState } from "react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { MapItem } from "@/content/bindings";
 import {
-  useUnitsyncHeightmap,
   useUnitsyncMapInfo,
-  useUnitsyncMetalmap,
   useUnitsyncMinimap,
   useUnitsyncThumbnails,
 } from "@/content/config";
 import { useBarMapPreview } from "@/downloads/config";
 import { MapCard } from "@/play/pages/components/MapCard";
+import {
+  MapLayerToggle,
+  MapOverlayImage,
+  useMapOverlayLayer,
+} from "@/play/pages/components/MapOverlay";
 import type { Battle, StartRect } from "../bindings";
 import { allyLetter, hexToI32, type MemberRow, readableText } from "./config";
 import { MissingMapBox } from "./MissingMapBox";
@@ -77,23 +79,11 @@ export function BattleMapCard({
   // the battle minimap so hosts/players can read terrain when placing start boxes.
   // Each render is fetched lazily (only when its layer is active) and cached, so the
   // common minimap-only view stays as cheap as before.
-  const [layer, setLayer] = useState<"off" | "metal" | "height">("off");
-  const heightmap = useUnitsyncHeightmap(
+  const { layer, setLayer, overlayUrl } = useMapOverlayLayer(
     enginePath,
     dataDir,
-    layer === "height" ? battle.map : undefined,
+    battle.map,
   );
-  const metalmap = useUnitsyncMetalmap(
-    enginePath,
-    dataDir,
-    layer === "metal" ? battle.map : undefined,
-  );
-  const overlayUrl =
-    layer === "height"
-      ? heightmap.data?.dataUrl
-      : layer === "metal"
-        ? metalmap.data?.dataUrl
-        : undefined;
   // Overlays only make sense once the map is installed and its minimap resolves.
   const canOverlay = !!localMap && !mapMissing && !!minimap.dataUrl;
 
@@ -190,12 +180,7 @@ export function BattleMapCard({
             {overlayUrl && (
               // Under the start boxes and pointer-transparent, so the editor's
               // drag surface and the picker button are unaffected.
-              <img
-                src={overlayUrl}
-                alt=""
-                aria-hidden
-                className="pointer-events-none absolute inset-0 size-full object-fill opacity-95"
-              />
+              <MapOverlayImage src={overlayUrl} />
             )}
             {canEditBoxes ? (
               <StartBoxEditor
@@ -224,26 +209,7 @@ export function BattleMapCard({
         }
       />
 
-      {canOverlay && (
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium text-muted-foreground">
-            Overlay
-          </span>
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
-            value={layer}
-            onValueChange={(v) =>
-              setLayer((v as "off" | "metal" | "height") || "off")
-            }
-          >
-            <ToggleGroupItem value="off">Map</ToggleGroupItem>
-            <ToggleGroupItem value="metal">Metal</ToggleGroupItem>
-            <ToggleGroupItem value="height">Height</ToggleGroupItem>
-          </ToggleGroup>
-        </div>
-      )}
+      {canOverlay && <MapLayerToggle layer={layer} onChange={setLayer} />}
 
       {canEditBoxes && (
         <div className="space-y-2 rounded-lg border border-border/50 bg-card p-3 text-xs">
