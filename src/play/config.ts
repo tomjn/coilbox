@@ -21,6 +21,7 @@ export {
   aiKey,
   applyRestrictions,
   defaultAi,
+  effectiveTeams,
   hexToRgb,
   initialParticipants,
   makeAiParticipant,
@@ -30,6 +31,7 @@ export {
   resolveRandomSides,
   rgbToHex,
   sanitizeColors,
+  setParticipantTeam,
   toBattleConfig,
 } from "./participants";
 

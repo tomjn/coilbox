@@ -11,6 +11,7 @@ import {
 import type { Side } from "@/content/bindings";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
+import { cn } from "@/lib/utils";
 import { aiByline } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { useMultiplayer } from "../store";
@@ -30,6 +31,7 @@ export function BattleMembersTable({
   sides,
   factionLogos,
   maxSlots,
+  startPosType,
   selfHost,
   canAddBot,
   hostControls,
@@ -48,6 +50,9 @@ export function BattleMembersTable({
   factionLogos?: Record<string, FactionLogoSrc>;
   /** Upper bound for the team/ally pickers (typically the battle's maxPlayers). */
   maxSlots: number;
+  /** The battle's start-position mode; with 0 (fixed map positions) the team
+   * picker notes that team N spawns at the map's start position N. */
+  startPosType?: number;
   /** When true, the viewer hosts this battle and may force/kick other members. */
   selfHost: boolean;
   /** When true, the viewer may add a bot (any seated member — see `useBattleRoom`). */
@@ -100,6 +105,22 @@ export function BattleMembersTable({
   const showActions = selfHost || ownsABot;
 
   const slots = Math.max(2, Math.min(maxSlots || 0, 16));
+  // First seated member per team, in row order: the "leader" whose colour marks
+  // the team in the picker, and whom later members of the same team visually
+  // hang off (branch glyph / Co-player badge). Display-only — wire state (each
+  // member's own colour/side/ally) is untouched.
+  const leaderByTeamId = new Map<number, Row>();
+  for (const r of rows) {
+    if (!r.spectator && !leaderByTeamId.has(r.teamId))
+      leaderByTeamId.set(r.teamId, r);
+  }
+  // Group rows by team so shared teams sit together; spectators sink to the
+  // bottom. Stable, so join order is kept within a team (leader stays first).
+  const displayOrder = [...rows].sort(
+    (a, b) =>
+      (a.spectator ? Number.MAX_SAFE_INTEGER : a.teamId) -
+      (b.spectator ? Number.MAX_SAFE_INTEGER : b.teamId),
+  );
   const sideOptions = sides.map((s: Side, i) => {
     const logo = factionLogos?.[s.name.toLowerCase()];
     return {
@@ -110,10 +131,37 @@ export function BattleMembersTable({
       ) : undefined,
     };
   });
-  const teamOptions = range(slots).map((i) => ({
-    value: String(i),
-    label: String(i + 1),
-  }));
+  // Offer only as many teams as there are seated members (like the skirmish
+  // table) rather than every battle slot — but never drop a team number someone
+  // already holds, so the select always has its current value.
+  const seated = rows.filter((r) => !r.spectator);
+  const teamSlots = Math.min(
+    slots,
+    Math.max(seated.length, ...seated.map((r) => r.teamId + 1), 1),
+  );
+  const teamOptions = range(teamSlots).map((i) => {
+    const leader = leaderByTeamId.get(i);
+    return {
+      value: String(i),
+      label: String(i + 1),
+      // Under fixed start positions the team number *is* the spawn choice — say
+      // so in the picker, since nothing else in the room links the two (#456).
+      description:
+        startPosType === 0 ? `Spawns at map position ${i + 1}` : undefined,
+      // Taken teams show their leader's colour in the open dropdown; an unused
+      // slot keeps a blank spacer so the numbers stay aligned.
+      icon: (
+        <span
+          aria-hidden
+          className={cn(
+            "size-3 shrink-0 rounded-sm",
+            leader && "border border-white/25",
+          )}
+          style={leader ? { background: leader.colorHex } : undefined}
+        />
+      ),
+    };
+  });
   const allyOptions = range(slots).map((i) => ({
     value: String(i),
     label: `Ally ${allyLetter(i)}`,
@@ -133,13 +181,13 @@ export function BattleMembersTable({
               <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
                 Player
               </TableHead>
-              <TableHead className="px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+              <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
                 Faction
               </TableHead>
-              <TableHead className="px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+              <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
                 Team
               </TableHead>
-              <TableHead className="px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+              <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
                 Ally
               </TableHead>
               {showActions && (
@@ -150,7 +198,13 @@ export function BattleMembersTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((row) => {
+            {displayOrder.map((row) => {
+              // A seated row whose team is led by an earlier row: it shows the
+              // branch glyph / Co-player badge instead of duplicated controls.
+              const leader = row.spectator
+                ? undefined
+                : leaderByTeamId.get(row.teamId);
+              const sharedWith = leader && leader !== row ? leader : undefined;
               // The host controls other members: humans get force/kick, bots get
               // team/ally edits (UPDATEBOT) plus removal — MemberRow keeps a bot's
               // colour read-only, so onForceColor/onForceSpectator stay no-ops. Our
@@ -183,6 +237,7 @@ export function BattleMembersTable({
                   row={row}
                   editable={row.self}
                   control={control}
+                  sharedWith={sharedWith}
                   showActions={showActions}
                   flashIngame={justWentIngame.has(row.name)}
                   sideOptions={sideOptions}

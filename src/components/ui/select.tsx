@@ -102,11 +102,15 @@ function SelectItem({
   className,
   children,
   description,
+  icon,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Item> & {
   /** Optional muted second line, shown in the dropdown only (not the trigger:
    * it lives outside `ItemText`, which is what Radix mirrors into the value). */
   description?: React.ReactNode;
+  /** Optional leading glyph, shown in the dropdown only (outside `ItemText`,
+   * like `description`, so it isn't mirrored into the trigger's value). */
+  icon?: React.ReactNode;
 }) {
   return (
     <SelectPrimitive.Item
@@ -125,6 +129,7 @@ function SelectItem({
           <CheckIcon className="size-4" />
         </SelectPrimitive.ItemIndicator>
       </span>
+      {icon}
       {description ? (
         // A `div` (not a span) wrapper so the `*:[span]:last` utilities above
         // don't force this two-line block into a horizontal row.

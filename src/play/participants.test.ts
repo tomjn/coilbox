@@ -4,6 +4,7 @@ import type { BattleConfig } from "./bindings";
 import {
   aiByline,
   applyRestrictions,
+  effectiveTeams,
   initialParticipants,
   makeAiParticipant,
   PALETTE,
@@ -12,6 +13,7 @@ import {
   resolveRandomSides,
   rgbToHex,
   sanitizeColors,
+  setParticipantTeam,
   toBattleConfig,
 } from "./participants";
 
@@ -187,6 +189,171 @@ describe("toBattleConfig AI blocks", () => {
   });
 });
 
+describe("effectiveTeams", () => {
+  it("defaults to row order when no slots are chosen", () => {
+    const ps = [you(PALETTE[0]), ai("a", PALETTE[1]), ai("b", PALETTE[2])];
+    const { teamIndexById, leaderIdByTeam } = effectiveTeams(ps);
+    expect(teamIndexById.get("you")).toBe(0);
+    expect(teamIndexById.get("a")).toBe(1);
+    expect(teamIndexById.get("b")).toBe(2);
+    expect(leaderIdByTeam).toEqual(["you", "a", "b"]);
+  });
+
+  it("honours an explicit permutation", () => {
+    const ps = [
+      { ...you(PALETTE[0]), team: 1 },
+      { ...ai("a", PALETTE[1]), team: 0 },
+    ];
+    const { teamIndexById } = effectiveTeams(ps);
+    expect(teamIndexById.get("you")).toBe(1);
+    expect(teamIndexById.get("a")).toBe(0);
+  });
+
+  it("groups rows sharing a slot into one team led by the first row", () => {
+    const ps = [
+      { ...you(PALETTE[0]), team: 0 },
+      { ...ai("a", PALETTE[1]), team: 0 },
+      { ...ai("b", PALETTE[2]), team: 1 },
+    ];
+    const { teamIndexById, leaderIdByTeam } = effectiveTeams(ps);
+    expect(teamIndexById.get("you")).toBe(0);
+    expect(teamIndexById.get("a")).toBe(0);
+    expect(teamIndexById.get("b")).toBe(1);
+    expect(leaderIdByTeam).toEqual(["you", "b"]);
+  });
+
+  it("compacts gaps so indices stay contiguous (1,1,3 -> 0,0,1)", () => {
+    const ps = [
+      { ...you(PALETTE[0]), team: 1 },
+      { ...ai("a", PALETTE[1]), team: 1 },
+      { ...ai("b", PALETTE[2]), team: 3 },
+    ];
+    const { teamIndexById, leaderIdByTeam } = effectiveTeams(ps);
+    expect(teamIndexById.get("you")).toBe(0);
+    expect(teamIndexById.get("a")).toBe(0);
+    expect(teamIndexById.get("b")).toBe(1);
+    expect(leaderIdByTeam).toHaveLength(2);
+  });
+
+  it("heals invalid slot values back to a per-row slot", () => {
+    const ps = [
+      { ...you(PALETTE[0]), team: -2 },
+      { ...ai("a", PALETTE[1]), team: 1.5 },
+    ];
+    const { teamIndexById } = effectiveTeams(ps);
+    expect(teamIndexById.get("you")).toBe(0);
+    expect(teamIndexById.get("a")).toBe(1);
+  });
+
+  it("excludes a spectating 'you' row", () => {
+    const ps = [{ ...you(PALETTE[0]), spectator: true }, ai("a", PALETTE[1])];
+    const { teamIndexById, leaderIdByTeam } = effectiveTeams(ps);
+    expect(teamIndexById.has("you")).toBe(false);
+    expect(teamIndexById.get("a")).toBe(0);
+    expect(leaderIdByTeam).toEqual(["a"]);
+  });
+});
+
+describe("setParticipantTeam", () => {
+  it("assigns the picked slot and materialises effective slots on other rows", () => {
+    const ps = [you(PALETTE[0]), ai("a", PALETTE[1])];
+    const out = setParticipantTeam(ps, "you", 1);
+    expect(out.find((p) => p.id === "you")?.team).toBe(1);
+    expect(out.find((p) => p.id === "a")?.team).toBe(1); // shares slot 1 now
+  });
+
+  it("lets two rows share a slot after prior explicit assignment", () => {
+    let ps = [you(PALETTE[0]), ai("a", PALETTE[1]), ai("b", PALETTE[2])];
+    ps = setParticipantTeam(ps, "a", 0); // a joins you on team 0
+    const { teamIndexById } = effectiveTeams(ps);
+    expect(teamIndexById.get("you")).toBe(0);
+    expect(teamIndexById.get("a")).toBe(0);
+    expect(teamIndexById.get("b")).toBe(1);
+  });
+
+  it("anchors against displayed (compacted) numbers, not stale slot values", () => {
+    // Stale draft: slots 4 and 7 display as teams 1 and 2. Moving "you" to
+    // displayed team 2 (slot 1) must join a's team, not land somewhere new.
+    const ps = [
+      { ...you(PALETTE[0]), team: 4 },
+      { ...ai("a", PALETTE[1]), team: 7 },
+    ];
+    const out = setParticipantTeam(ps, "you", 1);
+    const { teamIndexById, leaderIdByTeam } = effectiveTeams(out);
+    expect(teamIndexById.get("you")).toBe(0);
+    expect(teamIndexById.get("a")).toBe(0);
+    expect(leaderIdByTeam).toHaveLength(1); // one shared team
+  });
+});
+
+describe("toBattleConfig team slots", () => {
+  const base = {
+    mapName: "m",
+    gameType: "g",
+    startPosType: 0,
+    modOptions: {},
+  };
+
+  it("emits teams in effective slot order with players and AIs following", () => {
+    const cfg = toBattleConfig({
+      ...base,
+      participants: [
+        { ...you(PALETTE[0]), team: 1 },
+        {
+          ...ai("a", PALETTE[1]),
+          ai: { kind: "native", shortName: "X" },
+          team: 0,
+        },
+      ],
+    });
+    expect(cfg.teams).toHaveLength(2);
+    // Team 0 is the AI's (slot 0), team 1 is yours (slot 1).
+    expect(rgbToHex(cfg.teams[0].rgbColor)).toBe(rgbToHex(PALETTE[1]));
+    expect(rgbToHex(cfg.teams[1].rgbColor)).toBe(rgbToHex(PALETTE[0]));
+    expect(cfg.players[0].team).toBe(1);
+    expect(cfg.ais[0].team).toBe(0);
+  });
+
+  it("emits one shared team with the leader's attributes", () => {
+    const cfg = toBattleConfig({
+      ...base,
+      participants: [
+        { ...you(PALETTE[0]), handicap: 10, team: 0 },
+        {
+          ...ai("a", PALETTE[1]),
+          ai: { kind: "native", shortName: "X" },
+          allyTeam: 5,
+          team: 0,
+        },
+        {
+          ...ai("b", PALETTE[2]),
+          ai: { kind: "native", shortName: "X" },
+          team: 1,
+        },
+      ],
+    });
+    expect(cfg.teams).toHaveLength(2);
+    // The shared team takes the leader's ("you") colour, ally and handicap;
+    // the sharer's divergent allyTeam value is ignored.
+    expect(rgbToHex(cfg.teams[0].rgbColor)).toBe(rgbToHex(PALETTE[0]));
+    expect(cfg.teams[0].allyTeam).toBe(0);
+    expect(cfg.teams[0].advantage).toBeCloseTo(0.1, 5);
+    expect(cfg.players[0].team).toBe(0);
+    expect(cfg.ais.map((a) => a.team)).toEqual([0, 1]);
+    // Ally teams remap from leaders only: allys 0 (you) and 1 (b).
+    expect(cfg.allyTeams).toHaveLength(2);
+  });
+
+  it("keeps row-order teams for participants without slots (legacy drafts)", () => {
+    const cfg = toBattleConfig({
+      ...base,
+      participants: [you(PALETTE[0]), ai("a", PALETTE[1])],
+    });
+    expect(cfg.players[0].team).toBe(0);
+    expect(cfg.teams).toHaveLength(2);
+  });
+});
+
 describe("applyRestrictions", () => {
   const cfg = (): BattleConfig =>
     toBattleConfig({
@@ -215,6 +382,22 @@ describe("applyRestrictions", () => {
   it("is a no-op on a team-less config", () => {
     const empty = { ...cfg(), teams: [] };
     expect(() => applyRestrictions(empty, { advantage: 0.5 })).not.toThrow();
+  });
+
+  it("targets the player's team when 'you' is not team 0", () => {
+    const permuted = toBattleConfig({
+      participants: [
+        { ...you(PALETTE[0]), team: 1 },
+        { ...ai("a", PALETTE[1]), team: 0 },
+      ],
+      mapName: "m",
+      gameType: "g",
+      startPosType: 0,
+      modOptions: {},
+    });
+    const out = applyRestrictions(permuted, { advantage: 0.1 });
+    expect(out.teams[1].advantage).toBeCloseTo(0.1, 5); // yours
+    expect(out.teams[0].advantage).toBeUndefined(); // the AI's
   });
 });
 
