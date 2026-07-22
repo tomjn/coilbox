@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Battle, BattleStatus, MemberStatus } from "../bindings";
+import type { Battle, BattleStatus, MemberStatus, Vote } from "../bindings";
 import {
   allyLetter,
   battleStartable,
@@ -10,6 +10,7 @@ import {
   membersToRows,
   randomTeamColorHex,
   readableText,
+  shouldNotifyVoteOpened,
   startPosTypeOf,
   usedColorsFromBattle,
 } from "./config";
@@ -405,5 +406,44 @@ describe("battleStartable", () => {
         row({ kind: "human", spectator: false, ready: true }),
       ]),
     ).toBe(true);
+  });
+});
+
+describe("shouldNotifyVoteOpened", () => {
+  const vote = (p: Partial<Vote> = {}): Vote => ({
+    subject: "set map Red Comet",
+    caller: "Bob",
+    yes: 1,
+    no: 0,
+    yesNeeded: 3,
+    noNeeded: 3,
+    allowAbstain: true,
+    endsAt: 0,
+    ...p,
+  });
+
+  it("fires on the null -> set transition", () => {
+    expect(shouldNotifyVoteOpened(null, vote())).toBe(true);
+  });
+
+  it("does not fire while there was never a vote", () => {
+    expect(shouldNotifyVoteOpened(null, null)).toBe(false);
+  });
+
+  it("does not re-fire on a re-render with the same vote still open (tally ticking)", () => {
+    const opened = vote({ yes: 1 });
+    expect(shouldNotifyVoteOpened(opened, vote({ yes: 2 }))).toBe(false);
+  });
+
+  it("does not fire on the set -> null transition", () => {
+    expect(shouldNotifyVoteOpened(vote(), null)).toBe(false);
+  });
+
+  it("fires again for a new distinct vote once the prior one has cleared", () => {
+    // The caller resets its ref to null when currentVote clears, so the next
+    // open is seen as a fresh null -> set transition.
+    expect(shouldNotifyVoteOpened(null, vote({ subject: "set map DSD" }))).toBe(
+      true,
+    );
   });
 });
