@@ -215,6 +215,7 @@ export function BattleMapCard({
         placeholder={
           mapMissing ? (
             <MissingMapBox
+              battleId={battle.id}
               mapName={battle.map}
               onRescan={onRescan}
               previewUrl={remotePreview}

@@ -292,6 +292,7 @@ function BattleRoomPage() {
           )}
           {room.gameMissing && (
             <MissingContentCard
+              battleId={battle.id}
               gameName={battle.modname}
               onRescan={room.rescan}
             />
