@@ -20,6 +20,7 @@ import {
   aiKey,
   applyRestrictions,
   defaultAi,
+  effectiveTeams,
   initialParticipants,
   makeAiParticipant,
   type Participant,
@@ -27,6 +28,7 @@ import {
   resolveRandomSides,
   rgbToHex,
   sanitizeColors,
+  setParticipantTeam,
   toBattleConfig,
   useLastAi,
   usePreferredTarget,
@@ -231,13 +233,16 @@ export default function SkirmishPage() {
     setDraft,
   ]);
 
-  const activeColors = useMemo(
-    () =>
-      participants
-        .filter((p) => !(p.kind === "you" && p.spectator))
-        .map((p) => rgbToHex(p.color)),
-    [participants],
-  );
+  // Minimap marker colours in *team* order (leader colour per team), so under
+  // fixed start positions marker N shows who actually spawns at position N.
+  const activeColors = useMemo(() => {
+    const byId = new Map(participants.map((p) => [p.id, p]));
+    const { leaderIdByTeam } = effectiveTeams(participants);
+    return leaderIdByTeam.flatMap((id) => {
+      const p = byId.get(id);
+      return p ? rgbToHex(p.color) : [];
+    });
+  }, [participants]);
 
   const you = participants.find((p) => p.kind === "you");
   const activeCount = participants.filter(
@@ -482,7 +487,12 @@ export default function SkirmishPage() {
             factionLogos={factionLogos}
             ais={ais}
             disabled={running}
+            startPosType={startPosType}
+            startPosCount={minimap.startPositions?.length}
             onUpdate={updateParticipant}
+            onSetTeam={(id, team) =>
+              setParticipants((ps) => setParticipantTeam(ps, id, team))
+            }
             onRemove={removeParticipant}
             onAddAi={addAi}
           />
