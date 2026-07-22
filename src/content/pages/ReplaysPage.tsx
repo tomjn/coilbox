@@ -1,5 +1,5 @@
 import { Button, useSetting } from "@picoframe/frame";
-import { Code2, Eye, Tag, X } from "lucide-react";
+import { Clock, Code2, Eye, Tag, X } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,10 @@ import {
   useScanTargetSelection,
   useUnitsyncThumbnails,
 } from "../config";
-import { computeReplayFilterVisibility } from "../replayFilterVisibility";
+import {
+  computeReplayFilterVisibility,
+  isShortReplay,
+} from "../replayFilterVisibility";
 import { useReplayUserState } from "../replayUserState";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
@@ -108,6 +111,12 @@ export default function ReplaysPage() {
     "content.replayFilters.remixedOnly",
     false,
   );
+  // Sub-1-minute replays are noise (aborts, crashes), so they're hidden by
+  // default; this reveals them rather than narrowing the list further.
+  const [showShort, setShowShort] = useSetting(
+    "content.replayFilters.showShort",
+    false,
+  );
   const [tagFilter, setTagFilter] = useSetting("content.replayFilters.tag", "");
   const userState = useReplayUserState();
   const tagOptions = useMemo(
@@ -135,6 +144,7 @@ export default function ReplaysPage() {
       const us = userState.get(r.filename);
       if (watchedOnly && !us.watched) return false;
       if (remixedOnly && !r.remixed) return false;
+      if (!showShort && isShortReplay(r.durationSec)) return false;
       if (tagFilter && !(us.tags ?? []).includes(tagFilter)) return false;
       return true;
     });
@@ -144,6 +154,7 @@ export default function ReplaysPage() {
     mapFilter,
     watchedOnly,
     remixedOnly,
+    showShort,
     tagFilter,
     userState,
   ]);
@@ -237,6 +248,18 @@ export default function ReplaysPage() {
                 className="gap-1.5"
               >
                 <Code2 className="size-4" /> Remixed
+              </Button>
+            )}
+            {filterVisibility.short && (
+              <Button
+                variant={showShort ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowShort(!showShort)}
+                aria-pressed={showShort}
+                className="gap-1.5"
+                title="Show replays under a minute long"
+              >
+                <Clock className="size-4" /> Short replays
               </Button>
             )}
             {tagOptions.length > 1 && (
