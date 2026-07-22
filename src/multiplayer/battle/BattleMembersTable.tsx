@@ -131,7 +131,15 @@ export function BattleMembersTable({
       ) : undefined,
     };
   });
-  const teamOptions = range(slots).map((i) => {
+  // Offer only as many teams as there are seated members (like the skirmish
+  // table) rather than every battle slot — but never drop a team number someone
+  // already holds, so the select always has its current value.
+  const seated = rows.filter((r) => !r.spectator);
+  const teamSlots = Math.min(
+    slots,
+    Math.max(seated.length, ...seated.map((r) => r.teamId + 1), 1),
+  );
+  const teamOptions = range(teamSlots).map((i) => {
     const leader = leaderByTeamId.get(i);
     return {
       value: String(i),

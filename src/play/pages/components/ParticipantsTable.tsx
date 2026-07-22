@@ -130,6 +130,10 @@ export function ParticipantsTable({
     return {
       value: String(i),
       label: String(i + 1),
+      // Under fixed start positions the team number *is* the spawn choice — say
+      // so in the picker, mirroring the multiplayer team dropdown (#456).
+      description:
+        startPosType === 0 ? `Spawns at map position ${i + 1}` : undefined,
       icon: (
         <span
           aria-hidden
@@ -327,6 +331,7 @@ export function ParticipantsTable({
                           <SelectItem
                             key={o.value}
                             value={o.value}
+                            description={o.description}
                             icon={o.icon}
                           >
                             {o.label}
