@@ -41,6 +41,11 @@ import {
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
 import { GameSelectCard } from "./components/GameSelectCard";
 import { MapCard } from "./components/MapCard";
+import {
+  MapLayerToggle,
+  MapOverlayImage,
+  useMapOverlayLayer,
+} from "./components/MapOverlay";
 import { ParticipantsTable } from "./components/ParticipantsTable";
 import { PresetsDrawer } from "./components/PresetsDrawer";
 
@@ -123,6 +128,9 @@ export default function SkirmishPage() {
   const { ais } = useSkirmishAis(enginePath, dataDir, gameArchive);
   const [lastAi, setLastAi] = useLastAi();
   const minimap = useUnitsyncMinimap(enginePath, dataDir, selectedMap?.name);
+  const overlay = useMapOverlayLayer(enginePath, dataDir, selectedMap?.name);
+  // Overlays only make sense once a map is selected and its minimap resolves.
+  const canOverlay = !!selectedMap && !!minimap.dataUrl;
   const sides = gameInfo.info?.sides ?? [];
   const factionLogos = useFactionLogos({
     game: selectedGame ?? undefined,
@@ -496,7 +504,16 @@ export default function SkirmishPage() {
             mapsLoading={mapsLoading}
             onSelectMap={setMapName}
             disabled={running}
+            dimBase={!!overlay.overlayUrl}
+            overlay={
+              overlay.overlayUrl ? (
+                <MapOverlayImage src={overlay.overlayUrl} />
+              ) : undefined
+            }
           />
+          {canOverlay && (
+            <MapLayerToggle layer={overlay.layer} onChange={overlay.setLayer} />
+          )}
           <GameSelectCard
             game={selectedGame}
             games={games}
