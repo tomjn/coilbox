@@ -21,6 +21,7 @@ import { battleToSkirmishDraft } from "../battle/toSkirmish";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
 import { useBattleRoom } from "../battle/useBattleRoom";
 import { VotePanel } from "../battle/VotePanel";
+import { useNoteActions } from "../notes";
 import { useMpRevealed } from "../store";
 
 /**
@@ -40,6 +41,8 @@ function BattleRoomPage() {
     sideNames: room.sides.map((s) => s.name),
   });
   const launch = useBattleLaunch(room.serverKey, room.target, room.selfHost);
+  // Private, client-side per-player notes (issue #341), scoped to this server.
+  const { get: getNote, set: setNote } = useNoteActions(room.serverKey);
   const navigate = useNavigate();
   const presets = useBattlePresets();
   const [presetsOpen, setPresetsOpen] = useState(false);
@@ -181,6 +184,8 @@ function BattleRoomPage() {
             canAddBot={room.canAddBot}
             hostControls={room.hostControls}
             addableAis={room.addableAis}
+            noteFor={(row) => getNote(row.userId, row.name)}
+            onSetNote={(row, text) => setNote(row.userId, row.name, text)}
             onAddBot={room.addBot}
             onSide={room.setSide}
             onTeam={room.setTeam}

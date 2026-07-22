@@ -34,6 +34,8 @@ export function BattleMembersTable({
   canAddBot,
   hostControls,
   addableAis,
+  noteFor,
+  onSetNote,
   onAddBot,
   onSide,
   onTeam,
@@ -70,6 +72,10 @@ export function BattleMembersTable({
     version?: string;
     description?: string;
   }[];
+  /** Current private note for a human row ("" for none). Bots have no account
+   * so aren't offered notes (see `MemberRow`'s `onSetNote` gating below). */
+  noteFor?: (row: Row) => string;
+  onSetNote?: (row: Row, text: string) => void;
   onAddBot: (aiShortName: string) => void;
   onSide: (side: number) => void;
   onTeam: (teamId: number) => void;
@@ -182,6 +188,16 @@ export function BattleMembersTable({
                   sideOptions={sideOptions}
                   teamOptions={teamOptions}
                   allyOptions={allyOptions}
+                  note={
+                    row.kind === "human" && !row.self && noteFor
+                      ? noteFor(row)
+                      : undefined
+                  }
+                  onSetNote={
+                    row.kind === "human" && !row.self && onSetNote
+                      ? (text) => onSetNote(row, text)
+                      : undefined
+                  }
                   onSide={onSide}
                   onTeam={onTeam}
                   onAlly={onAlly}
