@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { X } from "lucide-react";
+import { Dices, X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -21,7 +21,13 @@ import type { Side, SkirmishAi } from "@/content/bindings";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
-import { aiByline, hexToRgb, type Participant, rgbToHex } from "../../config";
+import {
+  aiByline,
+  hexToRgb,
+  type Participant,
+  RANDOM_SIDE,
+  rgbToHex,
+} from "../../config";
 
 /** Ally-team letters (A, B, C…) mapped to indices, offered per row. */
 const allyLetter = (n: number) => String.fromCharCode(65 + n);
@@ -65,16 +71,25 @@ export function ParticipantsTable({
     teamByI.push(isSpec ? null : team++);
   }
 
-  const sideOptions = sides.map((s) => {
-    const logo = factionLogos?.[s.name.toLowerCase()];
-    return {
-      value: s.name,
-      label: s.name,
-      icon: logo ? (
-        <FactionLogo logo={logo} sideName={s.name} size={16} />
-      ) : undefined,
-    };
-  });
+  // Random sits first so any row (not just newly added AIs) can roll a faction;
+  // it resolves to a concrete side per-participant at launch.
+  const sideOptions = [
+    {
+      value: RANDOM_SIDE,
+      label: "Random",
+      icon: <Dices className="size-4 text-muted-foreground" />,
+    },
+    ...sides.map((s) => {
+      const logo = factionLogos?.[s.name.toLowerCase()];
+      return {
+        value: s.name,
+        label: s.name,
+        icon: logo ? (
+          <FactionLogo logo={logo} sideName={s.name} size={16} />
+        ) : undefined,
+      };
+    }),
+  ];
   // Offer allies up to the participant count so any FFA/teams split is reachable.
   const allyOptions = participants.map((_, i) => ({
     value: String(i),
@@ -203,7 +218,7 @@ export function ParticipantsTable({
                     value={p.side}
                     size="sm"
                     className="w-auto min-w-20"
-                    disabled={disabled || sideOptions.length === 0}
+                    disabled={disabled || sides.length === 0}
                     options={sideOptions}
                     onValueChange={(v) => onUpdate(p.id, { side: v })}
                   />
