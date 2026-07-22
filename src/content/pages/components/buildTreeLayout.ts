@@ -109,3 +109,74 @@ export function layoutBuildTree(
     return { ...n, position: { x: p.cx - nodeW / 2, y: p.top } };
   });
 }
+
+/** Node box size + spacing for the focused three-band layout, in px. */
+export interface FocusLayoutOptions {
+  nodeW?: number;
+  nodeH?: number;
+  /** Horizontal gap between siblings in a band. */
+  gapX?: number;
+  /** Clear band (for edges) between the focused unit and a neighbour band. */
+  bandGap?: number;
+  /** Vertical gap between wrapped rows *within* one band. */
+  rowGap?: number;
+}
+
+/**
+ * Clean layout for a focus subset (see `focusNeighbours`): the focused unit sits
+ * centred at the origin, its builders (built-by) in a block above it and the units
+ * it builds in a block below — matching the node's top (built-by) and bottom
+ * (builds) handles. Each block is a centred, square-ish grid so a hub with many
+ * neighbours uses vertical space instead of one ultra-wide row. Positions are
+ * React Flow top-left corners; deterministic for a given input order (callers pass
+ * sorted lists). Returns a map keyed by unit id. `builds`/`builtBy` must not
+ * include `focused`; a unit appearing in both should be placed in `builds` only.
+ */
+export function layoutFocusTree(
+  focused: string,
+  builds: string[],
+  builtBy: string[],
+  {
+    nodeW = 104,
+    nodeH = 124,
+    gapX = 24,
+    bandGap = 90,
+    rowGap = 16,
+  }: FocusLayoutOptions = {},
+): Map<string, { x: number; y: number }> {
+  const pos = new Map<string, { x: number; y: number }>();
+
+  const cols = (n: number) => Math.max(1, Math.min(n, Math.ceil(Math.sqrt(n))));
+  // Height of a centred grid block holding `n` nodes.
+  const blockHeight = (n: number) => {
+    if (n === 0) return 0;
+    const rows = Math.ceil(n / cols(n));
+    return rows * nodeH + (rows - 1) * rowGap;
+  };
+  // Place `ids` as a centred grid whose top row starts at `topY`, rows growing
+  // downward. Each row is centred so a short final row stays under the block.
+  const placeGrid = (ids: string[], topY: number) => {
+    const c = cols(ids.length);
+    const rows = Math.ceil(ids.length / c);
+    ids.forEach((id, i) => {
+      const r = Math.floor(i / c);
+      const col = i % c;
+      const rowCount = r === rows - 1 ? ids.length - r * c : c;
+      const rowW = rowCount * nodeW + (rowCount - 1) * gapX;
+      pos.set(id, {
+        x: -rowW / 2 + col * (nodeW + gapX),
+        y: topY + r * (nodeH + rowGap),
+      });
+    });
+  };
+
+  // Focused unit centred on the origin.
+  pos.set(focused, { x: -nodeW / 2, y: 0 });
+  // Builders above: bottom row sits one band-gap above the focused unit.
+  if (builtBy.length > 0)
+    placeGrid(builtBy, -bandGap - blockHeight(builtBy.length));
+  // Builds below: top row sits one band-gap under the focused unit.
+  if (builds.length > 0) placeGrid(builds, nodeH + bandGap);
+
+  return pos;
+}

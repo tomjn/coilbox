@@ -26,7 +26,7 @@ import {
 } from "../../buildTree";
 import { useUnitsyncUnitBuildpics } from "../../config";
 import { BuildTreeExportButton } from "./BuildTreeExportButton";
-import { layoutBuildTree } from "./buildTreeLayout";
+import { layoutBuildTree, layoutFocusTree } from "./buildTreeLayout";
 
 /** Data carried on each build-tree node: the unit's label + icon, and flags that
  * drive its ring — `isStart` (commander, blue) takes precedence over `isBuilder`
@@ -121,6 +121,31 @@ const EDGE_BUILT_BY = "#facc15"; // yellow: what builds the hovered unit (incomi
  * edge doesn't take — see EDGE_TRANSITION_CSS); nodes animate via inline style. */
 const HOVER_MS = 1500;
 const EDGE_TRANSITION_CSS = `.react-flow__edge-path{transition:stroke ${HOVER_MS}ms ease,stroke-width ${HOVER_MS}ms ease,opacity ${HOVER_MS}ms ease}`;
+/** How long the focus rearrange takes: focus-set nodes slide to their clean
+ * layout and irrelevant nodes fade out over this window. React Flow positions a
+ * node via a `transform` translate, so a CSS transition on `.react-flow__node`
+ * animates the move; reduced-motion disables it so positions apply instantly. */
+const FOCUS_MS = 360;
+const NODE_TRANSITION_CSS = `.react-flow__node{transition:transform ${FOCUS_MS}ms ease}@media (prefers-reduced-motion:reduce){.react-flow__node{transition:none}}`;
+/** Edge-path + node-transform transitions, injected once into the drawer. */
+const FLOW_TRANSITION_CSS = EDGE_TRANSITION_CSS + NODE_TRANSITION_CSS;
+
+/** True when the OS "reduce motion" setting is on, tracked live. */
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!mq) return;
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
 
 /**
  * Drawer body for a game's per-faction unit build graph. A clean spanning tree
@@ -160,6 +185,7 @@ export function BuildTreeDrawer({
   // the full tree. One value, not a stack — so each click replaces the focus and
   // a background click always exits to the full tree, never a previous focus.
   const [focusedUnit, setFocusedUnit] = useState<string | null>(null);
+  const reduceMotion = usePrefersReducedMotion();
   const active = sides.find((s) => s.name === activeName) ?? sides[0];
 
   // Switching faction resets the view: a focus/hover from another tree is
@@ -291,36 +317,74 @@ export function BuildTreeDrawer({
   // its builds read green and its builders yellow even without hovering.
   const emphasisId = hoveredId ?? focusedUnit;
 
-  // Inject resolved icons/labels, filter to the focus subset when focused, and
-  // dim nodes not connected to the hovered one.
+  // Clean positions for the focus subset: focused unit centred, its builders in a
+  // band above and what it builds in a band below. Nodes not in the subset keep
+  // their full-tree position but fade out; on unfocus every node animates home.
+  const focusLayout = useMemo(() => {
+    if (!focusedUnit || !focusSet) return null;
+    const f = focusedUnit.toLowerCase();
+    const builds = (edges.get(f) ?? [])
+      .filter((id) => id !== f && focusSet.has(id))
+      .sort();
+    const buildsSet = new Set(builds);
+    const builtBy = [...focusSet]
+      .filter(
+        (id) =>
+          id !== f &&
+          !buildsSet.has(id) &&
+          (edges.get(id)?.includes(f) ?? false),
+      )
+      .sort();
+    return layoutFocusTree(f, builds, builtBy);
+  }, [focusedUnit, focusSet, edges]);
+
+  // Inject resolved icons/labels. When focused, keep every node mounted so it can
+  // animate: focus-set nodes move to the clean focus layout, the rest fade out
+  // (opacity 0, click-through disabled). Also dim nodes not connected to the
+  // hovered one. On unfocus every node animates back to its full-tree position.
   const nodes = useMemo(
     () =>
-      laidOut.nodes
-        .filter((n) => !focusSet || focusSet.has(n.id))
-        .map((n) => {
-          const display = buildpics?.units[n.id];
-          const prev = n.data as UnitNodeData;
-          const dimmed =
-            hoveredId != null &&
-            n.id !== hoveredId &&
-            !adjacency.get(hoveredId)?.has(n.id);
-          return {
-            ...n,
-            data: {
-              label: display?.name ?? prev.label,
-              icon: display?.icon,
-              isBuilder: prev.isBuilder,
-              isStart: prev.isStart,
-              isMobile: prev.isMobile,
-              hovered: n.id === emphasisId,
-            },
-            style: {
-              opacity: dimmed ? 0.18 : 1,
-              transition: `opacity ${HOVER_MS}ms`,
-            },
-          };
-        }),
-    [laidOut, buildpics, hoveredId, emphasisId, focusSet, adjacency],
+      laidOut.nodes.map((n) => {
+        const display = buildpics?.units[n.id];
+        const prev = n.data as UnitNodeData;
+        const inFocus = !focusSet || focusSet.has(n.id);
+        const focusPos = focusLayout?.get(n.id);
+        const dimmed =
+          inFocus &&
+          hoveredId != null &&
+          n.id !== hoveredId &&
+          !adjacency.get(hoveredId)?.has(n.id);
+        // Focus fade is quick; the slow 1.5s ease is only for hover dimming in the
+        // full tree. Reduced motion drops both so state changes are instant.
+        const fadeMs = reduceMotion ? 0 : focusSet ? FOCUS_MS : HOVER_MS;
+        return {
+          ...n,
+          position: focusPos ?? n.position,
+          data: {
+            label: display?.name ?? prev.label,
+            icon: display?.icon,
+            isBuilder: prev.isBuilder,
+            isStart: prev.isStart,
+            isMobile: prev.isMobile,
+            hovered: n.id === emphasisId,
+          },
+          style: {
+            opacity: inFocus ? (dimmed ? 0.18 : 1) : 0,
+            pointerEvents: inFocus ? undefined : ("none" as const),
+            transition: `opacity ${fadeMs}ms`,
+          },
+        };
+      }),
+    [
+      laidOut,
+      buildpics,
+      hoveredId,
+      emphasisId,
+      focusSet,
+      focusLayout,
+      adjacency,
+      reduceMotion,
+    ],
   );
 
   // Style edges: solid backbone vs faint dashed extras. On hover, the hovered
@@ -391,8 +455,8 @@ export function BuildTreeDrawer({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, non-user CSS to animate React Flow edge paths (inline edge transition doesn't take) */}
-      <style dangerouslySetInnerHTML={{ __html: EDGE_TRANSITION_CSS }} />
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, non-user CSS animating React Flow edge paths + node transforms (inline transition doesn't take on either), reduced-motion aware */}
+      <style dangerouslySetInnerHTML={{ __html: FLOW_TRANSITION_CSS }} />
       {(sides.length > 1 || gameName) && (
         <div className="flex flex-wrap items-start justify-between gap-2">
           {sides.length > 1 ? (
@@ -475,7 +539,11 @@ export function BuildTreeDrawer({
               maxZoom={1.5}
               proOptions={{ hideAttribution: true }}
             >
-              <FocusRefit dep={`${activeName}:${focusedUnit ?? ""}`} />
+              <FocusRefit
+                dep={`${activeName}:${focusedUnit ?? ""}`}
+                focusIds={focusedUnit && focusSet ? [...focusSet] : null}
+                instant={reduceMotion}
+              />
               <Background />
               <Controls showInteractive={false} />
               <MiniMap
@@ -515,16 +583,33 @@ export function BuildTreeDrawer({
 
 /**
  * Refits the viewport whenever `dep` (the active faction + focused unit) changes,
- * so a focus subset — or the restored full tree — lands centred and framed.
- * Rendered inside ReactFlow so it can reach the flow store; renders nothing.
+ * so a focus subset — or the restored full tree — lands centred and framed. When
+ * focused, `focusIds` restricts the frame to the focus subset, since the other
+ * nodes stay mounted (faded out) to animate. The 400ms pan runs alongside the
+ * node slide; reduced motion (`instant`) snaps instead. Rendered inside ReactFlow
+ * so it can reach the flow store; renders nothing.
  */
-function FocusRefit({ dep }: { dep: string }) {
+function FocusRefit({
+  dep,
+  focusIds,
+  instant,
+}: {
+  dep: string;
+  focusIds: string[] | null;
+  instant: boolean;
+}) {
   const { fitView } = useReactFlow();
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refit is keyed on the focus/faction `dep` only, not on the recreated `fitView`
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refit is keyed on the focus/faction `dep` only, not on the recreated `fitView`/latest args
   useEffect(() => {
-    // Defer a frame so the filtered node set is committed before we frame it.
+    // Defer a frame so the new node positions are committed before we frame them.
     const raf = requestAnimationFrame(() =>
-      fitView({ padding: 0.15, minZoom: 0.08, maxZoom: 1, duration: 400 }),
+      fitView({
+        padding: 0.15,
+        minZoom: 0.08,
+        maxZoom: 1,
+        duration: instant ? 0 : 400,
+        ...(focusIds ? { nodes: focusIds.map((id) => ({ id })) } : {}),
+      }),
     );
     return () => cancelAnimationFrame(raf);
   }, [dep]);
