@@ -21,6 +21,7 @@ import {
 import type { Side, SkirmishAi } from "@/content/bindings";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
+import { cn } from "@/lib/utils";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   aiByline,
@@ -120,8 +121,10 @@ export function ParticipantsTable({
   }));
   // Offer team slots up to the active count: enough for full FFA, and picking a
   // taken number is how two rows come to share a team (shared unit control).
-  // Existing teams show their (leader's) colour so "join the red team" reads
-  // directly; a not-yet-used slot gets a hollow dot.
+  // Existing teams show their (leader's) colour in the open dropdown so "join
+  // the red team" reads directly; a not-yet-used slot keeps a blank spacer so
+  // the numbers stay aligned. The swatch is dropdown-only (`SelectItem` icon),
+  // keeping the closed trigger a plain number.
   const teamOptions = Array.from({ length: activeCount }, (_, i) => {
     const teamLeader = byId.get(leaderIdByTeam[i]);
     return {
@@ -130,7 +133,10 @@ export function ParticipantsTable({
       icon: (
         <span
           aria-hidden
-          className="size-3 shrink-0 rounded-sm border border-white/25"
+          className={cn(
+            "size-3 shrink-0 rounded-sm",
+            teamLeader && "border border-white/25",
+          )}
           style={
             teamLeader ? { background: rgbToHex(teamLeader.color) } : undefined
           }
@@ -282,7 +288,14 @@ export function ParticipantsTable({
                   {p.kind === "you" && p.spectator ? (
                     <span className="text-xs text-muted-foreground">–</span>
                   ) : sharer ? (
-                    <Badge variant="outline" title={sharedTitle}>
+                    <Badge
+                      variant="outline"
+                      title={sharedTitle}
+                      style={{
+                        color: rgbToHex(leader.color),
+                        borderColor: rgbToHex(leader.color),
+                      }}
+                    >
                       Co-player
                     </Badge>
                   ) : (
@@ -301,14 +314,26 @@ export function ParticipantsTable({
                   {teamIdx === undefined ? (
                     <span className="text-xs text-muted-foreground">–</span>
                   ) : (
-                    <OptionSelect
+                    <Select
                       value={String(teamIdx)}
-                      size="sm"
-                      className="w-20"
                       disabled={disabled}
-                      options={teamOptions}
                       onValueChange={(v) => onSetTeam(p.id, Number(v))}
-                    />
+                    >
+                      <SelectTrigger size="sm" className="w-16">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teamOptions.map((o) => (
+                          <SelectItem
+                            key={o.value}
+                            value={o.value}
+                            icon={o.icon}
+                          >
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
                 </TableCell>
 
