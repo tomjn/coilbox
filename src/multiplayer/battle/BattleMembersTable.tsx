@@ -30,6 +30,7 @@ export function BattleMembersTable({
   sides,
   factionLogos,
   maxSlots,
+  startPosType,
   selfHost,
   canAddBot,
   hostControls,
@@ -48,6 +49,9 @@ export function BattleMembersTable({
   factionLogos?: Record<string, FactionLogoSrc>;
   /** Upper bound for the team/ally pickers (typically the battle's maxPlayers). */
   maxSlots: number;
+  /** The battle's start-position mode; with 0 (fixed map positions) the team
+   * picker notes that team N spawns at the map's start position N. */
+  startPosType?: number;
   /** When true, the viewer hosts this battle and may force/kick other members. */
   selfHost: boolean;
   /** When true, the viewer may add a bot (any seated member — see `useBattleRoom`). */
@@ -113,6 +117,10 @@ export function BattleMembersTable({
   const teamOptions = range(slots).map((i) => ({
     value: String(i),
     label: String(i + 1),
+    // Under fixed start positions the team number *is* the spawn choice — say so
+    // in the picker, since nothing else in the room links the two (issue #456).
+    description:
+      startPosType === 0 ? `Spawns at map position ${i + 1}` : undefined,
   }));
   const allyOptions = range(slots).map((i) => ({
     value: String(i),

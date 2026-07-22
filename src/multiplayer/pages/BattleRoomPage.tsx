@@ -187,6 +187,7 @@ function BattleRoomPage() {
             sides={room.sides}
             factionLogos={factionLogos}
             maxSlots={battle.maxPlayers}
+            startPosType={room.startPosType}
             selfHost={room.selfHost}
             canAddBot={room.canAddBot}
             hostControls={room.hostControls}
@@ -245,10 +246,12 @@ function BattleRoomPage() {
             canEdit={room.canEditOptions}
             sendOption={room.sendOption}
             note={
-              room.startPosType === 2 &&
-              Object.keys(battle.startRects).length === 0
-                ? "The host hasn't set start boxes yet."
-                : undefined
+              room.startPosType === 0
+                ? "Each team spawns at its numbered map position — pick a team in the player list to choose yours."
+                : room.startPosType === 2 &&
+                    Object.keys(battle.startRects).length === 0
+                  ? "The host hasn't set start boxes yet."
+                  : undefined
             }
           >
             {room.canEditBoxes && (
