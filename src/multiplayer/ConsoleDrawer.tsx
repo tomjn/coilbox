@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { mpSend } from "./bindings";
 import { useMultiplayer } from "./store";
 
@@ -10,8 +11,10 @@ import { useMultiplayer } from "./store";
  * via `mpSend` (the raw escape hatch). Lives off a button in Settings > Lobby
  * servers so the debug console stays out of the main lobby UI. Unlike the chat-pane
  * drawers this one is viewport-anchored (`fixed`), since the settings page has no
- * positioned container to anchor an absolute drawer to. Motion is disabled under
- * prefers-reduced-motion via the `motion-reduce:` variants.
+ * positioned container to anchor an absolute drawer to — and portalled to `<body>`
+ * so a transformed/filtered ancestor can't hijack `fixed` and cut the drawer short
+ * of the window bottom. Motion is disabled under prefers-reduced-motion via the
+ * `motion-reduce:` variants.
  */
 export function ConsoleDrawer({
   open,
@@ -33,7 +36,7 @@ export function ConsoleDrawer({
     setCommand("");
   }
 
-  return (
+  return createPortal(
     <>
       {open && (
         <button
@@ -81,6 +84,7 @@ export function ConsoleDrawer({
           </Button>
         </form>
       </aside>
-    </>
+    </>,
+    document.body,
   );
 }
