@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   AtSign,
+  Download,
   Gamepad2,
   LogIn,
   MessagesSquare,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import LobbyStatusButton from "./LobbyStatusButton";
 import { BattleNavBadge, ChatNavBadge } from "./nav/navBadges";
+import BattleDownloadsSettings from "./pages/BattleDownloadsSettings";
 import HighlightsSettings from "./pages/HighlightsSettings";
 import IgnoreSettings from "./pages/IgnoreSettings";
 import {
@@ -111,6 +113,12 @@ const multiplayerPlugin: FramePlugin = {
     },
   ],
   settings: [
+    {
+      id: "battle-downloads",
+      title: "Battle downloads",
+      icon: Download,
+      Component: BattleDownloadsSettings,
+    },
     {
       id: "chat-highlights",
       title: "Chat highlights",

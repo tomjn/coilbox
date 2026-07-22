@@ -1,11 +1,13 @@
-import { Button } from "@picoframe/frame";
+import { Button, useSetting } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import { AlertTriangle, Download, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import type { DownloadProgress } from "@/downloads/bindings";
 import { useWriteRootPath } from "@/downloads/config";
+import { useDownloadQueue } from "@/downloads/DownloadQueueProvider";
 import { ProgressBar } from "@/downloads/pages/components/ProgressBar";
 import { errMessage } from "@/downloads/pages/components/states";
+import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
 import { downloadGameAnySource } from "./downloadGame";
 
 /**
@@ -17,13 +19,18 @@ import { downloadGameAnySource } from "./downloadGame";
  * `MissingMapBox`.)
  */
 export function MissingContentCard({
+  battleId,
   gameName,
   onRescan,
 }: {
+  /** The joined battle's id, to key the auto-download once per (battle, game). */
+  battleId: number;
   gameName: string;
   onRescan: () => Promise<void>;
 }) {
   const writePath = useWriteRootPath();
+  const { active, queued } = useDownloadQueue();
+  const [autoEnabled] = useSetting<boolean>(AUTO_DOWNLOAD_ON_JOIN_KEY, true);
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [rescanning, setRescanning] = useState(false);
@@ -55,6 +62,18 @@ export function MissingContentCard({
       setRescanning(false);
     }
   }
+
+  // On join, start the same download the button fires (issue #439) — this card
+  // only renders when the game is missing, so mounting means the required content
+  // is absent. Idempotent and gated so it fires once and never fights the queue.
+  useAutoDownload({
+    key: `${battleId}:game:${gameName}`,
+    enabled: autoEnabled,
+    writeRootReady: !!writePath,
+    queueIdle: active == null && queued.length === 0,
+    inFlight: downloading,
+    start: downloadGame,
+  });
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
