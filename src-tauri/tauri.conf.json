@@ -45,6 +45,9 @@
     "macOS": {
       "signingIdentity": "-",
       "entitlements": "entitlements.plist",
+      "files": {
+        "Resources/Assets.car": "icons/macos/Assets.car"
+      },
       "dmg": {
         "windowSize": { "width": 700, "height": 450 },
         "appPosition": { "x": 200, "y": 195 },

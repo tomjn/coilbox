@@ -1,0 +1,38 @@
+{
+  "fill" : {
+    "automatic-gradient" : "display-p3:0.07740,0.07789,0.09404,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "coilbox-glyph-white-filled-1024.svg",
+          "name" : "coilbox-glyph-white-filled-1024",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              0.038628257887467043,
+              -2.257997256515864
+            ]
+          }
+        }
+      ],
+      "name" : "Coilbox",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

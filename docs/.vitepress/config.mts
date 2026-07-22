@@ -15,7 +15,7 @@ export default defineConfig({
   // The guides cross-link to repo files (CONTRIBUTING.md, source paths) that aren't
   // part of the site; don't fail the build on those.
   ignoreDeadLinks: true,
-  head: [["link", { rel: "icon", href: "/coilbox/app-icon.png" }]],
+  head: [["link", { rel: "icon", href: "/coilbox/favicon.ico" }]],
   // Keep internal/design docs off the public site.
   srcExclude: ["**/superpowers/**", "mockups/**", "ideas-*.md", "README.md"],
   themeConfig: {

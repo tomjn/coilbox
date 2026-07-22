@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merged into the generated macOS Info.plist by Tauri (it auto-discovers an
+  Info.plist next to tauri.conf.json). CFBundleIconName points macOS 26 (Tahoe)
+  at the `coilbox` app icon in Contents/Resources/Assets.car, enabling the
+  Liquid Glass rendering. Tauri still sets CFBundleIconFile from bundle.icon
+  (icon.icns) as the pre-Tahoe fallback.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleIconName</key>
+	<string>coilbox</string>
+</dict>
+</plist>

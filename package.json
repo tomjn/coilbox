@@ -12,6 +12,7 @@
     "sidecar:unitsync": "bash scripts/build-unitsync-worker.sh",
     "sidecar:prdownloader": "bash scripts/assemble-prdownloader.sh",
     "sidecar:all": "bun run sidecar:unitsync && bun run sidecar:prdownloader",
+    "icon:macos-glass": "bash scripts/build-macos-glass-icon.sh",
     "clean": "bash scripts/clean.sh",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
