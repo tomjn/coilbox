@@ -10,9 +10,11 @@ import {
 import { cn } from "@/lib/utils";
 import {
   allServers,
+  isLastLogin,
   type LobbyAccount,
   resolveLastLogin,
   resolveServer,
+  sortAccountsByRecency,
   useCustomServers,
   useLastLogin,
   useLobbyAccounts,
@@ -113,13 +115,19 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   const [pending, setPending] = useState<LobbyAccount | null>(null);
   const [registering, setRegistering] = useState(false);
 
-  // A one-click "reconnect" shortcut to the last-used account, shown only when
-  // startup auto-connect is off (with it on, the boot connect already ran). Resolved
-  // against the profile-filtered catalog, so a profile-disallowed server won't offer
-  // it. Falls back to the plain account list below when there's no valid last login.
-  const reconnect = autoConnect
-    ? null
-    : resolveLastLogin(lastLogin, accounts, allServers(customCfg.servers));
+  // A one-click "reconnect" shortcut to the last-used account, earned only after a
+  // genuine connection this session (`revealed`) — on a fresh open it would just
+  // duplicate the top row of the most-recent-first list below. Also hidden when
+  // startup auto-connect is on (the boot connect already ran). Resolved against the
+  // profile-filtered catalog, so a profile-disallowed server won't offer it.
+  const reconnect =
+    autoConnect || !revealed
+      ? null
+      : resolveLastLogin(lastLogin, accounts, allServers(customCfg.servers));
+
+  // Most recently used first; the last-used login is badged instead of getting a
+  // dedicated connect button.
+  const sortedAccounts = sortAccountsByRecency(accounts, lastLogin);
 
   async function connectTo(account: LobbyAccount) {
     setError(null);
@@ -222,7 +230,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           Reconnect as {reconnect.account.username || "last account"}
         </Button>
       )}
-      {accounts.map((a) => {
+      {sortedAccounts.map((a) => {
         const server = resolveServer(a.serverId, customCfg.servers);
         return (
           <button
@@ -232,8 +240,13 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
             disabled={busy}
             className="flex flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
           >
-            <span className="text-base font-semibold leading-tight">
+            <span className="flex w-full items-center gap-2 text-base font-semibold leading-tight">
               {a.username || "(no username)"}
+              {isLastLogin(a, lastLogin) && (
+                <span className="ml-auto rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                  Last used
+                </span>
+              )}
             </span>
             <span className="text-xs text-muted-foreground">
               {server?.name ?? "Unknown server"}

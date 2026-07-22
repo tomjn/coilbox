@@ -20,11 +20,13 @@ import {
   autoConnectTarget,
   BUILTIN_SERVERS,
   buildCatalog,
+  isLastLogin,
   type LobbyAccount,
   type LobbyServer,
   OFFICIAL_ID,
   resolveProfileServerRules,
   resolveServer,
+  sortAccountsByRecency,
 } from "./config";
 
 const custom: LobbyServer = {
@@ -193,5 +195,59 @@ describe("autoConnectTarget", () => {
     // offers `techa`, so the disallowed server never resolves and never connects.
     const narrowed = buildCatalog([], { presets: ["techa"] });
     expect(autoConnectTarget(true, lastLogin, [account], narrowed)).toBeNull();
+  });
+});
+
+describe("sortAccountsByRecency", () => {
+  const acc = (id: string, extra?: Partial<LobbyAccount>): LobbyAccount => ({
+    id,
+    serverId: id,
+    username: "player",
+    ...extra,
+  });
+
+  it("orders by lastUsedAt, newest first, never-used last", () => {
+    const a = acc("a", { lastUsedAt: 100 });
+    const b = acc("b", { lastUsedAt: 300 });
+    const c = acc("c");
+    expect(sortAccountsByRecency([a, b, c], null).map((x) => x.id)).toEqual([
+      "b",
+      "a",
+      "c",
+    ]);
+  });
+
+  it("ranks the last login first even without a timestamp (pre-flag login)", () => {
+    const a = acc("a", { lastUsedAt: 100 });
+    const b = acc("b");
+    const sorted = sortAccountsByRecency([a, b], {
+      serverId: "b",
+      username: "player",
+    });
+    expect(sorted.map((x) => x.id)).toEqual(["b", "a"]);
+  });
+
+  it("keeps saved order for ties and does not mutate the input", () => {
+    const list = [acc("a"), acc("b"), acc("c")];
+    const sorted = sortAccountsByRecency(list, null);
+    expect(sorted.map((x) => x.id)).toEqual(["a", "b", "c"]);
+    expect(sorted).not.toBe(list);
+  });
+});
+
+describe("isLastLogin", () => {
+  const account: LobbyAccount = {
+    id: "acc-1",
+    serverId: "bar",
+    username: "player",
+  };
+  it("matches on serverId + username, not account id", () => {
+    expect(isLastLogin(account, { serverId: "bar", username: "player" })).toBe(
+      true,
+    );
+    expect(isLastLogin(account, { serverId: "bar", username: "other" })).toBe(
+      false,
+    );
+    expect(isLastLogin(account, null)).toBe(false);
   });
 });
