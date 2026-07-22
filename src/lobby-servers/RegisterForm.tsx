@@ -72,6 +72,8 @@ export function RegisterForm({
               id: crypto.randomUUID(),
               serverId: server.id,
               username: trimmedUser,
+              // The registration flow just stored the password above.
+              hasSecret: true,
             },
           ],
         });

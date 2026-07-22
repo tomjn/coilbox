@@ -7,8 +7,10 @@ import {
   Trash2,
   UserPlus,
   Users,
+  X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ConsoleDrawer } from "../../multiplayer/ConsoleDrawer";
 import { serverKeyFor, useMultiplayer } from "../../multiplayer/store";
 import {
@@ -44,6 +46,8 @@ export default function LobbyServersSettings() {
   const [customCfg, setCustomCfg] = useCustomServers();
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  // The account whose editor drawer is open (null = closed).
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [autoRejoin, setAutoRejoin] = useSetting<boolean>(
     "multiplayer.autoRejoin",
     true,
@@ -55,17 +59,22 @@ export default function LobbyServersSettings() {
 
   const servers = allServers(customCfg.servers);
 
-  const addAccount = () =>
+  const addAccount = () => {
+    const id = crypto.randomUUID();
     setAccountsCfg({
       accounts: [
         ...accountsCfg.accounts,
         {
-          id: crypto.randomUUID(),
+          id,
           serverId: servers[0]?.id ?? "",
           username: "",
+          hasSecret: false,
         },
       ],
     });
+    // A blank login is only editable through its drawer, so open it straight away.
+    setEditingId(id);
+  };
 
   const updateAccount = (id: string, patch: Partial<LobbyAccount>) =>
     setAccountsCfg({
@@ -75,6 +84,7 @@ export default function LobbyServersSettings() {
     });
 
   const removeAccount = (a: LobbyAccount) => {
+    if (editingId === a.id) setEditingId(null);
     setAccountsCfg({
       accounts: accountsCfg.accounts.filter((x) => x.id !== a.id),
     });
@@ -151,15 +161,13 @@ export default function LobbyServersSettings() {
             No logins yet. Add one to connect to a lobby.
           </p>
         ) : (
-          <ul className="space-y-4">
+          <ul className="space-y-2">
             {accountsCfg.accounts.map((a) => (
-              <AccountRow
+              <AccountListRow
                 key={a.id}
                 account={a}
                 servers={servers}
-                onChange={(patch) => updateAccount(a.id, patch)}
-                onRemove={() => removeAccount(a)}
-                onOpenConsole={() => setConsoleOpen(true)}
+                onOpen={() => setEditingId(a.id)}
               />
             ))}
           </ul>
@@ -182,16 +190,6 @@ export default function LobbyServersSettings() {
             <Plus /> Add login
           </Button>
         </div>
-        {registerOpen && (
-          <div className="space-y-3 rounded-md border border-border p-3">
-            <p className="text-sm font-medium">Create a new account</p>
-            <RegisterForm
-              servers={servers}
-              onSuccess={() => setRegisterOpen(false)}
-              onCancel={() => setRegisterOpen(false)}
-            />
-          </div>
-        )}
       </section>
 
       <section className="space-y-3">
@@ -224,16 +222,201 @@ export default function LobbyServersSettings() {
         )}
       </section>
 
+      <RegisterDrawer
+        open={registerOpen}
+        servers={servers}
+        onClose={() => setRegisterOpen(false)}
+      />
+      <AccountDrawer
+        account={accountsCfg.accounts.find((a) => a.id === editingId) ?? null}
+        servers={servers}
+        onChange={(id, patch) => updateAccount(id, patch)}
+        onRemove={removeAccount}
+        onOpenConsole={() => setConsoleOpen(true)}
+        onClose={() => setEditingId(null)}
+      />
       <ConsoleDrawer open={consoleOpen} onClose={() => setConsoleOpen(false)} />
     </div>
   );
 }
 
+/** Whether an account is the live connection, and how many users it sees. */
+function useAccountConnection(
+  a: LobbyAccount,
+  server: LobbyServer | undefined,
+) {
+  const { mirror, activeKey } = useMultiplayer();
+  const connected =
+    mirror.connected &&
+    server != null &&
+    activeKey === serverKeyFor(server, a.username);
+  const onlineCount = connected
+    ? Object.keys(mirror.state?.users ?? {}).length
+    : 0;
+  return { connected, onlineCount };
+}
+
 /**
- * One login. `serverId`/`username` persist through the parent; the password lives in
- * local state and syncs to the keychain (keyed by `{serverId, username}`) on blur.
+ * One login in the accounts list: a compact row (username + server, like the login
+ * popover) that opens the editor drawer. Editing lives entirely in the drawer.
  */
-function AccountRow({
+function AccountListRow({
+  account: a,
+  servers,
+  onOpen,
+}: {
+  account: LobbyAccount;
+  servers: LobbyServer[];
+  onOpen: () => void;
+}) {
+  const server = servers.find((s) => s.id === a.serverId);
+  const { connected, onlineCount } = useAccountConnection(a, server);
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-left hover:bg-accent"
+      >
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate text-sm font-semibold leading-tight">
+            {a.username || "(no username)"}
+          </span>
+          <span className="truncate text-xs text-muted-foreground">
+            {server?.name ?? "Unknown server"}
+          </span>
+        </span>
+        {connected && (
+          <span className="ml-auto flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
+            Connected · {onlineCount} online
+          </span>
+        )}
+      </button>
+    </li>
+  );
+}
+
+/**
+ * The editor drawer for one login (opened by clicking its list row). Same
+ * viewport-anchored slide-in as `ConsoleDrawer`. Because opening it is a user
+ * action, it's the one place that reads the keychain to verify a secret exists —
+ * an OS prompt here is expected, unlike the old always-on per-row check — and it
+ * heals the account's persisted `hasSecret` flag with the answer. The password
+ * itself lives in local state and syncs to the keychain on blur.
+ */
+function AccountDrawer({
+  account,
+  servers,
+  onChange,
+  onRemove,
+  onOpenConsole,
+  onClose,
+}: {
+  account: LobbyAccount | null;
+  servers: LobbyServer[];
+  onChange: (id: string, patch: Partial<LobbyAccount>) => void;
+  onRemove: (a: LobbyAccount) => void;
+  onOpenConsole: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <SlideDrawer
+      open={account != null}
+      title={account?.username.trim() ? account.username : "New login"}
+      onClose={onClose}
+    >
+      {account && (
+        <AccountForm
+          key={account.id}
+          account={account}
+          servers={servers}
+          onChange={(patch) => onChange(account.id, patch)}
+          onRemove={() => onRemove(account)}
+          onOpenConsole={onOpenConsole}
+        />
+      )}
+    </SlideDrawer>
+  );
+}
+
+/**
+ * Shared shell for this page's slide-in editors (login editor, registration):
+ * the same viewport-anchored right drawer as `ConsoleDrawer`, with a titled
+ * header and a click-away backdrop. Children mount only while open, so each
+ * visit starts fresh. Portalled to `<body>` so `fixed inset-y-0` really means
+ * the viewport — a transformed/filtered ancestor would otherwise become the
+ * positioning box and cut the drawer short of the window bottom.
+ */
+function SlideDrawer({
+  open,
+  title,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return createPortal(
+    <>
+      {open && (
+        <button
+          type="button"
+          aria-label={`Close ${title}`}
+          className="fixed inset-0 z-40 bg-black/20"
+          onClick={onClose}
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 right-0 z-50 flex w-96 max-w-full flex-col border-l border-border bg-background shadow-lg transition-transform motion-reduce:transition-none ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+        inert={!open}
+      >
+        <header className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold">{title}</h2>
+          <Button className="h-7 px-2" onClick={onClose} aria-label="Close">
+            <X className="size-4" />
+          </Button>
+        </header>
+        {open && children}
+      </aside>
+    </>,
+    document.body,
+  );
+}
+
+/**
+ * Account registration in the same slide-in drawer as the login editor, so the
+ * whole Accounts section edits through drawers.
+ */
+function RegisterDrawer({
+  open,
+  servers,
+  onClose,
+}: {
+  open: boolean;
+  servers: LobbyServer[];
+  onClose: () => void;
+}) {
+  return (
+    <SlideDrawer open={open} title="Create a new account" onClose={onClose}>
+      <div className="flex-1 overflow-y-auto p-4">
+        <RegisterForm
+          servers={servers}
+          onSuccess={onClose}
+          onCancel={onClose}
+        />
+      </div>
+    </SlideDrawer>
+  );
+}
+
+/** The drawer's body: server/username/password fields + channels + actions. */
+function AccountForm({
   account: a,
   servers,
   onChange,
@@ -247,25 +430,30 @@ function AccountRow({
   onOpenConsole: () => void;
 }) {
   const [password, setPassword] = useState("");
-  const [saved, setSaved] = useState<boolean | null>(null);
+  // Seed from the persisted flag for an instant render, then verify against the
+  // keychain — a user opened this drawer, so the (macOS) prompt is expected.
+  const [saved, setSaved] = useState<boolean | undefined>(a.hasSecret);
   const server = servers.find((s) => s.id === a.serverId);
+  const { connected, onlineCount } = useAccountConnection(a, server);
 
-  // At most one account is "connected" — the one whose key matches `activeKey`.
-  const { mirror, activeKey } = useMultiplayer();
-  const connected =
-    mirror.connected &&
-    server != null &&
-    activeKey === serverKeyFor(server, a.username);
-  const onlineCount = connected
-    ? Object.keys(mirror.state?.users ?? {}).length
-    : 0;
-
-  // On mount / key change, reflect whether a secret exists (never show plaintext).
+  // Latest patcher behind a ref so the probe effect keys only on the identity
+  // fields (a fresh `onChange` closure each render must not re-fire the probe).
+  const onChangeRef = useRef(onChange);
   useEffect(() => {
-    lsGetCredential({ serverId: a.serverId, username: a.username })
-      .then(({ secret }) => setSaved(secret != null))
-      .catch(() => setSaved(null));
-  }, [a.serverId, a.username]);
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  const { serverId, username, hasSecret } = a;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `hasSecret` is the probe's answer, not a trigger — keying on it would re-fire after the heal.
+  useEffect(() => {
+    lsGetCredential({ serverId, username })
+      .then(({ secret }) => {
+        const exists = secret != null;
+        setSaved(exists);
+        if (hasSecret !== exists) onChangeRef.current({ hasSecret: exists });
+      })
+      .catch(() => {});
+  }, [serverId, username]);
 
   const savePassword = () => {
     if (password === "") return;
@@ -274,40 +462,35 @@ function AccountRow({
       username: a.username,
       secret: password,
     })
-      .then(() => setSaved(true))
-      .catch(() => setSaved(false));
+      .then(() => {
+        setSaved(true);
+        onChange({ hasSecret: true });
+      })
+      .catch(() => {
+        setSaved(false);
+        onChange({ hasSecret: false });
+      });
   };
 
   return (
-    <li className="space-y-3 rounded-md border border-border p-3">
-      <div className="flex items-center gap-2">
-        {connected && (
+    <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      {connected && (
+        <div className="flex items-center gap-2">
           <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
             Connected · {onlineCount} online
           </span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          {connected && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onOpenConsole}
-              aria-label="Open protocol console"
-            >
-              <Terminal />
-            </Button>
-          )}
           <Button
             variant="outline"
             size="sm"
-            onClick={onRemove}
-            aria-label={`Remove ${a.username || "login"}`}
+            className="ml-auto"
+            onClick={onOpenConsole}
+            aria-label="Open protocol console"
           >
-            <Trash2 />
+            <Terminal />
           </Button>
         </div>
-      </div>
+      )}
       <Field label="Server">
         <OptionSelect
           value={a.serverId}
@@ -328,7 +511,7 @@ function AccountRow({
       <Field
         label="Password"
         hint={
-          saved === null ? undefined : saved ? "Saved in keychain" : "Not set"
+          saved == null ? undefined : saved ? "Saved in keychain" : "Not set"
         }
       >
         <Input
@@ -342,7 +525,17 @@ function AccountRow({
       {server && a.username.trim() !== "" && (
         <AutojoinChannels serverKey={serverKeyFor(server, a.username)} />
       )}
-    </li>
+      <div className="border-t border-border pt-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRemove}
+          aria-label={`Remove ${a.username || "login"}`}
+        >
+          <Trash2 /> Remove login
+        </Button>
+      </div>
+    </div>
   );
 }
 

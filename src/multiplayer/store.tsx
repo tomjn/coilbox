@@ -659,12 +659,29 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // can read the hydrated values without re-running when they change.
   const [autoConnect] = useSetting<boolean>("multiplayer.autoConnect", false);
   const [lastLogin, setLastLogin] = useLastLogin();
-  const [accountsCfg] = useLobbyAccounts();
+  const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
   const [customCfg] = useCustomServers();
   const setLastLoginRef = useRef(setLastLogin);
   useEffect(() => {
     setLastLoginRef.current = setLastLogin;
   }, [setLastLogin]);
+  // Stamp the connected account's recency + known-secret flag (a connect just
+  // read the password successfully), feeding the login panel's most-recent-first
+  // ordering. Ref'd like `setLastLoginRef` so `doConnect` stays stable.
+  const markAccountUsedRef = useRef(
+    (_serverId: string, _username: string) => {},
+  );
+  useEffect(() => {
+    markAccountUsedRef.current = (serverId: string, username: string) => {
+      setAccountsCfg({
+        accounts: accountsCfg.accounts.map((a) =>
+          a.serverId === serverId && a.username === username
+            ? { ...a, lastUsedAt: Date.now(), hasSecret: true }
+            : a,
+        ),
+      });
+    };
+  }, [accountsCfg.accounts, setAccountsCfg]);
   const bootRef = useRef({
     autoConnect,
     lastLogin,
@@ -916,6 +933,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // one-click reconnect row can seed it next launch. Keyed by id+username so
         // it survives the account being re-created (not by the volatile account id).
         setLastLoginRef.current({ serverId: server.id, username });
+        markAccountUsedRef.current(server.id, username);
       } catch (e) {
         // A user cancel aborts the in-flight connect, so `mpConnect` rejects by
         // design: swallow it, clear the mirror, and leave the UI disconnected

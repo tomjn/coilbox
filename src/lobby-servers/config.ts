@@ -177,6 +177,14 @@ export interface LobbyAccount {
   id: string;
   serverId: string;
   username: string;
+  /** ms epoch of the last successful connect with this login. */
+  lastUsedAt?: number;
+  /**
+   * A password is known to exist in the keychain (set on save/register/connect,
+   * cleared on none). `undefined` means unknown — pre-existing logins from before
+   * this flag; checking would require reading the secret, which prompts on macOS.
+   */
+  hasSecret?: boolean;
 }
 export interface AccountsConfig {
   accounts: LobbyAccount[];
@@ -202,6 +210,33 @@ export interface LastLogin {
 /** The last-used login, persisted under `lobbyServers.lastLogin` (null until first connect). */
 export function useLastLogin() {
   return useSetting<LastLogin | null>("lobbyServers.lastLogin", null);
+}
+
+/** Whether an account is the one named by the last login. Pure. */
+export function isLastLogin(
+  account: LobbyAccount,
+  lastLogin: LastLogin | null,
+): boolean {
+  return (
+    lastLogin != null &&
+    account.serverId === lastLogin.serverId &&
+    account.username === lastLogin.username
+  );
+}
+
+/**
+ * Accounts ordered most-recently-used first. Pure and stable: sorts by
+ * `lastUsedAt` (missing = never), except the {@link LastLogin} account always
+ * ranks at least above never-used ones — pre-stamp logins have no timestamp, but
+ * the last login is known to be the most recent of them. Ties keep saved order.
+ */
+export function sortAccountsByRecency(
+  accounts: LobbyAccount[],
+  lastLogin: LastLogin | null,
+): LobbyAccount[] {
+  const rank = (a: LobbyAccount) =>
+    Math.max(a.lastUsedAt ?? 0, isLastLogin(a, lastLogin) ? Infinity : 0);
+  return [...accounts].sort((x, y) => rank(y) - rank(x));
 }
 
 /**
