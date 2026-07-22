@@ -100,6 +100,16 @@ export interface Participant {
   spectator: boolean;
   /** Team handicap % (resource/damage bonus). Undefined = 0 (not emitted). */
   handicap?: number;
+  /**
+   * Chosen team slot (0-based). Rows sharing a slot form one engine team with
+   * shared unit control; team-level attributes (ally, colour, side, handicap)
+   * come from the slot's first row. Undefined = own slot by row order (the
+   * pre-existing behaviour, so old drafts need no migration). Slots are
+   * compacted to contiguous 0..k-1 indices by `effectiveTeams`, which also
+   * decides which fixed map start position each team gets (StartPosType 0 keys
+   * mapinfo positions by team index).
+   */
+  team?: number;
 }
 
 let idSeq = 0;
@@ -219,6 +229,62 @@ export function resolveRandomSides(
   return changed ? next : participants;
 }
 
+/**
+ * Resolve the effective team grouping: each active (non-spectator) participant's
+ * contiguous 0-based team index, and the leader (first row) of each team.
+ *
+ * Rows with the same valid `team` slot share one engine team; rows without one
+ * (old drafts) each get their own slot by row position, preserving the historic
+ * row-order teams. Groups are ordered by slot value then first appearance and
+ * compacted to 0..k-1 — gaps self-heal (picks 1,1,3 become teams 0,0,1), so the
+ * start script's `[TEAMn]` blocks stay contiguous and, under StartPosType 0,
+ * team index i lands on the map's start position i.
+ */
+export function effectiveTeams(participants: Participant[]): {
+  teamIndexById: Map<string, number>;
+  leaderIdByTeam: string[];
+} {
+  const active = participants.filter((p) => !(p.kind === "you" && p.spectator));
+  const groups = new Map<string, { sort: number; ids: string[] }>();
+  active.forEach((p, i) => {
+    const valid =
+      p.team !== undefined && Number.isInteger(p.team) && p.team >= 0;
+    const key = valid ? `t${p.team}` : `u${i}`;
+    const g = groups.get(key);
+    if (g) g.ids.push(p.id);
+    else groups.set(key, { sort: valid ? (p.team as number) : i, ids: [p.id] });
+  });
+  // Stable sort: equal slot values keep first-appearance (row) order.
+  const ordered = [...groups.values()].sort((a, b) => a.sort - b.sort);
+  const teamIndexById = new Map<string, number>();
+  const leaderIdByTeam: string[] = [];
+  ordered.forEach((g, idx) => {
+    leaderIdByTeam.push(g.ids[0]);
+    for (const id of g.ids) teamIndexById.set(id, idx);
+  });
+  return { teamIndexById, leaderIdByTeam };
+}
+
+/**
+ * Assign participant `id` to team slot `team` (0-based). Duplicates are legal —
+ * rows sharing a slot get shared control of one team. Before applying the pick,
+ * the current *effective* indices are materialised onto every active row, so the
+ * change is anchored against what the user sees (compacted numbers), not
+ * whatever stale slot values a draft carried.
+ */
+export function setParticipantTeam(
+  participants: Participant[],
+  id: string,
+  team: number,
+): Participant[] {
+  const { teamIndexById } = effectiveTeams(participants);
+  return participants.map((p) => {
+    if (p.id === id) return { ...p, team };
+    const eff = teamIndexById.get(p.id);
+    return eff !== undefined && p.team !== eff ? { ...p, team: eff } : p;
+  });
+}
+
 /** `#rrggbb` -> RGB in 0..1. */
 export function hexToRgb(hex: string): Rgb {
   const n = Number.parseInt(hex.replace("#", ""), 16);
@@ -236,8 +302,10 @@ export function rgbToHex([r, g, b]: Rgb): string {
 
 /**
  * Derive the engine-shaped `BattleConfig` from the UI model. Spectators are
- * dropped from the team list; non-spectator participants get team indices by
- * order; ally-team values are remapped to a contiguous 0..k range. Every AI —
+ * dropped from the team list; non-spectator participants get team indices from
+ * `effectiveTeams` (chosen slots, compacted; row order when nothing was chosen),
+ * so rows sharing a slot become one shared-control team whose attributes come
+ * from its leader; ally-team values are remapped to a contiguous 0..k range. Every AI —
  * native or game Lua — becomes an `[AI]` block: `LoadSkirmishAIs` is the engine's
  * only route into the script, and it decides Lua-ness itself by matching the
  * shortname against the game's `LuaAI.lua`.
@@ -262,14 +330,17 @@ export function toBattleConfig(opts: {
   const you = participants[0];
   const active = participants.filter((p) => !(p.kind === "you" && p.spectator));
 
-  const teamIndexById = new Map(active.map((p, i) => [p.id, i] as const));
+  const { teamIndexById, leaderIdByTeam } = effectiveTeams(participants);
+  const byId = new Map(active.map((p) => [p.id, p] as const));
+  // One team per distinct slot; its attributes come from the leader (first row).
+  const leaders = leaderIdByTeam.flatMap((id) => byId.get(id) ?? []);
 
-  const allyValues = [...new Set(active.map((p) => p.allyTeam))].sort(
+  const allyValues = [...new Set(leaders.map((p) => p.allyTeam))].sort(
     (a, b) => a - b,
   );
   const allyIndexByValue = new Map(allyValues.map((v, i) => [v, i] as const));
 
-  const teams = active.map((p) => {
+  const teams = leaders.map((p) => {
     const team: BattleConfig["teams"][number] = {
       teamLeader: 0,
       allyTeam: allyIndexByValue.get(p.allyTeam) ?? 0,
@@ -320,17 +391,19 @@ export function toBattleConfig(opts: {
 
 /**
  * Re-apply a captured battle's personal levers onto a built config's player team
- * (team 0 = "you"). Mirrors warpath's `applyPerks`: `advantage` adds to the team's
+ * (the team `players[0]` — "you" — sits on, which is no longer always team 0 now
+ * that team slots are assignable). Mirrors warpath's `applyPerks`: `advantage` adds to the team's
  * `Advantage` fraction (default 0), `incomeMultiplier` to its `IncomeMultiplier`
  * (default 1). Disabled units are handled by `toBattleConfig`'s own param, so this
  * only touches the two team levers a preset can't express through participants.
- * Mutates and returns `config` for chaining; a config with no teams is untouched.
+ * Mutates and returns `config` for chaining; a config with no teams — or a
+ * spectating player, who has no team — is untouched.
  */
 export function applyRestrictions(
   config: BattleConfig,
   restrictions?: BattleRestrictions,
 ): BattleConfig {
-  const team = config.teams[0];
+  const team = config.teams[config.players[0]?.team ?? -1];
   if (!restrictions || !team) return config;
   if (restrictions.advantage)
     team.advantage = (team.advantage ?? 0) + restrictions.advantage;
