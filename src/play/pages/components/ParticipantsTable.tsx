@@ -150,8 +150,8 @@ export function ParticipantsTable({
           {displayOrder.map((p) => {
             const teamIdx = teamIndexById.get(p.id);
             const leader = leaderOf(p);
-            // A non-leader row sharing a team: its team-level settings (colour,
-            // side, ally) are the leader's, shown read-only.
+            // A non-leader row sharing a team: its team-level controls (colour,
+            // side, ally) are hidden — the leader's row above carries them.
             const sharer = teamIdx !== undefined && leader.id !== p.id;
             const sharedTitle = sharer
               ? `Shares a team with ${leader.name} — team settings come from the first member`
@@ -163,17 +163,31 @@ export function ParticipantsTable({
               >
                 <TableCell className="px-3 py-2">
                   <div className="flex items-center gap-2.5">
-                    <input
-                      type="color"
-                      aria-label={`${p.name} colour`}
-                      value={rgbToHex(sharer ? leader.color : p.color)}
-                      disabled={disabled || sharer}
-                      title={sharedTitle}
-                      onChange={(e) =>
-                        onUpdate(p.id, { color: hexToRgb(e.target.value) })
-                      }
-                      className="color-swatch size-6 shrink-0 cursor-pointer rounded border border-white/25 bg-transparent p-0 disabled:cursor-not-allowed"
-                    />
+                    {sharer ? (
+                      // A file-explorer-style branch in the team colour, marking
+                      // this row as a member of the leader's team above it.
+                      <span
+                        aria-hidden
+                        title={sharedTitle}
+                        className="flex size-6 shrink-0 items-start justify-center"
+                      >
+                        <span
+                          className="h-4 w-3 translate-x-1.5 rounded-bl-md border-b-2 border-l-2"
+                          style={{ borderColor: rgbToHex(leader.color) }}
+                        />
+                      </span>
+                    ) : (
+                      <input
+                        type="color"
+                        aria-label={`${p.name} colour`}
+                        value={rgbToHex(p.color)}
+                        disabled={disabled}
+                        onChange={(e) =>
+                          onUpdate(p.id, { color: hexToRgb(e.target.value) })
+                        }
+                        className="color-swatch size-6 shrink-0 cursor-pointer rounded border border-white/25 bg-transparent p-0 disabled:cursor-not-allowed"
+                      />
+                    )}
                     {p.kind === "you" ? (
                       <div className="leading-tight">
                         <div>You</div>
@@ -252,17 +266,15 @@ export function ParticipantsTable({
                 <TableCell className="px-3 py-2">
                   {p.kind === "you" && p.spectator ? (
                     <span className="text-xs text-muted-foreground">–</span>
-                  ) : (
-                    <span title={sharedTitle}>
-                      <OptionSelect
-                        value={sharer ? leader.side : p.side}
-                        size="sm"
-                        className="w-auto min-w-20"
-                        disabled={disabled || sharer || sides.length === 0}
-                        options={sideOptions}
-                        onValueChange={(v) => onUpdate(p.id, { side: v })}
-                      />
-                    </span>
+                  ) : sharer ? null : (
+                    <OptionSelect
+                      value={p.side}
+                      size="sm"
+                      className="w-auto min-w-20"
+                      disabled={disabled || sides.length === 0}
+                      options={sideOptions}
+                      onValueChange={(v) => onUpdate(p.id, { side: v })}
+                    />
                   )}
                 </TableCell>
 
@@ -284,19 +296,17 @@ export function ParticipantsTable({
                 <TableCell className="px-3 py-2">
                   {p.kind === "you" && p.spectator ? (
                     <span className="text-xs text-muted-foreground">–</span>
-                  ) : (
-                    <span title={sharedTitle}>
-                      <OptionSelect
-                        value={String(sharer ? leader.allyTeam : p.allyTeam)}
-                        size="sm"
-                        className="w-24"
-                        disabled={disabled || sharer}
-                        options={allyOptions}
-                        onValueChange={(v) =>
-                          onUpdate(p.id, { allyTeam: Number(v) })
-                        }
-                      />
-                    </span>
+                  ) : sharer ? null : (
+                    <OptionSelect
+                      value={String(p.allyTeam)}
+                      size="sm"
+                      className="w-24"
+                      disabled={disabled}
+                      options={allyOptions}
+                      onValueChange={(v) =>
+                        onUpdate(p.id, { allyTeam: Number(v) })
+                      }
+                    />
                   )}
                 </TableCell>
 
