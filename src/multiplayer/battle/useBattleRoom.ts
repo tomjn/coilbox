@@ -8,6 +8,7 @@ import {
   useUnitsyncScan,
 } from "@/content/config";
 import { isBlackHex, pickTeamColorHex } from "@/lib/teamColor";
+import { notify } from "@/notify/notify";
 import {
   type PlayTarget,
   usePreferredTarget,
@@ -42,6 +43,7 @@ import {
   type MemberRow,
   membersToRows,
   type SyncState,
+  shouldNotifyVoteOpened,
   startPosTypeOf,
   usedColorsFromBattle,
 } from "./config";
@@ -297,6 +299,28 @@ export function useBattleRoom(): BattleRoomView {
   const hostIngame = !!battle && !!state?.users[battle.host]?.status.ingame;
   const allReady = battleStartable(rows);
   const startPosType = battle ? startPosTypeOf(battle) : 0;
+
+  // Votes only exist in autohost battles; when we self-host there's no bot to run
+  // them, so never surface a (stale) panel — or a notification — there.
+  const currentVote = selfHost ? null : (state?.currentVote ?? null);
+
+  // Notify once per vote (issue #429): fire on the null -> set transition only, so
+  // a re-render while the same vote stays open (tally/countdown ticking) doesn't
+  // re-fire, and a new distinct vote opening after this one clears fires again.
+  // `to` routes back to the battle room, useful once the user has clicked through
+  // elsewhere in the app; the room has no id in its route (one active battle at a
+  // time), so `to` is always safe to include here.
+  const prevVoteRef = useRef<Vote | null>(null);
+  useEffect(() => {
+    if (shouldNotifyVoteOpened(prevVoteRef.current, currentVote)) {
+      void notify({
+        title: "Vote called",
+        body: currentVote?.subject || "A vote is open in your battle.",
+        to: "/battle",
+      });
+    }
+    prevVoteRef.current = currentVote;
+  }, [currentVote]);
 
   // The colour we last intended (as the `0xBBGGRR` int), so a status push that
   // omits `color` never reverts to 0 while our colour echo is still in flight —
@@ -753,9 +777,7 @@ export function useBattleRoom(): BattleRoomView {
     sync,
     actionError,
     hostIngame,
-    // Votes only exist in autohost battles; when we self-host there's no bot to run
-    // them, so never surface a (stale) panel there.
-    currentVote: selfHost ? null : (state?.currentVote ?? null),
+    currentVote,
     allReady,
     serverKey: activeKey,
     contentNonce,

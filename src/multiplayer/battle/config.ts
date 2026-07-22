@@ -1,5 +1,5 @@
 import { randomTeamColorHex } from "@/lib/teamColor";
-import type { Battle, BattleStatus, User } from "../bindings";
+import type { Battle, BattleStatus, User, Vote } from "../bindings";
 
 // Re-exported so existing call sites (and config.test.ts) keep importing the
 // random-colour helper from `./config` unchanged; the implementation now lives in
@@ -218,4 +218,24 @@ export function battleStartable(rows: MemberRow[]): boolean {
   const playing = rows.filter((r) => !r.spectator);
   if (playing.length === 0) return false;
   return playing.every((r) => r.kind !== "human" || r.ready);
+}
+
+/* -------------------------------------------------------------------------- *
+ * Vote-open notification gate.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Whether a vote-called notification should fire for this render: only on the
+ * null -> set transition. `prevVote` is whatever `currentVote` was the last
+ * time this ran (tracked by the caller in a ref), so a re-render with the same
+ * open vote (tally ticking up, countdown ticking down) never re-fires — those
+ * still produce a non-null `vote`, but `prevVote` is non-null too. Once the
+ * vote clears (`currentVote` goes back to null) the caller's ref resets, so
+ * the next distinct vote opening fires again.
+ */
+export function shouldNotifyVoteOpened(
+  prevVote: Vote | null,
+  vote: Vote | null,
+): boolean {
+  return prevVote === null && vote !== null;
 }
