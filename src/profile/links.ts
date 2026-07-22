@@ -79,6 +79,15 @@ export function resolveLinkIcon(name?: string): IconComponent {
   return ICONS[name.toLowerCase()] ?? ExternalLink;
 }
 
+/**
+ * The curated icon names a profile link may use. The source of truth the on-demand
+ * validation checks a link's `icon` against — any other name silently falls back to
+ * ExternalLink, so validation flags it.
+ */
+export function linkIconNames(): string[] {
+  return Object.keys(ICONS);
+}
+
 /** Schemes the Tauri opener will open (matches `opener:default`'s allow-list). */
 export const ALLOWED_SCHEME = /^(https?:\/\/|mailto:|tel:)/i;
 

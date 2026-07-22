@@ -13,7 +13,17 @@ function base(): HealthInputs {
     writeRootPath: "/pkg/game",
     campaignFailures: [],
     writable: { writeRoot: { writable: true }, dataDir: { writable: true } },
+    hide: [],
+    hideableNavIds: ["content.games", "downloads.browse", "downloads.games"],
+    hideSettings: [],
+    settingsIds: ["content-folders", "engines", "uberstress"],
+    linkIcons: [],
+    validIconNames: ["discord", "globe", "docs"],
   };
+}
+
+function maybeById(inputs: HealthInputs, id: string) {
+  return deriveHealthChecks(inputs).find((x) => x.id === id);
 }
 
 function byId(inputs: HealthInputs, id: string) {
@@ -143,5 +153,64 @@ describe("deriveHealthChecks", () => {
   it("returns unknown for a check whose input is absent", () => {
     const c = byId({ ...base(), writeRootPath: undefined }, "writeRoot");
     expect(c.status).toBe("unknown");
+  });
+
+  describe("hide id no-op advisory", () => {
+    it("warns and names a hide id that matches nothing", () => {
+      const c = byId({ ...base(), hide: ["content.gmaes"] }, "hide");
+      expect(c.status).toBe("warn");
+      expect(c.hint).toContain("hide id 'content.gmaes' matches nothing");
+      // lists the ids the profile could actually hide.
+      expect(c.hint).toContain("content.games");
+    });
+
+    it("does not warn when every hide id is hideable", () => {
+      const c = byId({ ...base(), hide: ["content.games"] }, "hide");
+      expect(c.status).toBe("ok");
+    });
+
+    it("adds no hide row when the profile hides nothing", () => {
+      expect(maybeById(base(), "hide")).toBeUndefined();
+    });
+  });
+
+  describe("hideSettings id no-op advisory", () => {
+    it("warns and names a hideSettings id that matches no section", () => {
+      const c = byId(
+        { ...base(), hideSettings: ["uberstres"] },
+        "hideSettings",
+      );
+      expect(c.status).toBe("warn");
+      expect(c.hint).toContain("hideSettings id 'uberstres' matches nothing");
+    });
+
+    it("does not warn for a real section id", () => {
+      const c = byId(
+        { ...base(), hideSettings: ["uberstress"] },
+        "hideSettings",
+      );
+      expect(c.status).toBe("ok");
+    });
+
+    it("adds no hideSettings row when empty", () => {
+      expect(maybeById(base(), "hideSettings")).toBeUndefined();
+    });
+  });
+
+  describe("link icon no-op advisory", () => {
+    it("warns and names an unknown link icon", () => {
+      const c = byId({ ...base(), linkIcons: ["discrod"] }, "linkIcons");
+      expect(c.status).toBe("warn");
+      expect(c.hint).toContain("link icon 'discrod' is unknown");
+    });
+
+    it("does not warn for a curated icon (case-insensitively)", () => {
+      const c = byId({ ...base(), linkIcons: ["Discord"] }, "linkIcons");
+      expect(c.status).toBe("ok");
+    });
+
+    it("adds no link-icon row when no link sets an icon", () => {
+      expect(maybeById(base(), "linkIcons")).toBeUndefined();
+    });
   });
 });

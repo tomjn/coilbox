@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { plugins } from "../app.plugins";
 import { campaignList } from "../campaign/bindings";
 import { parseCampaignJson } from "../campaign/model";
 import { contentStateLoad } from "../content/bindings";
@@ -10,7 +11,9 @@ import {
   type HealthCheck,
   type HealthInputs,
 } from "./health";
+import { HIDEABLE_NAV_IDS } from "./hidden";
 import { describeJsonError } from "./jsonError";
+import { linkIconNames } from "./links";
 import {
   getProfile,
   getProfileError,
@@ -105,17 +108,34 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
 
       if (cancelled) return;
 
+      const profile = getProfile();
+      // Every settings-section id in the app — the set `hideSettings` can affect
+      // (applyProfileSettingsHiding wraps them all). The authoritative source of truth.
+      const settingsIds = plugins.flatMap(
+        (p) => p.settings?.map((s) => s.id) ?? [],
+      );
+      // Non-empty icon names on the profile's links; blanks fall back on purpose.
+      const linkIcons = (profile.links ?? [])
+        .map((l) => l.icon)
+        .filter((i): i is string => typeof i === "string" && i.trim() !== "");
+
       const inputs: HealthInputs = {
         portableRoot,
         profileSource: getProfileSource(),
         profileError: getProfileError(),
         profileErrorSnippet: getProfileErrorSnippet(),
-        gameFilter: getProfile().gameFilter,
+        gameFilter: profile.gameFilter,
         roots,
         installedGames,
         writeRootPath,
         campaignFailures,
         writable: { writeRoot: writeRootProbe, dataDir: dataDirProbe },
+        hide: profile.hide ?? [],
+        hideableNavIds: HIDEABLE_NAV_IDS,
+        hideSettings: profile.hideSettings ?? [],
+        settingsIds,
+        linkIcons,
+        validIconNames: linkIconNames(),
       };
       setChecks(deriveHealthChecks(inputs));
       setLoading(false);
