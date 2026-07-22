@@ -16,6 +16,10 @@ import { BattleRoomHeader } from "../battle/BattleRoomHeader";
 import { battleOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
 import { MissingContentCard } from "../battle/MissingContentCard";
+import {
+  StartBoxControls,
+  useStartBoxAllies,
+} from "../battle/StartBoxControls";
 import { StartPosOptions } from "../battle/StartPosOptions";
 import { battleToSkirmishDraft } from "../battle/toSkirmish";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
@@ -53,6 +57,9 @@ function BattleRoomPage() {
     room.dataDir,
     room.localGame?.primaryArchive.name,
   );
+  // Ally state for start-box editing, shared between the minimap's drag editor
+  // and the controls under the start-position dropdown.
+  const boxAllies = useStartBoxAllies(room.rows, room.battle?.startRects ?? {});
 
   // Per-game default preset: when we host a game that has a default preset set,
   // apply its options once. Guarded by a ref keyed on the battle + game so it seeds
@@ -209,17 +216,11 @@ function BattleRoomPage() {
             startPosType={room.startPosType}
             selfHost={room.selfHost}
             canEditBoxes={room.canEditBoxes}
+            activeAlly={boxAllies.activeAlly}
             onSetBox={room.setStartBox}
-            onClearBox={room.clearStartBox}
             onSuggestMap={room.suggestMap}
             onChangeMap={room.setMap}
             onRescan={room.rescan}
-          />
-          <BattleGameCard
-            enginePath={room.enginePath}
-            dataDir={room.dataDir}
-            game={room.localGame}
-            gameName={battle.modname}
           />
           {/* Save the whole battle as a replayable singleplayer skirmish (other
               humans become AIs). Distinct from the host-only "Option presets" below,
@@ -249,7 +250,20 @@ function BattleRoomPage() {
                 ? "The host hasn't set start boxes yet."
                 : undefined
             }
-          />
+          >
+            {room.canEditBoxes && (
+              <StartBoxControls
+                mapName={battle.map}
+                rects={battle.startRects}
+                allyList={boxAllies.allyList}
+                allyColors={boxAllies.allyColors}
+                activeAlly={boxAllies.activeAlly}
+                onPickAlly={boxAllies.pickAlly}
+                onSetBox={room.setStartBox}
+                onClearBox={room.clearStartBox}
+              />
+            )}
+          </StartPosOptions>
           <BattleOptionsDrawer
             battle={battle}
             modOptionsSchema={room.modOptionsSchema}
@@ -311,6 +325,12 @@ function BattleRoomPage() {
               onCommand={room.autohostSend}
             />
           )}
+          <BattleGameCard
+            enginePath={room.enginePath}
+            dataDir={room.dataDir}
+            game={room.localGame}
+            gameName={battle.modname}
+          />
         </aside>
       </div>
     </main>

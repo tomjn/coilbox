@@ -17,19 +17,22 @@ const LABELS: Record<number, string> = {
  * in place via the same select the Battle options drawer uses — sharing
  * `useBattleOptions` so the pick is optimistic and reconciles on the server echo.
  * Everyone else sees the mode read-only. `note` surfaces host-driven caveats (e.g.
- * box mode with no boxes set yet).
+ * box mode with no boxes set yet). `children` renders below the select — the
+ * host's start-box controls when choose-in-game is active.
  */
 export function StartPosOptions({
   battle,
   canEdit,
   sendOption,
   note,
+  children,
 }: {
   battle: Battle;
   /** Host may change the mode; joiners see it read-only. */
   canEdit: boolean;
   sendOption: (tagKey: string, spadsName: string, value: string) => void;
   note?: string;
+  children?: React.ReactNode;
 }) {
   const { pending, setOption } = useBattleOptions(
     battle.scriptTags,
@@ -59,6 +62,7 @@ export function StartPosOptions({
       {note && (
         <span className="mt-1 block text-xs text-muted-foreground">{note}</span>
       )}
+      {children}
     </div>
   );
 }
