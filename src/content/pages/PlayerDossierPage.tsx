@@ -32,10 +32,12 @@ function playedAt(ms: number): string {
 /**
  * A player dossier (#375): one other player's own record (games, win rate,
  * streak, favourite maps/factions, via `profileFor` — same shape as the
- * personal Stats page) plus your head-to-head with them (`relationTo`) — games
- * together vs against, and the maps you've shared. Reached from a replay
- * roster's player names. Entirely local, derived from the same stats database
- * as `StatsPage` (#414) — no new data path.
+ * personal Player stats page) plus your head-to-head with them (`relationTo`)
+ * — games together vs against, and the maps you've shared. Reached from a
+ * replay roster's player names. Entirely local, derived from the same stats
+ * database as `StatsPage` (#414) — no new data path. Registered at
+ * `stats/:name` by the multiplayer plugin (moved from `content/stats/:name`
+ * in #467).
  */
 export default function PlayerDossierPage() {
   const { name } = useParams();
@@ -79,10 +81,10 @@ export default function PlayerDossierPage() {
     <div className="flex flex-col gap-4 p-4">
       <header className="flex flex-col gap-1">
         <Link
-          to="/content/stats"
+          to="/stats"
           className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
-          <ArrowLeft className="size-3.5" /> Stats
+          <ArrowLeft className="size-3.5" /> Player stats
         </Link>
         <h1 className="text-lg font-semibold">{playerName || "Player"}</h1>
         <p className="text-sm text-muted-foreground">

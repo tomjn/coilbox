@@ -53,7 +53,7 @@ export function ReplayHistoryList({
       {matched.map((r) => (
         <li key={r.path}>
           <Link
-            to={`/content/replays/${encodeURIComponent(r.filename)}`}
+            to={`/play/replays/${encodeURIComponent(r.filename)}`}
             className="flex items-center justify-between gap-2 rounded-md border border-border/40 bg-card px-2 py-1.5 text-xs transition-colors hover:border-border hover:bg-accent/40"
           >
             <span className="flex min-w-0 items-center gap-1.5">

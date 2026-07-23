@@ -12,12 +12,13 @@ import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
 /**
- * Personal stats profile — a minimal, offline view over the local replay-stats
- * database (see `stats.rs`). It ingests the library's demos on open, then shows one
- * player's games, win rate, streak, favourite maps and factions. The
- * head-to-head dossier for another player lives at `PlayerDossierPage`
- * (`content/stats/:name`, #375); per-map/per-faction detail-page records are
- * deferred follow-ups.
+ * Personal stats profile ("Player stats" in the Multiplayer nav, moved from
+ * Content's "Stats" in #467) — a minimal, offline view over the local
+ * replay-stats database (see `stats.rs`). It ingests the library's demos on
+ * open, then shows one player's games, win rate, streak, favourite maps and
+ * factions. The head-to-head dossier for another player lives at
+ * `PlayerDossierPage` (`stats/:name`, #375); per-map/per-faction detail-page
+ * records are deferred follow-ups.
  */
 export default function StatsPage() {
   const { state } = useContentState();
