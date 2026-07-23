@@ -14,6 +14,7 @@ import {
 } from "@/content/config";
 import { useFactionLogos } from "@/factions/logos";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
+import { notify } from "@/notify/notify";
 import { contentListReplays } from "../../content/bindings";
 import { useReplayUserState } from "../../content/replayUserState";
 import type { BattleConfig } from "../bindings";
@@ -36,7 +37,11 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "../config";
-import { type BattleRestrictions, useSkirmishDraft } from "../drafts";
+import {
+  type BattleRestrictions,
+  type SkirmishDraft,
+  useSkirmishDraft,
+} from "../drafts";
 import { effectiveOptions } from "../modOptions";
 import { usePlay } from "../PlayProvider";
 import {
@@ -352,6 +357,17 @@ export default function SkirmishPage() {
       restrictions,
     });
 
+  // "New preset from replay…" (#368): save straight into the presets library,
+  // leaving the current setup on the page untouched.
+  const saveFromReplay = (name: string, draft: SkirmishDraft) => {
+    savePreset(name, draft);
+    notify({
+      title: "Saved to Singleplayer presets",
+      body: `"${name}" — replay it from Singleplayer → Presets.`,
+      level: "success",
+    });
+  };
+
   const loadPreset = (p: SkirmishPreset) => {
     // The mod-option reset effect wipes values whenever the game archive changes
     // to a different defined value. Pre-seed `prevArchive` to the incoming game's
@@ -456,6 +472,7 @@ export default function SkirmishPage() {
         onDelete={removePreset}
         onExportPreset={onExportPreset}
         onImport={onImportPreset}
+        onSaveFromReplay={saveFromReplay}
         disabled={running}
       />
 

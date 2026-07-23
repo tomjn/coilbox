@@ -3,7 +3,9 @@ import { Check, ImageOff, Save, Share2, Trash2, Upload, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
 import type { MapThumbData } from "@/content/config";
+import type { SkirmishDraft } from "../../drafts";
 import type { SkirmishPreset } from "../../presets";
+import { NewPresetFromReplayButton } from "./NewPresetFromReplayButton";
 
 /** A short, derived summary of a preset — its map, game and opponent count. No
  * description is stored on a preset, so this is computed at render time. */
@@ -29,6 +31,7 @@ export function PresetsDrawer({
   onDelete,
   onExportPreset,
   onImport,
+  onSaveFromReplay,
   disabled,
 }: {
   open: boolean;
@@ -40,6 +43,10 @@ export function PresetsDrawer({
   onDelete: (id: string) => void;
   onExportPreset: (preset: SkirmishPreset) => void;
   onImport: () => void;
+  /** "New preset from replay…" (#368): seed a preset from a decoded replay's
+   * setup (every seated player becomes an AI opponent) without touching the
+   * current Skirmish setup. */
+  onSaveFromReplay: (name: string, draft: SkirmishDraft) => void;
   disabled?: boolean;
 }) {
   const [naming, setNaming] = useState(false);
@@ -132,6 +139,15 @@ export function PresetsDrawer({
                 </Button>
               </>
             )}
+          </div>
+
+          {/* Seed a preset from a decoded replay's setup, the other end of the
+           * refight pipeline from the replay detail page's "Refight this setup". */}
+          <div className="flex items-center border-b border-border/60 px-5 py-3">
+            <NewPresetFromReplayButton
+              onSave={onSaveFromReplay}
+              disabled={disabled}
+            />
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
