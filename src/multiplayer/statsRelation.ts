@@ -4,6 +4,10 @@ import {
   useReplayStats,
   useScanTargetSelection,
 } from "@/content/config";
+import {
+  refightFilenames,
+  useReplayUserState,
+} from "@/content/replayUserState";
 import { type PlayerRelation, relationTo } from "@/content/stats";
 
 /**
@@ -21,8 +25,14 @@ export function useStatsRelations(
   const { selected } = useScanTargetSelection();
   const roots = useMemo(() => (state?.roots ?? []).map((r) => r.path), [state]);
   const { records } = useReplayStats(roots, selected?.enginePath);
+  const { state: replayUserState } = useReplayUserState();
+  const refights = useMemo(
+    () => refightFilenames(replayUserState),
+    [replayUserState],
+  );
 
   return useMemo(() => {
-    return (other: string) => (me ? relationTo(records, me, other) : null);
-  }, [records, me]);
+    return (other: string) =>
+      me ? relationTo(records, me, other, refights) : null;
+  }, [records, me, refights]);
 }

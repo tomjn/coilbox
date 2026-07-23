@@ -3,6 +3,7 @@ import type { StatPlayer, StatRecord } from "./bindings";
 import {
   allPlayers,
   guessPrimaryPlayer,
+  isGenuineMatch,
   profileFor,
   relationTo,
   replaysFor,
@@ -13,7 +14,7 @@ let seq = 0;
 function rec(
   map: string,
   players: StatPlayer[],
-  opts: { winnersKnown?: boolean } = {},
+  opts: { winnersKnown?: boolean; remixed?: boolean } = {},
 ): StatRecord {
   seq += 1;
   return {
@@ -28,7 +29,7 @@ function rec(
     modifiedMs: 1,
     winnersKnown: opts.winnersKnown ?? true,
     winningAllyTeams: [0],
-    remixed: false,
+    remixed: opts.remixed ?? false,
     ingestedAt: 0,
     players,
   };
@@ -287,5 +288,82 @@ describe("relationTo", () => {
       lastPlayedMs: 0,
       commonMaps: [],
     });
+  });
+});
+
+describe("remix/refight exclusion (#466)", () => {
+  it("isGenuineMatch is false for a remixed record", () => {
+    const remixed = rec("A", [p("me", true)], { remixed: true });
+    expect(isGenuineMatch(remixed, new Set())).toBe(false);
+  });
+
+  it("isGenuineMatch is false for a filename tagged as a refight", () => {
+    const refought = rec("A", [p("me", true)]);
+    expect(isGenuineMatch(refought, new Set([refought.filename]))).toBe(false);
+  });
+
+  it("isGenuineMatch is true for an ordinary record", () => {
+    const genuine = rec("A", [p("me", true)]);
+    expect(isGenuineMatch(genuine, new Set())).toBe(true);
+  });
+
+  it("allPlayers excludes remixed and refought games from the count", () => {
+    const genuine = rec("A", [p("me", true)]);
+    const remixed = rec("B", [p("me", false)], { remixed: true });
+    const refought = rec("C", [p("me", true)]);
+    const records = [genuine, remixed, refought];
+    expect(allPlayers(records, new Set([refought.filename]))).toEqual([
+      { name: "me", games: 1 },
+    ]);
+  });
+
+  it("profileFor drops a remix from games, wins, and favourite maps", () => {
+    const records = [
+      rec("Comet", [p("me", true)]),
+      rec("Valles Marineris", [p("me", true)], { remixed: true }),
+    ];
+    const prof = profileFor(records, "me");
+    expect(prof.games).toBe(1);
+    expect(prof.wins).toBe(1);
+    expect(prof.favouriteMaps).toEqual([{ key: "Comet", games: 1, wins: 1 }]);
+  });
+
+  it("profileFor drops a refought record given its filename", () => {
+    const genuine = rec("Comet", [p("me", true)]);
+    const refought = rec("Comet", [p("me", false)]);
+    const records = [genuine, refought];
+    const prof = profileFor(records, "me", new Set([refought.filename]));
+    expect(prof.games).toBe(1);
+    expect(prof.losses).toBe(0);
+  });
+
+  it("relationTo excludes remixed/refought shared games", () => {
+    const genuine = rec("A", [
+      p("me", true, "Armada", false, 0),
+      p("foe", false, "Cortex", false, 1),
+    ]);
+    const remixed = rec(
+      "B",
+      [p("me", false, "Armada", false, 0), p("foe", true, "Cortex", false, 1)],
+      { remixed: true },
+    );
+    const records = [genuine, remixed];
+    const rel = relationTo(records, "me", "foe");
+    expect(rel.gamesShared).toBe(1);
+    expect(rel.gamesAgainst).toBe(1);
+    expect(rel.winsAgainst).toBe(1);
+  });
+
+  it("replaysFor keeps remix/refight records visible but flags them", () => {
+    const genuine = rec("A", [p("me", true)]);
+    const remixed = rec("B", [p("me", true)], { remixed: true });
+    const refought = rec("C", [p("me", true)]);
+    const records = [genuine, remixed, refought];
+    const replays = replaysFor(records, "me", new Set([refought.filename]));
+    expect(replays).toHaveLength(3);
+    const byFilename = new Map(replays.map((r) => [r.filename, r]));
+    expect(byFilename.get(genuine.filename)?.excludedReason).toBeUndefined();
+    expect(byFilename.get(remixed.filename)?.excludedReason).toBe("remix");
+    expect(byFilename.get(refought.filename)?.excludedReason).toBe("refight");
   });
 });

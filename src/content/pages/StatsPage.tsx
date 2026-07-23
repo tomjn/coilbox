@@ -7,6 +7,7 @@ import {
   useReplayStats,
   useScanTargetSelection,
 } from "../config";
+import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, profileFor } from "../stats";
 import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
@@ -28,8 +29,16 @@ export default function StatsPage() {
     roots,
     selected?.enginePath,
   );
+  const { state: replayUserState } = useReplayUserState();
+  const refights = useMemo(
+    () => refightFilenames(replayUserState),
+    [replayUserState],
+  );
 
-  const players = useMemo(() => allPlayers(records), [records]);
+  const players = useMemo(
+    () => allPlayers(records, refights),
+    [records, refights],
+  );
   const [storedName, setStoredName] = useSetting("content.statsPlayer", "");
   // The active player: the stored pick when it still has games, else the
   // most-played name in the library.
@@ -37,8 +46,8 @@ export default function StatsPage() {
     players.find((p) => p.name === storedName)?.name ?? players[0]?.name ?? "";
 
   const profile = useMemo(
-    () => (activeName ? profileFor(records, activeName) : null),
-    [records, activeName],
+    () => (activeName ? profileFor(records, activeName, refights) : null),
+    [records, activeName, refights],
   );
 
   const playerOptions = useMemo(

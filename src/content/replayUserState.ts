@@ -93,3 +93,19 @@ export function useReplayUserState() {
 
   return { state, get, setWatched, setTags, setProvenance, allTags };
 }
+
+/**
+ * Filenames tagged as a "refight this setup" rerun (#368's `mode: "refight"`
+ * provenance) — the fallback marker #466 uses to exclude refights from stats
+ * when the Rust-side `remixed` flag doesn't apply. Best-effort: a refight
+ * whose tagging attempt failed (see `tagFreshReplay`) won't appear here.
+ */
+export function refightFilenames(
+  state: Record<string, ReplayUserState>,
+): Set<string> {
+  const set = new Set<string>();
+  for (const [filename, s] of Object.entries(state)) {
+    if (s.provenance?.mode === "refight") set.add(filename);
+  }
+  return set;
+}
