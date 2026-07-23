@@ -1,5 +1,5 @@
 import { Button, buttonVariants, cn, Input, useDrawer } from "@picoframe/frame";
-import { ChevronRight, Dices, Orbit, Trash2 } from "lucide-react";
+import { ChevronRight, Dices, Download, Orbit, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -7,6 +7,9 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
+import { ChallengeCodeInput } from "../../challenge/ChallengeCodeInput";
+import { challengeDecodeErrorMessage } from "../../challenge/code";
+import { unitsyncSkirmishAis } from "../../content/bindings";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
 import {
@@ -22,6 +25,7 @@ import {
 import { getGameMatcher, getProfile } from "../../profile/profile";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import { conquestDelete, conquestSave } from "../bindings";
+import { decodeConquestChallenge, optionsFromChallenge } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { type GenerateOptions, generateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc } from "../model";
@@ -65,6 +69,20 @@ export default function ConquestListPage() {
       ),
     });
 
+  const openImportChallenge = () =>
+    drawer.open({
+      title: "Import challenge",
+      width: "26rem",
+      content: (
+        <ImportChallengeForm
+          onImported={(id) => {
+            drawer.close();
+            navigate(`/conquest/${encodeURIComponent(id)}`);
+          }}
+        />
+      ),
+    });
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex items-start justify-between gap-4">
@@ -77,9 +95,15 @@ export default function ConquestListPage() {
           </p>
         </div>
         {!needsGame && (
-          <Button onClick={openGenerate} className="shrink-0">
-            <Dices className="mr-1.5 size-4" aria-hidden /> Generate a galaxy
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" onClick={openImportChallenge}>
+              <Download className="mr-1.5 size-4" aria-hidden /> Import
+              challenge
+            </Button>
+            <Button onClick={openGenerate}>
+              <Dices className="mr-1.5 size-4" aria-hidden /> Generate a galaxy
+            </Button>
+          </div>
         )}
       </header>
 
@@ -239,6 +263,11 @@ function GalaxyCard({
             {bundled && (
               <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                 Bundled
+              </span>
+            )}
+            {galaxy.importedChallenge && (
+              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                Imported challenge
               </span>
             )}
           </div>
@@ -618,5 +647,99 @@ function GenerateGalaxyForm({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Paste a challenge code, resolve it against the recipient's own install, and
+ * generate the identical galaxy locally (issue #376). `installedGame` is
+ * resolved from the decoded settings, not from the wizard's own game picker —
+ * a challenge names its own game.
+ *
+ * SEAM FOR #387 (resolve missing content on import): the "game not installed"
+ * branch below is exactly where a content-resolution/download flow belongs. It
+ * currently just reports the gap; `optionsFromChallenge` (see `../challenge.ts`)
+ * is the pure settings -> generator-options step #387's resolution result would
+ * feed into unchanged.
+ */
+function ImportChallengeForm({
+  onImported,
+}: {
+  onImported: (id: string) => void;
+}) {
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const brandingEntries = useBrandingCatalog();
+
+  const { run: runScan, data: scanData, loading: scanLoading } = scan;
+  useEffect(() => {
+    if (!scanData && !scanLoading) runScan();
+  }, [scanData, scanLoading, runScan]);
+
+  const importChallenge = async (code: string) => {
+    const result = decodeConquestChallenge(code);
+    if (!result.ok) {
+      throw new Error(challengeDecodeErrorMessage(result.error));
+    }
+    const { settings } = result;
+
+    if (!target) throw new Error("Install an engine first.");
+    const matcher = getGameMatcher();
+    const games = (scanData?.games ?? []).filter(
+      (g) => !matcher || matcher(g.name),
+    );
+    const installedGame = resolveGameByShortname(settings.game, games);
+    if (!installedGame) {
+      throw new Error(
+        `This challenge needs "${settings.game.shortname}", which isn't installed. Install it from Content → Games, then try again.`,
+      );
+    }
+
+    const maps = (scanData?.maps ?? []).map((m) => ({
+      name: m.name,
+      width: m.width,
+      height: m.height,
+    }));
+    const { ais } = await unitsyncSkirmishAis({
+      enginePath: target.enginePath,
+      dataDir: target.dataDir,
+      gameArchive: installedGame.primaryArchive.name,
+    });
+    const brandingEntry = resolveBranding(brandingEntries, installedGame);
+    const names = mergeConquestNames(
+      getProfile().conquest,
+      brandingEntry?.conquest,
+    );
+
+    const id = `generated-${crypto.randomUUID()}`;
+    const doc = generateGalaxy(
+      optionsFromChallenge(
+        settings,
+        {
+          maps,
+          ais: ais.map((a) => ({
+            kind: a.kind,
+            shortName: a.shortName,
+            name: a.name,
+          })),
+          names,
+          aiConfig: brandingEntry?.conquestAi,
+        },
+        id,
+      ),
+    );
+    await conquestSave({
+      id,
+      json: JSON.stringify({ ...doc, importedChallenge: true }),
+    });
+    await refreshGalaxies();
+    onImported(id);
+  };
+
+  return (
+    <ChallengeCodeInput
+      helpText="Paste a challenge code shared by another player to generate the identical galaxy on your own install."
+      onImport={importChallenge}
+    />
   );
 }

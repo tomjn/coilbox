@@ -33,6 +33,15 @@ describe("generateGalaxy", () => {
     expect(a.generated?.seed).toBe(1234);
   });
 
+  // #376: challenge sharing rests entirely on "same seed + settings -> same
+  // galaxy". Proven here rather than assumed: same seed round-trips to an
+  // identical doc (above), and a different seed changes the outcome.
+  it("differs for a different seed", () => {
+    const a = generateGalaxy({ ...base, seed: 1 }, "t0");
+    const b = generateGalaxy({ ...base, seed: 2 }, "t0");
+    expect(a).not.toEqual(b);
+  });
+
   it("never assigns a denied or chicken AI to a faction", () => {
     const messyAis = [
       { kind: "lua" as const, shortName: "Sandbox", name: "Sandbox" },

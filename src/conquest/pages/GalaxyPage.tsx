@@ -1,9 +1,10 @@
-import { Button } from "@picoframe/frame";
+import { Button, useDrawer } from "@picoframe/frame";
 import {
   ArrowLeft,
   Dices,
   Hourglass,
   Loader2,
+  Share2,
   ShieldAlert,
   Swords,
 } from "lucide-react";
@@ -12,6 +13,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogos } from "@/factions/logos";
+import { ChallengeCodeView } from "../../challenge/ChallengeCodeView";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncGameInfo, useUnitsyncScan } from "../../content/config";
 import { useKnownSpaceMaps } from "../../content/mapAppearanceCache";
@@ -30,6 +32,7 @@ import { assetUrl } from "../../lib/assetUrl";
 import { usePreferredTarget, useSkirmishAis } from "../../play/config";
 import { getProfile } from "../../profile/profile";
 import { conquestSave } from "../bindings";
+import { encodeConquestChallenge } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { factionFocusNode } from "../focusTarget";
 import { FOG_RANGE, withinJumps } from "../fog";
@@ -87,6 +90,19 @@ export default function GalaxyPage() {
 function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   const { loading, stateFor, saveFor } = useConquestState();
   const state = stateFor(galaxy);
+  const drawer = useDrawer();
+  const challengeCode = encodeConquestChallenge(galaxy);
+  const openShareChallenge = () =>
+    drawer.open({
+      title: "Share challenge",
+      width: "26rem",
+      content: (
+        <ChallengeCodeView
+          code={challengeCode ?? ""}
+          helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical galaxy, so results are directly comparable."
+        />
+      ),
+    });
   // A replay's "back to node" link deep-links here as `?node=<id>` — honoured
   // once on mount so the selection panel opens straight to it; a stale id (the
   // node no longer exists) just finds nothing and the panel stays closed.
@@ -267,11 +283,28 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
               <ArrowLeft className="size-5" aria-hidden />
             </Link>
           </BracketFrame>
-          {/* Galaxy title. */}
-          <BracketFrame className="pointer-events-auto flex items-center px-3 py-2">
+          {/* Galaxy title, with a Share action for procedurally generated
+              galaxies (nothing to share a seed for on an authored/bundled one). */}
+          <BracketFrame className="pointer-events-auto flex items-center gap-2 px-3 py-2">
             <span className="font-display text-sm font-semibold uppercase tracking-wide text-foreground">
               {galaxy.title}
             </span>
+            {galaxy.importedChallenge && (
+              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Imported challenge
+              </span>
+            )}
+            {challengeCode && (
+              <button
+                type="button"
+                onClick={openShareChallenge}
+                aria-label="Share this galaxy as a challenge code"
+                title="Share challenge"
+                className="text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Share2 className="size-4" aria-hidden />
+              </button>
+            )}
           </BracketFrame>
           {/* Turn — its own card with a large number, sized to content. */}
           {state && (
