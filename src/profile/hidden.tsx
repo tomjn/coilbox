@@ -26,6 +26,7 @@ import { getProfile } from "./profile";
  */
 export const HIDEABLE_NAV_IDS: string[] = [
   "content.games",
+  "content.setupPacks",
   "downloads.browse",
   "downloads.games",
   "multiplayer.stats",

@@ -5,6 +5,7 @@ import {
   FolderTree,
   Gamepad2,
   Map as MapIcon,
+  Package2,
   SlidersHorizontal,
 } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
@@ -31,6 +32,10 @@ import { makeLegacyRedirect } from "./pages/LegacyRedirect";
  * under Multiplayer as "Player stats", `multiplayer/index.tsx`) moved out of this
  * group in #467; their old `content/replays*`/`content/stats*` paths still route
  * here purely to redirect to the new locations, via `LegacyRedirect`.
+ *
+ * Setup packs (`../packs`, issue #415) also route through here as
+ * `content/setup-packs` since sharing an engine/game/map setup is a content
+ * concern, even though the pack's own logic lives in its own top-level module.
  *
  * Route Components are lazy-loaded; settings Components are imported eagerly (not
  * lazy): the frame settings page renders them directly without a Suspense
@@ -78,6 +83,14 @@ const contentPlugin: FramePlugin = {
           icon: ArchiveIcon,
           useVisible: useAdvancedMode,
         },
+        {
+          id: "content.setupPacks",
+          label: "Setup packs",
+          to: "/content/setup-packs",
+          order: 3,
+          icon: Package2,
+          useVisible: () => !isProfileHidden("content.setupPacks"),
+        },
       ],
     },
   ],
@@ -123,6 +136,14 @@ const contentPlugin: FramePlugin = {
       lazy: gateAdvanced(() => import("./pages/ArchiveReplPage")),
       crumb: (c) =>
         c.params.name ? `${c.params.name} · Lua REPL` : "Lua REPL",
+    },
+    {
+      path: "content/setup-packs",
+      lazy: gateProfileHidden(
+        "content.setupPacks",
+        () => import("../packs/pages/SetupPacksPage"),
+      ),
+      crumb: "Setup packs",
     },
     // Legacy paths (#467 moved Replays to Singleplayer and Stats to
     // Multiplayer as "Player stats") — kept so old bookmarks and provenance
