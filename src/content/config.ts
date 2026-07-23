@@ -17,10 +17,13 @@ import {
   contentListReplays,
   contentListSaves,
   contentStateLoad,
+  contentStatsIngest,
+  contentStatsQuery,
   type DemoInfo,
   type EngineConfigResult,
   type GameInfoResult,
   type HeightmapResult,
+  type IngestSummary,
   type MapInfoResult,
   type MapSkyboxResult,
   type MetalmapResult,
@@ -29,6 +32,7 @@ import {
   type SaveFile,
   type ScanResult,
   type StartPos,
+  type StatRecord,
   type UnitBuildpicsResult,
   type UnitDatasetResult,
   type UnitDisplay,
@@ -1439,4 +1443,61 @@ export function useDemoInfo(enginePath?: string, replayPath?: string) {
   }, [enginePath, replayPath]);
 
   return { info, loading, error };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Replay stats — the local stats database (ingest + query). See `stats.rs`.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Load the local stats database for the whole library: it ingests every root's
+ * new/changed demos (idempotent, off the UI thread) then holds the record set.
+ * `enginePath` locates demotool for the winner read; when absent the native decode
+ * still records map/players/game. Re-runs when the set of roots or the engine
+ * changes; `refresh` re-ingests on demand. An ingest failure falls back to a
+ * read-only query so a decode error still shows whatever's already stored.
+ */
+export function useReplayStats(roots: string[], enginePath?: string) {
+  const [records, setRecords] = useState<StatRecord[]>([]);
+  const [summary, setSummary] = useState<IngestSummary | null>(null);
+  const [ingesting, setIngesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Stable key so the effect depends on values, not the array's identity.
+  const rootsKey = roots.join("|");
+
+  const refresh = useCallback(async () => {
+    const rootList = rootsKey ? rootsKey.split("|") : [];
+    if (rootList.length === 0) {
+      setRecords([]);
+      setSummary(null);
+      return;
+    }
+    setIngesting(true);
+    setError(null);
+    try {
+      const res = await contentStatsIngest({
+        roots: rootList,
+        enginePath: enginePath ?? "",
+      });
+      setRecords(res.records);
+      setSummary(res.summary);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      // Ingest failed — still surface whatever's already in the store.
+      try {
+        const q = await contentStatsQuery(undefined);
+        setRecords(q.records);
+      } catch {
+        // Leave the last-known records in place.
+      }
+    } finally {
+      setIngesting(false);
+    }
+  }, [rootsKey, enginePath]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { records, summary, ingesting, error, refresh };
 }

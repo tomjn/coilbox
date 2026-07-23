@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   Archive as ArchiveIcon,
+  BarChart3,
   Boxes,
   Clapperboard,
   FolderTree,
@@ -81,6 +82,15 @@ const contentPlugin: FramePlugin = {
           order: 3,
           icon: Clapperboard,
         },
+        {
+          id: "content.stats",
+          label: "Stats",
+          to: "/content/stats",
+          order: 4,
+          icon: BarChart3,
+          // A distribution profile can hide the stats view like any other nav item.
+          useVisible: () => !isProfileHidden("content.stats"),
+        },
       ],
     },
   ],
@@ -136,6 +146,11 @@ const contentPlugin: FramePlugin = {
       path: "content/replays/:name",
       lazy: () => import("./pages/ReplayDetailPage"),
       crumb: (c) => c.params.name ?? "Replay",
+    },
+    {
+      path: "content/stats",
+      lazy: () => import("./pages/StatsPage"),
+      crumb: "Stats",
     },
   ],
   settings: [
