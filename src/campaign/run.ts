@@ -5,6 +5,7 @@ import {
   type ReplayFile,
 } from "../content/bindings";
 import { useUnitsyncScan } from "../content/config";
+import { useReplayUserState } from "../content/replayUserState";
 import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
 import { toBattleConfig, usePreferredTarget } from "../play/config";
@@ -62,18 +63,18 @@ async function detectMissionResult(opts: {
   target: PlayTarget;
   beforePaths: ReadonlySet<string>;
   playerName: string;
-}): Promise<DetectedResult> {
+}): Promise<{ outcome: DetectedResult; replay: ReplayFile | null }> {
   const { target, beforePaths, playerName } = opts;
   try {
     const replay = await findNewReplay(target.dataDir, beforePaths);
-    if (!replay) return "ambiguous";
+    if (!replay) return { outcome: "ambiguous", replay: null };
     const { info } = await contentDemoInfo({
       enginePath: target.enginePath,
       replayPath: replay.path,
     });
-    return resultFromDemoInfo(info, playerName);
+    return { outcome: resultFromDemoInfo(info, playerName), replay };
   } catch {
-    return "ambiguous";
+    return { outcome: "ambiguous", replay: null };
   }
 }
 
@@ -112,6 +113,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { running, launch } = usePlay();
   const { progress, save } = useCampaignProgress();
+  const { setProvenance } = useReplayUserState();
 
   const [phase, setPhase] = useState<MissionRunPhase>("briefing");
   const [error, setError] = useState<string | null>(null);
@@ -215,11 +217,21 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
       // rather than throwing; this catch is a last-resort safety net so an
       // unexpected throw still falls through to the manual prompt instead of
       // stranding the player on the "checking" screen.
-      const outcome = await detectMissionResult({
+      const { outcome, replay } = await detectMissionResult({
         target,
         beforePaths,
         playerName: snapshot.participants[0]?.name ?? "",
-      }).catch((): DetectedResult => "ambiguous");
+      }).catch((): { outcome: DetectedResult; replay: null } => ({
+        outcome: "ambiguous",
+        replay: null,
+      }));
+      if (replay) {
+        setProvenance(replay.filename, {
+          mode: "campaign",
+          campaignId: campaign.id,
+          missionId: mission.id,
+        });
+      }
       if (outcome === "ambiguous") {
         setPhase("result");
       } else {
@@ -236,6 +248,9 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     mission.disabledUnits,
     launch,
     applyResult,
+    campaign.id,
+    mission.id,
+    setProvenance,
   ]);
 
   const recordVictory = useCallback(
