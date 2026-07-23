@@ -328,6 +328,69 @@ export const contentDemoInfo = defineCommand<
   { info: DemoInfo }
 >("coilbox-content", "content_demo_info");
 
+/** One player as recorded in a stats-database game (flattened from the demo). */
+export interface StatPlayer {
+  name: string;
+  allyTeam?: number;
+  /** Faction (the team's `side`). */
+  side?: string;
+  spectator: boolean;
+  /** Set only for a decided game where the player wasn't a spectator. */
+  won?: boolean;
+  skill?: string;
+}
+
+/**
+ * One ingested game — the denormalized row every stats view aggregates over. The
+ * data layer for the personal profile, #375's head-to-head, and future per-map /
+ * per-faction records.
+ */
+export interface StatRecord {
+  filename: string;
+  path: string;
+  gameId?: string;
+  mapName: string;
+  gameType: string;
+  engineVersion: string;
+  durationSec: number;
+  startTimeMs: number;
+  sizeBytes: number;
+  modifiedMs: number;
+  /** False when the winner couldn't be read — the game is undecided, not a loss. */
+  winnersKnown: boolean;
+  winningAllyTeams: number[];
+  remixed: boolean;
+  players: StatPlayer[];
+  ingestedAt: number;
+}
+
+/** What an ingest pass did (for the status line). */
+export interface IngestSummary {
+  added: number;
+  updated: number;
+  skipped: number;
+  /** Files that couldn't be decoded (corrupt/truncated) — skipped, not fatal. */
+  failed: number;
+  total: number;
+}
+
+/**
+ * Incrementally parse every replay under `roots` into the local stats database,
+ * decoding only files new or changed since the last pass (idempotent, keyed by
+ * filename). `enginePath` locates `demotool` for the winner read; pass `dryRun` to
+ * run the pass without writing. Returns the summary and the full record set.
+ */
+export const contentStatsIngest = defineCommand<
+  { roots: string[]; enginePath: string; dryRun?: boolean },
+  { summary: IngestSummary; records: StatRecord[] }
+>("coilbox-content", "content_stats_ingest");
+
+/** Read the whole local stats record set (read-only; never ingests). */
+export const contentStatsQuery = defineCommand<
+  undefined,
+  { records: StatRecord[] }
+>("coilbox-content", "content_stats_query");
+
 /** One chat/system line from a replay's network stream. */
 export interface ChatLine {
   /** The speaking player's number, when the line names one. */

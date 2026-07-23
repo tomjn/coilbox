@@ -20,6 +20,7 @@ mod rapid_pool;
 mod savegame;
 mod scan;
 mod settings_backup;
+mod stats;
 
 use model::{
     load_store, save_store, ContentRoot, ContentState, RootCounts, RootKind, RootSource, StoreFile,
@@ -119,6 +120,13 @@ fn store_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(coilbox_portable::data_dir(app)?
         .join("content")
         .join("state.json"))
+}
+
+/// The replay-stats store, alongside the content `state.json` under app-data.
+fn stats_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(coilbox_portable::data_dir(app)?
+        .join("content")
+        .join("stats.json"))
 }
 
 /// Gather real filesystem anchors from the environment + tauri path APIs.
@@ -831,6 +839,59 @@ async fn content_demo_info(engine_path: String, replay_path: String) -> Result<C
     }
 }
 
+/// `content_stats_ingest` — incrementally parse every replay under `roots` into the
+/// local stats database, decoding only files new or changed since the last pass
+/// (idempotent, keyed by filename). `enginePath` locates `demotool` for the winner
+/// read; when empty/absent the native decode still records map/players/game. With
+/// `dryRun`, the pass runs but the store isn't written (returns the would-be
+/// summary). `roots` are `ContentRoot.path`s. Runs off the UI thread.
+#[tauri::command]
+async fn content_stats_ingest<R: Runtime>(
+    app: AppHandle<R>,
+    roots: Vec<String>,
+    engine_path: String,
+    dry_run: Option<bool>,
+) -> Result<CliResult, ()> {
+    let sp = match stats_path(&app) {
+        Ok(p) => p,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let dry_run = dry_run.unwrap_or(false);
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let mut store = stats::load(&sp)?;
+        let root_paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
+        let engine_dir = PathBuf::from(&engine_path);
+        let summary = stats::ingest(&root_paths, &engine_dir, &mut store);
+        if !dry_run {
+            stats::save(&sp, &store)?;
+        }
+        Ok::<_, String>((summary, store))
+    })
+    .await;
+    match res {
+        Ok(Ok((summary, store))) => Ok(CliResult::ok(
+            json!({ "summary": summary, "records": store.records }),
+        )),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("stats ingest task failed: {e}"))),
+    }
+}
+
+/// `content_stats_query` — return the whole local stats record set (the flat table
+/// every stats view aggregates over). Read-only; never triggers an ingest.
+#[tauri::command]
+async fn content_stats_query<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
+    let sp = match stats_path(&app) {
+        Ok(p) => p,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    match tauri::async_runtime::spawn_blocking(move || stats::load(&sp)).await {
+        Ok(Ok(store)) => Ok(CliResult::ok(json!({ "records": store.records }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("stats query task failed: {e}"))),
+    }
+}
+
 /// `content_demo_chat` — extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG`
 /// lines) by running `demotool --dump`. `enginePath` holds `demotool`; `replayPath`
 /// is an absolute demo path. Read on demand (it walks the whole demo stream), not
@@ -1148,6 +1209,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_open_path,
             content_list_replays,
             content_demo_info,
+            content_stats_ingest,
+            content_stats_query,
             content_demo_chat,
             content_rewrite_demo,
             content_delete_replay,

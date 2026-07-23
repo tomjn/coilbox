@@ -109,6 +109,55 @@ pub fn list_replays(root: &Path) -> Vec<ReplayFile> {
     out
 }
 
+/// A demo file's identity from cheap fs metadata only (no header/script decode) —
+/// what the stats ingest needs to decide whether a file is new or changed before
+/// paying for a full decode. `(size_bytes, modified_ms)` is the change signature.
+pub struct DemoFileEntry {
+    pub filename: String,
+    pub path: PathBuf,
+    pub size_bytes: u64,
+    pub modified_ms: u64,
+}
+
+/// Enumerate demo files under `<root>/demos` and `<root>/replays` with fs metadata
+/// only (no decode, no demotool), deduped by path. A missing folder is skipped, so
+/// a root without a demos dir simply yields nothing.
+pub fn demo_file_entries(root: &Path) -> Vec<DemoFileEntry> {
+    let mut out: Vec<DemoFileEntry> = Vec::new();
+    let mut seen: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
+    for dir in DEMO_DIRS {
+        let Ok(rd) = std::fs::read_dir(root.join(dir)) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            let name = e.file_name().to_string_lossy().to_string();
+            let lower = name.to_lowercase();
+            if !DEMO_EXTS.iter().any(|ext| lower.ends_with(ext)) {
+                continue;
+            }
+            let path = e.path();
+            if !seen.insert(path.clone()) {
+                continue;
+            }
+            let md = e.metadata().ok();
+            let size_bytes = md.as_ref().map(|m| m.len()).unwrap_or(0);
+            let modified_ms = md
+                .as_ref()
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            out.push(DemoFileEntry {
+                filename: name,
+                path,
+                size_bytes,
+                modified_ms,
+            });
+        }
+    }
+    out
+}
+
 // ---- decoding --------------------------------------------------------------
 
 /// Decode one replay: native header + start-script, plus demotool's winners.
