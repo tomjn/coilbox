@@ -48,6 +48,8 @@ import {
 import { useIgnoreActions } from "../ignore";
 import { canChannelModerate, chanServInfo } from "../moderation";
 import { useNoteActions } from "../notes";
+import { useStatsRelations } from "../statsRelation";
+import { relationSummary } from "../statsRelationSummary";
 import { useMpRevealed, useMultiplayer } from "../store";
 
 /**
@@ -92,6 +94,10 @@ function ChatPage() {
   // server, keyed on account id with a name fallback. The member panel exposes
   // add/edit/clear; the tooltip surfaces an existing note.
   const { get: getNote, set: setNote } = useNoteActions(activeKey);
+
+  // "N games with this player…" line for the note popover, from the local
+  // replay-stats database (#375) — purely a read, no server involvement.
+  const relationFor = useStatsRelations(me);
 
   // In a battle, tint messages by each player's team colour. The `teamColor` int
   // is `0xBBGGRR` (red is the low byte), matching the protocol's team_color_rgb.
@@ -419,6 +425,7 @@ function ChatPage() {
             onToggleIgnore={toggleIgnore}
             noteFor={(u) => getNote(u.userId, u.name)}
             onSetNote={(u, text) => setNote(u.userId, u.name, text)}
+            statsSummaryFor={(u) => relationSummary(relationFor(u.name))}
             renderActions={renderMemberActions}
           />
         )}

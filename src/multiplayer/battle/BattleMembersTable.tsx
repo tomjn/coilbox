@@ -38,6 +38,7 @@ export function BattleMembersTable({
   addableAis,
   noteFor,
   onSetNote,
+  statsSummaryFor,
   onAddBot,
   onSide,
   onTeam,
@@ -81,6 +82,9 @@ export function BattleMembersTable({
    * so aren't offered notes (see `MemberRow`'s `onSetNote` gating below). */
   noteFor?: (row: Row) => string;
   onSetNote?: (row: Row, text: string) => void;
+  /** "N games with this player…" summary from the local replay-stats database
+   * (#375), shown in the note popover alongside the manual note. */
+  statsSummaryFor?: (row: Row) => string | null;
   onAddBot: (aiShortName: string) => void;
   onSide: (side: number) => void;
   onTeam: (teamId: number) => void;
@@ -251,6 +255,11 @@ export function BattleMembersTable({
                   onSetNote={
                     row.kind === "human" && !row.self && onSetNote
                       ? (text) => onSetNote(row, text)
+                      : undefined
+                  }
+                  statsSummary={
+                    row.kind === "human" && !row.self
+                      ? statsSummaryFor?.(row)
                       : undefined
                   }
                   onSide={onSide}
