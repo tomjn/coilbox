@@ -131,6 +131,10 @@ export interface GalaxyDoc {
   theme?: GalaxyTheme;
   createdAt: string;
   updatedAt: string;
+  /** Set when this galaxy was created by importing a challenge code/file (see
+   * `./challenge.ts`) rather than generated locally or bundled — shown on the
+   * hub list so a shared-seed run's provenance stays visible. */
+  importedChallenge?: boolean;
   /**
    * Present on procedurally generated docs; carries the generation knobs so
    * the galaxy can be rerolled in place. Maps, AIs and naming pools are
@@ -508,6 +512,7 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
     theme: parseTheme(d.theme),
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
+    importedChallenge: d.importedChallenge === true ? true : undefined,
     generated: parseGenerated(d.generated),
   };
 }
