@@ -1,5 +1,16 @@
 import { Button, useSetting } from "@picoframe/frame";
-import { Clock, Code2, Eye, Tag, X } from "lucide-react";
+import {
+  Clock,
+  Code2,
+  Eye,
+  Gamepad2,
+  Milestone,
+  Orbit,
+  Rocket,
+  Swords,
+  Tag,
+  X,
+} from "lucide-react";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +24,8 @@ import {
 import {
   computeReplayFilterVisibility,
   isShortReplay,
+  type ReplayOrigin,
+  replayOrigin,
 } from "../replayFilterVisibility";
 import { useReplayUserState } from "../replayUserState";
 import { BrowserToolbar } from "./components/BrowserToolbar";
@@ -36,6 +49,41 @@ const SORT_OPTIONS = [
   { value: "size-desc", label: "Largest" },
   { value: "size-asc", label: "Smallest" },
 ];
+
+/** The origin filter's value, including the "no filter" choice. Radix's
+ * `Select.Item` rejects an empty-string value, so "no filter" needs its own
+ * sentinel rather than reusing `""` (as the tag filter does — that one never
+ * renders its `""` item live, since it's hidden until a tag exists). */
+type OriginFilterValue = ReplayOrigin | "all";
+
+/**
+ * Origin filter options. `other` is legacy/untagged replays — anything from
+ * before this feature, or a best-effort tag that didn't land — not a mode of
+ * its own.
+ */
+const ORIGIN_OPTIONS: { value: OriginFilterValue; label: string }[] = [
+  { value: "all", label: "All origins" },
+  { value: "conquest", label: "Conquest" },
+  { value: "warpath", label: "Warpath" },
+  { value: "campaign", label: "Campaign" },
+  { value: "skirmish", label: "Skirmish" },
+  { value: "multiplayer", label: "Multiplayer" },
+  { value: "other", label: "Unknown origin" },
+];
+
+const ORIGIN_BADGE: Record<
+  ReplayOrigin,
+  { label: string; icon: typeof Orbit } | null
+> = {
+  conquest: { label: "Conquest", icon: Orbit },
+  warpath: { label: "Warpath", icon: Rocket },
+  campaign: { label: "Campaign", icon: Milestone },
+  skirmish: { label: "Skirmish", icon: Swords },
+  multiplayer: { label: "Multiplayer", icon: Gamepad2 },
+  // No badge for "other" — there's nothing known to show, and a badge on
+  // every row would just be noise.
+  other: null,
+};
 
 /** Played date, e.g. `27 Apr 2026, 20:14`. */
 function playedAt(ms: number): string {
@@ -62,6 +110,21 @@ function formatDuration(sec: number): string {
   return h > 0
     ? `${h}:${mm}:${String(s).padStart(2, "0")}`
     : `${mm}:${String(s).padStart(2, "0")}`;
+}
+
+/** The mode badge for a replay's row/detail header, when its origin is known. */
+export function OriginBadge({ origin }: { origin: ReplayOrigin }) {
+  const badge = ORIGIN_BADGE[origin];
+  if (!badge) return null;
+  const Icon = badge.icon;
+  return (
+    <Badge
+      variant="ghost"
+      className="shrink-0 gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+    >
+      <Icon className="size-2.5" /> {badge.label}
+    </Badge>
+  );
 }
 
 /**
@@ -118,6 +181,10 @@ export default function ReplaysPage() {
     false,
   );
   const [tagFilter, setTagFilter] = useSetting("content.replayFilters.tag", "");
+  const [originFilter, setOriginFilter] = useSetting<OriginFilterValue>(
+    "content.replayFilters.origin",
+    "all",
+  );
   const userState = useReplayUserState();
   const tagOptions = useMemo(
     () => [
@@ -146,6 +213,8 @@ export default function ReplaysPage() {
       if (remixedOnly && !r.remixed) return false;
       if (!showShort && isShortReplay(r.durationSec)) return false;
       if (tagFilter && !(us.tags ?? []).includes(tagFilter)) return false;
+      if (originFilter !== "all" && replayOrigin(us) !== originFilter)
+        return false;
       return true;
     });
   }, [
@@ -156,6 +225,7 @@ export default function ReplaysPage() {
     remixedOnly,
     showShort,
     tagFilter,
+    originFilter,
     userState,
   ]);
 
@@ -203,79 +273,86 @@ export default function ReplaysPage() {
       />
 
       {!busy && replays.length > 0 && (
-        <>
-          <FilterBar
-            search={filter}
-            onSearch={setFilter}
-            searchPlaceholder="Filter replays…"
-            searchLabel="Filter replays"
-            sort={sort}
-            onSort={(v) => setSort(v as SortKey)}
-            sortOptions={SORT_OPTIONS}
-            total={replays.length}
-            shown={sorted.length}
-            noun="replays"
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            {mapFilter && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={clearMapFilter}
-                className="gap-1.5"
-                title="Clear the map filter"
-              >
-                Map: {mapFilter} <X className="size-3.5" />
-              </Button>
-            )}
-            {filterVisibility.watched && (
-              <Button
-                variant={watchedOnly ? "default" : "outline"}
-                size="sm"
-                onClick={() => setWatchedOnly(!watchedOnly)}
-                aria-pressed={watchedOnly}
-                className="gap-1.5"
-              >
-                <Eye className="size-4" /> Watched
-              </Button>
-            )}
-            {filterVisibility.remixed && (
-              <Button
-                variant={remixedOnly ? "default" : "outline"}
-                size="sm"
-                onClick={() => setRemixedOnly(!remixedOnly)}
-                aria-pressed={remixedOnly}
-                className="gap-1.5"
-              >
-                <Code2 className="size-4" /> Remixed
-              </Button>
-            )}
-            {filterVisibility.short && (
-              <Button
-                variant={showShort ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowShort(!showShort)}
-                aria-pressed={showShort}
-                className="gap-1.5"
-                title="Show replays under a minute long"
-              >
-                <Clock className="size-4" /> Short replays
-              </Button>
-            )}
-            {tagOptions.length > 1 && (
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Tag className="size-4" />
-                <OptionSelect
-                  value={tagFilter}
-                  onValueChange={setTagFilter}
-                  options={tagOptions}
+        <FilterBar
+          search={filter}
+          onSearch={setFilter}
+          searchPlaceholder="Filter replays…"
+          searchLabel="Filter replays"
+          sort={sort}
+          onSort={(v) => setSort(v as SortKey)}
+          sortOptions={SORT_OPTIONS}
+          total={replays.length}
+          shown={sorted.length}
+          noun="replays"
+          trailing={
+            <>
+              {mapFilter && (
+                <Button
+                  variant="secondary"
                   size="sm"
-                  className="w-40"
-                />
-              </div>
-            )}
-          </div>
-        </>
+                  onClick={clearMapFilter}
+                  className="gap-1.5"
+                  title="Clear the map filter"
+                >
+                  Map: {mapFilter} <X className="size-3.5" />
+                </Button>
+              )}
+              {filterVisibility.watched && (
+                <Button
+                  variant={watchedOnly ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setWatchedOnly(!watchedOnly)}
+                  aria-pressed={watchedOnly}
+                  className="gap-1.5"
+                >
+                  <Eye className="size-4" /> Watched
+                </Button>
+              )}
+              {filterVisibility.remixed && (
+                <Button
+                  variant={remixedOnly ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setRemixedOnly(!remixedOnly)}
+                  aria-pressed={remixedOnly}
+                  className="gap-1.5"
+                >
+                  <Code2 className="size-4" /> Remixed
+                </Button>
+              )}
+              {filterVisibility.short && (
+                <Button
+                  variant={showShort ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowShort(!showShort)}
+                  aria-pressed={showShort}
+                  className="gap-1.5"
+                  title="Show replays under a minute long"
+                >
+                  <Clock className="size-4" /> Short replays
+                </Button>
+              )}
+              {tagOptions.length > 1 && (
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Tag className="size-4" />
+                  <OptionSelect
+                    value={tagFilter}
+                    onValueChange={setTagFilter}
+                    options={tagOptions}
+                    size="sm"
+                    className="w-40"
+                  />
+                </div>
+              )}
+              <OptionSelect
+                value={originFilter}
+                onValueChange={(v) => setOriginFilter(v as OriginFilterValue)}
+                options={ORIGIN_OPTIONS}
+                size="sm"
+                className="w-44"
+              />
+            </>
+          }
+        />
       )}
 
       {error && <ErrorBanner message={error} />}
@@ -341,6 +418,7 @@ export default function ReplaysPage() {
                           <Code2 className="size-2.5" /> Remix
                         </Badge>
                       )}
+                      <OriginBadge origin={replayOrigin(us)} />
                     </div>
                     <span className="truncate text-xs text-muted-foreground">
                       {meta.join(" · ")}

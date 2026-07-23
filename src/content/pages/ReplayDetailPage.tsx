@@ -53,10 +53,12 @@ import {
   useUnitsyncMapSkybox,
   useUnitsyncMinimap,
 } from "../config";
+import type { ReplayProvenance } from "../replayUserState";
 import { useReplayUserState } from "../replayUserState";
 import { RemixPanel } from "./components/RemixPanel";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
 import { WatchButton } from "./components/WatchButton";
+import { OriginBadge } from "./ReplaysPage";
 
 /** BAR maps live on the files-cdn search endpoint (replays here are BAR-dominant). */
 const BAR_SEARCH_URL = "https://files-cdn.beyondallreason.dev/find";
@@ -71,6 +73,43 @@ function formatDuration(sec: number): string {
   const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
   const ss = String(s).padStart(2, "0");
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+/**
+ * Where a tagged replay's provenance links back to. Warpath links to the run
+ * (no per-node route exists there yet — see #369 follow-up); conquest links
+ * to the galaxy with the node preselected via `?node=`; campaign links
+ * straight to the mission briefing. A stale/deleted target (galaxy, run or
+ * mission no longer exists) still resolves to a route — each destination page
+ * already renders its own "not found" state rather than crashing.
+ */
+function provenanceLink(
+  p: ReplayProvenance,
+): { to: string; label: string } | null {
+  switch (p.mode) {
+    case "conquest":
+      if (!p.galaxyId) return null;
+      return {
+        to: p.nodeId
+          ? `/conquest/${encodeURIComponent(p.galaxyId)}?node=${encodeURIComponent(p.nodeId)}`
+          : `/conquest/${encodeURIComponent(p.galaxyId)}`,
+        label: "Back to conquest galaxy",
+      };
+    case "warpath":
+      if (!p.runId) return null;
+      return {
+        to: `/warpath/${encodeURIComponent(p.runId)}`,
+        label: "Back to warpath run",
+      };
+    case "campaign":
+      if (!p.campaignId || !p.missionId) return null;
+      return {
+        to: `/campaign/${encodeURIComponent(p.campaignId)}/${encodeURIComponent(p.missionId)}`,
+        label: "Back to mission",
+      };
+    default:
+      return null;
+  }
 }
 
 function playedAt(ms: number): string {
@@ -677,6 +716,10 @@ export default function ReplayDetailPage() {
   );
   // Drives the engine-mismatch "may not sync" hint under the header.
   const { resolved } = useReplayTarget(info?.engineVersion ?? "");
+  const userState = useReplayUserState();
+  const provenance = userState.get(filename).provenance;
+  const origin = provenance?.mode ?? "other";
+  const link = provenance ? provenanceLink(provenance) : null;
 
   // Remount the preview after a successful map download so it refetches.
   const [previewNonce, setPreviewNonce] = useState(0);
@@ -743,6 +786,7 @@ export default function ReplayDetailPage() {
                 <Code2 className="size-3" /> Remix
               </Badge>
             )}
+            <OriginBadge origin={origin} />
           </div>
           <p className="break-all font-mono text-xs text-muted-foreground">
             {filename}
@@ -753,6 +797,14 @@ export default function ReplayDetailPage() {
               className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
             >
               <ArrowLeft className="size-3.5" /> Back to original replay
+            </Link>
+          )}
+          {link && (
+            <Link
+              to={link.to}
+              className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <ArrowLeft className="size-3.5" /> {link.label}
             </Link>
           )}
           {info && resolved && !resolved.matched && (

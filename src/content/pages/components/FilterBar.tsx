@@ -1,5 +1,6 @@
 import { Input } from "@picoframe/frame";
 import { Search } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   Select,
   SelectContent,
@@ -25,6 +26,7 @@ export function FilterBar({
   total,
   shown,
   noun,
+  trailing,
 }: {
   search: string;
   onSearch: (v: string) => void;
@@ -36,6 +38,10 @@ export function FilterBar({
   total: number;
   shown: number;
   noun: string;
+  /** An extra control (e.g. an origin filter) rendered at the end of this same
+   * row — for a filter that, like sort, always applies rather than only when
+   * some row happens to match it (see the toggle row below this one). */
+  trailing?: ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -65,6 +71,7 @@ export function FilterBar({
           ))}
         </SelectContent>
       </Select>
+      {trailing}
       <span className="text-sm text-muted-foreground">
         {search.trim() ? `${shown} / ${total}` : total} {noun}
       </span>
