@@ -1,0 +1,209 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type DownloadProgress,
+  dlRecoilEngines,
+  dlSpringfilesEngines,
+  type EngineRelease,
+  type SpringfilesEngine,
+} from "../downloads/bindings";
+import { useWriteRootPath } from "../downloads/config";
+import {
+  identityOf,
+  type QueueStatus,
+  useDownloadComplete,
+  useDownloadQueue,
+} from "../downloads/DownloadQueueProvider";
+import { useContentTargets, useUnitsyncScan } from "./config";
+import {
+  type ContentRequirement,
+  computeMissingRequirements,
+  type InstalledContentSnapshot,
+} from "./resolveContent";
+
+/** Live state of resolving a set of requirements against the recipient's own
+ * install, plus the ability to download whatever's missing through the
+ * app-wide download queue (`DownloadQueueProvider`). */
+export interface ResolveContentState {
+  /** True while the install scan (or, for engine requirements, the engine
+   * catalogs) hasn't reported back yet. */
+  loading: boolean;
+  /** Every requirement not yet satisfied, deduped. */
+  missing: ContentRequirement[];
+  /** True once every requirement is satisfied (including no requirements at
+   * all) — the gate to call the actual import/launch step. */
+  resolved: boolean;
+  /** Queue a download for one missing requirement. A no-op if it can't be
+   * downloaded right now (see {@link ResolveContentState.canDownload}). */
+  download: (req: ContentRequirement) => void;
+  /** The queue's live status for a requirement, or `null` before it's queued. */
+  statusFor: (req: ContentRequirement) => QueueStatus | null;
+  /** Live progress while a requirement is downloading. */
+  progressFor: (req: ContentRequirement) => DownloadProgress | null;
+  /** The queue's failure message for a requirement's last attempt, if any. */
+  errorFor: (req: ContentRequirement) => string | null;
+  /** Whether a requirement can be downloaded at all right now — false with no
+   * write-root configured, or (engine requirements only) no catalog match. */
+  canDownload: (req: ContentRequirement) => boolean;
+}
+
+/**
+ * Resolve a set of content requirements against the given engine/data-root
+ * target (typically `usePreferredTarget()`'s target), offering downloads for
+ * anything missing via the app-wide queue. Re-scans after every queue
+ * completion so a just-downloaded item clears from `missing` without a manual
+ * refresh.
+ */
+export function useResolveContent(
+  requirements: ContentRequirement[],
+  target: { enginePath?: string; dataDir?: string } | undefined,
+): ResolveContentState {
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const contentTargets = useContentTargets();
+  const writePath = useWriteRootPath();
+  const { enqueue, statusFor: queueStatusFor, items } = useDownloadQueue();
+
+  const hasEngineReq = requirements.some((r) => r.kind === "engine");
+  const [engineCatalog, setEngineCatalog] = useState<{
+    recoil: EngineRelease[];
+    springfiles: SpringfilesEngine[];
+  } | null>(null);
+  useEffect(() => {
+    if (!hasEngineReq || engineCatalog) return;
+    let cancelled = false;
+    Promise.all([
+      dlRecoilEngines(undefined).catch(() => ({
+        releases: [] as EngineRelease[],
+      })),
+      dlSpringfilesEngines(undefined).catch(() => ({
+        engines: [] as SpringfilesEngine[],
+      })),
+    ]).then(([r, s]) => {
+      if (!cancelled)
+        setEngineCatalog({ recoil: r.releases, springfiles: s.engines });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasEngineReq, engineCatalog]);
+
+  useDownloadComplete(() => {
+    scan.run(true);
+    contentTargets.refresh();
+  });
+
+  const scanReady = !target?.enginePath || !target?.dataDir || !!scan.data;
+  const loading =
+    !scanReady || contentTargets.loading || (hasEngineReq && !engineCatalog);
+
+  const installed: InstalledContentSnapshot = useMemo(
+    () => ({
+      games: (scan.data?.games ?? []).map((g) => ({
+        name: g.name,
+        shortname: g.info.shortname,
+        version: g.info.version,
+      })),
+      maps: (scan.data?.maps ?? []).map((m) => m.name),
+      engineVersions: contentTargets.targets.map((t) => t.engineVersion),
+    }),
+    [scan.data, contentTargets.targets],
+  );
+
+  const missing = useMemo(
+    () => (loading ? [] : computeMissingRequirements(requirements, installed)),
+    [loading, requirements, installed],
+  );
+
+  const enqueueInputFor = useCallback(
+    (req: ContentRequirement) => {
+      if (!writePath) return null;
+      const key = req.downloadKey ?? req.label;
+      if (req.kind === "game") {
+        return {
+          kind: "rapid" as const,
+          label: `Game: ${req.label}`,
+          args: { tag: key, writePath },
+        };
+      }
+      if (req.kind === "map") {
+        return {
+          kind: "map" as const,
+          label: `Map: ${req.label}`,
+          args: { springName: key, writePath },
+        };
+      }
+      if (!engineCatalog) return null;
+      const recoil = engineCatalog.recoil.find((r) => r.version === key);
+      if (recoil) {
+        return {
+          kind: "engineRecoil" as const,
+          label: `Engine ${req.label}`,
+          args: {
+            version: recoil.version,
+            assetUrl: recoil.assetUrl,
+            writePath,
+          },
+        };
+      }
+      const spring = engineCatalog.springfiles.find((e) => e.version === key);
+      if (spring) {
+        return {
+          kind: "engineSpring" as const,
+          label: `Engine ${req.label}`,
+          args: { version: spring.version, writePath },
+        };
+      }
+      return null;
+    },
+    [writePath, engineCatalog],
+  );
+
+  const download = useCallback(
+    (req: ContentRequirement) => {
+      const input = enqueueInputFor(req);
+      if (input) enqueue(input);
+    },
+    [enqueueInputFor, enqueue],
+  );
+
+  const statusFor = useCallback(
+    (req: ContentRequirement) => {
+      const input = enqueueInputFor(req);
+      return input ? queueStatusFor(identityOf(input)) : null;
+    },
+    [enqueueInputFor, queueStatusFor],
+  );
+
+  const itemFor = useCallback(
+    (req: ContentRequirement) => {
+      const input = enqueueInputFor(req);
+      if (!input) return null;
+      const identity = identityOf(input);
+      return items.find((i) => i.identity === identity) ?? null;
+    },
+    [enqueueInputFor, items],
+  );
+
+  const progressFor = useCallback(
+    (req: ContentRequirement) => itemFor(req)?.progress ?? null,
+    [itemFor],
+  );
+  const errorFor = useCallback(
+    (req: ContentRequirement) => itemFor(req)?.error ?? null,
+    [itemFor],
+  );
+  const canDownload = useCallback(
+    (req: ContentRequirement) => enqueueInputFor(req) !== null,
+    [enqueueInputFor],
+  );
+
+  return {
+    loading,
+    missing,
+    resolved: !loading && missing.length === 0,
+    download,
+    statusFor,
+    progressFor,
+    errorFor,
+    canDownload,
+  };
+}

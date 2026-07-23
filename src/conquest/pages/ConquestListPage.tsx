@@ -12,11 +12,13 @@ import { challengeDecodeErrorMessage } from "../../challenge/code";
 import { unitsyncSkirmishAis } from "../../content/bindings";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
+import { ResolveContentGate } from "../../content/pages/components/ResolveContentDrawer";
 import {
   EmptyState,
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
+import type { ContentRequirement } from "../../content/resolveContent";
 import {
   usePlayReadiness,
   usePreferredTarget,
@@ -25,13 +27,42 @@ import {
 import { getGameMatcher, getProfile } from "../../profile/profile";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import { conquestDelete, conquestSave } from "../bindings";
-import { decodeConquestChallenge, optionsFromChallenge } from "../challenge";
+import {
+  type ConquestChallengeSettings,
+  decodeConquestChallenge,
+  optionsFromChallenge,
+} from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { type GenerateOptions, generateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc } from "../model";
 import { compareGameVersions, resolveGameByShortname } from "../model";
 import { mergeConquestNames } from "../names";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
+
+/** Best-effort shortname/version match, mirroring `resolveGameByShortname`
+ * (issue #387: the content-resolution step for a decoded challenge). */
+function shortnameGameRequirement(
+  game: ConquestChallengeSettings["game"],
+): ContentRequirement {
+  return {
+    kind: "game",
+    label: game.pinnedName ?? game.shortname,
+    downloadKey: game.shortname,
+    isInstalled: (installed) => {
+      const matcher = getGameMatcher();
+      const games = installed.games.filter((g) => !matcher || matcher(g.name));
+      return (
+        resolveGameByShortname(
+          game,
+          games.map((g) => ({
+            name: g.name,
+            info: { shortname: g.shortname ?? "", version: g.version ?? "" },
+          })),
+        ) !== undefined
+      );
+    },
+  };
+}
 
 /**
  * The Conquest hub: in-progress runs first, then galaxies ready to start
@@ -670,19 +701,16 @@ function ImportChallengeForm({
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const brandingEntries = useBrandingCatalog();
+  const [pending, setPending] = useState<ConquestChallengeSettings | null>(
+    null,
+  );
 
   const { run: runScan, data: scanData, loading: scanLoading } = scan;
   useEffect(() => {
     if (!scanData && !scanLoading) runScan();
   }, [scanData, scanLoading, runScan]);
 
-  const importChallenge = async (code: string) => {
-    const result = decodeConquestChallenge(code);
-    if (!result.ok) {
-      throw new Error(challengeDecodeErrorMessage(result.error));
-    }
-    const { settings } = result;
-
+  const finishImport = async (settings: ConquestChallengeSettings) => {
     if (!target) throw new Error("Install an engine first.");
     const matcher = getGameMatcher();
     const games = (scanData?.games ?? []).filter(
@@ -736,10 +764,32 @@ function ImportChallengeForm({
     onImported(id);
   };
 
+  // Decode the code, then either finish straight away (game already
+  // installed — no pointless prompt) or hand off to the resolve gate, which
+  // offers the download and calls `finishImport` once it clears (#387).
+  const importChallenge = async (code: string) => {
+    const result = decodeConquestChallenge(code);
+    if (!result.ok) {
+      throw new Error(challengeDecodeErrorMessage(result.error));
+    }
+    setPending(result.settings);
+  };
+
   return (
-    <ChallengeCodeInput
-      helpText="Paste a challenge code shared by another player to generate the identical galaxy on your own install."
-      onImport={importChallenge}
-    />
+    <>
+      <ChallengeCodeInput
+        helpText="Paste a challenge code shared by another player to generate the identical galaxy on your own install."
+        onImport={importChallenge}
+      />
+      {pending && (
+        <ResolveContentGate
+          title="Set up this challenge"
+          requirements={[shortnameGameRequirement(pending.game)]}
+          target={target ?? undefined}
+          onContinue={() => finishImport(pending).then(() => setPending(null))}
+          onCancel={() => setPending(null)}
+        />
+      )}
+    </>
   );
 }

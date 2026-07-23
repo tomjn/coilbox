@@ -9,17 +9,33 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { ResolveContentGate } from "../../content/pages/components/ResolveContentDrawer";
 import {
   EmptyState,
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
+import {
+  exactGameRequirement,
+  exactMapRequirement,
+} from "../../content/resolveContent";
+import { usePreferredTarget } from "../../play/config";
 import { campaignDelete, campaignImport, campaignSave } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
 import { materializeCampaignImages } from "../images";
 import type { Campaign } from "../model";
 import { parseCampaignExport } from "../transfer";
 import { CampaignIconBox } from "./components/CampaignImage";
+
+/** Every game+map a campaign's missions need installed, deduped by the shared
+ * gate itself (#387) — a campaign with several missions on one game only
+ * lists it once. */
+function requirementsForCampaign(campaign: Campaign) {
+  return campaign.missions.flatMap((m) => [
+    exactGameRequirement(m.snapshot.gameName),
+    exactMapRequirement(m.snapshot.mapName),
+  ]);
+}
 
 /**
  * Campaign builder landing: create a new campaign, import a shared one, and list
@@ -63,6 +79,29 @@ export default function CampaignBuilderPage() {
     }
   };
 
+  const [pendingCampaign, setPendingCampaign] = useState<Campaign | null>(null);
+  const { target } = usePreferredTarget();
+
+  // Mint a fresh id so importing never collides with an existing campaign,
+  // materialize every inlined (data-URI) image — icon, background and each
+  // mission's panorama + side graphic — to disk as files under the new id,
+  // then save. Only runs once every mission's game+map clears the resolve
+  // gate (#387) — nothing is written to disk before that.
+  const finishImport = async (parsed: Campaign) => {
+    const id = crypto.randomUUID();
+    const materialized = await materializeCampaignImages(parsed, id);
+    const now = new Date().toISOString();
+    const campaign: Campaign = {
+      ...materialized,
+      id,
+      createdAt: parsed.createdAt || now,
+      updatedAt: now,
+    };
+    await campaignSave({ id, json: JSON.stringify(campaign) });
+    await refreshCampaigns();
+    navigate(`/campaign-builder/${id}`);
+  };
+
   const importCampaign = async () => {
     setActionError(null);
     try {
@@ -79,21 +118,7 @@ export default function CampaignBuilderPage() {
         setActionError("That file isn't a valid coilbox campaign.");
         return;
       }
-      // Mint a fresh id so importing never collides with an existing campaign,
-      // then materialize every inlined (data-URI) image — icon, background and each
-      // mission's panorama + side graphic — to disk as files under the new id.
-      const id = crypto.randomUUID();
-      const materialized = await materializeCampaignImages(parsed, id);
-      const now = new Date().toISOString();
-      const campaign: Campaign = {
-        ...materialized,
-        id,
-        createdAt: parsed.createdAt || now,
-        updatedAt: now,
-      };
-      await campaignSave({ id, json: JSON.stringify(campaign) });
-      await refreshCampaigns();
-      navigate(`/campaign-builder/${id}`);
+      setPendingCampaign(parsed);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -242,6 +267,18 @@ export default function CampaignBuilderPage() {
         >
           Refresh
         </button>
+      )}
+
+      {pendingCampaign && (
+        <ResolveContentGate
+          title="Set up this campaign"
+          requirements={requirementsForCampaign(pendingCampaign)}
+          target={target ?? undefined}
+          onContinue={() =>
+            finishImport(pendingCampaign).then(() => setPendingCampaign(null))
+          }
+          onCancel={() => setPendingCampaign(null)}
+        />
       )}
     </div>
   );
