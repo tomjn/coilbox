@@ -26,6 +26,8 @@ import { useBattleLaunch } from "../battle/useBattleLaunch";
 import { useBattleRoom } from "../battle/useBattleRoom";
 import { VotePanel } from "../battle/VotePanel";
 import { useNoteActions } from "../notes";
+import { useStatsRelations } from "../statsRelation";
+import { relationSummary } from "../statsRelationSummary";
 import { useMpRevealed } from "../store";
 
 /**
@@ -47,6 +49,9 @@ function BattleRoomPage() {
   const launch = useBattleLaunch(room.serverKey, room.target, room.selfHost);
   // Private, client-side per-player notes (issue #341), scoped to this server.
   const { get: getNote, set: setNote } = useNoteActions(room.serverKey);
+  // "N games with this player…" line for the note popover, from the local
+  // replay-stats database (#375) — purely a read, no server involvement.
+  const relationFor = useStatsRelations(room.me);
   const navigate = useNavigate();
   const presets = useBattlePresets();
   const [presetsOpen, setPresetsOpen] = useState(false);
@@ -194,6 +199,7 @@ function BattleRoomPage() {
             addableAis={room.addableAis}
             noteFor={(row) => getNote(row.userId, row.name)}
             onSetNote={(row, text) => setNote(row.userId, row.name, text)}
+            statsSummaryFor={(row) => relationSummary(relationFor(row.name))}
             onAddBot={room.addBot}
             onSide={room.setSide}
             onTeam={room.setTeam}

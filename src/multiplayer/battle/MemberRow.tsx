@@ -76,6 +76,7 @@ export function MemberRow({
   allyOptions,
   note,
   onSetNote,
+  statsSummary,
   onSide,
   onTeam,
   onAlly,
@@ -105,6 +106,9 @@ export function MemberRow({
    * only, and never on our own row — see `notes.ts` (issue #341). */
   note?: string;
   onSetNote?: (text: string) => void;
+  /** "N games with this player…" summary from the local replay-stats database
+   * (#375), shown in the note popover alongside the manual note. */
+  statsSummary?: string | null;
   onSide: (side: number) => void;
   onTeam: (teamId: number) => void;
   onAlly: (ally: number) => void;
@@ -207,7 +211,12 @@ export function MemberRow({
             </span>
           </div>
           {onSetNote && (
-            <NoteButton name={row.name} note={note ?? ""} onSave={onSetNote} />
+            <NoteButton
+              name={row.name}
+              note={note ?? ""}
+              onSave={onSetNote}
+              statsSummary={statsSummary}
+            />
           )}
         </div>
       </TableCell>

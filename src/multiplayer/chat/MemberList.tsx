@@ -20,6 +20,7 @@ export function MemberList({
   onToggleIgnore,
   noteFor,
   onSetNote,
+  statsSummaryFor,
   renderActions,
 }: {
   members: User[];
@@ -40,6 +41,10 @@ export function MemberList({
   noteFor?: (user: User) => string;
   /** Save (or, given "", clear) a member's private note. */
   onSetNote?: (user: User, text: string) => void;
+  /** "N games with this player…" summary from the local replay-stats database
+   * (#375), or null with nothing to say. Shown in the note popover alongside
+   * the manual note. */
+  statsSummaryFor?: (user: User) => string | null;
   /** Optional trailing per-member control (e.g. a moderation menu). Returns a node
    * to render at the end of the row, or null/undefined to render nothing for it. */
   renderActions?: (username: string) => ReactNode;
@@ -113,6 +118,7 @@ export function MemberList({
                   name={u.name}
                   note={note}
                   onSave={(text) => onSetNote(u, text)}
+                  statsSummary={statsSummaryFor?.(u)}
                 />
               )}
               {onToggleIgnore && (

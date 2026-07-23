@@ -16,17 +16,23 @@ import { NOTE_MAX_LENGTH } from "./notes";
  * without relying on colour alone; the popover itself is the editor, matching
  * `MemberActionsMenu`'s inline-form-in-a-popover pattern rather than a modal.
  * Saving a blank (whitespace-only) note clears it — `onSave("")` is the delete
- * path, handled by the `notes.ts` store.
+ * path, handled by the `notes.ts` store. When `statsSummary` is given (from the
+ * local replay-stats database, #375) it's shown above the note field, e.g. "5
+ * games with this player · 2W/1L as teammates".
  */
 export function NoteButton({
   name,
   note,
   onSave,
+  statsSummary,
 }: {
   name: string;
   /** Current saved note text; "" means none. */
   note: string;
   onSave: (text: string) => void;
+  /** "N games with this player…" summary from the local stats database, or
+   * undefined when there's nothing to say (no shared replays, or unavailable). */
+  statsSummary?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(note);
@@ -46,7 +52,9 @@ export function NoteButton({
           aria-label={
             hasNote ? `Edit note for ${name}` : `Add note for ${name}`
           }
-          title={hasNote ? note : "Add a private note"}
+          title={
+            hasNote ? note : (statsSummary ?? undefined) || "Add a private note"
+          }
           className={cn(
             "inline-flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground",
             hasNote && "text-amber-600 dark:text-amber-400",
@@ -68,6 +76,9 @@ export function NoteButton({
           }}
         >
           <p className="px-1 text-sm font-medium">Note: {name}</p>
+          {statsSummary && (
+            <p className="px-1 text-xs text-muted-foreground">{statsSummary}</p>
+          )}
           <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value.slice(0, NOTE_MAX_LENGTH))}
