@@ -14,7 +14,15 @@ export type ReplayMode =
   | "warpath"
   | "campaign"
   | "skirmish"
-  | "multiplayer";
+  | "multiplayer"
+  /**
+   * A synthetic rerun of a decoded replay's setup (issue #368's "refight this
+   * setup") — every seated player from the source replay refought as an AI.
+   * Not a genuine match: #466 uses this marker to exclude refights from player
+   * stats. Tagged the same best-effort way as skirmish/multiplayer, right
+   * after the launch exits (see `tagFreshReplay`, called from `RefightPanel`).
+   */
+  | "refight";
 
 /**
  * Where a replay came from: the mode plus enough ids to link back to the
@@ -33,6 +41,9 @@ export interface ReplayProvenance {
   nodeId?: string;
   /** Campaign: the mission id played. */
   missionId?: string;
+  /** Refight: the filename of the replay the setup was refought from, so the
+   * new replay's detail page can link back to it. */
+  sourceReplayFilename?: string;
 }
 
 /**
