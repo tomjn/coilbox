@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeReplayFilterVisibility,
   isShortReplay,
+  replayOrigin,
 } from "./replayFilterVisibility";
 
 describe("isShortReplay", () => {
@@ -82,5 +83,28 @@ describe("computeReplayFilterVisibility", () => {
   it("returns false for empty list", () => {
     const result = computeReplayFilterVisibility([], () => ({}));
     expect(result).toEqual({ watched: false, remixed: false, short: false });
+  });
+});
+
+describe("replayOrigin", () => {
+  it("reads the mode off recorded provenance", () => {
+    expect(
+      replayOrigin({ provenance: { mode: "conquest", galaxyId: "g1" } }),
+    ).toBe("conquest");
+    expect(replayOrigin({ provenance: { mode: "warpath", runId: "r1" } })).toBe(
+      "warpath",
+    );
+    expect(
+      replayOrigin({ provenance: { mode: "campaign", campaignId: "c1" } }),
+    ).toBe("campaign");
+    expect(replayOrigin({ provenance: { mode: "skirmish" } })).toBe("skirmish");
+    expect(replayOrigin({ provenance: { mode: "multiplayer" } })).toBe(
+      "multiplayer",
+    );
+  });
+
+  it("buckets a replay with no recorded provenance as other", () => {
+    expect(replayOrigin({})).toBe("other");
+    expect(replayOrigin({ watched: true, tags: ["gg"] })).toBe("other");
   });
 });

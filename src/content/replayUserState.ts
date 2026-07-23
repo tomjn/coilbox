@@ -1,14 +1,51 @@
 import { useSetting } from "@picoframe/frame";
 
 /**
- * Per-replay user state — a watched flag and free-form tags — persisted through the
- * frame settings store (like the skirmish presets), keyed by the replay's filename
- * (stable within a content root, and available in the cheap list summary where the
- * demo's game-id isn't). Kept out of the Rust store so it needs no new commands.
+ * Which mode produced a replay. Conquest/warpath/campaign tag it at the exact
+ * moment they read back their fresh replay for result detection (see
+ * `play/detect.ts` call sites in `conquest/run.ts`, `runlite/runlite-run.ts`
+ * and `campaign/run.ts`); skirmish and multiplayer don't read a replay back
+ * for anything, so they tag it best-effort right after their launch exits
+ * (see `play/tagReplayProvenance.ts`, used by `SkirmishPage.tsx` and
+ * `multiplayer/battle/useBattleLaunch.ts`).
+ */
+export type ReplayMode =
+  | "conquest"
+  | "warpath"
+  | "campaign"
+  | "skirmish"
+  | "multiplayer";
+
+/**
+ * Where a replay came from: the mode plus enough ids to link back to the
+ * originating node/run/mission. Absent entirely on replays predating this
+ * feature, or when the best-effort tagging attempt found nothing.
+ */
+export interface ReplayProvenance {
+  mode: ReplayMode;
+  /** Conquest: the galaxy document id. */
+  galaxyId?: string;
+  /** Warpath: the run's opaque id in `RunStateFile.runs`. */
+  runId?: string;
+  /** Campaign: the campaign document id. */
+  campaignId?: string;
+  /** Conquest/warpath: the node id fought at. */
+  nodeId?: string;
+  /** Campaign: the mission id played. */
+  missionId?: string;
+}
+
+/**
+ * Per-replay user state — a watched flag, free-form tags, and provenance —
+ * persisted through the frame settings store (like the skirmish presets), keyed
+ * by the replay's filename (stable within a content root, and available in the
+ * cheap list summary where the demo's game-id isn't). Kept out of the Rust
+ * store so it needs no new commands.
  */
 export interface ReplayUserState {
   watched?: boolean;
   tags?: string[];
+  provenance?: ReplayProvenance;
 }
 
 export function useReplayUserState() {
@@ -27,6 +64,13 @@ export function useReplayUserState() {
     setState({ ...state, [key]: { ...state[key], tags } });
   };
 
+  /** Record where a replay came from — set once, when the mode first reads it
+   * back for result detection. A no-op re-set (same filename fought twice
+   * over, unlikely) just overwrites with the latest provenance. */
+  const setProvenance = (key: string, provenance: ReplayProvenance) => {
+    setState({ ...state, [key]: { ...state[key], provenance } });
+  };
+
   /** Every tag in use, sorted, for the filter dropdown. */
   const allTags = (): string[] => {
     const set = new Set<string>();
@@ -36,5 +80,5 @@ export function useReplayUserState() {
     return [...set].sort((a, b) => a.localeCompare(b));
   };
 
-  return { state, get, setWatched, setTags, allTags };
+  return { state, get, setWatched, setTags, setProvenance, allTags };
 }

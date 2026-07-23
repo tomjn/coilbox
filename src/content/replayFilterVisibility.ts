@@ -1,4 +1,4 @@
-import type { ReplayUserState } from "./replayUserState";
+import type { ReplayMode, ReplayUserState } from "./replayUserState";
 
 /**
  * Which of the replay library's watched/remixed toggle filters could match
@@ -27,6 +27,18 @@ export const SHORT_REPLAY_SECONDS = 60;
  */
 export function isShortReplay(durationSec: number | undefined): boolean {
   return durationSec != null && durationSec < SHORT_REPLAY_SECONDS;
+}
+
+/**
+ * The origin filter's bucket for a replay: the recorded {@link ReplayMode}, or
+ * `"other"` for a replay with no provenance at all — one from before this
+ * feature shipped, or a best-effort tag (skirmish/multiplayer) that missed its
+ * window (see #369).
+ */
+export type ReplayOrigin = ReplayMode | "other";
+
+export function replayOrigin(us: ReplayUserState): ReplayOrigin {
+  return us.provenance?.mode ?? "other";
 }
 
 export function computeReplayFilterVisibility(
