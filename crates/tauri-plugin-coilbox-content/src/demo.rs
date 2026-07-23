@@ -780,6 +780,11 @@ fn build_demo_info(raw: RawDemo, game: &Section, winners: Option<Vec<u32>>) -> D
 
     let marker = read_remix_marker(game);
 
+    let mod_options = game
+        .child("modoptions")
+        .map(|s| s.keys.clone())
+        .unwrap_or_default();
+
     DemoInfo {
         engine_version: raw.engine_version,
         game_id: (!raw.game_id.is_empty()).then_some(raw.game_id),
@@ -797,6 +802,7 @@ fn build_demo_info(raw: RawDemo, game: &Section, winners: Option<Vec<u32>>) -> D
         remixed: marker.remixed,
         source_gametype: marker.source,
         origin_filename: marker.origin,
+        mod_options,
     }
 }
 
@@ -1210,6 +1216,32 @@ mod tests {
         assert_eq!(min, Some(25.0));
         assert_eq!(avg, Some(25.0));
         assert_eq!(max, Some(25.0));
+    }
+
+    #[test]
+    fn build_demo_info_reads_modoptions() {
+        let game = find_game(&parse_tdf(SCRIPT));
+        let info = build_demo_info(
+            RawDemo {
+                engine_version: String::new(),
+                game_id: String::new(),
+                unix_time: 0,
+                game_time: 0,
+                wallclock: 0,
+                script: SCRIPT.to_string(),
+            },
+            &game,
+            None,
+        );
+        assert_eq!(
+            info.mod_options.get("zombies").map(String::as_str),
+            Some("disabled")
+        );
+        assert_eq!(
+            info.mod_options.get("emptyval").map(String::as_str),
+            Some("")
+        );
+        assert_eq!(info.mod_options.len(), 2);
     }
 
     #[test]
