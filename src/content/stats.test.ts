@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { StatPlayer, StatRecord } from "./bindings";
-import { allPlayers, guessPrimaryPlayer, profileFor } from "./stats";
+import {
+  allPlayers,
+  guessPrimaryPlayer,
+  profileFor,
+  relationTo,
+} from "./stats";
 
 let seq = 0;
 
@@ -33,8 +38,9 @@ function p(
   won: boolean | undefined,
   side = "Armada",
   spectator = false,
+  allyTeam?: number,
 ): StatPlayer {
-  return { name, won, side, spectator };
+  return { name, won, side, spectator, allyTeam };
 }
 
 describe("allPlayers", () => {
@@ -122,6 +128,12 @@ describe("profileFor", () => {
     expect(profileFor(records, "me").currentStreak).toBe(-2);
   });
 
+  it("reports the most recent game's start time as lastPlayedMs", () => {
+    const records = [rec("A", [p("me", true)]), rec("B", [p("me", false)])];
+    expect(profileFor(records, "me").lastPlayedMs).toBe(records[1].startTimeMs);
+    expect(profileFor([], "me").lastPlayedMs).toBe(0);
+  });
+
   it("tallies factions used", () => {
     const records = [
       rec("A", [p("me", true, "Armada")]),
@@ -131,5 +143,100 @@ describe("profileFor", () => {
     const prof = profileFor(records, "me");
     expect(prof.factions[0]).toEqual({ key: "Armada", games: 2, wins: 2 });
     expect(prof.factions[1]).toEqual({ key: "Cortex", games: 1, wins: 0 });
+  });
+});
+
+describe("relationTo", () => {
+  it("splits shared games into together and against, from me's wins", () => {
+    const records = [
+      // Together, I won.
+      rec("A", [
+        p("me", true, "Armada", false, 0),
+        p("ally", true, "Cortex", false, 0),
+      ]),
+      // Against, I won.
+      rec("B", [
+        p("me", true, "Armada", false, 0),
+        p("foe", false, "Cortex", false, 1),
+      ]),
+      // Against, I lost.
+      rec("C", [
+        p("me", false, "Armada", false, 0),
+        p("foe", true, "Cortex", false, 1),
+      ]),
+      // A game without foe or ally — not shared.
+      rec("D", [p("me", true)]),
+    ];
+    const withAlly = relationTo(records, "me", "ally");
+    expect(withAlly).toMatchObject({
+      gamesShared: 1,
+      gamesTogether: 1,
+      winsTogether: 1,
+      gamesAgainst: 0,
+      winsAgainst: 0,
+    });
+
+    const withFoe = relationTo(records, "me", "foe");
+    expect(withFoe).toMatchObject({
+      gamesShared: 2,
+      gamesTogether: 0,
+      gamesAgainst: 2,
+      winsAgainst: 1,
+    });
+  });
+
+  it("counts a shared game toward gamesShared even with an unknown ally team", () => {
+    const records = [rec("A", [p("me", true), p("foe", false)])];
+    const rel = relationTo(records, "me", "foe");
+    expect(rel.gamesShared).toBe(1);
+    expect(rel.gamesTogether).toBe(0);
+    expect(rel.gamesAgainst).toBe(0);
+  });
+
+  it("ignores spectators and reports the most recent shared game", () => {
+    const records = [
+      rec("A", [
+        p("me", true, "Armada", false, 0),
+        p("foe", false, "Cortex", false, 1),
+      ]),
+      rec("B", [
+        p("me", true, "Armada", false, 0),
+        p("foe", false, "Cortex", false, 1),
+      ]),
+      rec("C", [
+        p("me", true, "Armada", false, 0),
+        p("foe", undefined, "Cortex", true, 1),
+      ]),
+    ];
+    const rel = relationTo(records, "me", "foe");
+    expect(rel.gamesShared).toBe(2);
+    expect(rel.lastPlayedMs).toBe(records[1].startTimeMs);
+  });
+
+  it("tallies common maps by me's win", () => {
+    const records = [
+      rec("Comet", [
+        p("me", true, "Armada", false, 0),
+        p("foe", false, "Cortex", false, 1),
+      ]),
+      rec("Comet", [
+        p("me", false, "Armada", false, 0),
+        p("foe", true, "Cortex", false, 1),
+      ]),
+    ];
+    const rel = relationTo(records, "me", "foe");
+    expect(rel.commonMaps).toEqual([{ key: "Comet", games: 2, wins: 1 }]);
+  });
+
+  it("is empty when the players have never shared a game", () => {
+    const records = [rec("A", [p("me", true)]), rec("B", [p("foe", true)])];
+    const rel = relationTo(records, "me", "foe");
+    expect(rel).toMatchObject({
+      gamesShared: 0,
+      gamesTogether: 0,
+      gamesAgainst: 0,
+      lastPlayedMs: 0,
+      commonMaps: [],
+    });
   });
 });

@@ -81,6 +81,8 @@ export interface PlayerProfile {
   favouriteMaps: Tally[];
   /** Factions used, most-used first. */
   factions: Tally[];
+  /** Most recent game's start time, or 0 with no games. */
+  lastPlayedMs: number;
 }
 
 /** Tally games + wins by a key extractor, dropping empty keys. */
@@ -145,5 +147,80 @@ export function profileFor(records: StatRecord[], name: string): PlayerProfile {
     longestWinStreak: longestWinRun(games),
     favouriteMaps: tally(games, (g) => g.record.mapName),
     factions: tally(games, (g) => g.side ?? ""),
+    lastPlayedMs: games.length ? games[games.length - 1].record.startTimeMs : 0,
+  };
+}
+
+/**
+ * `me`'s relationship to one other player across the record set (#375): every
+ * game they've shared, split into "together" (same ally team) and "against"
+ * (opposing ally team) — the shared-lobby view a #414 profile alone doesn't
+ * give. Backs both the player dossier and the multiplayer user popover's "N
+ * games with this player" line.
+ */
+export interface PlayerRelation {
+  name: string;
+  /** Every non-spectator game where both `me` and `name` played. */
+  gamesShared: number;
+  /** Subset of shared games where they were on the same ally team. */
+  gamesTogether: number;
+  /** `me`'s wins among `gamesTogether`. */
+  winsTogether: number;
+  /** Subset of shared games where they were on opposing ally teams. */
+  gamesAgainst: number;
+  /** `me`'s wins among `gamesAgainst`. */
+  winsAgainst: number;
+  /** Most recent shared game's start time, or 0 when they've never played together. */
+  lastPlayedMs: number;
+  /** Maps shared, most-played first (wins are `me`'s wins). */
+  commonMaps: Tally[];
+}
+
+/**
+ * Aggregate `me`'s history with `other`: every record where both appeared as
+ * non-spectators. A game only counts toward the together/against split when
+ * both ally teams are known — an unknown ally team still counts toward
+ * `gamesShared`, `commonMaps`, and `lastPlayedMs`.
+ */
+export function relationTo(
+  records: StatRecord[],
+  me: string,
+  other: string,
+): PlayerRelation {
+  const shared: PlayerGame[] = [];
+  let gamesTogether = 0;
+  let winsTogether = 0;
+  let gamesAgainst = 0;
+  let winsAgainst = 0;
+  let lastPlayedMs = 0;
+
+  for (const record of records) {
+    const mine = record.players.find((p) => !p.spectator && p.name === me);
+    const theirs = record.players.find((p) => !p.spectator && p.name === other);
+    if (!mine || !theirs) continue;
+
+    const won = record.winnersKnown ? (mine.won ?? undefined) : undefined;
+    shared.push({ record, side: mine.side, won });
+    if (record.startTimeMs > lastPlayedMs) lastPlayedMs = record.startTimeMs;
+
+    if (mine.allyTeam == null || theirs.allyTeam == null) continue;
+    if (mine.allyTeam === theirs.allyTeam) {
+      gamesTogether += 1;
+      if (won === true) winsTogether += 1;
+    } else {
+      gamesAgainst += 1;
+      if (won === true) winsAgainst += 1;
+    }
+  }
+
+  return {
+    name: other,
+    gamesShared: shared.length,
+    gamesTogether,
+    winsTogether,
+    gamesAgainst,
+    winsAgainst,
+    lastPlayedMs,
+    commonMaps: tally(shared, (g) => g.record.mapName),
   };
 }
