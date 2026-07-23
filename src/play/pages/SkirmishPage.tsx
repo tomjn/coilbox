@@ -14,6 +14,8 @@ import {
 } from "@/content/config";
 import { useFactionLogos } from "@/factions/logos";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
+import { contentListReplays } from "../../content/bindings";
+import { useReplayUserState } from "../../content/replayUserState";
 import type { BattleConfig } from "../bindings";
 import { playExportPreset, playImportPreset } from "../bindings";
 import {
@@ -42,6 +44,7 @@ import {
   type SkirmishPreset,
   useSkirmishPresets,
 } from "../presets";
+import { tagFreshReplay } from "../tagReplayProvenance";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
 import { GameSelectCard } from "./components/GameSelectCard";
 import { MapCard } from "./components/MapCard";
@@ -74,6 +77,7 @@ export default function SkirmishPage() {
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
   const { running, launch } = usePlay();
+  const { setProvenance } = useReplayUserState();
 
   const scan = useUnitsyncScan(enginePath, dataDir);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
@@ -306,6 +310,16 @@ export default function SkirmishPage() {
     const config = buildConfig();
     if (!config) return;
     setError(null);
+    // Snapshot the replays that exist before the engine runs, so any new file
+    // afterwards can be tagged as a skirmish. Best-effort: a failure here just
+    // disables tagging for this launch, never the launch itself.
+    let beforePaths: Set<string> | null = null;
+    try {
+      const { replays } = await contentListReplays({ root: target.dataDir });
+      beforePaths = new Set(replays.map((r) => r.path));
+    } catch {
+      beforePaths = null;
+    }
     try {
       const res = await launch("skirmish", {
         config,
@@ -314,6 +328,14 @@ export default function SkirmishPage() {
       });
       if (res.exitCode && res.exitCode !== 0) {
         setError(`Engine exited with code ${res.exitCode}.`);
+      }
+      if (beforePaths && res.exitCode !== null) {
+        tagFreshReplay(
+          target.dataDir,
+          beforePaths,
+          { mode: "skirmish" },
+          setProvenance,
+        );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
