@@ -16,6 +16,8 @@ const COMMANDS: &[&str] = &[
     "content_open_path",
     "content_list_replays",
     "content_demo_info",
+    "content_stats_ingest",
+    "content_stats_query",
     "content_demo_chat",
     "content_rewrite_demo",
     "content_delete_replay",

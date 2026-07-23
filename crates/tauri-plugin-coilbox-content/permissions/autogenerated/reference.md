@@ -17,6 +17,8 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-open-path`
 - `allow-content-list-replays`
 - `allow-content-demo-info`
+- `allow-content-stats-ingest`
+- `allow-content-stats-query`
 - `allow-content-demo-chat`
 - `allow-content-rewrite-demo`
 - `allow-content-delete-replay`
@@ -741,6 +743,58 @@ Enables the content_state_load command without any pre-configured scope.
 <td>
 
 Denies the content_state_load command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-stats-ingest`
+
+</td>
+<td>
+
+Enables the content_stats_ingest command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-stats-ingest`
+
+</td>
+<td>
+
+Denies the content_stats_ingest command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-stats-query`
+
+</td>
+<td>
+
+Enables the content_stats_query command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-stats-query`
+
+</td>
+<td>
+
+Denies the content_stats_query command without any pre-configured scope.
 
 </td>
 </tr>

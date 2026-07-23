@@ -615,10 +615,10 @@
           "markdownDescription": "Denies the conquest_state_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-rewrite-demo`\n- `allow-content-delete-replay`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-content-warm-rapid-pool`\n- `allow-content-prune-rapid-pool`\n- `allow-content-reclaim-caches`\n- `allow-content-export-build-tree-html`\n- `allow-content-export-build-tree-zip`\n- `allow-branding-catalog`\n- `allow-branding-image`",
+          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-stats-ingest`\n- `allow-content-stats-query`\n- `allow-content-demo-chat`\n- `allow-content-rewrite-demo`\n- `allow-content-delete-replay`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-content-warm-rapid-pool`\n- `allow-content-prune-rapid-pool`\n- `allow-content-reclaim-caches`\n- `allow-content-export-build-tree-html`\n- `allow-content-export-build-tree-zip`\n- `allow-branding-catalog`\n- `allow-branding-image`",
           "type": "string",
           "const": "coilbox-content:default",
-          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-demo-chat`\n- `allow-content-rewrite-demo`\n- `allow-content-delete-replay`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-content-warm-rapid-pool`\n- `allow-content-prune-rapid-pool`\n- `allow-content-reclaim-caches`\n- `allow-content-export-build-tree-html`\n- `allow-content-export-build-tree-zip`\n- `allow-branding-catalog`\n- `allow-branding-image`"
+          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-stats-ingest`\n- `allow-content-stats-query`\n- `allow-content-demo-chat`\n- `allow-content-rewrite-demo`\n- `allow-content-delete-replay`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-content-warm-rapid-pool`\n- `allow-content-prune-rapid-pool`\n- `allow-content-reclaim-caches`\n- `allow-content-export-build-tree-html`\n- `allow-content-export-build-tree-zip`\n- `allow-branding-catalog`\n- `allow-branding-image`"
         },
         {
           "description": "Enables the branding_catalog command without any pre-configured scope.",
@@ -781,6 +781,18 @@
           "type": "string",
           "const": "coilbox-content:allow-content-state-load",
           "markdownDescription": "Enables the content_state_load command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_stats_ingest command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-stats-ingest",
+          "markdownDescription": "Enables the content_stats_ingest command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_stats_query command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:allow-content-stats-query",
+          "markdownDescription": "Enables the content_stats_query command without any pre-configured scope."
         },
         {
           "description": "Enables the content_verify_engine command without any pre-configured scope.",
@@ -955,6 +967,18 @@
           "type": "string",
           "const": "coilbox-content:deny-content-state-load",
           "markdownDescription": "Denies the content_state_load command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_stats_ingest command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-stats-ingest",
+          "markdownDescription": "Denies the content_stats_ingest command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_stats_query command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-content:deny-content-stats-query",
+          "markdownDescription": "Denies the content_stats_query command without any pre-configured scope."
         },
         {
           "description": "Denies the content_verify_engine command without any pre-configured scope.",
