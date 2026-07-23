@@ -8,66 +8,15 @@ import {
   useScanTargetSelection,
 } from "../config";
 import { allPlayers, profileFor } from "../stats";
+import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
-
-/** A single headline stat tile. */
-function StatCard({
-  icon,
-  label,
-  value,
-  sub,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  sub?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1 rounded-lg border border-border/60 bg-card p-4">
-      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {icon}
-        {label}
-      </div>
-      <div className="text-2xl font-semibold tabular-nums">{value}</div>
-      {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
-    </div>
-  );
-}
-
-/** A win/loss tally row (map or faction), with a win-rate bar. */
-function TallyRow({
-  label,
-  games,
-  wins,
-}: {
-  label: string;
-  games: number;
-  wins: number;
-}) {
-  const rate = games > 0 ? wins / games : 0;
-  return (
-    <li className="flex items-center gap-3 py-1.5">
-      <span className="min-w-0 flex-1 truncate text-sm" title={label}>
-        {label}
-      </span>
-      <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full rounded-full bg-primary/70"
-          style={{ width: `${Math.round(rate * 100)}%` }}
-        />
-      </div>
-      <span className="w-24 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-        {wins}/{games} · {Math.round(rate * 100)}%
-      </span>
-    </li>
-  );
-}
 
 /**
  * Personal stats profile — a minimal, offline view over the local replay-stats
  * database (see `stats.rs`). It ingests the library's demos on open, then shows one
- * player's games, win rate, streak, favourite maps and factions. The richer
- * head-to-head dossier is #375; per-map/per-faction detail-page records are
+ * player's games, win rate, streak, favourite maps and factions. The
+ * head-to-head dossier for another player lives at `PlayerDossierPage`
+ * (`content/stats/:name`, #375); per-map/per-faction detail-page records are
  * deferred follow-ups.
  */
 export default function StatsPage() {

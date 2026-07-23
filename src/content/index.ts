@@ -152,6 +152,11 @@ const contentPlugin: FramePlugin = {
       lazy: () => import("./pages/StatsPage"),
       crumb: "Stats",
     },
+    {
+      path: "content/stats/:name",
+      lazy: () => import("./pages/PlayerDossierPage"),
+      crumb: (c) => c.params.name ?? "Player",
+    },
   ],
   settings: [
     {

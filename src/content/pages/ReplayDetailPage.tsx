@@ -106,8 +106,20 @@ function PlayerRow({ p, won }: { p: ReplayPlayer; won: boolean }) {
         style={{ backgroundColor: swatch(p.rgbColor) ?? "transparent" }}
         aria-hidden
       />
-      <span className="min-w-0 flex-1 truncate text-sm" title={p.name}>
-        {p.name}
+      <span className="min-w-0 flex-1 truncate text-sm">
+        {/* Spectators aren't in the stats database (see stats.rs), so only
+         * seated players link through to the dossier (#375). */}
+        {p.spectator ? (
+          p.name
+        ) : (
+          <Link
+            to={`/content/stats/${encodeURIComponent(p.name)}`}
+            className="hover:underline"
+            title={p.name}
+          >
+            {p.name}
+          </Link>
+        )}
         {p.countryCode ? (
           <span className="ml-1 text-xs text-muted-foreground">
             {p.countryCode}
