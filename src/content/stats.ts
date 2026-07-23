@@ -176,6 +176,32 @@ export interface PlayerRelation {
   commonMaps: Tally[];
 }
 
+/** One replay `name` appeared in, for the dossier's replay list. */
+export interface PlayerReplay {
+  filename: string;
+  mapName: string;
+  gameType: string;
+  startTimeMs: number;
+  /** True/false when the game was decided; undefined when the result is unknown. */
+  won?: boolean;
+}
+
+/** Every replay `name` appears in, most-recent-first. */
+export function replaysFor(
+  records: StatRecord[],
+  name: string,
+): PlayerReplay[] {
+  return gamesFor(records, name)
+    .map((g) => ({
+      filename: g.record.filename,
+      mapName: g.record.mapName,
+      gameType: g.record.gameType,
+      startTimeMs: g.record.startTimeMs,
+      won: g.won,
+    }))
+    .sort((a, b) => b.startTimeMs - a.startTimeMs);
+}
+
 /**
  * Aggregate `me`'s history with `other`: every record where both appeared as
  * non-spectators. A game only counts toward the together/against split when

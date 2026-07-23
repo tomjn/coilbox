@@ -5,6 +5,7 @@ import {
   guessPrimaryPlayer,
   profileFor,
   relationTo,
+  replaysFor,
 } from "./stats";
 
 let seq = 0;
@@ -143,6 +144,54 @@ describe("profileFor", () => {
     const prof = profileFor(records, "me");
     expect(prof.factions[0]).toEqual({ key: "Armada", games: 2, wins: 2 });
     expect(prof.factions[1]).toEqual({ key: "Cortex", games: 1, wins: 0 });
+  });
+});
+
+describe("replaysFor", () => {
+  it("lists every replay the player appears in, most-recent-first", () => {
+    const records = [
+      rec("A", [p("me", true)]),
+      rec("B", [p("me", false)]),
+      rec("C", [p("foe", true)]),
+    ];
+    const replays = replaysFor(records, "me");
+    expect(replays).toEqual([
+      {
+        filename: records[1].filename,
+        mapName: "B",
+        gameType: "BAR",
+        startTimeMs: records[1].startTimeMs,
+        won: false,
+      },
+      {
+        filename: records[0].filename,
+        mapName: "A",
+        gameType: "BAR",
+        startTimeMs: records[0].startTimeMs,
+        won: true,
+      },
+    ]);
+  });
+
+  it("excludes spectator appearances and reports an undefined result when unknown", () => {
+    const records = [
+      rec("A", [p("me", undefined, "Armada", true)]),
+      rec("B", [p("me", undefined)], { winnersKnown: false }),
+    ];
+    const replays = replaysFor(records, "me");
+    expect(replays).toEqual([
+      {
+        filename: records[1].filename,
+        mapName: "B",
+        gameType: "BAR",
+        startTimeMs: records[1].startTimeMs,
+        won: undefined,
+      },
+    ]);
+  });
+
+  it("is empty for a player with no games", () => {
+    expect(replaysFor([], "me")).toEqual([]);
   });
 });
 
