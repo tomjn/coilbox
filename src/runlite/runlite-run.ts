@@ -8,6 +8,7 @@ import {
 import { useBrandingEntry } from "../content/branding";
 import { buildEdgeMap } from "../content/buildTree";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../content/config";
+import { useReplayUserState } from "../content/replayUserState";
 import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
 import {
@@ -53,22 +54,25 @@ async function findNewReplay(
   return null;
 }
 
+/** Mirrors conquest's `detectBattleResult`: the replay (when found) comes back
+ * alongside the outcome so the caller can tag it with provenance the moment
+ * its filename is known. */
 async function detectBattleResult(opts: {
   target: PlayTarget;
   beforePaths: ReadonlySet<string>;
   playerName: string;
-}): Promise<DetectedResult> {
+}): Promise<{ outcome: DetectedResult; replay: ReplayFile | null }> {
   const { target, beforePaths, playerName } = opts;
   try {
     const replay = await findNewReplay(target.dataDir, beforePaths);
-    if (!replay) return "ambiguous";
+    if (!replay) return { outcome: "ambiguous", replay: null };
     const { info } = await contentDemoInfo({
       enginePath: target.enginePath,
       replayPath: replay.path,
     });
-    return resultFromDemoInfo(info, playerName);
+    return { outcome: resultFromDemoInfo(info, playerName), replay };
   } catch {
-    return "ambiguous";
+    return { outcome: "ambiguous", replay: null };
   }
 }
 
@@ -99,10 +103,14 @@ export function useRunEncounter(
   run: RogueliteRun,
   node: RunNode | undefined,
   onResolved: (next: RogueliteRun) => void | Promise<void>,
+  /** The run's opaque id in `RunStateFile.runs` (see `runlite/runs.ts`), for
+   * tagging a freshly-detected replay's provenance. */
+  runId?: string,
 ) {
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { running, launch } = usePlay();
+  const { setProvenance } = useReplayUserState();
 
   const [phase, setPhase] = useState<BattleRunPhase>("briefing");
   const [error, setError] = useState<string | null>(null);
@@ -242,11 +250,21 @@ export function useRunEncounter(
         return;
       }
       setPhase("checking");
-      const outcome = await detectBattleResult({
+      const { outcome, replay } = await detectBattleResult({
         target,
         beforePaths,
         playerName: PLAYER_NAME,
-      }).catch((): DetectedResult => "ambiguous");
+      }).catch((): { outcome: DetectedResult; replay: null } => ({
+        outcome: "ambiguous",
+        replay: null,
+      }));
+      if (replay) {
+        setProvenance(replay.filename, {
+          mode: "warpath",
+          runId,
+          nodeId: node.id,
+        });
+      }
       if (outcome === "ambiguous") {
         setPhase("result");
       } else {
@@ -255,7 +273,16 @@ export function useRunEncounter(
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [target, node, installedGame, snapshot, launch, applyResult]);
+  }, [
+    target,
+    node,
+    installedGame,
+    snapshot,
+    launch,
+    applyResult,
+    runId,
+    setProvenance,
+  ]);
 
   const recordVictory = useCallback(
     () => applyResult("victory", false),
