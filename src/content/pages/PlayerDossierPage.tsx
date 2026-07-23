@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Calendar,
   Flame,
+  History,
   Map as MapIcon,
   Swords,
   Trophy,
@@ -20,6 +21,7 @@ import {
   guessPrimaryPlayer,
   profileFor,
   relationTo,
+  replaysFor,
 } from "../stats";
 import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
@@ -29,15 +31,22 @@ function playedAt(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
+function outcomeLabel(won: boolean | undefined): string {
+  if (won === true) return "Win";
+  if (won === false) return "Loss";
+  return "Unknown";
+}
+
 /**
  * A player dossier (#375): one other player's own record (games, win rate,
  * streak, favourite maps/factions, via `profileFor` — same shape as the
  * personal Player stats page) plus your head-to-head with them (`relationTo`)
- * — games together vs against, and the maps you've shared. Reached from a
- * replay roster's player names. Entirely local, derived from the same stats
- * database as `StatsPage` (#414) — no new data path. Registered at
- * `stats/:name` by the multiplayer plugin (moved from `content/stats/:name`
- * in #467).
+ * — games together vs against, and the maps you've shared — plus every
+ * replay they appear in (`replaysFor`, #465), most-recent-first, linking to
+ * `/play/replays/:name` (#467). Reached from a replay roster's player names.
+ * Entirely local, derived from the same stats database as `StatsPage`
+ * (#414) — no new data path. Registered at `stats/:name` by the multiplayer
+ * plugin (moved from `content/stats/:name` in #467).
  */
 export default function PlayerDossierPage() {
   const { name } = useParams();
@@ -64,6 +73,10 @@ export default function PlayerDossierPage() {
   const relation = useMemo(
     () => (me && playerName ? relationTo(records, me, playerName) : null),
     [records, me, playerName],
+  );
+  const replays = useMemo(
+    () => (playerName ? replaysFor(records, playerName) : []),
+    [records, playerName],
   );
 
   const winRatePct =
@@ -241,6 +254,45 @@ export default function PlayerDossierPage() {
               )}
             </section>
           </div>
+
+          <section className="rounded-lg border border-border/60 bg-card p-4">
+            <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
+              <History className="size-4 text-muted-foreground" />
+              Replays
+            </h2>
+            {replays.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No replays recorded.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border/40">
+                {replays.map((r) => (
+                  <li key={r.filename}>
+                    <Link
+                      to={`/play/replays/${encodeURIComponent(r.filename)}`}
+                      className="flex items-center justify-between gap-3 py-1.5 text-sm transition-colors hover:text-foreground"
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {r.mapName}
+                        {r.gameType && (
+                          <span className="text-muted-foreground">
+                            {" "}
+                            · {r.gameType}
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {playedAt(r.startTimeMs)}
+                      </span>
+                      <span className="w-16 shrink-0 text-right text-xs font-medium">
+                        {outcomeLabel(r.won)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </>
       )}
     </div>
