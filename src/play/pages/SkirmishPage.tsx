@@ -37,6 +37,7 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "../config";
+import { bumpAiHandicap } from "../debrief";
 import {
   type BattleRestrictions,
   type SkirmishDraft,
@@ -49,7 +50,8 @@ import {
   type SkirmishPreset,
   useSkirmishPresets,
 } from "../presets";
-import { tagFreshReplay } from "../tagReplayProvenance";
+import { useSkirmishDebrief } from "../useSkirmishDebrief";
+import { DebriefDrawer } from "./components/DebriefDrawer";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
 import { GameSelectCard } from "./components/GameSelectCard";
 import { MapCard } from "./components/MapCard";
@@ -83,6 +85,15 @@ export default function SkirmishPage() {
   const dataDir = target?.dataDir;
   const { running, launch } = usePlay();
   const { setProvenance } = useReplayUserState();
+  const {
+    debrief,
+    open: debriefOpen,
+    checking: checkingResult,
+    setOpen: setDebriefOpen,
+    resolve: resolveDebrief,
+    markUndetectable,
+    reset: resetDebrief,
+  } = useSkirmishDebrief();
 
   const scan = useUnitsyncScan(enginePath, dataDir);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
@@ -289,12 +300,17 @@ export default function SkirmishPage() {
 
   // Derive the engine `BattleConfig` from the current setup, or null if a game
   // or map isn't selected yet. Shared by launch and export so they never drift.
-  function buildConfig(): BattleConfig | null {
+  // `parts` defaults to the live participants so callers only need to pass an
+  // override when launching a tweaked roster (see "Rematch with a tweak"),
+  // where a freshly-computed array must be used instead of stale state.
+  function buildConfig(
+    parts: Participant[] = participants,
+  ): BattleConfig | null {
     if (!selectedGame || !selectedMap) return null;
     // Roll each Random-faction bot to a concrete side here, at the impure launch
     // boundary, so the start script gets a real side and each Random AI rolls
     // independently. The participant model stays free of randomness (issue #332).
-    const resolved = resolveRandomSides(participants, sides);
+    const resolved = resolveRandomSides(parts, sides);
     // Disabled units render into `[RESTRICT]` via `toBattleConfig`; the team-0
     // perk levers are re-applied afterwards. Both no-op for a hand-built setup.
     return applyRestrictions(
@@ -310,14 +326,28 @@ export default function SkirmishPage() {
     );
   }
 
-  async function onStart() {
+  // The current setup as a launchable/saveable `SkirmishDraft` — shared by
+  // "Save current setup", the debrief's "Save as preset", and (implicitly)
+  // the persisted draft effect above.
+  const currentDraft = (): SkirmishDraft => ({
+    participants,
+    gameName,
+    mapName,
+    startPosType,
+    modOptionValues,
+    restrictions,
+  });
+
+  async function onStart(parts: Participant[] = participants) {
     if (!target) return;
-    const config = buildConfig();
+    const config = buildConfig(parts);
     if (!config) return;
     setError(null);
+    resetDebrief();
     // Snapshot the replays that exist before the engine runs, so any new file
-    // afterwards can be tagged as a skirmish. Best-effort: a failure here just
-    // disables tagging for this launch, never the launch itself.
+    // afterwards can be tagged as a skirmish (and, on exit, decoded for the
+    // debrief's outcome/duration — see `useSkirmishDebrief`). Best-effort: a
+    // failure here just disables tagging/detection, never the launch itself.
     let beforePaths: Set<string> | null = null;
     try {
       const { replays } = await contentListReplays({ root: target.dataDir });
@@ -334,28 +364,40 @@ export default function SkirmishPage() {
       if (res.exitCode && res.exitCode !== 0) {
         setError(`Engine exited with code ${res.exitCode}.`);
       }
-      if (beforePaths && res.exitCode !== null) {
-        tagFreshReplay(
-          target.dataDir,
-          beforePaths,
-          { mode: "skirmish" },
-          setProvenance,
-        );
+      // Cancelled before the game started: nothing to debrief.
+      if (res.exitCode === null) return;
+      if (!beforePaths) {
+        markUndetectable();
+        return;
       }
+      await resolveDebrief({
+        target,
+        beforePaths,
+        playerName: config.myPlayerName,
+        setProvenance,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   }
 
+  const onRematch = () => {
+    onStart();
+  };
+
+  // "Rematch with a tweak" (#370, keeping #354's richer per-AI control
+  // separate): nudge every AI's handicap by a fixed delta, persist it onto the
+  // visible setup, and relaunch. The tweaked array is threaded through
+  // explicitly rather than read back from `participants` — `setParticipants`
+  // hasn't committed by the time `onStart` would otherwise read it.
+  const onRematchWithTweak = (deltaPercent: number) => {
+    const tweaked = bumpAiHandicap(participants, deltaPercent);
+    setParticipants(tweaked);
+    onStart(tweaked);
+  };
+
   const saveCurrentPreset = (name: string): SkirmishPreset =>
-    savePreset(name, {
-      participants,
-      gameName,
-      mapName,
-      startPosType,
-      modOptionValues,
-      restrictions,
-    });
+    savePreset(name, currentDraft());
 
   // "New preset from replay…" (#368): save straight into the presets library,
   // leaving the current setup on the page untouched.
@@ -455,7 +497,7 @@ export default function SkirmishPage() {
           >
             <Bookmark className="size-4" /> Presets
           </Button>
-          <Button onClick={onStart} disabled={!canStart}>
+          <Button onClick={() => onStart()} disabled={!canStart}>
             <Play className="size-4 fill-current" />{" "}
             {running ? "Game running…" : "Start Game"}
           </Button>
@@ -474,6 +516,19 @@ export default function SkirmishPage() {
         onImport={onImportPreset}
         onSaveFromReplay={saveFromReplay}
         disabled={running}
+      />
+
+      <DebriefDrawer
+        open={debriefOpen}
+        onOpenChange={setDebriefOpen}
+        debrief={debrief}
+        onRematch={onRematch}
+        onRematchWithTweak={onRematchWithTweak}
+        getDraft={currentDraft}
+        defaultPresetName={
+          selectedMap ? `Rematch: ${selectedMap.name}` : "Rematch"
+        }
+        disabled={!canStart}
       />
 
       {!target && !scan.loading && (
@@ -500,6 +555,12 @@ export default function SkirmishPage() {
       {running && (
         <p className="rounded-md border border-border/50 bg-card p-3 text-sm text-muted-foreground">
           Game running — settings are frozen until the engine exits.
+        </p>
+      )}
+
+      {checkingResult && (
+        <p className="rounded-md border border-border/50 bg-card p-3 text-sm text-muted-foreground">
+          Checking match result…
         </p>
       )}
 
