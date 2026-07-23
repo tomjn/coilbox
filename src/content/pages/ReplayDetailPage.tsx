@@ -55,6 +55,7 @@ import {
 } from "../config";
 import type { ReplayProvenance } from "../replayUserState";
 import { useReplayUserState } from "../replayUserState";
+import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
 import { WatchButton } from "./components/WatchButton";
@@ -106,6 +107,12 @@ function provenanceLink(
       return {
         to: `/campaign/${encodeURIComponent(p.campaignId)}/${encodeURIComponent(p.missionId)}`,
         label: "Back to mission",
+      };
+    case "refight":
+      if (!p.sourceReplayFilename) return null;
+      return {
+        to: `/play/replays/${encodeURIComponent(p.sourceReplayFilename)}`,
+        label: "Back to original replay",
       };
     default:
       return null;
@@ -831,6 +838,7 @@ export default function ReplayDetailPage() {
                 onRemixed={onRemixed}
               />
             )}
+            <RefightPanel info={info} filename={filename} />
             <WatchButton
               replayPath={replay.path}
               engineVersion={info.engineVersion}

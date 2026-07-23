@@ -6,6 +6,7 @@ import {
   Gamepad2,
   Milestone,
   Orbit,
+  Repeat,
   Rocket,
   Swords,
   Tag,
@@ -68,6 +69,7 @@ const ORIGIN_OPTIONS: { value: OriginFilterValue; label: string }[] = [
   { value: "campaign", label: "Campaign" },
   { value: "skirmish", label: "Skirmish" },
   { value: "multiplayer", label: "Multiplayer" },
+  { value: "refight", label: "Refight" },
   { value: "other", label: "Unknown origin" },
 ];
 
@@ -80,6 +82,7 @@ const ORIGIN_BADGE: Record<
   campaign: { label: "Campaign", icon: Milestone },
   skirmish: { label: "Skirmish", icon: Swords },
   multiplayer: { label: "Multiplayer", icon: Gamepad2 },
+  refight: { label: "Refight", icon: Repeat },
   // No badge for "other" — there's nothing known to show, and a badge on
   // every row would just be noise.
   other: null,

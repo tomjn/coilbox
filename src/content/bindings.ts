@@ -311,6 +311,10 @@ export interface DemoInfo {
   sourceGametype?: string;
   /** For a remix, the filename of the original replay it was made from. */
   originFilename?: string;
+  /** The `[modoptions]` section verbatim (key -> value), for surfaces that want
+   * to reproduce the battle's options (e.g. refight-as-skirmish, #368). Empty
+   * when the script carried no `[modoptions]` section. */
+  modOptions: Record<string, string>;
 }
 
 /** List replays in a content root's `demos/`/`replays/` (cheap; newest first). */

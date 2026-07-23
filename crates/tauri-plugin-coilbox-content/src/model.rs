@@ -236,6 +236,10 @@ pub struct DemoInfo {
     pub num_ally_teams: u32,
     pub ally_teams: Vec<AllyTeamInfo>,
     pub players: Vec<PlayerInfo>,
+    /// The `[modoptions]` section verbatim (key -> value), for surfaces that want
+    /// to reproduce the battle's options (e.g. refight-as-skirmish, #368). Empty
+    /// when the script carried no `[modoptions]` section.
+    pub mod_options: std::collections::HashMap<String, String>,
     /// True when this file carries coilbox's remix marker (a rewritten copy, not an
     /// engine-recorded demo).
     pub remixed: bool,
