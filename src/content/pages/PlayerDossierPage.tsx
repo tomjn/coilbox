@@ -2,6 +2,7 @@ import { useSetting } from "@picoframe/frame";
 import {
   ArrowLeft,
   Calendar,
+  Code2,
   Flame,
   History,
   Map as MapIcon,
@@ -11,14 +12,17 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useParams } from "react-router";
+import { Badge } from "@/components/ui/badge";
 import {
   useContentState,
   useReplayStats,
   useScanTargetSelection,
 } from "../config";
+import { refightFilenames, useReplayUserState } from "../replayUserState";
 import {
   allPlayers,
   guessPrimaryPlayer,
+  type PlayerReplay,
   profileFor,
   relationTo,
   replaysFor,
@@ -35,6 +39,32 @@ function outcomeLabel(won: boolean | undefined): string {
   if (won === true) return "Win";
   if (won === false) return "Loss";
   return "Unknown";
+}
+
+/**
+ * Flags a remix/refight rerun in the replay list (#466) — still listed for a
+ * complete history, but visibly marked as not counting toward the stats above.
+ */
+function ExclusionBadge({
+  reason,
+}: {
+  reason: PlayerReplay["excludedReason"];
+}) {
+  if (!reason) return null;
+  const label = reason === "remix" ? "Remix" : "Refight";
+  const title =
+    reason === "remix"
+      ? "A coilbox remix — rewritten to run on a local build. Doesn't count toward stats."
+      : "A refought setup — a rerun of an existing replay. Doesn't count toward stats.";
+  return (
+    <Badge
+      variant="ghost"
+      className="shrink-0 gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+      title={title}
+    >
+      <Code2 className="size-2.5" /> {label}
+    </Badge>
+  );
 }
 
 /**
@@ -58,25 +88,34 @@ export default function PlayerDossierPage() {
     roots,
     selected?.enginePath,
   );
+  const { state: replayUserState } = useReplayUserState();
+  const refights = useMemo(
+    () => refightFilenames(replayUserState),
+    [replayUserState],
+  );
 
-  const players = useMemo(() => allPlayers(records), [records]);
+  const players = useMemo(
+    () => allPlayers(records, refights),
+    [records, refights],
+  );
   const [storedMe] = useSetting("content.statsPlayer", "");
   const me =
     players.find((p) => p.name === storedMe)?.name ??
-    guessPrimaryPlayer(records) ??
+    guessPrimaryPlayer(records, refights) ??
     "";
 
   const profile = useMemo(
-    () => (playerName ? profileFor(records, playerName) : null),
-    [records, playerName],
+    () => (playerName ? profileFor(records, playerName, refights) : null),
+    [records, playerName, refights],
   );
   const relation = useMemo(
-    () => (me && playerName ? relationTo(records, me, playerName) : null),
-    [records, me, playerName],
+    () =>
+      me && playerName ? relationTo(records, me, playerName, refights) : null,
+    [records, me, playerName, refights],
   );
   const replays = useMemo(
-    () => (playerName ? replaysFor(records, playerName) : []),
-    [records, playerName],
+    () => (playerName ? replaysFor(records, playerName, refights) : []),
+    [records, playerName, refights],
   );
 
   const winRatePct =
@@ -272,14 +311,17 @@ export default function PlayerDossierPage() {
                       to={`/play/replays/${encodeURIComponent(r.filename)}`}
                       className="flex items-center justify-between gap-3 py-1.5 text-sm transition-colors hover:text-foreground"
                     >
-                      <span className="min-w-0 flex-1 truncate">
-                        {r.mapName}
-                        {r.gameType && (
-                          <span className="text-muted-foreground">
-                            {" "}
-                            · {r.gameType}
-                          </span>
-                        )}
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                        <span className="truncate">
+                          {r.mapName}
+                          {r.gameType && (
+                            <span className="text-muted-foreground">
+                              {" "}
+                              · {r.gameType}
+                            </span>
+                          )}
+                        </span>
+                        <ExclusionBadge reason={r.excludedReason} />
                       </span>
                       <span className="shrink-0 text-xs text-muted-foreground">
                         {playedAt(r.startTimeMs)}

@@ -19,6 +19,40 @@ interface PlayerGame {
   won?: boolean;
 }
 
+/**
+ * Why a record is a synthetic rerun rather than a genuine match, or `undefined`
+ * when it counts. Two independent signals (#466): a coilbox remix stamped
+ * in-file by `demo::rewrite_demo` (`record.remixed`, issue #367 — read fresh on
+ * every ingest, so it also corrects records ingested before this change), or a
+ * "refight this setup" rerun (issue #368), tagged best-effort by filename in
+ * `content.replayState` (`ReplayProvenance.mode === "refight"`) since that
+ * provenance lives outside the Rust stats store.
+ */
+function excludedReasonFor(
+  record: StatRecord,
+  refightFilenames: ReadonlySet<string>,
+): "remix" | "refight" | undefined {
+  if (record.remixed) return "remix";
+  if (refightFilenames.has(record.filename)) return "refight";
+  return undefined;
+}
+
+/** True when `record` is a genuine match that should count toward the aggregates. */
+export function isGenuineMatch(
+  record: StatRecord,
+  refightFilenames: ReadonlySet<string>,
+): boolean {
+  return excludedReasonFor(record, refightFilenames) === undefined;
+}
+
+/** Drop remixed/refought records, keeping only genuine matches for the aggregates. */
+function excludeSyntheticReruns(
+  records: StatRecord[],
+  refightFilenames: ReadonlySet<string>,
+): StatRecord[] {
+  return records.filter((r) => isGenuineMatch(r, refightFilenames));
+}
+
 /** Every non-spectator appearance of `name`, chronological (oldest first). */
 function gamesFor(records: StatRecord[], name: string): PlayerGame[] {
   const out: PlayerGame[] = [];
@@ -35,12 +69,17 @@ function gamesFor(records: StatRecord[], name: string): PlayerGame[] {
   return out;
 }
 
-/** Every human player, by games played (descending), for the profile selector. */
+/**
+ * Every human player, by games played (descending), for the profile selector.
+ * `refightFilenames` excludes remix/refight reruns (#466) — see
+ * `excludedReasonFor`.
+ */
 export function allPlayers(
   records: StatRecord[],
+  refightFilenames: ReadonlySet<string> = new Set(),
 ): { name: string; games: number }[] {
   const counts = new Map<string, number>();
-  for (const r of records) {
+  for (const r of excludeSyntheticReruns(records, refightFilenames)) {
     for (const p of r.players) {
       if (p.spectator) continue;
       counts.set(p.name, (counts.get(p.name) ?? 0) + 1);
@@ -52,8 +91,11 @@ export function allPlayers(
 }
 
 /** The most-played player name — the profile's default "me". */
-export function guessPrimaryPlayer(records: StatRecord[]): string | undefined {
-  return allPlayers(records)[0]?.name;
+export function guessPrimaryPlayer(
+  records: StatRecord[],
+  refightFilenames: ReadonlySet<string> = new Set(),
+): string | undefined {
+  return allPlayers(records, refightFilenames)[0]?.name;
 }
 
 /** A map or faction tally within a player's history. */
@@ -130,9 +172,19 @@ function currentStreak(games: PlayerGame[]): number {
   return streak;
 }
 
-/** Aggregate one player's full profile from the record set. */
-export function profileFor(records: StatRecord[], name: string): PlayerProfile {
-  const games = gamesFor(records, name);
+/**
+ * Aggregate one player's full profile from the record set, excluding
+ * remix/refight reruns (#466) via `refightFilenames`.
+ */
+export function profileFor(
+  records: StatRecord[],
+  name: string,
+  refightFilenames: ReadonlySet<string> = new Set(),
+): PlayerProfile {
+  const games = gamesFor(
+    excludeSyntheticReruns(records, refightFilenames),
+    name,
+  );
   const decided = games.filter((g) => g.won !== undefined);
   const wins = decided.filter((g) => g.won === true).length;
   const losses = decided.length - wins;
@@ -184,12 +236,23 @@ export interface PlayerReplay {
   startTimeMs: number;
   /** True/false when the game was decided; undefined when the result is unknown. */
   won?: boolean;
+  /**
+   * Set when this replay is a remix or refight rerun (#466) — still listed
+   * here for visibility, but excluded from every other aggregate.
+   */
+  excludedReason?: "remix" | "refight";
 }
 
-/** Every replay `name` appears in, most-recent-first. */
+/**
+ * Every replay `name` appears in, most-recent-first. Unlike the other
+ * aggregates, remix/refight reruns are kept (not filtered) so the dossier's
+ * replay list stays a complete history — but each is flagged via
+ * `excludedReason` so the UI can mark it as not counting.
+ */
 export function replaysFor(
   records: StatRecord[],
   name: string,
+  refightFilenames: ReadonlySet<string> = new Set(),
 ): PlayerReplay[] {
   return gamesFor(records, name)
     .map((g) => ({
@@ -198,6 +261,7 @@ export function replaysFor(
       gameType: g.record.gameType,
       startTimeMs: g.record.startTimeMs,
       won: g.won,
+      excludedReason: excludedReasonFor(g.record, refightFilenames),
     }))
     .sort((a, b) => b.startTimeMs - a.startTimeMs);
 }
@@ -206,12 +270,14 @@ export function replaysFor(
  * Aggregate `me`'s history with `other`: every record where both appeared as
  * non-spectators. A game only counts toward the together/against split when
  * both ally teams are known — an unknown ally team still counts toward
- * `gamesShared`, `commonMaps`, and `lastPlayedMs`.
+ * `gamesShared`, `commonMaps`, and `lastPlayedMs`. `refightFilenames` excludes
+ * remix/refight reruns (#466).
  */
 export function relationTo(
   records: StatRecord[],
   me: string,
   other: string,
+  refightFilenames: ReadonlySet<string> = new Set(),
 ): PlayerRelation {
   const shared: PlayerGame[] = [];
   let gamesTogether = 0;
@@ -220,7 +286,7 @@ export function relationTo(
   let winsAgainst = 0;
   let lastPlayedMs = 0;
 
-  for (const record of records) {
+  for (const record of excludeSyntheticReruns(records, refightFilenames)) {
     const mine = record.players.find((p) => !p.spectator && p.name === me);
     const theirs = record.players.find((p) => !p.spectator && p.name === other);
     if (!mine || !theirs) continue;
