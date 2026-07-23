@@ -7,6 +7,7 @@ import { resolveGameByShortname } from "../../conquest/model";
 import { BracketFrame } from "../../conquest/pages/components/hudChrome";
 import { buildEdgeMap, reachableFrom } from "../../content/buildTree";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../../content/config";
+import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
 import {
   EmptyState,
   SkeletonList,
@@ -208,6 +209,8 @@ export default function RunPage() {
                 .filter((h) => h.nodeId === selectedId && h.note)
                 .at(-1)
                 ?.note?.trim()}
+              runId={runId}
+              dataDir={target?.dataDir}
               onEnter={() => onSelect(selectedId)}
               onClose={() => setSelectedId(null)}
             />
@@ -219,6 +222,7 @@ export default function RunPage() {
         {active && isBattleNode(active.type) && (
           <EncounterOverlay
             run={run}
+            runId={runId}
             node={active}
             onResolved={applyAndSave}
             onClose={closeOverlay}
@@ -333,6 +337,8 @@ function InspectPanel({
   node,
   isChoice,
   chosen,
+  runId,
+  dataDir,
   onEnter,
   onClose,
 }: {
@@ -340,6 +346,10 @@ function InspectPanel({
   isChoice: boolean;
   /** For a resolved node, what the player took here (from run history). */
   chosen?: string;
+  /** For a battle node's replay history — the run's opaque id + the target's
+   * data dir to scan for replays. */
+  runId?: string;
+  dataDir?: string;
   onEnter: () => void;
   onClose: () => void;
 }) {
@@ -387,6 +397,22 @@ function InspectPanel({
               </div>
             ))}
           </dl>
+        )}
+        {isBattleNode(node.type) && (
+          <div className="flex flex-col gap-1.5">
+            <span className="font-display text-[10px] uppercase tracking-wider text-muted-foreground">
+              Battle history
+            </span>
+            <ReplayHistoryList
+              dataDir={dataDir}
+              match={(p) =>
+                p.mode === "warpath" &&
+                p.runId === runId &&
+                p.nodeId === node.id
+              }
+              emptyLabel="No battles fought here yet."
+            />
+          </div>
         )}
         {chosen && (
           <div

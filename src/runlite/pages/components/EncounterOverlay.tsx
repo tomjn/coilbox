@@ -24,19 +24,22 @@ import { useRunEncounter } from "../../runlite-run";
  */
 export function EncounterOverlay({
   run,
+  runId,
   node,
   onResolved,
   onClose,
   onCelebrate,
 }: {
   run: RogueliteRun;
+  /** The run's opaque id, for tagging a freshly-detected replay's provenance. */
+  runId?: string;
   node: RunNode;
   onResolved: (next: RogueliteRun) => Promise<void>;
   onClose: () => void;
   /** Called when leaving the map after a victory, to fire the win burst. */
   onCelebrate?: () => void;
 }) {
-  const enc = useRunEncounter(run, node, onResolved);
+  const enc = useRunEncounter(run, node, onResolved, runId);
   const spec = node.battle;
   const kindLabel =
     node.type === "boss"

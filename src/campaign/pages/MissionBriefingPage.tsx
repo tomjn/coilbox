@@ -17,6 +17,7 @@ import { Link, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
 import { invalidateMapPreview, invalidateScans } from "../../content/config";
+import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
 import { type DownloadProgress, dlDownloadMap } from "../../downloads/bindings";
 import { useWriteRootPath } from "../../downloads/config";
 import { ProgressBar } from "../../downloads/pages/components/ProgressBar";
@@ -191,6 +192,7 @@ function Briefing({
   mission: CampaignMission;
   run: ReturnType<typeof useMissionRun>;
 }) {
+  const { target } = usePreferredTarget();
   return (
     <div className="flex w-full items-end gap-4">
       <div className="flex w-full max-w-2xl flex-col gap-4 rounded-xl border border-border/50 bg-card/80 p-5 backdrop-blur-sm">
@@ -233,6 +235,21 @@ function Briefing({
             </ul>
           </div>
         )}
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Battle history
+          </span>
+          <ReplayHistoryList
+            dataDir={target?.dataDir}
+            match={(p) =>
+              p.mode === "campaign" &&
+              p.campaignId === campaign.id &&
+              p.missionId === mission.id
+            }
+            emptyLabel="No attempts recorded yet."
+          />
+        </div>
 
         {run.error && (
           <Alert variant="destructive" className="p-3">
