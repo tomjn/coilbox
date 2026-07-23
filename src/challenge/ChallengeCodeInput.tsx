@@ -5,17 +5,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { ErrorBanner } from "../content/pages/components/states";
 
 /**
- * A paste-in box for a challenge code plus an Import action — the "Import
- * challenge" drawer content, shared by conquest and warpath (issue #376).
- * `onImport` does the actual decode/generate/save; this component only owns
- * the textbox, the busy state and surfacing whatever error it throws.
+ * A paste-in box for a base64url code plus an Import action. Started as the
+ * "Import challenge" drawer content shared by conquest and warpath (issue
+ * #376). `placeholder`/`submitLabel` let other base64url formats reuse it
+ * without the wording claiming to be a "challenge" (setup packs, issue #415).
+ * `onImport` does the actual decode/apply/save. This component only owns the
+ * textbox, the busy state and surfacing whatever error it throws.
  */
 export function ChallengeCodeInput({
   helpText,
+  placeholder = "Paste a challenge code…",
+  submitLabel = "Import challenge",
   busyLabel = "Importing…",
   onImport,
 }: {
   helpText: string;
+  placeholder?: string;
+  submitLabel?: string;
   busyLabel?: string;
   onImport: (code: string) => Promise<void>;
 }) {
@@ -42,14 +48,14 @@ export function ChallengeCodeInput({
       <Textarea
         value={code}
         onChange={(e) => setCode(e.target.value)}
-        placeholder="Paste a challenge code…"
+        placeholder={placeholder}
         rows={6}
         className="font-mono text-xs"
       />
       {error && <ErrorBanner message={error} />}
       <Button onClick={submit} disabled={busy || !code.trim()}>
         <Download className="mr-1.5 size-4" aria-hidden />
-        {busy ? busyLabel : "Import challenge"}
+        {busy ? busyLabel : submitLabel}
       </Button>
     </div>
   );
