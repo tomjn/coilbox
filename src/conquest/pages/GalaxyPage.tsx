@@ -8,13 +8,14 @@ import {
   Swords,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogos } from "@/factions/logos";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncGameInfo, useUnitsyncScan } from "../../content/config";
 import { useKnownSpaceMaps } from "../../content/mapAppearanceCache";
+import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
 import {
   EmptyState,
   ErrorBanner,
@@ -86,7 +87,13 @@ export default function GalaxyPage() {
 function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   const { loading, stateFor, saveFor } = useConquestState();
   const state = stateFor(galaxy);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // A replay's "back to node" link deep-links here as `?node=<id>` — honoured
+  // once on mount so the selection panel opens straight to it; a stale id (the
+  // node no longer exists) just finds nothing and the panel stays closed.
+  const [searchParams] = useSearchParams();
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    searchParams.get("node"),
+  );
   // Faction preview while setting up a run (before any state exists).
   const [setupFaction, setSetupFaction] = useState(galaxy.playerFactionId);
   const reduceMotion = useReduceMotion();
@@ -355,6 +362,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
           node={selected}
           attackable={attackable.has(selected.id)}
           voidBody={voidBodies.get(selected.id)}
+          dataDir={target?.dataDir}
           onBattle={setBattleNodeId}
           onClose={() => setSelectedId(null)}
         />
@@ -565,6 +573,7 @@ function SelectionPanel({
   node,
   attackable,
   voidBody,
+  dataDir,
   onBattle,
   onClose,
 }: {
@@ -573,6 +582,7 @@ function SelectionPanel({
   node: GalaxyNode;
   attackable: boolean;
   voidBody: VoidBody | undefined;
+  dataDir: string | undefined;
   onBattle: (nodeId: string) => void;
   onClose: () => void;
 }) {
@@ -628,6 +638,20 @@ function SelectionPanel({
       {node.blurb && (
         <p className="text-xs text-muted-foreground">{node.blurb}</p>
       )}
+      <div className="flex flex-col gap-1.5">
+        <span className="font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          Battle history
+        </span>
+        <ReplayHistoryList
+          dataDir={dataDir}
+          match={(p) =>
+            p.mode === "conquest" &&
+            p.galaxyId === galaxy.id &&
+            p.nodeId === node.id
+          }
+          emptyLabel="No battles fought here yet."
+        />
+      </div>
       {underIncursion ? (
         <Button className="w-full" onClick={() => onBattle(node.id)}>
           <ShieldAlert className="mr-1.5 size-4" aria-hidden /> Defend
