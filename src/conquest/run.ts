@@ -6,6 +6,7 @@ import {
 } from "../content/bindings";
 import { useBrandingEntry } from "../content/branding";
 import { useUnitsyncScan } from "../content/config";
+import { useReplayUserState } from "../content/replayUserState";
 import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
 import {
@@ -56,23 +57,25 @@ async function findNewReplay(
 }
 
 /** Decode the new replay and read off the player's result; every failure mode
- * resolves to `"ambiguous"` so the caller falls back to the manual prompt. */
+ * resolves to `"ambiguous"` so the caller falls back to the manual prompt. The
+ * replay itself (when found) is returned alongside so the caller can tag it
+ * with provenance at exactly the moment its filename becomes known. */
 async function detectBattleResult(opts: {
   target: PlayTarget;
   beforePaths: ReadonlySet<string>;
   playerName: string;
-}): Promise<DetectedResult> {
+}): Promise<{ outcome: DetectedResult; replay: ReplayFile | null }> {
   const { target, beforePaths, playerName } = opts;
   try {
     const replay = await findNewReplay(target.dataDir, beforePaths);
-    if (!replay) return "ambiguous";
+    if (!replay) return { outcome: "ambiguous", replay: null };
     const { info } = await contentDemoInfo({
       enginePath: target.enginePath,
       replayPath: replay.path,
     });
-    return resultFromDemoInfo(info, playerName);
+    return { outcome: resultFromDemoInfo(info, playerName), replay };
   } catch {
-    return "ambiguous";
+    return { outcome: "ambiguous", replay: null };
   }
 }
 
@@ -113,6 +116,7 @@ export function useConquestBattleRun(
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { running, launch } = usePlay();
   const { saveFor } = useConquestState();
+  const { setProvenance } = useReplayUserState();
 
   const [phase, setPhase] = useState<BattleRunPhase>("briefing");
   const [error, setError] = useState<string | null>(null);
@@ -241,11 +245,23 @@ export function useConquestBattleRun(
         return;
       }
       setPhase("checking");
-      const outcome = await detectBattleResult({
+      const { outcome, replay } = await detectBattleResult({
         target,
         beforePaths,
         playerName: PLAYER_NAME,
-      }).catch((): DetectedResult => "ambiguous");
+      }).catch((): { outcome: DetectedResult; replay: null } => ({
+        outcome: "ambiguous",
+        replay: null,
+      }));
+      // Tag the replay with where it came from the moment its filename is
+      // known — regardless of whether the outcome itself was readable.
+      if (replay) {
+        setProvenance(replay.filename, {
+          mode: "conquest",
+          galaxyId: galaxy.id,
+          nodeId: node.id,
+        });
+      }
       if (outcome === "ambiguous") {
         setPhase("result");
       } else {
@@ -254,7 +270,17 @@ export function useConquestBattleRun(
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [target, state, node, installedGame, snapshot, launch, applyResult]);
+  }, [
+    target,
+    state,
+    node,
+    installedGame,
+    snapshot,
+    launch,
+    applyResult,
+    galaxy.id,
+    setProvenance,
+  ]);
 
   const recordVictory = useCallback(
     () => applyResult("victory", false),
