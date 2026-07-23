@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   AtSign,
+  BarChart3,
   Download,
   Gamepad2,
   LogIn,
@@ -8,6 +9,7 @@ import {
   Swords,
   UserX,
 } from "lucide-react";
+import { isProfileHidden } from "../profile/hidden";
 import LobbyStatusButton from "./LobbyStatusButton";
 import { BattleNavBadge, ChatNavBadge } from "./nav/navBadges";
 import BattleDownloadsSettings from "./pages/BattleDownloadsSettings";
@@ -26,6 +28,11 @@ import {
  * backed by the `tauri-plugin-coilbox-multiplayer` crate (ACL id
  * `coilbox-multiplayer`). Connection state / mirror store and the battle-list, chat
  * and battle-room pages are filled in during implementation; UI/UX is a follow-up.
+ *
+ * "Player stats" (list + player dossier) moved here from Content in #467, renamed
+ * from "Stats"; the pages themselves still live in `content/pages` (built on the
+ * content plugin's local replay-stats database) — only the nav item and route
+ * registration moved.
  */
 const multiplayerPlugin: FramePlugin = {
   id: "multiplayer",
@@ -82,6 +89,15 @@ const multiplayerPlugin: FramePlugin = {
           // Unread battle chat + a status dot when the game is running (#273).
           badge: () => <BattleNavBadge />,
         },
+        {
+          id: "multiplayer.stats",
+          label: "Player stats",
+          to: "/stats",
+          order: 4,
+          icon: BarChart3,
+          // A distribution profile can hide the stats view like any other nav item.
+          useVisible: () => !isProfileHidden("multiplayer.stats"),
+        },
       ],
     },
   ],
@@ -105,6 +121,16 @@ const multiplayerPlugin: FramePlugin = {
       path: "chatlogs",
       lazy: () => import("./pages/ChatLogPage"),
       crumb: "Chat logs",
+    },
+    {
+      path: "stats",
+      lazy: () => import("../content/pages/StatsPage"),
+      crumb: "Player stats",
+    },
+    {
+      path: "stats/:name",
+      lazy: () => import("../content/pages/PlayerDossierPage"),
+      crumb: (c) => c.params.name ?? "Player",
     },
     {
       path: "battle",

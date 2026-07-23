@@ -12,13 +12,14 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | ------------- | ------------- | -------------------- | ------------------ | -------- |
 | Play          | Singleplayer  | `#/play/skirmish`    | `play.skirmish`    | no       |
 | Play          | Campaigns     | `#/campaign`         | `campaign.list`    | no¹      |
+| Play          | Replays       | `#/play/replays`     | `play.replays`     | no       |
 | Multiplayer   | Login         | `#/lobby`            | `multiplayer.lobby`| no²      |
 | Multiplayer   | Chat          | `#/chat`             | `multiplayer.chat` | no²      |
 | Multiplayer   | Battles       | `#/battles`          | `multiplayer.battles` | no²   |
 | Multiplayer   | Battle Room   | `#/battle`           | `multiplayer.battle`  | no²   |
+| Multiplayer   | Player stats  | `#/stats`            | `multiplayer.stats`   | **yes** |
 | Content       | Maps          | `#/content/maps`     | `content.maps`     | no       |
 | Content       | Games         | `#/content/games`    | `content.games`    | **yes**  |
-| Content       | Replays       | `#/content/replays`  | `content.replays`  | no       |
 | Downloads     | Browse Rapid  | `#/downloads`        | `downloads.browse` | **yes**  |
 | Downloads     | Maps          | `#/downloads/maps`   | `downloads.maps`   | no       |
 | Downloads     | Games         | `#/downloads/games`  | `downloads.games`  | **yes**  |
@@ -27,7 +28,9 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 
 ² **Multiplayer** items appear contextually, not via the profile: **Login** shows only while logged out; **Chat** and **Battles** appear after the first connect; **Battle Room** only while you're in a battle.
 
-> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin — ask and the list can grow. Today only `content.games`, `downloads.browse` and `downloads.games` are wired for hiding.
+> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin — ask and the list can grow. Today only `content.games`, `downloads.browse`, `downloads.games` and `multiplayer.stats` are wired for hiding.
+
+> **Old paths**: `#/content/replays(/:name)` and `#/content/stats(/:name)` redirect to `#/play/replays(/:name)` and `#/stats(/:name)` respectively, so existing bookmarks and links keep working (#467).
 
 ## Advanced-mode pages
 
@@ -55,7 +58,8 @@ Reachable by clicking through the lists above; not sidebar items, but you can de
 | ----------------------------------- | ------------------------------ |
 | `#/content/maps/:name`              | A single map's detail page     |
 | `#/content/games/:name`             | A single game's detail page    |
-| `#/content/replays/:name`           | A single replay's detail page  |
+| `#/play/replays/:name`              | A single replay's detail page  |
+| `#/stats/:name`                     | A player's dossier (head-to-head stats) |
 | `#/content/archives/:name`          | A single archive (advanced)    |
 | `#/campaign/:id`                    | A campaign's mission list      |
 | `#/campaign/:id/:missionId`         | A mission briefing/result      |
@@ -90,7 +94,7 @@ A profile's [`welcome`](distribution-profile.md#welcome-object) HTML commonly po
 <a href="#/play/skirmish">Play Skirmish</a>
 <a href="#/campaign">Campaigns</a>
 <a href="#/content/maps">Maps</a>
-<a href="#/content/replays">Replays</a>
+<a href="#/play/replays">Replays</a>
 <a href="#/battles">Multiplayer</a>
 <a href="#/settings">Settings</a>
 ```

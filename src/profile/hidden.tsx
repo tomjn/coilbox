@@ -20,13 +20,15 @@ import { getProfile } from "./profile";
  * profile's `hide` list can actually affect — anything else is a silent no-op. The
  * on-demand profile validation checks `hide` against this.
  *
- * KEEP IN SYNC with the `isProfileHidden(...)` call sites (see `content/index.ts`
- * and `downloads/index.ts`): add an id here whenever a nav item opts into hiding.
+ * KEEP IN SYNC with the `isProfileHidden(...)` call sites (see `content/index.ts`,
+ * `downloads/index.ts` and `multiplayer/index.tsx`): add an id here whenever a nav
+ * item opts into hiding.
  */
 export const HIDEABLE_NAV_IDS: string[] = [
   "content.games",
   "downloads.browse",
   "downloads.games",
+  "multiplayer.stats",
 ];
 
 /**

@@ -185,7 +185,7 @@ export default function MapDetailPage() {
           variant="outline"
           className="gap-1.5"
           onClick={() =>
-            navigate(`/content/replays?map=${encodeURIComponent(map.name)}`)
+            navigate(`/play/replays?map=${encodeURIComponent(map.name)}`)
           }
         >
           <Clapperboard className="size-4" /> Replays on this map

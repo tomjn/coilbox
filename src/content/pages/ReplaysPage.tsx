@@ -389,7 +389,7 @@ export default function ReplaysPage() {
                 className="flex items-stretch overflow-hidden rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40"
               >
                 <Link
-                  to={`/content/replays/${encodeURIComponent(r.filename)}`}
+                  to={`/play/replays/${encodeURIComponent(r.filename)}`}
                   className="flex min-w-0 flex-1 items-stretch gap-3 p-2"
                 >
                   <div className="size-16 shrink-0 overflow-hidden rounded-md">

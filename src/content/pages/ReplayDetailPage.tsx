@@ -152,7 +152,7 @@ function PlayerRow({ p, won }: { p: ReplayPlayer; won: boolean }) {
           p.name
         ) : (
           <Link
-            to={`/content/stats/${encodeURIComponent(p.name)}`}
+            to={`/stats/${encodeURIComponent(p.name)}`}
             className="hover:underline"
             title={p.name}
           >
@@ -730,7 +730,7 @@ export default function ReplayDetailPage() {
     await refresh();
     const newName = newPath.split(/[\\/]/).pop();
     if (!newName) return;
-    navigate(`/content/replays/${encodeURIComponent(newName)}`);
+    navigate(`/play/replays/${encodeURIComponent(newName)}`);
     // Flag the navigation so the jump to a different file isn't a surprise.
     toast.success("Remix created", {
       description: "Opened the remixed replay — use Watch to run it.",
@@ -738,14 +738,13 @@ export default function ReplayDetailPage() {
   };
 
   const onDeleted = () => {
-    navigate("/content/replays");
+    navigate("/play/replays");
     toast.success("Replay deleted");
   };
 
-  if (listLoading && !replay)
-    return <DetailLoading backTo="/content/replays" />;
+  if (listLoading && !replay) return <DetailLoading backTo="/play/replays" />;
   if (!listLoading && !replay)
-    return <NotFound backTo="/content/replays" label="replay" />;
+    return <NotFound backTo="/play/replays" label="replay" />;
 
   const metaRows: [string, string][] = info
     ? [
@@ -769,7 +768,7 @@ export default function ReplayDetailPage() {
       <header className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <Link
-            to="/content/replays"
+            to="/play/replays"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
           >
             <ArrowLeft className="size-3.5" /> Replays
@@ -793,7 +792,7 @@ export default function ReplayDetailPage() {
           </p>
           {info?.remixed && info.originFilename && (
             <Link
-              to={`/content/replays/${encodeURIComponent(info.originFilename)}`}
+              to={`/play/replays/${encodeURIComponent(info.originFilename)}`}
               className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
             >
               <ArrowLeft className="size-3.5" /> Back to original replay
@@ -843,7 +842,7 @@ export default function ReplayDetailPage() {
       {error && <ErrorBanner message={error} />}
 
       {loading && !info ? (
-        <DetailLoading backTo="/content/replays" />
+        <DetailLoading backTo="/play/replays" />
       ) : info ? (
         <>
           <section className="flex flex-col gap-2">

@@ -1,5 +1,5 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Save, Swords } from "lucide-react";
+import { Clapperboard, Save, Swords } from "lucide-react";
 import InGameBadge from "./InGameBadge";
 import { PlayProvider } from "./PlayProvider";
 
@@ -9,6 +9,10 @@ import { PlayProvider } from "./PlayProvider";
  * game, factions, AI opponents, colours, teams/allyteams, spectate) and launches
  * the preferred engine via the `tauri-plugin-coilbox-play` crate (ACL id
  * `coilbox-play`). Skirmish-AI enumeration comes from the unitsync plugin.
+ *
+ * Replays (list + detail) moved here from Content in #467; the pages themselves
+ * still live in `content/pages` (they're built on the content plugin's unitsync
+ * hooks) — only the nav item and route registration moved.
  */
 const playPlugin: FramePlugin = {
   id: "play",
@@ -27,6 +31,13 @@ const playPlugin: FramePlugin = {
           icon: Swords,
         },
         {
+          id: "play.replays",
+          label: "Replays",
+          to: "/play/replays",
+          order: 4,
+          icon: Clapperboard,
+        },
+        {
           id: "play.savegames",
           label: "Save Games",
           to: "/play/savegames",
@@ -43,6 +54,16 @@ const playPlugin: FramePlugin = {
       path: "play/skirmish",
       lazy: () => import("./pages/SkirmishPage"),
       crumb: "Singleplayer",
+    },
+    {
+      path: "play/replays",
+      lazy: () => import("../content/pages/ReplaysPage"),
+      crumb: "Replays",
+    },
+    {
+      path: "play/replays/:name",
+      lazy: () => import("../content/pages/ReplayDetailPage"),
+      crumb: (c) => c.params.name ?? "Replay",
     },
     {
       path: "play/savegames",

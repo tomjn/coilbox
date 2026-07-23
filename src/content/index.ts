@@ -1,9 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   Archive as ArchiveIcon,
-  BarChart3,
   Boxes,
-  Clapperboard,
   FolderTree,
   Gamepad2,
   Map as MapIcon,
@@ -16,6 +14,7 @@ import { HomeSetupCard } from "./pages/components/SetupCard";
 import EngineSettingsSection from "./pages/EngineSettingsSection";
 import EnginesSection from "./pages/EnginesSection";
 import FoldersSection from "./pages/FoldersSection";
+import { makeLegacyRedirect } from "./pages/LegacyRedirect";
 
 /**
  * The content plugin's frontend half. It owns the **Content** sidebar section —
@@ -24,10 +23,14 @@ import FoldersSection from "./pages/FoldersSection";
  * settings sections: Content Folders (Spring/Recoil data roots), Engines
  * (installs found within them), and Engine Settings (a curated, read-only view of
  * `springsettings.cfg` via unitsync), at `/settings/content-folders`,
- * `/settings/engines` and `/settings/engine-settings`. (Replays etc. join the
- * sidebar group later.) Pair with the
+ * `/settings/engines` and `/settings/engine-settings`. Pair with the
  * `tauri-plugin-coilbox-content` crate (ACL id `coilbox-content`), whose persisted
  * state.json is the cross-plugin read API for where game content lives.
+ *
+ * Replays (now under Singleplayer, `play/index.ts`) and the stats profile (now
+ * under Multiplayer as "Player stats", `multiplayer/index.tsx`) moved out of this
+ * group in #467; their old `content/replays*`/`content/stats*` paths still route
+ * here purely to redirect to the new locations, via `LegacyRedirect`.
  *
  * Route Components are lazy-loaded; settings Components are imported eagerly (not
  * lazy): the frame settings page renders them directly without a Suspense
@@ -67,29 +70,13 @@ const contentPlugin: FramePlugin = {
         },
         {
           // Archive explorer is a modding tool — gated behind advanced mode,
-          // unlike the player-facing Maps/Games/Replays in this same group.
+          // unlike the player-facing Maps/Games in this same group.
           id: "content.archives",
           label: "Archives",
           to: "/content/archives",
           order: 2,
           icon: ArchiveIcon,
           useVisible: useAdvancedMode,
-        },
-        {
-          id: "content.replays",
-          label: "Replays",
-          to: "/content/replays",
-          order: 3,
-          icon: Clapperboard,
-        },
-        {
-          id: "content.stats",
-          label: "Stats",
-          to: "/content/stats",
-          order: 4,
-          icon: BarChart3,
-          // A distribution profile can hide the stats view like any other nav item.
-          useVisible: () => !isProfileHidden("content.stats"),
         },
       ],
     },
@@ -137,25 +124,34 @@ const contentPlugin: FramePlugin = {
       crumb: (c) =>
         c.params.name ? `${c.params.name} · Lua REPL` : "Lua REPL",
     },
+    // Legacy paths (#467 moved Replays to Singleplayer and Stats to
+    // Multiplayer as "Player stats") — kept so old bookmarks and provenance
+    // links already written into `content.replayState` still resolve.
     {
       path: "content/replays",
-      lazy: () => import("./pages/ReplaysPage"),
-      crumb: "Replays",
+      lazy: async () => ({
+        default: makeLegacyRedirect(() => "/play/replays"),
+      }),
     },
     {
       path: "content/replays/:name",
-      lazy: () => import("./pages/ReplayDetailPage"),
-      crumb: (c) => c.params.name ?? "Replay",
+      lazy: async () => ({
+        default: makeLegacyRedirect(
+          (name) => `/play/replays/${encodeURIComponent(name ?? "")}`,
+        ),
+      }),
     },
     {
       path: "content/stats",
-      lazy: () => import("./pages/StatsPage"),
-      crumb: "Stats",
+      lazy: async () => ({ default: makeLegacyRedirect(() => "/stats") }),
     },
     {
       path: "content/stats/:name",
-      lazy: () => import("./pages/PlayerDossierPage"),
-      crumb: (c) => c.params.name ?? "Player",
+      lazy: async () => ({
+        default: makeLegacyRedirect(
+          (name) => `/stats/${encodeURIComponent(name ?? "")}`,
+        ),
+      }),
     },
   ],
   settings: [
