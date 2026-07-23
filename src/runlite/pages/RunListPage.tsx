@@ -1,5 +1,5 @@
 import { Button, useDrawer } from "@picoframe/frame";
-import { Loader2, Play, Rocket, Trash2 } from "lucide-react";
+import { Download, Loader2, Play, Rocket, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
@@ -9,6 +9,7 @@ import { EmptyState } from "../../content/pages/components/states";
 import { usePlayReadiness, usePreferredTarget } from "../../play/config";
 import type { RogueliteRun } from "../model";
 import { useRuns } from "../runs";
+import { ImportChallengeForm } from "./components/ImportChallengeForm";
 import { RunSetupForm } from "./components/RunSetupForm";
 
 /**
@@ -43,6 +44,20 @@ export default function RunListPage() {
       ),
     });
 
+  const openImportChallenge = () =>
+    drawer.open({
+      title: "Import challenge",
+      width: "26rem",
+      content: (
+        <ImportChallengeForm
+          onImported={(id) => {
+            drawer.close();
+            navigate(`/warpath/${encodeURIComponent(id)}`);
+          }}
+        />
+      ),
+    });
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex items-start justify-between gap-4">
@@ -57,9 +72,15 @@ export default function RunListPage() {
           </p>
         </div>
         {hasGames && (
-          <Button onClick={openSetup} className="shrink-0">
-            <Rocket className="mr-1.5 size-4" aria-hidden /> New warpath
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" onClick={openImportChallenge}>
+              <Download className="mr-1.5 size-4" aria-hidden /> Import
+              challenge
+            </Button>
+            <Button onClick={openSetup}>
+              <Rocket className="mr-1.5 size-4" aria-hidden /> New warpath
+            </Button>
+          </div>
         )}
       </header>
 
@@ -166,7 +187,14 @@ function RunCard({
           />
         )}
         <div>
-          <div className="font-medium">{run.name}</div>
+          <div className="flex items-center gap-2 font-medium">
+            {run.name}
+            {run.importedChallenge && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                Imported challenge
+              </span>
+            )}
+          </div>
           <div className="text-xs text-muted-foreground">
             {label} · {run.settings.game.shortname} · health {hull}/{maxHull}
           </div>

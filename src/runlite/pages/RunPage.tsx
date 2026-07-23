@@ -1,8 +1,9 @@
-import { Button } from "@picoframe/frame";
-import { ArrowLeft, Check, Trophy, X } from "lucide-react";
+import { Button, useDrawer } from "@picoframe/frame";
+import { ArrowLeft, Check, Share2, Trophy, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
+import { ChallengeCodeView } from "../../challenge/ChallengeCodeView";
 import { resolveGameByShortname } from "../../conquest/model";
 import { BracketFrame } from "../../conquest/pages/components/hudChrome";
 import { buildEdgeMap, reachableFrom } from "../../content/buildTree";
@@ -13,6 +14,7 @@ import {
   SkeletonList,
 } from "../../content/pages/components/states";
 import { usePreferredTarget } from "../../play/config";
+import { encodeWarpathChallenge } from "../challenge";
 import { awardMeta } from "../meta";
 import {
   isBattleNode,
@@ -54,6 +56,20 @@ export default function RunPage() {
   const [burstId, setBurstId] = useState<string | null>(null);
   // Guard so a finished run awards meta-progression exactly once.
   const awardedRef = useRef<string | null>(null);
+  const drawer = useDrawer();
+  const openShareChallenge = () => {
+    if (!run) return;
+    drawer.open({
+      title: "Share challenge",
+      width: "26rem",
+      content: (
+        <ChallengeCodeView
+          code={encodeWarpathChallenge(run)}
+          helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable."
+        />
+      ),
+    });
+  };
 
   // The arsenal ceiling size, for the HUD gauge (best-effort).
   const { target } = usePreferredTarget();
@@ -167,8 +183,22 @@ export default function RunPage() {
           hides the sidebar nav. The inspect panel flows below the gauges in the
           same column, so it shares the gauges' gap and never overlaps them. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4">
-        <div className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300/90 drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
+        <div className="pointer-events-auto flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300/90 drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
           {run.name}
+          {run.importedChallenge && (
+            <span className="rounded bg-card/70 px-1.5 py-0.5 text-[10px] tracking-wide text-muted-foreground">
+              Imported challenge
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={openShareChallenge}
+            aria-label="Share this warpath as a challenge code"
+            title="Share challenge"
+            className="text-muted-foreground transition-colors hover:text-cyan-200"
+          >
+            <Share2 className="size-4" aria-hidden />
+          </button>
         </div>
         <div className="flex items-stretch gap-3">
           {selectedId && !active ? (

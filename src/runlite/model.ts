@@ -225,6 +225,10 @@ export interface RogueliteRun {
   history: RunHistoryEntry[];
   createdAt: string;
   updatedAt: string;
+  /** Set when this run was created by importing a challenge code/file (see
+   * `./challenge.ts`) rather than generated locally — shown on the hub list so
+   * a shared-seed run's provenance stays visible. */
+  importedChallenge?: boolean;
 }
 
 /**
@@ -443,7 +447,10 @@ function parseNode(value: unknown): RunNode | null {
   };
 }
 
-function parseSettings(value: unknown): RunSettings | null {
+/** Parse a `RunSettings` blob — exported for reuse by the challenge codec
+ * (`./challenge.ts`), which validates a shared-code payload with the same
+ * rules as a saved run's settings. */
+export function parseRunSettings(value: unknown): RunSettings | null {
   if (!isRecord(value)) return null;
   const game = value.game;
   if (
@@ -532,7 +539,7 @@ export function parseRunJson(json: string): RogueliteRun | null {
   if (!isRecord(data)) return null;
   if (data.type !== "roguelite-run") return null;
 
-  const settings = parseSettings(data.settings);
+  const settings = parseRunSettings(data.settings);
   if (!settings) return null;
 
   const nodes: RunNode[] = [];
@@ -609,6 +616,7 @@ export function parseRunJson(json: string): RogueliteRun | null {
     history,
     createdAt: typeof data.createdAt === "string" ? data.createdAt : now(),
     updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : now(),
+    importedChallenge: data.importedChallenge === true ? true : undefined,
   };
 }
 
