@@ -12,6 +12,11 @@ import {
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { ResolveContentGate } from "@/content/pages/components/ResolveContentDrawer";
+import {
+  exactGameRequirement,
+  exactMapRequirement,
+} from "@/content/resolveContent";
 import { useFactionLogos } from "@/factions/logos";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import { notify } from "@/notify/notify";
@@ -445,9 +450,14 @@ export default function SkirmishPage() {
     }
   }
 
-  // Import a shared preset file: read it, validate the shape, then add it as a
-  // new preset (fresh id/timestamps via savePreset) without touching the current
-  // setup.
+  // Import a shared preset file: read it, validate the shape, then — once its
+  // game and map are confirmed installed (or downloaded, #387) — add it as a
+  // new preset (fresh id/timestamps via savePreset) without touching the
+  // current setup.
+  const [pendingPreset, setPendingPreset] = useState<
+    (SkirmishDraft & { name?: string }) | null
+  >(null);
+
   async function onImportPreset() {
     setError(null);
     try {
@@ -463,7 +473,7 @@ export default function SkirmishPage() {
         setError("That file isn't a valid coilbox preset.");
         return;
       }
-      savePreset(parsed.name?.trim() || "Imported preset", parsed);
+      setPendingPreset(parsed);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -517,6 +527,25 @@ export default function SkirmishPage() {
         onSaveFromReplay={saveFromReplay}
         disabled={running}
       />
+
+      {pendingPreset && (
+        <ResolveContentGate
+          title="Set up this preset"
+          requirements={[
+            exactGameRequirement(pendingPreset.gameName),
+            exactMapRequirement(pendingPreset.mapName),
+          ]}
+          target={target ?? undefined}
+          onContinue={() => {
+            savePreset(
+              pendingPreset.name?.trim() || "Imported preset",
+              pendingPreset,
+            );
+            setPendingPreset(null);
+          }}
+          onCancel={() => setPendingPreset(null)}
+        />
+      )}
 
       <DebriefDrawer
         open={debriefOpen}

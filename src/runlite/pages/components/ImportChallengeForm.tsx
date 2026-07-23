@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ChallengeCodeInput } from "../../../challenge/ChallengeCodeInput";
 import { challengeDecodeErrorMessage } from "../../../challenge/code";
 import {
@@ -6,23 +7,43 @@ import {
   unitsyncUnitDataset,
 } from "../../../content/bindings";
 import { useUnitsyncScan } from "../../../content/config";
+import { ResolveContentGate } from "../../../content/pages/components/ResolveContentDrawer";
+import type { ContentRequirement } from "../../../content/resolveContent";
 import { usePreferredTarget } from "../../../play/config";
 import { getGameMatcher } from "../../../profile/profile";
-import { decodeWarpathChallenge, optionsFromChallenge } from "../../challenge";
+import {
+  decodeWarpathChallenge,
+  optionsFromChallenge,
+  type WarpathChallengeSettings,
+} from "../../challenge";
 import type { GenBuildGraph } from "../../generate";
 import { generateRun } from "../../generate";
 import { useRuns } from "../../runs";
 
+/** Best-effort shortname match, filtered by the distribution profile's game
+ * filter — the same rule `importChallenge` used before #387. */
+function shortnameGameRequirement(shortname: string): ContentRequirement {
+  const want = shortname.trim().toLowerCase();
+  return {
+    kind: "game",
+    label: shortname,
+    downloadKey: shortname,
+    isInstalled: (installed) => {
+      const matcher = getGameMatcher();
+      return installed.games.some(
+        (g) =>
+          (!matcher || matcher(g.name)) &&
+          (g.shortname ?? g.name).trim().toLowerCase() === want,
+      );
+    },
+  };
+}
+
 /**
  * Paste a challenge code and generate the identical warpath locally, resolved
- * against the recipient's own install (issue #376). Mirrors conquest's
- * `ImportChallengeForm` in `ConquestListPage.tsx`.
- *
- * SEAM FOR #387 (resolve missing content on import): the "game not installed"
- * branch below is where a content-resolution/download flow belongs; today it
- * just reports the gap. `optionsFromChallenge` (see `../../challenge.ts`) is
- * the pure settings -> generator-options step #387's resolution result would
- * feed into unchanged.
+ * against the recipient's own install (issue #376), offering to download the
+ * challenge's game first if it isn't installed (issue #387). Mirrors
+ * conquest's `ImportChallengeForm` in `ConquestListPage.tsx`.
  */
 export function ImportChallengeForm({
   onImported,
@@ -32,14 +53,9 @@ export function ImportChallengeForm({
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { saveRun } = useRuns();
+  const [pending, setPending] = useState<WarpathChallengeSettings | null>(null);
 
-  const importChallenge = async (code: string) => {
-    const result = decodeWarpathChallenge(code);
-    if (!result.ok) {
-      throw new Error(challengeDecodeErrorMessage(result.error));
-    }
-    const { settings } = result;
-
+  const finishImport = async (settings: WarpathChallengeSettings) => {
     if (!target) throw new Error("Install an engine first.");
     const matcher = getGameMatcher();
     const games = (scan.data?.games ?? []).filter(
@@ -111,10 +127,32 @@ export function ImportChallengeForm({
     onImported(id);
   };
 
+  // Decode the code, then either finish straight away (game already
+  // installed — no pointless prompt) or hand off to the resolve gate, which
+  // offers the download and calls `finishImport` once it clears (#387).
+  const importChallenge = async (code: string) => {
+    const result = decodeWarpathChallenge(code);
+    if (!result.ok) {
+      throw new Error(challengeDecodeErrorMessage(result.error));
+    }
+    setPending(result.settings);
+  };
+
   return (
-    <ChallengeCodeInput
-      helpText="Paste a challenge code shared by another player to generate the identical warpath on your own install."
-      onImport={importChallenge}
-    />
+    <>
+      <ChallengeCodeInput
+        helpText="Paste a challenge code shared by another player to generate the identical warpath on your own install."
+        onImport={importChallenge}
+      />
+      {pending && (
+        <ResolveContentGate
+          title="Set up this challenge"
+          requirements={[shortnameGameRequirement(pending.game.shortname)]}
+          target={target ?? undefined}
+          onContinue={() => finishImport(pending).then(() => setPending(null))}
+          onCancel={() => setPending(null)}
+        />
+      )}
+    </>
   );
 }
