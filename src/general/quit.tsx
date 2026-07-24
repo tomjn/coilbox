@@ -1,4 +1,3 @@
-import { Button } from "@picoframe/frame";
 import { exit } from "@tauri-apps/plugin-process";
 import { LogOut } from "lucide-react";
 import { getProfile } from "../profile/profile";
@@ -25,14 +24,19 @@ export function quitApp(): void {
 export function QuitControl() {
   if (getProfile().quit !== true) return null;
 
+  // Matches the frame's own sidebar-footer nav items (see settingsPlugin's
+  // SettingsFooterLink) rather than the generic Button, so icon size, gap, and
+  // padding line up with Settings beneath it.
   return (
-    <Button
-      variant="ghost"
-      className="w-full justify-start gap-2"
+    <button
+      type="button"
       onClick={quitApp}
+      className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsed]/sidebar:justify-center"
     >
-      <LogOut size={16} />
-      Quit
-    </Button>
+      <LogOut size={18} className="shrink-0" />
+      <span className="truncate group-data-[collapsed]/sidebar:hidden">
+        Quit
+      </span>
+    </button>
   );
 }
