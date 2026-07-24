@@ -1,7 +1,6 @@
 import { useSetting } from "@picoframe/frame";
 import { Flame, Map as MapIcon, Swords, Trophy } from "lucide-react";
 import { useMemo } from "react";
-import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import {
   useContentState,
   useReplayStats,
@@ -9,6 +8,7 @@ import {
 } from "../config";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, profileFor } from "../stats";
+import { PlayerPicker } from "./components/PlayerPicker";
 import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
@@ -50,16 +50,6 @@ export default function StatsPage() {
     [records, activeName, refights],
   );
 
-  const playerOptions = useMemo(
-    () =>
-      players.map((p) => ({
-        value: p.name,
-        label: p.name,
-        description: `${p.games} game${p.games === 1 ? "" : "s"}`,
-      })),
-    [players],
-  );
-
   const winRatePct =
     profile?.winRate == null ? null : Math.round(profile.winRate * 100);
   const streak = profile?.currentStreak ?? 0;
@@ -97,12 +87,12 @@ export default function StatsPage() {
             >
               Player
             </label>
-            <div id="stats-player" className="w-56">
-              <OptionSelect
+            <div className="w-56">
+              <PlayerPicker
+                id="stats-player"
                 value={activeName}
                 onValueChange={setStoredName}
-                options={playerOptions}
-                size="sm"
+                players={players}
               />
             </div>
             {summary && (
