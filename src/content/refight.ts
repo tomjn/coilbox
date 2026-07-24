@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { usePreferredTarget, useSkirmishAis } from "@/play/config";
 import type { DemoInfo } from "./bindings";
 import { useUnitsyncGameInfo, useUnitsyncScan } from "./config";
+import { gameNamesMatch } from "./resolveContent";
 
 /**
  * Resolve what a "refight this setup" (#368) needs from the currently
@@ -24,11 +25,15 @@ export function useRefightSetup(info: DemoInfo | null | undefined) {
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
 
-  // Best-effort exact-name match, same caveat as the replay page's own
-  // `GameDownload`/map-preview affordances: the demo's `gameType` is a display
-  // string, not a guaranteed archive key.
+  // Matched tolerant of version-string form (issue #494), since the demo's
+  // `gameType` is a display string, not a guaranteed archive key, and can
+  // encode a version differently than the installed archive's own name (e.g.
+  // "0.178" vs "v0.178" vs "0.1.78"). See `gameNamesMatch`.
   const installedGame = useMemo(
-    () => (info ? games.find((g) => g.name === info.gameType) : undefined),
+    () =>
+      info
+        ? games.find((g) => gameNamesMatch(g.name, info.gameType))
+        : undefined,
     [games, info],
   );
   const installedMap = useMemo(

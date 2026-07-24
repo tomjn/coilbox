@@ -45,6 +45,29 @@ export interface ContentRequirement {
 
 /** Build a requirement satisfied by an exact-name match — the convention already
  * used by campaign missions, skirmish presets and replay refight. */
+/**
+ * Normalise a game name/version string so version-form differences don't
+ * break a match: lower-cased, a "v" directly before a version number dropped,
+ * then every remaining separator (space, dot, dash) stripped. This collapses
+ * "SplinterFaction 0.178", "SplinterFaction v0.178" and "SplinterFaction
+ * 0.1.78" to the same identity (issue #494) without needing a real
+ * `shortname` field, which a replay's `gameType` string doesn't carry.
+ */
+export function normalizeGameIdentity(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\bv(?=\d)/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/** Whether two game name/version strings identify the same game, tolerant of
+ * version-string form (see {@link normalizeGameIdentity}). Used to match a
+ * replay's `gameType` against the live unitsync scan, e.g. by the replay
+ * detail's missing-content check and `useRefightSetup`. */
+export function gameNamesMatch(a: string, b: string): boolean {
+  return normalizeGameIdentity(a) === normalizeGameIdentity(b);
+}
+
 export function exactGameRequirement(name: string): ContentRequirement {
   return {
     kind: "game",

@@ -6,7 +6,9 @@ import {
   engineVersionRequirement,
   exactGameRequirement,
   exactMapRequirement,
+  gameNamesMatch,
   type InstalledContentSnapshot,
+  normalizeGameIdentity,
 } from "./resolveContent";
 
 const installed = (
@@ -90,5 +92,46 @@ describe("computeMissingRequirements", () => {
     expect(computeMissingRequirements([req], installed({ games: [] }))).toEqual(
       [req],
     );
+  });
+});
+
+describe("normalizeGameIdentity / gameNamesMatch", () => {
+  it("collapses version-string form differences (issue #494)", () => {
+    expect(normalizeGameIdentity("SplinterFaction 0.178")).toBe(
+      normalizeGameIdentity("SplinterFaction v0.178"),
+    );
+    expect(normalizeGameIdentity("SplinterFaction 0.178")).toBe(
+      normalizeGameIdentity("SplinterFaction 0.1.78"),
+    );
+  });
+
+  it("recognises an installed game across version-string forms", () => {
+    expect(
+      gameNamesMatch("SplinterFaction 0.178", "SplinterFaction v0.178"),
+    ).toBe(true);
+    expect(
+      gameNamesMatch("SplinterFaction 0.178", "SplinterFaction 0.1.78"),
+    ).toBe(true);
+    expect(
+      gameNamesMatch(
+        "Beyond All Reason test-30018",
+        "Beyond All Reason test-30018",
+      ),
+    ).toBe(true);
+  });
+
+  it("still reports a genuinely absent game as not matching", () => {
+    expect(gameNamesMatch("SplinterFaction 0.178", "Zero-K v1.10.6")).toBe(
+      false,
+    );
+    expect(
+      gameNamesMatch("SplinterFaction 0.178", "SplinterFaction 0.179"),
+    ).toBe(false);
+  });
+
+  it("is case-insensitive", () => {
+    expect(
+      gameNamesMatch("splinterfaction 0.178", "SPLINTERFACTION 0.178"),
+    ).toBe(true);
   });
 });
