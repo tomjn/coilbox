@@ -9,8 +9,6 @@ import { MapPacksBanner } from "../../../downloads/pages/components/MapPacksBann
 import { usePreferredTarget } from "../../../play/config";
 import { getGameMatcher } from "../../../profile/profile";
 import {
-  filterUninstalledGames,
-  filterUninstalledMaps,
   type SuggestedGame,
   type SuggestedMap,
   useBrandingCatalog,
@@ -19,6 +17,7 @@ import {
 } from "../../branding";
 import { useSetupStatus, useUnitsyncScan } from "../../config";
 import { filterSuggestedGamesByFilter } from "../../suggestedGames";
+import { getStartedCandidates } from "./getStartedCandidates";
 import { SuggestionsList } from "./SuggestionsList";
 
 /**
@@ -73,11 +72,9 @@ export function GetStartedCard() {
   }, [refreshInstalled]);
 
   // unitsync is the truth for games (it sees rapid content). The file listing
-  // only backs maps. Wait for the scan to settle so a not-yet-run scan can't let
-  // an already-installed rapid game slip back into the suggestions.
+  // only backs maps.
   const scannedGames = scan.data?.games ?? [];
   const scanSettled = scan.data != null || scan.error != null;
-  const hasGames = (installed?.games.size ?? 0) > 0 || scannedGames.length > 0;
   // A distribution's gameFilter narrows the suggestions first, so a single-game
   // distribution (e.g. SplinterFaction) never advertises other games' downloads.
   const scopedGames = filterSuggestedGamesByFilter(
@@ -85,18 +82,14 @@ export function GetStartedCard() {
     entries,
     getGameMatcher(),
   );
-  const candidateGames =
-    installed && scanSettled && !hasGames
-      ? filterUninstalledGames(
-          scopedGames,
-          entries,
-          installed.games,
-          scannedGames,
-        )
-      : [];
-  const candidateMaps = installed
-    ? filterUninstalledMaps(suggestedMaps, installed.maps, [])
-    : [];
+  const { games: candidateGames, maps: candidateMaps } = getStartedCandidates({
+    installed,
+    scanSettled,
+    scannedGames,
+    scopedGames,
+    entries,
+    suggestedMaps,
+  });
 
   // Captured once the readiness signals (root paths resolved, installed listing
   // in, settled scan) are all in, then held for the rest of this mount (issue
