@@ -1,0 +1,63 @@
+import { Button, useDrawer } from "@picoframe/frame";
+import { Download, Package2 } from "lucide-react";
+import { usePlayReadiness } from "../../play/config";
+
+/**
+ * The Content → Setup packs page (issue #415): export the current engine,
+ * game, chosen maps and optionally presets into a small pasteable code, or
+ * import one shared by someone else. The Prism/mrpack pattern applied to
+ * coilbox: references, not content, resolved through issue #387's
+ * `ResolveContentGate` on import.
+ */
+export default function SetupPacksPage() {
+  const { target, ready } = usePlayReadiness();
+  const drawer = useDrawer();
+
+  const openExport = async () => {
+    if (!target) return;
+    const { ExportPackForm } = await import("./components/ExportPackForm");
+    drawer.open({
+      title: "Export a setup pack",
+      width: "26rem",
+      content: <ExportPackForm target={target} />,
+    });
+  };
+
+  const openImport = async () => {
+    const { ImportPackForm } = await import("./components/ImportPackForm");
+    drawer.open({
+      title: "Import a setup pack",
+      width: "26rem",
+      content: <ImportPackForm target={target} />,
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <header className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-lg font-semibold">Setup packs</h1>
+          <p className="text-sm text-muted-foreground">
+            Share your exact setup, an engine version, a game, a map list and
+            optionally presets, as one small code someone else can paste in.
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" onClick={openImport}>
+            <Download className="mr-1.5 size-4" aria-hidden /> Import
+          </Button>
+          <Button onClick={openExport} disabled={!ready}>
+            <Package2 className="mr-1.5 size-4" aria-hidden /> Export
+          </Button>
+        </div>
+      </header>
+
+      {!ready && (
+        <p className="text-sm text-muted-foreground">
+          Install an engine and a game before exporting a pack. Importing a pack
+          from someone else works regardless.
+        </p>
+      )}
+    </div>
+  );
+}
