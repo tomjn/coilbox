@@ -75,8 +75,18 @@ function RefightForm({
   filename: string;
   onLaunched: () => void;
 }) {
-  const { target, scanLoading, missingGame, missingMap, sides, ais } =
-    useRefightSetup(info);
+  const {
+    target,
+    scanLoading,
+    shortGameId,
+    gameCandidates,
+    selectedGameName,
+    setSelectedGameName,
+    missingGame,
+    missingMap,
+    sides,
+    ais,
+  } = useRefightSetup(info);
   const { running, launch } = usePlay();
   const { setProvenance } = useReplayUserState();
   const [aiKey, setAiKey] = useState("");
@@ -118,10 +128,20 @@ function RefightForm({
               ? "This replay's game isn't installed."
               : "This replay's map isn't installed."}{" "}
           Download {missingGame && missingMap ? "them" : "it"} below first.
+          {missingGame &&
+            shortGameId &&
+            !shortGameId.exact &&
+            " Its exact game couldn't be confirmed from the replay, so this is a name-only check."}
         </p>
       </div>
     );
   }
+
+  const gameOptions = gameCandidates.map((g) => ({
+    value: g.name,
+    label: g.name,
+    description: g.info?.version,
+  }));
 
   const nativeAis = ais.filter((a) => a.kind === "native");
   const luaAis = ais.filter((a) => a.kind === "lua");
@@ -190,6 +210,18 @@ function RefightForm({
           take a seat from the Skirmish page if you want to play.
         </p>
       </div>
+
+      {gameCandidates.length > 1 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium">Game version</span>
+          <OptionSelect
+            value={selectedGameName}
+            onValueChange={setSelectedGameName}
+            options={gameOptions}
+            size="sm"
+          />
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-medium">AI to fill every player</span>

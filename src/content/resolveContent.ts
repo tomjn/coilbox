@@ -68,6 +68,80 @@ export function gameNamesMatch(a: string, b: string): boolean {
   return normalizeGameIdentity(a) === normalizeGameIdentity(b);
 }
 
+/**
+ * Strip a trailing version-looking token from a game display name, leaving
+ * the family name modinfo keeps stable across releases, e.g. "Beyond All
+ * Reason test-30018-d71d659" becomes "Beyond All Reason", "SplinterFaction
+ * 0.178" becomes "SplinterFaction". A word counts as version-looking if it
+ * contains a digit, so trailing such words are dropped, always keeping at
+ * least one word. Used only as a proxy for a real modinfo `shortname` when
+ * one isn't available (see {@link resolveReplayShortGameId}).
+ */
+export function stripVersionSuffix(name: string): string {
+  const words = name.trim().split(/\s+/);
+  while (words.length > 1 && /\d/.test(words[words.length - 1])) {
+    words.pop();
+  }
+  return words.join(" ");
+}
+
+/**
+ * The short game id an installed game is matched by (issue #503). It's the
+ * real modinfo `shortname` when present, otherwise the normalised,
+ * version-stripped family name of its display name.
+ */
+export function installedGameShortId(game: {
+  name: string;
+  shortname?: string;
+}): string {
+  const shortname = game.shortname?.trim();
+  return shortname
+    ? normalizeGameIdentity(shortname)
+    : normalizeGameIdentity(stripVersionSuffix(game.name));
+}
+
+/**
+ * A replay's short game id (issue #503), version-independent so it groups
+ * every installed version of the same game while still excluding an
+ * unrelated one. `exact` is true when it's a real modinfo `shortname`,
+ * recovered from an installed game (any version) whose family name matches
+ * the replay's `gameType`. The replay itself only carries `gameType` as a
+ * display string, never a `shortname`. When no installed game's family
+ * matches, there's nothing to recover a real shortname from, so the fallback
+ * is `gameType`'s own version-stripped family identity, flagged
+ * `exact: false` so callers can tell the user the check is approximate.
+ */
+export interface ShortGameId {
+  id: string;
+  exact: boolean;
+}
+
+export function resolveReplayShortGameId(
+  gameType: string,
+  installed: readonly { name: string; shortname?: string }[],
+): ShortGameId {
+  const family = normalizeGameIdentity(stripVersionSuffix(gameType));
+  const match = installed.find(
+    (g) =>
+      g.shortname?.trim() &&
+      normalizeGameIdentity(stripVersionSuffix(g.name)) === family,
+  );
+  if (match?.shortname) {
+    return { id: normalizeGameIdentity(match.shortname), exact: true };
+  }
+  return { id: family, exact: false };
+}
+
+/** Whether an installed game is a valid remix/refight target for a replay's
+ * short game id (see {@link resolveReplayShortGameId}), same short id, any
+ * version. */
+export function gameMatchesShortId(
+  replayShortId: ShortGameId,
+  game: { name: string; shortname?: string },
+): boolean {
+  return installedGameShortId(game) === replayShortId.id;
+}
+
 export function exactGameRequirement(name: string): ContentRequirement {
   return {
     kind: "game",
