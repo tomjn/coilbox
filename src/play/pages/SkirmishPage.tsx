@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { Bookmark, Play, Swords } from "lucide-react";
+import { Bookmark, History, Play, Swords } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -19,6 +19,7 @@ import {
   exactMapRequirement,
 } from "@/content/resolveContent";
 import { useFactionLogos } from "@/factions/logos";
+import { mostRecentOpen } from "@/lib/recency";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import { notify } from "@/notify/notify";
 import { contentListReplays } from "../../content/bindings";
@@ -131,6 +132,19 @@ export default function SkirmishPage() {
   const [presetsOpen, setPresetsOpen] = useState(false);
   const { presets, savePreset, touchPreset, removePreset } =
     useSkirmishPresets();
+
+  // The single most recently used preset (issue #374's "continue playing"
+  // affordance): a compact header button, mirroring the login panel's
+  // "Reconnect as ..." shortcut, that loads it back into the working setup.
+  const mostRecentPreset = useMemo(
+    () =>
+      mostRecentOpen(
+        presets,
+        () => true,
+        (p) => Date.parse(p.lastUsedAt),
+      ),
+    [presets],
+  );
 
   // The team colour remembered across surfaces (shared with the MP lobby via the
   // same setting key). Empty = never picked.
@@ -547,6 +561,15 @@ export default function SkirmishPage() {
               />
               Spectate
             </label>
+          )}
+          {mostRecentPreset && (
+            <Button
+              variant="outline"
+              onClick={() => loadPreset(mostRecentPreset)}
+              disabled={running}
+            >
+              <History className="size-4" /> Continue: {mostRecentPreset.name}
+            </Button>
           )}
           <Button
             variant="outline"

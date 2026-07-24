@@ -3,10 +3,12 @@ import { ChevronRight, Dices, Download, Orbit, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { ContinueBadge } from "@/components/ContinueBadge";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
+import { mostRecentOpen } from "@/lib/recency";
 import { ChallengeCodeInput } from "../../challenge/ChallengeCodeInput";
 import { challengeDecodeErrorMessage } from "../../challenge/code";
 import { unitsyncSkirmishAis } from "../../content/bindings";
@@ -89,6 +91,19 @@ export default function ConquestListPage() {
 
   const runs = galaxies.filter((g) => file.conquests[g.galaxy.id]);
   const unstarted = galaxies.filter((g) => !file.conquests[g.galaxy.id]);
+
+  // The single most recently updated run still in progress (issue #374's
+  // "continue playing" affordance). Badged below, not a separate button,
+  // since each run's card already links straight to it.
+  const resumeGalaxyId = useMemo(
+    () =>
+      mostRecentOpen(
+        runs,
+        (g) => file.conquests[g.galaxy.id]?.status === "active",
+        (g) => Date.parse(file.conquests[g.galaxy.id]?.updatedAt ?? ""),
+      )?.galaxy.id,
+    [runs, file],
+  );
 
   const openGenerate = (initialGameName?: string) =>
     drawer.open({
@@ -214,6 +229,7 @@ export default function ConquestListPage() {
                       galaxy={galaxy}
                       bundled={source === "bundled"}
                       state={file.conquests[galaxy.id]}
+                      resume={galaxy.id === resumeGalaxyId}
                       onAbandon={() => saveFor(galaxy.id, undefined)}
                     />
                   </li>
@@ -259,11 +275,15 @@ function GalaxyCard({
   galaxy,
   bundled,
   state,
+  resume,
   onAbandon,
 }: {
   galaxy: GalaxyDoc;
   bundled: boolean;
   state: ConquestState | undefined;
+  /** The single most-recently-updated active run (issue #374): badged, not a
+   * separate control, since this card's own link already resumes it. */
+  resume?: boolean;
   /** Present for in-progress cards: clears the run state, keeping the galaxy. */
   onAbandon?: () => void;
 }) {
@@ -325,6 +345,7 @@ function GalaxyCard({
                 Imported challenge
               </span>
             )}
+            {resume && <ContinueBadge />}
           </div>
           <p className="line-clamp-1 text-xs text-muted-foreground">
             {galaxy.game.shortname} · {galaxy.nodes.length} systems ·{" "}
