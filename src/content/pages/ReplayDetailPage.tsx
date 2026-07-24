@@ -54,7 +54,7 @@ import {
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
-import type { ReplayProvenance } from "../replayUserState";
+import { provenanceLink } from "../replayProvenanceLink";
 import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
 import { RefightPanel } from "./components/RefightPanel";
@@ -76,49 +76,6 @@ function formatDuration(sec: number): string {
   const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
   const ss = String(s).padStart(2, "0");
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
-
-/**
- * Where a tagged replay's provenance links back to. Warpath links to the run
- * (no per-node route exists there yet — see #369 follow-up); conquest links
- * to the galaxy with the node preselected via `?node=`; campaign links
- * straight to the mission briefing. A stale/deleted target (galaxy, run or
- * mission no longer exists) still resolves to a route — each destination page
- * already renders its own "not found" state rather than crashing.
- */
-function provenanceLink(
-  p: ReplayProvenance,
-): { to: string; label: string } | null {
-  switch (p.mode) {
-    case "conquest":
-      if (!p.galaxyId) return null;
-      return {
-        to: p.nodeId
-          ? `/conquest/${encodeURIComponent(p.galaxyId)}?node=${encodeURIComponent(p.nodeId)}`
-          : `/conquest/${encodeURIComponent(p.galaxyId)}`,
-        label: "Back to conquest galaxy",
-      };
-    case "warpath":
-      if (!p.runId) return null;
-      return {
-        to: `/warpath/${encodeURIComponent(p.runId)}`,
-        label: "Back to warpath run",
-      };
-    case "campaign":
-      if (!p.campaignId || !p.missionId) return null;
-      return {
-        to: `/campaign/${encodeURIComponent(p.campaignId)}/${encodeURIComponent(p.missionId)}`,
-        label: "Back to mission",
-      };
-    case "refight":
-      if (!p.sourceReplayFilename) return null;
-      return {
-        to: `/play/replays/${encodeURIComponent(p.sourceReplayFilename)}`,
-        label: "Back to original replay",
-      };
-    default:
-      return null;
-  }
 }
 
 function playedAt(ms: number): string {
