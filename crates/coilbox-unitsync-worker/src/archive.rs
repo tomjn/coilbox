@@ -15,6 +15,10 @@ use std::path::Path;
 const TEXT_CAP: usize = 512 * 1024;
 /// Image members are previewed up to 8 MiB.
 const IMAGE_CAP: usize = 8 * 1024 * 1024;
+/// Audio members are previewed up to 16 MiB (voice lines and short cues). A
+/// bigger track still plays fine in-game, it is just too large to round-trip
+/// as a data URL for preview.
+const AUDIO_CAP: usize = 16 * 1024 * 1024;
 /// Game-header loadpictures are read up to this size before downscaling. 4K PNGs
 /// run ~12 MiB (past the preview cap), so the header cap is larger; anything
 /// beyond it is treated as unusable rather than decoded.
@@ -205,7 +209,7 @@ fn read_member(us: &Unitsync, handle: i32, inner: &str) -> ArchiveFileOutput {
         // An image we can present to the browser: native formats pass through,
         // `.tga` is transcoded. A decode failure may mean the file isn't really an
         // image (e.g. a texture that's actually a mis-downloaded HTML page), so
-        // fall back to a text preview when the bytes are UTF-8; else binary.
+        // fall back to a text preview when the bytes are UTF-8, else binary.
         Kind::Image if !oversize => match encode_preview_image(&ext, &bytes) {
             Some(data_url) => ArchiveFileOutput {
                 kind: "image".into(),
@@ -221,6 +225,23 @@ fn read_member(us: &Unitsync, handle: i32, inner: &str) -> ArchiveFileOutput {
                 ..Default::default()
             }),
         },
+        // Audio browsers can play natively, so it passes straight through as a
+        // data URL (no transcode, unlike the image path's `.tga` case).
+        Kind::Audio if !oversize => match audio_mime(&ext) {
+            Some(mime) => ArchiveFileOutput {
+                kind: "audio".into(),
+                data_url: Some(raw_data_url(mime, &bytes)),
+                size,
+                truncated: false,
+                ..Default::default()
+            },
+            None => ArchiveFileOutput {
+                kind: "binary".into(),
+                size,
+                truncated: false,
+                ..Default::default()
+            },
+        },
         // Binary members, or previewable types that exceeded their cap.
         _ => ArchiveFileOutput {
             kind: "binary".into(),
@@ -234,11 +255,12 @@ fn read_member(us: &Unitsync, handle: i32, inner: &str) -> ArchiveFileOutput {
 enum Kind {
     Text,
     Image,
+    Audio,
     Binary,
 }
 
 /// Map an extension to a preview kind and its byte cap. `.tga` is decoded to PNG
-/// for preview; other formats browsers can't render (`.dds`, ...) fall through to
+/// for preview, other formats browsers can't render (`.dds`, ...) fall through to
 /// binary.
 fn classify(ext: &str) -> (Kind, usize) {
     const TEXT: &[&str] = &[
@@ -246,13 +268,37 @@ fn classify(ext: &str) -> (Kind, usize) {
         "bos", "yml", "yaml", "csv", "html", "css", "js",
     ];
     const IMAGE: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "tga"];
+    const AUDIO: &[&str] = &["ogg", "oga", "mp3", "wav", "flac", "opus", "m4a"];
     if TEXT.contains(&ext) {
         (Kind::Text, TEXT_CAP)
     } else if IMAGE.contains(&ext) {
         (Kind::Image, IMAGE_CAP)
+    } else if AUDIO.contains(&ext) {
+        (Kind::Audio, AUDIO_CAP)
     } else {
         (Kind::Binary, 0)
     }
+}
+
+/// The `audio/*` MIME type for a previewable audio extension, or `None` for an
+/// extension `classify` never routes here.
+fn audio_mime(ext: &str) -> Option<&'static str> {
+    match ext {
+        "ogg" | "oga" => Some("audio/ogg"),
+        "mp3" => Some("audio/mpeg"),
+        "wav" => Some("audio/wav"),
+        "flac" => Some("audio/flac"),
+        "opus" => Some("audio/opus"),
+        "m4a" => Some("audio/mp4"),
+        _ => None,
+    }
+}
+
+/// Build a `data:` URL from a content type and raw bytes (the audio preview
+/// path). The image path has its own encoder alongside the `.tga` transcode.
+fn raw_data_url(content_type: &str, bytes: &[u8]) -> String {
+    let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+    format!("data:{content_type};base64,{b64}")
 }
 
 /// Reinterpret an undecodable "image" as text when its bytes are valid UTF-8 and
@@ -805,5 +851,46 @@ mod header_tests {
         assert!(dir.join("eeee.none").exists());
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn classify_routes_known_extensions_to_their_kind() {
+        assert!(matches!(classify("lua").0, Kind::Text));
+        assert!(matches!(classify("png").0, Kind::Image));
+        assert!(matches!(classify("ogg").0, Kind::Audio));
+        assert!(matches!(classify("mp3").0, Kind::Audio));
+        assert!(matches!(classify("dds").0, Kind::Binary));
+        assert!(matches!(classify("").0, Kind::Binary));
+    }
+
+    #[test]
+    fn classify_caps_match_the_kind() {
+        assert_eq!(classify("lua").1, TEXT_CAP);
+        assert_eq!(classify("png").1, IMAGE_CAP);
+        assert_eq!(classify("wav").1, AUDIO_CAP);
+        assert_eq!(classify("dds").1, 0);
+    }
+
+    #[test]
+    fn audio_mime_maps_every_previewable_extension() {
+        assert_eq!(audio_mime("ogg"), Some("audio/ogg"));
+        assert_eq!(audio_mime("oga"), Some("audio/ogg"));
+        assert_eq!(audio_mime("mp3"), Some("audio/mpeg"));
+        assert_eq!(audio_mime("wav"), Some("audio/wav"));
+        assert_eq!(audio_mime("flac"), Some("audio/flac"));
+        assert_eq!(audio_mime("opus"), Some("audio/opus"));
+        assert_eq!(audio_mime("m4a"), Some("audio/mp4"));
+        assert_eq!(audio_mime("dds"), None);
+    }
+
+    #[test]
+    fn raw_data_url_builds_a_valid_base64_data_uri() {
+        let url = raw_data_url("audio/ogg", b"hello");
+        assert_eq!(url, "data:audio/ogg;base64,aGVsbG8=");
     }
 }

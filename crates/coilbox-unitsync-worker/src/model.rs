@@ -486,17 +486,17 @@ pub struct ArchiveTreeOutput {
 }
 
 /// Output of the `--archive --file` (member preview) mode. `kind` selects which
-/// field carries the content: `text` -> `text`, `image` -> `data_url`,
+/// field carries the content: `text` -> `text`, `image`/`audio` -> `data_url`,
 /// `binary` -> neither (metadata only).
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchiveFileOutput {
-    /// `"text"`, `"image"`, or `"binary"`.
+    /// `"text"`, `"image"`, `"audio"`, or `"binary"`.
     pub kind: String,
     /// Decoded (utf8-lossy) contents, when `kind == "text"`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
-    /// `data:` URL, when `kind == "image"`.
+    /// `data:` URL, when `kind == "image"` or `kind == "audio"`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data_url: Option<String>,
     /// The member's real size in bytes (before any cap).
