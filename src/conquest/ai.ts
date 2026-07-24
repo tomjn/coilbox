@@ -98,3 +98,29 @@ export function neutralAi<T extends { shortName: string }>(
   const chicken = ais.find((a) => isChickenAi(a) && !isDeniedAi(a, config));
   return chicken ?? fallbackFactionAi(ais, config);
 }
+
+/**
+ * Resolve a desired AI reference against a game's actual AI list: keep it if
+ * still available there, otherwise remap to `fallbackFactionAi` (skipping
+ * do-nothing bots like Sandbox/NullAI) so a bot never carries an AI the game
+ * doesn't provide. Matched by `shortName` only, case-insensitively, since a
+ * shortName is unique regardless of native/Lua kind on the wire. Returns
+ * undefined only when the game has no usable AI at all.
+ *
+ * Shared so every "pick an AI for this game" surface agrees: the multiplayer
+ * preset-to-battle bridge (`draftToHostSeed`), and, in time, the
+ * singleplayer opponent picker's own game-switch fallback.
+ */
+export function resolveGameAi<T extends { shortName: string }>(
+  desired: { shortName: string } | undefined,
+  ais: T[],
+  config?: ConquestAiConfig,
+): T | undefined {
+  if (desired) {
+    const found = ais.find(
+      (a) => norm(a.shortName) === norm(desired.shortName),
+    );
+    if (found) return found;
+  }
+  return fallbackFactionAi(ais, config);
+}
