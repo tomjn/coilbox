@@ -192,6 +192,13 @@ export interface BattleRoomView {
       name: string,
       patch: { teamId?: number; ally?: number },
     ) => void;
+    /**
+     * Change an existing bot's AI (host/owner), keeping its seat. The lobby
+     * protocol has no "change bot AI" command (ADDBOT carries the aiDll, UPDATEBOT
+     * does not), so this removes the bot and re-adds it under the new AI with the
+     * same name, team, ally, side, colour and handicap (issue #532).
+     */
+    changeBotAi: (name: string, aiShortName: string) => void;
   };
   /** AIs the host can add as bots (host only): the game's own AIs — native engine
    *  AIs and/or its Lua AIs — or the engine's natives when the game declares none. */
@@ -584,6 +591,32 @@ export function useBattleRoom(): BattleRoomView {
           side: bs.side,
           color: bot.teamColor,
         }).then(clearErr, setErr);
+      },
+      // Change a bot's AI (issue #532). The protocol carries the aiDll only on
+      // ADDBOT, so we remove the bot and re-add it with the same seat under the
+      // new AI. Awaited in order so the re-add lands after the removal.
+      changeBotAi: (name: string, aiShortName: string) => {
+        if (!activeKey || !battle) return;
+        const bot = battle.bots[name];
+        if (!bot) return;
+        const bs = bot.battleStatus;
+        mpRemoveBot({ serverKey: activeKey, name })
+          .then(() =>
+            mpAddBot({
+              serverKey: activeKey,
+              name,
+              ready: bs.ready,
+              teamId: bs.teamId,
+              ally: bs.ally,
+              mode: bs.mode,
+              handicap: bs.handicap,
+              sync: bs.sync,
+              side: bs.side,
+              color: bot.teamColor,
+              aiDll: aiShortName,
+            }),
+          )
+          .then(clearErr, setErr);
       },
     }),
     [activeKey, battle, debounceColor, setErr, clearErr],
