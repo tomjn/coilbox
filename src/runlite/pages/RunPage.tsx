@@ -1,7 +1,7 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { ArrowLeft, Check, Trophy, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
 import { resolveGameByShortname } from "../../conquest/model";
 import { BracketFrame } from "../../conquest/pages/components/hudChrome";
@@ -49,7 +49,14 @@ export default function RunPage() {
   const { runId } = useParams();
   const { run, loading, save } = useRun(runId);
   const { meta, save: saveMeta } = useRunMeta();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // A replay's "back to node" link deep-links here as `?node=<id>`, honoured
+  // once on mount so the inspect panel opens straight to it (mirrors conquest's
+  // `?node=` on GalaxyPage). A stale id (the node no longer exists in this run)
+  // just finds nothing and the panel stays closed.
+  const [searchParams] = useSearchParams();
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    searchParams.get("node"),
+  );
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   // The node id to celebrate with a win burst (cleared after the burst plays).
   const [burstId, setBurstId] = useState<string | null>(null);
