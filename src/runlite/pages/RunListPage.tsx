@@ -7,6 +7,7 @@ import { useFactionLogo } from "@/factions/logos";
 import { resolveGameByShortname } from "../../conquest/model";
 import { useUnitsyncScan } from "../../content/config";
 import { EmptyState } from "../../content/pages/components/states";
+import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { usePlayReadiness, usePreferredTarget } from "../../play/config";
 import type { RogueliteRun } from "../model";
@@ -32,12 +33,13 @@ export default function RunListPage() {
   const { hasGames } = usePlayReadiness();
   const runEntries = Object.entries(runs);
 
-  const openSetup = () =>
+  const openSetup = (initialGameName?: string) =>
     drawer.open({
       title: "New warpath",
       width: "30rem",
       content: (
         <RunSetupForm
+          initialGameName={initialGameName}
           onStarted={(id) => {
             drawer.close();
             navigate(`/warpath/${encodeURIComponent(id)}`);
@@ -69,6 +71,15 @@ export default function RunListPage() {
     if (importCode) openImportChallenge(importCode);
   }, [importCode]);
 
+  // Game detail's "Start a warpath run" action (issue #372) lands here with
+  // the game preselected in the query string. Open the setup drawer with it
+  // prefilled, the same way an import code opens its own drawer above.
+  const presetGame = useGamePresetParam();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the preset arrives, not on every drawer identity change
+  useEffect(() => {
+    if (presetGame) openSetup(presetGame);
+  }, [presetGame]);
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex items-start justify-between gap-4">
@@ -88,7 +99,7 @@ export default function RunListPage() {
               <Download className="mr-1.5 size-4" aria-hidden /> Import
               challenge
             </Button>
-            <Button onClick={openSetup}>
+            <Button onClick={() => openSetup()}>
               <Rocket className="mr-1.5 size-4" aria-hidden /> New warpath
             </Button>
           </div>
