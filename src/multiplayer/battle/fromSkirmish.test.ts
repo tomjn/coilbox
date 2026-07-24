@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Side, SkirmishAi } from "@/content/bindings";
 import type { SkirmishDraft } from "@/play/drafts";
 import { type Participant, RANDOM_SIDE } from "@/play/participants";
-import { draftToHostSeed } from "./fromSkirmish";
+import { reconcileParticipantAis } from "@/play/reconcileAi";
+import { draftToHostSeed, hostSeedAiNotice } from "./fromSkirmish";
 
 const SIDES: Side[] = [{ name: "Armada" }, { name: "Cortex" }];
 
@@ -223,6 +224,50 @@ describe("draftToHostSeed", () => {
     expect(seed.self.spectator).toBe(true);
   });
 
+  // The exact live bug (#531): a SplinterFaction preset whose bot wants a native
+  // the game doesn't offer must remap to one of the game's OWN AIs, never to a
+  // different native (e.g. BARb) the game itself rejects.
+  it("remaps to a member of the hosted game's own AI list, never a native it omits (#531)", () => {
+    const SPLINTER_AIS: Pick<SkirmishAi, "shortName">[] = [
+      { shortName: "Sandbox" },
+      { shortName: "SimpleAI" },
+    ];
+    const seed = draftToHostSeed({
+      draft: mkDraft({
+        participants: [
+          you(),
+          ai({ ai: { kind: "native", shortName: "BARb" } }),
+        ],
+      }),
+      sides: SIDES,
+      ais: SPLINTER_AIS,
+    });
+    expect(seed.bots[0].aiDll).toBe("SimpleAI");
+    expect(SPLINTER_AIS.map((a) => a.shortName)).toContain(seed.bots[0].aiDll);
+  });
+
+  // Singleplayer (`reconcileParticipantAis`) and hosting (`draftToHostSeed`) share
+  // `reconcileAi`, so against the same game AI list they must pick the same AI.
+  it("agrees with the singleplayer reconciliation on the same game's AI list (#531)", () => {
+    const SPLINTER_AIS: Pick<SkirmishAi, "shortName" | "kind" | "name">[] = [
+      { shortName: "Sandbox", kind: "lua", name: "Sandbox" },
+      { shortName: "SimpleAI", kind: "lua", name: "SimpleAI" },
+    ];
+    const participants = [
+      you(),
+      ai({ ai: { kind: "native", shortName: "BARb", name: "BARbarian" } }),
+    ];
+    const sp = reconcileParticipantAis(participants, SPLINTER_AIS);
+    const spBot = sp.participants.find((p) => p.kind === "ai");
+    const seed = draftToHostSeed({
+      draft: mkDraft({ participants }),
+      sides: SIDES,
+      ais: SPLINTER_AIS,
+    });
+    expect(seed.bots[0].aiDll).toBe("SimpleAI");
+    expect(seed.bots[0].aiDll).toBe(spBot?.ai?.shortName);
+  });
+
   it("falls back to side index 0 for an unresolvable side name", () => {
     const seed = draftToHostSeed({
       draft: mkDraft({
@@ -249,5 +294,45 @@ describe("draftToHostSeed", () => {
     expect(seed.bots).toHaveLength(1);
     expect(seed.bots[0].aiDll).toBe("BARb");
     expect(seed.openSlots).toBe(1);
+  });
+});
+
+describe("hostSeedAiNotice", () => {
+  it("returns undefined when nothing was substituted or dropped", () => {
+    expect(
+      hostSeedAiNotice({ substitutions: [], unresolvedAiCount: 0 }),
+    ).toBeUndefined();
+  });
+
+  it("summarises a substitution (#501)", () => {
+    expect(
+      hostSeedAiNotice({
+        substitutions: [{ from: "BARb", to: "SimpleAI" }],
+        unresolvedAiCount: 0,
+      }),
+    ).toBe("This game doesn't offer BARb. Using SimpleAI instead.");
+  });
+
+  it("reports a single bot dropped for having no available AI", () => {
+    expect(hostSeedAiNotice({ substitutions: [], unresolvedAiCount: 1 })).toBe(
+      "One bot had no AI available in this game and was skipped.",
+    );
+  });
+
+  it("reports several dropped bots", () => {
+    expect(hostSeedAiNotice({ substitutions: [], unresolvedAiCount: 3 })).toBe(
+      "3 bots had no AI available in this game and were skipped.",
+    );
+  });
+
+  it("combines a substitution and a dropped bot", () => {
+    expect(
+      hostSeedAiNotice({
+        substitutions: [{ from: "BARb", to: "SimpleAI" }],
+        unresolvedAiCount: 1,
+      }),
+    ).toBe(
+      "This game doesn't offer BARb. Using SimpleAI instead. One bot had no AI available in this game and was skipped.",
+    );
   });
 });

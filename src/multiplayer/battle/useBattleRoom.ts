@@ -192,6 +192,13 @@ export interface BattleRoomView {
       name: string,
       patch: { teamId?: number; ally?: number },
     ) => void;
+    /**
+     * Change an existing bot's AI (host/owner), keeping its seat. The lobby
+     * protocol has no "change bot AI" command (ADDBOT carries the aiDll, UPDATEBOT
+     * does not), so this removes the bot and re-adds it under the new AI with the
+     * same name, team, ally, side, colour and handicap (issue #532).
+     */
+    changeBotAi: (name: string, aiShortName: string) => void;
   };
   /** AIs the host can add as bots (host only): the game's own AIs — native engine
    *  AIs and/or its Lua AIs — or the engine's natives when the game declares none. */
@@ -202,6 +209,12 @@ export interface BattleRoomView {
     version?: string;
     description?: string;
   }[];
+  /**
+   * Whether `addableAis` is the game's final list (settled), not a still-loading
+   * one. The host-seed reconciliation gates on this so a preset's bot AIs are
+   * only reconciled once the real list is known (issue #531).
+   */
+  addableAisReady: boolean;
   /** Add an AI bot on the next free team/ally (host only). Lua AIs are addable too:
    *  ADDBOT carries the shortName and the host scripts each as an `[AI]` block. */
   addBot: (aiShortName: string) => void;
@@ -272,12 +285,28 @@ export function useBattleRoom(): BattleRoomView {
   // when the game declares no AIs at all (e.g. an empty/absent whitelist with no
   // Lua AIs) do we fall back to the engine's natives (a no-game query skips the
   // whitelist) so "Add AI" is never uselessly empty.
-  const { ais } = useSkirmishAis(enginePath, dataDir, gameArchive);
-  const { ais: engineAis } = useSkirmishAis(enginePath, dataDir, undefined);
+  const { ais, loaded: aisLoaded } = useSkirmishAis(
+    enginePath,
+    dataDir,
+    gameArchive,
+  );
+  const { ais: engineAis, loaded: engineAisLoaded } = useSkirmishAis(
+    enginePath,
+    dataDir,
+    undefined,
+  );
   const addableAis = useMemo(
     () => (ais.length > 0 ? ais : engineAis.filter((a) => a.kind === "native")),
     [ais, engineAis],
   );
+  // Whether `addableAis` is the game's final list rather than a still-loading
+  // one: the game-scoped query has settled, and if it came back empty (the game
+  // declares no AIs, so we fall back to the engine's natives) that query has
+  // settled too. The host-seed reconciliation waits for this so it never remaps
+  // a preset's AI against the engine-natives fallback while the game's own list
+  // is still loading (issue #531). That produced a native AI, e.g. BARb, that
+  // the game itself doesn't offer.
+  const addableAisReady = aisLoaded && (ais.length > 0 || engineAisLoaded);
 
   const [contentNonce, setContentNonce] = useState(0);
 
@@ -563,6 +592,32 @@ export function useBattleRoom(): BattleRoomView {
           color: bot.teamColor,
         }).then(clearErr, setErr);
       },
+      // Change a bot's AI (issue #532). The protocol carries the aiDll only on
+      // ADDBOT, so we remove the bot and re-add it with the same seat under the
+      // new AI. Awaited in order so the re-add lands after the removal.
+      changeBotAi: (name: string, aiShortName: string) => {
+        if (!activeKey || !battle) return;
+        const bot = battle.bots[name];
+        if (!bot) return;
+        const bs = bot.battleStatus;
+        mpRemoveBot({ serverKey: activeKey, name })
+          .then(() =>
+            mpAddBot({
+              serverKey: activeKey,
+              name,
+              ready: bs.ready,
+              teamId: bs.teamId,
+              ally: bs.ally,
+              mode: bs.mode,
+              handicap: bs.handicap,
+              sync: bs.sync,
+              side: bs.side,
+              color: bot.teamColor,
+              aiDll: aiShortName,
+            }),
+          )
+          .then(clearErr, setErr);
+      },
     }),
     [activeKey, battle, debounceColor, setErr, clearErr],
   );
@@ -830,6 +885,7 @@ export function useBattleRoom(): BattleRoomView {
     setIngame,
     hostControls,
     addableAis,
+    addableAisReady,
     addBot,
     leave,
     autohostSend,

@@ -1,4 +1,8 @@
-import { type AiSubstitution, reconcileAi } from "@/conquest/ai";
+import {
+  type AiSubstitution,
+  reconcileAi,
+  summarizeSubstitutions,
+} from "@/conquest/ai";
 import type { Side, SkirmishAi } from "@/content/bindings";
 import type { SkirmishDraft } from "@/play/drafts";
 import {
@@ -179,4 +183,26 @@ export function draftToHostSeed(opts: {
     unresolvedAiCount,
     substitutions,
   };
+}
+
+/**
+ * One human notice for what reconciling a host seed's bot AIs did: the remapped
+ * AIs (issue #501), plus any bot dropped because the game offers no usable AI at
+ * all (issue #531). Returns undefined when every bot kept its AI, so the caller
+ * can skip the notice.
+ */
+export function hostSeedAiNotice(
+  seed: Pick<HostSeed, "substitutions" | "unresolvedAiCount">,
+): string | undefined {
+  const parts: string[] = [];
+  const subs = summarizeSubstitutions(seed.substitutions);
+  if (subs) parts.push(subs);
+  if (seed.unresolvedAiCount === 1) {
+    parts.push("One bot had no AI available in this game and was skipped.");
+  } else if (seed.unresolvedAiCount > 1) {
+    parts.push(
+      `${seed.unresolvedAiCount} bots had no AI available in this game and were skipped.`,
+    );
+  }
+  return parts.length > 0 ? parts.join(" ") : undefined;
 }

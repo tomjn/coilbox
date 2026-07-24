@@ -210,16 +210,29 @@ export function useSkirmishAis(
 ) {
   const [ais, setAis] = useState<SkirmishAi[]>([]);
   const [loading, setLoading] = useState(false);
+  // The key whose AI list `ais` currently holds, set once the query settles
+  // (cache hit or fetch resolved). Lets callers tell "still loading" (an empty
+  // list that hasn't settled) from "genuinely no AIs" (settled but empty), so a
+  // reconciliation never runs against a premature list. Null until the first
+  // settle, or when there is no target.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+
+  const key =
+    enginePath && dataDir
+      ? `${dataDir}::${enginePath}::${gameArchive ?? ""}`
+      : null;
 
   useEffect(() => {
     if (!enginePath || !dataDir) {
       setAis([]);
+      setLoadedKey(null);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${gameArchive ?? ""}`;
-    const cached = skirmishAiCache.get(key);
+    const k = `${dataDir}::${enginePath}::${gameArchive ?? ""}`;
+    const cached = skirmishAiCache.get(k);
     if (cached) {
       setAis(cached.ais);
+      setLoadedKey(k);
       return;
     }
     let cancelled = false;
@@ -227,21 +240,29 @@ export function useSkirmishAis(
     unitsyncSkirmishAis({ enginePath, dataDir, gameArchive })
       .then((res) => {
         if (cancelled) return;
-        skirmishAiCache.set(key, res);
+        skirmishAiCache.set(k, res);
         setAis(res.ais);
       })
       .catch(() => {
         if (!cancelled) setAis([]);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setLoadedKey(k);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [enginePath, dataDir, gameArchive]);
 
-  return { ais, loading };
+  // `ais` matches the current key only once this key has settled. During a key
+  // change `loadedKey` still points at the previous key, so `loaded` is false
+  // until the new query settles.
+  const loaded = key != null && loadedKey === key;
+
+  return { ais, loading, loaded };
 }
 
 /**

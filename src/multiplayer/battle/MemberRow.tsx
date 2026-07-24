@@ -36,6 +36,8 @@ export interface MemberControls {
   onForceColor: (hex: string) => void;
   onForceSpectator: () => void;
   onKick: () => void;
+  /** Bots we own/host only: change the bot's AI in place (issue #532). */
+  onChangeAi?: (aiShortName: string) => void;
 }
 
 /** Ready state as a round check/cross; spectators show an eye (always "ready"). */
@@ -75,6 +77,7 @@ export function MemberRow({
   sideOptions,
   teamOptions,
   allyOptions,
+  aiOptions,
   note,
   onSetNote,
   statsSummary,
@@ -106,6 +109,8 @@ export function MemberRow({
     icon?: ReactNode;
   }[];
   allyOptions: { value: string; label: string }[];
+  /** The game's addable AIs, for a bot row's in-place AI picker (issue #532). */
+  aiOptions?: { value: string; label: string; description?: string }[];
   /** Current private note on this player ("" for none), and its setter. Humans
    * only, and never on our own row — see `notes.ts` (issue #341). */
   note?: string;
@@ -136,6 +141,14 @@ export function MemberRow({
   // Team/ally are settable on any controlled row — humans via FORCE*, bots via
   // UPDATEBOT (both routed through `control`); discrete dropdowns, no flood risk.
   const canEditTeamAlly = editable || !!control;
+  // A bot we own/host can have its AI changed in place (issue #532), offered
+  // from the same list as the Add AI dropdown. Complements the invalid-AI flag
+  // (#501): the host can now fix a bot carrying an AI this game doesn't offer.
+  const canChangeAi =
+    row.kind === "bot" &&
+    !!control?.onChangeAi &&
+    !!aiOptions &&
+    aiOptions.length > 0;
   const setTeam = (v: number) =>
     editable ? onTeam(v) : control?.onForceTeam(v);
   const setAlly = (v: number) =>
@@ -210,15 +223,31 @@ export function MemberRow({
               </span>
               {row.rank != null && <RankBadge rank={row.rank} />}
             </div>
-            {aiInvalid ? (
+            {aiInvalid && (
               <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="size-3 shrink-0" />
                 {row.aiDll} isn't available in this game
               </span>
+            )}
+            {canChangeAi ? (
+              <OptionSelect
+                value={
+                  aiOptions?.some((o) => o.value === row.aiDll)
+                    ? (row.aiDll ?? "")
+                    : ""
+                }
+                onValueChange={(v) => control?.onChangeAi?.(v)}
+                options={aiOptions ?? []}
+                size="sm"
+                className="mt-1 h-7 w-auto min-w-36"
+                placeholder={row.aiDll ?? "Select an AI"}
+              />
             ) : (
-              <span className="text-[11px] text-muted-foreground">
-                {subtitle}
-              </span>
+              !aiInvalid && (
+                <span className="text-[11px] text-muted-foreground">
+                  {subtitle}
+                </span>
+              )
             )}
           </div>
           {onSetNote && (

@@ -69,6 +69,7 @@ export function BattleMembersTable({
       name: string,
       patch: { teamId?: number; ally?: number },
     ) => void;
+    changeBotAi: (name: string, aiShortName: string) => void;
   };
   /** AIs addable as bots — native engine AIs and the game's own Lua AIs. */
   addableAis: {
@@ -170,6 +171,13 @@ export function BattleMembersTable({
     value: String(i),
     label: `Ally ${allyLetter(i)}`,
   }));
+  // The AI options, shared by the Add AI dropdown and each bot row's in-place AI
+  // picker (issue #532), so both offer exactly the game's addable AIs.
+  const aiOptions = addableAis.map((a) => ({
+    value: a.shortName,
+    label: a.name ?? a.shortName,
+    description: aiByline(a),
+  }));
 
   return (
     <div className="rounded-lg border border-border/50 bg-card">
@@ -233,6 +241,7 @@ export function BattleMembersTable({
                   onForceColor: noop,
                   onForceSpectator: noop,
                   onKick: () => hostControls.removeBot(row.name),
+                  onChangeAi: (ai) => hostControls.changeBotAi(row.name, ai),
                 };
               }
               // Defensive flag (#501): a bot whose AI isn't in this game's
@@ -258,6 +267,7 @@ export function BattleMembersTable({
                   sideOptions={sideOptions}
                   teamOptions={teamOptions}
                   allyOptions={allyOptions}
+                  aiOptions={aiOptions}
                   note={
                     row.kind === "human" && !row.self && noteFor
                       ? noteFor(row)
@@ -302,11 +312,7 @@ export function BattleMembersTable({
           <OptionSelect
             value={chosenAi}
             onValueChange={setChosenAi}
-            options={addableAis.map((a) => ({
-              value: a.shortName,
-              label: a.name ?? a.shortName,
-              description: aiByline(a),
-            }))}
+            options={aiOptions}
             size="sm"
             className="w-auto min-w-40"
             placeholder={
