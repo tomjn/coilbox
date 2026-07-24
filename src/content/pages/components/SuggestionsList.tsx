@@ -1,7 +1,7 @@
 import { Button, cn } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
   type DownloadProgress,
@@ -10,6 +10,12 @@ import {
   dlDownloadMap,
   dlGithubReleaseArchives,
 } from "../../../downloads/bindings";
+import {
+  GAME_REPOS,
+  type GameRepo,
+  mergeGameRepos,
+  repoForKey,
+} from "../../../downloads/gameRepos";
 import { ProgressBar } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
 import {
@@ -19,6 +25,7 @@ import {
   type SuggestedMap,
   useBrandingCatalog,
   useBrandingImage,
+  useGithubGameRepos,
 } from "../../branding";
 import { invalidateScans } from "../../config";
 
@@ -34,12 +41,15 @@ interface SuggestionsListProps {
   heading?: string;
 }
 
-/** Dispatch a suggestion to the matching downloads-plugin command. */
+/** Dispatch a suggestion to the matching downloads-plugin command. `repos` is the
+ * unified GitHub game-repo registry (issue #512), used to resolve a `github`
+ * download's `sourceKey`. */
 async function runDownload(
   dl: SuggestedDownload,
   kind: "game" | "map",
   writePath: string,
   onProgress: Channel<DownloadProgress>,
+  repos: GameRepo[],
 ): Promise<{ message: string }> {
   switch (dl.kind) {
     case "rapid":
@@ -68,15 +78,22 @@ async function runDownload(
         onProgress,
       });
     case "github": {
-      // Resolve the repo's release archives, then stream the matching (or newest)
-      // one directly — games like SplinterFaction ship only via GitHub releases.
-      const { archives } = await dlGithubReleaseArchives({ repo: dl.repo });
+      // Resolve the repo directly, or via the unified registry's sourceKey (issue
+      // 512), then stream the matching (or newest) release archive directly.
+      // Games like SplinterFaction ship only via GitHub releases.
+      const repo = dl.repo ?? repoForKey(repos, dl.sourceKey ?? "");
+      if (!repo) {
+        throw new Error(
+          `No GitHub repo declared for source "${dl.sourceKey ?? ""}".`,
+        );
+      }
+      const { archives } = await dlGithubReleaseArchives({ repo });
       const pick = dl.asset
         ? archives.find((a) =>
             a.filename.toLowerCase().includes(dl.asset?.toLowerCase() ?? ""),
           )
         : archives[0];
-      if (!pick) throw new Error(`No release archive found for ${dl.repo}.`);
+      if (!pick) throw new Error(`No release archive found for ${repo}.`);
       return dlDownloadFile({
         url: pick.url,
         filename: pick.filename,
@@ -102,6 +119,13 @@ export function SuggestionsList({
   heading,
 }: SuggestionsListProps) {
   const entries = useBrandingCatalog();
+  // Unified GitHub game-repo registry (issue #512): the catalog is authoritative
+  // once loaded, GAME_REPOS is the fallback seed.
+  const catalogRepos = useGithubGameRepos();
+  const repos = useMemo(
+    () => mergeGameRepos(catalogRepos, GAME_REPOS),
+    [catalogRepos],
+  );
   const [downloading, setDownloading] = useState<string | null>(null);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
@@ -123,6 +147,7 @@ export function SuggestionsList({
         kind,
         writePath,
         onProgress,
+        repos,
       );
       setResult({ ok: true, message });
       // A newly-downloaded game/map must appear without a manual rescan.

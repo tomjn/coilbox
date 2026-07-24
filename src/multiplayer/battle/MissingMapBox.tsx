@@ -5,10 +5,10 @@ import { useState } from "react";
 import type { DownloadProgress } from "@/downloads/bindings";
 import { useWriteRootPath } from "@/downloads/config";
 import { useDownloadQueue } from "@/downloads/DownloadQueueProvider";
+import { downloadMapAnySource } from "@/downloads/downloadMap";
 import { ProgressBar } from "@/downloads/pages/components/ProgressBar";
 import { errMessage } from "@/downloads/pages/components/states";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
-import { downloadMapAnySource } from "./downloadMap";
 
 /**
  * The map-not-installed state, rendered inside the minimap box (where the user is

@@ -128,10 +128,12 @@ export function useResolveContent(
         };
       }
       if (req.kind === "map") {
+        // Resolve across every source in policy order (known mirrors first,
+        // pr-downloader last, per issue 511), matching the game requirement above.
         return {
-          kind: "map" as const,
+          kind: "mapAnySource" as const,
           label: `Map: ${req.label}`,
-          args: { springName: key, writePath },
+          args: { mapName: key, writePath },
         };
       }
       if (!engineCatalog) return null;
