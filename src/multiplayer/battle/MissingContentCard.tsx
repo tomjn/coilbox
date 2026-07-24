@@ -5,14 +5,14 @@ import { useState } from "react";
 import type { DownloadProgress } from "@/downloads/bindings";
 import { useWriteRootPath } from "@/downloads/config";
 import { useDownloadQueue } from "@/downloads/DownloadQueueProvider";
+import { downloadGameAnySource } from "@/downloads/downloadGame";
 import { ProgressBar } from "@/downloads/pages/components/ProgressBar";
 import { errMessage } from "@/downloads/pages/components/states";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
-import { downloadGameAnySource } from "./downloadGame";
 
 /**
  * Shown when the battle's game isn't installed locally. Downloads the game
- * (rapid via pr-downloader, falling back to the springfiles catalog — see
+ * (GitHub releases and mirrors first, pr-downloader last, see
  * `downloadGameAnySource`) or rescans if it's already on disk. On success it
  * calls `onRescan`, which re-scans and remounts the cards so the real game
  * appears. (The missing-map case is handled inline in the minimap box, see

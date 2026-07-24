@@ -21,6 +21,7 @@ import {
   dlDownloadFile,
   dlDownloadMap,
 } from "./bindings";
+import { downloadGameAnySource } from "./downloadGame";
 import { errMessage } from "./pages/components/states";
 
 /**
@@ -33,6 +34,13 @@ export type EnqueueInput =
       kind: "rapid";
       label: string;
       args: { tag: string; masterUrl?: string; writePath?: string };
+    }
+  | {
+      // Resolve a game across every source in policy order (GitHub and mirrors
+      // first, pr-downloader last, per issue 500), rather than pinning rapid.
+      kind: "game";
+      label: string;
+      args: { gameName: string; writePath?: string };
     }
   | {
       kind: "map";
@@ -81,6 +89,8 @@ export function identityOf(input: EnqueueInput): string {
   switch (input.kind) {
     case "rapid":
       return `rapid:${input.args.masterUrl ?? ""}:${input.args.tag}`;
+    case "game":
+      return `game:${input.args.gameName}`;
     case "map":
       return `map:${input.args.springName}`;
     case "file":
@@ -168,6 +178,17 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           await dlDownload({ ...item.args, opId: item.id, onProgress });
           // The freshly-written `.sdp` is now on disk; warm it into the page
           // cache so the first launch/join after this download is quicker.
+          warmAllRoots().catch(() => {});
+          return;
+        case "game":
+          // May install a rapid pool entry or a direct file in the games folder,
+          // so run both a scan invalidation and the rapid page-cache warm.
+          await downloadGameAnySource({
+            ...item.args,
+            opId: item.id,
+            onProgress,
+          });
+          invalidateScans();
           warmAllRoots().catch(() => {});
           return;
         case "map":

@@ -118,10 +118,13 @@ export function useResolveContent(
       if (!writePath) return null;
       const key = req.downloadKey ?? req.label;
       if (req.kind === "game") {
+        // Resolve across every source in policy order (GitHub and mirrors first,
+        // pr-downloader last, per issue 500) so a GitHub-only game such as
+        // SplinterFaction installs instead of failing on rapid.
         return {
-          kind: "rapid" as const,
+          kind: "game" as const,
           label: `Game: ${req.label}`,
-          args: { tag: key, writePath },
+          args: { gameName: key, writePath },
         };
       }
       if (req.kind === "map") {
