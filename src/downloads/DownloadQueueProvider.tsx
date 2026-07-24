@@ -22,6 +22,7 @@ import {
   dlDownloadMap,
 } from "./bindings";
 import { downloadGameAnySource } from "./downloadGame";
+import { downloadMapAnySource } from "./downloadMap";
 import { errMessage } from "./pages/components/states";
 
 /**
@@ -46,6 +47,15 @@ export type EnqueueInput =
       kind: "map";
       label: string;
       args: { springName: string; searchUrl?: string; writePath?: string };
+    }
+  | {
+      // Resolve a map across every source in policy order (known mirrors first,
+      // pr-downloader last, per issue 511), rather than pinning rapid. Distinct
+      // from "map" (a specific catalog source the user already picked, e.g. the
+      // browse page or a curated pack).
+      kind: "mapAnySource";
+      label: string;
+      args: { mapName: string; writePath?: string };
     }
   | {
       kind: "file";
@@ -93,6 +103,8 @@ export function identityOf(input: EnqueueInput): string {
       return `game:${input.args.gameName}`;
     case "map":
       return `map:${input.args.springName}`;
+    case "mapAnySource":
+      return `mapAnySource:${input.args.mapName}`;
     case "file":
       return `file:${input.args.destDir}/${input.args.filename}`;
     case "engineRecoil":
@@ -193,6 +205,14 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           return;
         case "map":
           await dlDownloadMap({ ...item.args, opId: item.id, onProgress });
+          invalidateScans();
+          return;
+        case "mapAnySource":
+          await downloadMapAnySource({
+            ...item.args,
+            opId: item.id,
+            onProgress,
+          });
           invalidateScans();
           return;
         case "file":
