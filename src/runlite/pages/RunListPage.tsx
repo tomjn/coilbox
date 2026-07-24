@@ -1,11 +1,13 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Download, Loader2, Play, Rocket, Trash2 } from "lucide-react";
+import { useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
 import { resolveGameByShortname } from "../../conquest/model";
 import { useUnitsyncScan } from "../../content/config";
 import { EmptyState } from "../../content/pages/components/states";
+import { useImportParam } from "../../deeplink/useImportParam";
 import { usePlayReadiness, usePreferredTarget } from "../../play/config";
 import type { RogueliteRun } from "../model";
 import { useRuns } from "../runs";
@@ -44,12 +46,13 @@ export default function RunListPage() {
       ),
     });
 
-  const openImportChallenge = () =>
+  const openImportChallenge = (initialCode?: string) =>
     drawer.open({
       title: "Import challenge",
       width: "26rem",
       content: (
         <ImportChallengeForm
+          initialCode={initialCode}
           onImported={(id) => {
             drawer.close();
             navigate(`/warpath/${encodeURIComponent(id)}`);
@@ -57,6 +60,14 @@ export default function RunListPage() {
         />
       ),
     });
+
+  // A confirmed `coilbox://import` deep link (issue #388) lands here with the
+  // challenge code in the query string. Open the import drawer with it prefilled.
+  const importCode = useImportParam();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the deep-link code arrives, not on every drawer identity change
+  useEffect(() => {
+    if (importCode) openImportChallenge(importCode);
+  }, [importCode]);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -73,7 +84,7 @@ export default function RunListPage() {
         </div>
         {hasGames && (
           <div className="flex shrink-0 gap-2">
-            <Button variant="outline" onClick={openImportChallenge}>
+            <Button variant="outline" onClick={() => openImportChallenge()}>
               <Download className="mr-1.5 size-4" aria-hidden /> Import
               challenge
             </Button>

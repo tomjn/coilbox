@@ -90,6 +90,14 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // `coilbox://` deep links (issue #388): a link in Discord or lobby chat
+        // carries an action (join a battle, import a preset/challenge, open a
+        // screen). The plugin captures the launch URL for cold start and emits
+        // `deep-link://new-url` while running. The frontend confirms every link
+        // before acting. Note the same `coilbox://` string also names the webview
+        // asset protocol registered below. They live at different layers (OS URL
+        // dispatch vs in-webview asset serving) and do not collide.
+        .plugin(tauri_plugin_deep_link::init())
         // Serve local media (images/audio/video/fonts) from the portable `.coilbox`
         // folder and per-campaign app-data over `coilbox://`, with HTTP range support
         // so `<video>` can seek. Registered here rather than in a picoframe plugin so
@@ -115,6 +123,22 @@ fn main() {
     builder = builder.plugin(tauri_plugin_coilbox_lobby_servers::init());
     builder = builder.plugin(tauri_plugin_coilbox_multiplayer::init());
     // picoframe:plugins-end
+
+    // In a dev (non-bundled) build the OS has no record of the `coilbox://`
+    // scheme, so on Windows and Linux register it at runtime so links dispatch
+    // during development. macOS resolves the scheme from the bundled app's
+    // Info.plist only, so runtime registration is neither available nor needed
+    // there. A release build ships the scheme in its bundle, so this is dev-only.
+    #[cfg(all(debug_assertions, any(target_os = "windows", target_os = "linux")))]
+    {
+        builder = builder.setup(|app| {
+            use tauri_plugin_deep_link::DeepLinkExt;
+            if let Err(e) = app.deep_link().register_all() {
+                eprintln!("coilbox: dev deep-link scheme registration failed: {e}");
+            }
+            Ok(())
+        });
+    }
 
     // Dev-only: expose an MCP socket server so AI agents can drive the app
     // (screenshots, DOM, input). The `tauri-mcp` server in .mcp.json connects

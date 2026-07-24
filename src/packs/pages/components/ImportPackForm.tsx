@@ -20,7 +20,14 @@ import {
  * pack), then save any bundled presets, renaming on a name collision rather
  * than overwriting an existing preset.
  */
-export function ImportPackForm({ target }: { target: PlayTarget | null }) {
+export function ImportPackForm({
+  target,
+  initialCode,
+}: {
+  target: PlayTarget | null;
+  /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
+  initialCode?: string;
+}) {
   const { presets, savePreset } = useSkirmishPresets();
   const [pending, setPending] = useState<SetupPackManifest | null>(null);
 
@@ -71,6 +78,7 @@ export function ImportPackForm({ target }: { target: PlayTarget | null }) {
         placeholder="Paste a setup pack code…"
         submitLabel="Import setup pack"
         busyLabel="Checking…"
+        initialCode={initialCode}
         onImport={importCode}
       />
       {pending && (

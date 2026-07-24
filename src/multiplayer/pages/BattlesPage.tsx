@@ -2,6 +2,7 @@ import { Button, NavGate } from "@picoframe/frame";
 import { useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useScanTargetSelection } from "../../content/config";
+import { notify } from "../../notify/notify";
 import { getGameMatcher } from "../../profile/profile";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
 import { BattleList } from "../battles/BattleList";
@@ -63,6 +64,17 @@ function BattlesPage() {
   const location = useLocation();
   const hostMap = (location.state as { hostMap?: string } | null)?.hostMap;
 
+  // A confirmed coilbox://join deep link (issue #388) navigates here with the
+  // target server and battle id. Join only when already connected to a server
+  // and the battle is open. Cross-server auto-connect is out of scope, so an
+  // unconnected or missing target is reported rather than acted on silently.
+  const deeplinkJoin = (
+    location.state as {
+      deeplinkJoin?: { server: string; battle: string; password?: string };
+    } | null
+  )?.deeplinkJoin;
+  const deeplinkJoinHandledRef = useRef(false);
+
   const navigate = useNavigate();
   const ready = mirror.phase === "ready";
   const joinedId = mirror.state?.currentBattle ?? null;
@@ -80,6 +92,34 @@ function BattlesPage() {
   }, [joinedId, navigate]);
   const joinedBattle =
     joinedId != null ? mirror.state?.battles[String(joinedId)] : undefined;
+
+  // Carry out a deep-link join once the connection is ready. Fires at most once
+  // per arrival (the ref guard), and reports rather than acts when it cannot.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: onJoin is a stable hoisted handler, re-adding it would loop the join
+  useEffect(() => {
+    if (!deeplinkJoin || deeplinkJoinHandledRef.current) return;
+    if (!ready || !activeKey) {
+      deeplinkJoinHandledRef.current = true;
+      notify({
+        title: "Connect first to join",
+        body: `Log in to ${deeplinkJoin.server}, then open the link again.`,
+        level: "error",
+      });
+      return;
+    }
+    const target = all.find((b) => String(b.id) === deeplinkJoin.battle);
+    if (!target) {
+      deeplinkJoinHandledRef.current = true;
+      notify({
+        title: "Battle not found",
+        body: `Battle "${deeplinkJoin.battle}" is not open on this server.`,
+        level: "error",
+      });
+      return;
+    }
+    deeplinkJoinHandledRef.current = true;
+    void onJoin(target, deeplinkJoin.password);
+  }, [deeplinkJoin, ready, activeKey, all]);
 
   // A battle is "in progress" when its host is in-game; BattleList groups on this
   // (open first, in-progress last). The joined battle is pinned separately so its

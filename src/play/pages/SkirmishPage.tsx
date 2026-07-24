@@ -23,6 +23,7 @@ import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import { notify } from "@/notify/notify";
 import { contentListReplays } from "../../content/bindings";
 import { useReplayUserState } from "../../content/replayUserState";
+import { useImportParam } from "../../deeplink/useImportParam";
 import type { BattleConfig } from "../bindings";
 import { playExportPreset, playImportPreset } from "../bindings";
 import {
@@ -483,6 +484,20 @@ export default function SkirmishPage() {
       setError(e instanceof Error ? e.message : String(e));
     }
   }
+
+  // A confirmed `coilbox://import` deep link (issue #388) lands here with a
+  // preset code in the query string. Decode it with the same validator as a file
+  // import, then hand off to the content-resolution gate below.
+  const presetImportCode = useImportParam();
+  useEffect(() => {
+    if (!presetImportCode) return;
+    const parsed = parsePresetJson(presetImportCode);
+    if (!parsed) {
+      setError("That link isn't a valid coilbox preset.");
+      return;
+    }
+    setPendingPreset(parsed);
+  }, [presetImportCode]);
 
   return (
     <div className="flex flex-col gap-5 p-4">

@@ -25,6 +25,7 @@ tauri-plugin-coilbox-runlite = { path = "../crates/tauri-plugin-coilbox-runlite"
 tauri-plugin-coilbox-profile = { path = "../crates/tauri-plugin-coilbox-profile" }
 tauri-plugin-coilbox-lobby-servers = { path = "../crates/tauri-plugin-coilbox-lobby-servers" }
 tauri-plugin-coilbox-multiplayer = { path = "../crates/tauri-plugin-coilbox-multiplayer" }
+tauri-plugin-deep-link = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-updater = "2"

@@ -1,5 +1,6 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ReactNode } from "react";
+import { dispatchDeepLink } from "../../deeplink/bus";
 import { jumbojiCount } from "./jumboji";
 import { type Inline, parseMessage } from "./parseMessage";
 
@@ -62,7 +63,10 @@ function renderNode(n: Inline, key: string): ReactNode {
           {n.value}
         </span>
       );
-    case "url":
+    case "url": {
+      // A coilbox:// deep link routes through the in-app confirm-before-act
+      // handler (issue #388), everything else opens in the browser.
+      const isDeepLink = n.value.startsWith("coilbox://");
       return (
         <a
           key={key}
@@ -70,12 +74,14 @@ function renderNode(n: Inline, key: string): ReactNode {
           className="underline"
           onClick={(e) => {
             e.preventDefault();
-            openUrl(n.value).catch(() => {});
+            if (isDeepLink) dispatchDeepLink(n.value);
+            else openUrl(n.value).catch(() => {});
           }}
         >
           {n.value}
         </a>
       );
+    }
     case "bold":
       return (
         <strong key={key} className="font-semibold">

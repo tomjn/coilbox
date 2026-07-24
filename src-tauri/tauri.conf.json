@@ -61,6 +61,11 @@
     }
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["coilbox"]
+      }
+    },
     "updater": {
       "endpoints": [
         "https://github.com/tomjn/coilbox/releases/latest/download/latest.json"
