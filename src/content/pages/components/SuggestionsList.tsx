@@ -103,9 +103,10 @@ async function runDownload(
 /**
  * A grid of pre-curated download suggestions (games or maps) shown on the
  * first-run/empty content screens. Reuses the downloads-plugin commands, progress
- * channel and `ProgressBar`; on a successful download it clears the unitsync scan
- * cache and calls `onComplete` so the host screen refreshes and the item drops out
- * (or the whole block is replaced once real content appears).
+ * channel and `ProgressBar`. On a successful download it clears the unitsync scan
+ * cache and calls `onComplete` so the host screen's own state refreshes, while a
+ * downloaded item stays in its slot marked done (issue #526) so the rest of
+ * `items` (whatever the caller passed in) stays selectable for the visit.
  */
 export function SuggestionsList({
   kind,
@@ -127,6 +128,11 @@ export function SuggestionsList({
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
     null,
   );
+  // Marks an item done in place once its download succeeds, rather than relying
+  // on `items` shrinking (the caller holds a stable snapshot for the visit so the
+  // rest stay selectable - issue #526). Local to this list, so it survives
+  // regardless of how the caller reacts to `onComplete`.
+  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
 
   if (items.length === 0) return null;
 
@@ -146,6 +152,7 @@ export function SuggestionsList({
         repos,
       );
       setResult({ ok: true, message });
+      setDoneIds((prev) => new Set(prev).add(item.id));
       // A newly-downloaded game/map must appear without a manual rescan.
       invalidateScans();
       onComplete?.();
@@ -180,7 +187,10 @@ export function SuggestionsList({
         )}
       </div>
 
-      <ul className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-3">
+      {/* auto-fill, not auto-fit: a suggestion card stays game-card sized even
+          when only one or two are shown on a wide window (issue #529). auto-fit
+          would stretch the real tracks to fill the row, blowing the art up. */}
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
         {items.map((item) => (
           <SuggestionCard
             key={item.id}
@@ -191,6 +201,7 @@ export function SuggestionsList({
                 : (item as SuggestedMap).thumb
             }
             active={downloading === item.id}
+            done={doneIds.has(item.id)}
             progress={progress}
             disabled={!writePath || downloading !== null}
             onDownload={() => onDownload(item)}
@@ -226,6 +237,7 @@ function SuggestionCard({
   item,
   art,
   active,
+  done,
   progress,
   disabled,
   onDownload,
@@ -233,6 +245,9 @@ function SuggestionCard({
   item: Suggestion;
   art?: string[];
   active: boolean;
+  /** This item's download already succeeded this visit (issue #526): stays in
+   * place, marked done, instead of vanishing or re-offering the download. */
+  done: boolean;
   progress: DownloadProgress | null;
   disabled: boolean;
   onDownload: () => void;
@@ -266,11 +281,19 @@ function SuggestionCard({
             variant="outline"
             size="sm"
             onClick={onDownload}
-            disabled={disabled}
-            aria-label={`Download ${item.title}`}
+            disabled={disabled || done}
+            aria-label={
+              done ? `${item.title} downloaded` : `Download ${item.title}`
+            }
           >
-            {active ? <Loader2 className="animate-spin" /> : <Download />}
-            {active ? "Downloading…" : "Download"}
+            {done ? (
+              <CheckCircle2 className="text-emerald-500" />
+            ) : active ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <Download />
+            )}
+            {done ? "Downloaded" : active ? "Downloading…" : "Download"}
           </Button>
           {active && progress && <ProgressBar progress={progress} />}
         </div>
