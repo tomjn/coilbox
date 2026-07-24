@@ -82,7 +82,11 @@ export function HostBattlePopover({
   const [title, setTitle] = useState(initialTitle ?? "");
   const [gameName, setGameName] = useState(initialGame ?? "");
   const [mapName, setMapName] = useState(initialMap ?? "");
-  const [maxPlayers, setMaxPlayers] = useState(16);
+  // 8 is a sensible starting size for a fresh host (issue #502), the user can
+  // still raise it. A "Host as battle" draft only ever carries the AIs (added
+  // as bots, not real player slots) plus the one human host seat, so no
+  // preset needs this raised to fit.
+  const [maxPlayers, setMaxPlayers] = useState(8);
   const [port, setPort] = useState(DEFAULT_HOST_PORT);
   const [password, setPassword] = useState("");
   // Default on: most home hosts are behind NAT, and the server-side hole punching
