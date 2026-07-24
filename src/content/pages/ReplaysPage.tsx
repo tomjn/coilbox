@@ -14,7 +14,9 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
+import { ContinueBadge } from "@/components/ContinueBadge";
 import { Badge } from "@/components/ui/badge";
+import { mostRecentOpen } from "@/lib/recency";
 import { formatBytes } from "../../downloads/pages/components/ProgressBar";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import {
@@ -203,6 +205,19 @@ export default function ReplaysPage() {
   // library — so toggling one filter never hides another filter's control.
   const filterVisibility = useMemo(
     () => computeReplayFilterVisibility(replays, userState.get),
+    [replays, userState],
+  );
+
+  // The single most recent unwatched replay (issue #374's "continue playing"
+  // affordance): badged wherever it lands in the current sort/filter, since
+  // its row already links straight to the replay.
+  const resumeFilename = useMemo(
+    () =>
+      mostRecentOpen(
+        replays,
+        (r) => !userState.get(r.filename).watched,
+        (r) => dateOf(r),
+      )?.filename,
     [replays, userState],
   );
 
@@ -422,6 +437,9 @@ export default function ReplaysPage() {
                         </Badge>
                       )}
                       <OriginBadge origin={replayOrigin(us)} />
+                      {r.filename === resumeFilename && (
+                        <ContinueBadge label="Unwatched" />
+                      )}
                     </div>
                     <span className="truncate text-xs text-muted-foreground">
                       {meta.join(" · ")}

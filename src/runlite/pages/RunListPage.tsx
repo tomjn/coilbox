@@ -1,9 +1,11 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Download, Loader2, Play, Rocket, Trash2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router";
+import { ContinueBadge } from "@/components/ContinueBadge";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
+import { mostRecentOpen } from "@/lib/recency";
 import { resolveGameByShortname } from "../../conquest/model";
 import { useUnitsyncScan } from "../../content/config";
 import { EmptyState } from "../../content/pages/components/states";
@@ -32,6 +34,19 @@ export default function RunListPage() {
   // the two never disagree on whether a game is installed.
   const { hasGames } = usePlayReadiness();
   const runEntries = Object.entries(runs);
+
+  // The single most recently updated run still in progress (issue #374's
+  // "continue playing" affordance). Badged, not a separate button, since
+  // every run already has its own explicit Resume button.
+  const resumeRunId = useMemo(
+    () =>
+      mostRecentOpen(
+        runEntries,
+        ([, run]) => run.progress.status === "active",
+        ([, run]) => Date.parse(run.updatedAt),
+      )?.[0],
+    [runEntries],
+  );
 
   const openSetup = (initialGameName?: string) =>
     drawer.open({
@@ -149,6 +164,7 @@ export default function RunListPage() {
             <li key={id}>
               <RunCard
                 run={run}
+                resume={id === resumeRunId}
                 onResume={() => navigate(`/warpath/${encodeURIComponent(id)}`)}
                 onAbandon={() => deleteRun(id)}
               />
@@ -165,10 +181,13 @@ export default function RunListPage() {
 /** One run in the hub, resolving its own faction emblem from the chosen side. */
 function RunCard({
   run,
+  resume,
   onResume,
   onAbandon,
 }: {
   run: RogueliteRun;
+  /** The single most-recently-updated active run (issue #374). */
+  resume?: boolean;
   onResume: () => void;
   onAbandon: () => void;
 }) {
@@ -216,6 +235,7 @@ function RunCard({
                 Imported challenge
               </span>
             )}
+            {resume && <ContinueBadge />}
           </div>
           <div className="text-xs text-muted-foreground">
             {label} · {run.settings.game.shortname} · health {hull}/{maxHull}

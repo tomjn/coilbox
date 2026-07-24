@@ -1,5 +1,23 @@
 import type { Campaign, CampaignProgress } from "./model";
 
+/**
+ * The mission to resume for a campaign (issue #374's "continue playing"
+ * affordance), or `undefined` if there's nothing to resume: no progress yet,
+ * the last-played mission was itself already completed (nothing left hanging
+ * mid-attempt), or it references a mission the campaign no longer has (an
+ * authored mission removed after it was played).
+ */
+export function resumeMissionId(
+  campaign: Campaign,
+  progress: CampaignProgress | undefined,
+): string | undefined {
+  const missionId = progress?.lastPlayedMissionId;
+  if (!missionId) return undefined;
+  if (progress.completedMissionIds.includes(missionId)) return undefined;
+  if (!campaign.missions.some((m) => m.id === missionId)) return undefined;
+  return missionId;
+}
+
 /** A mission's play state, derived from the campaign order and saved progress. */
 export type MissionState = "locked" | "available" | "complete";
 
