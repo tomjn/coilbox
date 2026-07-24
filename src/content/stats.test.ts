@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { StatPlayer, StatRecord } from "./bindings";
 import {
   allPlayers,
+  filterPlayers,
   guessPrimaryPlayer,
   isGenuineMatch,
   profileFor,
@@ -56,6 +57,30 @@ describe("allPlayers", () => {
       { name: "me", games: 3 },
       { name: "foe", games: 2 },
     ]);
+  });
+});
+
+describe("filterPlayers", () => {
+  const players = [
+    { name: "Alice", games: 5 },
+    { name: "bob", games: 3 },
+    { name: "Charlie", games: 1 },
+  ];
+
+  it("returns everything for an empty query", () => {
+    expect(filterPlayers(players, "")).toEqual(players);
+    expect(filterPlayers(players, "   ")).toEqual(players);
+  });
+
+  it("matches case-insensitively by substring, preserving order", () => {
+    expect(filterPlayers(players, "AL")).toEqual([{ name: "Alice", games: 5 }]);
+    expect(filterPlayers(players, "rl")).toEqual([
+      { name: "Charlie", games: 1 },
+    ]);
+  });
+
+  it("returns an empty array when nothing matches", () => {
+    expect(filterPlayers(players, "zzz")).toEqual([]);
   });
 });
 

@@ -90,7 +90,21 @@ export function allPlayers(
     .sort((a, b) => b.games - a.games || a.name.localeCompare(b.name));
 }
 
-/** The most-played player name — the profile's default "me". */
+/**
+ * Narrow an {@link allPlayers} list to names matching a search query
+ * (case-insensitive substring), for the player stats picker (#496). Preserves
+ * the input order. An empty/whitespace query returns the full list.
+ */
+export function filterPlayers<T extends { name: string }>(
+  players: T[],
+  query: string,
+): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return players;
+  return players.filter((p) => p.name.toLowerCase().includes(q));
+}
+
+/** The most-played player name, the profile's default "me". */
 export function guessPrimaryPlayer(
   records: StatRecord[],
   refightFilenames: ReadonlySet<string> = new Set(),
