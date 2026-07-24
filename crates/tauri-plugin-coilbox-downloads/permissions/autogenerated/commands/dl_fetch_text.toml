@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-dl-fetch-text"
+description = "Enables the dl_fetch_text command without any pre-configured scope."
+commands.allow = ["dl_fetch_text"]
+
+[[permission]]
+identifier = "deny-dl-fetch-text"
+description = "Denies the dl_fetch_text command without any pre-configured scope."
+commands.deny = ["dl_fetch_text"]

@@ -46,6 +46,11 @@ const STALL_MSG: &str =
     "Download stalled — no data received for 2 minutes. Check your connection or try a different mirror, then retry.";
 const CANCELLED_MSG: &str = "Download cancelled.";
 
+/// Largest shared import payload `dl_fetch_text` will read. Import codes are a
+/// few KB, so a generous cap still rejects anything that is clearly not a
+/// coilbox container. Kept in step with `MAX_IMPORT_BYTES` in `fetchImport.ts`.
+const IMPORT_FETCH_LIMIT: u64 = 512 * 1024;
+
 /// A running download's cancel controls: a `flag` the reqwest chunk loops poll,
 /// and (for sidecar downloads) the `child` process to kill. `dl_cancel` looks
 /// these up by the caller-supplied op id and trips both.
@@ -639,6 +644,70 @@ async fn dl_download_file(
     }
 }
 
+/// `dl_fetch_text` - fetch a shared `coilbox://import?url=` payload as text over
+/// HTTPS from the Rust side, so it is not subject to the webview's CORS rules (a
+/// browser `fetch` only reaches hosts that send permissive CORS headers, which
+/// most paste/gist hosts do not). https only, with a hard byte cap enforced
+/// while streaming so an oversized (or length-lying) body is dropped mid
+/// transfer, never fully buffered. The frontend runs the returned text through
+/// `identify()` before offering to apply it, and confirms first (issue #482).
+#[tauri::command]
+async fn dl_fetch_text(url: String) -> CliResult {
+    let url = url.trim();
+    if url.is_empty() {
+        return CliResult::err("url is required");
+    }
+    // Defence in depth: the frontend parser already enforced https.
+    if !url.starts_with("https://") {
+        return CliResult::err("Import URLs must be https.");
+    }
+
+    let client = match timed_client() {
+        Ok(c) => c,
+        Err(e) => return CliResult::err(e),
+    };
+    let mut resp = match client.get(url).send().await {
+        Ok(r) => r,
+        Err(e) if e.is_timeout() => return CliResult::err("The host took too long to respond."),
+        Err(_) => return CliResult::err("Could not reach the host."),
+    };
+    if !resp.status().is_success() {
+        return CliResult::err(format!(
+            "The host returned an error ({}).",
+            resp.status().as_u16()
+        ));
+    }
+    if let Some(len) = resp.content_length() {
+        if len > IMPORT_FETCH_LIMIT {
+            return CliResult::err("That import is too large to be a coilbox import.");
+        }
+    }
+
+    // Stream with a hard cap so a body that exceeds (or lies about) its size is
+    // dropped mid transfer rather than fully downloaded first.
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        match resp.chunk().await {
+            Ok(Some(chunk)) => {
+                if buf.len() as u64 + chunk.len() as u64 > IMPORT_FETCH_LIMIT {
+                    return CliResult::err("That import is too large to be a coilbox import.");
+                }
+                buf.extend_from_slice(&chunk);
+            }
+            Ok(None) => break,
+            Err(e) if e.is_timeout() => {
+                return CliResult::err("The host took too long to respond.")
+            }
+            Err(_) => return CliResult::err("The download failed part way through."),
+        }
+    }
+
+    match String::from_utf8(buf) {
+        Ok(text) => CliResult::ok(json!({ "text": text })),
+        Err(_) => CliResult::err("That import is not a coilbox import."),
+    }
+}
+
 /// GitHub's API rejects requests without a `User-Agent`; set one explicitly.
 async fn fetch_github(url: &str) -> Result<String, String> {
     let client = reqwest::Client::builder()
@@ -979,7 +1048,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_download_engine_spring,
             dl_installed_content,
             dl_set_engine_dirs,
-            dl_path_writable
+            dl_path_writable,
+            dl_fetch_text
         ])
         .build()
 }
