@@ -4,7 +4,18 @@ import { Bookmark, History, Play, Swords } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { summarizeSubstitutions } from "@/conquest/ai";
 import {
   encodeContainerCode,
@@ -25,6 +36,7 @@ import {
 import { useFactionLogos } from "@/factions/logos";
 import { mostRecentOpen } from "@/lib/recency";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
+import { useMultiplayer } from "@/multiplayer/store";
 import { notify } from "@/notify/notify";
 import { contentListReplays } from "../../content/bindings";
 import { useReplayUserState } from "../../content/replayUserState";
@@ -142,6 +154,15 @@ export default function SkirmishPage() {
   const [presetsOpen, setPresetsOpen] = useState(false);
   const { presets, savePreset, touchPreset, removePreset } =
     useSkirmishPresets();
+
+  // Whether Host is offered at all (issue #514): hosting needs a live multiplayer
+  // login, so the button is hidden rather than shown disabled when logged out.
+  const { connected: mpConnected } = useMultiplayer();
+
+  // Header overflow fix (issue #514): the Continue affordance goes icon-only,
+  // with its full "Continue: <preset name>" text moved into this popover so a
+  // long preset name never widens the header.
+  const [continueOpen, setContinueOpen] = useState(false);
 
   // The single most recently used preset (issue #374's "continue playing"
   // affordance): a compact header button, mirroring the login panel's
@@ -578,56 +599,97 @@ export default function SkirmishPage() {
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      <header className="flex items-center justify-between gap-4">
-        <h1 className="text-lg font-semibold">Singleplayer</h1>
-        <div className="flex items-center gap-4">
-          {you && (
-            <label
-              htmlFor="spectate-you"
-              className="inline-flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
-            >
-              <Switch
-                id="spectate-you"
-                checked={you.spectator}
-                disabled={running}
-                onCheckedChange={(v) =>
-                  updateParticipant(you.id, { spectator: v === true })
+      <TooltipProvider>
+        <header className="flex items-center justify-between gap-4">
+          <h1 className="text-lg font-semibold">Singleplayer</h1>
+          <div className="flex items-center gap-4">
+            {you && (
+              <label
+                htmlFor="spectate-you"
+                className="inline-flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
+              >
+                <Switch
+                  id="spectate-you"
+                  checked={you.spectator}
+                  disabled={running}
+                  onCheckedChange={(v) =>
+                    updateParticipant(you.id, { spectator: v === true })
+                  }
+                />
+                Spectate
+              </label>
+            )}
+            {mostRecentPreset && (
+              <Popover open={continueOpen} onOpenChange={setContinueOpen}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label={`Continue: ${mostRecentPreset.name}`}
+                        disabled={running}
+                      >
+                        <History className="size-4" />
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Continue: {mostRecentPreset.name}
+                  </TooltipContent>
+                </Tooltip>
+                <PopoverContent align="end" className="w-64 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      loadPreset(mostRecentPreset);
+                      setContinueOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <History className="size-4 shrink-0" />
+                    <span className="truncate">
+                      Continue: {mostRecentPreset.name}
+                    </span>
+                  </button>
+                </PopoverContent>
+              </Popover>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Presets"
+                  onClick={() => setPresetsOpen(true)}
+                  disabled={running}
+                >
+                  <Bookmark className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Presets</TooltipContent>
+            </Tooltip>
+            {mpConnected && (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  hostAsBattle(
+                    currentDraft(),
+                    `${gameName || "Skirmish"} (hosted)`,
+                  )
                 }
-              />
-              Spectate
-            </label>
-          )}
-          {mostRecentPreset && (
-            <Button
-              variant="outline"
-              onClick={() => loadPreset(mostRecentPreset)}
-              disabled={running}
-            >
-              <History className="size-4" /> Continue: {mostRecentPreset.name}
+                disabled={running || !selectedGame || !selectedMap}
+              >
+                <Swords className="size-4" /> Host
+              </Button>
+            )}
+            <Button onClick={() => onStart()} disabled={!canStart}>
+              <Play className="size-4 fill-current" />{" "}
+              {running ? "Game running…" : "Start Game"}
             </Button>
-          )}
-          <Button
-            variant="outline"
-            onClick={() => setPresetsOpen(true)}
-            disabled={running}
-          >
-            <Bookmark className="size-4" /> Presets
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() =>
-              hostAsBattle(currentDraft(), `${gameName || "Skirmish"} (hosted)`)
-            }
-            disabled={running || !selectedGame || !selectedMap}
-          >
-            <Swords className="size-4" /> Host as battle
-          </Button>
-          <Button onClick={() => onStart()} disabled={!canStart}>
-            <Play className="size-4 fill-current" />{" "}
-            {running ? "Game running…" : "Start Game"}
-          </Button>
-        </div>
-      </header>
+          </div>
+        </header>
+      </TooltipProvider>
 
       <PresetsDrawer
         open={presetsOpen}
