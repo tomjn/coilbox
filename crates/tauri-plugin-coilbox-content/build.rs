@@ -32,6 +32,8 @@ const COMMANDS: &[&str] = &[
     "content_reclaim_caches",
     "content_export_build_tree_html",
     "content_export_build_tree_zip",
+    "content_export_challenge",
+    "content_import_challenge",
     "branding_catalog",
     "branding_image",
 ];

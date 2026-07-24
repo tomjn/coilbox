@@ -1,4 +1,5 @@
 import { Button, buttonVariants, cn, Input, useDrawer } from "@picoframe/frame";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   ChevronRight,
   Dices,
@@ -16,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
 import { mostRecentOpen } from "@/lib/recency";
+import { challengeExport, challengeImport } from "../../challenge/bindings";
 import { ChallengeCodeInput } from "../../challenge/ChallengeCodeInput";
 import { ChallengeCodeView } from "../../challenge/ChallengeCodeView";
 import { challengeDecodeErrorMessage } from "../../challenge/code";
@@ -45,6 +47,7 @@ import {
   type ConquestChallengeSettings,
   decodeConquestChallenge,
   encodeConquestChallenge,
+  encodeConquestChallengeFile,
   optionsFromChallenge,
 } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
@@ -301,6 +304,17 @@ function GalaxyCard({
   // Only a procedurally generated galaxy carries the seed a challenge code
   // needs (issue #376), so nothing to share for an authored/bundled one.
   const challengeCode = encodeConquestChallenge(galaxy);
+  const exportChallengeFile = async () => {
+    const fileText = encodeConquestChallengeFile(galaxy);
+    if (!fileText) return;
+    const dest = await save({
+      title: "Export challenge",
+      defaultPath: `${galaxy.title || "challenge"}.json`,
+      filters: [{ name: "Coilbox challenge", extensions: ["json"] }],
+    });
+    if (!dest) return;
+    await challengeExport({ text: fileText, dest });
+  };
   const openShareChallenge = () =>
     drawer.open({
       title: "Share challenge",
@@ -309,6 +323,7 @@ function GalaxyCard({
         <ChallengeCodeView
           code={challengeCode ?? ""}
           helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical galaxy, so results are directly comparable."
+          onExportFile={exportChallengeFile}
         />
       ),
     });
@@ -877,12 +892,27 @@ function ImportChallengeForm({
     setPending(result.settings);
   };
 
+  // Open a challenge file exported via exportChallengeFile above (#476), the
+  // rest of the import (decode, resolve, generate) is identical to a pasted
+  // code.
+  const pickChallengeFile = async (): Promise<string | null> => {
+    const src = await open({
+      title: "Import challenge",
+      multiple: false,
+      filters: [{ name: "Coilbox challenge", extensions: ["json"] }],
+    });
+    if (typeof src !== "string") return null;
+    const { text } = await challengeImport({ src });
+    return text;
+  };
+
   return (
     <>
       <ChallengeCodeInput
         helpText="Paste a challenge code shared by another player to generate the identical galaxy on your own install."
         initialCode={initialCode}
         onImport={importChallenge}
+        onPickFile={pickChallengeFile}
       />
       {pending && (
         <ResolveContentGate

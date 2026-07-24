@@ -1,4 +1,6 @@
+import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
+import { challengeImport } from "../../../challenge/bindings";
 import { ChallengeCodeInput } from "../../../challenge/ChallengeCodeInput";
 import { challengeDecodeErrorMessage } from "../../../challenge/code";
 import {
@@ -141,12 +143,26 @@ export function ImportChallengeForm({
     setPending(result.settings);
   };
 
+  // Open a challenge file exported alongside the code (#476), the rest of the
+  // import (decode, resolve, generate) is identical to a pasted code.
+  const pickChallengeFile = async (): Promise<string | null> => {
+    const src = await open({
+      title: "Import challenge",
+      multiple: false,
+      filters: [{ name: "Coilbox challenge", extensions: ["json"] }],
+    });
+    if (typeof src !== "string") return null;
+    const { text } = await challengeImport({ src });
+    return text;
+  };
+
   return (
     <>
       <ChallengeCodeInput
         helpText="Paste a challenge code shared by another player to generate the identical warpath on your own install."
         initialCode={initialCode}
         onImport={importChallenge}
+        onPickFile={pickChallengeFile}
       />
       {pending && (
         <ResolveContentGate

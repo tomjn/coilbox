@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeChallenge, encodeChallenge } from "./code";
+import { decodeChallenge, encodeChallenge, encodeChallengeFile } from "./code";
 
 interface Settings {
   seed: number;
@@ -104,6 +104,37 @@ describe("challenge code", () => {
       ok: true,
       settings: { seed: 7, name: "Legacy Reach" },
     });
+  });
+
+  it("round-trips settings through a file export's JSON text (issue #476)", () => {
+    const settings: Settings = { seed: 42, name: "Crimson Reach" };
+    const fileText = encodeChallengeFile("conquest", settings);
+    const result = decodeChallenge(fileText, "conquest", parseSettings);
+    expect(result).toEqual({ ok: true, settings });
+  });
+
+  it("writes a file export as readable JSON, not a base64url code", () => {
+    const fileText = encodeChallengeFile("conquest", { seed: 1, name: "x" });
+    expect(() => JSON.parse(fileText)).not.toThrow();
+    expect(JSON.parse(fileText)).toMatchObject({
+      format: "coilbox",
+      kind: "challenge",
+    });
+  });
+
+  it("rejects a malformed file export", () => {
+    const result = decodeChallenge(
+      "{ not valid json",
+      "conquest",
+      parseSettings,
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a file export for the wrong kind", () => {
+    const fileText = encodeChallengeFile("conquest", { seed: 1, name: "x" });
+    const result = decodeChallenge(fileText, "warpath", parseSettings);
+    expect(result).toEqual({ ok: false, error: "wrong-kind" });
   });
 
   it("rejects a container with a newer kind version", () => {

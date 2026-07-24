@@ -32,6 +32,8 @@ permissions = [
   "allow-content-reclaim-caches",
   "allow-content-export-build-tree-html",
   "allow-content-export-build-tree-zip",
+  "allow-content-export-challenge",
+  "allow-content-import-challenge",
   "allow-branding-catalog",
   "allow-branding-image",
 ]
