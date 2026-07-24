@@ -22,6 +22,7 @@ import { BrandingScreenshots } from "./components/BrandingScreenshots";
 import { FactionBuildList } from "./components/FactionBuildList";
 import { GameHeader } from "./components/GameHeader";
 import { OptionsList } from "./components/OptionsList";
+import { StartModeActions } from "./components/StartModeActions";
 import {
   DetailError,
   DetailLoading,
@@ -134,6 +135,8 @@ export default function GameDetailPage() {
           </p>
         )}
       </div>
+
+      <StartModeActions gameName={game.name} />
 
       {brand && <BrandingLinks entry={brand} />}
       {brand?.screenshots?.length ? (
