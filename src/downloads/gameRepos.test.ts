@@ -5,6 +5,7 @@ import {
   mergeGameRepos,
   norm,
   repoForKey,
+  resolveGithubRepo,
 } from "./gameRepos";
 
 const repo = (p: Partial<GameRepo> = {}): GameRepo => ({
@@ -84,5 +85,44 @@ describe("mergeGameRepos (issue #512)", () => {
     const catalog = [repo({ key: "catalog-only" })];
     const merged = mergeGameRepos(catalog, []);
     expect(merged.map((g) => g.key)).toEqual(["catalog-only"]);
+  });
+});
+
+describe("resolveGithubRepo (issue #525)", () => {
+  it("prefers a direct repo over sourceKey", () => {
+    const repos = [repo({ key: "splinterfaction", repo: "owner/registry" })];
+    expect(
+      resolveGithubRepo(repos, {
+        repo: "owner/direct",
+        sourceKey: "splinterfaction",
+      }),
+    ).toBe("owner/direct");
+  });
+
+  it("resolves via sourceKey against the registry when repo is absent", () => {
+    const repos = [repo({ key: "splinterfaction", repo: "owner/sf" })];
+    expect(resolveGithubRepo(repos, { sourceKey: "splinterfaction" })).toBe(
+      "owner/sf",
+    );
+  });
+
+  it("resolves via sourceKey even when the registry came from the fallback seed only (empty catalog)", () => {
+    const fallback = [repo({ key: "splinterfaction", repo: "owner/sf" })];
+    const repos = mergeGameRepos([], fallback);
+    expect(resolveGithubRepo(repos, { sourceKey: "splinterfaction" })).toBe(
+      "owner/sf",
+    );
+  });
+
+  it("throws a clear error rather than returning undefined when sourceKey doesn't resolve", () => {
+    expect(() => resolveGithubRepo([], { sourceKey: "unknown-game" })).toThrow(
+      /unknown-game/,
+    );
+  });
+
+  it("throws a clear error when neither repo nor sourceKey is set", () => {
+    expect(() => resolveGithubRepo([repo()], {})).toThrow(
+      /No GitHub repo declared/,
+    );
   });
 });

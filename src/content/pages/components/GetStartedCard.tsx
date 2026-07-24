@@ -1,4 +1,3 @@
-import { useSetting } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { dlInstalledContent } from "../../../downloads/bindings";
@@ -12,6 +11,8 @@ import { getGameMatcher } from "../../../profile/profile";
 import {
   filterUninstalledGames,
   filterUninstalledMaps,
+  type SuggestedGame,
+  type SuggestedMap,
   useBrandingCatalog,
   useSuggestedGames,
   useSuggestedMaps,
@@ -23,18 +24,21 @@ import { SuggestionsList } from "./SuggestionsList";
 /**
  * Welcome-screen card offering curated game/map downloads once setup (content
  * folder + engine) is complete but the user still has no content. Maps use the
- * cheap `dlInstalledContent` directory listing (maps land as files); games are
+ * cheap `dlInstalledContent` directory listing (maps land as files). Games are
  * resolved against a unitsync scan, since rapid installs live in
  * `packages/`+`pool/` and never appear as an archive in `games/`, so a file
- * listing would re-suggest a game the user can already launch. Dismissible and
- * self-hiding once content lands.
+ * listing would re-suggest a game the user can already launch. Self-hides once
+ * every suggestion has been downloaded (issue #530: no manual dismiss).
+ *
+ * The offered list is snapshotted once per visit (issue #526). Downloading one
+ * suggestion refreshes `installed`, but re-deriving the list from that would
+ * shrink or empty it mid-visit. The snapshot holds steady until this card
+ * unmounts (navigating away from the welcome screen), and the next visit
+ * recomputes it fresh. A downloaded item stays in its slot, marked done, via
+ * `SuggestionsList`'s own per-item tracking.
  */
 export function GetStartedCard() {
   const { complete } = useSetupStatus();
-  const [dismissed, setDismissed] = useSetting<boolean>(
-    "suggestions.dismissed",
-    false,
-  );
   const rootPaths = useContentRootPaths();
   const writePath = useWriteRootPath();
   const entries = useBrandingCatalog();
@@ -45,6 +49,10 @@ export function GetStartedCard() {
   const [installed, setInstalled] = useState<{
     games: Set<string>;
     maps: Set<string>;
+  } | null>(null);
+  const [snapshot, setSnapshot] = useState<{
+    games: SuggestedGame[];
+    maps: SuggestedMap[];
   } | null>(null);
 
   const refreshInstalled = useCallback(async () => {
@@ -64,14 +72,12 @@ export function GetStartedCard() {
     refreshInstalled();
   }, [refreshInstalled]);
 
-  if (!complete || dismissed || !installed) return null;
-
-  // unitsync is the truth for games (it sees rapid content); the file listing
+  // unitsync is the truth for games (it sees rapid content). The file listing
   // only backs maps. Wait for the scan to settle so a not-yet-run scan can't let
   // an already-installed rapid game slip back into the suggestions.
   const scannedGames = scan.data?.games ?? [];
   const scanSettled = scan.data != null || scan.error != null;
-  const hasGames = installed.games.size > 0 || scannedGames.length > 0;
+  const hasGames = (installed?.games.size ?? 0) > 0 || scannedGames.length > 0;
   // A distribution's gameFilter narrows the suggestions first, so a single-game
   // distribution (e.g. SplinterFaction) never advertises other games' downloads.
   const scopedGames = filterSuggestedGamesByFilter(
@@ -79,8 +85,8 @@ export function GetStartedCard() {
     entries,
     getGameMatcher(),
   );
-  const games =
-    scanSettled && !hasGames
+  const candidateGames =
+    installed && scanSettled && !hasGames
       ? filterUninstalledGames(
           scopedGames,
           entries,
@@ -88,45 +94,56 @@ export function GetStartedCard() {
           scannedGames,
         )
       : [];
-  const maps =
-    installed.maps.size === 0
-      ? filterUninstalledMaps(suggestedMaps, installed.maps, [])
-      : [];
-  if (games.length === 0 && maps.length === 0) return null;
+  const candidateMaps = installed
+    ? filterUninstalledMaps(suggestedMaps, installed.maps, [])
+    : [];
+
+  // Captured once the readiness signals (root paths resolved, installed listing
+  // in, settled scan) are all in, then held for the rest of this mount (issue
+  // #526). `rootPaths` starts empty and loads asynchronously, independently of
+  // `complete`, so without this check the very first `installed` (still keyed
+  // off the not-yet-loaded empty root list) could freeze a snapshot with
+  // nothing marked installed.
+  useEffect(() => {
+    if (snapshot || rootPaths.length === 0 || !installed || !scanSettled)
+      return;
+    setSnapshot({ games: candidateGames, maps: candidateMaps });
+  }, [
+    snapshot,
+    rootPaths,
+    installed,
+    scanSettled,
+    candidateGames,
+    candidateMaps,
+  ]);
+
+  if (!complete || !installed || !snapshot) return null;
+  if (snapshot.games.length === 0 && snapshot.maps.length === 0) return null;
 
   return (
     <Card className="gap-4 rounded-lg border-border p-4 shadow-none">
-      <div className="flex items-start justify-between gap-2">
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold">Get started</h2>
-          <p className="text-xs text-muted-foreground">
-            Download a game or map to start playing.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="-mx-1 px-1 py-1.5 text-xs text-muted-foreground underline"
-          onClick={() => setDismissed(true)}
-        >
-          Dismiss
-        </button>
+      <div className="space-y-1">
+        <h2 className="text-sm font-semibold">Get started</h2>
+        <p className="text-xs text-muted-foreground">
+          Download a game or map to start playing.
+        </p>
       </div>
 
-      {games.length > 0 && (
+      {snapshot.games.length > 0 && (
         <SuggestionsList
           kind="game"
           heading="Games"
-          items={games}
+          items={snapshot.games}
           writePath={writePath}
           onComplete={refreshInstalled}
         />
       )}
-      {maps.length > 0 && (
+      {snapshot.maps.length > 0 && (
         <>
           <SuggestionsList
             kind="map"
             heading="Maps"
-            items={maps}
+            items={snapshot.maps}
             writePath={writePath}
             onComplete={refreshInstalled}
           />
