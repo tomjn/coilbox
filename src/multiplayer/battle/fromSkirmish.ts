@@ -1,4 +1,4 @@
-import { resolveGameAi } from "@/conquest/ai";
+import { type AiSubstitution, reconcileAi } from "@/conquest/ai";
 import type { Side, SkirmishAi } from "@/content/bindings";
 import type { SkirmishDraft } from "@/play/drafts";
 import {
@@ -50,6 +50,12 @@ export interface HostSeed {
   /** `kind: "ai"` participants for which no usable AI exists in the hosted
    * game at all (not even a fallback). Can't run as a bot, so skipped. */
   unresolvedAiCount: number;
+  /**
+   * Bots whose preset AI the hosted game doesn't offer, remapped to a valid
+   * default (issue #501). Deduped/summarised by the caller so the substitution
+   * is surfaced rather than applied silently. Empty when every AI was kept.
+   */
+  substitutions: AiSubstitution[];
 }
 
 /**
@@ -127,6 +133,7 @@ export function draftToHostSeed(opts: {
   const bots: HostSeedBot[] = [];
   let openSlots = 0;
   let unresolvedAiCount = 0;
+  const substitutions: AiSubstitution[] = [];
   for (const p of resolved) {
     if (p === you) continue;
     if (p.kind !== "ai") {
@@ -134,14 +141,17 @@ export function draftToHostSeed(opts: {
       openSlots++;
       continue;
     }
-    const resolvedAi = resolveGameAi(p.ai, ais);
-    if (!resolvedAi) {
+    const outcome = reconcileAi(p.ai, ais);
+    if (!outcome.ai) {
       unresolvedAiCount++;
       continue;
     }
+    if (outcome.status === "substituted" && p.ai) {
+      substitutions.push({ from: p.ai.shortName, to: outcome.ai.shortName });
+    }
     bots.push({
       name: p.name,
-      aiDll: resolvedAi.shortName,
+      aiDll: outcome.ai.shortName,
       side: sideIndex(p.side),
       colorHex: rgbToHex(p.color),
       teamId: teamIndexById.get(p.id) ?? 0,
@@ -161,5 +171,12 @@ export function draftToHostSeed(opts: {
     Object.assign(scriptTags, restrictTagsFor(disabledUnits));
   }
 
-  return { scriptTags, self, bots, openSlots, unresolvedAiCount };
+  return {
+    scriptTags,
+    self,
+    bots,
+    openSlots,
+    unresolvedAiCount,
+    substitutions,
+  };
 }

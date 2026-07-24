@@ -67,6 +67,7 @@ function ReadyIcon({ row }: { row: Row }) {
 export function MemberRow({
   row,
   editable,
+  aiInvalid,
   control,
   sharedWith,
   showActions,
@@ -84,6 +85,9 @@ export function MemberRow({
 }: {
   row: Row;
   editable: boolean;
+  /** Bots only: this bot's AI isn't in the game's addable list (#501). Flagged
+   * inline so an invalid config from a cross-game/version preset reads as such. */
+  aiInvalid?: boolean;
   control?: MemberControls | null;
   /** The earlier row leading this row's team, when the team is shared. The row
    * then shows a branch glyph and Co-player badge instead of colour/side/ally —
@@ -206,9 +210,16 @@ export function MemberRow({
               </span>
               {row.rank != null && <RankBadge rank={row.rank} />}
             </div>
-            <span className="text-[11px] text-muted-foreground">
-              {subtitle}
-            </span>
+            {aiInvalid ? (
+              <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="size-3 shrink-0" />
+                {row.aiDll} isn't available in this game
+              </span>
+            ) : (
+              <span className="text-[11px] text-muted-foreground">
+                {subtitle}
+              </span>
+            )}
           </div>
           {onSetNote && (
             <NoteButton

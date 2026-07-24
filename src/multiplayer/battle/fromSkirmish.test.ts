@@ -162,6 +162,31 @@ describe("draftToHostSeed", () => {
     expect(seed.bots[0].aiDll).toBe("SimpleAI");
   });
 
+  it("reports a substitution when a bot's desired AI is remapped (issue #501)", () => {
+    const seed = draftToHostSeed({
+      draft: mkDraft({
+        participants: [you(), ai({ ai: { kind: "native", shortName: "DAI" } })],
+      }),
+      sides: SIDES,
+      ais: GAME_AIS, // "DAI" absent, remapped to SimpleAI
+    });
+    expect(seed.substitutions).toEqual([{ from: "DAI", to: "SimpleAI" }]);
+  });
+
+  it("reports no substitution when the desired AI is kept", () => {
+    const seed = draftToHostSeed({
+      draft: mkDraft({
+        participants: [
+          you(),
+          ai({ ai: { kind: "native", shortName: "SurvivalAI" } }),
+        ],
+      }),
+      sides: SIDES,
+      ais: GAME_AIS,
+    });
+    expect(seed.substitutions).toEqual([]);
+  });
+
   it("keeps a bot's AI when it is present in the hosted game's AI list, even alongside other games' AIs", () => {
     const seed = draftToHostSeed({
       draft: mkDraft({
