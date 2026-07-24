@@ -2,7 +2,9 @@ import { Button, NavGate } from "@picoframe/frame";
 import { Bookmark, Gamepad2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { summarizeSubstitutions } from "@/conquest/ai";
 import { useFactionLogos } from "@/factions/logos";
+import { notify } from "@/notify/notify";
 import { useSkirmishAis } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
 import { SaveAsPresetButton } from "@/play/pages/components/SaveAsPresetButton";
@@ -130,6 +132,13 @@ function BattleRoomPage() {
       sides: room.sides,
       ais: room.addableAis,
     });
+    // Surface any AI the hosted game doesn't offer (issue #501): the preset
+    // may have been authored against a different game or an older version, so
+    // its bots were remapped to valid defaults rather than added blind.
+    const hostNotice = summarizeSubstitutions(seed.substitutions);
+    if (hostNotice) {
+      notify({ title: "Preset AI adjusted", body: hostNotice, level: "info" });
+    }
     room.setBattleStatusBatch({
       side: seed.self.side,
       ally: seed.self.ally,
@@ -168,6 +177,10 @@ function BattleRoomPage() {
       sides: room.sides,
       ais: room.addableAis,
     });
+    const applyNotice = summarizeSubstitutions(seed.substitutions);
+    if (applyNotice) {
+      notify({ title: "Preset AI adjusted", body: applyNotice, level: "info" });
+    }
     room.setBattleStatusBatch({
       side: seed.self.side,
       ally: seed.self.ally,

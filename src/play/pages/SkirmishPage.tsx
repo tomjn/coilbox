@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
+import { summarizeSubstitutions } from "@/conquest/ai";
 import { encodeContainerJson } from "@/container/container";
 import {
   useUnitsyncGameHeaders,
@@ -59,6 +60,7 @@ import {
   type SkirmishPreset,
   useSkirmishPresets,
 } from "../presets";
+import { reconcileParticipantAis } from "../reconcileAi";
 import { useSkirmishDebrief } from "../useSkirmishDebrief";
 import { DebriefDrawer } from "./components/DebriefDrawer";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
@@ -128,6 +130,9 @@ export default function SkirmishPage() {
     BattleRestrictions | undefined
   >(() => draft.restrictions);
   const [error, setError] = useState<string | null>(null);
+  // A one-line notice when applying a preset/draft into a game that doesn't
+  // offer one of its AIs, so the remap to a valid default isn't silent (#501).
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
 
   const [presetsOpen, setPresetsOpen] = useState(false);
   const { presets, savePreset, touchPreset, removePreset } =
@@ -251,6 +256,24 @@ export default function SkirmishPage() {
       return changed ? next : ps;
     });
   }, [lastAi, ais]);
+
+  // Reconcile every AI slot against the selected game's actual AI list (#501).
+  // Presets and drafts are reused across games and versions, so switching the
+  // game (or loading a preset for a different one) can leave a slot pointing at
+  // an AI this game doesn't offer, which showed as a blank dropdown. Runs when
+  // the AI list changes. Reads the current participants via a ref so an edit
+  // doesn't re-trigger it. Remaps present-but-unavailable AIs to a valid default
+  // and surfaces the swap, leaving genuine blanks to the fill pass above.
+  const participantsRef = useRef(participants);
+  participantsRef.current = participants;
+  useEffect(() => {
+    if (ais.length === 0) return;
+    const res = reconcileParticipantAis(participantsRef.current, ais);
+    if (res.changed) setParticipants(res.participants);
+    // Clear a stale notice too, so switching to a game that offers every AI
+    // doesn't leave the previous game's substitution message on screen.
+    setAiNotice(summarizeSubstitutions(res.substitutions) ?? null);
+  }, [ais]);
 
   // Persist the working draft (debounced — one write after edits settle, not per
   // keystroke). Transient run state (running/error) is intentionally excluded.
@@ -697,6 +720,20 @@ export default function SkirmishPage() {
 
       <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,14rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,17rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="flex flex-col gap-5">
+          {aiNotice && (
+            <Alert className="p-3">
+              <AlertDescription className="flex items-center justify-between gap-3 text-sm">
+                <span>{aiNotice}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAiNotice(null)}
+                >
+                  Dismiss
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
           {restrictions && (
             <Alert className="p-3">
               <AlertDescription className="flex items-center justify-between gap-3 text-sm">
