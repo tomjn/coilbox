@@ -76,6 +76,48 @@ describe("parsePresetJson restrictions", () => {
   });
 });
 
+describe("parsePresetJson container handling", () => {
+  it("reads a canonical container preset (issue #479)", () => {
+    const container = JSON.stringify({
+      format: "coilbox",
+      container: 1,
+      kind: "preset",
+      kindVersion: 1,
+      payload: base,
+    });
+    const parsed = parsePresetJson(container);
+    expect(parsed?.gameName).toBe(base.gameName);
+    expect(parsed?.name).toBe(base.name);
+  });
+
+  it("still reads a legacy bare preset file (no envelope)", () => {
+    const parsed = parsePresetJson(JSON.stringify(base));
+    expect(parsed?.gameName).toBe(base.gameName);
+  });
+
+  it("rejects a container of the wrong kind", () => {
+    const container = JSON.stringify({
+      format: "coilbox",
+      container: 1,
+      kind: "campaign",
+      kindVersion: 1,
+      payload: base,
+    });
+    expect(parsePresetJson(container)).toBeNull();
+  });
+
+  it("rejects a container from a newer version of coilbox", () => {
+    const container = JSON.stringify({
+      format: "coilbox",
+      container: 1,
+      kind: "preset",
+      kindVersion: 99,
+      payload: base,
+    });
+    expect(parsePresetJson(container)).toBeNull();
+  });
+});
+
 const rgb = (r: number, g: number, b: number): [number, number, number] => [
   r,
   g,

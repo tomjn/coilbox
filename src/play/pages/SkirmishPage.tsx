@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
+import { encodeContainerJson } from "@/container/container";
 import {
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
@@ -51,6 +52,7 @@ import {
 import { effectiveOptions } from "../modOptions";
 import { usePlay } from "../PlayProvider";
 import {
+  PRESET_KIND_VERSION,
   parsePresetJson,
   type SkirmishPreset,
   useSkirmishPresets,
@@ -444,7 +446,10 @@ export default function SkirmishPage() {
         filters: [{ name: "Coilbox preset", extensions: ["json"] }],
       });
       if (!dest) return;
-      await playExportPreset({ json: JSON.stringify(preset, null, 2), dest });
+      await playExportPreset({
+        json: encodeContainerJson("preset", PRESET_KIND_VERSION, preset),
+        dest,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }

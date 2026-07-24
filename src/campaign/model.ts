@@ -1,3 +1,4 @@
+import { asContainer } from "../container/container";
 import type { SkirmishDraft } from "../play/drafts";
 
 /**
@@ -253,10 +254,19 @@ export function parseCampaignJson(json: string): Campaign | null {
   if (typeof data !== "object" || data === null) return null;
   let d = data as Record<string, unknown>;
 
-  // Also accept the export/share wrapper (`CampaignExportFile`), so a bundled
-  // campaign can be the exact file the builder exported, dropped into
+  // Accept the canonical coilbox container (issue #479), so a bundled campaign
+  // can be the exact file the builder exported, dropped into
   // `.coilbox/campaigns/` as-is.
+  const container = asContainer(d);
   if (
+    container &&
+    container.kind === "campaign" &&
+    typeof container.payload === "object" &&
+    container.payload !== null
+  ) {
+    d = container.payload as Record<string, unknown>;
+  } else if (
+    // Also accept the legacy export/share wrapper (`CampaignExportFile`).
     d.format === "coilbox-campaign" &&
     typeof d.campaign === "object" &&
     d.campaign !== null

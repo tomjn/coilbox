@@ -19,48 +19,72 @@ const campaign: Campaign = {
 };
 
 describe("wrapCampaignForExport", () => {
-  it("wraps a campaign with the format + version envelope", () => {
+  it("wraps a campaign in the canonical coilbox container", () => {
     const file = wrapCampaignForExport(campaign);
-    expect(file.format).toBe(EXPORT_FORMAT);
-    expect(file.formatVersion).toBe(EXPORT_FORMAT_VERSION);
-    expect(file.campaign).toBe(campaign);
+    expect(file.format).toBe("coilbox");
+    expect(file.kind).toBe("campaign");
+    expect(file.kindVersion).toBe(1);
+    expect(file.payload).toBe(campaign);
   });
 });
 
 describe("parseCampaignExport", () => {
-  it("round-trips a wrapped campaign", () => {
+  it("round-trips a container-wrapped campaign", () => {
     const json = JSON.stringify(wrapCampaignForExport(campaign));
     const parsed = parseCampaignExport(json);
     expect(parsed?.id).toBe("abc");
     expect(parsed?.title).toBe("Test");
   });
 
+  it("still reads a legacy pre-container export file", () => {
+    const json = JSON.stringify({
+      format: EXPORT_FORMAT,
+      formatVersion: EXPORT_FORMAT_VERSION,
+      campaign,
+    });
+    const parsed = parseCampaignExport(json);
+    expect(parsed?.id).toBe("abc");
+  });
+
   it("rejects non-JSON", () => {
     expect(parseCampaignExport("not json")).toBeNull();
   });
 
-  it("rejects a wrong format tag", () => {
+  it("rejects a container of the wrong kind", () => {
     const json = JSON.stringify({
-      ...wrapCampaignForExport(campaign),
+      format: "coilbox",
+      container: 1,
+      kind: "preset",
+      kindVersion: 1,
+      payload: campaign,
+    });
+    expect(parseCampaignExport(json)).toBeNull();
+  });
+
+  it("rejects a container from a newer version of coilbox", () => {
+    const json = JSON.stringify({
+      format: "coilbox",
+      container: 1,
+      kind: "campaign",
+      kindVersion: 99,
+      payload: campaign,
+    });
+    expect(parseCampaignExport(json)).toBeNull();
+  });
+
+  it("rejects a legacy wrapper with a wrong format tag", () => {
+    const json = JSON.stringify({
       format: "x",
-    });
-    expect(parseCampaignExport(json)).toBeNull();
-  });
-
-  it("rejects a wrong format version", () => {
-    const json = JSON.stringify({
-      ...wrapCampaignForExport(campaign),
-      formatVersion: 2,
-    });
-    expect(parseCampaignExport(json)).toBeNull();
-  });
-
-  it("rejects a wrapper whose inner campaign is invalid", () => {
-    const json = JSON.stringify({
-      format: EXPORT_FORMAT,
       formatVersion: EXPORT_FORMAT_VERSION,
-      campaign: { type: "ta", id: "x" }, // no missions array
+      campaign,
     });
+    expect(parseCampaignExport(json)).toBeNull();
+  });
+
+  it("rejects a container whose inner campaign is invalid", () => {
+    const json = JSON.stringify(
+      wrapCampaignForExport({ type: "ta", id: "x" } as never),
+    );
     expect(parseCampaignExport(json)).toBeNull();
   });
 
