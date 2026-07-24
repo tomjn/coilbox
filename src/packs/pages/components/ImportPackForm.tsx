@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChallengeCodeInput } from "../../../challenge/ChallengeCodeInput";
+import { identify } from "../../../container/container";
 import { ResolveContentGate } from "../../../content/pages/components/ResolveContentDrawer";
 import { notify } from "../../../notify/notify";
 import type { PlayTarget } from "../../../play/config";
@@ -26,6 +27,14 @@ export function ImportPackForm({ target }: { target: PlayTarget | null }) {
   const importCode = async (code: string) => {
     const result = decodeSetupPack(code);
     if (!result.ok) {
+      // Identify the paste so a mystery code gets a specific message: a
+      // newer-version warning, or "that's a campaign, not a setup pack",
+      // instead of a generic "corrupted" (issue #479).
+      const id = identify(code);
+      if (id.warnings.length > 0) throw new Error(id.warnings[0]);
+      if (id.kind !== "unknown" && id.kind !== "setup-pack") {
+        throw new Error(`That code is a coilbox ${id.kind}, not a setup pack.`);
+      }
       throw new Error(packDecodeErrorMessage(result.error));
     }
     setPending(result.settings);
