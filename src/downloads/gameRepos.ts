@@ -68,6 +68,25 @@ export function repoForKey(repos: GameRepo[], key: string): string | undefined {
   return repos.find((g) => g.key === key)?.repo;
 }
 
+/**
+ * Resolve a `github`-kind suggested download to a concrete `owner/name` repo: a
+ * direct `repo` wins, else it's looked up in `repos` by `sourceKey`. Throws a
+ * clear error instead of ever returning undefined, so a caller can pass the
+ * result straight to `dlGithubReleaseArchives` without an invalid-args failure.
+ */
+export function resolveGithubRepo(
+  repos: GameRepo[],
+  dl: { repo?: string; sourceKey?: string },
+): string {
+  const repo = dl.repo ?? repoForKey(repos, dl.sourceKey ?? "");
+  if (!repo) {
+    throw new Error(
+      `No GitHub repo declared for source "${dl.sourceKey ?? ""}".`,
+    );
+  }
+  return repo;
+}
+
 /** The curated GitHub repo in `repos` whose game this name belongs to, or
  * undefined. Matches by normalised-name prefix so a versioned name (`Splinter
  * Faction 0.1.72`) still resolves. Sources with an empty `nameKey` are skipped. */

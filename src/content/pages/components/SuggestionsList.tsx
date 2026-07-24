@@ -14,7 +14,7 @@ import {
   GAME_REPOS,
   type GameRepo,
   mergeGameRepos,
-  repoForKey,
+  resolveGithubRepo,
 } from "../../../downloads/gameRepos";
 import { ProgressBar } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
@@ -80,13 +80,9 @@ async function runDownload(
     case "github": {
       // Resolve the repo directly, or via the unified registry's sourceKey (issue
       // 512), then stream the matching (or newest) release archive directly.
-      // Games like SplinterFaction ship only via GitHub releases.
-      const repo = dl.repo ?? repoForKey(repos, dl.sourceKey ?? "");
-      if (!repo) {
-        throw new Error(
-          `No GitHub repo declared for source "${dl.sourceKey ?? ""}".`,
-        );
-      }
+      // Games like SplinterFaction ship only via GitHub releases. `resolveGithubRepo`
+      // never returns undefined - it throws a clear error instead (issue #525).
+      const repo = resolveGithubRepo(repos, dl);
       const { archives } = await dlGithubReleaseArchives({ repo });
       const pick = dl.asset
         ? archives.find((a) =>
