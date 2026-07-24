@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Download } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { ErrorBanner } from "../content/pages/components/states";
 
@@ -17,30 +17,47 @@ export function ChallengeCodeInput({
   placeholder = "Paste a challenge code…",
   submitLabel = "Import challenge",
   busyLabel = "Importing…",
+  initialCode,
   onImport,
 }: {
   helpText: string;
   placeholder?: string;
   submitLabel?: string;
   busyLabel?: string;
+  /** A code to prefill and submit once on mount, used by a `coilbox://` import
+   * deep link (issue #388) that has already been confirmed. The user still sees
+   * the code and the import runs through the same decode plus content-resolution
+   * path as a manual paste. */
+  initialCode?: string;
   onImport: (code: string) => Promise<void>;
 }) {
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const submit = async () => {
-    if (!code.trim()) return;
+  const submit = async (value: string = code) => {
+    if (!value.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      await onImport(code);
+      await onImport(value);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
+
+  // Auto-submit a deep-link-supplied code once. Guarded so a re-render never
+  // re-fires it, and so editing the box afterwards behaves like a manual paste.
+  const autoFired = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fires exactly once for the initial code, not on every submit identity change
+  useEffect(() => {
+    if (initialCode && !autoFired.current) {
+      autoFired.current = true;
+      void submit(initialCode);
+    }
+  }, [initialCode]);
 
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -53,7 +70,7 @@ export function ChallengeCodeInput({
         className="font-mono text-xs"
       />
       {error && <ErrorBanner message={error} />}
-      <Button onClick={submit} disabled={busy || !code.trim()}>
+      <Button onClick={() => submit()} disabled={busy || !code.trim()}>
         <Download className="mr-1.5 size-4" aria-hidden />
         {busy ? busyLabel : submitLabel}
       </Button>

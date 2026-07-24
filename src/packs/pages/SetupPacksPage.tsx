@@ -1,5 +1,7 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Download, Package2 } from "lucide-react";
+import { useEffect } from "react";
+import { useImportParam } from "../../deeplink/useImportParam";
 import { usePlayReadiness } from "../../play/config";
 
 /**
@@ -23,14 +25,22 @@ export default function SetupPacksPage() {
     });
   };
 
-  const openImport = async () => {
+  const openImport = async (initialCode?: string) => {
     const { ImportPackForm } = await import("./components/ImportPackForm");
     drawer.open({
       title: "Import a setup pack",
       width: "26rem",
-      content: <ImportPackForm target={target} />,
+      content: <ImportPackForm target={target} initialCode={initialCode} />,
     });
   };
+
+  // A confirmed `coilbox://import` deep link (issue #388) lands here with the
+  // pack code in the query string. Open the import drawer with it prefilled.
+  const importCode = useImportParam();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the deep-link code arrives, not on every drawer identity change
+  useEffect(() => {
+    if (importCode) void openImport(importCode);
+  }, [importCode]);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -43,7 +53,7 @@ export default function SetupPacksPage() {
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Button variant="outline" onClick={openImport}>
+          <Button variant="outline" onClick={() => openImport()}>
             <Download className="mr-1.5 size-4" aria-hidden /> Import
           </Button>
           <Button onClick={openExport} disabled={!ready}>

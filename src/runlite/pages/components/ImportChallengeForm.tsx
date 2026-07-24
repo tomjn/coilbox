@@ -47,8 +47,11 @@ function shortnameGameRequirement(shortname: string): ContentRequirement {
  */
 export function ImportChallengeForm({
   onImported,
+  initialCode,
 }: {
   onImported: (id: string) => void;
+  /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
+  initialCode?: string;
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -142,6 +145,7 @@ export function ImportChallengeForm({
     <>
       <ChallengeCodeInput
         helpText="Paste a challenge code shared by another player to generate the identical warpath on your own install."
+        initialCode={initialCode}
         onImport={importChallenge}
       />
       {pending && (

@@ -19,6 +19,7 @@ import {
   SkeletonList,
 } from "../../content/pages/components/states";
 import type { ContentRequirement } from "../../content/resolveContent";
+import { useImportParam } from "../../deeplink/useImportParam";
 import {
   usePlayReadiness,
   usePreferredTarget,
@@ -100,12 +101,13 @@ export default function ConquestListPage() {
       ),
     });
 
-  const openImportChallenge = () =>
+  const openImportChallenge = (initialCode?: string) =>
     drawer.open({
       title: "Import challenge",
       width: "26rem",
       content: (
         <ImportChallengeForm
+          initialCode={initialCode}
           onImported={(id) => {
             drawer.close();
             navigate(`/conquest/${encodeURIComponent(id)}`);
@@ -113,6 +115,15 @@ export default function ConquestListPage() {
         />
       ),
     });
+
+  // A confirmed `coilbox://import` deep link (issue #388) lands here with the
+  // challenge code in the query string. Open the import drawer with it prefilled,
+  // so the same decode plus content-resolution flow runs as a manual paste.
+  const importCode = useImportParam();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the deep-link code arrives, not on every drawer identity change
+  useEffect(() => {
+    if (importCode) openImportChallenge(importCode);
+  }, [importCode]);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -127,7 +138,7 @@ export default function ConquestListPage() {
         </div>
         {!needsGame && (
           <div className="flex shrink-0 gap-2">
-            <Button variant="outline" onClick={openImportChallenge}>
+            <Button variant="outline" onClick={() => openImportChallenge()}>
               <Download className="mr-1.5 size-4" aria-hidden /> Import
               challenge
             </Button>
@@ -695,8 +706,11 @@ function GenerateGalaxyForm({
  */
 function ImportChallengeForm({
   onImported,
+  initialCode,
 }: {
   onImported: (id: string) => void;
+  /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
+  initialCode?: string;
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -779,6 +793,7 @@ function ImportChallengeForm({
     <>
       <ChallengeCodeInput
         helpText="Paste a challenge code shared by another player to generate the identical galaxy on your own install."
+        initialCode={initialCode}
         onImport={importChallenge}
       />
       {pending && (
