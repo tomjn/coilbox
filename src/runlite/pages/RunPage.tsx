@@ -13,6 +13,7 @@ import {
   EmptyState,
   SkeletonList,
 } from "../../content/pages/components/states";
+import { TechTreePicker } from "../../content/pages/components/TechTreePicker";
 import { usePreferredTarget } from "../../play/config";
 import { encodeWarpathChallenge } from "../challenge";
 import { awardMeta } from "../meta";
@@ -96,6 +97,40 @@ export default function RunPage() {
     if (!run?.startUnit || !dataset) return undefined;
     return reachableFrom(run.startUnit, buildEdgeMap(dataset.units)).size;
   }, [run?.startUnit, dataset]);
+
+  // The run's faction arsenal only: the dataset carries every side's units, but
+  // a warpath is single-faction, so scope the read-only tree to what the run's
+  // commander can reach. This drops the other faction from "Other units".
+  const arsenalUnits = useMemo(() => {
+    if (!run?.startUnit || !dataset) return [];
+    const reachable = reachableFrom(run.startUnit, buildEdgeMap(dataset.units));
+    return dataset.units.filter((u) => reachable.has(u.name.toLowerCase()));
+  }, [run?.startUnit, dataset]);
+
+  // Read-only lit-tree of the run's unlocked arsenal, opened from the HUD's
+  // Arsenal tile. The unlocked-unit set lights up against the faction's full
+  // tree, so the shared tech ceiling is visible without changing unlock rules.
+  const openArsenalTree =
+    run && dataset && run.startUnit
+      ? () =>
+          drawer.open({
+            title: "Arsenal",
+            description:
+              "Units unlocked into your shared arsenal, lit up against the faction's full build tree.",
+            width: "40rem",
+            content: (
+              <TechTreePicker
+                units={arsenalUnits}
+                roots={run.startUnit ? [run.startUnit] : []}
+                selected={run.progress.unlockedUnits}
+                selectedLabel="unlocked"
+                enginePath={target?.enginePath}
+                dataDir={target?.dataDir}
+                gameArchive={game?.primaryArchive.name}
+              />
+            ),
+          })
+      : undefined;
 
   const choices = useMemo(() => (run ? nextChoices(run) : []), [run]);
 
@@ -227,6 +262,7 @@ export default function RunPage() {
               arsenalTotal={arsenalTotal}
               logo={factionLogo}
               side={run.settings.side}
+              onInspectArsenal={openArsenalTree}
             />
           </div>
         </div>
