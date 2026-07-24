@@ -236,6 +236,18 @@ export const dlPathWritable = defineCommand<
   { writable: boolean; error: string | null }
 >("coilbox-downloads", "dl_path_writable");
 
+/**
+ * Fetch a shared `coilbox://import?url=` payload as text over HTTPS from the
+ * Rust side, bypassing the webview's CORS limits (issue #482). Enforces https, a
+ * byte cap and a timeout, and rejects (throws the reason) on a non-200,
+ * oversized, unreachable or timed-out response. Used by the deep-link import
+ * handler, which runs the text through `identify()` before applying anything.
+ */
+export const dlFetchText = defineCommand<{ url: string }, { text: string }>(
+  "coilbox-downloads",
+  "dl_fetch_text",
+);
+
 /** A Recoil engine release matching the running platform. */
 export interface EngineRelease {
   version: string;

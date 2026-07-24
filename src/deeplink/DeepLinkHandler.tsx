@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
-import { AlertTriangle, ExternalLink } from "lucide-react";
+import { AlertTriangle, ExternalLink, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -11,10 +11,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { dlFetchText } from "../downloads/bindings";
 import { notify } from "../notify/notify";
-import { describeOpen, prepareImport } from "./actions";
+import { describeOpen, type ImportPlan, prepareImport } from "./actions";
 import { setDeepLinkHandler } from "./bus";
+import { type FetchText, fetchImportPlan } from "./fetchImport";
 import { openScreenRoute, parseDeepLink } from "./parse";
+
+/**
+ * The production text fetcher: wraps the `dl_fetch_text` Rust command (which
+ * enforces https, a byte cap and a timeout) and maps its thrown error into the
+ * `FetchText` result shape `fetchImportPlan` expects. The fetch runs Rust-side
+ * to bypass the webview's CORS limits (see `fetchImport.ts`).
+ */
+const fetchImportText: FetchText = async (url) => {
+  try {
+    const { text } = await dlFetchText({ url });
+    return { ok: true, text };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+};
 
 /**
  * The `coilbox://` deep-link handler (issue #388). Mounted app-wide as the
@@ -29,6 +49,14 @@ import { openScreenRoute, parseDeepLink } from "./parse";
  * Acting on an import navigates to the matching importer page carrying the code,
  * so the importer's own decode plus `ResolveContentGate` flow (issue #387) runs
  * unchanged, resolving any missing content before anything is saved.
+ *
+ * A fetch-URL import (`import?url=`, issue #482) pulls content from a remote
+ * host, so it is higher risk and uses two confirmations, never one. First the
+ * user agrees to contact the host (no network request happens before this).
+ * Then coilbox fetches the URL with a byte cap and a timeout, runs the result
+ * through `identify()` (via `fetchImportPlan`), and only on a recognised
+ * container asks a second time to apply what was found. A rejected or oversized
+ * response applies nothing.
  */
 
 /** A confirmed action, held while the dialog is open. */
@@ -44,6 +72,47 @@ interface Pending {
 export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [pending, setPending] = useState<Pending | null>(null);
+  // Set while a fetch-URL import is downloading, so the user sees progress and
+  // cannot fire a second fetch. Holds the host being contacted.
+  const [fetching, setFetching] = useState<string | null>(null);
+
+  // Build the second (apply) confirmation for a resolved import plan. `host` is
+  // set for a fetch-URL import so the dialog says where the content came from.
+  const buildImportPending = useCallback(
+    (plan: ImportPlan, host?: string): Pending => ({
+      title: "Import from a link",
+      lines: [
+        host
+          ? `Import a ${plan.label} downloaded from ${host}?`
+          : `Import a ${plan.label} shared with you?`,
+        "It opens in the importer, which resolves any missing content before saving.",
+      ],
+      warnings: plan.warnings,
+      confirmLabel: "Continue",
+      run: () => navigate(plan.route),
+    }),
+    [navigate],
+  );
+
+  // Contact the host, cap and validate the response, then offer to apply it.
+  // Only ever called after the user agreed to the fetch. Applies nothing here.
+  const runFetch = useCallback(
+    async (url: string, host: string) => {
+      setFetching(host);
+      const result = await fetchImportPlan(url, fetchImportText);
+      setFetching(null);
+      if (!result.ok) {
+        notify({
+          title: "Ignored a coilbox link",
+          body: result.reason,
+          level: "error",
+        });
+        return;
+      }
+      setPending(buildImportPending(result.plan, result.host));
+    },
+    [buildImportPending],
+  );
 
   // Build a pending confirmation from a raw link, or surface a rejection as a
   // toast. Never acts directly: the dialog's Confirm button does.
@@ -93,16 +162,30 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Import. Fetch-URL payloads are not supported yet (see report / follow-up).
+      // Import from a URL: confirm the network fetch first, then fetch, validate
+      // and confirm again. No request is made before the user agrees.
       if (result.source.type === "url") {
-        notify({
-          title: "Ignored a coilbox link",
-          body: "Importing from a URL is not supported yet. Ask for the code instead.",
-          level: "error",
+        const { url } = result.source;
+        let host: string;
+        try {
+          host = new URL(url).host;
+        } catch {
+          host = url;
+        }
+        setPending({
+          title: "Download an import",
+          lines: [
+            `This link downloads an import from ${host}.`,
+            "Coilbox has not contacted it yet. Only continue if you trust this link.",
+          ],
+          warnings: [],
+          confirmLabel: "Fetch and check",
+          run: () => void runFetch(url, host),
         });
         return;
       }
 
+      // Import from an inline code: validate and confirm in one step.
       const plan = prepareImport(result.source.code);
       if (!plan.ok) {
         notify({
@@ -113,18 +196,9 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      setPending({
-        title: "Import from a link",
-        lines: [
-          `Import a ${plan.plan.label} shared with you?`,
-          "It opens in the importer, which resolves any missing content before saving.",
-        ],
-        warnings: plan.plan.warnings,
-        confirmLabel: "Continue",
-        run: () => navigate(plan.plan.route),
-      });
+      setPending(buildImportPending(plan.plan));
     },
-    [navigate],
+    [navigate, runFetch, buildImportPending],
   );
 
   useEffect(() => {
@@ -176,6 +250,19 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
+      <Dialog open={fetching !== null}>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              Downloading an import
+            </DialogTitle>
+            <DialogDescription>
+              Contacting {fetching} and checking what it sends back.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={pending !== null}
         onOpenChange={(open) => !open && setPending(null)}

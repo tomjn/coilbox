@@ -23,6 +23,7 @@ Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR
 - `allow-dl-installed-content`
 - `allow-dl-set-engine-dirs`
 - `allow-dl-path-writable`
+- `allow-dl-fetch-text`
 
 ## Permission Table
 
@@ -211,6 +212,32 @@ Enables the dl_download_map command without any pre-configured scope.
 <td>
 
 Denies the dl_download_map command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:allow-dl-fetch-text`
+
+</td>
+<td>
+
+Enables the dl_fetch_text command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-downloads:deny-dl-fetch-text`
+
+</td>
+<td>
+
+Denies the dl_fetch_text command without any pre-configured scope.
 
 </td>
 </tr>
