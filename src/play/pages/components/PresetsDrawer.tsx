@@ -1,5 +1,14 @@
 import { Button, Input } from "@picoframe/frame";
-import { Check, ImageOff, Save, Share2, Trash2, Upload, X } from "lucide-react";
+import {
+  Check,
+  ImageOff,
+  Save,
+  Share2,
+  Swords,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
 import type { MapThumbData } from "@/content/config";
@@ -32,6 +41,7 @@ export function PresetsDrawer({
   onExportPreset,
   onImport,
   onSaveFromReplay,
+  onHostAsBattle,
   disabled,
 }: {
   open: boolean;
@@ -47,6 +57,9 @@ export function PresetsDrawer({
    * setup (every seated player becomes an AI opponent) without touching the
    * current Skirmish setup. */
   onSaveFromReplay: (name: string, draft: SkirmishDraft) => void;
+  /** "Host as battle" (#373): take this preset online without loading it into
+   * the page first. */
+  onHostAsBattle: (preset: SkirmishPreset) => void;
   disabled?: boolean;
 }) {
   const [naming, setNaming] = useState(false);
@@ -211,6 +224,16 @@ export function PresetsDrawer({
                           </div>
                         </button>
                         <div className="flex items-center gap-1 pr-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onHostAsBattle(p)}
+                            disabled={disabled}
+                            aria-label={`Host ${p.name} as a battle`}
+                            title="Host as battle"
+                          >
+                            <Swords className="size-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
