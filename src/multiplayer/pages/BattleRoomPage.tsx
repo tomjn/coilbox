@@ -2,7 +2,6 @@ import { Button, NavGate } from "@picoframe/frame";
 import { Bookmark, Gamepad2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { summarizeSubstitutions } from "@/conquest/ai";
 import { useFactionLogos } from "@/factions/logos";
 import { notify } from "@/notify/notify";
 import { useSkirmishAis } from "@/play/config";
@@ -21,7 +20,7 @@ import { BattlePresetsDrawer } from "../battle/BattlePresetsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
 import { battleOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
-import { draftToHostSeed } from "../battle/fromSkirmish";
+import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import {
   StartBoxControls,
@@ -125,6 +124,11 @@ function BattleRoomPage() {
     if (!hostDraft || !b || !room.selfHost) return;
     if (appliedHostSeedRef.current === b.id) return;
     if (!room.contentKnown || room.gameMissing || room.mapMissing) return;
+    // Wait for the game's own addable-AI list to load before reconciling the
+    // preset's bots against it (issue #531). Reconciling early ran against the
+    // engine-natives fallback and remapped a valid preset AI (e.g. SimpleAI) to
+    // a native (e.g. BARb) the game doesn't offer.
+    if (!room.addableAisReady) return;
     appliedHostSeedRef.current = b.id;
 
     const seed = draftToHostSeed({
@@ -135,7 +139,7 @@ function BattleRoomPage() {
     // Surface any AI the hosted game doesn't offer (issue #501): the preset
     // may have been authored against a different game or an older version, so
     // its bots were remapped to valid defaults rather than added blind.
-    const hostNotice = summarizeSubstitutions(seed.substitutions);
+    const hostNotice = hostSeedAiNotice(seed);
     if (hostNotice) {
       notify({ title: "Preset AI adjusted", body: hostNotice, level: "info" });
     }
@@ -170,6 +174,14 @@ function BattleRoomPage() {
   // never runs against a battle we merely joined.
   function applySkirmishPresetInPlace(preset: SkirmishPreset, maphash: number) {
     if (!room.battle) return;
+    // Don't reconcile the preset's bot AIs until the game's real addable-AI list
+    // has loaded (issue #531), so an early click can't remap against the
+    // engine-natives fallback.
+    if (!room.addableAisReady) {
+      setHostSeedError("Still loading this game's AI list. Try again.");
+      return;
+    }
+    setHostSeedError(null);
     if (preset.mapName !== room.battle.map)
       room.setMap(preset.mapName, maphash);
     const seed = draftToHostSeed({
@@ -177,7 +189,7 @@ function BattleRoomPage() {
       sides: room.sides,
       ais: room.addableAis,
     });
-    const applyNotice = summarizeSubstitutions(seed.substitutions);
+    const applyNotice = hostSeedAiNotice(seed);
     if (applyNotice) {
       notify({ title: "Preset AI adjusted", body: applyNotice, level: "info" });
     }

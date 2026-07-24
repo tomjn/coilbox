@@ -202,6 +202,12 @@ export interface BattleRoomView {
     version?: string;
     description?: string;
   }[];
+  /**
+   * Whether `addableAis` is the game's final list (settled), not a still-loading
+   * one. The host-seed reconciliation gates on this so a preset's bot AIs are
+   * only reconciled once the real list is known (issue #531).
+   */
+  addableAisReady: boolean;
   /** Add an AI bot on the next free team/ally (host only). Lua AIs are addable too:
    *  ADDBOT carries the shortName and the host scripts each as an `[AI]` block. */
   addBot: (aiShortName: string) => void;
@@ -272,12 +278,28 @@ export function useBattleRoom(): BattleRoomView {
   // when the game declares no AIs at all (e.g. an empty/absent whitelist with no
   // Lua AIs) do we fall back to the engine's natives (a no-game query skips the
   // whitelist) so "Add AI" is never uselessly empty.
-  const { ais } = useSkirmishAis(enginePath, dataDir, gameArchive);
-  const { ais: engineAis } = useSkirmishAis(enginePath, dataDir, undefined);
+  const { ais, loaded: aisLoaded } = useSkirmishAis(
+    enginePath,
+    dataDir,
+    gameArchive,
+  );
+  const { ais: engineAis, loaded: engineAisLoaded } = useSkirmishAis(
+    enginePath,
+    dataDir,
+    undefined,
+  );
   const addableAis = useMemo(
     () => (ais.length > 0 ? ais : engineAis.filter((a) => a.kind === "native")),
     [ais, engineAis],
   );
+  // Whether `addableAis` is the game's final list rather than a still-loading
+  // one: the game-scoped query has settled, and if it came back empty (the game
+  // declares no AIs, so we fall back to the engine's natives) that query has
+  // settled too. The host-seed reconciliation waits for this so it never remaps
+  // a preset's AI against the engine-natives fallback while the game's own list
+  // is still loading (issue #531). That produced a native AI, e.g. BARb, that
+  // the game itself doesn't offer.
+  const addableAisReady = aisLoaded && (ais.length > 0 || engineAisLoaded);
 
   const [contentNonce, setContentNonce] = useState(0);
 
@@ -830,6 +852,7 @@ export function useBattleRoom(): BattleRoomView {
     setIngame,
     hostControls,
     addableAis,
+    addableAisReady,
     addBot,
     leave,
     autohostSend,
