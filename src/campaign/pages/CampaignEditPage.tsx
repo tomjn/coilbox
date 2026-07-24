@@ -10,7 +10,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncThumbnails } from "@/content/config";
 import { refIsVideo } from "@/lib/assetUrl";
@@ -66,6 +66,12 @@ export default function CampaignEditPage() {
   // Map minimaps for the mission-row thumbnails, keyed by map name.
   const { target } = usePreferredTarget();
   const { thumbs } = useUnitsyncThumbnails(target?.enginePath, target?.dataDir);
+  // The game preselected from game detail's "New campaign" action (issue
+  // #372), carried through navigation state from the create step. Scopes the
+  // first "Add mission from preset" picker to that game by default.
+  const location = useLocation();
+  const presetGame = (location.state as { presetGame?: string } | null)
+    ?.presetGame;
 
   const loaded = campaigns.find((c) => c.campaign.id === id);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -173,6 +179,9 @@ export default function CampaignEditPage() {
       content: (
         <PresetPickerDrawer
           presets={presets}
+          initialGameName={
+            campaign.missions.length === 0 ? presetGame : undefined
+          }
           onPick={(preset) =>
             void persist({
               ...campaign,
