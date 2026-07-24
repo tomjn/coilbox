@@ -2,6 +2,7 @@ import { defineCommand } from "@picoframe/plugin-sdk";
 import { useEffect, useState } from "react";
 import type { ConquestAiConfig } from "../conquest/ai";
 import type { ConquestNames } from "../conquest/names";
+import type { GameRepo } from "../downloads/gameRepos";
 import type { GameItem, MapItem } from "./bindings";
 import { withMapSource } from "./mapSource";
 
@@ -67,7 +68,11 @@ export type SuggestedDownload =
   | { kind: "url"; url: string; filename: string; subdir?: "games" | "maps" }
   | {
       kind: "github";
-      repo: string;
+      /** A direct repo, or a `githubGameRepos` key to resolve one from the
+       * unified registry (issue #512). At least one must be set. `repo` wins
+       * when both are given. */
+      repo?: string;
+      sourceKey?: string;
       asset?: string;
       subdir?: "games" | "maps";
     };
@@ -121,6 +126,12 @@ export interface BrandingCatalog {
     maps?: SuggestedMap[];
     mapLists?: SuggestedMapList[];
   };
+  /** The unified per-game GitHub source registry (issue #512): one declarative
+   * list of curated release repos, consumed by both the any-source game
+   * download resolver and the Downloads > Games browse dropdown, plus any
+   * `suggested.games[]` entry whose `github` download references it by
+   * `sourceKey`. See `downloads/gameRepos.ts` for the in-code fallback seed. */
+  githubGameRepos?: GameRepo[];
 }
 
 interface CatalogResult {
@@ -198,6 +209,7 @@ interface LoadedCatalog {
   games: SuggestedGame[];
   maps: SuggestedMap[];
   mapLists: SuggestedMapList[];
+  githubGameRepos: GameRepo[];
 }
 
 const EMPTY_CATALOG: LoadedCatalog = {
@@ -205,6 +217,7 @@ const EMPTY_CATALOG: LoadedCatalog = {
   games: [],
   maps: [],
   mapLists: [],
+  githubGameRepos: [],
 };
 
 let catalogPromise: Promise<LoadedCatalog> | null = null;
@@ -223,6 +236,7 @@ function loadCatalog(): Promise<LoadedCatalog> {
             ...l,
             maps: l.maps.map(withMapSource),
           })),
+          githubGameRepos: parsed.githubGameRepos ?? [],
         };
       })
       .catch((e) => {
@@ -296,6 +310,30 @@ export function useSuggestedMapLists(): SuggestedMapList[] {
     };
   }, []);
   return lists;
+}
+
+/** Load just the catalog's `githubGameRepos` registry once per session, for
+ * non-React callers (issue #512). Callers merge with the in-code fallback seed
+ * via `gameRepos.ts`'s `mergeGameRepos`. Empty on load failure. */
+export function loadGithubGameRepos(): Promise<GameRepo[]> {
+  return loadCatalog().then((c) => c.githubGameRepos);
+}
+
+/** The catalog's `githubGameRepos` registry (issue #512), unmerged with the
+ * in-code fallback seed, matching `useSuggestedMapLists`. Callers merge in the
+ * fallback via `gameRepos.ts`'s `mergeGameRepos`. Empty until loaded/on failure. */
+export function useGithubGameRepos(): GameRepo[] {
+  const [repos, setRepos] = useState<GameRepo[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    loadGithubGameRepos().then((r) => {
+      if (!cancelled) setRepos(r);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return repos;
 }
 
 /**

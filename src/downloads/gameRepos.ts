@@ -3,6 +3,15 @@
  * repo's GitHub releases (not rapid or springfiles). Shared by the Downloads →
  * Games browse dropdown (keyed by `key`) and the battle auto-download fallback
  * (matched against a live game name by `nameKey`), so both agree on the list.
+ *
+ * Unified registry (issue #512). The branding catalog's `githubGameRepos` field
+ * is now the live, updatable-without-a-build source of truth, read via
+ * `useGithubGameRepos`/`loadGithubGameRepos` in `content/branding.ts`. The
+ * `GAME_REPOS` constant below is the in-code fallback seed, used before the
+ * catalog has loaded and for any key the catalog hasn't (yet) migrated.
+ * `mergeGameRepos` combines the two. Every lookup function here takes the
+ * resolved list as a parameter rather than reading `GAME_REPOS` directly, so it
+ * stays pure and testable independent of where the list came from.
  */
 
 /** Loose key for matching a game name to a curated entry: lowercased, extension
@@ -54,15 +63,39 @@ export const GAME_REPOS: GameRepo[] = [
   },
 ];
 
-/** The `owner/name` repo for a source key, or undefined. */
-export function repoForKey(key: string): string | undefined {
-  return GAME_REPOS.find((g) => g.key === key)?.repo;
+/** The `owner/name` repo for a source key in `repos`, or undefined. */
+export function repoForKey(repos: GameRepo[], key: string): string | undefined {
+  return repos.find((g) => g.key === key)?.repo;
 }
 
-/** The curated GitHub repo whose game this name belongs to, or undefined. Matches
- * by normalised-name prefix so a versioned name (`Splinter Faction 0.1.72`) still
- * resolves. Sources with an empty `nameKey` are skipped. */
-export function githubRepoForGame(gameName: string): string | undefined {
+/** The curated GitHub repo in `repos` whose game this name belongs to, or
+ * undefined. Matches by normalised-name prefix so a versioned name (`Splinter
+ * Faction 0.1.72`) still resolves. Sources with an empty `nameKey` are skipped. */
+export function githubRepoForGame(
+  repos: GameRepo[],
+  gameName: string,
+): string | undefined {
   const n = norm(gameName);
-  return GAME_REPOS.find((g) => g.nameKey && n.startsWith(g.nameKey))?.repo;
+  return repos.find((g) => g.nameKey && n.startsWith(g.nameKey))?.repo;
+}
+
+/**
+ * Merge the catalog's GitHub game-repo registry with the in-code fallback seed,
+ * catalog entries first, deduped by `key` (first occurrence wins), mirroring
+ * `mapLists.ts`'s `mergeMapLists`. A catalog update can thus override a seed
+ * entry by reusing its key (e.g. a repo rename), and a game not yet migrated to
+ * the catalog still resolves from the fallback rather than disappearing.
+ */
+export function mergeGameRepos(
+  catalog: GameRepo[],
+  fallback: GameRepo[],
+): GameRepo[] {
+  const seen = new Set<string>();
+  const out: GameRepo[] = [];
+  for (const g of [...catalog, ...fallback]) {
+    if (seen.has(g.key)) continue;
+    seen.add(g.key);
+    out.push(g);
+  }
+  return out;
 }

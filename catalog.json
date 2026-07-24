@@ -1,6 +1,38 @@
 {
   "version": 1,
   "updated": "2026-07-05",
+  "githubGameRepos": [
+    {
+      "key": "metal-factions",
+      "label": "Metal Factions",
+      "repo": "springraaar/metal_factions",
+      "nameKey": "metalfactions"
+    },
+    {
+      "key": "evolution-rts",
+      "label": "Evolution RTS",
+      "repo": "EvolutionRTS/Evolution-RTS",
+      "nameKey": "evolutionrts"
+    },
+    {
+      "key": "tap",
+      "label": "TAP",
+      "repo": "FluidPlay/TAP",
+      "nameKey": ""
+    },
+    {
+      "key": "balanced-annihilation",
+      "label": "Balanced Annihilation",
+      "repo": "Balanced-Annihilation/Balanced-Annihilation",
+      "nameKey": "balancedannihilation"
+    },
+    {
+      "key": "splinterfaction",
+      "label": "SplinterFaction",
+      "repo": "SplinterFaction/SplinterFaction",
+      "nameKey": "splinterfaction"
+    }
+  ],
   "suggested": {
     "games": [
       {
@@ -24,7 +56,7 @@
         "blurb": "Asymmetric sci-fi RTS, distributed via GitHub releases.",
         "download": {
           "kind": "github",
-          "repo": "SplinterFaction/SplinterFaction"
+          "sourceKey": "splinterfaction"
         }
       }
     ],

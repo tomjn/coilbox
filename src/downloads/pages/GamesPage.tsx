@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
+import { useGithubGameRepos } from "@/content/branding";
 import {
   dlGithubReleaseArchives,
   dlInstalledContent,
@@ -22,7 +23,7 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../DownloadQueueProvider";
-import { GAME_REPOS, repoForKey } from "../gameRepos";
+import { GAME_REPOS, mergeGameRepos, repoForKey } from "../gameRepos";
 import { OptionSelect } from "./components/OptionSelect";
 import { EmptyState, errMessage } from "./components/states";
 import { HIDE_INSTALLED_KEY } from "./hideInstalled";
@@ -36,7 +37,9 @@ const SORT_OPTIONS = [
   { value: "size-asc", label: "Smallest" },
 ];
 
-type Source = "springfiles" | (typeof GAME_REPOS)[number]["key"];
+/** "springfiles" for the built-in catalog, or a `GameRepo.key` from the unified
+ * registry (issue #512, resolved at render time so it can't be a literal union). */
+type Source = string;
 
 /** Normalised game row rendered by the list, regardless of source. Every source
  * resolves to a direct archive download into `<root>/games/`. */
@@ -61,6 +64,14 @@ interface GameItem {
 export default function GamesPage() {
   const writePath = useWriteRootPath();
   const { enqueue, statusFor, active } = useDownloadQueue();
+  // Unified GitHub game-repo registry (issue #512): the catalog is authoritative
+  // once loaded, GAME_REPOS is the fallback seed shown immediately. Memoized so
+  // `load`'s identity (and the effect that calls it) doesn't churn every render.
+  const catalogRepos = useGithubGameRepos();
+  const repos = useMemo(
+    () => mergeGameRepos(catalogRepos, GAME_REPOS),
+    [catalogRepos],
+  );
   const [source, setSource] = useState<Source>("springfiles");
   const [games, setGames] = useState<GameItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,41 +83,44 @@ export default function GamesPage() {
     false,
   );
 
-  const load = useCallback(async (src: Source) => {
-    setLoading(true);
-    setError(null);
-    setGames(null);
-    try {
-      const repo = src === "springfiles" ? undefined : repoForKey(src);
-      if (repo) {
-        const { archives } = await dlGithubReleaseArchives({ repo });
-        setGames(
-          archives.map((a) => ({
-            id: a.filename,
-            name: a.filename.replace(/\.(sd7|sdz)$/i, ""),
-            filename: a.filename,
-            size: a.size,
-            url: a.url,
-          })),
-        );
-      } else {
-        const { results } = await dlSpringfilesList({ category: "game" });
-        setGames(
-          results.map((g) => ({
-            id: g.springname,
-            name: g.name || g.springname,
-            filename: g.filename,
-            size: g.size,
-            url: g.mirrors[0],
-          })),
-        );
+  const load = useCallback(
+    async (src: Source) => {
+      setLoading(true);
+      setError(null);
+      setGames(null);
+      try {
+        const repo = src === "springfiles" ? undefined : repoForKey(repos, src);
+        if (repo) {
+          const { archives } = await dlGithubReleaseArchives({ repo });
+          setGames(
+            archives.map((a) => ({
+              id: a.filename,
+              name: a.filename.replace(/\.(sd7|sdz)$/i, ""),
+              filename: a.filename,
+              size: a.size,
+              url: a.url,
+            })),
+          );
+        } else {
+          const { results } = await dlSpringfilesList({ category: "game" });
+          setGames(
+            results.map((g) => ({
+              id: g.springname,
+              name: g.name || g.springname,
+              filename: g.filename,
+              size: g.size,
+              url: g.mirrors[0],
+            })),
+          );
+        }
+      } catch (e) {
+        setError(errMessage(e));
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      setError(errMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [repos],
+  );
 
   useEffect(() => {
     load(source);
@@ -199,7 +213,7 @@ export default function GamesPage() {
             className="w-48"
             options={[
               { value: "springfiles", label: "springfiles" },
-              ...GAME_REPOS.map((g) => ({ value: g.key, label: g.label })),
+              ...repos.map((g) => ({ value: g.key, label: g.label })),
             ]}
           />
           <div className="relative max-w-xs flex-1">

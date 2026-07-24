@@ -1,4 +1,5 @@
 import type { Channel } from "@tauri-apps/api/core";
+import { loadGithubGameRepos } from "../content/branding";
 import {
   type DownloadProgress,
   dlDownloadFileRaw,
@@ -7,7 +8,12 @@ import {
   dlSpringfilesList,
 } from "./bindings";
 import { withDownloadNotify } from "./downloadNotify";
-import { githubRepoForGame, norm } from "./gameRepos";
+import {
+  GAME_REPOS,
+  githubRepoForGame,
+  mergeGameRepos,
+  norm,
+} from "./gameRepos";
 import { type GameSource, gameSourceOrder } from "./gameSources";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -27,6 +33,10 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
  *
  * Steps 1 and 2 need a write root. Without one only rapid is attempted. Throws
  * with every attempted source error when all fail.
+ *
+ * The GitHub repo per game comes from the unified registry (issue #512): the
+ * branding catalog is authoritative, `GAME_REPOS` in `gameRepos.ts` is the
+ * in-code fallback seed. See `mergeGameRepos`.
  */
 async function downloadGameAnySourceImpl(opts: {
   gameName: string;
@@ -39,12 +49,16 @@ async function downloadGameAnySourceImpl(opts: {
   const target = norm(gameName);
   const errors: string[] = [];
 
+  // The unified GitHub game-repo registry (issue #512): the catalog is
+  // authoritative once loaded, the in-code GAME_REPOS list is the fallback seed.
+  const repos = mergeGameRepos(await loadGithubGameRepos(), GAME_REPOS);
+
   const attempt = async (source: GameSource): Promise<string | null> => {
     switch (source) {
       // Curated GitHub releases: resolve a known repo from the game name and
       // fetch its matching (or newest) release archive.
       case "github": {
-        const repo = githubRepoForGame(gameName);
+        const repo = githubRepoForGame(repos, gameName);
         if (!repo || !writePath) return null;
         const { archives } = await dlGithubReleaseArchives({ repo });
         const hit =
@@ -86,7 +100,7 @@ async function downloadGameAnySourceImpl(opts: {
   };
 
   const order = gameSourceOrder({
-    hasGithubRepo: !!githubRepoForGame(gameName),
+    hasGithubRepo: !!githubRepoForGame(repos, gameName),
     hasWritePath: !!writePath,
   });
   for (const source of order) {
