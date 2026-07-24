@@ -964,11 +964,11 @@ export const unitsyncArchiveTree = defineCommand<
 >("coilbox-unitsync", "unitsync_archive_tree");
 
 export interface ArchiveFileResult {
-  /** `"text"`, `"image"`, or `"binary"`. */
-  kind: "text" | "image" | "binary";
+  /** `"text"`, `"image"`, `"audio"`, or `"binary"`. */
+  kind: "text" | "image" | "audio" | "binary";
   /** Decoded contents, when `kind === "text"`. */
   text?: string;
-  /** `data:` URL, when `kind === "image"`. */
+  /** `data:` URL, when `kind === "image"` or `kind === "audio"`. */
   dataUrl?: string;
   /** The member's real size in bytes. */
   size: number;
@@ -979,8 +979,9 @@ export interface ArchiveFileResult {
 
 /**
  * Read one member of an archive for preview. `file` is the member's
- * slash-separated path within `archive`. Text members are returned up to 512 KB
- * and images up to 8 MB; anything larger (or non-previewable) returns as binary.
+ * slash-separated path within `archive`. Text members are returned up to 512 KB,
+ * images up to 8 MB and audio up to 16 MB. Anything larger (or non-previewable)
+ * returns as binary.
  */
 export const unitsyncArchiveFile = defineCommand<
   { enginePath: string; dataDir: string; archive: string; file: string },

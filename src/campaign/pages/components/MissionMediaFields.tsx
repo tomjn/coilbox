@@ -7,6 +7,7 @@ import { AUDIO_EXTS, VIDEO_EXTS } from "../../../lib/assetUrl";
 import { campaignMediaImport } from "../../bindings";
 import type { MediaPlayback, MediaRef } from "../../model";
 import { useCampaignImage } from "../../panorama";
+import { ArchiveMediaImportButton } from "./ArchiveMediaImportButton";
 import { CampaignAudio, CampaignVideo, CUE_DEFAULTS } from "./MediaPlayer";
 
 /**
@@ -70,6 +71,7 @@ export function MissionAvField({
   onChange,
   label,
   help,
+  gameName,
 }: {
   campaignId: string;
   kind: "audio" | "video";
@@ -77,6 +79,13 @@ export function MissionAvField({
   onChange: (next: MediaRef | undefined) => void;
   label: string;
   help?: string;
+  /**
+   * The mission's game name. When set and `kind === "audio"`, shows an "import
+   * from game files" archive browser alongside the file picker. There is no
+   * archive-import path for video (see {@link ArchiveMediaImportButton}), so a
+   * `kind === "video"` field ignores this prop and stays file-picker only.
+   */
+  gameName?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
   const src = useCampaignImage(campaignId, value);
@@ -129,10 +138,18 @@ export function MissionAvField({
             className="max-h-40 w-full rounded-md bg-black"
           />
         ))}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" className="gap-1.5" onClick={pick}>
           <Icon className="size-4" /> {value ? "Replace" : `Choose ${kind}`}
         </Button>
+        {kind === "audio" && gameName !== undefined && (
+          <ArchiveMediaImportButton
+            campaignId={campaignId}
+            gameName={gameName}
+            mediaType="audio"
+            onImported={(file) => onChange({ kind: "file", file })}
+          />
+        )}
         {value && (
           <Button
             size="sm"

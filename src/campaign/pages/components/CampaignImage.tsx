@@ -11,6 +11,7 @@ import {
 } from "../../bindings";
 import type { ImageRef, MediaPlayback } from "../../model";
 import { useCampaignImage } from "../../panorama";
+import { ArchiveMediaImportButton } from "./ArchiveMediaImportButton";
 import {
   CampaignVideo,
   DECORATIVE_DEFAULTS,
@@ -136,6 +137,7 @@ export function CampaignImageField({
   help,
   preview,
   allowVideo = false,
+  gameName,
 }: {
   campaignId: string;
   kind: CampaignImageKind;
@@ -147,11 +149,18 @@ export function CampaignImageField({
   preview: ReactNode;
   /**
    * Also accept a video file. A picked video is copied verbatim via
-   * `campaignMediaImport` (not re-encoded) and stored as a `file` ref; the resolver
-   * serves it over `coilbox://`. Used for the mission side graphic, which can loop a
-   * muted video. Off for icon/background (images only).
+   * `campaignMediaImport` (not re-encoded) and stored as a `file` ref, and the
+   * resolver serves it over `coilbox://`. Used for the mission side graphic,
+   * which can loop a muted video. Off for icon/background (images only).
    */
   allowVideo?: boolean;
+  /**
+   * The mission's (or, for campaign-level fields, the best-effort first
+   * mission's) game name. When set, shows an "import from game files" archive
+   * browser alongside the file picker. Images only, a video slot still needs
+   * the file picker for a video file.
+   */
+  gameName?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
 
@@ -194,10 +203,19 @@ export function CampaignImageField({
         </Alert>
       )}
       {value && preview}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" className="gap-1.5" onClick={pick}>
           <ImageIcon className="size-4" /> {value ? "Replace" : "Choose image"}
         </Button>
+        {gameName !== undefined && (
+          <ArchiveMediaImportButton
+            campaignId={campaignId}
+            gameName={gameName}
+            mediaType="image"
+            imageKind={kind}
+            onImported={(file) => onChange({ kind: "file", file })}
+          />
+        )}
         {value && (
           <Button
             size="sm"
