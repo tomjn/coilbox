@@ -12,6 +12,7 @@ Allows the campaign plugin's storage, image import/read and progress commands.
 - `allow-campaign-image-read`
 - `allow-campaign-image-delete`
 - `allow-campaign-media-import`
+- `allow-campaign-media-import-data`
 - `allow-campaign-export`
 - `allow-campaign-import`
 - `allow-campaign-progress-load`
@@ -256,6 +257,32 @@ Enables the campaign_media_import command without any pre-configured scope.
 <td>
 
 Denies the campaign_media_import command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-campaign:allow-campaign-media-import-data`
+
+</td>
+<td>
+
+Enables the campaign_media_import_data command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-campaign:deny-campaign-media-import-data`
+
+</td>
+<td>
+
+Denies the campaign_media_import_data command without any pre-configured scope.
 
 </td>
 </tr>

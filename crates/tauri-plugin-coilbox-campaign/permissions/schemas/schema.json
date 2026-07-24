@@ -403,6 +403,18 @@
           "markdownDescription": "Denies the campaign_media_import command without any pre-configured scope."
         },
         {
+          "description": "Enables the campaign_media_import_data command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-campaign-media-import-data",
+          "markdownDescription": "Enables the campaign_media_import_data command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the campaign_media_import_data command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-campaign-media-import-data",
+          "markdownDescription": "Denies the campaign_media_import_data command without any pre-configured scope."
+        },
+        {
           "description": "Enables the campaign_progress_load command without any pre-configured scope.",
           "type": "string",
           "const": "allow-campaign-progress-load",
@@ -439,10 +451,10 @@
           "markdownDescription": "Denies the campaign_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the campaign plugin's storage, image import/read and progress commands.\n#### This default permission set includes:\n\n- `allow-campaign-list`\n- `allow-campaign-save`\n- `allow-campaign-delete`\n- `allow-campaign-image-import`\n- `allow-campaign-image-import-data`\n- `allow-campaign-image-read`\n- `allow-campaign-image-delete`\n- `allow-campaign-media-import`\n- `allow-campaign-export`\n- `allow-campaign-import`\n- `allow-campaign-progress-load`\n- `allow-campaign-progress-save`",
+          "description": "Allows the campaign plugin's storage, image import/read and progress commands.\n#### This default permission set includes:\n\n- `allow-campaign-list`\n- `allow-campaign-save`\n- `allow-campaign-delete`\n- `allow-campaign-image-import`\n- `allow-campaign-image-import-data`\n- `allow-campaign-image-read`\n- `allow-campaign-image-delete`\n- `allow-campaign-media-import`\n- `allow-campaign-media-import-data`\n- `allow-campaign-export`\n- `allow-campaign-import`\n- `allow-campaign-progress-load`\n- `allow-campaign-progress-save`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the campaign plugin's storage, image import/read and progress commands.\n#### This default permission set includes:\n\n- `allow-campaign-list`\n- `allow-campaign-save`\n- `allow-campaign-delete`\n- `allow-campaign-image-import`\n- `allow-campaign-image-import-data`\n- `allow-campaign-image-read`\n- `allow-campaign-image-delete`\n- `allow-campaign-media-import`\n- `allow-campaign-export`\n- `allow-campaign-import`\n- `allow-campaign-progress-load`\n- `allow-campaign-progress-save`"
+          "markdownDescription": "Allows the campaign plugin's storage, image import/read and progress commands.\n#### This default permission set includes:\n\n- `allow-campaign-list`\n- `allow-campaign-save`\n- `allow-campaign-delete`\n- `allow-campaign-image-import`\n- `allow-campaign-image-import-data`\n- `allow-campaign-image-read`\n- `allow-campaign-image-delete`\n- `allow-campaign-media-import`\n- `allow-campaign-media-import-data`\n- `allow-campaign-export`\n- `allow-campaign-import`\n- `allow-campaign-progress-load`\n- `allow-campaign-progress-save`"
         }
       ]
     }

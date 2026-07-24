@@ -304,6 +304,50 @@ async fn campaign_media_import<R: Runtime>(
     }
 }
 
+/// `campaign_media_import_data`, importing an audio/video clip from a base64
+/// `data:` URI (the archive-import path, the frontend reads the clip out of a
+/// game archive via unitsync and hands its bytes here). Copied verbatim, like
+/// `campaign_media_import`, just sourced from bytes instead of a file path.
+/// `ext` is the extension to store it under (no leading dot), sanitized the same
+/// way. Returns the bare stored filename.
+#[tauri::command]
+async fn campaign_media_import_data<R: Runtime>(
+    app: AppHandle<R>,
+    campaign_id: String,
+    data_uri: String,
+    ext: String,
+) -> CliResult {
+    if !valid_id(&campaign_id) {
+        return CliResult::err(format!("invalid campaign id: {campaign_id}"));
+    }
+    let raw = match data_uri_bytes(&data_uri) {
+        Some(b) => b,
+        None => return CliResult::err("invalid media data URI"),
+    };
+    let ext: String = ext
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    let ext = if ext.is_empty() {
+        "bin".to_string()
+    } else {
+        ext
+    };
+    let dir = match media_dir(&app) {
+        Ok(d) => d.join(&campaign_id),
+        Err(e) => return CliResult::err(e),
+    };
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return CliResult::err(format!("could not create media dir: {e}"));
+    }
+    let file = format!("{}.{}", uuid::Uuid::new_v4(), ext);
+    match std::fs::write(dir.join(&file), raw) {
+        Ok(()) => CliResult::ok(json!({ "file": file })),
+        Err(e) => CliResult::err(format!("could not import media: {e}")),
+    }
+}
+
 /// `campaign_export` — write a caller-serialized campaign export document to a
 /// caller-chosen path (opaque; the frontend builds the export shape and picks the
 /// destination via the save dialog).
@@ -367,6 +411,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             campaign_image_read,
             campaign_image_delete,
             campaign_media_import,
+            campaign_media_import_data,
             campaign_export,
             campaign_import,
             campaign_progress_load,
