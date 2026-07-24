@@ -540,6 +540,7 @@ export function MissionEditorDrawer({
           onChange={(cutscene) => patch({ cutscene })}
           label="Intro cutscene"
           help="Optional video offered on the briefing screen."
+          gameName={mission.snapshot.gameName}
         />
         {mission.cutscene && (
           <PlaybackTuning

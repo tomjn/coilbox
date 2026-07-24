@@ -80,10 +80,8 @@ export function MissionAvField({
   label: string;
   help?: string;
   /**
-   * The mission's game name. When set and `kind === "audio"`, shows an "import
-   * from game files" archive browser alongside the file picker. There is no
-   * archive-import path for video (see {@link ArchiveMediaImportButton}), so a
-   * `kind === "video"` field ignores this prop and stays file-picker only.
+   * The mission's game name. When set, shows an "import from game files"
+   * archive browser alongside the file picker, matching `kind`.
    */
   gameName?: string;
 }) {
@@ -142,11 +140,11 @@ export function MissionAvField({
         <Button size="sm" variant="outline" className="gap-1.5" onClick={pick}>
           <Icon className="size-4" /> {value ? "Replace" : `Choose ${kind}`}
         </Button>
-        {kind === "audio" && gameName !== undefined && (
+        {gameName !== undefined && (
           <ArchiveMediaImportButton
             campaignId={campaignId}
             gameName={gameName}
-            mediaType="audio"
+            mediaType={kind}
             onImported={(file) => onChange({ kind: "file", file })}
           />
         )}

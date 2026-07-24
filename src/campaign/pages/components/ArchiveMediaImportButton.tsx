@@ -1,4 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
+import { join, tempDir } from "@tauri-apps/api/path";
 import { FolderSearch } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -8,15 +9,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { unitsyncArchiveExtract } from "@/content/bindings";
 import {
   useUnitsyncArchiveFile,
   useUnitsyncArchiveTree,
   useUnitsyncScan,
 } from "@/content/config";
+import { formatBytes } from "@/content/format";
 import { usePreferredTarget } from "@/play/config";
 import {
   type CampaignImageKind,
   campaignImageImportData,
+  campaignMediaImport,
   campaignMediaImportData,
 } from "../../bindings";
 import {
@@ -43,6 +47,14 @@ const RESULT_LIMIT = 200;
  * {@link campaignMediaImportData}), so the resulting `{ kind: "file" }` ref is
  * indistinguishable from one picked off disk.
  *
+ * A video pick has no in-popover preview: unitsync's archive preview command
+ * only decodes image/audio/text members, so a video always reports as binary.
+ * Instead it is extracted to a temp file with {@link unitsyncArchiveExtract}
+ * and that path is handed to {@link campaignMediaImport}, avoiding buffering a
+ * potentially large clip through this process as base64. The field the button
+ * sits in resolves the resulting `{ kind: "file" }` ref itself, so the video
+ * still plays there once the import completes.
+ *
  * Renders as a popover (not the app's single shared drawer) so it can be opened
  * from *inside* an already-open drawer, e.g. the mission editor, without
  * replacing that drawer's content.
@@ -58,6 +70,7 @@ export function ArchiveMediaImportButton({
   gameName,
   mediaType,
   imageKind,
+  triggerLabel = "From game files",
   onImported,
 }: {
   campaignId: string;
@@ -65,6 +78,12 @@ export function ArchiveMediaImportButton({
   mediaType: ArchiveMediaType;
   /** Passed through to {@link campaignImageImportData} for image imports. */
   imageKind?: CampaignImageKind;
+  /**
+   * Overrides the trigger button's text. A field that shows two of these
+   * side by side (an image-or-video slot) needs distinct labels. A
+   * single-purpose field can leave this at its default.
+   */
+  triggerLabel?: string;
   onImported: (file: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -90,11 +109,14 @@ export function ArchiveMediaImportButton({
     target?.dataDir,
     archiveName,
   );
+  // A video member always previews as binary (unitsync doesn't decode video),
+  // so skip fetching it entirely rather than spend a worker session on a
+  // preview that's never shown.
   const { data: preview, loading: previewLoading } = useUnitsyncArchiveFile(
     target?.enginePath,
     target?.dataDir,
     archiveName,
-    selected ?? undefined,
+    mediaType === "video" ? undefined : (selected ?? undefined),
   );
 
   const filtered = useMemo(() => {
@@ -105,6 +127,7 @@ export function ArchiveMediaImportButton({
     );
   }, [tree, mediaType, query]);
   const visible = filtered.slice(0, RESULT_LIMIT);
+  const selectedEntry = visible.find((f) => f.path === selected);
 
   const reset = () => {
     setQuery("");
@@ -130,7 +153,11 @@ export function ArchiveMediaImportButton({
       : false;
 
   const doImport = async () => {
-    if (!selected || !archiveName || !preview) return;
+    if (!selected || !archiveName) return;
+    if (mediaType !== "video" && !preview) return;
+    if (mediaType === "video" && (!target?.enginePath || !target?.dataDir)) {
+      return;
+    }
     if (
       needsDuplicateConfirm(
         importedRef.current,
@@ -146,10 +173,33 @@ export function ArchiveMediaImportButton({
     setError(null);
     try {
       let file: string;
-      if (mediaType === "image") {
-        if (preview.kind !== "image" || !preview.dataUrl) {
+      if (mediaType === "video") {
+        // No data-URL round trip for video: extract the member to a temp file
+        // on disk, then hand that path to the same file-based import a
+        // file-picker video uses. The temp file is left for the OS to reclaim
+        // rather than deleted here, there's no delete-file command exposed to
+        // the frontend and adding one purely for this cleanup isn't worth the
+        // extra attack surface.
+        const ext = archiveFileExt(selected) || "bin";
+        const dest = await join(
+          await tempDir(),
+          `coilbox-video-import-${crypto.randomUUID()}.${ext}`,
+        );
+        const extracted = await unitsyncArchiveExtract({
+          enginePath: target?.enginePath ?? "",
+          dataDir: target?.dataDir ?? "",
+          archive: archiveName,
+          file: selected,
+          dest,
+        });
+        if (extracted.errors.length > 0) {
+          throw new Error(extracted.errors.join(". "));
+        }
+        ({ file } = await campaignMediaImport({ campaignId, srcPath: dest }));
+      } else if (mediaType === "image") {
+        if (preview?.kind !== "image" || !preview.dataUrl) {
           throw new Error(
-            preview.truncated
+            preview?.truncated
               ? "This image is too large to import from the archive. Use the file picker instead."
               : "Couldn't read this file as an image.",
           );
@@ -160,9 +210,9 @@ export function ArchiveMediaImportButton({
           kind: imageKind,
         }));
       } else {
-        if (preview.kind !== "audio" || !preview.dataUrl) {
+        if (preview?.kind !== "audio" || !preview.dataUrl) {
           throw new Error(
-            preview.truncated
+            preview?.truncated
               ? "This clip is too large to import from the archive. Use the file picker instead."
               : "Couldn't read this file as audio.",
           );
@@ -184,7 +234,12 @@ export function ArchiveMediaImportButton({
     }
   };
 
-  const noun = mediaType === "audio" ? "audio clip" : "image";
+  const noun =
+    mediaType === "audio"
+      ? "audio clip"
+      : mediaType === "video"
+        ? "video"
+        : "image";
   const resolving = scan.loading || (Boolean(archiveName) && treeLoading);
 
   return (
@@ -197,7 +252,7 @@ export function ArchiveMediaImportButton({
     >
       <PopoverTrigger asChild>
         <Button size="sm" variant="outline" className="gap-1.5">
-          <FolderSearch className="size-4" /> From game files
+          <FolderSearch className="size-4" /> {triggerLabel}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="flex w-96 flex-col gap-3 p-3">
@@ -264,7 +319,15 @@ export function ArchiveMediaImportButton({
 
             {selected && (
               <div className="flex flex-col gap-2 rounded-md border border-border/50 bg-muted/20 p-2">
-                {previewLoading ? (
+                {mediaType === "video" ? (
+                  <p className="text-xs text-muted-foreground">
+                    {selectedEntry?.size != null
+                      ? formatBytes(selectedEntry.size)
+                      : "Unknown size"}
+                    . No preview before import here. It plays in the field below
+                    once imported.
+                  </p>
+                ) : previewLoading ? (
                   <Skeleton className="h-20 w-full" />
                 ) : preview?.kind === "image" && preview.dataUrl ? (
                   <img
