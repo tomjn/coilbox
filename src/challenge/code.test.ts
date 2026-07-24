@@ -72,12 +72,47 @@ describe("challenge code", () => {
     expect(result).toEqual({ ok: false, error: "unknown-format" });
   });
 
-  it("rejects a future format version", () => {
+  it("rejects a future legacy format version", () => {
     const raw = JSON.stringify({
       format: "coilbox-challenge",
       formatVersion: 2,
       kind: "conquest",
       settings: { seed: 1, name: "x" },
+    });
+    const code = btoa(unescape(encodeURIComponent(raw)))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+    const result = decodeChallenge(code, "conquest", parseSettings);
+    expect(result).toEqual({ ok: false, error: "unsupported-version" });
+  });
+
+  it("decodes a legacy pre-container challenge code", () => {
+    // A code shared before the #479 container: the old envelope, base64url.
+    const raw = JSON.stringify({
+      format: "coilbox-challenge",
+      formatVersion: 1,
+      kind: "conquest",
+      settings: { seed: 7, name: "Legacy Reach" },
+    });
+    const code = btoa(unescape(encodeURIComponent(raw)))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+    const result = decodeChallenge(code, "conquest", parseSettings);
+    expect(result).toEqual({
+      ok: true,
+      settings: { seed: 7, name: "Legacy Reach" },
+    });
+  });
+
+  it("rejects a container with a newer kind version", () => {
+    const raw = JSON.stringify({
+      format: "coilbox",
+      container: 1,
+      kind: "challenge",
+      kindVersion: 99,
+      payload: { mode: "conquest", settings: { seed: 1, name: "x" } },
     });
     const code = btoa(unescape(encodeURIComponent(raw)))
       .replace(/\+/g, "-")

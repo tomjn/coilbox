@@ -90,6 +90,38 @@ describe("envelope", () => {
     });
   });
 
+  it("decodes a legacy pre-container pack code", () => {
+    // A pack shared before the #479 container: the old envelope, base64url.
+    const code = btoa(
+      JSON.stringify({
+        format: "coilbox-pack",
+        formatVersion: 1,
+        kind: "setup-pack",
+        settings: { n: 5 },
+      }),
+    );
+    expect(decodePackEnvelope(code, parse)).toEqual({
+      ok: true,
+      settings: { n: 5 },
+    });
+  });
+
+  it("rejects a container with a newer kind version", () => {
+    const code = btoa(
+      JSON.stringify({
+        format: "coilbox",
+        container: 1,
+        kind: "setup-pack",
+        kindVersion: 99,
+        payload: { n: 1 },
+      }),
+    );
+    expect(decodePackEnvelope(code, parse)).toEqual({
+      ok: false,
+      error: "unsupported-version",
+    });
+  });
+
   it("gives every error a distinct human message", () => {
     const messages = new Set(
       (

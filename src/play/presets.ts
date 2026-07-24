@@ -1,5 +1,13 @@
 import { useSetting } from "@picoframe/frame";
+import {
+  asContainer,
+  CONTAINER_VERSION,
+  decodeContainerText,
+} from "../container/container";
 import type { BattleRestrictions, SkirmishDraft } from "./drafts";
+
+/** Payload schema version for a preset container. */
+export const PRESET_KIND_VERSION = 1;
 
 /**
  * Named singleplayer (skirmish) presets: saved snapshots of a full setup (game,
@@ -111,22 +119,33 @@ export function presetMatchesDraft(
 
 /**
  * Parse the raw JSON of an imported preset file into a `SkirmishDraft` (plus its
- * original name), or `null` if the shape doesn't match — an imported file is
+ * original name), or `null` if the shape doesn't match. An imported file is
  * untrusted input, so validate the five draft fields before adopting it. Identity
  * and timestamps are intentionally dropped: the importer mints fresh ones via
  * `savePreset`, so importing never collides with an existing preset's id.
+ *
+ * Accepts BOTH the canonical coilbox container (issue #479, `kind: "preset"`)
+ * and a legacy bare preset file (no envelope, exported before #479), so no
+ * already-shared preset breaks. A newer-version container is rejected as `null`.
+ * The pack importer also calls this on bare preset objects bundled inside a
+ * pack, which stay unwrapped, so the bare path must keep working.
  */
 export function parsePresetJson(
   json: string,
 ): (SkirmishDraft & { name?: string }) | null {
-  let data: unknown;
-  try {
-    data = JSON.parse(json);
-  } catch {
-    return null;
+  const parsed = decodeContainerText(json);
+  if (typeof parsed !== "object" || parsed === null) return null;
+
+  let value: unknown = parsed;
+  const container = asContainer(parsed);
+  if (container) {
+    if (container.kind !== "preset") return null;
+    if (container.container > CONTAINER_VERSION) return null;
+    if (container.kindVersion > PRESET_KIND_VERSION) return null;
+    value = container.payload;
   }
-  if (typeof data !== "object" || data === null) return null;
-  const d = data as Record<string, unknown>;
+  if (typeof value !== "object" || value === null) return null;
+  const d = value as Record<string, unknown>;
   if (
     !Array.isArray(d.participants) ||
     typeof d.gameName !== "string" ||
