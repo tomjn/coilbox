@@ -170,9 +170,21 @@ fn unchanged(existing: &StatRecord, entry: &DemoFileEntry) -> bool {
 /// counted in `failed`, never aborting the pass. Records are keyed by filename, so
 /// re-ingesting the same library is idempotent.
 ///
-/// The store is only mutated in memory; the caller persists it (or discards it, for
-/// a dry run).
+/// The store carries one `schema_version` for every record in it, not a per-record
+/// version. A store written under an older version may be missing fields added
+/// since, even for a file whose `(size, mtime)` signature has not changed, so this
+/// pass ignores the unchanged-signature fast path and re-decodes every record when
+/// the stored version is behind `STATS_SCHEMA_VERSION`. Once the pass completes the
+/// store is stamped current, and later passes are back on the fast path. A
+/// store-level flag is enough here because ingest only ever persists after a full
+/// pass completes (load, then ingest, then save, in one call), so there is no
+/// partial-pass state that could land on disk with the version bumped but records
+/// still stale.
+///
+/// The store is only mutated in memory. The caller persists it, or discards it for
+/// a dry run.
 pub fn ingest(roots: &[PathBuf], engine_dir: &Path, store: &mut StatsStore) -> IngestSummary {
+    let force_reingest = store.schema_version < STATS_SCHEMA_VERSION;
     store.schema_version = STATS_SCHEMA_VERSION;
     // filename -> index into records, for O(1) upsert.
     let mut index: HashMap<String, usize> = store
@@ -186,7 +198,7 @@ pub fn ingest(roots: &[PathBuf], engine_dir: &Path, store: &mut StatsStore) -> I
     for root in roots {
         for entry in demo::demo_file_entries(root) {
             if let Some(&i) = index.get(&entry.filename) {
-                if unchanged(&store.records[i], &entry) {
+                if !force_reingest && unchanged(&store.records[i], &entry) {
                     summary.skipped += 1;
                     continue;
                 }
@@ -313,5 +325,123 @@ mod tests {
         let _ = std::fs::remove_file(&p);
         let store = load(&p).unwrap();
         assert!(store.records.is_empty());
+    }
+
+    // ---- schema-version-driven re-ingest ---------------------------------
+    //
+    // A tiny synthetic `.sdfz` builder, mirroring demo.rs's own test fixture, so
+    // `ingest()` can be exercised end to end without a real replay file. The
+    // header offsets are private to demo.rs, so they are duplicated here rather
+    // than shared.
+
+    const TEST_MAGIC: &[u8] = b"spring demofile";
+    const TEST_OFF_HEADER_SIZE: usize = 20;
+    const TEST_OFF_VERSION_STRING: usize = 24;
+    const TEST_OFF_GAME_ID: usize = 280;
+    const TEST_OFF_UNIX_TIME: usize = 296;
+    const TEST_OFF_SCRIPT_SIZE: usize = 304;
+    const TEST_OFF_GAME_TIME: usize = 312;
+    const TEST_OFF_WALLCLOCK: usize = 316;
+    const TEST_SCRIPT: &str =
+        "[game]\n{\nmapname=TestMap;\ngametype=TestGame;\n[player0]\n{\nname=Alice;\nspectator=0;\n}\n}\n";
+
+    fn build_test_demo(script: &str) -> Vec<u8> {
+        let mut h = vec![0u8; 352];
+        h[..TEST_MAGIC.len()].copy_from_slice(TEST_MAGIC);
+        h[16..20].copy_from_slice(&5i32.to_le_bytes());
+        h[TEST_OFF_HEADER_SIZE..TEST_OFF_HEADER_SIZE + 4].copy_from_slice(&352i32.to_le_bytes());
+        let ver = b"105.1.2 TEST";
+        h[TEST_OFF_VERSION_STRING..TEST_OFF_VERSION_STRING + ver.len()].copy_from_slice(ver);
+        for (k, b) in (0..16).zip(0xA0u8..) {
+            h[TEST_OFF_GAME_ID + k] = b;
+        }
+        h[TEST_OFF_UNIX_TIME..TEST_OFF_UNIX_TIME + 8]
+            .copy_from_slice(&1_777_320_845u64.to_le_bytes());
+        h[TEST_OFF_SCRIPT_SIZE..TEST_OFF_SCRIPT_SIZE + 4]
+            .copy_from_slice(&(script.len() as i32).to_le_bytes());
+        h[TEST_OFF_GAME_TIME..TEST_OFF_GAME_TIME + 4].copy_from_slice(&2356i32.to_le_bytes());
+        h[TEST_OFF_WALLCLOCK..TEST_OFF_WALLCLOCK + 4].copy_from_slice(&2531i32.to_le_bytes());
+        h.extend_from_slice(script.as_bytes());
+        h
+    }
+
+    /// Write a synthetic demo under `<dir>/demos/<name>` and return its on-disk
+    /// `(size, mtime)` signature, matching what `demo::demo_file_entries` would see.
+    fn write_test_demo(dir: &Path, name: &str) -> (u64, u64) {
+        let demos = dir.join("demos");
+        std::fs::create_dir_all(&demos).unwrap();
+        let p = demos.join(name);
+        std::fs::write(&p, build_test_demo(TEST_SCRIPT)).unwrap();
+        let md = std::fs::metadata(&p).unwrap();
+        let mtime = md
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        (md.len(), mtime)
+    }
+
+    #[test]
+    fn ingest_redecodes_stale_schema_record_despite_unchanged_signature() {
+        let dir = std::env::temp_dir().join("coilbox_stats_ingest_stale");
+        let _ = std::fs::remove_dir_all(&dir);
+        let (size, mtime) = write_test_demo(&dir, "a.sdfz");
+
+        // A record whose (size, mtime) signature already matches the file on disk,
+        // but whose shape stands in for a record written before a field was added
+        // (here, an empty roster), stored under an older schema version.
+        let stale = record_from(
+            &entry("a.sdfz", size, mtime),
+            demo_info("Stale", true, vec![]),
+        );
+        let mut store = StatsStore {
+            schema_version: STATS_SCHEMA_VERSION - 1,
+            records: vec![stale],
+        };
+
+        let summary = ingest(
+            std::slice::from_ref(&dir),
+            Path::new("/no/such/engine"),
+            &mut store,
+        );
+
+        assert_eq!(summary.updated, 1);
+        assert_eq!(summary.skipped, 0);
+        assert_eq!(store.records[0].map_name, "TestMap");
+        assert_eq!(store.records[0].players.len(), 1);
+        assert_eq!(store.schema_version, STATS_SCHEMA_VERSION);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ingest_skips_unchanged_record_already_at_current_schema() {
+        let dir = std::env::temp_dir().join("coilbox_stats_ingest_current");
+        let _ = std::fs::remove_dir_all(&dir);
+        let (size, mtime) = write_test_demo(&dir, "a.sdfz");
+
+        let current = record_from(
+            &entry("a.sdfz", size, mtime),
+            demo_info("Current", true, vec![player("Alice", 0, Some(true))]),
+        );
+        let mut store = StatsStore {
+            schema_version: STATS_SCHEMA_VERSION,
+            records: vec![current],
+        };
+
+        let summary = ingest(
+            std::slice::from_ref(&dir),
+            Path::new("/no/such/engine"),
+            &mut store,
+        );
+
+        assert_eq!(summary.skipped, 1);
+        assert_eq!(summary.updated, 0);
+        // Unchanged: still carries the pre-ingest (unreal) shape, since the fast
+        // path never re-decoded it.
+        assert_eq!(store.records[0].map_name, "Current");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
