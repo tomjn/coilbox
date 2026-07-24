@@ -1,5 +1,4 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { save } from "@tauri-apps/plugin-dialog";
 import {
   ArrowDown,
   ArrowLeft,
@@ -7,7 +6,6 @@ import {
   Pencil,
   Plus,
   Trash2,
-  Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
@@ -22,11 +20,9 @@ import {
   ErrorBanner,
   NotFound,
 } from "../../content/pages/components/states";
-import { campaignExport, campaignImageDelete, campaignSave } from "../bindings";
+import { campaignImageDelete, campaignSave } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
-import { inlineCampaignImages } from "../images";
 import type { Campaign, CampaignMission } from "../model";
-import { wrapCampaignForExport } from "../transfer";
 import { CampaignImage, CampaignImageField } from "./components/CampaignImage";
 import { DECORATIVE_DEFAULTS, PlaybackTuning } from "./components/MediaPlayer";
 import { MissionEditorDrawer } from "./components/MissionEditorDrawer";
@@ -192,24 +188,6 @@ export default function CampaignEditPage() {
       ),
     });
 
-  const exportCampaign = async () => {
-    setError(null);
-    try {
-      // Inline every stored image (icon, background, each mission's panorama and
-      // side graphic) as a data URI so the export is a single self-contained file.
-      const file = wrapCampaignForExport(await inlineCampaignImages(campaign));
-      const dest = await save({
-        title: "Export campaign",
-        defaultPath: `${campaign.title || "campaign"}.json`,
-        filters: [{ name: "Coilbox campaign", extensions: ["json"] }],
-      });
-      if (!dest) return;
-      await campaignExport({ json: JSON.stringify(file, null, 2), dest });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
-
   return (
     <div className="flex flex-col gap-5 p-4">
       <Link
@@ -221,33 +199,26 @@ export default function CampaignEditPage() {
 
       {error && <ErrorBanner message={error} />}
 
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <Input
-            aria-label="Campaign title"
-            value={campaign.title}
-            onChange={(e) =>
-              setCampaign((c) => (c ? { ...c, title: e.target.value } : c))
-            }
-            onBlur={() => void persist(campaign)}
-            className="text-base font-semibold"
-          />
-          <Textarea
-            aria-label="Campaign description"
-            value={campaign.description}
-            placeholder="Description"
-            className="min-h-16"
-            onChange={(e) =>
-              setCampaign((c) =>
-                c ? { ...c, description: e.target.value } : c,
-              )
-            }
-            onBlur={() => void persist(campaign)}
-          />
-        </div>
-        <Button variant="outline" className="gap-1.5" onClick={exportCampaign}>
-          <Upload className="size-4" /> Export
-        </Button>
+      <header className="flex flex-col gap-3">
+        <Input
+          aria-label="Campaign title"
+          value={campaign.title}
+          onChange={(e) =>
+            setCampaign((c) => (c ? { ...c, title: e.target.value } : c))
+          }
+          onBlur={() => void persist(campaign)}
+          className="text-base font-semibold"
+        />
+        <Textarea
+          aria-label="Campaign description"
+          value={campaign.description}
+          placeholder="Description"
+          className="min-h-16"
+          onChange={(e) =>
+            setCampaign((c) => (c ? { ...c, description: e.target.value } : c))
+          }
+          onBlur={() => void persist(campaign)}
+        />
       </header>
 
       <section className="grid gap-4 rounded-lg border border-border/50 bg-card p-4 sm:grid-cols-2">

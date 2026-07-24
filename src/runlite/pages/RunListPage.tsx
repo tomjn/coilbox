@@ -1,7 +1,8 @@
 import { Button, useDrawer } from "@picoframe/frame";
-import { Download, Loader2, Play, Rocket, Trash2 } from "lucide-react";
+import { Download, Loader2, Play, Rocket, Share2, Trash2 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router";
+import { ChallengeCodeView } from "@/challenge/ChallengeCodeView";
 import { ContinueBadge } from "@/components/ContinueBadge";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
@@ -12,6 +13,7 @@ import { EmptyState } from "../../content/pages/components/states";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { usePlayReadiness, usePreferredTarget } from "../../play/config";
+import { encodeWarpathChallenge } from "../challenge";
 import type { RogueliteRun } from "../model";
 import { useRuns } from "../runs";
 import { ImportChallengeForm } from "./components/ImportChallengeForm";
@@ -191,6 +193,18 @@ function RunCard({
   onResume: () => void;
   onAbandon: () => void;
 }) {
+  const drawer = useDrawer();
+  const openShareChallenge = () =>
+    drawer.open({
+      title: "Share challenge",
+      width: "26rem",
+      content: (
+        <ChallengeCodeView
+          code={encodeWarpathChallenge(run)}
+          helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable."
+        />
+      ),
+    });
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const game = resolveGameByShortname(
@@ -243,6 +257,15 @@ function RunCard({
         </div>
       </div>
       <div className="flex gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Share ${run.name} as a challenge code`}
+          title="Share challenge"
+          onClick={openShareChallenge}
+        >
+          <Share2 className="size-4" aria-hidden />
+        </Button>
         <Button onClick={onResume}>
           <Play className="mr-1.5 size-4" aria-hidden />
           {status === "active" ? "Resume" : "View"}
