@@ -15,6 +15,7 @@ mod caches;
 mod demo;
 mod engine;
 mod model;
+mod path_validity;
 mod paths;
 mod rapid_pool;
 mod savegame;
@@ -275,6 +276,12 @@ fn compute_state<R: Runtime>(
     let mut accs = auto_accs(portable_seed_dir(), candidate_roots(current_os(), &base));
 
     for u in &store.user_roots {
+        // A manual root stored as an absolute path from a different OS (e.g. a
+        // shared portable `.coilbox/data` copied cross-machine) can never resolve
+        // here, drop it rather than track a permanently-dead entry (issue #524).
+        if path_validity::is_foreign_absolute(&u.path) {
+            continue;
+        }
         let canon = canonical(&resolve_stored(&u.path));
         let portable = Path::new(&u.path).is_relative();
         match accs.iter_mut().find(|a| a.canon == canon) {
@@ -325,11 +332,16 @@ fn persist(path: &Path, mut store: StoreFile, state: &ContentState) -> Result<()
 
 /// Re-derive the filesystem-dependent fields of a cached snapshot without a full
 /// rescan. The snapshot freezes `exists` / `valid` / `engines` at scan time, but a
-/// content folder or engine can be deleted between runs — so any read that gates UI
+/// content folder or engine can be deleted between runs, so any read that gates UI
 /// (first-run setup, engine-download buttons) must re-check disk, or it acts on
 /// stale truth. Cheap: re-stats each root and re-scans only the `engine/` layout,
 /// deliberately skipping the content-count walk (those counts self-correct on the
-/// next explicit rescan). Not persisted — a read must stay read-only.
+/// next explicit rescan). Not persisted, a read must stay read-only.
+///
+/// A root whose path is an absolute path from a different OS (a Windows path in a
+/// state.json copied onto macOS/Linux, or the reverse) is dropped outright. It can
+/// never exist here, and offering it as a recreate-this-folder manual root would
+/// try to create a garbage, literally-named folder (issue #524).
 fn refresh_against_disk(state: ContentState) -> ContentState {
     let ContentState {
         schema_version,
@@ -338,6 +350,7 @@ fn refresh_against_disk(state: ContentState) -> ContentState {
     } = state;
     let mut roots: Vec<ContentRoot> = roots
         .into_iter()
+        .filter(|r| !path_validity::is_foreign_absolute(&r.path))
         .map(|mut r| {
             let canon = canonical(Path::new(&r.path));
             let exists = canon.is_dir();
@@ -349,7 +362,11 @@ fn refresh_against_disk(state: ContentState) -> ContentState {
                 Vec::new()
             };
             r.exists = exists;
-            r.valid = kind.is_some() || forced;
+            // `forced` means valid even with no recognizable Spring layout, not
+            // valid even though the folder is gone. A forced root whose directory
+            // has vanished (deleted, or copied from another machine) must not
+            // report itself as usable.
+            r.valid = exists && (kind.is_some() || forced);
             if let Some(k) = kind {
                 r.kind = k;
             }
@@ -372,6 +389,45 @@ fn refresh_against_disk(state: ContentState) -> ContentState {
         roots,
         last_scan_at,
     }
+}
+
+/// Make sure a portable install's own root (the app dir) is present in `roots`,
+/// re-derived fresh from the current machine's portable anchor rather than trusted
+/// from whatever the snapshot says. `content_state_load` only refreshes existing
+/// snapshot entries against disk. It never re-runs auto-discovery the way a rescan
+/// does, so a snapshot copied from another machine or OS (a shared portable
+/// `.coilbox/data` folder) can leave portable installs with zero usable roots even
+/// though the real folder sits right next to the executable (issue #524). Not
+/// persisted, mirrors `refresh_against_disk`'s read-only contract. An explicit
+/// rescan writes the seeded root for real, exactly like a first run does.
+fn ensure_portable_seed(roots: Vec<ContentRoot>) -> Vec<ContentRoot> {
+    ensure_portable_seed_in(roots, portable_seed_dir())
+}
+
+/// Pure core of [`ensure_portable_seed`], taking the portable app dir explicitly
+/// (mirrors [`auto_accs`]) so it's unit-testable without a real `.coilbox` folder
+/// next to the test binary.
+fn ensure_portable_seed_in(
+    mut roots: Vec<ContentRoot>,
+    portable_app_dir: Option<PathBuf>,
+) -> Vec<ContentRoot> {
+    let Some(app_dir) = portable_app_dir else {
+        return roots;
+    };
+    let canon = canonical(&app_dir);
+    if roots.iter().any(|r| canonical(Path::new(&r.path)) == canon) {
+        return roots;
+    }
+    let acc = Acc {
+        canon,
+        origins: vec!["portable".into()],
+        source: RootSource::Auto,
+        label: None,
+        forced: true,
+        portable: true,
+    };
+    roots.push(build_root(acc, false, now_ms()));
+    roots
 }
 
 // ---- commands --------------------------------------------------------------
@@ -427,7 +483,8 @@ async fn content_state_load<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, 
         Ok(s) => s,
         Err(e) => return Ok(CliResult::err(e)),
     };
-    let state = refresh_against_disk(store.snapshot.unwrap_or_default());
+    let mut state = refresh_against_disk(store.snapshot.unwrap_or_default());
+    state.roots = ensure_portable_seed(state.roots);
     Ok(CliResult::ok(json!({ "state": state })))
 }
 
@@ -1423,6 +1480,144 @@ mod tests {
         assert!(!gone_r.exists, "deleted folder is detected as gone");
         assert!(!gone_r.valid, "gone, unforced root is invalid");
         assert_eq!(gone_r.counts.games, 0, "stale counts zeroed when gone");
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// A Windows-style drive path off Windows (or a POSIX path on Windows) as a
+    /// stored root path, the shape a `state.json` copied cross-machine carries.
+    fn foreign_path() -> &'static str {
+        if cfg!(windows) {
+            "/Users/someone/Coilbox-master"
+        } else {
+            r"E:\Coilbox-master"
+        }
+    }
+
+    #[test]
+    fn refresh_against_disk_drops_foreign_auto_root_even_when_forced() {
+        let state = ContentState {
+            schema_version: SCHEMA_VERSION,
+            roots: vec![stale_root(foreign_path(), RootSource::Auto, true)],
+            last_scan_at: Some(0),
+        };
+        let out = refresh_against_disk(state);
+        assert!(
+            out.roots.is_empty(),
+            "a foreign-OS path is never a live root, forced or not"
+        );
+    }
+
+    #[test]
+    fn refresh_against_disk_drops_foreign_manual_root_instead_of_offering_recreate() {
+        let state = ContentState {
+            schema_version: SCHEMA_VERSION,
+            roots: vec![stale_root(foreign_path(), RootSource::Manual, false)],
+            last_scan_at: Some(0),
+        };
+        let out = refresh_against_disk(state);
+        assert!(
+            out.roots.is_empty(),
+            "a foreign manual root can never be recreated here, so it is dropped"
+        );
+    }
+
+    #[test]
+    fn refresh_against_disk_keeps_valid_local_root_alongside_a_dropped_foreign_one() {
+        let base = std::env::temp_dir().join("coilbox_refresh_mixed_paths_test");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("games")).unwrap();
+
+        let state = ContentState {
+            schema_version: SCHEMA_VERSION,
+            roots: vec![
+                stale_root(&display_path(&base), RootSource::Manual, false),
+                stale_root(foreign_path(), RootSource::Auto, true),
+            ],
+            last_scan_at: Some(0),
+        };
+        let out = refresh_against_disk(state);
+        assert_eq!(out.roots.len(), 1);
+        assert!(out.roots[0].exists && out.roots[0].valid);
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn refresh_against_disk_forced_root_is_invalid_once_it_vanishes() {
+        let base = std::env::temp_dir().join("coilbox_refresh_forced_gone_test");
+        let _ = std::fs::remove_dir_all(&base); // never created: simulates a gone folder
+
+        let state = ContentState {
+            schema_version: SCHEMA_VERSION,
+            roots: vec![stale_root(&display_path(&base), RootSource::Auto, true)],
+            last_scan_at: Some(0),
+        };
+        let out = refresh_against_disk(state);
+        assert!(
+            out.roots.is_empty(),
+            "forced must not keep a vanished auto root reporting itself as valid"
+        );
+    }
+
+    #[test]
+    fn ensure_portable_seed_in_noop_without_a_portable_app_dir() {
+        let roots = vec![stale_root("/some/path", RootSource::Manual, false)];
+        let out = ensure_portable_seed_in(roots.clone(), None);
+        assert_eq!(out.len(), roots.len());
+    }
+
+    #[test]
+    fn ensure_portable_seed_in_injects_a_fresh_root_when_absent() {
+        let base = std::env::temp_dir().join("coilbox_ensure_portable_seed_test");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+
+        let out = ensure_portable_seed_in(Vec::new(), Some(base.clone()));
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].path, display_path(&canonical(&base)));
+        assert!(out[0].portable);
+        assert_eq!(out[0].forced, Some(true));
+        assert!(out[0].exists);
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn ensure_portable_seed_in_does_not_duplicate_an_existing_entry() {
+        let base = std::env::temp_dir().join("coilbox_ensure_portable_seed_dup_test");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        let existing = stale_root(&display_path(&canonical(&base)), RootSource::Auto, true);
+
+        let out = ensure_portable_seed_in(vec![existing], Some(base.clone()));
+        assert_eq!(out.len(), 1, "an already-fresh app-dir entry is left alone");
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn ensure_portable_seed_in_recovers_after_a_dead_cross_machine_snapshot() {
+        // Issue #524: the only root in a copied snapshot is a dead foreign path
+        // baked in on another machine. Once `refresh_against_disk` drops it,
+        // `ensure_portable_seed_in` must still supply a live root at *this*
+        // machine's portable anchor rather than leaving the app un-set-up.
+        let base = std::env::temp_dir().join("coilbox_ensure_portable_seed_crossmachine_test");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+
+        let state = ContentState {
+            schema_version: SCHEMA_VERSION,
+            roots: vec![stale_root(foreign_path(), RootSource::Auto, true)],
+            last_scan_at: Some(0),
+        };
+        let refreshed = refresh_against_disk(state);
+        assert!(refreshed.roots.is_empty());
+
+        let seeded = ensure_portable_seed_in(refreshed.roots, Some(base.clone()));
+        assert_eq!(seeded.len(), 1);
+        assert!(seeded[0].exists && seeded[0].valid);
+        assert_eq!(seeded[0].path, display_path(&canonical(&base)));
 
         let _ = std::fs::remove_dir_all(&base);
     }
