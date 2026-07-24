@@ -2,6 +2,7 @@ import { Button, Input } from "@picoframe/frame";
 import {
   Check,
   ImageOff,
+  Link as LinkIcon,
   Save,
   Share2,
   Swords,
@@ -39,6 +40,7 @@ export function PresetsDrawer({
   onSave,
   onDelete,
   onExportPreset,
+  onCopyPresetLink,
   onImport,
   onSaveFromReplay,
   onHostAsBattle,
@@ -52,6 +54,9 @@ export function PresetsDrawer({
   onSave: (name: string) => SkirmishPreset;
   onDelete: (id: string) => void;
   onExportPreset: (preset: SkirmishPreset) => void;
+  /** Copy this preset as a `coilbox://import?code=` link (issue #498), an
+   * addition alongside the file-export share action above, not a replacement. */
+  onCopyPresetLink: (preset: SkirmishPreset) => void;
   onImport: () => void;
   /** "New preset from replay…" (#368): seed a preset from a decoded replay's
    * setup (every seated player becomes an AI opponent) without touching the
@@ -239,9 +244,20 @@ export function PresetsDrawer({
                             size="icon"
                             onClick={() => onExportPreset(p)}
                             disabled={disabled}
-                            aria-label={`Share preset ${p.name}`}
+                            aria-label={`Export preset ${p.name} to a file`}
+                            title="Export to file"
                           >
                             <Share2 className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onCopyPresetLink(p)}
+                            disabled={disabled}
+                            aria-label={`Copy a link for preset ${p.name}`}
+                            title="Copy link"
+                          >
+                            <LinkIcon className="size-4" />
                           </Button>
                           <Button
                             variant="ghost"

@@ -1,8 +1,10 @@
 import { Button } from "@picoframe/frame";
-import { Lock, LogOut, Users } from "lucide-react";
+import { Link as LinkIcon, Lock, LogOut, Users } from "lucide-react";
 import { useState } from "react";
 import { useUnitsyncMinimap } from "../../content/config";
 import { MapThumb } from "../../content/pages/components/MapThumb";
+import { buildJoinLink } from "../../deeplink/build";
+import { copyDeepLink } from "../../deeplink/copyLink";
 import type { Battle } from "../bindings";
 import { battleRowAction, occupancy } from "./battleFilters";
 import { JoinBattlePopover } from "./JoinBattlePopover";
@@ -32,6 +34,7 @@ export function BattleRow({
   onLeave,
   enginePath,
   dataDir,
+  serverAddress,
 }: {
   battle: Battle;
   joined: boolean;
@@ -43,6 +46,9 @@ export function BattleRow({
   onLeave: () => void;
   enginePath?: string;
   dataDir?: string;
+  /** This server's `host:port` (issue #498), for a "Copy invite link" action.
+   * `undefined` hides the action rather than building a broken link. */
+  serverAddress?: string;
 }) {
   const players = occupancy(battle);
   const restricted = battle.passworded || battle.locked;
@@ -121,6 +127,20 @@ export function BattleRow({
           <span className="ml-1">+{battle.spectatorCount} spec</span>
         )}
       </div>
+      {serverAddress && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 shrink-0"
+          aria-label={`Copy an invite link for ${battle.title}`}
+          title="Copy invite link"
+          onClick={() =>
+            copyDeepLink(buildJoinLink(serverAddress, String(battle.id)))
+          }
+        >
+          <LinkIcon className="size-4" />
+        </Button>
+      )}
       {joined ? (
         <Button
           className="h-8 shrink-0 gap-1 px-3"

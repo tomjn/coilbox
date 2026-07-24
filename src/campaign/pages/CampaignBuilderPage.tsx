@@ -1,6 +1,6 @@
 import { Button, Input } from "@picoframe/frame";
-import { open } from "@tauri-apps/plugin-dialog";
-import { Download, Pencil, Plus, Trash2 } from "lucide-react";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -21,11 +21,16 @@ import {
 } from "../../content/resolveContent";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { usePreferredTarget } from "../../play/config";
-import { campaignDelete, campaignImport, campaignSave } from "../bindings";
+import {
+  campaignDelete,
+  campaignExport,
+  campaignImport,
+  campaignSave,
+} from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
-import { materializeCampaignImages } from "../images";
+import { inlineCampaignImages, materializeCampaignImages } from "../images";
 import type { Campaign } from "../model";
-import { parseCampaignExport } from "../transfer";
+import { parseCampaignExport, wrapCampaignForExport } from "../transfer";
 import { CampaignIconBox } from "./components/CampaignImage";
 
 /** Every game+map a campaign's missions need installed, deduped by the shared
@@ -146,6 +151,26 @@ export default function CampaignBuilderPage() {
     }
   };
 
+  // Export a local campaign to a single-file .json (issue #499: moved here from
+  // the editor's own header, so a campaign can be shared without opening it).
+  const exportCampaign = async (campaign: Campaign) => {
+    setActionError(null);
+    try {
+      // Inline every stored image (icon, background, each mission's panorama and
+      // side graphic) as a data URI so the export is a single self-contained file.
+      const file = wrapCampaignForExport(await inlineCampaignImages(campaign));
+      const dest = await save({
+        title: "Export campaign",
+        defaultPath: `${campaign.title || "campaign"}.json`,
+        filters: [{ name: "Coilbox campaign", extensions: ["json"] }],
+      });
+      if (!dest) return;
+      await campaignExport({ json: JSON.stringify(file, null, 2), dest });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <div className="flex flex-col gap-5 p-4">
       <header className="flex flex-col gap-1">
@@ -235,6 +260,14 @@ export default function CampaignBuilderPage() {
                       }
                     >
                       <Pencil className="size-4" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => void exportCampaign(campaign)}
+                    >
+                      <Upload className="size-4" /> Export
                     </Button>
                     <Popover>
                       <PopoverTrigger asChild>

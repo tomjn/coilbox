@@ -6,7 +6,10 @@ import { Link, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { summarizeSubstitutions } from "@/conquest/ai";
-import { encodeContainerJson } from "@/container/container";
+import {
+  encodeContainerCode,
+  encodeContainerJson,
+} from "@/container/container";
 import {
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
@@ -25,6 +28,8 @@ import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import { notify } from "@/notify/notify";
 import { contentListReplays } from "../../content/bindings";
 import { useReplayUserState } from "../../content/replayUserState";
+import { buildImportCodeLink } from "../../deeplink/build";
+import { copyDeepLink } from "../../deeplink/copyLink";
 import { useImportParam } from "../../deeplink/useImportParam";
 import type { BattleConfig } from "../bindings";
 import { playExportPreset, playImportPreset } from "../bindings";
@@ -521,7 +526,14 @@ export default function SkirmishPage() {
     }
   }
 
-  // Import a shared preset file: read it, validate the shape, then — once its
+  // Copy a preset as a coilbox://import?code= link (issue #498), an addition
+  // alongside the file-export share action above, not a replacement for it.
+  function onCopyPresetLink(preset: SkirmishPreset) {
+    const code = encodeContainerCode("preset", PRESET_KIND_VERSION, preset);
+    void copyDeepLink(buildImportCodeLink(code));
+  }
+
+  // Import a shared preset file: read it, validate the shape, then, once its
   // game and map are confirmed installed (or downloaded, #387) — add it as a
   // new preset (fresh id/timestamps via savePreset) without touching the
   // current setup.
@@ -626,6 +638,7 @@ export default function SkirmishPage() {
         onSave={saveCurrentPreset}
         onDelete={removePreset}
         onExportPreset={onExportPreset}
+        onCopyPresetLink={onCopyPresetLink}
         onImport={onImportPreset}
         onSaveFromReplay={saveFromReplay}
         onHostAsBattle={(p) => hostAsBattle(p, p.name)}

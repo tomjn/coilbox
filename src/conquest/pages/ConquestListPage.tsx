@@ -1,5 +1,12 @@
 import { Button, buttonVariants, cn, Input, useDrawer } from "@picoframe/frame";
-import { ChevronRight, Dices, Download, Orbit, Trash2 } from "lucide-react";
+import {
+  ChevronRight,
+  Dices,
+  Download,
+  Orbit,
+  Share2,
+  Trash2,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -10,6 +17,7 @@ import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
 import { mostRecentOpen } from "@/lib/recency";
 import { ChallengeCodeInput } from "../../challenge/ChallengeCodeInput";
+import { ChallengeCodeView } from "../../challenge/ChallengeCodeView";
 import { challengeDecodeErrorMessage } from "../../challenge/code";
 import { unitsyncSkirmishAis } from "../../content/bindings";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
@@ -36,6 +44,7 @@ import { conquestDelete, conquestSave } from "../bindings";
 import {
   type ConquestChallengeSettings,
   decodeConquestChallenge,
+  encodeConquestChallenge,
   optionsFromChallenge,
 } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
@@ -288,8 +297,23 @@ function GalaxyCard({
   onAbandon?: () => void;
 }) {
   const { refresh } = useGalaxies();
+  const drawer = useDrawer();
+  // Only a procedurally generated galaxy carries the seed a challenge code
+  // needs (issue #376), so nothing to share for an authored/bundled one.
+  const challengeCode = encodeConquestChallenge(galaxy);
+  const openShareChallenge = () =>
+    drawer.open({
+      title: "Share challenge",
+      width: "26rem",
+      content: (
+        <ChallengeCodeView
+          code={challengeCode ?? ""}
+          helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical galaxy, so results are directly comparable."
+        />
+      ),
+    });
   // The player's chosen faction emblem (by its in-game side), shown in place of the
-  // generic orbit glyph. Resolved per card — hooks are shared/cached per target.
+  // generic orbit glyph. Resolved per card, hooks are shared/cached per target.
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const installedGame = resolveGameByShortname(
@@ -368,6 +392,17 @@ function GalaxyCard({
           aria-hidden
         />
       </Link>
+      {challengeCode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Share ${galaxy.title} as a challenge code`}
+          title="Share challenge"
+          onClick={openShareChallenge}
+        >
+          <Share2 className="size-4 text-muted-foreground" aria-hidden />
+        </Button>
+      )}
       {state && onAbandon ? (
         <Button
           variant="ghost"

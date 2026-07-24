@@ -1,9 +1,8 @@
 import { Button, useDrawer } from "@picoframe/frame";
-import { ArrowLeft, Check, Share2, Trophy, X } from "lucide-react";
+import { ArrowLeft, Check, Trophy, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
-import { ChallengeCodeView } from "../../challenge/ChallengeCodeView";
 import { resolveGameByShortname } from "../../conquest/model";
 import { BracketFrame } from "../../conquest/pages/components/hudChrome";
 import { buildEdgeMap, reachableFrom } from "../../content/buildTree";
@@ -15,7 +14,6 @@ import {
 } from "../../content/pages/components/states";
 import { TechTreePicker } from "../../content/pages/components/TechTreePicker";
 import { usePreferredTarget } from "../../play/config";
-import { encodeWarpathChallenge } from "../challenge";
 import { awardMeta } from "../meta";
 import {
   isBattleNode,
@@ -58,19 +56,6 @@ export default function RunPage() {
   // Guard so a finished run awards meta-progression exactly once.
   const awardedRef = useRef<string | null>(null);
   const drawer = useDrawer();
-  const openShareChallenge = () => {
-    if (!run) return;
-    drawer.open({
-      title: "Share challenge",
-      width: "26rem",
-      content: (
-        <ChallengeCodeView
-          code={encodeWarpathChallenge(run)}
-          helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable."
-        />
-      ),
-    });
-  };
 
   // The arsenal ceiling size, for the HUD gauge (best-effort).
   const { target } = usePreferredTarget();
@@ -225,15 +210,6 @@ export default function RunPage() {
               Imported challenge
             </span>
           )}
-          <button
-            type="button"
-            onClick={openShareChallenge}
-            aria-label="Share this warpath as a challenge code"
-            title="Share challenge"
-            className="text-muted-foreground transition-colors hover:text-cyan-200"
-          >
-            <Share2 className="size-4" aria-hidden />
-          </button>
         </div>
         <div className="flex items-stretch gap-3">
           {selectedId && !active ? (

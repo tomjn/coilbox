@@ -73,6 +73,12 @@ export function serverKeyFor(server: LobbyServer, username: string): string {
   return `${username}@${server.host}:${server.port}`;
 }
 
+/** The `host:port` half of a `serverKey`, for a `coilbox://join` link (issue
+ * #498) - a link should carry where to connect, not who was connected. */
+export function serverAddressFromKey(serverKey: string): string {
+  return serverKey.slice(serverKey.indexOf("@") + 1);
+}
+
 /**
  * The just-arrived chat message referenced by a `chatMessage` / `privateMessage`
  * delta, resolved against the fresh snapshot (deltas carry only a location, not the

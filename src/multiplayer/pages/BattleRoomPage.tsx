@@ -283,6 +283,7 @@ function BattleRoomPage() {
         selfHost={room.selfHost}
         locked={battle.locked}
         onToggleLock={room.setLocked}
+        serverKey={room.serverKey}
       />
 
       {room.currentVote && (
