@@ -1,17 +1,21 @@
-import { Button } from "@picoframe/frame";
+import { Button, useDrawer } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
-import { Download, Loader2, ShieldAlert, Swords } from "lucide-react";
-import { useState } from "react";
+import { Download, ListTree, Loader2, ShieldAlert, Swords } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogos } from "@/factions/logos";
+import { buildEdgeMap, reachableFrom } from "../../../content/buildTree";
 import {
   invalidateMapPreview,
   invalidateScans,
+  useUnitsyncGameInfo,
   useUnitsyncScan,
+  useUnitsyncUnitDataset,
 } from "../../../content/config";
 import { ErrorBanner } from "../../../content/pages/components/states";
+import { TechTreePicker } from "../../../content/pages/components/TechTreePicker";
 import {
   type DownloadProgress,
   dlDownloadMap,
@@ -49,6 +53,7 @@ export function BattleOverlay({
   onClose: () => void;
 }) {
   const run = useConquestBattleRun(galaxy, state, node, mode);
+  const drawer = useDrawer();
 
   const enemyFactionId =
     mode === "defend"
@@ -80,6 +85,64 @@ export function BattleOverlay({
     : undefined;
   const enemyLogo = enemyFaction?.side
     ? factionLogos[enemyFaction.side.toLowerCase()]
+    : undefined;
+
+  // Read-only tech tree (issue #489). Conquest has no persistent unlock set
+  // like warpath's unlockedUnits, so a node's authored disabledUnits
+  // restriction stands in as its "opaque id set" (see #377). Light the
+  // complement, the units still usable in this fight, against the player's
+  // faction tree.
+  const dataset = useUnitsyncUnitDataset(
+    target?.enginePath,
+    target?.dataDir,
+    installedGame?.primaryArchive.name,
+  );
+  const gameInfo = useUnitsyncGameInfo(
+    target?.enginePath,
+    target?.dataDir,
+    installedGame?.primaryArchive.name,
+  );
+  const playerStartUnit = state.playerSide
+    ? gameInfo.info?.sides.find(
+        (s) => s.name.toLowerCase() === state.playerSide?.toLowerCase(),
+      )?.startUnit
+    : undefined;
+  // Scope to the player's own faction tree when it's known, dropping other
+  // factions' units so they don't clutter an "Other units" bucket. Otherwise
+  // fall back to the whole dataset, still grouped sensibly by TechTreePicker.
+  const techUnits = useMemo(() => {
+    const units = dataset.dataset?.units ?? [];
+    if (!playerStartUnit) return units;
+    const reachable = reachableFrom(playerStartUnit, buildEdgeMap(units));
+    return units.filter((u) => reachable.has(u.name.toLowerCase()));
+  }, [dataset.dataset, playerStartUnit]);
+  const availableUnits = useMemo(() => {
+    const disabled = new Set(
+      (node.battle.disabledUnits ?? []).map((u) => u.toLowerCase()),
+    );
+    return techUnits
+      .map((u) => u.name.toLowerCase())
+      .filter((id) => !disabled.has(id));
+  }, [techUnits, node.battle.disabledUnits]);
+  const openTechTree = installedGame
+    ? () =>
+        drawer.open({
+          title: "Available units",
+          description:
+            "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit.",
+          width: "40rem",
+          content: (
+            <TechTreePicker
+              units={techUnits}
+              roots={playerStartUnit ? [playerStartUnit] : []}
+              selected={availableUnits}
+              selectedLabel="available"
+              enginePath={target?.enginePath}
+              dataDir={target?.dataDir}
+              gameArchive={installedGame.primaryArchive.name}
+            />
+          ),
+        })
     : undefined;
 
   return (
@@ -114,6 +177,19 @@ export function BattleOverlay({
             defaultName={`${node.name} vs ${enemyFaction?.name ?? "garrison"}`}
             className="absolute right-full top-16 mr-4"
           />
+        )}
+        {/* Another gutter box beneath the preset save button. Read-only lit
+            tree of units still usable in this fight (issue #489). */}
+        {openTechTree && (
+          <button
+            type="button"
+            onClick={openTechTree}
+            aria-label="View available units"
+            title="View tech tree"
+            className="pointer-events-auto absolute right-full top-32 mr-4 flex items-center justify-center rounded-md border border-border/50 bg-card/70 p-3.5 text-muted-foreground backdrop-blur-sm transition-colors hover:border-border hover:text-foreground"
+          >
+            <ListTree className="size-5" aria-hidden />
+          </button>
         )}
         <header className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 font-display text-lg font-semibold uppercase tracking-wide">
