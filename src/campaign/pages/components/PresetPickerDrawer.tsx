@@ -11,18 +11,29 @@ import type { SkirmishPreset } from "@/play/presets";
 export function PresetPickerDrawer({
   presets,
   onPick,
+  initialGameName,
 }: {
   presets: SkirmishPreset[];
   onPick: (preset: SkirmishPreset) => void;
+  /**
+   * Scope the list to this game's presets by default (game detail's "New
+   * campaign" action, issue #372). The user can still clear it to see every
+   * preset.
+   */
+  initialGameName?: string;
 }) {
   const drawer = useDrawer();
   const [query, setQuery] = useState("");
+  const [gameFilter, setGameFilter] = useState(initialGameName);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return presets;
-    return presets.filter((p) => p.name.toLowerCase().includes(q));
-  }, [presets, query]);
+    return presets.filter((p) => {
+      if (gameFilter && p.gameName !== gameFilter) return false;
+      if (q && !p.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [presets, query, gameFilter]);
 
   if (presets.length === 0) {
     return (
@@ -42,6 +53,19 @@ export function PresetPickerDrawer({
 
   return (
     <div className="flex flex-col gap-3">
+      {gameFilter && (
+        <p className="text-xs text-muted-foreground">
+          Showing presets for{" "}
+          <span className="text-foreground">{gameFilter}</span>.{" "}
+          <button
+            type="button"
+            className="underline underline-offset-4"
+            onClick={() => setGameFilter(undefined)}
+          >
+            Show all
+          </button>
+        </p>
+      )}
       <Input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -68,7 +92,19 @@ export function PresetPickerDrawer({
             </button>
           </li>
         ))}
-        {filtered.length === 0 && (
+        {filtered.length === 0 && gameFilter && (
+          <li className="text-xs text-muted-foreground">
+            No presets for {gameFilter}.{" "}
+            <button
+              type="button"
+              className="underline underline-offset-4"
+              onClick={() => setGameFilter(undefined)}
+            >
+              Show all
+            </button>
+          </li>
+        )}
+        {filtered.length === 0 && !gameFilter && (
           <li className="text-xs text-muted-foreground">No presets match.</li>
         )}
       </ul>

@@ -12,6 +12,8 @@ import { challengeDecodeErrorMessage } from "../../challenge/code";
 import { unitsyncSkirmishAis } from "../../content/bindings";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
+import { BrandingLinks } from "../../content/pages/components/BrandingLinks";
+import { BrandingScreenshots } from "../../content/pages/components/BrandingScreenshots";
 import { ResolveContentGate } from "../../content/pages/components/ResolveContentDrawer";
 import {
   EmptyState,
@@ -19,6 +21,7 @@ import {
   SkeletonList,
 } from "../../content/pages/components/states";
 import type { ContentRequirement } from "../../content/resolveContent";
+import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
 import {
   usePlayReadiness,
@@ -87,12 +90,13 @@ export default function ConquestListPage() {
   const runs = galaxies.filter((g) => file.conquests[g.galaxy.id]);
   const unstarted = galaxies.filter((g) => !file.conquests[g.galaxy.id]);
 
-  const openGenerate = () =>
+  const openGenerate = (initialGameName?: string) =>
     drawer.open({
       title: "Generate a galaxy",
       width: "30rem",
       content: (
         <GenerateGalaxyForm
+          initialGameName={initialGameName}
           onCreated={(id) => {
             drawer.close();
             navigate(`/conquest/${encodeURIComponent(id)}`);
@@ -125,6 +129,15 @@ export default function ConquestListPage() {
     if (importCode) openImportChallenge(importCode);
   }, [importCode]);
 
+  // Game detail's "Start a conquest" action (issue #372) lands here with the
+  // game preselected in the query string. Open the generate wizard with it
+  // prefilled, the same way an import code opens its own drawer above.
+  const presetGame = useGamePresetParam();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the preset arrives, not on every drawer identity change
+  useEffect(() => {
+    if (presetGame) openGenerate(presetGame);
+  }, [presetGame]);
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex items-start justify-between gap-4">
@@ -142,7 +155,7 @@ export default function ConquestListPage() {
               <Download className="mr-1.5 size-4" aria-hidden /> Import
               challenge
             </Button>
-            <Button onClick={openGenerate}>
+            <Button onClick={() => openGenerate()}>
               <Dices className="mr-1.5 size-4" aria-hidden /> Generate a galaxy
             </Button>
           </div>
@@ -406,8 +419,16 @@ const STARTING_OPTIONS = [
  */
 function GenerateGalaxyForm({
   onCreated,
+  initialGameName,
 }: {
   onCreated: (id: string) => void;
+  /**
+   * Preselect this game (its unitsync name) from game detail's "Start a
+   * conquest" action (issue #372). Falls back to the wizard's own default
+   * pick when the name doesn't match any available game, e.g. it's since
+   * been removed.
+   */
+  initialGameName?: string;
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -438,12 +459,17 @@ function GenerateGalaxyForm({
   }, [scan.data]);
 
   const [gameShort, setGameShort] = useState("");
-  // Default to the first game so the create button is never a silent dead-end;
-  // the user can still switch games via the select.
+  // Default to the preselected game (if it matches one on offer), else the
+  // first game, so the create button is never a silent dead-end. The user
+  // can still switch games via the select.
   const selected =
     gameChoices.find(
       (g) => (g.info.shortname ?? g.name).trim().toLowerCase() === gameShort,
-    ) ?? gameChoices[0];
+    ) ??
+    (initialGameName
+      ? gameChoices.find((g) => g.name === initialGameName)
+      : undefined) ??
+    gameChoices[0];
   const effectiveShort = selected
     ? (selected.info.shortname ?? selected.name).trim()
     : "";
@@ -599,6 +625,12 @@ function GenerateGalaxyForm({
               <span className="text-foreground">{gameChoices[0].name}</span>
             </p>
           )}
+          {/* Reuse the same branding catalog art shown on game detail (issue
+              #372), so the conquest setup feels like part of the game's world. */}
+          {brandingEntry && <BrandingLinks entry={brandingEntry} />}
+          {brandingEntry?.screenshots?.length ? (
+            <BrandingScreenshots shots={brandingEntry.screenshots} />
+          ) : null}
           <div className="flex flex-col gap-1.5 text-sm">
             <span className="font-medium">Galaxy size</span>
             <OptionSelect

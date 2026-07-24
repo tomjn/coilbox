@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Hammer, Milestone } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import { getCachedCampaign, useHasCampaigns } from "./campaigns";
 
 /**
@@ -46,7 +47,9 @@ const campaignPlugin: FramePlugin = {
           to: "/campaign-builder",
           order: 1,
           icon: Hammer,
-          useVisible: useAdvancedMode,
+          // A distribution can also hide Campaign Builder outright (issue #372).
+          useVisible: () =>
+            useAdvancedMode() && !isProfileHidden("campaign.builder"),
         },
       ],
     },
@@ -82,12 +85,22 @@ const campaignPlugin: FramePlugin = {
     },
     {
       path: "campaign-builder",
-      lazy: gateAdvanced(() => import("./pages/CampaignBuilderPage")),
+      lazy: gateAdvanced(
+        gateProfileHidden(
+          "campaign.builder",
+          () => import("./pages/CampaignBuilderPage"),
+        ),
+      ),
       crumb: "Campaign Builder",
     },
     {
       path: "campaign-builder/:id",
-      lazy: gateAdvanced(() => import("./pages/CampaignEditPage")),
+      lazy: gateAdvanced(
+        gateProfileHidden(
+          "campaign.builder",
+          () => import("./pages/CampaignEditPage"),
+        ),
+      ),
       crumb: "Edit",
     },
   ],

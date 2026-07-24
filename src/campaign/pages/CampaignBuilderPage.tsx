@@ -1,7 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Download, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Popover,
@@ -19,6 +19,7 @@ import {
   exactGameRequirement,
   exactMapRequirement,
 } from "../../content/resolveContent";
+import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { usePreferredTarget } from "../../play/config";
 import { campaignDelete, campaignImport, campaignSave } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
@@ -50,6 +51,15 @@ export default function CampaignBuilderPage() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Game detail's "New campaign" action (issue #372) lands here with the game
+  // preselected in the query string. There's no campaign-level game field (a
+  // campaign's game is set per-mission from a preset), so this only seeds the
+  // title and is carried forward to prefill the first "Add mission" picker.
+  const presetGame = useGamePresetParam();
+  useEffect(() => {
+    if (presetGame) setTitle((t) => t || `${presetGame} Campaign`);
+  }, [presetGame]);
+
   const create = async () => {
     const trimmed = title.trim();
     if (!trimmed || busy) return;
@@ -71,7 +81,7 @@ export default function CampaignBuilderPage() {
       await refreshCampaigns();
       setTitle("");
       setDescription("");
-      navigate(`/campaign-builder/${campaign.id}`);
+      navigate(`/campaign-builder/${campaign.id}`, { state: { presetGame } });
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
     } finally {

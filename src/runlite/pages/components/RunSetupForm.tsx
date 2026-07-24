@@ -5,12 +5,15 @@ import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogos } from "@/factions/logos";
+import { resolveBranding, useBrandingCatalog } from "../../../content/branding";
 import {
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
   useUnitsyncScan,
   useUnitsyncUnitDataset,
 } from "../../../content/config";
+import { BrandingLinks } from "../../../content/pages/components/BrandingLinks";
+import { BrandingScreenshots } from "../../../content/pages/components/BrandingScreenshots";
 import { usePreferredTarget, useSkirmishAis } from "../../../play/config";
 import { GameSelectCard } from "../../../play/pages/components/GameSelectCard";
 import { getGameMatcher } from "../../../profile/profile";
@@ -35,8 +38,16 @@ const LAST_GAME_KEY = "runlite:lastGame";
 
 export function RunSetupForm({
   onStarted,
+  initialGameName,
 }: {
   onStarted: (id: string) => void;
+  /**
+   * Preselect this game (its unitsync name) from game detail's "Start a
+   * warpath run" action (issue #372). Falls back to the last-picked/first
+   * game when the name doesn't match any available game, e.g. it's since
+   * been removed.
+   */
+  initialGameName?: string;
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -74,8 +85,9 @@ export function RunSetupForm({
     target?.dataDir,
   );
 
-  // Default to the last game the player picked (if still installed/allowed),
-  // else the first available game.
+  // Default to the preselected game (if it's on offer), else the last game
+  // the player picked (if still installed/allowed), else the first available
+  // game.
   useEffect(() => {
     if (gameName && games.some((g) => g.name === gameName)) return;
     if (games.length === 0) return;
@@ -83,12 +95,19 @@ export function RunSetupForm({
     try {
       last = localStorage.getItem(LAST_GAME_KEY);
     } catch {}
-    const pick = games.find((g) => g.name === last) ?? games[0];
+    const pick =
+      (initialGameName && games.find((g) => g.name === initialGameName)) ||
+      games.find((g) => g.name === last) ||
+      games[0];
     setGameName(pick.name);
-  }, [games, gameName]);
+  }, [games, gameName, initialGameName]);
 
   const game = games.find((g) => g.name === gameName) ?? null;
   const archive = game?.primaryArchive.name;
+  // Reuse the same branding catalog art shown on game detail (issue #372), so
+  // the warpath setup feels like part of the game's world.
+  const brandingEntries = useBrandingCatalog();
+  const brandingEntry = game ? resolveBranding(brandingEntries, game) : null;
   const { info, loading: infoLoading } = useUnitsyncGameInfo(
     target?.enginePath,
     target?.dataDir,
@@ -181,6 +200,11 @@ export function RunSetupForm({
           />
         </Field>
       )}
+
+      {brandingEntry && <BrandingLinks entry={brandingEntry} />}
+      {brandingEntry?.screenshots?.length ? (
+        <BrandingScreenshots shots={brandingEntry.screenshots} />
+      ) : null}
 
       {(sides.length > 0 || gameLoading) && (
         <Field label="Faction / side">

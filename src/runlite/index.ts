@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Rocket } from "lucide-react";
 import { NeedsGameNavBadge } from "../play/navBadges";
+import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import { getCachedRun } from "./runs";
 
 /**
@@ -32,6 +33,8 @@ const runlitePlugin: FramePlugin = {
           order: 3,
           icon: Rocket,
           badge: NeedsGameNavBadge,
+          // A distribution can hide Warpath entirely (issue #372).
+          useVisible: () => !isProfileHidden("runlite.list"),
         },
       ],
     },
@@ -39,12 +42,15 @@ const runlitePlugin: FramePlugin = {
   routes: [
     {
       path: "warpath",
-      lazy: () => import("./pages/RunListPage"),
+      lazy: gateProfileHidden(
+        "runlite.list",
+        () => import("./pages/RunListPage"),
+      ),
       crumb: "Warpath",
     },
     {
       path: "warpath/:runId",
-      lazy: () => import("./pages/RunPage"),
+      lazy: gateProfileHidden("runlite.list", () => import("./pages/RunPage")),
       crumb: (c) =>
         (c.params.runId && getCachedRun(c.params.runId)?.name) || "Warpath",
     },
