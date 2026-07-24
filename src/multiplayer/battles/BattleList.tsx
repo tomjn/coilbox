@@ -9,6 +9,7 @@ type RowProps = {
   onLeave: () => void;
   enginePath?: string;
   dataDir?: string;
+  serverAddress?: string;
 };
 
 /**
@@ -29,6 +30,7 @@ export function BattleList({
   onLeave,
   enginePath,
   dataDir,
+  serverAddress,
 }: {
   battles: Battle[];
   totalCount: number;
@@ -40,9 +42,19 @@ export function BattleList({
   onLeave: () => void;
   enginePath?: string;
   dataDir?: string;
+  /** This server's `host:port` (issue #498), threaded down to each row's
+   * "Copy invite link" action. */
+  serverAddress?: string;
 }) {
   const [collapsed, setCollapsed] = useState({ open: false, running: false });
-  const rowProps: RowProps = { canJoin, onJoin, onLeave, enginePath, dataDir };
+  const rowProps: RowProps = {
+    canJoin,
+    onJoin,
+    onLeave,
+    enginePath,
+    dataDir,
+    serverAddress,
+  };
 
   const rest = battles.filter((b) => b.id !== joinedId);
   const open = rest.filter((b) => !inProgressIds.has(b.id));

@@ -19,7 +19,7 @@ import {
   mpLeaveBattle,
   mpOpenBattle,
 } from "../bindings";
-import { useMpRevealed, useMultiplayer } from "../store";
+import { serverAddressFromKey, useMpRevealed, useMultiplayer } from "../store";
 
 /**
  * The Battles hub: search + filter/sort controls over the live battle list, with
@@ -248,6 +248,7 @@ function BattlesPage() {
         onLeave={leave}
         enginePath={selected?.enginePath}
         dataDir={selected?.rootPath}
+        serverAddress={activeKey ? serverAddressFromKey(activeKey) : undefined}
       />
     </main>
   );

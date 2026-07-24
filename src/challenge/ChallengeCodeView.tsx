@@ -1,11 +1,17 @@
 import { Button } from "@picoframe/frame";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { buildImportCodeLink } from "@/deeplink/build";
+import { copyDeepLink } from "@/deeplink/copyLink";
 
 /**
- * Read-only display of a challenge code with a copy button — the "Share
- * challenge" drawer content, shared by conquest and warpath (issue #376).
+ * Read-only display of a challenge or setup-pack code with a copy button -
+ * the "Share challenge"/"Share pack" drawer content (issue #376). Also offers
+ * a "Copy link" action that wraps the same code as a `coilbox://import?code=`
+ * link (issue #498), for pasting somewhere a raw code would be mistaken for
+ * noise - the link is an addition alongside the raw-code copy, not a
+ * replacement for it.
  */
 export function ChallengeCodeView({
   code,
@@ -22,7 +28,7 @@ export function ChallengeCodeView({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // clipboard may be unavailable; the code is still selectable in the box.
+      // clipboard may be unavailable, so the code is still selectable in the box.
     }
   };
 
@@ -36,17 +42,26 @@ export function ChallengeCodeView({
         className="font-mono text-xs"
         onFocus={(e) => e.currentTarget.select()}
       />
-      <Button onClick={copy}>
-        {copied ? (
-          <>
-            <Check className="mr-1.5 size-4" aria-hidden /> Copied
-          </>
-        ) : (
-          <>
-            <Copy className="mr-1.5 size-4" aria-hidden /> Copy code
-          </>
-        )}
-      </Button>
+      <div className="flex gap-2">
+        <Button className="flex-1" onClick={copy}>
+          {copied ? (
+            <>
+              <Check className="mr-1.5 size-4" aria-hidden /> Copied
+            </>
+          ) : (
+            <>
+              <Copy className="mr-1.5 size-4" aria-hidden /> Copy code
+            </>
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => copyDeepLink(buildImportCodeLink(code))}
+        >
+          <LinkIcon className="mr-1.5 size-4" aria-hidden /> Copy link
+        </Button>
+      </div>
     </div>
   );
 }

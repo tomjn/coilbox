@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { Lock, LogOut, Play } from "lucide-react";
+import { Link as LinkIcon, Lock, LogOut, Play } from "lucide-react";
 import { useState } from "react";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
@@ -8,7 +8,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import { buildJoinLink } from "@/deeplink/build";
+import { copyDeepLink } from "@/deeplink/copyLink";
 import type { Battle, MemberStatus } from "../bindings";
+import { serverAddressFromKey } from "../store";
 import type { SyncState } from "./config";
 import { SyncStatusPill } from "./SyncStatusPill";
 
@@ -36,6 +39,7 @@ export function BattleRoomHeader({
   selfHost,
   locked,
   onToggleLock,
+  serverKey,
 }: {
   battle: Battle;
   myStatus: MemberStatus | undefined;
@@ -49,6 +53,9 @@ export function BattleRoomHeader({
   selfHost: boolean;
   locked: boolean;
   onToggleLock: (locked: boolean) => void;
+  /** This room's connection key (issue #498), for a "Copy invite link"
+   * action. `null` hides the action rather than building a broken link. */
+  serverKey: string | null;
 }) {
   const ready = myStatus?.battleStatus.ready ?? false;
   const spectator = myStatus ? !myStatus.battleStatus.mode : false;
@@ -61,6 +68,25 @@ export function BattleRoomHeader({
           {battle.title || `Battle ${battle.id}`}
         </h1>
         <SyncStatusPill state={sync} />
+        {serverKey && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0 text-muted-foreground"
+            aria-label="Copy an invite link for this battle"
+            title="Copy invite link"
+            onClick={() =>
+              copyDeepLink(
+                buildJoinLink(
+                  serverAddressFromKey(serverKey),
+                  String(battle.id),
+                ),
+              )
+            }
+          >
+            <LinkIcon className="size-4" />
+          </Button>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-4">
