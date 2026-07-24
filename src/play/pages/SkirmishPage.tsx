@@ -1,8 +1,8 @@
 import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { Bookmark, Play } from "lucide-react";
+import { Bookmark, Play, Swords } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { encodeContainerJson } from "@/container/container";
@@ -88,6 +88,7 @@ function restrictionSummary(r: BattleRestrictions): string {
 /** Basic singleplayer (skirmish) launcher: pick a game, map and opponents, then
  * launch the engine. Uses the preferred engine silently (no picker). */
 export default function SkirmishPage() {
+  const navigate = useNavigate();
   const { target } = usePreferredTarget();
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
@@ -346,6 +347,33 @@ export default function SkirmishPage() {
     restrictions,
   });
 
+  // "Host as battle" (issue #373): take a skirmish draft (the current setup, or
+  // a saved preset from the drawer) online. A draft's game or map might not be
+  // installed locally at all (a preset saved on another machine, or an old one
+  // whose content moved). `HostBattlePopover` only ever offers installed
+  // games/maps, so hosting one that isn't would silently open a battle for a
+  // different game. Gate on the resolve-content flow (#387) first. Only once
+  // both are confirmed installed does this navigate to the Battles hub with
+  // the draft to seed (`BattlesPage`/`BattleRoomPage` carry it the rest of the
+  // way). Not connected yet, or not logged in? `/battles` itself already
+  // prompts to connect (same as the content map detail's "Host a battle here"),
+  // so nothing extra is needed here.
+  const [pendingHost, setPendingHost] = useState<{
+    draft: SkirmishDraft;
+    title: string;
+  } | null>(null);
+
+  function hostAsBattle(draft: SkirmishDraft, title: string) {
+    const installed =
+      games.some((g) => g.name === draft.gameName) &&
+      maps.some((m) => m.name === draft.mapName);
+    if (installed) {
+      navigate("/battles", { state: { hostDraft: draft, hostTitle: title } });
+      return;
+    }
+    setPendingHost({ draft, title });
+  }
+
   async function onStart(parts: Participant[] = participants) {
     if (!target) return;
     const config = buildConfig(parts);
@@ -527,6 +555,15 @@ export default function SkirmishPage() {
           >
             <Bookmark className="size-4" /> Presets
           </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              hostAsBattle(currentDraft(), `${gameName || "Skirmish"} (hosted)`)
+            }
+            disabled={running || !selectedGame || !selectedMap}
+          >
+            <Swords className="size-4" /> Host as battle
+          </Button>
           <Button onClick={() => onStart()} disabled={!canStart}>
             <Play className="size-4 fill-current" />{" "}
             {running ? "Game running…" : "Start Game"}
@@ -545,6 +582,7 @@ export default function SkirmishPage() {
         onExportPreset={onExportPreset}
         onImport={onImportPreset}
         onSaveFromReplay={saveFromReplay}
+        onHostAsBattle={(p) => hostAsBattle(p, p.name)}
         disabled={running}
       />
 
@@ -564,6 +602,27 @@ export default function SkirmishPage() {
             setPendingPreset(null);
           }}
           onCancel={() => setPendingPreset(null)}
+        />
+      )}
+
+      {pendingHost && (
+        <ResolveContentGate
+          title="Set up this battle for hosting"
+          requirements={[
+            exactGameRequirement(pendingHost.draft.gameName),
+            exactMapRequirement(pendingHost.draft.mapName),
+          ]}
+          target={target ?? undefined}
+          onContinue={() => {
+            navigate("/battles", {
+              state: {
+                hostDraft: pendingHost.draft,
+                hostTitle: pendingHost.title,
+              },
+            });
+            setPendingHost(null);
+          }}
+          onCancel={() => setPendingHost(null)}
         />
       )}
 

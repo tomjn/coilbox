@@ -1,6 +1,7 @@
 import { Button, NavGate } from "@picoframe/frame";
 import { useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
+import type { SkirmishDraft } from "@/play/drafts";
 import { useScanTargetSelection } from "../../content/config";
 import { notify } from "../../notify/notify";
 import { getGameMatcher } from "../../profile/profile";
@@ -59,10 +60,20 @@ function BattlesPage() {
   // Selected engine + content root for rendering local minimaps in the rows.
   const { selected } = useScanTargetSelection();
 
-  // A content map detail's "Host a battle here" navigates here with the map name;
-  // preselect it in the host popover and open it on arrival.
+  // A content map detail's "Host a battle here" navigates here with the map name,
+  // preselecting it in the host popover and opening it on arrival.
   const location = useLocation();
   const hostMap = (location.state as { hostMap?: string } | null)?.hostMap;
+
+  // A Singleplayer preset's "Host as battle" (issue #373) navigates here with the
+  // draft to host and a title. Preselect its game/map/title and, once the room
+  // opens, forward the same draft to the battle room so it can seed the room's
+  // options, start boxes, host seat and bots (see `BattleRoomPage`'s apply effect).
+  const hostState = location.state as {
+    hostDraft?: SkirmishDraft;
+    hostTitle?: string;
+  } | null;
+  const hostDraft = hostState?.hostDraft;
 
   // A confirmed coilbox://join deep link (issue #388) navigates here with the
   // target server and battle id. Join only when already connected to a server
@@ -82,14 +93,24 @@ function BattlesPage() {
 
   // After a user-initiated join lands (the ack sets `currentBattle`), go straight
   // to the battle room. Gated on `joiningRef` so merely revisiting this page while
-  // already in a battle doesn't redirect.
+  // already in a battle doesn't redirect. `hostingFromDraftRef` distinguishes
+  // "we just opened this from a preset's Host as battle" from an ordinary join
+  // (including a join of someone *else's* battle made while a hostDraft happens
+  // to be sitting in this page's state), so the draft is only ever forwarded to
+  // the room we actually hosted from it.
   const joiningRef = useRef(false);
+  const hostingFromDraftRef = useRef(false);
   useEffect(() => {
     if (joinedId != null && joiningRef.current) {
       joiningRef.current = false;
-      navigate("/battle");
+      const seeded = hostingFromDraftRef.current;
+      hostingFromDraftRef.current = false;
+      navigate(
+        "/battle",
+        seeded && hostDraft ? { state: { hostDraft } } : undefined,
+      );
     }
-  }, [joinedId, navigate]);
+  }, [joinedId, navigate, hostDraft]);
   const joinedBattle =
     joinedId != null ? mirror.state?.battles[String(joinedId)] : undefined;
 
@@ -141,6 +162,7 @@ function BattlesPage() {
   async function onJoin(b: Battle, key?: string) {
     if (!activeKey) return;
     clearJoinError();
+    hostingFromDraftRef.current = false;
     joiningRef.current = true;
     try {
       await mpJoinBattle({ serverKey: activeKey, id: b.id, key });
@@ -155,11 +177,13 @@ function BattlesPage() {
   async function onHost(args: OpenBattleArgs) {
     if (!activeKey) return;
     clearJoinError();
+    hostingFromDraftRef.current = !!hostDraft;
     joiningRef.current = true;
     try {
       await mpOpenBattle({ serverKey: activeKey, ...args });
     } catch {
       joiningRef.current = false;
+      hostingFromDraftRef.current = false;
     }
   }
 
@@ -195,8 +219,10 @@ function BattlesPage() {
           <HostBattlePopover
             disabled={!canJoin}
             onHost={onHost}
-            initialMap={hostMap}
-            autoOpen={!!hostMap}
+            initialMap={hostDraft?.mapName ?? hostMap}
+            initialGame={hostDraft?.gameName}
+            initialTitle={hostState?.hostTitle}
+            autoOpen={!!hostMap || !!hostDraft}
           />
           <BattleFilterPopover filters={filters} setFilters={setFilters} />
         </div>

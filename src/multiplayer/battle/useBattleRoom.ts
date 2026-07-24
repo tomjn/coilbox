@@ -162,7 +162,22 @@ export interface BattleRoomView {
   setTeam: (teamId: number) => void;
   setAlly: (ally: number) => void;
   setColor: (hex: string) => void;
-  /** Set our own in-game flag (MYSTATUS); the host flips this to start the match. */
+  /**
+   * Set several of our own battle-status fields at once (host-seed apply, see
+   * `useApplyHostSeed`). Sequential single-field setters each snapshot the
+   * *other* fields from state at call time, so firing several in one tick can
+   * race and clobber each other. This sends one MYBATTLESTATUS carrying every
+   * changed field together. `colorHex` is `#rrggbb`, converted to the lobby
+   * int here like every other colour entry point.
+   */
+  setBattleStatusBatch: (patch: {
+    side?: number;
+    ally?: number;
+    teamId?: number;
+    colorHex?: string;
+    spectator?: boolean;
+  }) => void;
+  /** Set our own in-game flag (MYSTATUS): the host flips this to start the match. */
   setIngame: (ingame: boolean) => void;
   /** Host controls over another member (self-hosted battles only; no-op otherwise). */
   hostControls: {
@@ -796,6 +811,20 @@ export function useBattleRoom(): BattleRoomView {
       debounceColor("self", () => {
         setSavedColor(hex);
         pushStatus({ color: hexToColorInt(hex) });
+      });
+    },
+    setBattleStatusBatch: (patch) => {
+      if (patch.colorHex !== undefined)
+        intendedColorRef.current = hexToColorInt(patch.colorHex);
+      pushStatus({
+        side: patch.side,
+        ally: patch.ally,
+        teamId: patch.teamId,
+        mode: patch.spectator === undefined ? undefined : !patch.spectator,
+        color:
+          patch.colorHex === undefined
+            ? undefined
+            : hexToColorInt(patch.colorHex),
       });
     },
     setIngame,
