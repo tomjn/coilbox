@@ -66,8 +66,17 @@ function ReplayPickerForm({
     target?.enginePath,
     replayPath || undefined,
   );
-  const { missingGame, missingMap, sides, ais, scanLoading } =
-    useRefightSetup(info);
+  const {
+    shortGameId,
+    gameCandidates,
+    selectedGameName,
+    setSelectedGameName,
+    missingGame,
+    missingMap,
+    sides,
+    ais,
+    scanLoading,
+  } = useRefightSetup(info);
   const [aiKey, setAiKey] = useState("");
   const [name, setName] = useState("");
 
@@ -89,6 +98,11 @@ function ReplayPickerForm({
     value: aiValue(a),
     label: a.name ?? a.shortName,
     description: aiByline(a),
+  }));
+  const gameOptions = gameCandidates.map((g) => ({
+    value: g.name,
+    label: g.name,
+    description: g.info?.version,
   }));
 
   const draft: SkirmishDraft | null = info
@@ -139,11 +153,26 @@ function ReplayPickerForm({
           {missingGame ? "This replay's game isn't installed. " : ""}
           {missingMap ? "This replay's map isn't installed. " : ""}
           Install it first from the Replays screen.
+          {missingGame &&
+            shortGameId &&
+            !shortGameId.exact &&
+            " Its exact game couldn't be confirmed from the replay, so this is a name-only check."}
         </p>
       )}
 
       {ready && info && !missingGame && !missingMap && (
         <>
+          {gameCandidates.length > 1 && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium">Game version</span>
+              <OptionSelect
+                value={selectedGameName}
+                onValueChange={setSelectedGameName}
+                options={gameOptions}
+                size="sm"
+              />
+            </div>
+          )}
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium">AI to fill every player</span>
             {ais.length === 0 ? (

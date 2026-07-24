@@ -916,6 +916,7 @@ export default function ReplayDetailPage() {
             {selected && !info.remixed && (
               <RemixPanel
                 replayPath={replay.path}
+                recordedGameType={info.gameType}
                 recordedEngineVersion={info.engineVersion}
                 enginePath={selected.enginePath}
                 dataDir={selected.rootPath}

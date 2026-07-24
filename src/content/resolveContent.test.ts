@@ -6,9 +6,13 @@ import {
   engineVersionRequirement,
   exactGameRequirement,
   exactMapRequirement,
+  gameMatchesShortId,
   gameNamesMatch,
   type InstalledContentSnapshot,
+  installedGameShortId,
   normalizeGameIdentity,
+  resolveReplayShortGameId,
+  stripVersionSuffix,
 } from "./resolveContent";
 
 const installed = (
@@ -133,5 +137,69 @@ describe("normalizeGameIdentity / gameNamesMatch", () => {
     expect(
       gameNamesMatch("splinterfaction 0.178", "SPLINTERFACTION 0.178"),
     ).toBe(true);
+  });
+});
+
+describe("stripVersionSuffix", () => {
+  it("drops trailing version-looking words, keeping the family name", () => {
+    expect(stripVersionSuffix("Beyond All Reason test-30018-d71d659")).toBe(
+      "Beyond All Reason",
+    );
+    expect(stripVersionSuffix("SplinterFaction 0.178")).toBe("SplinterFaction");
+  });
+
+  it("leaves a name with no version-looking word unchanged", () => {
+    expect(stripVersionSuffix("Zero-K")).toBe("Zero-K");
+  });
+
+  it("always keeps at least one word", () => {
+    expect(stripVersionSuffix("30018")).toBe("30018");
+  });
+});
+
+describe("resolveReplayShortGameId / gameMatchesShortId (issue #503)", () => {
+  it("recovers a real shortname from an installed game of a different version", () => {
+    const installedGames = [
+      { name: "Beyond All Reason test-30050", shortname: "byar" },
+    ];
+    const shortId = resolveReplayShortGameId(
+      "Beyond All Reason test-30018-d71d659",
+      installedGames,
+    );
+    expect(shortId).toEqual({ id: "byar", exact: true });
+    expect(gameMatchesShortId(shortId, installedGames[0])).toBe(true);
+  });
+
+  it("allows a same-shortname different version as a valid target", () => {
+    const older = { name: "Beyond All Reason test-30018", shortname: "byar" };
+    const newer = { name: "Beyond All Reason test-30050", shortname: "byar" };
+    const shortId = resolveReplayShortGameId(older.name, [older, newer]);
+    expect(gameMatchesShortId(shortId, older)).toBe(true);
+    expect(gameMatchesShortId(shortId, newer)).toBe(true);
+  });
+
+  it("rejects a different game even when both are installed", () => {
+    const bar = { name: "Beyond All Reason test-30018", shortname: "byar" };
+    const zk = { name: "Zero-K v1.10.6", shortname: "zk" };
+    const shortId = resolveReplayShortGameId(bar.name, [bar, zk]);
+    expect(gameMatchesShortId(shortId, bar)).toBe(true);
+    expect(gameMatchesShortId(shortId, zk)).toBe(false);
+  });
+
+  it("falls back to the version-stripped family identity with no installed match", () => {
+    const zk = { name: "Zero-K v1.10.6", shortname: "zk" };
+    const shortId = resolveReplayShortGameId("Some Uninstalled Game 4.2", [zk]);
+    expect(shortId).toEqual({ id: "someuninstalledgame", exact: false });
+    expect(gameMatchesShortId(shortId, zk)).toBe(false);
+  });
+
+  it("installedGameShortId prefers the real shortname over the family name", () => {
+    expect(
+      installedGameShortId({
+        name: "Beyond All Reason test-30018",
+        shortname: "byar",
+      }),
+    ).toBe("byar");
+    expect(installedGameShortId({ name: "Zero-K v1.10.6" })).toBe("zerok");
   });
 });
