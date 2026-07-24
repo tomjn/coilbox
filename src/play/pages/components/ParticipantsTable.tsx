@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { Dices, X } from "lucide-react";
+import { AlertTriangle, Dices, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -151,6 +151,17 @@ export function ParticipantsTable({
   const nativeAis = ais.filter((a) => a.kind === "native");
   const luaAis = ais.filter((a) => a.kind === "lua");
 
+  // Defensive flag (#501): a row whose selected AI isn't in this game's list at
+  // all reads as invalid rather than being shown as a normal (blank) pick. Only
+  // meaningful once the list has loaded, so an empty list never flags anything.
+  const aiInvalid = (p: Participant): boolean =>
+    p.kind === "ai" &&
+    !!p.ai &&
+    ais.length > 0 &&
+    !ais.some(
+      (a) => a.shortName.toLowerCase() === p.ai?.shortName.toLowerCase(),
+    );
+
   return (
     <div className="rounded-lg border border-border/50 bg-card">
       <Table className="border-collapse">
@@ -283,6 +294,12 @@ export function ParticipantsTable({
                             )}
                           </SelectContent>
                         </Select>
+                        {aiInvalid(p) && (
+                          <span className="mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
+                            <AlertTriangle className="size-3.5 shrink-0" />
+                            {p.ai?.shortName} isn't available in this game
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

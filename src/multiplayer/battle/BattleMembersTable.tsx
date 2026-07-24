@@ -235,11 +235,22 @@ export function BattleMembersTable({
                   onKick: () => hostControls.removeBot(row.name),
                 };
               }
+              // Defensive flag (#501): a bot whose AI isn't in this game's
+              // addable list at all (a preset or hand-add from another game or
+              // version) reads as invalid rather than as a normal bot.
+              const aiInvalid =
+                row.kind === "bot" &&
+                !!row.aiDll &&
+                addableAis.length > 0 &&
+                !addableAis.some(
+                  (a) => a.shortName.toLowerCase() === row.aiDll?.toLowerCase(),
+                );
               return (
                 <MemberRow
                   key={`${row.kind}:${row.name}`}
                   row={row}
                   editable={row.self}
+                  aiInvalid={aiInvalid}
                   control={control}
                   sharedWith={sharedWith}
                   showActions={showActions}
