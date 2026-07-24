@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Orbit } from "lucide-react";
 import { NeedsGameNavBadge } from "../play/navBadges";
+import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import { getCachedGalaxy } from "./conquests";
 
 /**
@@ -36,6 +37,8 @@ const conquestPlugin: FramePlugin = {
           order: 2,
           icon: Orbit,
           badge: NeedsGameNavBadge,
+          // A distribution can hide Conquest entirely (issue #372).
+          useVisible: () => !isProfileHidden("conquest.list"),
         },
       ],
     },
@@ -43,14 +46,20 @@ const conquestPlugin: FramePlugin = {
   routes: [
     {
       path: "conquest",
-      lazy: () => import("./pages/ConquestListPage"),
+      lazy: gateProfileHidden(
+        "conquest.list",
+        () => import("./pages/ConquestListPage"),
+      ),
       crumb: "Conquest",
     },
     {
       // The battle briefing lives on this page as an overlay (camera zooms to
-      // the contested node) — there is no separate battle route.
+      // the contested node). There is no separate battle route.
       path: "conquest/:id",
-      lazy: () => import("./pages/GalaxyPage"),
+      lazy: gateProfileHidden(
+        "conquest.list",
+        () => import("./pages/GalaxyPage"),
+      ),
       crumb: (c) =>
         (c.params.id && getCachedGalaxy(c.params.id)?.galaxy.title) || "Galaxy",
     },
