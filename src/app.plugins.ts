@@ -4,6 +4,7 @@ import animationPlugin from "./animation";
 import campaignPlugin from "./campaign";
 import conquestPlugin from "./conquest";
 import contentPlugin from "./content";
+import deepLinkPlugin from "./deeplink";
 import downloadsPlugin from "./downloads";
 import gameUpdatesPlugin from "./game-updates";
 import generalPlugin from "./general";
@@ -34,6 +35,7 @@ export const plugins: FramePlugin[] = [
   lobbyServersPlugin,
   multiplayerPlugin,
   // picoframe:plugins-end
+  deepLinkPlugin,
   generalPlugin,
   profilePlugin,
   updaterPlugin,

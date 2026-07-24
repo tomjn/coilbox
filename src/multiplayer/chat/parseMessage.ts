@@ -147,11 +147,16 @@ function parseInline(text: string): Inline[] {
   return out;
 }
 
-/** Extract bare http(s) URLs; remaining runs handed to bold/italic parsing. */
+/**
+ * Extract bare http(s) URLs and `coilbox://` deep links, remaining runs handed
+ * to bold/italic parsing. `coilbox://` is allowed so a shared deep link (issue
+ * #388) renders as a clickable link in chat, the same as any web link. Clicking
+ * it dispatches through the app's confirm-before-act deep-link handler.
+ */
 function parseUrls(text: string): Inline[] {
   const out: Inline[] = [];
   let last = 0;
-  for (const m of text.matchAll(/https?:\/\/\S+/g)) {
+  for (const m of text.matchAll(/(?:https?|coilbox):\/\/\S+/g)) {
     if (m.index > last) out.push(...parseEmphasis(text.slice(last, m.index)));
     const url = m[0];
     const trail = /[.,!?)\]}:;]+$/.exec(url);
