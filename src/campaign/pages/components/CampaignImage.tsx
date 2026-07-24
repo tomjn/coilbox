@@ -157,8 +157,8 @@ export function CampaignImageField({
   /**
    * The mission's (or, for campaign-level fields, the best-effort first
    * mission's) game name. When set, shows an "import from game files" archive
-   * browser alongside the file picker. Images only, a video slot still needs
-   * the file picker for a video file.
+   * browser alongside the file picker, for images. When `allowVideo` is also
+   * set, a second browser is shown for video members.
    */
   gameName?: string;
 }) {
@@ -213,6 +213,16 @@ export function CampaignImageField({
             gameName={gameName}
             mediaType="image"
             imageKind={kind}
+            triggerLabel={allowVideo ? "Image from game files" : undefined}
+            onImported={(file) => onChange({ kind: "file", file })}
+          />
+        )}
+        {allowVideo && gameName !== undefined && (
+          <ArchiveMediaImportButton
+            campaignId={campaignId}
+            gameName={gameName}
+            mediaType="video"
+            triggerLabel="Video from game files"
             onImported={(file) => onChange({ kind: "file", file })}
           />
         )}

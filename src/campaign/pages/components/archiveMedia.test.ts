@@ -37,6 +37,8 @@ describe("filterArchiveFilesByType", () => {
     entry("sounds/explosion.wav"),
     entry("gamedata/defs.lua"),
     entry("bitmaps/loading.jpg"),
+    entry("videos/intro.mp4"),
+    entry("videos/outro.webm"),
   ];
 
   it("keeps only image extensions for the image type", () => {
@@ -51,9 +53,18 @@ describe("filterArchiveFilesByType", () => {
     );
   });
 
+  it("keeps only video extensions for the video type", () => {
+    expect(filterArchiveFilesByType(files, "video").map((f) => f.path)).toEqual(
+      ["videos/intro.mp4", "videos/outro.webm"],
+    );
+  });
+
   it("returns an empty list when nothing matches", () => {
     expect(
       filterArchiveFilesByType([entry("gamedata/defs.lua")], "image"),
+    ).toEqual([]);
+    expect(
+      filterArchiveFilesByType([entry("gamedata/defs.lua")], "video"),
     ).toEqual([]);
   });
 });

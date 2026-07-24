@@ -1,5 +1,5 @@
 import type { ArchiveFileEntry } from "../../../content/bindings";
-import { AUDIO_EXTS, IMAGE_EXTS } from "../../../lib/assetUrl";
+import { AUDIO_EXTS, IMAGE_EXTS, VIDEO_EXTS } from "../../../lib/assetUrl";
 
 /**
  * Pure logic for the "import from game files" media pickers (see
@@ -10,11 +10,11 @@ import { AUDIO_EXTS, IMAGE_EXTS } from "../../../lib/assetUrl";
  */
 
 /** The media kind a picker cares about: images (icon/panorama/side graphic
- * slots) or audio (the voiceover slot). Video is out of scope. unitsync's
- * archive preview command doesn't decode audio/video streams for a browser
- * `<video>` tag, so there's no in-picker way to preview or size-cap a clip
- * before import, so it stays file-picker only. */
-export type ArchiveMediaType = "image" | "audio";
+ * slots), audio (the voiceover slot) or video (the cutscene / video side
+ * graphic slots). unitsync's archive preview command doesn't decode video
+ * streams for a browser `<video>` tag, so a video pick is extracted straight
+ * to a path and imported rather than previewed in the popover. */
+export type ArchiveMediaType = "image" | "audio" | "video";
 
 /** The extension of a slash-separated archive member path, lowercased and
  * without the dot, or "" when the path has none. */
@@ -33,7 +33,8 @@ export function filterArchiveFilesByType(
   files: ArchiveFileEntry[],
   type: ArchiveMediaType,
 ): ArchiveFileEntry[] {
-  const exts = type === "audio" ? AUDIO_EXTS : IMAGE_EXTS;
+  const exts =
+    type === "audio" ? AUDIO_EXTS : type === "video" ? VIDEO_EXTS : IMAGE_EXTS;
   return files.filter((f) => exts.includes(archiveFileExt(f.path)));
 }
 
