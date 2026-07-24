@@ -1,4 +1,8 @@
-import { decodeChallenge, encodeChallenge } from "../challenge/code";
+import {
+  decodeChallenge,
+  encodeChallenge,
+  encodeChallengeFile,
+} from "../challenge/code";
 import type { GalaxyLayout, GenerateOptions } from "./generate";
 import type { GalaxyDoc, GameRef } from "./model";
 
@@ -110,6 +114,13 @@ function parseConquestChallengeSettings(
 export function encodeConquestChallenge(galaxy: GalaxyDoc): string | null {
   const settings = challengeSettingsFromGalaxy(galaxy);
   return settings ? encodeChallenge("conquest", settings) : null;
+}
+
+/** Encode a generated galaxy as a challenge file's JSON text (issue #476), or
+ * `null` if the galaxy isn't procedurally generated. */
+export function encodeConquestChallengeFile(galaxy: GalaxyDoc): string | null {
+  const settings = challengeSettingsFromGalaxy(galaxy);
+  return settings ? encodeChallengeFile("conquest", settings) : null;
 }
 
 /** Decode a pasted challenge code into settings, or a typed error. */

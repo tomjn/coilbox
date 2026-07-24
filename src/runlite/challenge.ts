@@ -1,4 +1,8 @@
-import { decodeChallenge, encodeChallenge } from "../challenge/code";
+import {
+  decodeChallenge,
+  encodeChallenge,
+  encodeChallengeFile,
+} from "../challenge/code";
 import type { GenBuildGraph, GenerateRunOpts, GenRunMap } from "./generate";
 import type { RogueliteRun, RunSettings } from "./model";
 import { parseRunSettings } from "./model";
@@ -14,6 +18,11 @@ export type WarpathChallengeSettings = RunSettings;
 /** Encode a run's settings as a pasteable challenge code. */
 export function encodeWarpathChallenge(run: RogueliteRun): string {
   return encodeChallenge("warpath", run.settings);
+}
+
+/** Encode a run's settings as a challenge file's JSON text (issue #476). */
+export function encodeWarpathChallengeFile(run: RogueliteRun): string {
+  return encodeChallengeFile("warpath", run.settings);
 }
 
 /** Decode a pasted challenge code into settings, or a typed error. */

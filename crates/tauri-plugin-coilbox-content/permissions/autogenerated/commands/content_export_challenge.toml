@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-export-challenge"
+description = "Enables the content_export_challenge command without any pre-configured scope."
+commands.allow = ["content_export_challenge"]
+
+[[permission]]
+identifier = "deny-content-export-challenge"
+description = "Denies the content_export_challenge command without any pre-configured scope."
+commands.deny = ["content_export_challenge"]

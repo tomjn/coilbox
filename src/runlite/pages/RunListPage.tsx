@@ -1,7 +1,9 @@
 import { Button, useDrawer } from "@picoframe/frame";
+import { save } from "@tauri-apps/plugin-dialog";
 import { Download, Loader2, Play, Rocket, Share2, Trash2 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router";
+import { challengeExport } from "@/challenge/bindings";
 import { ChallengeCodeView } from "@/challenge/ChallengeCodeView";
 import { ContinueBadge } from "@/components/ContinueBadge";
 import { FactionLogo } from "@/factions/FactionLogo";
@@ -13,7 +15,10 @@ import { EmptyState } from "../../content/pages/components/states";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { usePlayReadiness, usePreferredTarget } from "../../play/config";
-import { encodeWarpathChallenge } from "../challenge";
+import {
+  encodeWarpathChallenge,
+  encodeWarpathChallengeFile,
+} from "../challenge";
 import type { RogueliteRun } from "../model";
 import { useRuns } from "../runs";
 import { ImportChallengeForm } from "./components/ImportChallengeForm";
@@ -194,6 +199,15 @@ function RunCard({
   onAbandon: () => void;
 }) {
   const drawer = useDrawer();
+  const exportChallengeFile = async () => {
+    const dest = await save({
+      title: "Export challenge",
+      defaultPath: `${run.settings.game.shortname || "warpath"}-challenge.json`,
+      filters: [{ name: "Coilbox challenge", extensions: ["json"] }],
+    });
+    if (!dest) return;
+    await challengeExport({ text: encodeWarpathChallengeFile(run), dest });
+  };
   const openShareChallenge = () =>
     drawer.open({
       title: "Share challenge",
@@ -202,6 +216,7 @@ function RunCard({
         <ChallengeCodeView
           code={encodeWarpathChallenge(run)}
           helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable."
+          onExportFile={exportChallengeFile}
         />
       ),
     });

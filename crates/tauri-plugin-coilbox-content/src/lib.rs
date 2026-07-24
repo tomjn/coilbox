@@ -1007,6 +1007,29 @@ async fn content_export_build_tree_zip(
     })
 }
 
+/// `content_export_challenge`, write a caller-serialized challenge container
+/// (the pretty-printed JSON text from `code.ts`'s `encodeChallengeFile`) to a
+/// caller-chosen path. Opaque, the frontend owns the container format and picks
+/// the destination via the save dialog (mirrors `campaign_export`, issue #476).
+#[tauri::command]
+async fn content_export_challenge(dest: String, text: String) -> Result<CliResult, ()> {
+    Ok(match std::fs::write(&dest, text) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(format!("could not write challenge export: {e}")),
+    })
+}
+
+/// `content_import_challenge`, read a challenge file the user picked and hand its
+/// raw text back for the frontend to decode through the same `decodeChallenge` a
+/// pasted code uses (issue #476).
+#[tauri::command]
+async fn content_import_challenge(src: String) -> Result<CliResult, ()> {
+    Ok(match std::fs::read_to_string(&src) {
+        Ok(text) => CliResult::ok(json!({ "text": text })),
+        Err(e) => CliResult::err(format!("could not read challenge import: {e}")),
+    })
+}
+
 /// `branding_catalog` — fetch the remote branding catalog JSON, disk-cache it, and
 /// fall back to the cache then the bundled seed on network failure. Returns the
 /// raw JSON text; the frontend parses/matches it (Rust stays schema-agnostic).
@@ -1225,6 +1248,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_reclaim_caches,
             content_export_build_tree_html,
             content_export_build_tree_zip,
+            content_export_challenge,
+            content_import_challenge,
             branding_catalog,
             branding_image
         ])

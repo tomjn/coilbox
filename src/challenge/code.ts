@@ -12,6 +12,13 @@
  * (see `../conquest/challenge.ts` and `../runlite/challenge.ts`). Codes shared
  * before the container (the legacy `coilbox-challenge` envelope) still decode,
  * so no already-pasted code breaks.
+ *
+ * Issue #476 adds a file export alongside the pasteable code: the same
+ * container, written as pretty-printed JSON to a `.json` file instead of
+ * base64url text, for larger payloads or where pasting a long code is
+ * awkward. `decodeChallenge` already reads either shape (see
+ * `decodeContainerText`), so a file round-trips through the exact same decode
+ * as a pasted code with no extra branch.
  */
 
 import {
@@ -19,6 +26,7 @@ import {
   CONTAINER_VERSION,
   decodeContainerText,
   encodeContainerCode,
+  encodeContainerJson,
 } from "../container/container";
 
 /** Payload schema version for a challenge container. */
@@ -41,6 +49,16 @@ export function encodeChallenge<K extends string, S>(
 ): string {
   const payload: ChallengePayload<S> = { mode: kind, settings };
   return encodeContainerCode("challenge", CHALLENGE_KIND_VERSION, payload);
+}
+
+/** Encode a challenge's settings as pretty-printed JSON text, for a `.json`
+ * file export (issue #476) instead of a pasteable code. */
+export function encodeChallengeFile<K extends string, S>(
+  kind: K,
+  settings: S,
+): string {
+  const payload: ChallengePayload<S> = { mode: kind, settings };
+  return encodeContainerJson("challenge", CHALLENGE_KIND_VERSION, payload);
 }
 
 /** Why a pasted code was rejected — surfaced as a friendly inline message. */
