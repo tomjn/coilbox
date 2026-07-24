@@ -249,6 +249,7 @@ export default function CampaignEditPage() {
           onChange={(icon) => void persist({ ...campaign, icon })}
           label="Icon"
           help="Small emblem shown on this campaign in lists. Transparency is kept."
+          gameName={campaign.missions[0]?.snapshot.gameName}
           preview={
             <div className="flex size-20 items-center justify-center overflow-hidden rounded-md border border-border/50 bg-muted">
               <CampaignImage
@@ -267,6 +268,7 @@ export default function CampaignEditPage() {
           onChange={(background) => void persist({ ...campaign, background })}
           label="Background"
           help="Backdrop behind the campaign's mission list — an image or a looping video. A video imported here only plays back on this machine (it isn't bundled into a single-file export)."
+          gameName={campaign.missions[0]?.snapshot.gameName}
           allowVideo
           preview={
             <div className="overflow-hidden rounded-md border border-border/50 bg-muted">

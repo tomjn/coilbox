@@ -11,6 +11,7 @@ const COMMANDS: &[&str] = &[
     "campaign_image_read",
     "campaign_image_delete",
     "campaign_media_import",
+    "campaign_media_import_data",
     "campaign_export",
     "campaign_import",
     "campaign_progress_load",

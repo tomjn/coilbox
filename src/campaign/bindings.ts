@@ -73,6 +73,19 @@ export const campaignMediaImport = defineCommand<
   { file: string }
 >("coilbox-campaign", "campaign_media_import");
 
+/**
+ * Import an audio/video clip from a base64 `data:` URI, copied verbatim like
+ * {@link campaignMediaImport} (no re-encode). Used by the archive-import picker:
+ * the clip is read out of a game archive via unitsync, not a file the user
+ * picked, so there is no on-disk `srcPath` to hand the file-based command.
+ * `ext` (no leading dot) picks the stored file's extension. Returns the bare
+ * stored filename.
+ */
+export const campaignMediaImportData = defineCommand<
+  { campaignId: string; dataUri: string; ext: string },
+  { file: string }
+>("coilbox-campaign", "campaign_media_import_data");
+
 /** Read a stored panorama back as a `data:` URL for display. */
 export const campaignImageRead = defineCommand<
   { campaignId: string; file: string },

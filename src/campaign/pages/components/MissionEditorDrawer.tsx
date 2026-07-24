@@ -21,6 +21,7 @@ import {
   campaignMediaImport,
 } from "../../bindings";
 import type { CampaignMission, MapPreviewConfig } from "../../model";
+import { ArchiveMediaImportButton } from "./ArchiveMediaImportButton";
 import { CampaignImage, CampaignImageField } from "./CampaignImage";
 import {
   CUE_DEFAULTS,
@@ -230,6 +231,14 @@ export function MissionEditorDrawer({
     patch({ panorama: undefined });
   };
 
+  // Same session-import bookkeeping as `pickImage`'s success path, just sourced
+  // from the archive picker instead of the OS file dialog.
+  const importPanoramaFromArchive = (file: string) => {
+    discardSessionPanorama();
+    sessionFiles.current.add(file);
+    patch({ panorama: { kind: "file", file } });
+  };
+
   const setObjective = (i: number, value: string) =>
     patch({
       objectives: mission.objectives.map((o, j) => (j === i ? value : o)),
@@ -406,7 +415,7 @@ export function MissionEditorDrawer({
                   onChange={(panoramaPlayback) => patch({ panoramaPlayback })}
                 />
               ))}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant="outline"
@@ -416,6 +425,12 @@ export function MissionEditorDrawer({
                 <Image className="size-4" />{" "}
                 {mission.panorama ? "Replace media" : "Choose image or video"}
               </Button>
+              <ArchiveMediaImportButton
+                campaignId={campaignId}
+                gameName={mission.snapshot.gameName}
+                mediaType="image"
+                onImported={importPanoramaFromArchive}
+              />
               {mission.panorama && (
                 <Button
                   size="sm"
@@ -466,6 +481,7 @@ export function MissionEditorDrawer({
               onChange={(sideGraphic) => patch({ sideGraphic })}
               label="Image or video"
               help="A unit render or emblem, for example. Image transparency is kept; a video loops muted."
+              gameName={mission.snapshot.gameName}
               allowVideo
               preview={
                 <div className="rounded-md border border-border/50 bg-muted p-2">
@@ -503,6 +519,7 @@ export function MissionEditorDrawer({
           onChange={(voiceover) => patch({ voiceover })}
           label="Briefing voiceover"
           help="Optional audio played on the briefing screen."
+          gameName={mission.snapshot.gameName}
         />
         {mission.voiceover && (
           <PlaybackTuning
