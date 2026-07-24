@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Campaign, CampaignMission, CampaignProgress } from "./model";
-import { missionStates } from "./progress";
+import { missionStates, resumeMissionId } from "./progress";
 
 /** Build a minimal mission with only the fields `missionStates` reads. */
 function mission(id: string, skippable = false): CampaignMission {
@@ -29,8 +29,11 @@ function campaign(missions: CampaignMission[]): Campaign {
   };
 }
 
-function progress(completed: string[]): CampaignProgress {
-  return { completedMissionIds: completed, updatedAt: "" };
+function progress(
+  completed: string[],
+  lastPlayedMissionId?: string,
+): CampaignProgress {
+  return { completedMissionIds: completed, lastPlayedMissionId, updatedAt: "" };
 }
 
 describe("missionStates", () => {
@@ -82,5 +85,27 @@ describe("missionStates", () => {
     expect(states.get("a")).toBe("available");
     expect(states.get("b")).toBe("locked");
     expect(states.get("c")).toBe("locked");
+  });
+});
+
+describe("resumeMissionId", () => {
+  it("is undefined with no progress", () => {
+    const c = campaign([mission("a"), mission("b")]);
+    expect(resumeMissionId(c, undefined)).toBeUndefined();
+  });
+
+  it("resumes the last-played mission when it isn't completed", () => {
+    const c = campaign([mission("a"), mission("b")]);
+    expect(resumeMissionId(c, progress([], "a"))).toBe("a");
+  });
+
+  it("is undefined once the last-played mission is completed", () => {
+    const c = campaign([mission("a"), mission("b")]);
+    expect(resumeMissionId(c, progress(["a"], "a"))).toBeUndefined();
+  });
+
+  it("is undefined when the last-played mission no longer exists", () => {
+    const c = campaign([mission("a"), mission("b")]);
+    expect(resumeMissionId(c, progress([], "deleted"))).toBeUndefined();
   });
 });
