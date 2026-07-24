@@ -1,4 +1,11 @@
-import { Heart, HelpCircle, Layers, Sparkles, Wrench } from "lucide-react";
+import {
+  Heart,
+  HelpCircle,
+  Layers,
+  ListTree,
+  Sparkles,
+  Wrench,
+} from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -53,12 +60,15 @@ export function RunHud({
   arsenalTotal,
   logo,
   side,
+  onInspectArsenal,
 }: {
   run: RogueliteRun;
   arsenalTotal?: number;
   /** The run's chosen faction emblem, shown as a leading tile when resolved. */
   logo?: FactionLogoSrc;
   side?: string;
+  /** Open the read-only arsenal tech-tree. Adds an inspect control when given. */
+  onInspectArsenal?: () => void;
 }) {
   const p = run.progress;
   const maxCol = Math.max(...run.nodes.map((n) => n.col), 1);
@@ -160,10 +170,23 @@ export function RunHud({
         value={tier ? `Tech ${toRoman(tier)}` : `${unlocked}`}
         accent="neutral"
         action={
-          <HelpDot
-            label="Arsenal"
-            help="The units you can currently build, out of your faction's full tree. Rewards and depots unlock more — but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
-          />
+          <div className="flex items-center gap-1">
+            {onInspectArsenal && (
+              <button
+                type="button"
+                onClick={onInspectArsenal}
+                aria-label="View the arsenal tech tree"
+                title="View arsenal tree"
+                className="pointer-events-auto -m-1 flex size-5 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <ListTree className="size-3" aria-hidden />
+              </button>
+            )}
+            <HelpDot
+              label="Arsenal"
+              help="The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
+            />
+          </div>
         }
       >
         <p className="mt-1 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
