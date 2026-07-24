@@ -39,13 +39,19 @@ export function HostBattlePopover({
   disabled,
   onHost,
   initialMap,
+  initialGame,
+  initialTitle,
   autoOpen,
 }: {
   disabled: boolean;
   onHost: (args: OpenBattleArgs) => void;
   /** Preselect this map (e.g. from a content map detail's "Host a battle here"). */
   initialMap?: string;
-  /** Open the popover on mount — paired with `initialMap` for the same jump. */
+  /** Preselect this game (e.g. from a skirmish preset's "Host as battle"). */
+  initialGame?: string;
+  /** Preselect this title (e.g. a skirmish preset's name). */
+  initialTitle?: string;
+  /** Open the popover on mount, paired with `initialMap`/`initialGame` for the same jump. */
   autoOpen?: boolean;
 }) {
   const [open, setOpen] = useState(!!autoOpen);
@@ -73,8 +79,8 @@ export function HostBattlePopover({
     [scan.data],
   );
 
-  const [title, setTitle] = useState("");
-  const [gameName, setGameName] = useState("");
+  const [title, setTitle] = useState(initialTitle ?? "");
+  const [gameName, setGameName] = useState(initialGame ?? "");
   const [mapName, setMapName] = useState(initialMap ?? "");
   const [maxPlayers, setMaxPlayers] = useState(16);
   const [port, setPort] = useState(DEFAULT_HOST_PORT);

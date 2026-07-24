@@ -1,11 +1,15 @@
 import { Button, NavGate } from "@picoframe/frame";
 import { Bookmark, Gamepad2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useFactionLogos } from "@/factions/logos";
 import { useSkirmishAis } from "@/play/config";
+import type { SkirmishDraft } from "@/play/drafts";
 import { SaveAsPresetButton } from "@/play/pages/components/SaveAsPresetButton";
+import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
+import { ApplySkirmishPresetPopover } from "../battle/ApplySkirmishPresetPopover";
 import { AutohostControls } from "../battle/AutohostControls";
+import { addHostSeedBots } from "../battle/applyHostSeed";
 import { BattleChatCard } from "../battle/BattleChatCard";
 import { BattleGameCard } from "../battle/BattleGameCard";
 import { BattleMapCard } from "../battle/BattleMapCard";
@@ -15,12 +19,14 @@ import { BattlePresetsDrawer } from "../battle/BattlePresetsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
 import { battleOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
+import { draftToHostSeed } from "../battle/fromSkirmish";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import {
   StartBoxControls,
   useStartBoxAllies,
 } from "../battle/StartBoxControls";
 import { StartPosOptions } from "../battle/StartPosOptions";
+import { useSavedStartBoxes } from "../battle/startBoxSaved";
 import { battleToSkirmishDraft } from "../battle/toSkirmish";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
 import { useBattleRoom } from "../battle/useBattleRoom";
@@ -66,6 +72,20 @@ function BattleRoomPage() {
   // and the controls under the start-position dropdown.
   const boxAllies = useStartBoxAllies(room.rows, room.battle?.startRects ?? {});
 
+  // Skirmish presets (issue #373): the singleplayer preset store, distinct
+  // from `useBattlePresets` above (options-only snapshots). Used both to host
+  // a preset's own bots once a room WE opened from it comes up, and to let a
+  // self-hosted room apply one in place.
+  const skirmishPresets = useSkirmishPresets();
+  const [savedBoxes] = useSavedStartBoxes();
+  const [hostSeedError, setHostSeedError] = useState<string | null>(null);
+
+  // "Host as battle" (from a skirmish preset or the current Singleplayer setup)
+  // navigates here with the draft to seed once the room we just opened is ready.
+  const location = useLocation();
+  const hostDraft = (location.state as { hostDraft?: SkirmishDraft } | null)
+    ?.hostDraft;
+
   // Per-game default preset: when we host a game that has a default preset set,
   // apply its options once. Guarded by a ref keyed on the battle + game so it seeds
   // the room a single time and never re-clobbers options the host then tweaks.
@@ -83,6 +103,97 @@ function BattleRoomPage() {
     room.applyOptionTags(preset.scriptTags);
     presets.touchPreset(preset.id);
   }, [room, presets]);
+
+  // Apply a "Host as battle" seed once, the first time this battle is ready:
+  // the draft's own seat, its mod/map options, start-pos type and unit
+  // restrictions, its saved-for-this-map start boxes (if it uses choose-in-map),
+  // and its bots. Guarded by a ref keyed on the battle id, set only once the
+  // seeding actually runs, so a re-render (or the host later tweaking options)
+  // never re-seeds. `contentKnown`'s "some content is known" shortcut can
+  // briefly report a just-installed game/map as missing while the room's own
+  // scan is still catching up (live-verified: locking here on that transient
+  // read produced a false "not installed" banner for a game that WAS
+  // installed). So a missing verdict is never locked in or reported here: the
+  // effect just waits and re-checks on the next render: if the game or map is
+  // genuinely missing, it never seeds, and the room's own `MissingContentCard`
+  // (rendered elsewhere below) already tells the host that.
+  const appliedHostSeedRef = useRef<number | null>(null);
+  useEffect(() => {
+    const b = room.battle;
+    if (!hostDraft || !b || !room.selfHost) return;
+    if (appliedHostSeedRef.current === b.id) return;
+    if (!room.contentKnown || room.gameMissing || room.mapMissing) return;
+    appliedHostSeedRef.current = b.id;
+
+    const seed = draftToHostSeed({
+      draft: hostDraft,
+      sides: room.sides,
+      ais: room.addableAis,
+    });
+    room.setBattleStatusBatch({
+      side: seed.self.side,
+      ally: seed.self.ally,
+      teamId: seed.self.teamId,
+      colorHex: seed.self.colorHex,
+      spectator: seed.self.spectator,
+    });
+    room.applyOptionTags(seed.scriptTags);
+    if (hostDraft.startPosType === 2) {
+      const boxes = savedBoxes[hostDraft.mapName];
+      if (boxes) {
+        for (const [ally, rect] of Object.entries(boxes))
+          room.setStartBox(Number(ally), rect);
+      }
+    }
+    if (seed.bots.length === 0 || !room.serverKey) return;
+    const serverKey = room.serverKey;
+    addHostSeedBots(serverKey, seed.bots).then((failures) => {
+      if (failures.length > 0) {
+        setHostSeedError(
+          `${failures.length} of ${seed.bots.length} bot(s) couldn't be added. ${failures.join(", ")}`,
+        );
+      }
+    });
+  }, [hostDraft, room, savedBoxes]);
+
+  // Apply a saved skirmish preset to the current room in place (issue #373).
+  // Only ever reachable while self-hosting (see the button below), so this
+  // never runs against a battle we merely joined.
+  function applySkirmishPresetInPlace(preset: SkirmishPreset, maphash: number) {
+    if (!room.battle) return;
+    if (preset.mapName !== room.battle.map)
+      room.setMap(preset.mapName, maphash);
+    const seed = draftToHostSeed({
+      draft: preset,
+      sides: room.sides,
+      ais: room.addableAis,
+    });
+    room.setBattleStatusBatch({
+      side: seed.self.side,
+      ally: seed.self.ally,
+      teamId: seed.self.teamId,
+      colorHex: seed.self.colorHex,
+      spectator: seed.self.spectator,
+    });
+    room.applyOptionTags(seed.scriptTags);
+    if (preset.startPosType === 2) {
+      const boxes = savedBoxes[preset.mapName];
+      if (boxes) {
+        for (const [ally, rect] of Object.entries(boxes))
+          room.setStartBox(Number(ally), rect);
+      }
+    }
+    skirmishPresets.touchPreset(preset.id);
+    if (seed.bots.length === 0 || !room.serverKey) return;
+    const serverKey = room.serverKey;
+    addHostSeedBots(serverKey, seed.bots).then((failures) => {
+      if (failures.length > 0) {
+        setHostSeedError(
+          `${failures.length} of ${seed.bots.length} bot(s) couldn't be added. ${failures.join(", ")}`,
+        );
+      }
+    });
+  }
 
   // Auto-launch: for a battle we JOIN, match start is driven by the protocol, not a
   // button — when the host goes in-game, launch the engine as a client. Guard against
@@ -178,6 +289,11 @@ function BattleRoomPage() {
           {room.actionError}
         </p>
       )}
+      {hostSeedError && (
+        <p className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          {hostSeedError}
+        </p>
+      )}
       {room.hostIngame && !canRun && (
         <p className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
           The match has started, but the map or game isn't installed — install
@@ -247,6 +363,19 @@ function BattleRoomPage() {
             className="w-full"
             label="Save as skirmish preset"
           />
+          {/* Apply a saved skirmish preset to this room in place (issue #373):
+              its map, options, start boxes and bots, without touching any real
+              seated player. Self-host only, mirroring the host-seed apply above. */}
+          {room.selfHost && (
+            <ApplySkirmishPresetPopover
+              presets={skirmishPresets.presets.filter(
+                (p) => p.gameName === battle.modname,
+              )}
+              enginePath={room.enginePath}
+              dataDir={room.dataDir}
+              onApply={applySkirmishPresetInPlace}
+            />
+          )}
           <StartPosOptions
             battle={battle}
             canEdit={room.canEditOptions}
