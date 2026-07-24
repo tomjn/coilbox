@@ -52,9 +52,11 @@ import {
   useUnitsyncHeightmap,
   useUnitsyncMapSkybox,
   useUnitsyncMinimap,
+  useUnitsyncScan,
 } from "../config";
 import type { ReplayProvenance } from "../replayUserState";
 import { useReplayUserState } from "../replayUserState";
+import { gameNamesMatch } from "../resolveContent";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
@@ -247,55 +249,27 @@ function Players({ info }: { info: DemoInfo }) {
 }
 
 /**
- * The map preview for the replay's map. When the map isn't installed, unitsync
- * can't render it, so we offer a download; on success the parent remounts this
- * (via `onDownloaded` bumping a key) so the now-installed map renders.
+ * The map preview for the replay's map. When the map isn't installed,
+ * unitsync can't render it. The download control for that now lives in
+ * {@link MissingContentNotice} near the top of the page (#495), so this just
+ * explains why the preview is blank.
  */
 function ReplayMapPreview({
   enginePath,
   dataDir,
   mapName,
   allyTeams,
-  onDownloaded,
 }: {
   enginePath: string;
   dataDir: string;
   mapName: string;
   allyTeams: AllyTeamInfo[];
-  onDownloaded: () => void;
 }) {
-  const writePath = useWriteRootPath();
   const minimap = useUnitsyncMinimap(enginePath, dataDir, mapName);
   const heightmap = useUnitsyncHeightmap(enginePath, dataDir, mapName);
   const skybox = useUnitsyncMapSkybox(enginePath, dataDir, mapName);
-  const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [dlError, setDlError] = useState<string | null>(null);
 
   const busy = minimap.loading || heightmap.loading;
-
-  async function download() {
-    setDownloading(true);
-    setDlError(null);
-    setProgress(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = setProgress;
-    try {
-      await dlDownloadMap({
-        springName: mapName,
-        searchUrl: BAR_SEARCH_URL,
-        writePath,
-        onProgress,
-      });
-      invalidateMapPreview(enginePath, dataDir, mapName);
-      onDownloaded();
-    } catch (e) {
-      setDlError(errMessage(e));
-    } finally {
-      setDownloading(false);
-      setProgress(null);
-    }
-  }
 
   if (busy) {
     return (
@@ -383,7 +357,8 @@ function ReplayMapPreview({
     );
   }
 
-  // Map not installed / not renderable: offer a download.
+  // Map not installed / not renderable: the download control for this sits
+  // in the missing-content notice near the top of the page.
   return (
     <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center">
       <ImageOff className="size-6 text-muted-foreground" />
@@ -391,37 +366,6 @@ function ReplayMapPreview({
         <span className="font-medium text-foreground">{mapName}</span> isn't
         installed, so its preview can't be rendered.
       </p>
-      {downloading ? (
-        <ProgressBar
-          progress={
-            progress ?? {
-              phase: "downloading",
-              downloadedBytes: 0,
-              totalBytes: null,
-              percent: null,
-              bytesPerSec: null,
-            }
-          }
-          className="w-full max-w-xs"
-        />
-      ) : (
-        <Button onClick={download} className="gap-1.5" disabled={!writePath}>
-          <Download className="size-4" /> Download map
-        </Button>
-      )}
-      {!writePath && !downloading && (
-        <p className="text-xs text-muted-foreground">
-          Set a download folder in{" "}
-          <Link
-            className="underline underline-offset-4"
-            to="/settings/downloads"
-          >
-            Downloads settings
-          </Link>{" "}
-          first.
-        </p>
-      )}
-      {dlError && <ErrorBanner message={dlError} />}
     </div>
   );
 }
@@ -487,6 +431,121 @@ function GameDownload({ gameType }: { gameType: string }) {
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Map download for the missing-content notice. `onDownloaded` invalidates the
+ * cached preview and bumps the parent's remount key so the map preview
+ * further down the page picks up the newly installed map.
+ */
+function MapDownload({
+  mapName,
+  onDownloaded,
+}: {
+  mapName: string;
+  onDownloaded: () => void;
+}) {
+  const writePath = useWriteRootPath();
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  const [dlError, setDlError] = useState<string | null>(null);
+
+  async function download() {
+    setDownloading(true);
+    setDlError(null);
+    setProgress(null);
+    const onProgress = new Channel<DownloadProgress>();
+    onProgress.onmessage = setProgress;
+    try {
+      await dlDownloadMap({
+        springName: mapName,
+        searchUrl: BAR_SEARCH_URL,
+        writePath,
+        onProgress,
+      });
+      onDownloaded();
+    } catch (e) {
+      setDlError(errMessage(e));
+    } finally {
+      setDownloading(false);
+      setProgress(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <Button
+          onClick={download}
+          disabled={downloading || !writePath}
+          className="gap-1.5"
+        >
+          {downloading ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Download className="size-4" />
+          )}
+          Download map
+        </Button>
+      </div>
+      {downloading && progress && (
+        <ProgressBar progress={progress} className="max-w-xs" />
+      )}
+      {!writePath && !downloading && (
+        <p className="text-xs text-muted-foreground">
+          Set a download folder in{" "}
+          <Link
+            className="underline underline-offset-4"
+            to="/settings/downloads"
+          >
+            Downloads settings
+          </Link>{" "}
+          first.
+        </p>
+      )}
+      {dlError && <p className="text-xs text-destructive">{dlError}</p>}
+    </div>
+  );
+}
+
+/**
+ * Missing-content affordance for the replay's game and/or map, surfaced near
+ * the top of the page next to the game/map identity (#495) instead of at the
+ * bottom, so it's the first thing a user sees when something needs
+ * downloading. Renders nothing once both are installed, the common case,
+ * especially after the #494 version-tolerant match fix.
+ */
+function MissingContentNotice({
+  gameType,
+  mapName,
+  missingGame,
+  missingMap,
+  onMapDownloaded,
+}: {
+  gameType: string;
+  mapName: string;
+  missingGame: boolean;
+  missingMap: boolean;
+  onMapDownloaded: () => void;
+}) {
+  if (!missingGame && !missingMap) return null;
+  const label =
+    missingGame && missingMap
+      ? "Game and map not installed"
+      : missingGame
+        ? "Game not installed"
+        : "Map not installed";
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3">
+      <div className="flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400">
+        <Download className="size-4" /> {label}
+      </div>
+      {missingGame && <GameDownload gameType={gameType} />}
+      {missingMap && mapName && (
+        <MapDownload mapName={mapName} onDownloaded={onMapDownloaded} />
+      )}
+    </section>
   );
 }
 
@@ -730,6 +789,31 @@ export default function ReplayDetailPage() {
 
   // Remount the preview after a successful map download so it refetches.
   const [previewNonce, setPreviewNonce] = useState(0);
+  const onMapDownloaded = () => {
+    if (selected && info) {
+      invalidateMapPreview(
+        selected.enginePath,
+        selected.rootPath,
+        info.mapName,
+      );
+    }
+    setPreviewNonce((n) => n + 1);
+  };
+
+  // Whether the replay's game/map are actually installed, matched against the
+  // live unitsync scan the same way the game picker resolves installed games
+  // (tolerant of version-string form, see `gameNamesMatch`) rather than a
+  // literal string compare (issue #494). Feeds the missing-content notice
+  // near the top of the page (#495).
+  const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
+  const missingGame =
+    info && scan.data && !scan.loading
+      ? !scan.data.games.some((g) => gameNamesMatch(g.name, info.gameType))
+      : false;
+  const missingMap =
+    info?.mapName && scan.data && !scan.loading
+      ? !scan.data.maps.some((m) => m.name === info.mapName)
+      : false;
 
   // After a remix, pull the new copy into the list, then open its detail page —
   // so the user lands on the remix (where Watch lives) instead of re-triggering it.
@@ -853,6 +937,14 @@ export default function ReplayDetailPage() {
         <DetailLoading backTo="/play/replays" />
       ) : info ? (
         <>
+          <MissingContentNotice
+            gameType={info.gameType}
+            mapName={info.mapName}
+            missingGame={missingGame}
+            missingMap={missingMap}
+            onMapDownloaded={onMapDownloaded}
+          />
+
           <section className="flex flex-col gap-2">
             <h2 className="text-sm font-medium">Details</h2>
             <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
@@ -885,18 +977,12 @@ export default function ReplayDetailPage() {
                 dataDir={selected.rootPath}
                 mapName={info.mapName}
                 allyTeams={info.allyTeams}
-                onDownloaded={() => setPreviewNonce((n) => n + 1)}
               />
             ) : (
               <p className="text-sm text-muted-foreground">
                 No map recorded for this replay.
               </p>
             )}
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium">Game</h2>
-            <GameDownload gameType={info.gameType} />
           </section>
         </>
       ) : null}
