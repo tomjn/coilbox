@@ -22,6 +22,7 @@ mod savegame;
 mod scan;
 mod settings_backup;
 mod stats;
+mod stats_watcher;
 
 use model::{
     load_store, save_store, ContentRoot, ContentState, RootCounts, RootKind, RootSource, StoreFile,
@@ -949,6 +950,39 @@ async fn content_stats_query<R: Runtime>(app: AppHandle<R>) -> Result<CliResult,
     }
 }
 
+/// `content_stats_watch_start` (#462): start (or restart) the live filesystem
+/// watcher over `roots`' demos/replays folders, so a newly-arrived replay is
+/// ingested as it lands rather than only on the next scan-on-open. Idempotent:
+/// replaces any watcher already running. `enginePath` is used the same way as
+/// [`content_stats_ingest`]'s. A watcher that fails to start (e.g. the OS watch
+/// couldn't be constructed) reports an error but never crashes the app,
+/// scan-on-open keeps working regardless.
+#[tauri::command]
+async fn content_stats_watch_start<R: Runtime>(
+    app: AppHandle<R>,
+    roots: Vec<String>,
+    engine_path: String,
+) -> Result<CliResult, ()> {
+    let sp = match stats_path(&app) {
+        Ok(p) => p,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let root_paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
+    let engine_dir = PathBuf::from(&engine_path);
+    match stats_watcher::start(app, root_paths, engine_dir, sp) {
+        Ok(()) => Ok(CliResult::ok(json!({ "watching": true }))),
+        Err(e) => Ok(CliResult::err(e)),
+    }
+}
+
+/// `content_stats_watch_stop` (#462): stop the live filesystem watcher, if one
+/// is running. Idempotent.
+#[tauri::command]
+fn content_stats_watch_stop() -> Result<CliResult, ()> {
+    stats_watcher::stop();
+    Ok(CliResult::ok(json!({ "watching": false })))
+}
+
 /// `content_demo_chat` — extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG`
 /// lines) by running `demotool --dump`. `enginePath` holds `demotool`; `replayPath`
 /// is an absolute demo path. Read on demand (it walks the whole demo stream), not
@@ -1291,6 +1325,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_demo_info,
             content_stats_ingest,
             content_stats_query,
+            content_stats_watch_start,
+            content_stats_watch_stop,
             content_demo_chat,
             content_rewrite_demo,
             content_delete_replay,
@@ -1310,6 +1346,14 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             branding_catalog,
             branding_image
         ])
+        // Stop the replay watcher (#462) cleanly when the app is shutting
+        // down, rather than leaving its background thread to be torn down by
+        // process exit.
+        .on_event(|_app, event| {
+            if let tauri::RunEvent::Exit = event {
+                stats_watcher::stop();
+            }
+        })
         .build()
 }
 

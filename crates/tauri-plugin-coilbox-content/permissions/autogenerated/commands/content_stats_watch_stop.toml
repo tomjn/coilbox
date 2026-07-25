@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-stats-watch-stop"
+description = "Enables the content_stats_watch_stop command without any pre-configured scope."
+commands.allow = ["content_stats_watch_stop"]
+
+[[permission]]
+identifier = "deny-content-stats-watch-stop"
+description = "Denies the content_stats_watch_stop command without any pre-configured scope."
+commands.deny = ["content_stats_watch_stop"]

@@ -18,6 +18,8 @@ permissions = [
   "allow-content-demo-info",
   "allow-content-stats-ingest",
   "allow-content-stats-query",
+  "allow-content-stats-watch-start",
+  "allow-content-stats-watch-stop",
   "allow-content-demo-chat",
   "allow-content-rewrite-demo",
   "allow-content-delete-replay",

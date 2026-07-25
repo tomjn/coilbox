@@ -395,6 +395,31 @@ export const contentStatsQuery = defineCommand<
   { records: StatRecord[] }
 >("coilbox-content", "content_stats_query");
 
+/**
+ * The Tauri event emitted to every window once the live watcher (#462) has
+ * ingested a newly-arrived replay and persisted the store. Payload is the
+ * pass's {@link IngestSummary}. Listeners should re-query
+ * {@link contentStatsQuery} to pick up the refreshed record set.
+ */
+export const STATS_UPDATED_EVENT = "coilbox-content://stats-updated";
+
+/**
+ * Start (or restart) the live filesystem watcher over `roots`' demos/replays
+ * folders, so a replay landing while the app is open is ingested immediately
+ * instead of waiting for the next scan-on-open. Idempotent: replaces any
+ * watcher already running for a previous root/engine selection.
+ */
+export const contentStatsWatchStart = defineCommand<
+  { roots: string[]; enginePath: string },
+  { watching: boolean }
+>("coilbox-content", "content_stats_watch_start");
+
+/** Stop the live filesystem watcher, if one is running. Idempotent. */
+export const contentStatsWatchStop = defineCommand<
+  undefined,
+  { watching: boolean }
+>("coilbox-content", "content_stats_watch_stop");
+
 /** One chat/system line from a replay's network stream. */
 export interface ChatLine {
   /** The speaking player's number, when the line names one. */
