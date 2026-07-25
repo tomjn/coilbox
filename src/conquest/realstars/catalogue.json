@@ -1,0 +1,1416 @@
+{
+  "source": "RECONS, The One Hundred Nearest Star Systems (http://www.recons.org/TOP100.posted.htm), plus cited post-2012 discoveries",
+  "epoch": "2012-01-01, supplemented",
+  "note": "Positions are light years from Sol in equatorial Cartesian coordinates: +X to the vernal equinox, +Z to the north celestial pole. The census of very faint brown dwarfs is not closed, so this is a dated snapshot rather than a guarantee of completeness.",
+  "generatedBy": "scripts/build-star-catalogue.mjs",
+  "systems": [
+    {
+      "name": "Sol",
+      "distance": 0,
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "components": [
+        "G2 V"
+      ],
+      "home": true
+    },
+    {
+      "name": "Alpha Centauri",
+      "distance": 4.365,
+      "pos": [
+        -1.6319,
+        -1.3645,
+        -3.8115
+      ],
+      "components": [
+        "G2.0 V",
+        "K0 V",
+        "M5.0 V"
+      ]
+    },
+    {
+      "name": "Barnard's Star",
+      "distance": 5.979,
+      "pos": [
+        -0.057,
+        -5.9586,
+        0.4892
+      ],
+      "components": [
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "Luhman 16",
+      "distance": 6.51,
+      "pos": [
+        -3.7052,
+        1.1814,
+        -5.221
+      ],
+      "components": [
+        "L7.5",
+        "T0.5"
+      ]
+    },
+    {
+      "name": "WISE 0855-0714",
+      "distance": 7.43,
+      "pos": [
+        -5.1008,
+        5.32,
+        -0.937
+      ],
+      "components": [
+        "Y4"
+      ]
+    },
+    {
+      "name": "Wolf 359",
+      "distance": 7.782,
+      "pos": [
+        -7.4293,
+        2.1133,
+        0.9504
+      ],
+      "components": [
+        "M5.5 V"
+      ]
+    },
+    {
+      "name": "Lalande 21185",
+      "distance": 8.294,
+      "pos": [
+        -6.5083,
+        1.6427,
+        4.8715
+      ],
+      "components": [
+        "M2.0 V"
+      ]
+    },
+    {
+      "name": "Sirius",
+      "distance": 8.583,
+      "pos": [
+        -1.6088,
+        8.0609,
+        -2.4686
+      ],
+      "components": [
+        "A1.0 V",
+        "DA2"
+      ]
+    },
+    {
+      "name": "BL Ceti",
+      "distance": 8.728,
+      "pos": [
+        7.5399,
+        3.4768,
+        -2.6898
+      ],
+      "components": [
+        "M5.5 V",
+        "M6.0 V"
+      ]
+    },
+    {
+      "name": "Ross 154",
+      "distance": 9.672,
+      "pos": [
+        1.9082,
+        -8.6387,
+        -3.9086
+      ],
+      "components": [
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "Ross 248",
+      "distance": 10.309,
+      "pos": [
+        7.371,
+        -0.583,
+        7.1841
+      ],
+      "components": [
+        "M5.5 V"
+      ]
+    },
+    {
+      "name": "Epsilon Eridani",
+      "distance": 10.48,
+      "pos": [
+        6.1877,
+        8.281,
+        -1.7222
+      ],
+      "components": [
+        "K2.0 V"
+      ]
+    },
+    {
+      "name": "Lacaille 9352",
+      "distance": 10.691,
+      "pos": [
+        8.4246,
+        -2.0277,
+        -6.2617
+      ],
+      "components": [
+        "M1.0 V"
+      ]
+    },
+    {
+      "name": "Ross 128",
+      "distance": 10.94,
+      "pos": [
+        -10.923,
+        0.5849,
+        0.1536
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "EZ Aquarii",
+      "distance": 11.266,
+      "pos": [
+        10.1878,
+        -3.7809,
+        -2.9732
+      ],
+      "components": [
+        "M5.0 VJ",
+        "M V",
+        "M V"
+      ]
+    },
+    {
+      "name": "61 Cygni",
+      "distance": 11.401,
+      "pos": [
+        6.4736,
+        -6.0951,
+        7.136
+      ],
+      "components": [
+        "K5.0 V",
+        "K7.0 V"
+      ]
+    },
+    {
+      "name": "Procyon",
+      "distance": 11.437,
+      "pos": [
+        -4.782,
+        10.3372,
+        1.0416
+      ],
+      "components": [
+        "F5 IV-V",
+        "DQZ"
+      ]
+    },
+    {
+      "name": "GJ 725",
+      "distance": 11.491,
+      "pos": [
+        1.0781,
+        -5.7088,
+        9.9144
+      ],
+      "components": [
+        "M3.0 V",
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "GX Andromedae",
+      "distance": 11.654,
+      "pos": [
+        8.3529,
+        0.6714,
+        8.0988
+      ],
+      "components": [
+        "M1.5 V",
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "Epsilon Indi",
+      "distance": 11.814,
+      "pos": [
+        5.6513,
+        -3.1532,
+        -9.8842
+      ],
+      "components": [
+        "K4.0 V",
+        "T1.0 V",
+        "T6.0 V"
+      ]
+    },
+    {
+      "name": "DX Cancri",
+      "distance": 11.826,
+      "pos": [
+        -6.4207,
+        8.3809,
+        5.3278
+      ],
+      "components": [
+        "M6.0 V"
+      ]
+    },
+    {
+      "name": "Tau Ceti",
+      "distance": 11.905,
+      "pos": [
+        10.2872,
+        5.0212,
+        -3.2689
+      ],
+      "components": [
+        "G8.5 V"
+      ]
+    },
+    {
+      "name": "GJ 1061",
+      "distance": 11.991,
+      "pos": [
+        5.026,
+        6.9174,
+        -8.4062
+      ],
+      "components": [
+        "M5.0 V"
+      ]
+    },
+    {
+      "name": "YZ Ceti",
+      "distance": 12.121,
+      "pos": [
+        11.0163,
+        3.6065,
+        -3.5437
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "Luyten's Star",
+      "distance": 12.251,
+      "pos": [
+        -4.541,
+        11.3234,
+        1.1158
+      ],
+      "components": [
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "SCR 1845-63",
+      "distance": 12.569,
+      "pos": [
+        1.0784,
+        -5.4105,
+        -11.2931
+      ],
+      "components": [
+        "M8.5 V",
+        "T6.0 V"
+      ]
+    },
+    {
+      "name": "SO 0253+165",
+      "distance": 12.573,
+      "pos": [
+        8.7626,
+        8.2442,
+        3.6511
+      ],
+      "components": [
+        "M6.5 V"
+      ]
+    },
+    {
+      "name": "Kapteyn's Star",
+      "distance": 12.757,
+      "pos": [
+        1.8873,
+        8.8179,
+        -9.0234
+      ],
+      "components": [
+        "M2.0 VI"
+      ]
+    },
+    {
+      "name": "AX Microscopii",
+      "distance": 12.869,
+      "pos": [
+        7.598,
+        -6.5322,
+        -8.0757
+      ],
+      "components": [
+        "K9.0 V"
+      ]
+    },
+    {
+      "name": "DEN 1048-39",
+      "distance": 13.123,
+      "pos": [
+        -9.5735,
+        3.0993,
+        -8.4242
+      ],
+      "components": [
+        "M8.5 V"
+      ]
+    },
+    {
+      "name": "Kruger 60",
+      "distance": 13.148,
+      "pos": [
+        6.4679,
+        -2.7458,
+        11.1132
+      ],
+      "components": [
+        "M3.0 V",
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "Ross 614",
+      "distance": 13.343,
+      "pos": [
+        -1.7043,
+        13.2175,
+        -0.655
+      ],
+      "components": [
+        "M4.5 VJ",
+        "M V"
+      ]
+    },
+    {
+      "name": "Wolf 1061",
+      "distance": 13.916,
+      "pos": [
+        -5.1793,
+        -12.5506,
+        -3.0504
+      ],
+      "components": [
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "Van Maanen's Star",
+      "distance": 14.016,
+      "pos": [
+        13.6344,
+        2.9706,
+        1.3163
+      ],
+      "components": [
+        "DZ7"
+      ]
+    },
+    {
+      "name": "GJ 1",
+      "distance": 14.161,
+      "pos": [
+        11.253,
+        0.2655,
+        -8.5927
+      ],
+      "components": [
+        "M1.5 V"
+      ]
+    },
+    {
+      "name": "Wolf 424",
+      "distance": 14.311,
+      "pos": [
+        -13.9856,
+        -2.0457,
+        2.2439
+      ],
+      "components": [
+        "M V",
+        "M5.0 VJ"
+      ]
+    },
+    {
+      "name": "TZ Arietis",
+      "distance": 14.509,
+      "pos": [
+        12.2335,
+        7.0787,
+        3.2766
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "GJ 687",
+      "distance": 14.794,
+      "pos": [
+        -0.5606,
+        -5.4317,
+        13.749
+      ],
+      "components": [
+        "M3.0 V"
+      ]
+    },
+    {
+      "name": "LHS 292",
+      "distance": 14.805,
+      "pos": [
+        -13.8098,
+        4.4731,
+        -2.9104
+      ],
+      "components": [
+        "M6.5 V"
+      ]
+    },
+    {
+      "name": "G 208-044",
+      "distance": 14.812,
+      "pos": [
+        5.0444,
+        -9.2999,
+        10.3661
+      ],
+      "components": [
+        "M5.5 VJ",
+        "M6.0 V",
+        "M V"
+      ]
+    },
+    {
+      "name": "GJ 674",
+      "distance": 14.818,
+      "pos": [
+        -1.3801,
+        -10.0311,
+        -10.8186
+      ],
+      "components": [
+        "M2.5 V"
+      ]
+    },
+    {
+      "name": "WD 1142-645",
+      "distance": 15.091,
+      "pos": [
+        -6.4033,
+        0.3996,
+        -13.6598
+      ],
+      "components": [
+        "DQ6"
+      ]
+    },
+    {
+      "name": "Ross 780",
+      "distance": 15.208,
+      "pos": [
+        14.1185,
+        -4.2305,
+        -3.7469
+      ],
+      "components": [
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "GJ 1002",
+      "distance": 15.313,
+      "pos": [
+        15.1736,
+        0.4457,
+        -2.0091
+      ],
+      "components": [
+        "M5.0 V"
+      ]
+    },
+    {
+      "name": "LHS 288",
+      "distance": 15.553,
+      "pos": [
+        -7.0862,
+        2.4278,
+        -13.6309
+      ],
+      "components": [
+        "M5.5 V"
+      ]
+    },
+    {
+      "name": "GJ 412",
+      "distance": 15.858,
+      "pos": [
+        -11.1742,
+        2.7097,
+        10.9214
+      ],
+      "components": [
+        "M1.0 V",
+        "M5.5 V"
+      ]
+    },
+    {
+      "name": "GJ 380",
+      "distance": 15.869,
+      "pos": [
+        -9.1785,
+        4.7086,
+        12.0587
+      ],
+      "components": [
+        "K7.0 V"
+      ]
+    },
+    {
+      "name": "GJ 388",
+      "distance": 15.941,
+      "pos": [
+        -13.5766,
+        6.3593,
+        5.4181
+      ],
+      "components": [
+        "M2.5 V"
+      ]
+    },
+    {
+      "name": "GJ 832",
+      "distance": 16.144,
+      "pos": [
+        8.5005,
+        -6.315,
+        -12.1856
+      ],
+      "components": [
+        "M1.5 V"
+      ]
+    },
+    {
+      "name": "LP 944-020",
+      "distance": 16.194,
+      "pos": [
+        7.5884,
+        10.7958,
+        -9.3876
+      ],
+      "components": [
+        "M9.0 V"
+      ]
+    },
+    {
+      "name": "DEN 0255-47",
+      "distance": 16.197,
+      "pos": [
+        7.9752,
+        7.6387,
+        -11.8484
+      ],
+      "components": [
+        "L7.5 V"
+      ]
+    },
+    {
+      "name": "Omicron 2 Eridani",
+      "distance": 16.255,
+      "pos": [
+        7.1082,
+        14.4572,
+        -2.1647
+      ],
+      "components": [
+        "K0.5 V",
+        "DA4",
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "EV Lacertae",
+      "distance": 16.455,
+      "pos": [
+        11.1752,
+        -3.6943,
+        11.4995
+      ],
+      "components": [
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "GJ 682",
+      "distance": 16.465,
+      "pos": [
+        -1.1771,
+        -11.7211,
+        -11.5034
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "70 Ophiuchi",
+      "distance": 16.644,
+      "pos": [
+        0.3957,
+        -16.6235,
+        0.726
+      ],
+      "components": [
+        "K0.0 V",
+        "K5 V"
+      ]
+    },
+    {
+      "name": "Altair",
+      "distance": 16.692,
+      "pos": [
+        7.6652,
+        -14.6026,
+        2.5733
+      ],
+      "components": [
+        "A7 IV-V"
+      ]
+    },
+    {
+      "name": "EI Cancri",
+      "distance": 17.058,
+      "pos": [
+        -11.2646,
+        11.4381,
+        5.7677
+      ],
+      "components": [
+        "M5.5 VJ",
+        "M V"
+      ]
+    },
+    {
+      "name": "G 099-049",
+      "distance": 17.097,
+      "pos": [
+        -0.0043,
+        17.0778,
+        0.8074
+      ],
+      "components": [
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "LHS 1723",
+      "distance": 17.356,
+      "pos": [
+        4.3169,
+        16.6791,
+        -2.0991
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "2MA 0939-24",
+      "distance": 17.414,
+      "pos": [
+        -12.9319,
+        9.0894,
+        -7.3063
+      ],
+      "components": [
+        "T8.0 V"
+      ]
+    },
+    {
+      "name": "GJ 445",
+      "distance": 17.417,
+      "pos": [
+        -3.4106,
+        0.1834,
+        17.0791
+      ],
+      "components": [
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "Wolf 498",
+      "distance": 17.657,
+      "pos": [
+        -15.2799,
+        -7.5958,
+        4.5376
+      ],
+      "components": [
+        "M1.0 V"
+      ]
+    },
+    {
+      "name": "Stein 2051",
+      "distance": 18.068,
+      "pos": [
+        3.5185,
+        8.6213,
+        15.4833
+      ],
+      "components": [
+        "M4.0 V",
+        "DC5"
+      ]
+    },
+    {
+      "name": "GJ 251",
+      "distance": 18.312,
+      "pos": [
+        -3.6273,
+        14.8751,
+        10.0452
+      ],
+      "components": [
+        "M3.0 V"
+      ]
+    },
+    {
+      "name": "2MA 1835+32",
+      "distance": 18.479,
+      "pos": [
+        2.3998,
+        -15.3113,
+        10.064
+      ],
+      "components": [
+        "M8.5 V"
+      ]
+    },
+    {
+      "name": "Wolf 1453",
+      "distance": 18.533,
+      "pos": [
+        2.2974,
+        18.3513,
+        -1.1886
+      ],
+      "components": [
+        "M1.0 V"
+      ]
+    },
+    {
+      "name": "LP 816-060",
+      "distance": 18.634,
+      "pos": [
+        12.1862,
+        -13.0053,
+        -5.4403
+      ],
+      "components": [
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "2MA 0415-09",
+      "distance": 18.708,
+      "pos": [
+        8.1354,
+        16.5561,
+        -3.1152
+      ],
+      "components": [
+        "T8.0 V"
+      ]
+    },
+    {
+      "name": "Sigma Draconis",
+      "distance": 18.767,
+      "pos": [
+        2.5582,
+        -6.0004,
+        17.5972
+      ],
+      "components": [
+        "G9.0 V"
+      ]
+    },
+    {
+      "name": "GJ 229",
+      "distance": 18.769,
+      "pos": [
+        -0.8036,
+        17.4007,
+        -6.99
+      ],
+      "components": [
+        "M1.5 V",
+        "T6.0 V"
+      ]
+    },
+    {
+      "name": "Ross 47",
+      "distance": 19.018,
+      "pos": [
+        1.4443,
+        18.5116,
+        4.1128
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "GJ 693",
+      "distance": 19.062,
+      "pos": [
+        -0.6028,
+        -10.2752,
+        -16.0446
+      ],
+      "components": [
+        "M3.0 V"
+      ]
+    },
+    {
+      "name": "Wolf 1055",
+      "distance": 19.078,
+      "pos": [
+        6.2581,
+        -17.9402,
+        1.7188
+      ],
+      "components": [
+        "M2.5 V",
+        "M8.0 V"
+      ]
+    },
+    {
+      "name": "GJ 570",
+      "distance": 19.116,
+      "pos": [
+        -12.7221,
+        -12.4439,
+        -6.9798
+      ],
+      "components": [
+        "K4.0 V",
+        "M1.5 VJ",
+        "M V",
+        "T7.0 V"
+      ]
+    },
+    {
+      "name": "GJ 300",
+      "distance": 19.197,
+      "pos": [
+        -9.7688,
+        14.9453,
+        -7.0522
+      ],
+      "components": [
+        "M3.5 V"
+      ]
+    },
+    {
+      "name": "GJ 754",
+      "distance": 19.28,
+      "pos": [
+        4.6614,
+        -12.6693,
+        -13.7649
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "GJ 588",
+      "distance": 19.354,
+      "pos": [
+        -8.7428,
+        -11.6248,
+        -12.7676
+      ],
+      "components": [
+        "M2.5 V"
+      ]
+    },
+    {
+      "name": "GJ 1005",
+      "distance": 19.374,
+      "pos": [
+        18.5683,
+        1.2551,
+        -5.3836
+      ],
+      "components": [
+        "M3.5 VJ",
+        "M V"
+      ]
+    },
+    {
+      "name": "Eta Cassiopei",
+      "distance": 19.388,
+      "pos": [
+        10.0906,
+        2.1957,
+        16.4083
+      ],
+      "components": [
+        "G3 V",
+        "K7.0 V"
+      ]
+    },
+    {
+      "name": "36 Ophiuchi",
+      "distance": 19.4,
+      "pos": [
+        -3.3581,
+        -17.0182,
+        -8.6875
+      ],
+      "components": [
+        "K1.5 VJ",
+        "K V",
+        "K5.0 V"
+      ]
+    },
+    {
+      "name": "GJ 908",
+      "distance": 19.412,
+      "pos": [
+        19.3732,
+        -0.9129,
+        0.8133
+      ],
+      "components": [
+        "M1.0 V"
+      ]
+    },
+    {
+      "name": "Ross 882",
+      "distance": 19.508,
+      "pos": [
+        -8.5865,
+        17.4751,
+        1.2088
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "GJ 783",
+      "distance": 19.617,
+      "pos": [
+        8.5861,
+        -13.3233,
+        -11.5587
+      ],
+      "components": [
+        "K2.5 V",
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "82 Eridani",
+      "distance": 19.711,
+      "pos": [
+        9.2592,
+        11.0275,
+        -13.4603
+      ],
+      "components": [
+        "G8.0 V"
+      ]
+    },
+    {
+      "name": "GJ 1221",
+      "distance": 19.803,
+      "pos": [
+        -0.3364,
+        -6.4794,
+        18.71
+      ],
+      "components": [
+        "DXP9"
+      ]
+    },
+    {
+      "name": "GJ 338",
+      "distance": 19.92,
+      "pos": [
+        -9.057,
+        7.9863,
+        15.8433
+      ],
+      "components": [
+        "M0.0 V",
+        "K7.0 V"
+      ]
+    },
+    {
+      "name": "Delta Pavonis",
+      "distance": 19.923,
+      "pos": [
+        4.2851,
+        -6.8094,
+        -18.226
+      ],
+      "components": [
+        "G8.0 IV"
+      ]
+    },
+    {
+      "name": "QY Aurigae",
+      "distance": 19.959,
+      "pos": [
+        -4.6972,
+        14.8907,
+        12.433
+      ],
+      "components": [
+        "M4.5 VJ",
+        "M V"
+      ]
+    },
+    {
+      "name": "2MA 0937+29",
+      "distance": 19.973,
+      "pos": [
+        -14.1298,
+        10.1176,
+        9.8436
+      ],
+      "components": [
+        "T6.0 V"
+      ]
+    },
+    {
+      "name": "GJ 2130",
+      "distance": 20.162,
+      "pos": [
+        -1.027,
+        -17.0479,
+        -10.715
+      ],
+      "components": [
+        "M2 V",
+        "M2 VJ",
+        "M V"
+      ]
+    },
+    {
+      "name": "GJ 784",
+      "distance": 20.214,
+      "pos": [
+        7.8609,
+        -11.8889,
+        -14.3344
+      ],
+      "components": [
+        "M0.0 V"
+      ]
+    },
+    {
+      "name": "HN Librae",
+      "distance": 20.286,
+      "pos": [
+        -15.4833,
+        -12.3469,
+        -4.3974
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "EQ Pegasi",
+      "distance": 20.4,
+      "pos": [
+        19.0332,
+        -2.3479,
+        6.9562
+      ],
+      "components": [
+        "M3.5 V",
+        "M4.5 V"
+      ]
+    },
+    {
+      "name": "Wolf 562",
+      "distance": 20.669,
+      "pos": [
+        -13.2031,
+        -15.6579,
+        -2.7773
+      ],
+      "components": [
+        "M3.0 V"
+      ]
+    },
+    {
+      "name": "LHS 2090",
+      "distance": 20.792,
+      "pos": [
+        -13.6705,
+        13.6237,
+        7.733
+      ],
+      "components": [
+        "M6.0 V"
+      ]
+    },
+    {
+      "name": "LHS 337",
+      "distance": 20.803,
+      "pos": [
+        -16.0743,
+        -2.749,
+        -12.9168
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "GJ 661",
+      "distance": 20.865,
+      "pos": [
+        -3.0234,
+        -14.2642,
+        14.924
+      ],
+      "components": [
+        "M3.0 VJ",
+        "M V"
+      ]
+    },
+    {
+      "name": "WD 0552-041",
+      "distance": 20.901,
+      "pos": [
+        0.44,
+        20.8407,
+        -1.5203
+      ],
+      "components": [
+        "DZ9"
+      ]
+    },
+    {
+      "name": "G 180-060",
+      "distance": 20.907,
+      "pos": [
+        -5.9674,
+        -14.642,
+        13.6793
+      ],
+      "components": [
+        "M5.0 V"
+      ]
+    },
+    {
+      "name": "Wolf 630",
+      "distance": 21.048,
+      "pos": [
+        -5.7857,
+        -20.0056,
+        -3.0516
+      ],
+      "components": [
+        "M2.5 VJ",
+        "M V",
+        "M V",
+        "M3.0 V",
+        "M7.0 V"
+      ]
+    },
+    {
+      "name": "GJ 625",
+      "distance": 21.298,
+      "pos": [
+        -4.9846,
+        -11.3835,
+        17.2966
+      ],
+      "components": [
+        "M1.5 V"
+      ]
+    },
+    {
+      "name": "GJ 1128",
+      "distance": 21.31,
+      "pos": [
+        -6.3414,
+        4.3269,
+        -19.8796
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "GL Virginis",
+      "distance": 21.331,
+      "pos": [
+        -20.8586,
+        -1.7337,
+        4.116
+      ],
+      "components": [
+        "M4.5 V"
+      ]
+    },
+    {
+      "name": "GJ 892",
+      "distance": 21.34,
+      "pos": [
+        11.3303,
+        -2.3421,
+        17.9311
+      ],
+      "components": [
+        "K3.0 V"
+      ]
+    },
+    {
+      "name": "LHS 3003",
+      "distance": 21.389,
+      "pos": [
+        -13.5273,
+        -13.1366,
+        -10.0955
+      ],
+      "components": [
+        "M7.0 V"
+      ]
+    },
+    {
+      "name": "Ross 104",
+      "distance": 21.843,
+      "pos": [
+        -19.4468,
+        5.2042,
+        8.476
+      ],
+      "components": [
+        "M2.5 V"
+      ]
+    },
+    {
+      "name": "Ross 775",
+      "distance": 21.888,
+      "pos": [
+        16.5268,
+        -12.7258,
+        6.6341
+      ],
+      "components": [
+        "M3.0 VJ",
+        "M V"
+      ]
+    },
+    {
+      "name": "G 041-014",
+      "distance": 22.088,
+      "pos": [
+        -15.3766,
+        15.5197,
+        3.2549
+      ],
+      "components": [
+        "M3.5 VJ",
+        "M V",
+        "M V"
+      ]
+    },
+    {
+      "name": "Ksi Bootis",
+      "distance": 22.102,
+      "pos": [
+        -15.3122,
+        -14.2028,
+        7.2323
+      ],
+      "components": [
+        "G7.0 V",
+        "K4 V"
+      ]
+    },
+    {
+      "name": "EE Leonis",
+      "distance": 22.165,
+      "pos": [
+        -21.0149,
+        6.5385,
+        2.6275
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "Ross 671",
+      "distance": 22.283,
+      "pos": [
+        20.5469,
+        -5.8355,
+        6.3486
+      ],
+      "components": [
+        "M1.5 V"
+      ]
+    },
+    {
+      "name": "Ross 619",
+      "distance": 22.294,
+      "pos": [
+        -11.9965,
+        18.4804,
+        3.4008
+      ],
+      "components": [
+        "M4.0 V"
+      ]
+    },
+    {
+      "name": "LP 771-095",
+      "distance": 22.68,
+      "pos": [
+        15.2441,
+        15.4931,
+        -6.4768
+      ],
+      "components": [
+        "M2.5 V",
+        "M3.5 VJ",
+        "M V"
+      ]
+    }
+  ]
+}
