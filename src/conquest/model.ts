@@ -20,6 +20,12 @@ export const NEUTRAL = "neutral";
 export const MIN_DIFFICULTY = 1;
 export const MAX_DIFFICULTY = 5;
 
+/**
+ * Smallest galaxy the generator will build. Real-star galaxies can be this
+ * small: an 8 light year radius holds only six systems.
+ */
+export const MIN_NODE_COUNT = 5;
+
 /** Default number of turns the player has to answer an incursion. */
 export const DEFAULT_GRACE_TURNS = 2;
 
@@ -71,12 +77,33 @@ export interface NodeBattleSpec {
   handicap?: number;
 }
 
+/**
+ * Authored layout position: 2D for the procedural scatters, 3D for galaxies
+ * built from real star positions. Read the third component through
+ * {@link posZ} rather than indexing, which the union does not allow.
+ */
+export type NodePos = [number, number] | [number, number, number];
+
+/** A position's vertical component, 0 for the flat 2D form. */
+export function posZ(pos: NodePos): number {
+  return pos.length === 3 ? pos[2] : 0;
+}
+
+/** Describes a node's real star, when it has one. Absent on procedural nodes,
+ * whose appearance stays a hash of the node id. */
+export interface NodeStar {
+  /** One spectral type per component, brightest first ("A1.0 V", "DA2"). */
+  spectral: string[];
+}
+
 export interface GalaxyNode {
   /** Stable id referenced by links, owners and run state. */
   id: string;
   name: string;
-  /** Authored 2D layout position on the strategic plane (any units). */
-  pos: [number, number];
+  /** Authored layout position on the strategic plane (any units). */
+  pos: NodePos;
+  /** Real stellar data, when this node came from the star catalogue. */
+  star?: NodeStar;
   /** Initial owner: a faction id or {@link NEUTRAL}. */
   owner: string;
   /**
@@ -145,10 +172,12 @@ export interface GalaxyDoc {
     seed: number;
     nodeCount?: number;
     factionCount?: number;
-    layout?: "scatter" | "spiral" | "clusters" | "ring" | "random";
+    layout?: "scatter" | "spiral" | "clusters" | "ring" | "random" | "realstars";
     skin?: "galaxy" | "theatre";
     startingSystems?: number;
     fogOfWar?: boolean;
+    /** Real-star mode only: the catalogue radius in light years. */
+    radiusLy?: number;
   };
 }
 
@@ -320,7 +349,7 @@ function parseGenerated(value: unknown): GalaxyDoc["generated"] {
     seed: g.seed,
     nodeCount:
       typeof g.nodeCount === "number" && Number.isFinite(g.nodeCount)
-        ? clamp(Math.round(g.nodeCount), 8, 80)
+        ? clamp(Math.round(g.nodeCount), MIN_NODE_COUNT, 80)
         : undefined,
     factionCount:
       typeof g.factionCount === "number" && Number.isFinite(g.factionCount)
@@ -331,8 +360,13 @@ function parseGenerated(value: unknown): GalaxyDoc["generated"] {
       g.layout === "spiral" ||
       g.layout === "clusters" ||
       g.layout === "ring" ||
-      g.layout === "random"
+      g.layout === "random" ||
+      g.layout === "realstars"
         ? g.layout
+        : undefined,
+    radiusLy:
+      typeof g.radiusLy === "number" && Number.isFinite(g.radiusLy)
+        ? clamp(g.radiusLy, 1, 25)
         : undefined,
     skin: g.skin === "galaxy" || g.skin === "theatre" ? g.skin : undefined,
     startingSystems:
@@ -425,11 +459,17 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
     }
     const battle = parseBattle(n.battle);
     if (!battle) return null;
+    // A third component is optional: pre-3D galaxies stay flat.
+    const z = typeof pos[2] === "number" && Number.isFinite(pos[2]) ? pos[2] : 0;
+    const spectral = stringArray(
+      (n.star as Record<string, unknown> | null | undefined)?.spectral,
+    );
     nodeIds.add(n.id);
     nodes.push({
       id: n.id,
       name: n.name,
-      pos: [pos[0], pos[1]],
+      pos: z === 0 ? [pos[0], pos[1]] : [pos[0], pos[1], z],
+      star: spectral.length > 0 ? { spectral } : undefined,
       owner:
         typeof n.owner === "string" && factionIds.has(n.owner)
           ? n.owner

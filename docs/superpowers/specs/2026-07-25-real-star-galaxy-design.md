@@ -133,7 +133,9 @@ Naming pools and `limitToNamed` do not apply in real-star mode. A game's lore st
 
 `buildLinks` gains a 3D distance function. The crossing-prune step is dropped for the range linker, because two segments properly crossing in 3D is vanishingly rare, and testing it in projection would prune lanes that do not actually cross.
 
-The range linker connects any two systems within 6 light years, then reuses the existing union-find repair to bridge stranded systems to their nearest neighbour. This falls out of the real data pleasingly: the crowded region near Sol is well connected, while WISE 0855 hangs off a single lane.
+The range linker connects any two systems within 8 light years, then reuses the existing union-find repair to bridge stranded systems to their nearest neighbour.
+
+The range was measured rather than guessed. The real neighbourhood is sparser than it looks: at 6 light years a 12 light year galaxy fragments into 7 disconnected pieces, so the repair would end up inventing most of the map. At 8 light years the graph holds together with 1.7 to 2.2 lanes per system across every offered radius, which matches the density the procedural maps already have. Crowded regions end up densely connected while isolated stars hang off one or two lanes, which no uniform nearest-neighbour rule would produce.
 
 Procedural sources keep the k-nearest linker unchanged, so existing galaxies do not shift.
 
@@ -172,12 +174,12 @@ Selecting it swaps the Galaxy size row for a radius picker, each option showing 
 
 | Radius | Systems |
 |---|---|
-| 8 ly | about 6 |
-| 10 ly | about 12 |
-| 12 ly | about 22 |
-| 14 ly | about 35 |
-| 16 ly | about 47 |
-| 19 ly | about 70 |
+| 8 ly | 6 |
+| 10 ly | 10 |
+| 12 ly | 23 |
+| 14 ly | 33 |
+| 16 ly | 48 |
+| 19 ly | 70 |
 
 Counts are computed from the built catalogue rather than hardcoded, so they cannot drift from the data.
 

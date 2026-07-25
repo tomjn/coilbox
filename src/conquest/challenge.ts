@@ -4,7 +4,7 @@ import {
   encodeChallengeFile,
 } from "../challenge/code";
 import type { GalaxyLayout, GenerateOptions } from "./generate";
-import type { GalaxyDoc, GameRef } from "./model";
+import { type GalaxyDoc, type GameRef, MIN_NODE_COUNT } from "./model";
 
 /**
  * Shareable challenge settings for a generated conquest galaxy — everything
@@ -20,18 +20,21 @@ export interface ConquestChallengeSettings {
   title: string;
   nodeCount: number;
   factionCount: number;
-  layout: GalaxyLayout | "random";
+  layout: GalaxyLayout | "random" | "realstars";
+  /** Real-star mode only, so the recipient rebuilds the same radius. */
+  radiusLy?: number;
   skin: "galaxy" | "theatre";
   startingSystems?: number;
   fogOfWar?: boolean;
 }
 
-const LAYOUTS: readonly (GalaxyLayout | "random")[] = [
+const LAYOUTS: readonly (GalaxyLayout | "random" | "realstars")[] = [
   "scatter",
   "spiral",
   "clusters",
   "ring",
   "random",
+  "realstars",
 ];
 
 const clamp = (v: number, lo: number, hi: number) =>
@@ -56,6 +59,7 @@ export function challengeSettingsFromGalaxy(
     nodeCount: g.nodeCount,
     factionCount: g.factionCount,
     layout: g.layout ?? "scatter",
+    radiusLy: g.radiusLy,
     skin: g.skin ?? "galaxy",
     startingSystems: g.startingSystems,
     fogOfWar: g.fogOfWar,
@@ -94,10 +98,14 @@ function parseConquestChallengeSettings(
           : undefined,
     },
     title: v.title,
-    nodeCount: clamp(Math.round(v.nodeCount), 8, 80),
+    nodeCount: clamp(Math.round(v.nodeCount), MIN_NODE_COUNT, 80),
     factionCount: clamp(Math.round(v.factionCount), 1, 3),
-    layout: LAYOUTS.includes(v.layout as GalaxyLayout | "random")
-      ? (v.layout as GalaxyLayout | "random")
+    radiusLy:
+      typeof v.radiusLy === "number" && Number.isFinite(v.radiusLy)
+        ? clamp(v.radiusLy, 1, 25)
+        : undefined,
+    layout: LAYOUTS.includes(v.layout as GalaxyLayout | "random" | "realstars")
+      ? (v.layout as GalaxyLayout | "random" | "realstars")
       : "scatter",
     skin: v.skin === "theatre" ? "theatre" : "galaxy",
     startingSystems:
@@ -157,6 +165,7 @@ export function optionsFromChallenge(
     nodeCount: settings.nodeCount,
     factionCount: settings.factionCount,
     layout: settings.layout,
+    radiusLy: settings.radiusLy,
     skin: settings.skin,
     startingSystems: settings.startingSystems,
     fogOfWar: settings.fogOfWar,
