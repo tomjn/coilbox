@@ -164,6 +164,7 @@ describe("layoutNodes with real depth", () => {
       { id: "a", pos: [-10, -10] as [number, number] },
       { id: "b", pos: [10, 10] as [number, number] },
     ]);
-    for (const p of out.values()) expect(Math.abs(p[1])).toBeLessThanOrEqual(Y_JITTER);
+    for (const p of out.values())
+      expect(Math.abs(p[1])).toBeLessThanOrEqual(Y_JITTER);
   });
 });

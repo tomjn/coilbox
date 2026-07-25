@@ -99,7 +99,11 @@ describe("real stellar systems", () => {
   });
 
   it("names a trinary as a triple system", () => {
-    const alphaCen = starSystemFor("n", false, star(["G2.0 V", "K0 V", "M5.0 V"]));
+    const alphaCen = starSystemFor(
+      "n",
+      false,
+      star(["G2.0 V", "K0 V", "M5.0 V"]),
+    );
     expect(alphaCen.members).toHaveLength(3);
     expect(starSystemLabel(alphaCen)).toBe(
       "triple system, yellow star + orange dwarf + red dwarf",

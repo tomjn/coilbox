@@ -338,7 +338,10 @@ function repairConnectivity(
  * connected while isolated stars hang off one or two lanes, which no uniform
  * nearest-neighbour rule would produce.
  */
-function buildRangeLinks(stars: SourceStar[], range: number): [number, number][] {
+function buildRangeLinks(
+  stars: SourceStar[],
+  range: number,
+): [number, number][] {
   const links: [number, number][] = [];
   for (let i = 0; i < stars.length; i++) {
     for (let j = i + 1; j < stars.length; j++) {

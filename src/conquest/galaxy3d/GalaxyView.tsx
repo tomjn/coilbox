@@ -235,7 +235,8 @@ export function starTypeForSpectral(spectral: string): StarType {
   const index = CLASS_TYPES[text[0]];
   if (index === undefined) return STAR_TYPES[2];
   const luminosity = text.match(/\b(I{1,3}|IV|V|VI|VII)\b/)?.[1];
-  const giant = luminosity === "I" || luminosity === "II" || luminosity === "III";
+  const giant =
+    luminosity === "I" || luminosity === "II" || luminosity === "III";
   if (giant) return STAR_TYPES[index === 0 || index === 1 ? 6 : 5];
   return STAR_TYPES[index];
 }

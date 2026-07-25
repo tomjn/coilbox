@@ -110,7 +110,9 @@ function parseRecons(text) {
     // never become nodes, so drop them before anything else looks at the row.
     if (spectral === "planet") continue;
     if (spectral !== "" && !SPECTRAL.test(spectral)) {
-      throw new Error(`unrecognised spectral type ${JSON.stringify(spectral)} in: ${line}`);
+      throw new Error(
+        `unrecognised spectral type ${JSON.stringify(spectral)} in: ${line}`,
+      );
     }
     const magText = slice(line, COL.visualMag).replace(/[^\d.-]/g, "");
     const component = {
@@ -119,7 +121,11 @@ function parseRecons(text) {
       spectral,
       visualMag: magText === "" ? Number.POSITIVE_INFINITY : Number(magText),
       commonName: slice(line, COL.commonName).replace(/\s+/g, " "),
-      ...toCartesian(coords[0].slice(0, 10), coords[0].slice(11), Number(parallax[1])),
+      ...toCartesian(
+        coords[0].slice(0, 10),
+        coords[0].slice(11),
+        Number(parallax[1]),
+      ),
     };
     if (slice(line, COL.rank) !== "") systems.push([]);
     if (systems.length === 0) {
@@ -152,7 +158,9 @@ function systemName(brightest) {
  * that RECONS ranks by Proxima. Components are listed brightest first.
  */
 function mergeSystem(components) {
-  const byBrightness = [...components].sort((a, b) => a.visualMag - b.visualMag);
+  const byBrightness = [...components].sort(
+    (a, b) => a.visualMag - b.visualMag,
+  );
   const brightest = byBrightness[0];
   return {
     name: systemName(brightest),
@@ -218,7 +226,8 @@ function verify(systems) {
     }
   };
 
-  if (systems[0]?.name !== "Sol") throw new Error("Sol is not the first system");
+  if (systems[0]?.name !== "Sol")
+    throw new Error("Sol is not the first system");
   near(Math.hypot(...(systems[0].pos ?? [])), 0, 1e-9, "Sol at the origin");
 
   near(find("Alpha Centauri")?.distance, 4.37, 0.05, "Alpha Centauri distance");

@@ -13,7 +13,7 @@
     "sidecar:prdownloader": "bash scripts/assemble-prdownloader.sh",
     "sidecar:all": "bun run sidecar:unitsync && bun run sidecar:prdownloader",
     "icon:macos-glass": "bash scripts/build-macos-glass-icon.sh",
-    "stars:catalogue": "bun scripts/build-star-catalogue.mjs",
+    "stars:catalogue": "bun scripts/build-star-catalogue.mjs && biome check --write src/conquest/realstars/catalogue.json",
     "clean": "bash scripts/clean.sh",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",

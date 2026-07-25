@@ -172,7 +172,13 @@ export interface GalaxyDoc {
     seed: number;
     nodeCount?: number;
     factionCount?: number;
-    layout?: "scatter" | "spiral" | "clusters" | "ring" | "random" | "realstars";
+    layout?:
+      | "scatter"
+      | "spiral"
+      | "clusters"
+      | "ring"
+      | "random"
+      | "realstars";
     skin?: "galaxy" | "theatre";
     startingSystems?: number;
     fogOfWar?: boolean;
@@ -460,7 +466,8 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
     const battle = parseBattle(n.battle);
     if (!battle) return null;
     // A third component is optional: pre-3D galaxies stay flat.
-    const z = typeof pos[2] === "number" && Number.isFinite(pos[2]) ? pos[2] : 0;
+    const z =
+      typeof pos[2] === "number" && Number.isFinite(pos[2]) ? pos[2] : 0;
     const spectral = stringArray(
       (n.star as Record<string, unknown> | null | undefined)?.spectral,
     );
