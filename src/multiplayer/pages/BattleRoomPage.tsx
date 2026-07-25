@@ -160,13 +160,15 @@ function BattleRoomPage() {
     }
     if (seed.bots.length === 0 || !room.serverKey) return;
     const serverKey = room.serverKey;
-    addHostSeedBots(serverKey, seed.bots).then((failures) => {
-      if (failures.length > 0) {
-        setHostSeedError(
-          `${failures.length} of ${seed.bots.length} bot(s) couldn't be added. ${failures.join(", ")}`,
-        );
-      }
-    });
+    addHostSeedBots(serverKey, seed.bots, Object.keys(b.bots)).then(
+      (failures) => {
+        if (failures.length > 0) {
+          setHostSeedError(
+            `${failures.length} of ${seed.bots.length} bot(s) couldn't be added. ${failures.join(", ")}`,
+          );
+        }
+      },
+    );
   }, [hostDraft, room, savedBoxes]);
 
   // Apply a saved skirmish preset to the current room in place (issue #373).
@@ -211,13 +213,15 @@ function BattleRoomPage() {
     skirmishPresets.touchPreset(preset.id);
     if (seed.bots.length === 0 || !room.serverKey) return;
     const serverKey = room.serverKey;
-    addHostSeedBots(serverKey, seed.bots).then((failures) => {
-      if (failures.length > 0) {
-        setHostSeedError(
-          `${failures.length} of ${seed.bots.length} bot(s) couldn't be added. ${failures.join(", ")}`,
-        );
-      }
-    });
+    addHostSeedBots(serverKey, seed.bots, Object.keys(room.battle.bots)).then(
+      (failures) => {
+        if (failures.length > 0) {
+          setHostSeedError(
+            `${failures.length} of ${seed.bots.length} bot(s) couldn't be added. ${failures.join(", ")}`,
+          );
+        }
+      },
+    );
   }
 
   // Auto-launch: for a battle we JOIN, match start is driven by the protocol, not a
