@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import {
   Select,
   SelectContent,
@@ -38,28 +38,12 @@ export function OptionSelect({
   className?: string;
   size?: "sm" | "default";
 }) {
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  // Inside a dialog or drawer the list renders in place instead of portalling
-  // to the body. A portalled list is not a DOM descendant of the drawer, so a
-  // click on it reads as a click outside and dismisses the drawer, losing
-  // everything the user had filled in.
-  const [inDialog, setInDialog] = useState(false);
-  useEffect(() => {
-    setInDialog(!!triggerRef.current?.closest('[role="dialog"]'));
-  }, []);
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger
-        ref={triggerRef}
-        size={size}
-        className={cn("w-full", className)}
-      >
+      <SelectTrigger size={size} className={cn("w-full", className)}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent
-        portalled={!inDialog}
-        position={inDialog ? "popper" : undefined}
-      >
+      <SelectContent>
         {options.map((o) => (
           <SelectItem key={o.value} value={o.value} description={o.description}>
             {o.icon ? (
