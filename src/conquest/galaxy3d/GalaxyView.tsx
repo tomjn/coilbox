@@ -8,16 +8,17 @@ import {
 } from "three/addons/renderers/CSS2DRenderer.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { assetUrl } from "../../lib/assetUrl";
-import type { GalaxyDoc, GalaxyNode, Incursion } from "../model";
+import type { GalaxyDoc, GalaxyNode, Incursion, NodeStar } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
-import { bodyLabel, type VoidBody, voidBodiesFor } from "./bodies";
+import { bodyLabel, isVoidNode, type VoidBody, voidBodiesFor } from "./bodies";
 import { factionSides } from "./factionShape";
 import {
   hashString,
   layoutNodes,
   playBounds,
   playExtentFor,
+  trimLane,
   type WorldPos,
 } from "./layout";
 import { buildStarfield } from "./starfield";
@@ -173,6 +174,13 @@ interface GalaxyViewProps {
   className?: string;
 }
 
+/** How much brighter a lane gets while either end is hovered. */
+const HOVER_LANE_BOOST = 1.6;
+
+/** How far every other lane fades while a system is hovered. Pulling the rest
+ * back is what separates a system's reach from the web behind it. */
+const HOVER_LANE_FADE = 0.4;
+
 const NEUTRAL_COLOR = "#6b7280";
 /** The quiet blue-grey of an unowned lane (the base lane pair's colour). */
 const BASE_LANE_HEX = 0x93a7c8;
@@ -194,15 +202,61 @@ const STAR_TYPES = [
   { name: "white dwarf", color: "#cfe4ff", size: 0.55, tint: 0.65, glow: 0.7 },
   { name: "blue giant", color: "#7fa8ff", size: 1.9, tint: 0.5, glow: 1.25 },
   { name: "red giant", color: "#ff5230", size: 2.05, tint: 0.3, glow: 1.2 },
+  // Substellar, so it never lights up. Only real catalogue data selects it.
+  { name: "brown dwarf", color: "#7a2a18", size: 0.4, tint: 0.05, glow: 0.2 },
 ] as const;
 const GIANT_TYPES = [5, 6]; // indices into STAR_TYPES
-// Dwarfs are common, giants rare — mirrors a real stellar population.
-const TYPE_WEIGHTS = [3, 3, 2, 2, 1, 1, 1];
+// Dwarfs are common, giants rare, mirroring a real stellar population. Brown
+// dwarfs carry weight 0: a procedural galaxy never rolls one, so adding the
+// class leaves every existing galaxy looking exactly as it did.
+const TYPE_WEIGHTS = [3, 3, 2, 2, 1, 1, 1, 0];
 const WEIGHT_TOTAL = TYPE_WEIGHTS.reduce((a, b) => a + b, 0);
 
 export type StarType = (typeof STAR_TYPES)[number];
 
-export function starTypeFor(nodeId: string, capital: boolean): StarType {
+/** Index into {@link STAR_TYPES} keyed by spectral class letter. */
+const CLASS_TYPES: Record<string, number> = {
+  O: 5,
+  B: 5,
+  A: 3,
+  F: 3,
+  G: 2,
+  K: 1,
+  M: 0,
+  L: 7,
+  T: 7,
+  Y: 7,
+};
+
+/**
+ * The star type for a real spectral classification such as "A1.0 V", "DA2" or
+ * "T6.0 V". White dwarfs are their own class, luminosity class III or brighter
+ * promotes a star to the matching giant, and anything unrecognised falls back
+ * to a yellow star.
+ *
+ * Nothing within 19 light years is a giant, so that branch is here for
+ * correctness rather than for anything currently on the map.
+ */
+export function starTypeForSpectral(spectral: string): StarType {
+  const text = spectral.trim().toUpperCase();
+  if (text.startsWith("D")) return STAR_TYPES[4]; // white dwarf
+  const index = CLASS_TYPES[text[0]];
+  if (index === undefined) return STAR_TYPES[2];
+  const luminosity = text.match(/\b(I{1,3}|IV|V|VI|VII)\b/)?.[1];
+  const giant =
+    luminosity === "I" || luminosity === "II" || luminosity === "III";
+  if (giant) return STAR_TYPES[index === 0 || index === 1 ? 6 : 5];
+  return STAR_TYPES[index];
+}
+
+export function starTypeFor(
+  nodeId: string,
+  capital: boolean,
+  spectral?: string,
+): StarType {
+  // Real data always wins. A hash of the node id cannot know that Sirius is
+  // an A1 V.
+  if (spectral) return starTypeForSpectral(spectral);
   const h = hashString(`${nodeId}-stellar`);
   if (capital) return STAR_TYPES[GIANT_TYPES[h % GIANT_TYPES.length]];
   let roll = h % WEIGHT_TOTAL;
@@ -221,6 +275,11 @@ export interface StarSystem {
   primary: StarType;
   /** Present ~1 in 6 systems — the map/backdrop draws a second, smaller star. */
   companion?: StarType;
+  /**
+   * Every component of the system, brightest first. Procedural galaxies have
+   * one or two. Real ones can have three, as Alpha Centauri does.
+   */
+  members: StarType[];
 }
 
 /**
@@ -228,7 +287,17 @@ export interface StarSystem {
  * roughly one node in six, a dwarf companion. Same hash-of-id approach as
  * {@link starTypeFor} so map, panel and battle backdrop always agree.
  */
-export function starSystemFor(nodeId: string, capital: boolean): StarSystem {
+export function starSystemFor(
+  nodeId: string,
+  capital: boolean,
+  star?: NodeStar,
+): StarSystem {
+  // A catalogued system already knows what it is, down to how many stars it
+  // has, so the binary roll is skipped entirely.
+  if (star && star.spectral.length > 0) {
+    const members = star.spectral.map(starTypeForSpectral);
+    return { primary: members[0], companion: members[1], members };
+  }
   const primary = starTypeFor(nodeId, capital);
   const binary = hashString(`${nodeId}-binary`) % 6 === 0;
   const companion = binary
@@ -238,11 +307,27 @@ export function starSystemFor(nodeId: string, capital: boolean): StarSystem {
         ]
       ]
     : undefined;
-  return { primary, companion };
+  return {
+    primary,
+    companion,
+    members: companion ? [primary, companion] : [primary],
+  };
 }
 
 /** A human label for a node's stellar system (selection panel). */
+/** Word for a system of three or more stars, by component count. */
+const MULTIPLICITY: Record<number, string> = {
+  3: "triple",
+  4: "quadruple",
+  5: "quintuple",
+};
+
 export function starSystemLabel(system: StarSystem): string {
+  if (system.members.length >= 3) {
+    const word = MULTIPLICITY[system.members.length] ?? "multiple";
+    const names = system.members.map((m) => m.name).join(" + ");
+    return `${word} system, ${names}`;
+  }
   return system.companion
     ? `binary pair — ${system.primary.name} + ${system.companion.name}`
     : system.primary.name;
@@ -290,13 +375,14 @@ export function nodeBodyLabel(
   nodeId: string,
   capital: boolean,
   voidBody: VoidBody | undefined,
+  star?: NodeStar,
 ): string {
   if (voidBody) return bodyLabel(voidBody);
-  if (!capital) {
+  if (!capital && !star) {
     const exotic = exoticClassFor(nodeId);
     if (exotic) return EXOTIC_LABEL[exotic];
   }
-  return starSystemLabel(starSystemFor(nodeId, capital));
+  return starSystemLabel(starSystemFor(nodeId, capital, star));
 }
 
 /** One lane segment in 3D: [x1, y1, z1, x2, y2, z2]. */
@@ -693,10 +779,20 @@ export function GalaxyView({
     // Graded emphasis: a node's opacity multiplier (1 when not listed / no map).
     const dimOf = (id: string): number =>
       emphasisRef.current?.get(id)?.opacity ?? 1;
+    // The node under the pointer, so its lanes can be picked out of the web.
+    // Plain mutable state rather than a ref: only this effect reads it, and the
+    // hover handler below lives in the same scope.
+    let hoveredNodeId: string | null = null;
+
     // A lane is only as bright as its dimmer end, so a lane into a faded node
-    // fades with it.
-    const laneDim = (a: string, b: string): number =>
-      Math.min(dimOf(a), dimOf(b));
+    // fades with it. A lane touching the hovered node is lifted above its base
+    // brightness, which is what makes a system's reach readable at a glance.
+    const laneDim = (a: string, b: string): number => {
+      const dim = Math.min(dimOf(a), dimOf(b));
+      if (hoveredNodeId === null) return dim;
+      const touchesHover = a === hoveredNodeId || b === hoveredNodeId;
+      return dim * (touchesHover ? HOVER_LANE_BOOST : HOVER_LANE_FADE);
+    };
 
     /* ------------------------- decorative backdrop ------------------------- */
 
@@ -1024,15 +1120,8 @@ export function GalaxyView({
       const a = laneEnd(aId);
       const b = laneEnd(bId);
       if (!a || !b) return null;
-      const len = Math.hypot(b[0] - a[0], b[2] - a[2]);
-      if (len <= LANE_TRIM * 2 + 0.5) return null;
-      const at = (t: number): [number, number, number] => [
-        a[0] + (b[0] - a[0]) * t,
-        a[1] + (b[1] - a[1]) * t,
-        a[2] + (b[2] - a[2]) * t,
-      ];
-      const t0 = LANE_TRIM / len;
-      return [...at(t0), ...at(1 - t0)] as LaneSeg;
+      const ends = trimLane(a, b, LANE_TRIM);
+      return ends ? ([...ends[0], ...ends[1]] as LaneSeg) : null;
     };
     // No-Man's-Sky-style lines: each lane draws twice — a crisp thin core
     // plus a wide, very faint halo — both with gaussian cross-sections and
@@ -1106,6 +1195,9 @@ export function GalaxyView({
     // `laneFlow` (run) mode the same pair is drawn *solid* instead — the run's
     // open lanes are directional travel routes, not a contested battle line.
     const frontier = makeLanePair({
+      // Vertex-coloured so hover and emphasis can grade individual dashes. The
+      // material colour multiplies in, so a white vertex colour is plain gold.
+      vertexColors: true,
       color: 0xffcf8a,
       coreOpacity: 0.9,
       haloOpacity: 0.1,
@@ -1419,7 +1511,7 @@ export function GalaxyView({
     // Star size = stellar class × role: a red giant capital dwarfs a white
     // dwarf border system, per-node hash keeps the mix stable.
     const nodeSystem = galaxy.nodes.map((n) =>
-      starSystemFor(n.id, n.kind === "capital"),
+      starSystemFor(n.id, n.kind === "capital", n.star),
     );
     const nodeType = nodeSystem.map((s) => s.primary);
     const starScale = (i: number) =>
@@ -1450,9 +1542,7 @@ export function GalaxyView({
     // Voidwater bodies for the whole galaxy at once, so at least one node is a
     // comet whenever any are space maps (see `voidBodiesFor`).
     const voidBodies = voidBodiesFor(
-      galaxy.nodes
-        .filter((n) => !!spaceMaps?.has(n.battle.mapName))
-        .map((n) => n.id),
+      galaxy.nodes.filter((n) => isVoidNode(n, spaceMaps)).map((n) => n.id),
     );
 
     const WHITE = new THREE.Color(0xffffff);
@@ -2432,12 +2522,16 @@ export function GalaxyView({
       // rare comet variant gets a trailing tail. Reuses the star/corona/spike
       // slots so intro, ownership rings and selection keep working; skips the
       // binary companion. See `./bodies` for the pure asteroid/comet split.
-      const isVoid = !!spaceMaps?.has(n.battle.mapName);
+      const isVoid = isVoidNode(n, spaceMaps);
       // Rare exotic star (shared with conquest): pulsar / gas giant / dyson swarm
       // fully replace the star; variable / carbon tweak the ordinary star below.
       // Never for capitals (they read as important giants) or void asteroid fields.
+      // A node with real spectral data is a real star, and there is no pulsar
+      // within 19 light years. Inventing one would undercut the whole mode.
       const exotic =
-        n.kind === "capital" || isVoid ? undefined : exoticClassFor(n.id);
+        n.kind === "capital" || isVoid || n.star
+          ? undefined
+          : exoticClassFor(n.id);
       if (exotic === "dysonswarm" && buildDysonSwarm(i, n, p)) {
         return;
       }
@@ -3096,6 +3190,7 @@ export function GalaxyView({
       const factionSegs: LaneSeg[] = [];
       const factionSegColors: THREE.Color[] = [];
       const frontierSegs: LaneSeg[] = [];
+      const frontierEnds: [string, string][] = [];
       const routeSegs: LaneSeg[] = [];
       const pathSegs: LaneSeg[] = [];
       // The quiet base lane, dimmed by whichever end is more faded.
@@ -3135,6 +3230,7 @@ export function GalaxyView({
         }
         if (aPlayer !== bPlayer) {
           frontierSegs.push(seg);
+          frontierEnds.push([a, b]);
         } else if (ownerA === ownerB && ownerA !== NEUTRAL) {
           factionSegs.push(seg);
           // clone: ownerColor returns the shared cached faction colour.
@@ -3148,12 +3244,32 @@ export function GalaxyView({
       setLanePair(lanes, baseSegs, baseSegColors);
       if (laneFlow) {
         setLanePair(factionLanes, []); // runs have no shared-owner lanes
-        setLanePair(frontier, routeSegs); // solid, not dashed
+        // Solid, not dashed. Full-brightness colours since run routes carry no
+        // hover grading of their own.
+        setLanePair(
+          frontier,
+          routeSegs,
+          routeSegs.map(() => new THREE.Color(0xffffff)),
+        );
         setLanePair(pathTaken, pathSegs); // green trail behind you
         layoutChevrons(routeSegs);
       } else {
         setLanePair(factionLanes, factionSegs, factionSegColors);
-        setLanePair(frontier, dashSegments(frontierSegs, 1.5, 1.2));
+        // Dashed per segment rather than in one pass, so each dash inherits
+        // the brightness of the lane it came from.
+        const dashes: LaneSeg[] = [];
+        const dashColors: THREE.Color[] = [];
+        frontierSegs.forEach((seg, i) => {
+          const [endA, endB] = frontierEnds[i];
+          const tint = new THREE.Color(0xffffff).multiplyScalar(
+            laneDim(endA, endB),
+          );
+          for (const dash of dashSegments([seg], 1.5, 1.2)) {
+            dashes.push(dash);
+            dashColors.push(tint);
+          }
+        });
+        setLanePair(frontier, dashes, dashColors);
       }
     };
     applyOwnersRef.current = applyOwners;
@@ -3336,6 +3452,11 @@ export function GalaxyView({
       if (hovered >= 0) setHoverStyle(hovered, false);
       hovered = idx;
       if (hovered >= 0) setHoverStyle(hovered, true);
+      // Lane colours are baked into the merged geometry, so lifting the hovered
+      // node's lanes means rebuilding them. That is the same work an ownership
+      // change already does, and it only runs when the hovered node changes.
+      hoveredNodeId = idx >= 0 ? galaxy.nodes[idx].id : null;
+      applyOwners();
       if (renderer) {
         renderer.domElement.style.cursor = hovered >= 0 ? "pointer" : "";
       }

@@ -4,6 +4,7 @@ import type { Faction, GalaxyDoc, GalaxyNode } from "./model";
 import { MAX_DIFFICULTY, NEUTRAL } from "./model";
 import type { ConquestNames } from "./names";
 import { factionSpecs, makeStarNamer, resolveConquestNames } from "./names";
+import { DEFAULT_RADIUS_LY, systemsWithin } from "./realstars";
 import { mulberry32, pick, type Rng } from "./rng";
 
 /**
@@ -25,8 +26,48 @@ export interface GenAi {
   name?: string;
 }
 
-/** How node positions are scattered on the strategic plane. */
+/** How node positions are scattered on the strategic plane. `realstars` is not
+ * a scatter at all: it reads the real solar neighbourhood from the catalogue. */
 export type GalaxyLayout = "scatter" | "spiral" | "clusters" | "ring";
+
+/**
+ * One node's worth of position and identity, before it becomes a
+ * {@link GalaxyNode}. Procedural scatters emit bare coordinates with `z: 0`
+ * and no name, so naming and star class fall back to the usual hashes. The
+ * real-star source fills all of it in.
+ *
+ * This is the seam the whole real-star mode hangs off. Everything downstream
+ * of it (capitals, difficulty, map tiering, factions) is unchanged.
+ */
+export interface SourceStar {
+  pos: [number, number, number];
+  /** Real name. Absent, so `starName()` supplies one. */
+  name?: string;
+  /** Spectral type per component, brightest first. Absent on procedural nodes. */
+  spectral?: string[];
+  /** Sol. Becomes the player capital instead of the westernmost node. */
+  home?: boolean;
+}
+
+/**
+ * Systems within this many light years of each other get a jump lane. Chosen
+ * by measuring the real catalogue: 8 light years gives 1.7 to 2.2 lanes per
+ * system across every offered radius, matching the density of the procedural
+ * maps. Shorter ranges fragment the neighbourhood badly, leaving the
+ * connectivity repair to invent most of the map.
+ */
+export const JUMP_RANGE_LY = 8;
+
+/**
+ * Most lanes a single system gets. Without a cap, a star sitting in a crowded
+ * pocket becomes a hub with eight or more lanes, which reads as noise on the
+ * map and makes that system a chokepoint the strategy never intended.
+ */
+export const MAX_LANES_PER_SYSTEM = 4;
+
+/** Added to a bridge's cost when either end is already at the lane cap. Larger
+ * than the galaxy so an unsaturated bridge always wins when one exists. */
+const SATURATED_BRIDGE_PENALTY = 1000;
 
 export interface GenerateOptions {
   seed: number;
@@ -38,7 +79,10 @@ export interface GenerateOptions {
   /** Enemy factions, clamped to 1..3. */
   factionCount: number;
   /** Point-scatter shape; `random` picks one from the seed. Default `scatter`. */
-  layout?: GalaxyLayout | "random";
+  layout?: GalaxyLayout | "random" | "realstars";
+  /** Real-star mode only. Catalogue radius in light years, which decides the
+   * node count. Ignored by every other layout. */
+  radiusLy?: number;
   /** Strategic-map presentation; sets `theme.skin`. Default `galaxy`. */
   skin?: "galaxy" | "theatre";
   /**
@@ -59,6 +103,14 @@ export interface GenerateOptions {
 
 type Pt = [number, number];
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+type Pt3 = [number, number, number];
+const dist3 = (a: Pt3, b: Pt3) =>
+  Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+/** Lift a flat scatter into source stars, which is what the generator consumes. */
+const flatSource = (pts: Pt[]): SourceStar[] =>
+  pts.map((p) => ({ pos: [p[0], p[1], 0] }));
 
 /** Standard-normal sample (Box–Muller, one output). */
 function gaussian(rng: Rng): number {
@@ -151,7 +203,10 @@ function resolveLayout(
   layout: GenerateOptions["layout"],
   rng: Rng,
 ): GalaxyLayout {
-  if (!layout || layout === "scatter") return "scatter";
+  // `realstars` never reaches here, since it bypasses the scatters entirely.
+  if (!layout || layout === "scatter" || layout === "realstars") {
+    return "scatter";
+  }
   if (layout === "random") {
     return pick(rng, ["scatter", "spiral", "clusters", "ring"] as const);
   }
@@ -175,6 +230,16 @@ function scatterFor(
     default:
       return scatterDisc(rng, count, radius);
   }
+}
+
+/** The real solar neighbourhood within `radiusLy` of Sol, as source stars. */
+function realStarSource(radiusLy: number): SourceStar[] {
+  return systemsWithin(radiusLy).map((s) => ({
+    pos: [s.pos[0], s.pos[1], s.pos[2]],
+    name: s.name,
+    spectral: s.components,
+    home: s.home,
+  }));
 }
 
 /** Do segments a-b and c-d properly intersect (shared endpoints excluded)? */
@@ -219,8 +284,22 @@ function buildLinks(pts: Pt[]): [number, number][] {
   }
   links = kept;
 
-  // Connectivity repair: union-find, then bridge closest component pairs.
-  const parent = pts.map((_, i) => i);
+  return repairConnectivity(pts.length, links, (a, b) => dist(pts[a], pts[b]));
+}
+
+/**
+ * Bridge disconnected components until the graph is whole: union-find over the
+ * existing lanes, then repeatedly join the closest pair spanning two
+ * components. Shared by both linkers, since an unreachable system is
+ * unplayable however the lanes were chosen.
+ */
+function repairConnectivity(
+  count: number,
+  links: [number, number][],
+  distOf: (a: number, b: number) => number,
+): [number, number][] {
+  const out = [...links];
+  const parent = Array.from({ length: count }, (_, i) => i);
   const find = (x: number): number => {
     let root = x;
     while (parent[root] !== root) root = parent[root];
@@ -236,28 +315,79 @@ function buildLinks(pts: Pt[]): [number, number][] {
   const union = (a: number, b: number) => {
     parent[find(a)] = find(b);
   };
-  for (const [a, b] of links) union(a, b);
+  for (const [a, b] of out) union(a, b);
   for (;;) {
-    const roots = new Set(pts.map((_, i) => find(i)));
+    const roots = new Set(parent.map((_, i) => find(i)));
     if (roots.size <= 1) break;
     const [first, ...rest] = [...roots];
     let best: [number, number] = [-1, -1];
     let bestD = Number.POSITIVE_INFINITY;
-    for (let i = 0; i < pts.length; i++) {
+    for (let i = 0; i < count; i++) {
       if (find(i) !== first) continue;
-      for (let j = 0; j < pts.length; j++) {
+      for (let j = 0; j < count; j++) {
         if (!rest.includes(find(j))) continue;
-        const d = dist(pts[i], pts[j]);
+        const d = distOf(i, j);
         if (d < bestD) {
           bestD = d;
           best = [i, j];
         }
       }
     }
-    links.push(best);
+    out.push(best);
     union(best[0], best[1]);
   }
-  return links;
+  return out;
+}
+
+/**
+ * Jump-range lanes for real 3D positions: link every pair within `range` light
+ * years, then repair. The 2D crossing prune is deliberately absent, because two
+ * lanes properly crossing in 3D is vanishingly rare and testing it in
+ * projection would cut lanes that never actually meet.
+ *
+ * The real data gives this texture for free. Crowded regions end up densely
+ * connected while isolated stars hang off one or two lanes, which no uniform
+ * nearest-neighbour rule would produce.
+ */
+function buildRangeLinks(
+  stars: SourceStar[],
+  range: number,
+): [number, number][] {
+  const candidates: { pair: [number, number]; d: number }[] = [];
+  for (let i = 0; i < stars.length; i++) {
+    for (let j = i + 1; j < stars.length; j++) {
+      const d = dist3(stars[i].pos, stars[j].pos);
+      if (d <= range) candidates.push({ pair: [i, j], d });
+    }
+  }
+  // Shortest lanes first, so when a crowded system hits its cap the lanes it
+  // keeps are the ones to its nearest neighbours.
+  candidates.sort((a, b) => a.d - b.d);
+  const degree = new Array<number>(stars.length).fill(0);
+  const links: [number, number][] = [];
+  for (const { pair } of candidates) {
+    const [a, b] = pair;
+    if (
+      degree[a] >= MAX_LANES_PER_SYSTEM ||
+      degree[b] >= MAX_LANES_PER_SYSTEM
+    ) {
+      continue;
+    }
+    links.push(pair);
+    degree[a]++;
+    degree[b]++;
+  }
+  // Bridges are costed as if saturated systems were far away, so the repair
+  // reaches for a system with room before it breaks the cap. When every
+  // candidate is full the penalty applies to all of them equally and the
+  // closest pair still wins, because reachability beats tidiness: an
+  // unreachable system is unplayable.
+  return repairConnectivity(stars.length, links, (a, b) => {
+    const d = dist3(stars[a].pos, stars[b].pos);
+    const full =
+      degree[a] >= MAX_LANES_PER_SYSTEM || degree[b] >= MAX_LANES_PER_SYSTEM;
+    return full ? d + SATURATED_BRIDGE_PENALTY : d;
+  });
 }
 
 /** BFS hop distances from a start node over an adjacency list. */
@@ -300,30 +430,51 @@ export function generateGalaxy(
   // limitToNamed caps the galaxy to the named-star pool (no fallback names);
   // the 8-node floor still applies, so pools smaller than 8 fill the few extra
   // names via the numeral fallback.
-  const requested = Math.round(opts.nodeCount);
-  const capped =
-    names.limitToNamed && names.starNames.length > 0
-      ? Math.min(requested, names.starNames.length)
-      : requested;
-  const nodeCount = Math.min(80, Math.max(8, capped));
+  // Real-star galaxies take their size and their names from the catalogue, so
+  // neither the node-count knob nor the naming-pool cap applies to them.
+  const realStars = opts.layout === "realstars";
+  const radiusLy = opts.radiusLy ?? DEFAULT_RADIUS_LY;
+  const layout = realStars ? "scatter" : resolveLayout(opts.layout, rng);
 
-  const layout = resolveLayout(opts.layout, rng);
-  const pts = scatterFor(layout, rng, nodeCount, 100);
-  const links = buildLinks(pts);
+  let source: SourceStar[];
+  if (realStars) {
+    source = realStarSource(radiusLy);
+  } else {
+    const requested = Math.round(opts.nodeCount);
+    const capped =
+      names.limitToNamed && names.starNames.length > 0
+        ? Math.min(requested, names.starNames.length)
+        : requested;
+    source = flatSource(
+      scatterFor(layout, rng, Math.min(80, Math.max(8, capped)), 100),
+    );
+  }
+  const nodeCount = source.length;
 
-  // Player capital: the westernmost node. Enemy capitals: farthest-point
-  // sampling so multiple factions start spread apart.
-  const playerCapital = pts.reduce(
-    (best, p, i) => (p[0] < pts[best][0] ? i : best),
-    0,
-  );
+  const pts = source.map((s) => [s.pos[0], s.pos[1]] as Pt);
+  const links = realStars
+    ? buildRangeLinks(source, JUMP_RANGE_LY)
+    : buildLinks(pts);
+
+  // Distances are measured in 3D throughout. Procedural sources are flat, so
+  // this is identical to the old planar maths for them.
+  const distAt = (a: number, b: number) => dist3(source[a].pos, source[b].pos);
+
+  // Player capital: Sol when the source names a home, else the westernmost
+  // node. Enemy capitals: farthest-point sampling so multiple factions start
+  // spread apart.
+  const home = source.findIndex((s) => s.home);
+  const playerCapital =
+    home >= 0
+      ? home
+      : pts.reduce((best, p, i) => (p[0] < pts[best][0] ? i : best), 0);
   const capitals = [playerCapital];
   for (let f = 0; f < enemyCount; f++) {
     let far = -1;
     let farD = -1;
-    for (let i = 0; i < pts.length; i++) {
+    for (let i = 0; i < source.length; i++) {
       if (capitals.includes(i)) continue;
-      const d = Math.min(...capitals.map((c) => dist(pts[i], pts[c])));
+      const d = Math.min(...capitals.map((c) => distAt(i, c)));
       if (d > farD) {
         farD = d;
         far = i;
@@ -360,15 +511,21 @@ export function generateGalaxy(
     adj[a].push(b);
     adj[b].push(a);
   }
+  // Real-star galaxies start lean by default. The full-frontier default hands
+  // every capital all its neighbours, and a small radius is dense enough that
+  // this leaves no neutral territory at all: at 8 light years, all six systems
+  // would be owned on turn 0 with nothing to fight over.
   const startCount =
     opts.startingSystems === undefined
-      ? undefined
+      ? realStars
+        ? 1
+        : undefined
       : Math.min(4, Math.max(1, Math.round(opts.startingSystems)));
   capitals.forEach((cap, f) => {
     owners[cap] = factions[f].id;
     const neighbours = adj[cap]
       .filter((n) => !capitals.includes(n))
-      .sort((a, b) => dist(pts[cap], pts[a]) - dist(pts[cap], pts[b]));
+      .sort((a, b) => distAt(cap, a) - distAt(cap, b));
     const take = startCount === undefined ? neighbours.length : startCount - 1;
     for (const n of neighbours.slice(0, take)) {
       if (owners[n] === NEUTRAL) owners[n] = factions[f].id;
@@ -408,10 +565,15 @@ export function generateGalaxy(
     return poolAll[cursor % poolAll.length].name;
   };
 
-  const nodes: GalaxyNode[] = pts.map((p, i) => ({
+  const nodes: GalaxyNode[] = source.map((s, i) => ({
     id: `node-${i}`,
-    name: starName(usedNames),
-    pos: [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10],
+    name: s.name ?? starName(usedNames),
+    // Catalogue positions are already rounded and are in light years, so they
+    // keep their precision. Scatter positions keep the original 0.1 rounding.
+    pos: realStars
+      ? [s.pos[0], s.pos[1], s.pos[2]]
+      : [Math.round(s.pos[0] * 10) / 10, Math.round(s.pos[1] * 10) / 10],
+    star: s.spectral ? { spectral: s.spectral } : undefined,
     owner: owners[i],
     kind: capitals.includes(i) ? "capital" : undefined,
     difficulty: difficulty[i],
@@ -423,7 +585,9 @@ export function generateGalaxy(
     id: opts.id ?? `generated-${opts.seed >>> 0}`,
     type: "conquest-galaxy",
     title: opts.title ?? `${opts.game.shortname} Conquest`,
-    description: `A procedurally generated conquest of ${nodeCount} systems.`,
+    description: realStars
+      ? `The ${nodeCount} real star systems within ${radiusLy} light years of Sol.`
+      : `A procedurally generated conquest of ${nodeCount} systems.`,
     game: { shortname: opts.game.shortname },
     playerFactionId: factions[0].id,
     playableFactionIds: factions.map((f) => f.id),
@@ -439,6 +603,7 @@ export function generateGalaxy(
       nodeCount,
       factionCount: enemyCount,
       layout: opts.layout ?? "scatter",
+      radiusLy: realStars ? radiusLy : undefined,
       skin: opts.skin === "theatre" ? "theatre" : "galaxy",
       startingSystems: startCount,
       fogOfWar: opts.fogOfWar ? true : undefined,
@@ -479,6 +644,7 @@ export function regenerateGalaxy(
       nodeCount: g.nodeCount,
       factionCount: g.factionCount,
       layout: g.layout,
+      radiusLy: g.radiusLy,
       skin: g.skin,
       startingSystems: g.startingSystems,
       fogOfWar: g.fogOfWar,

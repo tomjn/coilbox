@@ -55,6 +55,11 @@ import { type GenerateOptions, generateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc } from "../model";
 import { compareGameVersions, resolveGameByShortname } from "../model";
 import { mergeConquestNames } from "../names";
+import {
+  DEFAULT_RADIUS_LY,
+  RADIUS_CHOICES,
+  systemCountWithin,
+} from "../realstars";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
 
 /** Best-effort shortname/version match, mirroring `resolveGameByShortname`
@@ -468,14 +473,26 @@ const LAYOUT_OPTIONS = [
   { value: "spiral", label: "Spiral arms" },
   { value: "clusters", label: "Clusters" },
   { value: "ring", label: "Ring" },
+  { value: "realstars", label: "Real stars (the solar neighbourhood)" },
 ];
+// Real-star galaxies are sized by radius, not by node count: every system
+// inside the radius is on the map. Counts come from the catalogue so they
+// cannot drift from the data.
+const RADIUS_OPTIONS = RADIUS_CHOICES.map((ly) => ({
+  value: String(ly),
+  label: `${ly} light years (${systemCountWithin(ly)} systems)`,
+}));
 const STYLE_OPTIONS = [
   { value: "galaxy", label: "Galaxy (starfield)" },
   { value: "theatre", label: "Theatre map (flat chart)" },
 ];
-// "" means the classic full-frontier start (capital + all neighbours).
+/** Sentinel for "let the generator decide" (the classic full-frontier start for
+ * procedural galaxies, capital-only for real stars). An empty string cannot be
+ * used: Radix Select reads it as no selection and falls back to the
+ * placeholder, leaving the row looking blank. */
+const STARTING_DEFAULT = "auto";
 const STARTING_OPTIONS = [
-  { value: "", label: "Full frontier (default)" },
+  { value: STARTING_DEFAULT, label: "Full frontier (default)" },
   { value: "1", label: "Capital only" },
   { value: "2", label: "Capital + 1 system" },
   { value: "3", label: "Capital + 2 systems" },
@@ -564,8 +581,10 @@ function GenerateGalaxyForm({
   const [size, setSize] = useState("18");
   const [factions, setFactions] = useState("2");
   const [layout, setLayout] = useState("random");
+  const [radius, setRadius] = useState(String(DEFAULT_RADIUS_LY));
+  const realStars = layout === "realstars";
   const [style, setStyle] = useState("galaxy");
-  const [starting, setStarting] = useState("");
+  const [starting, setStarting] = useState(STARTING_DEFAULT);
   const [fog, setFog] = useState(false);
   const [seed, setSeed] = useState(() =>
     String(Math.floor(Math.random() * 100000)),
@@ -594,8 +613,10 @@ function GenerateGalaxyForm({
       nodeCount: Number(size),
       factionCount: Number(factions),
       layout: layout as GenerateOptions["layout"],
-      skin: style === "theatre" ? "theatre" : "galaxy",
-      startingSystems: starting ? Number(starting) : undefined,
+      radiusLy: Number(radius),
+      skin: style === "theatre" && !realStars ? "theatre" : "galaxy",
+      startingSystems:
+        starting === STARTING_DEFAULT ? undefined : Number(starting),
       fogOfWar: fog,
       names,
       id,
@@ -609,6 +630,8 @@ function GenerateGalaxyForm({
       size,
       factions,
       layout,
+      radius,
+      realStars,
       style,
       starting,
       fog,
@@ -703,12 +726,36 @@ function GenerateGalaxyForm({
             <BrandingScreenshots shots={brandingEntry.screenshots} />
           ) : null}
           <div className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Galaxy size</span>
+            <span className="font-medium">Shape</span>
             <OptionSelect
-              value={size}
-              onValueChange={setSize}
-              options={SIZE_OPTIONS}
+              value={layout}
+              onValueChange={setLayout}
+              options={LAYOUT_OPTIONS}
             />
+          </div>
+          <div className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium">
+              {realStars ? "Radius from Sol" : "Galaxy size"}
+            </span>
+            {realStars ? (
+              <OptionSelect
+                value={radius}
+                onValueChange={setRadius}
+                options={RADIUS_OPTIONS}
+              />
+            ) : (
+              <OptionSelect
+                value={size}
+                onValueChange={setSize}
+                options={SIZE_OPTIONS}
+              />
+            )}
+            {realStars && (
+              <span className="text-xs text-muted-foreground">
+                Every real system within the radius, at its true position. You
+                start at Sol, in the middle.
+              </span>
+            )}
           </div>
           <div className="flex flex-col gap-1.5 text-sm">
             <span className="font-medium">Opposition</span>
@@ -718,28 +765,32 @@ function GenerateGalaxyForm({
               options={FACTION_OPTIONS}
             />
           </div>
-          <div className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Shape</span>
-            <OptionSelect
-              value={layout}
-              onValueChange={setLayout}
-              options={LAYOUT_OPTIONS}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Map style</span>
-            <OptionSelect
-              value={style}
-              onValueChange={setStyle}
-              options={STYLE_OPTIONS}
-            />
-          </div>
+          {!realStars && (
+            <div className="flex flex-col gap-1.5 text-sm">
+              <span className="font-medium">Map style</span>
+              <OptionSelect
+                value={style}
+                onValueChange={setStyle}
+                options={STYLE_OPTIONS}
+              />
+            </div>
+          )}
           <div className="flex flex-col gap-1.5 text-sm">
             <span className="font-medium">Starting systems</span>
             <OptionSelect
               value={starting}
               onValueChange={setStarting}
-              options={STARTING_OPTIONS}
+              options={
+                realStars
+                  ? [
+                      {
+                        value: STARTING_DEFAULT,
+                        label: "Capital only (default)",
+                      },
+                      ...STARTING_OPTIONS.slice(1),
+                    ]
+                  : STARTING_OPTIONS
+              }
             />
           </div>
           <div className="flex items-center justify-between gap-3 text-sm">
@@ -771,10 +822,12 @@ function GenerateGalaxyForm({
               </Button>
             </div>
             <span className="text-xs text-muted-foreground">
-              The same seed always builds the same galaxy.
+              {realStars
+                ? "The stars never change. The seed sets the factions, where your enemies start, and which maps each system is fought on."
+                : "The same seed always builds the same galaxy."}
             </span>
           </div>
-          {preview && (
+          {preview && !realStars && (
             <div className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Preview</span>
               <GalaxyPreview2D galaxy={preview} />

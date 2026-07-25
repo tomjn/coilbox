@@ -1,0 +1,23 @@
+{
+  "comment": "Nearby systems discovered after the RECONS TOP100 snapshot (epoch 2012-01-01) that fall inside the real-star conquest radius. Each row cites the measurement it uses. Merged by scripts/build-star-catalogue.mjs.",
+  "systems": [
+    {
+      "name": "Luhman 16",
+      "designation": "WISE J104915.57-531906.1",
+      "ra": "10 49 15.57",
+      "dec": "-53 19 06.0",
+      "parallax": 0.500993,
+      "components": ["L7.5", "T0.5"],
+      "source": "Bedin et al. (2024), parallax 500.993 mas. Discovered Luhman (2013)."
+    },
+    {
+      "name": "WISE 0855-0714",
+      "designation": "WISE J085510.83-071442.5",
+      "ra": "08 55 10.83",
+      "dec": "-07 14 42.5",
+      "parallax": 0.439,
+      "components": ["Y4"],
+      "source": "Parallax 439.0 mas. Discovered Luhman (2014). Coldest known brown dwarf."
+    }
+  ]
+}

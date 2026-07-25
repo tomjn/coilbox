@@ -6,6 +6,7 @@ import {
   PLAY_EXTENT,
   playBounds,
   playExtentFor,
+  trimLane,
   Y_JITTER,
 } from "./layout";
 import { buildStarfield } from "./starfield";
@@ -125,5 +126,76 @@ describe("buildStarfield", () => {
       expect(colors[i * 3 + 1]).toBe(0);
       expect(colors[i * 3 + 2]).toBe(0);
     }
+  });
+});
+
+describe("layoutNodes with real depth", () => {
+  it("uses the authored third component instead of the hash jitter", () => {
+    const nodes = [
+      { id: "a", pos: [-10, 0, -10] as [number, number, number] },
+      { id: "b", pos: [10, 0, 10] as [number, number, number] },
+    ];
+    const out = layoutNodes(nodes, 100);
+    // The two nodes sit at opposite vertical extremes, far beyond the +/- 3
+    // jitter a flat galaxy would get.
+    const heights = [...out.values()].map((p) => p[1]);
+    expect(Math.abs(heights[0])).toBeGreaterThan(Y_JITTER);
+    expect(heights[0]).toBeCloseTo(-heights[1], 6);
+  });
+
+  it("scales height by the same factor as width, keeping depth honest", () => {
+    const out = layoutNodes(
+      [
+        { id: "a", pos: [-10, 0, -10] as [number, number, number] },
+        { id: "b", pos: [10, 0, 10] as [number, number, number] },
+      ],
+      100,
+    );
+    const a = out.get("a");
+    const b = out.get("b");
+    // Equal spans in x and z map to equal world spans.
+    expect(Math.abs((b?.[0] ?? 0) - (a?.[0] ?? 0))).toBeCloseTo(
+      Math.abs((b?.[1] ?? 0) - (a?.[1] ?? 0)),
+      6,
+    );
+  });
+
+  it("keeps the jitter for galaxies without a third component", () => {
+    const out = layoutNodes([
+      { id: "a", pos: [-10, -10] as [number, number] },
+      { id: "b", pos: [10, 10] as [number, number] },
+    ]);
+    for (const p of out.values())
+      expect(Math.abs(p[1])).toBeLessThanOrEqual(Y_JITTER);
+  });
+});
+
+describe("trimLane", () => {
+  it("keeps a lane between systems stacked vertically", () => {
+    // The bug this guards: measuring only the top-down projection collapses
+    // this lane's length to zero, so it was dropped and the two systems looked
+    // unconnected. GJ 229 lost its only lane this way.
+    const seg = trimLane([0, -20, 0], [0, 20, 0], 2.45);
+    expect(seg).not.toBeNull();
+    expect(seg?.[0][1]).toBeCloseTo(-17.55, 5);
+    expect(seg?.[1][1]).toBeCloseTo(17.55, 5);
+  });
+
+  it("returns a stub rather than nothing for a cramped pair", () => {
+    const seg = trimLane([0, 0, 0], [1, 0, 0], 2.45);
+    expect(seg).not.toBeNull();
+    // Trimmed to 35% in from each end, so a third of the lane still draws.
+    expect(seg?.[0][0]).toBeCloseTo(0.35, 5);
+    expect(seg?.[1][0]).toBeCloseTo(0.65, 5);
+  });
+
+  it("trims by the full amount when there is room", () => {
+    const seg = trimLane([0, 0, 0], [100, 0, 0], 2.45);
+    expect(seg?.[0][0]).toBeCloseTo(2.45, 5);
+    expect(seg?.[1][0]).toBeCloseTo(97.55, 5);
+  });
+
+  it("is null only when the ends coincide", () => {
+    expect(trimLane([5, 5, 5], [5, 5, 5], 2.45)).toBeNull();
   });
 });

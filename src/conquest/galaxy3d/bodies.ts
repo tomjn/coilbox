@@ -1,7 +1,24 @@
+import type { GalaxyNode } from "../model";
 import { hashString } from "./layout";
 
 /** A node's non-stellar body when it sits on a voidwater (space) map. */
 export type VoidBody = "asteroid" | "comet";
+
+/**
+ * Does this node render as an asteroid field or comet rather than a star?
+ *
+ * A space battle map is the trigger, but a node with real catalogue data is a
+ * real star and stays one whichever map it drew. Otherwise a genuine brown
+ * dwarf like 2MA 0415-09 would show up as an asteroid field purely because of
+ * the map behind it.
+ */
+export function isVoidNode(
+  node: Pick<GalaxyNode, "battle" | "star">,
+  spaceMaps: Set<string> | undefined,
+): boolean {
+  if (node.star) return false;
+  return !!spaceMaps?.has(node.battle.mapName);
+}
 
 /**
  * The void body for a node: an asteroid field, or a comet for roughly one node

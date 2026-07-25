@@ -33,7 +33,7 @@ import { conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { factionFocusNode } from "../focusTarget";
 import { FOG_RANGE, withinJumps } from "../fog";
-import { type VoidBody, voidBodiesFor } from "../galaxy3d/bodies";
+import { isVoidNode, type VoidBody, voidBodiesFor } from "../galaxy3d/bodies";
 import { factionSides } from "../galaxy3d/factionShape";
 import { GalaxyView, nodeBodyLabel } from "../galaxy3d/GalaxyView";
 import { galaxyPalette } from "../galaxy3d/palette";
@@ -107,9 +107,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   const voidBodies = useMemo(
     () =>
       voidBodiesFor(
-        galaxy.nodes
-          .filter((n) => spaceMaps.has(n.battle.mapName))
-          .map((n) => n.id),
+        galaxy.nodes.filter((n) => isVoidNode(n, spaceMaps)).map((n) => n.id),
       ),
     [galaxy, spaceMaps],
   );
@@ -617,7 +615,12 @@ function SelectionPanel({
           </span>
           {galaxy.theme?.skin !== "theatre" && (
             <span className="text-xs capitalize text-muted-foreground/70">
-              {nodeBodyLabel(node.id, node.kind === "capital", voidBody)}
+              {nodeBodyLabel(
+                node.id,
+                node.kind === "capital",
+                voidBody,
+                node.star,
+              )}
             </span>
           )}
         </div>
