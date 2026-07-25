@@ -1,4 +1,4 @@
-import type { GalaxyNode } from "../model";
+import { type GalaxyNode, posZ } from "../model";
 
 /**
  * Pure layout maths for the 3D galaxy view: authored 2D node positions map to
@@ -40,7 +40,13 @@ export type WorldPos = [number, number, number];
 /**
  * Map authored `pos: [x, y]` to centred world `[x, y, z]` coordinates: the
  * longest authored span scales to `extent` (default {@link PLAY_EXTENT};
- * aspect preserved, authored y becomes world z), plus a hash-derived Y jitter.
+ * aspect preserved, authored y becomes world z).
+ *
+ * World height comes from the authored third component when the galaxy has
+ * one, scaled by the same factor as the other axes so real depth stays true to
+ * real width. Galaxies without it keep the small hash-derived jitter, which
+ * exists only so the play layer is not perfectly flat.
+ *
  * A single node (or zero-span axis) lands at the origin rather than dividing
  * by zero.
  */
@@ -50,19 +56,30 @@ export function layoutNodes(
 ): Map<string, WorldPos> {
   const xs = nodes.map((n) => n.pos[0]);
   const ys = nodes.map((n) => n.pos[1]);
+  const zs = nodes.map((n) => posZ(n.pos));
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
-  const span = Math.max(maxX - minX, maxY - minY);
+  const minZ = Math.min(...zs);
+  const maxZ = Math.max(...zs);
+  // The span covers all three axes so a galaxy with real depth still fits the
+  // extent. A flat galaxy has no z span, so its scale is unchanged.
+  const span = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
   const scale = span > 0 ? extent / span : 0;
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
+  const cz = (minZ + maxZ) / 2;
+
+  // Real 3D positions replace the decorative jitter outright. Applying the
+  // same scale to all three axes is what keeps the vertical spread honest.
+  const hasDepth = nodes.some((n) => n.pos.length === 3);
 
   const out = new Map<string, WorldPos>();
   for (const n of nodes) {
     const jitter = ((hashString(n.id) % 1000) / 1000 - 0.5) * 2 * Y_JITTER;
-    out.set(n.id, [(n.pos[0] - cx) * scale, jitter, (n.pos[1] - cy) * scale]);
+    const y = hasDepth ? (posZ(n.pos) - cz) * scale : jitter;
+    out.set(n.id, [(n.pos[0] - cx) * scale, y, (n.pos[1] - cy) * scale]);
   }
   return out;
 }

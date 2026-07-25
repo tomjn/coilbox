@@ -617,7 +617,7 @@ function SelectionPanel({
           </span>
           {galaxy.theme?.skin !== "theatre" && (
             <span className="text-xs capitalize text-muted-foreground/70">
-              {nodeBodyLabel(node.id, node.kind === "capital", voidBody)}
+              {nodeBodyLabel(node.id, node.kind === "capital", voidBody, node.star)}
             </span>
           )}
         </div>

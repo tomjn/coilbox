@@ -127,3 +127,43 @@ describe("buildStarfield", () => {
     }
   });
 });
+
+describe("layoutNodes with real depth", () => {
+  it("uses the authored third component instead of the hash jitter", () => {
+    const nodes = [
+      { id: "a", pos: [-10, 0, -10] as [number, number, number] },
+      { id: "b", pos: [10, 0, 10] as [number, number, number] },
+    ];
+    const out = layoutNodes(nodes, 100);
+    // The two nodes sit at opposite vertical extremes, far beyond the +/- 3
+    // jitter a flat galaxy would get.
+    const heights = [...out.values()].map((p) => p[1]);
+    expect(Math.abs(heights[0])).toBeGreaterThan(Y_JITTER);
+    expect(heights[0]).toBeCloseTo(-heights[1], 6);
+  });
+
+  it("scales height by the same factor as width, keeping depth honest", () => {
+    const out = layoutNodes(
+      [
+        { id: "a", pos: [-10, 0, -10] as [number, number, number] },
+        { id: "b", pos: [10, 0, 10] as [number, number, number] },
+      ],
+      100,
+    );
+    const a = out.get("a");
+    const b = out.get("b");
+    // Equal spans in x and z map to equal world spans.
+    expect(Math.abs((b?.[0] ?? 0) - (a?.[0] ?? 0))).toBeCloseTo(
+      Math.abs((b?.[1] ?? 0) - (a?.[1] ?? 0)),
+      6,
+    );
+  });
+
+  it("keeps the jitter for galaxies without a third component", () => {
+    const out = layoutNodes([
+      { id: "a", pos: [-10, -10] as [number, number] },
+      { id: "b", pos: [10, 10] as [number, number] },
+    ]);
+    for (const p of out.values()) expect(Math.abs(p[1])).toBeLessThanOrEqual(Y_JITTER);
+  });
+});

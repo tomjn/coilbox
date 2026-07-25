@@ -8,7 +8,7 @@ import {
 } from "three/addons/renderers/CSS2DRenderer.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { assetUrl } from "../../lib/assetUrl";
-import type { GalaxyDoc, GalaxyNode, Incursion } from "../model";
+import type { GalaxyDoc, GalaxyNode, Incursion, NodeStar } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
 import { bodyLabel, type VoidBody, voidBodiesFor } from "./bodies";
@@ -194,15 +194,60 @@ const STAR_TYPES = [
   { name: "white dwarf", color: "#cfe4ff", size: 0.55, tint: 0.65, glow: 0.7 },
   { name: "blue giant", color: "#7fa8ff", size: 1.9, tint: 0.5, glow: 1.25 },
   { name: "red giant", color: "#ff5230", size: 2.05, tint: 0.3, glow: 1.2 },
+  // Substellar, so it never lights up. Only real catalogue data selects it.
+  { name: "brown dwarf", color: "#7a2a18", size: 0.4, tint: 0.05, glow: 0.2 },
 ] as const;
 const GIANT_TYPES = [5, 6]; // indices into STAR_TYPES
-// Dwarfs are common, giants rare — mirrors a real stellar population.
-const TYPE_WEIGHTS = [3, 3, 2, 2, 1, 1, 1];
+// Dwarfs are common, giants rare, mirroring a real stellar population. Brown
+// dwarfs carry weight 0: a procedural galaxy never rolls one, so adding the
+// class leaves every existing galaxy looking exactly as it did.
+const TYPE_WEIGHTS = [3, 3, 2, 2, 1, 1, 1, 0];
 const WEIGHT_TOTAL = TYPE_WEIGHTS.reduce((a, b) => a + b, 0);
 
 export type StarType = (typeof STAR_TYPES)[number];
 
-export function starTypeFor(nodeId: string, capital: boolean): StarType {
+/** Index into {@link STAR_TYPES} keyed by spectral class letter. */
+const CLASS_TYPES: Record<string, number> = {
+  O: 5,
+  B: 5,
+  A: 3,
+  F: 3,
+  G: 2,
+  K: 1,
+  M: 0,
+  L: 7,
+  T: 7,
+  Y: 7,
+};
+
+/**
+ * The star type for a real spectral classification such as "A1.0 V", "DA2" or
+ * "T6.0 V". White dwarfs are their own class, luminosity class III or brighter
+ * promotes a star to the matching giant, and anything unrecognised falls back
+ * to a yellow star.
+ *
+ * Nothing within 19 light years is a giant, so that branch is here for
+ * correctness rather than for anything currently on the map.
+ */
+export function starTypeForSpectral(spectral: string): StarType {
+  const text = spectral.trim().toUpperCase();
+  if (text.startsWith("D")) return STAR_TYPES[4]; // white dwarf
+  const index = CLASS_TYPES[text[0]];
+  if (index === undefined) return STAR_TYPES[2];
+  const luminosity = text.match(/\b(I{1,3}|IV|V|VI|VII)\b/)?.[1];
+  const giant = luminosity === "I" || luminosity === "II" || luminosity === "III";
+  if (giant) return STAR_TYPES[index === 0 || index === 1 ? 6 : 5];
+  return STAR_TYPES[index];
+}
+
+export function starTypeFor(
+  nodeId: string,
+  capital: boolean,
+  spectral?: string,
+): StarType {
+  // Real data always wins. A hash of the node id cannot know that Sirius is
+  // an A1 V.
+  if (spectral) return starTypeForSpectral(spectral);
   const h = hashString(`${nodeId}-stellar`);
   if (capital) return STAR_TYPES[GIANT_TYPES[h % GIANT_TYPES.length]];
   let roll = h % WEIGHT_TOTAL;
@@ -221,6 +266,11 @@ export interface StarSystem {
   primary: StarType;
   /** Present ~1 in 6 systems — the map/backdrop draws a second, smaller star. */
   companion?: StarType;
+  /**
+   * Every component of the system, brightest first. Procedural galaxies have
+   * one or two. Real ones can have three, as Alpha Centauri does.
+   */
+  members: StarType[];
 }
 
 /**
@@ -228,7 +278,17 @@ export interface StarSystem {
  * roughly one node in six, a dwarf companion. Same hash-of-id approach as
  * {@link starTypeFor} so map, panel and battle backdrop always agree.
  */
-export function starSystemFor(nodeId: string, capital: boolean): StarSystem {
+export function starSystemFor(
+  nodeId: string,
+  capital: boolean,
+  star?: NodeStar,
+): StarSystem {
+  // A catalogued system already knows what it is, down to how many stars it
+  // has, so the binary roll is skipped entirely.
+  if (star && star.spectral.length > 0) {
+    const members = star.spectral.map(starTypeForSpectral);
+    return { primary: members[0], companion: members[1], members };
+  }
   const primary = starTypeFor(nodeId, capital);
   const binary = hashString(`${nodeId}-binary`) % 6 === 0;
   const companion = binary
@@ -238,11 +298,27 @@ export function starSystemFor(nodeId: string, capital: boolean): StarSystem {
         ]
       ]
     : undefined;
-  return { primary, companion };
+  return {
+    primary,
+    companion,
+    members: companion ? [primary, companion] : [primary],
+  };
 }
 
 /** A human label for a node's stellar system (selection panel). */
+/** Word for a system of three or more stars, by component count. */
+const MULTIPLICITY: Record<number, string> = {
+  3: "triple",
+  4: "quadruple",
+  5: "quintuple",
+};
+
 export function starSystemLabel(system: StarSystem): string {
+  if (system.members.length >= 3) {
+    const word = MULTIPLICITY[system.members.length] ?? "multiple";
+    const names = system.members.map((m) => m.name).join(" + ");
+    return `${word} system, ${names}`;
+  }
   return system.companion
     ? `binary pair — ${system.primary.name} + ${system.companion.name}`
     : system.primary.name;
@@ -290,13 +366,14 @@ export function nodeBodyLabel(
   nodeId: string,
   capital: boolean,
   voidBody: VoidBody | undefined,
+  star?: NodeStar,
 ): string {
   if (voidBody) return bodyLabel(voidBody);
-  if (!capital) {
+  if (!capital && !star) {
     const exotic = exoticClassFor(nodeId);
     if (exotic) return EXOTIC_LABEL[exotic];
   }
-  return starSystemLabel(starSystemFor(nodeId, capital));
+  return starSystemLabel(starSystemFor(nodeId, capital, star));
 }
 
 /** One lane segment in 3D: [x1, y1, z1, x2, y2, z2]. */
@@ -1419,7 +1496,7 @@ export function GalaxyView({
     // Star size = stellar class × role: a red giant capital dwarfs a white
     // dwarf border system, per-node hash keeps the mix stable.
     const nodeSystem = galaxy.nodes.map((n) =>
-      starSystemFor(n.id, n.kind === "capital"),
+      starSystemFor(n.id, n.kind === "capital", n.star),
     );
     const nodeType = nodeSystem.map((s) => s.primary);
     const starScale = (i: number) =>
@@ -2436,8 +2513,12 @@ export function GalaxyView({
       // Rare exotic star (shared with conquest): pulsar / gas giant / dyson swarm
       // fully replace the star; variable / carbon tweak the ordinary star below.
       // Never for capitals (they read as important giants) or void asteroid fields.
+      // A node with real spectral data is a real star, and there is no pulsar
+      // within 19 light years. Inventing one would undercut the whole mode.
       const exotic =
-        n.kind === "capital" || isVoid ? undefined : exoticClassFor(n.id);
+        n.kind === "capital" || isVoid || n.star
+          ? undefined
+          : exoticClassFor(n.id);
       if (exotic === "dysonswarm" && buildDysonSwarm(i, n, p)) {
         return;
       }
