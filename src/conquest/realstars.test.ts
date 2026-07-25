@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { generateGalaxy, JUMP_RANGE_LY } from "./generate";
+import {
+  generateGalaxy,
+  JUMP_RANGE_LY,
+  MAX_LANES_PER_SYSTEM,
+} from "./generate";
 import { NEUTRAL, posZ } from "./model";
 import {
   DEFAULT_RADIUS_LY,
@@ -137,6 +141,31 @@ describe("real-star galaxy generation", () => {
     // thing shaping the map.
     const overRange = lengths.filter((d) => d > JUMP_RANGE_LY + 1e-6);
     expect(overRange.length).toBeLessThan(lengths.length * 0.1);
+  });
+
+  it("caps a system at four lanes", () => {
+    // A crowded pocket would otherwise make one star an eight-lane hub, which
+    // reads as noise and invents a chokepoint the strategy never intended.
+    for (const radiusLy of RADIUS_CHOICES) {
+      const g = generateGalaxy({
+        seed: 5,
+        game: { shortname: "bar" },
+        maps: [{ name: "M", width: 10, height: 10 }],
+        ais: [{ kind: "native", shortName: "AI" }],
+        nodeCount: 0,
+        factionCount: 2,
+        layout: "realstars",
+        radiusLy,
+      });
+      const degree = new Map<string, number>();
+      for (const [a, b] of g.links) {
+        degree.set(a, (degree.get(a) ?? 0) + 1);
+        degree.set(b, (degree.get(b) ?? 0) + 1);
+      }
+      expect(Math.max(...degree.values())).toBeLessThanOrEqual(
+        MAX_LANES_PER_SYSTEM,
+      );
+    }
   });
 
   it("leaves every system reachable", () => {

@@ -58,6 +58,17 @@ export interface SourceStar {
  */
 export const JUMP_RANGE_LY = 8;
 
+/**
+ * Most lanes a single system gets. Without a cap, a star sitting in a crowded
+ * pocket becomes a hub with eight or more lanes, which reads as noise on the
+ * map and makes that system a chokepoint the strategy never intended.
+ */
+export const MAX_LANES_PER_SYSTEM = 4;
+
+/** Added to a bridge's cost when either end is already at the lane cap. Larger
+ * than the galaxy so an unsaturated bridge always wins when one exists. */
+const SATURATED_BRIDGE_PENALTY = 1000;
+
 export interface GenerateOptions {
   seed: number;
   game: { shortname: string };
@@ -342,15 +353,41 @@ function buildRangeLinks(
   stars: SourceStar[],
   range: number,
 ): [number, number][] {
-  const links: [number, number][] = [];
+  const candidates: { pair: [number, number]; d: number }[] = [];
   for (let i = 0; i < stars.length; i++) {
     for (let j = i + 1; j < stars.length; j++) {
-      if (dist3(stars[i].pos, stars[j].pos) <= range) links.push([i, j]);
+      const d = dist3(stars[i].pos, stars[j].pos);
+      if (d <= range) candidates.push({ pair: [i, j], d });
     }
   }
-  return repairConnectivity(stars.length, links, (a, b) =>
-    dist3(stars[a].pos, stars[b].pos),
-  );
+  // Shortest lanes first, so when a crowded system hits its cap the lanes it
+  // keeps are the ones to its nearest neighbours.
+  candidates.sort((a, b) => a.d - b.d);
+  const degree = new Array<number>(stars.length).fill(0);
+  const links: [number, number][] = [];
+  for (const { pair } of candidates) {
+    const [a, b] = pair;
+    if (
+      degree[a] >= MAX_LANES_PER_SYSTEM ||
+      degree[b] >= MAX_LANES_PER_SYSTEM
+    ) {
+      continue;
+    }
+    links.push(pair);
+    degree[a]++;
+    degree[b]++;
+  }
+  // Bridges are costed as if saturated systems were far away, so the repair
+  // reaches for a system with room before it breaks the cap. When every
+  // candidate is full the penalty applies to all of them equally and the
+  // closest pair still wins, because reachability beats tidiness: an
+  // unreachable system is unplayable.
+  return repairConnectivity(stars.length, links, (a, b) => {
+    const d = dist3(stars[a].pos, stars[b].pos);
+    const full =
+      degree[a] >= MAX_LANES_PER_SYSTEM || degree[b] >= MAX_LANES_PER_SYSTEM;
+    return full ? d + SATURATED_BRIDGE_PENALTY : d;
+  });
 }
 
 /** BFS hop distances from a start node over an adjacency list. */

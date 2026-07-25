@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bodyLabel, voidBodiesFor, voidBodyFor } from "./bodies";
+import { bodyLabel, isVoidNode, voidBodiesFor, voidBodyFor } from "./bodies";
 
 /** All-asteroid ids under voidBodyFor, so voidBodiesFor must promote one. */
 function cometFreeIds(count: number): string[] {
@@ -60,5 +60,31 @@ describe("bodyLabel", () => {
   it("labels void bodies", () => {
     expect(bodyLabel("comet")).toBe("comet");
     expect(bodyLabel("asteroid")).toBe("asteroid field");
+  });
+});
+
+describe("isVoidNode", () => {
+  const node = (mapName: string, star?: { spectral: string[] }) => ({
+    battle: { mapName },
+    star,
+  });
+
+  it("treats a space-map node as a void body", () => {
+    expect(isVoidNode(node("Void Chasm"), new Set(["Void Chasm"]))).toBe(true);
+  });
+
+  it("leaves a real star a star whichever map it drew", () => {
+    // 2MA 0415-09 is a real brown dwarf. Drawing a space map should not turn it
+    // into an asteroid field.
+    expect(
+      isVoidNode(
+        node("Void Chasm", { spectral: ["T8"] }),
+        new Set(["Void Chasm"]),
+      ),
+    ).toBe(false);
+  });
+
+  it("is false with no space maps known", () => {
+    expect(isVoidNode(node("Green Valley"), undefined)).toBe(false);
   });
 });

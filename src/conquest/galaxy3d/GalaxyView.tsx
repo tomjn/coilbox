@@ -11,7 +11,7 @@ import { assetUrl } from "../../lib/assetUrl";
 import type { GalaxyDoc, GalaxyNode, Incursion, NodeStar } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
-import { bodyLabel, type VoidBody, voidBodiesFor } from "./bodies";
+import { bodyLabel, isVoidNode, type VoidBody, voidBodiesFor } from "./bodies";
 import { factionSides } from "./factionShape";
 import {
   hashString,
@@ -172,6 +172,9 @@ interface GalaxyViewProps {
   display?: Partial<GalaxyDisplay>;
   className?: string;
 }
+
+/** How much brighter a lane gets while either end is hovered. */
+const HOVER_LANE_BOOST = 1.6;
 
 const NEUTRAL_COLOR = "#6b7280";
 /** The quiet blue-grey of an unowned lane (the base lane pair's colour). */
@@ -771,10 +774,20 @@ export function GalaxyView({
     // Graded emphasis: a node's opacity multiplier (1 when not listed / no map).
     const dimOf = (id: string): number =>
       emphasisRef.current?.get(id)?.opacity ?? 1;
+    // The node under the pointer, so its lanes can be picked out of the web.
+    // Plain mutable state rather than a ref: only this effect reads it, and the
+    // hover handler below lives in the same scope.
+    let hoveredNodeId: string | null = null;
+
     // A lane is only as bright as its dimmer end, so a lane into a faded node
-    // fades with it.
-    const laneDim = (a: string, b: string): number =>
-      Math.min(dimOf(a), dimOf(b));
+    // fades with it. A lane touching the hovered node is lifted above its base
+    // brightness, which is what makes a system's reach readable at a glance.
+    const laneDim = (a: string, b: string): number => {
+      const dim = Math.min(dimOf(a), dimOf(b));
+      const touchesHover =
+        hoveredNodeId !== null && (a === hoveredNodeId || b === hoveredNodeId);
+      return touchesHover ? dim * HOVER_LANE_BOOST : dim;
+    };
 
     /* ------------------------- decorative backdrop ------------------------- */
 
@@ -1528,9 +1541,7 @@ export function GalaxyView({
     // Voidwater bodies for the whole galaxy at once, so at least one node is a
     // comet whenever any are space maps (see `voidBodiesFor`).
     const voidBodies = voidBodiesFor(
-      galaxy.nodes
-        .filter((n) => !!spaceMaps?.has(n.battle.mapName))
-        .map((n) => n.id),
+      galaxy.nodes.filter((n) => isVoidNode(n, spaceMaps)).map((n) => n.id),
     );
 
     const WHITE = new THREE.Color(0xffffff);
@@ -2510,7 +2521,7 @@ export function GalaxyView({
       // rare comet variant gets a trailing tail. Reuses the star/corona/spike
       // slots so intro, ownership rings and selection keep working; skips the
       // binary companion. See `./bodies` for the pure asteroid/comet split.
-      const isVoid = !!spaceMaps?.has(n.battle.mapName);
+      const isVoid = isVoidNode(n, spaceMaps);
       // Rare exotic star (shared with conquest): pulsar / gas giant / dyson swarm
       // fully replace the star; variable / carbon tweak the ordinary star below.
       // Never for capitals (they read as important giants) or void asteroid fields.
@@ -3418,6 +3429,11 @@ export function GalaxyView({
       if (hovered >= 0) setHoverStyle(hovered, false);
       hovered = idx;
       if (hovered >= 0) setHoverStyle(hovered, true);
+      // Lane colours are baked into the merged geometry, so lifting the hovered
+      // node's lanes means rebuilding them. That is the same work an ownership
+      // change already does, and it only runs when the hovered node changes.
+      hoveredNodeId = idx >= 0 ? galaxy.nodes[idx].id : null;
+      applyOwners();
       if (renderer) {
         renderer.domElement.style.cursor = hovered >= 0 ? "pointer" : "";
       }
