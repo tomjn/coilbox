@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Battle, BattleStatus, MemberStatus, Vote } from "../bindings";
 import {
+  aiShortNameFromDll,
   allyLetter,
   battleStartable,
   colorIntToHex,
   deriveSync,
   hexToColorInt,
+  isAiUnavailable,
   type MemberRow,
   membersToRows,
   randomTeamColorHex,
@@ -445,5 +447,39 @@ describe("shouldNotifyVoteOpened", () => {
     expect(shouldNotifyVoteOpened(null, vote({ subject: "set map DSD" }))).toBe(
       true,
     );
+  });
+});
+
+describe("aiShortNameFromDll", () => {
+  it("returns a bare shortName unchanged", () => {
+    expect(aiShortNameFromDll("SimpleAI")).toBe("SimpleAI");
+  });
+
+  it("strips a leading numeric id prefix, keeping the shortName", () => {
+    expect(aiShortNameFromDll("11772313 SimpleAI")).toBe("SimpleAI");
+  });
+});
+
+describe("isAiUnavailable", () => {
+  const ais = [{ shortName: "SimpleAI" }, { shortName: "BARb" }];
+
+  it("does not flag a valid shortName carrying an id prefix (#547)", () => {
+    expect(isAiUnavailable("11772313 SimpleAI", ais, true)).toBe(false);
+  });
+
+  it("does not flag a valid bare shortName", () => {
+    expect(isAiUnavailable("BARb", ais, true)).toBe(false);
+  });
+
+  it("flags a genuinely absent shortName", () => {
+    expect(isAiUnavailable("SurvivalAI", ais, true)).toBe(true);
+  });
+
+  it("does not flag while the addable list isn't ready yet (#531)", () => {
+    expect(isAiUnavailable("SurvivalAI", [], false)).toBe(false);
+  });
+
+  it("does not flag a row with no aiDll", () => {
+    expect(isAiUnavailable(undefined, ais, true)).toBe(false);
   });
 });

@@ -187,6 +187,41 @@ export function membersToRows(
 }
 
 /* -------------------------------------------------------------------------- *
+ * Bot AI availability (#501, false positive fixed in #547).
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A bot's `aiDll` as carried on the wire can be more than a bare shortName.
+ * Some autohosts (seen with SplinterFaction) prefix it with a numeric id, e.g.
+ * `"11772313 SimpleAI"`. The addable-AI list is always keyed by the bare
+ * shortName, so the last whitespace-separated token is what should be
+ * compared against it. A plain `"SimpleAI"` has only the one token, so it is
+ * unaffected.
+ */
+export function aiShortNameFromDll(aiDll: string): string {
+  const parts = aiDll.trim().split(/\s+/);
+  return parts[parts.length - 1] || aiDll;
+}
+
+/**
+ * Whether a bot's current AI should read as unavailable (#501): its shortName
+ * (extracted from `aiDll`, ignoring any id/version prefix, see
+ * `aiShortNameFromDll`) isn't offered by the hosted game at all. Never flags
+ * while the addable-AI list isn't ready yet (`ready`, e.g. `addableAisReady`
+ * from `useBattleRoom`, #531). An unloaded list must not read as "this game
+ * has no AIs".
+ */
+export function isAiUnavailable(
+  aiDll: string | undefined,
+  addableAis: { shortName: string }[],
+  ready: boolean,
+): boolean {
+  if (!ready || !aiDll) return false;
+  const shortName = aiShortNameFromDll(aiDll).toLowerCase();
+  return !addableAis.some((a) => a.shortName.toLowerCase() === shortName);
+}
+
+/* -------------------------------------------------------------------------- *
  * Sync roll-up for the top status pill.
  * -------------------------------------------------------------------------- */
 

@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { aiByline } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { useMultiplayer } from "../store";
-import { allyLetter, type MemberRow as Row } from "./config";
+import { allyLetter, isAiUnavailable, type MemberRow as Row } from "./config";
 import { type MemberControls, MemberRow } from "./MemberRow";
 
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
@@ -36,6 +36,7 @@ export function BattleMembersTable({
   canAddBot,
   hostControls,
   addableAis,
+  addableAisReady,
   noteFor,
   onSetNote,
   statsSummaryFor,
@@ -79,6 +80,10 @@ export function BattleMembersTable({
     version?: string;
     description?: string;
   }[];
+  /** Whether `addableAis` has finished loading (#531). Gates the invalid-AI
+   * flag below so a bot's AI never reads as unavailable before the list is
+   * actually known. */
+  addableAisReady: boolean;
   /** Current private note for a human row ("" for none). Bots have no account
    * so aren't offered notes (see `MemberRow`'s `onSetNote` gating below). */
   noteFor?: (row: Row) => string;
@@ -247,13 +252,12 @@ export function BattleMembersTable({
               // Defensive flag (#501): a bot whose AI isn't in this game's
               // addable list at all (a preset or hand-add from another game or
               // version) reads as invalid rather than as a normal bot.
+              // `isAiUnavailable` compares by shortName only, so a valid AI
+              // whose `aiDll` carries an id/version prefix (#547) isn't
+              // flagged, and it never fires before the list has loaded.
               const aiInvalid =
                 row.kind === "bot" &&
-                !!row.aiDll &&
-                addableAis.length > 0 &&
-                !addableAis.some(
-                  (a) => a.shortName.toLowerCase() === row.aiDll?.toLowerCase(),
-                );
+                isAiUnavailable(row.aiDll, addableAis, addableAisReady);
               return (
                 <MemberRow
                   key={`${row.kind}:${row.name}`}

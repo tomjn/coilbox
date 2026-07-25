@@ -339,6 +339,7 @@ function BattleRoomPage() {
             canAddBot={room.canAddBot}
             hostControls={room.hostControls}
             addableAis={room.addableAis}
+            addableAisReady={room.addableAisReady}
             noteFor={(row) => getNote(row.userId, row.name)}
             onSetNote={(row, text) => setNote(row.userId, row.name, text)}
             statsSummaryFor={(row) => relationSummary(relationFor(row.name))}
