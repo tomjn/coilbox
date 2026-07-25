@@ -1,13 +1,16 @@
-import { Button } from "@picoframe/frame";
-import { FolderOpen } from "lucide-react";
+import { Button, useSetting } from "@picoframe/frame";
+import { FolderOpen, Trophy } from "lucide-react";
 import { useMemo } from "react";
 import { useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFactionLogos } from "@/factions/logos";
+import { isProfileHidden } from "@/profile/hidden";
 import { type Archive, contentOpenPath } from "../bindings";
 import { useBrandingEntry } from "../branding";
 import {
   classifyArchive,
+  useContentState,
+  useReplayStats,
   useScanTargetSelection,
   useUnitsyncGameInfo,
   useUnitsyncScan,
@@ -15,6 +18,8 @@ import {
   useUnitsyncUnitDataset,
 } from "../config";
 import { isSdd } from "../format";
+import { refightFilenames, useReplayUserState } from "../replayUserState";
+import { allPlayers, factionRecordsFor, guessPrimaryPlayer } from "../stats";
 import { usePlayGame } from "../usePlayGame";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { BrandingLinks } from "./components/BrandingLinks";
@@ -23,6 +28,7 @@ import { FactionBuildList } from "./components/FactionBuildList";
 import { GameHeader } from "./components/GameHeader";
 import { OptionsList } from "./components/OptionsList";
 import { StartModeActions } from "./components/StartModeActions";
+import { TallyBar } from "./components/StatWidgets";
 import {
   DetailError,
   DetailLoading,
@@ -80,14 +86,49 @@ export default function GameDetailPage() {
     game?.primaryArchive.name,
   );
   const brand = useBrandingEntry(game);
+  const factionNames = useMemo(
+    () => gameInfo?.sides.map((s) => s.name) ?? [],
+    [gameInfo],
+  );
   const factionLogos = useFactionLogos({
     game,
     enginePath: selected?.enginePath,
     dataDir: selected?.rootPath,
     gameArchive: game?.primaryArchive.name,
-    sideNames: gameInfo?.sides.map((s) => s.name) ?? [],
+    sideNames: factionNames,
     size: 20,
   });
+
+  // Per-faction records (#460): a distribution profile can hide stats entirely,
+  // in which case the roots stay empty so `useReplayStats` never ingests.
+  const statsHidden = isProfileHidden("multiplayer.stats");
+  const { state: contentState } = useContentState();
+  const statsRoots = useMemo(
+    () => (statsHidden ? [] : (contentState?.roots ?? []).map((r) => r.path)),
+    [contentState, statsHidden],
+  );
+  const { records: statRecords, ingesting: statsIngesting } = useReplayStats(
+    statsRoots,
+    selected?.enginePath,
+  );
+  const { state: replayUserState } = useReplayUserState();
+  const refights = useMemo(
+    () => refightFilenames(replayUserState),
+    [replayUserState],
+  );
+  const [storedStatsPlayer] = useSetting("content.statsPlayer", "");
+  const statsPlayer = useMemo(() => {
+    const players = allPlayers(statRecords, refights);
+    return (
+      players.find((p) => p.name === storedStatsPlayer)?.name ??
+      guessPrimaryPlayer(statRecords, refights) ??
+      ""
+    );
+  }, [statRecords, refights, storedStatsPlayer]);
+  const factionRecords = useMemo(
+    () => factionRecordsFor(statRecords, factionNames, statsPlayer, refights),
+    [statRecords, factionNames, statsPlayer, refights],
+  );
 
   if (error && !data)
     return (
@@ -183,6 +224,42 @@ export default function GameDetailPage() {
               factionLogos={factionLogos}
               branding={brand}
             />
+          )}
+        </section>
+      )}
+
+      {!statsHidden && factionNames.length > 0 && (
+        <section className="rounded-lg border border-border/60 bg-card p-4">
+          <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
+            <Trophy className="size-4 text-muted-foreground" />
+            Your record by faction
+          </h2>
+          {statsIngesting && statRecords.length === 0 ? (
+            <Skeleton className="h-12 rounded bg-muted" />
+          ) : (
+            <ul className="divide-y divide-border/40">
+              {factionRecords.map((f) => (
+                <li
+                  key={f.faction}
+                  className="flex items-center gap-3 py-1.5 text-sm"
+                >
+                  <span className="min-w-0 flex-1 truncate" title={f.faction}>
+                    {f.faction}
+                  </span>
+                  {f.games === 0 ? (
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      No games recorded
+                    </span>
+                  ) : f.decided === 0 ? (
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {f.games} game{f.games === 1 ? "" : "s"} · outcome unknown
+                    </span>
+                  ) : (
+                    <TallyBar games={f.games} wins={f.wins} />
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       )}

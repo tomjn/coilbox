@@ -25,6 +25,26 @@ export function StatCard({
   );
 }
 
+/** A win-rate bar plus its "wins/games · rate%" label, with no wrapper element
+ * so callers can place it inside their own row (see `TallyRow`, and the game
+ * detail page's per-faction records, #460). */
+export function TallyBar({ games, wins }: { games: number; wins: number }) {
+  const rate = games > 0 ? wins / games : 0;
+  return (
+    <>
+      <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-primary/70"
+          style={{ width: `${Math.round(rate * 100)}%` }}
+        />
+      </div>
+      <span className="w-24 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+        {wins}/{games} · {Math.round(rate * 100)}%
+      </span>
+    </>
+  );
+}
+
 /** A win/loss tally row (map or faction), with a win-rate bar. */
 export function TallyRow({
   label,
@@ -35,21 +55,12 @@ export function TallyRow({
   games: number;
   wins: number;
 }) {
-  const rate = games > 0 ? wins / games : 0;
   return (
     <li className="flex items-center gap-3 py-1.5">
       <span className="min-w-0 flex-1 truncate text-sm" title={label}>
         {label}
       </span>
-      <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full rounded-full bg-primary/70"
-          style={{ width: `${Math.round(rate * 100)}%` }}
-        />
-      </div>
-      <span className="w-24 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-        {wins}/{games} · {Math.round(rate * 100)}%
-      </span>
+      <TallyBar games={games} wins={wins} />
     </li>
   );
 }

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { StatPlayer, StatRecord } from "./bindings";
 import {
   allPlayers,
+  factionRecordsFor,
   filterPlayers,
   guessPrimaryPlayer,
   isGenuineMatch,
+  mapRecordFor,
   profileFor,
   relationTo,
   replaysFor,
@@ -313,6 +315,125 @@ describe("relationTo", () => {
       lastPlayedMs: 0,
       commonMaps: [],
     });
+  });
+});
+
+describe("mapRecordFor (#460)", () => {
+  it("computes games, win rate, last played, and favourite faction for one map", () => {
+    const records = [
+      rec("Comet", [p("me", true, "Armada")]),
+      rec("Comet", [p("me", false, "Armada")]),
+      rec("Delta", [p("me", true, "Cortex")]),
+    ];
+    const record = mapRecordFor(records, "Comet", "me");
+    expect(record.games).toBe(2);
+    expect(record.decided).toBe(2);
+    expect(record.wins).toBe(1);
+    expect(record.losses).toBe(1);
+    expect(record.winRate).toBeCloseTo(0.5);
+    expect(record.lastPlayedMs).toBe(records[1].startTimeMs);
+    expect(record.favouriteFaction).toEqual({
+      key: "Armada",
+      games: 2,
+      wins: 1,
+    });
+  });
+
+  it("is empty for a map the player has never played", () => {
+    const records = [rec("Comet", [p("me", true)])];
+    const record = mapRecordFor(records, "Delta", "me");
+    expect(record).toMatchObject({
+      games: 0,
+      decided: 0,
+      winRate: null,
+      lastPlayedMs: 0,
+      favouriteFaction: null,
+    });
+  });
+
+  it("has a null win rate when every game on the map is undecided", () => {
+    const records = [
+      rec("Comet", [p("me", undefined)], { winnersKnown: false }),
+      rec("Comet", [p("me", undefined)], { winnersKnown: false }),
+    ];
+    const record = mapRecordFor(records, "Comet", "me");
+    expect(record.games).toBe(2);
+    expect(record.decided).toBe(0);
+    expect(record.winRate).toBeNull();
+  });
+
+  it("excludes remix/refight reruns from the map record", () => {
+    const genuine = rec("Comet", [p("me", true)]);
+    const remixed = rec("Comet", [p("me", false)], { remixed: true });
+    const refought = rec("Comet", [p("me", false)]);
+    const records = [genuine, remixed, refought];
+    const record = mapRecordFor(
+      records,
+      "Comet",
+      "me",
+      new Set([refought.filename]),
+    );
+    expect(record.games).toBe(1);
+    expect(record.losses).toBe(0);
+  });
+});
+
+describe("factionRecordsFor (#460)", () => {
+  it("computes a record for each requested faction", () => {
+    const records = [
+      rec("A", [p("me", true, "Armada")]),
+      rec("B", [p("me", false, "Armada")]),
+      rec("C", [p("me", true, "Cortex")]),
+    ];
+    const [armada, cortex] = factionRecordsFor(
+      records,
+      ["Armada", "Cortex"],
+      "me",
+    );
+    expect(armada).toMatchObject({
+      faction: "Armada",
+      games: 2,
+      decided: 2,
+      wins: 1,
+      losses: 1,
+    });
+    expect(cortex).toMatchObject({
+      faction: "Cortex",
+      games: 1,
+      decided: 1,
+      wins: 1,
+      losses: 0,
+    });
+  });
+
+  it("reports zero games and a null win rate for a faction never played", () => {
+    const records = [rec("A", [p("me", true, "Armada")])];
+    const [legion] = factionRecordsFor(records, ["Legion"], "me");
+    expect(legion).toMatchObject({
+      faction: "Legion",
+      games: 0,
+      decided: 0,
+      winRate: null,
+    });
+  });
+
+  it("has a null win rate when every game with that faction is undecided", () => {
+    const records = [
+      rec("A", [p("me", undefined, "Armada")], { winnersKnown: false }),
+    ];
+    const [armada] = factionRecordsFor(records, ["Armada"], "me");
+    expect(armada.games).toBe(1);
+    expect(armada.decided).toBe(0);
+    expect(armada.winRate).toBeNull();
+  });
+
+  it("excludes remix/refight reruns from faction records", () => {
+    const genuine = rec("A", [p("me", true, "Armada")]);
+    const remixed = rec("B", [p("me", false, "Armada")], { remixed: true });
+    const records = [genuine, remixed];
+    const [armada] = factionRecordsFor(records, ["Armada"], "me");
+    expect(armada.games).toBe(1);
+    expect(armada.losses).toBe(0);
   });
 });
 

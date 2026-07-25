@@ -217,6 +217,91 @@ export function profileFor(
   };
 }
 
+/** A player's record on one map or with one faction: games, win rate (when
+ * decided), and when they last played it. */
+export interface ScopedRecord {
+  /** Non-spectator games played, including undecided ones. */
+  games: number;
+  /** Games with a known result. */
+  decided: number;
+  wins: number;
+  losses: number;
+  /** wins / decided, or null when no game in scope has a known result. */
+  winRate: number | null;
+  /** Most recent game's start time, or 0 with no games. */
+  lastPlayedMs: number;
+}
+
+function scopedRecord(games: PlayerGame[]): ScopedRecord {
+  const decided = games.filter((g) => g.won !== undefined);
+  const wins = decided.filter((g) => g.won === true).length;
+  return {
+    games: games.length,
+    decided: decided.length,
+    wins,
+    losses: decided.length - wins,
+    winRate: decided.length ? wins / decided.length : null,
+    lastPlayedMs: games.length ? games[games.length - 1].record.startTimeMs : 0,
+  };
+}
+
+/** One player's record on a single map (#460), plus the faction they favour there. */
+export interface MapRecord extends ScopedRecord {
+  /** The most-used faction on this map, or null when no faction is recorded. */
+  favouriteFaction: Tally | null;
+}
+
+/**
+ * `playerName`'s record on `mapName` (#460): a thin filter of the same
+ * per-player game history `profileFor` builds, scoped to one map. Backs the
+ * map detail page's "Your record" card. `refightFilenames` excludes
+ * remix/refight reruns (#466), matching every other aggregate here.
+ */
+export function mapRecordFor(
+  records: StatRecord[],
+  mapName: string,
+  playerName: string,
+  refightFilenames: ReadonlySet<string> = new Set(),
+): MapRecord {
+  const games = gamesFor(
+    excludeSyntheticReruns(records, refightFilenames),
+    playerName,
+  ).filter((g) => g.record.mapName === mapName);
+  return {
+    ...scopedRecord(games),
+    favouriteFaction: tally(games, (g) => g.side ?? "")[0] ?? null,
+  };
+}
+
+/** One player's record with a single faction (#460). */
+export interface FactionRecord extends ScopedRecord {
+  faction: string;
+}
+
+/**
+ * `playerName`'s record with each of `factionNames` (#460), one entry per
+ * requested faction in the same order. Includes factions they've never
+ * played, with `games: 0` and `winRate: null`, so a caller can render "no
+ * games recorded" rather than silently dropping the row. Backs the game
+ * detail page's per-faction records, scoped to that game's own sides.
+ * `refightFilenames` excludes remix/refight reruns (#466).
+ */
+export function factionRecordsFor(
+  records: StatRecord[],
+  factionNames: string[],
+  playerName: string,
+  refightFilenames: ReadonlySet<string> = new Set(),
+): FactionRecord[] {
+  const games = gamesFor(
+    excludeSyntheticReruns(records, refightFilenames),
+    playerName,
+  );
+  return factionNames.map((faction) => ({
+    faction,
+    ...scopedRecord(games.filter((g) => g.side === faction)),
+  }));
+}
+
 /**
  * `me`'s relationship to one other player across the record set (#375): every
  * game they've shared, split into "together" (same ally team) and "against"
