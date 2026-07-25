@@ -18,6 +18,7 @@ import {
   layoutNodes,
   playBounds,
   playExtentFor,
+  trimLane,
   type WorldPos,
 } from "./layout";
 import { buildStarfield } from "./starfield";
@@ -175,6 +176,10 @@ interface GalaxyViewProps {
 
 /** How much brighter a lane gets while either end is hovered. */
 const HOVER_LANE_BOOST = 1.6;
+
+/** How far every other lane fades while a system is hovered. Pulling the rest
+ * back is what separates a system's reach from the web behind it. */
+const HOVER_LANE_FADE = 0.4;
 
 const NEUTRAL_COLOR = "#6b7280";
 /** The quiet blue-grey of an unowned lane (the base lane pair's colour). */
@@ -784,9 +789,9 @@ export function GalaxyView({
     // brightness, which is what makes a system's reach readable at a glance.
     const laneDim = (a: string, b: string): number => {
       const dim = Math.min(dimOf(a), dimOf(b));
-      const touchesHover =
-        hoveredNodeId !== null && (a === hoveredNodeId || b === hoveredNodeId);
-      return touchesHover ? dim * HOVER_LANE_BOOST : dim;
+      if (hoveredNodeId === null) return dim;
+      const touchesHover = a === hoveredNodeId || b === hoveredNodeId;
+      return dim * (touchesHover ? HOVER_LANE_BOOST : HOVER_LANE_FADE);
     };
 
     /* ------------------------- decorative backdrop ------------------------- */
@@ -1115,15 +1120,8 @@ export function GalaxyView({
       const a = laneEnd(aId);
       const b = laneEnd(bId);
       if (!a || !b) return null;
-      const len = Math.hypot(b[0] - a[0], b[2] - a[2]);
-      if (len <= LANE_TRIM * 2 + 0.5) return null;
-      const at = (t: number): [number, number, number] => [
-        a[0] + (b[0] - a[0]) * t,
-        a[1] + (b[1] - a[1]) * t,
-        a[2] + (b[2] - a[2]) * t,
-      ];
-      const t0 = LANE_TRIM / len;
-      return [...at(t0), ...at(1 - t0)] as LaneSeg;
+      const ends = trimLane(a, b, LANE_TRIM);
+      return ends ? ([...ends[0], ...ends[1]] as LaneSeg) : null;
     };
     // No-Man's-Sky-style lines: each lane draws twice — a crisp thin core
     // plus a wide, very faint halo — both with gaussian cross-sections and
@@ -1197,6 +1195,9 @@ export function GalaxyView({
     // `laneFlow` (run) mode the same pair is drawn *solid* instead — the run's
     // open lanes are directional travel routes, not a contested battle line.
     const frontier = makeLanePair({
+      // Vertex-coloured so hover and emphasis can grade individual dashes. The
+      // material colour multiplies in, so a white vertex colour is plain gold.
+      vertexColors: true,
       color: 0xffcf8a,
       coreOpacity: 0.9,
       haloOpacity: 0.1,
@@ -3189,6 +3190,7 @@ export function GalaxyView({
       const factionSegs: LaneSeg[] = [];
       const factionSegColors: THREE.Color[] = [];
       const frontierSegs: LaneSeg[] = [];
+      const frontierEnds: [string, string][] = [];
       const routeSegs: LaneSeg[] = [];
       const pathSegs: LaneSeg[] = [];
       // The quiet base lane, dimmed by whichever end is more faded.
@@ -3228,6 +3230,7 @@ export function GalaxyView({
         }
         if (aPlayer !== bPlayer) {
           frontierSegs.push(seg);
+          frontierEnds.push([a, b]);
         } else if (ownerA === ownerB && ownerA !== NEUTRAL) {
           factionSegs.push(seg);
           // clone: ownerColor returns the shared cached faction colour.
@@ -3241,12 +3244,32 @@ export function GalaxyView({
       setLanePair(lanes, baseSegs, baseSegColors);
       if (laneFlow) {
         setLanePair(factionLanes, []); // runs have no shared-owner lanes
-        setLanePair(frontier, routeSegs); // solid, not dashed
+        // Solid, not dashed. Full-brightness colours since run routes carry no
+        // hover grading of their own.
+        setLanePair(
+          frontier,
+          routeSegs,
+          routeSegs.map(() => new THREE.Color(0xffffff)),
+        );
         setLanePair(pathTaken, pathSegs); // green trail behind you
         layoutChevrons(routeSegs);
       } else {
         setLanePair(factionLanes, factionSegs, factionSegColors);
-        setLanePair(frontier, dashSegments(frontierSegs, 1.5, 1.2));
+        // Dashed per segment rather than in one pass, so each dash inherits
+        // the brightness of the lane it came from.
+        const dashes: LaneSeg[] = [];
+        const dashColors: THREE.Color[] = [];
+        frontierSegs.forEach((seg, i) => {
+          const [endA, endB] = frontierEnds[i];
+          const tint = new THREE.Color(0xffffff).multiplyScalar(
+            laneDim(endA, endB),
+          );
+          for (const dash of dashSegments([seg], 1.5, 1.2)) {
+            dashes.push(dash);
+            dashColors.push(tint);
+          }
+        });
+        setLanePair(frontier, dashes, dashColors);
       }
     };
     applyOwnersRef.current = applyOwners;

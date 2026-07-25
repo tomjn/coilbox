@@ -6,6 +6,7 @@ import {
   PLAY_EXTENT,
   playBounds,
   playExtentFor,
+  trimLane,
   Y_JITTER,
 } from "./layout";
 import { buildStarfield } from "./starfield";
@@ -166,5 +167,35 @@ describe("layoutNodes with real depth", () => {
     ]);
     for (const p of out.values())
       expect(Math.abs(p[1])).toBeLessThanOrEqual(Y_JITTER);
+  });
+});
+
+describe("trimLane", () => {
+  it("keeps a lane between systems stacked vertically", () => {
+    // The bug this guards: measuring only the top-down projection collapses
+    // this lane's length to zero, so it was dropped and the two systems looked
+    // unconnected. GJ 229 lost its only lane this way.
+    const seg = trimLane([0, -20, 0], [0, 20, 0], 2.45);
+    expect(seg).not.toBeNull();
+    expect(seg?.[0][1]).toBeCloseTo(-17.55, 5);
+    expect(seg?.[1][1]).toBeCloseTo(17.55, 5);
+  });
+
+  it("returns a stub rather than nothing for a cramped pair", () => {
+    const seg = trimLane([0, 0, 0], [1, 0, 0], 2.45);
+    expect(seg).not.toBeNull();
+    // Trimmed to 35% in from each end, so a third of the lane still draws.
+    expect(seg?.[0][0]).toBeCloseTo(0.35, 5);
+    expect(seg?.[1][0]).toBeCloseTo(0.65, 5);
+  });
+
+  it("trims by the full amount when there is room", () => {
+    const seg = trimLane([0, 0, 0], [100, 0, 0], 2.45);
+    expect(seg?.[0][0]).toBeCloseTo(2.45, 5);
+    expect(seg?.[1][0]).toBeCloseTo(97.55, 5);
+  });
+
+  it("is null only when the ends coincide", () => {
+    expect(trimLane([5, 5, 5], [5, 5, 5], 2.45)).toBeNull();
   });
 });

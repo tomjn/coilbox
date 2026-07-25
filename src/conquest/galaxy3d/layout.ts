@@ -108,3 +108,32 @@ export function playBounds(positions: Iterable<WorldPos>): PlayBounds {
   if (b.minX > b.maxX) return { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
   return b;
 }
+
+/**
+ * Trim a lane back from both node centres so it meets each ring's edge rather
+ * than the node's middle, returning the shortened endpoints.
+ *
+ * Length is measured in all three axes. Measuring the top-down projection
+ * alone collapses to nearly zero for two systems sitting almost above one
+ * another, which a galaxy with real depth has plenty of, and the lane then
+ * looks unconnected.
+ *
+ * A lane is never dropped for being short: a cramped pair gets a stub instead,
+ * because a missing lane tells the player two systems are unconnected when
+ * they are not. `null` means the two ends coincide, so there is nothing to draw.
+ */
+export function trimLane(
+  a: WorldPos,
+  b: WorldPos,
+  trim: number,
+): [WorldPos, WorldPos] | null {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  if (len <= 0) return null;
+  const t0 = Math.min(trim, len * 0.35) / len;
+  const at = (t: number): WorldPos => [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+  ];
+  return [at(t0), at(1 - t0)];
+}
