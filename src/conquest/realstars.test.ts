@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateGalaxy, JUMP_RANGE_LY } from "./generate";
-import { posZ } from "./model";
+import { NEUTRAL, posZ } from "./model";
 import {
   DEFAULT_RADIUS_LY,
   RADIUS_CHOICES,
@@ -159,6 +159,26 @@ describe("real-star galaxy generation", () => {
       }
     }
     expect(seen.size).toBe(g.nodes.length);
+  });
+
+  it("always leaves neutral territory to fight over", () => {
+    // The full-frontier default hands every capital all its neighbours, which
+    // in a small dense galaxy is the entire map. Real-star galaxies start lean
+    // instead, so turn 1 is never a straight capital assault.
+    for (const radiusLy of RADIUS_CHOICES) {
+      const g = generateGalaxy({
+        seed: 5,
+        game: { shortname: "bar" },
+        maps: [{ name: "M", width: 10, height: 10 }],
+        ais: [{ kind: "native", shortName: "AI" }],
+        nodeCount: 0,
+        factionCount: 3,
+        layout: "realstars",
+        radiusLy,
+      });
+      const neutral = g.nodes.filter((n) => n.owner === NEUTRAL);
+      expect(neutral.length).toBeGreaterThan(0);
+    }
   });
 
   it("records the radius so the galaxy can be rerolled in place", () => {

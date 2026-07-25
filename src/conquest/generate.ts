@@ -474,9 +474,15 @@ export function generateGalaxy(
     adj[a].push(b);
     adj[b].push(a);
   }
+  // Real-star galaxies start lean by default. The full-frontier default hands
+  // every capital all its neighbours, and a small radius is dense enough that
+  // this leaves no neutral territory at all: at 8 light years, all six systems
+  // would be owned on turn 0 with nothing to fight over.
   const startCount =
     opts.startingSystems === undefined
-      ? undefined
+      ? realStars
+        ? 1
+        : undefined
       : Math.min(4, Math.max(1, Math.round(opts.startingSystems)));
   capitals.forEach((cap, f) => {
     owners[cap] = factions[f].id;

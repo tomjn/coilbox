@@ -772,7 +772,14 @@ function GenerateGalaxyForm({
             <OptionSelect
               value={starting}
               onValueChange={setStarting}
-              options={STARTING_OPTIONS}
+              options={
+                realStars
+                  ? [
+                      { value: "", label: "Capital only (default)" },
+                      ...STARTING_OPTIONS.slice(1),
+                    ]
+                  : STARTING_OPTIONS
+              }
             />
           </div>
           <div className="flex items-center justify-between gap-3 text-sm">
