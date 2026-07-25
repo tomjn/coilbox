@@ -112,6 +112,44 @@ export function guessPrimaryPlayer(
   return allPlayers(records, refightFilenames)[0]?.name;
 }
 
+/**
+ * One player's genuine-match game, flattened for the offline achievements
+ * evaluator (#461). A slim, chronological (oldest first) projection of the same
+ * per-player history every other aggregate here is built from - no raw record
+ * reference, so the achievements module stays a pure function of plain facts.
+ */
+export interface PlayerGameFact {
+  startTimeMs: number;
+  mapName: string;
+  gameType: string;
+  /** The faction (side) the player used, when known. */
+  side?: string;
+  /** True/false when the game was decided, undefined when the result is unknown. */
+  won?: boolean;
+}
+
+/**
+ * `name`'s genuine-match games, chronological, for the achievements evaluator
+ * (#461). Reuses the same genuine-match filter (`refightFilenames` excludes
+ * remix/refight reruns, #466) and non-spectator extraction as every other
+ * aggregate, so an achievement can never be earned via a synthetic rerun.
+ */
+export function playerGameFacts(
+  records: StatRecord[],
+  name: string,
+  refightFilenames: ReadonlySet<string> = new Set(),
+): PlayerGameFact[] {
+  return gamesFor(excludeSyntheticReruns(records, refightFilenames), name).map(
+    (g) => ({
+      startTimeMs: g.record.startTimeMs,
+      mapName: g.record.mapName,
+      gameType: g.record.gameType,
+      side: g.side,
+      won: g.won,
+    }),
+  );
+}
+
 /** A map or faction tally within a player's history. */
 export interface Tally {
   key: string;

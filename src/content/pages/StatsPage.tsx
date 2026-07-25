@@ -8,6 +8,7 @@ import {
 } from "../config";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, profileFor } from "../stats";
+import { AchievementsSection } from "./components/AchievementsSection";
 import { PlayerPicker } from "./components/PlayerPicker";
 import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
@@ -186,6 +187,12 @@ export default function StatsPage() {
               )}
             </section>
           </div>
+
+          <AchievementsSection
+            records={records}
+            playerName={activeName}
+            refights={refights}
+          />
         </>
       )}
     </div>
