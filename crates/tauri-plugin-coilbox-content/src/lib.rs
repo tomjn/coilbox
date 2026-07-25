@@ -758,7 +758,12 @@ async fn content_recreate_root<R: Runtime>(
     Ok(CliResult::ok(json!({ "state": state })))
 }
 
-/// `content_list_engines` — every engine across tracked roots (read API).
+/// `content_list_engines`, every engine across tracked roots (read API).
+///
+/// Shares `content_state_load`'s re-anchoring. A snapshot copied from another
+/// machine can leave only dead foreign roots, so this also runs
+/// `ensure_portable_seed` after `refresh_against_disk` to recover a live portable
+/// root before collecting engines (issue #539, following on from #524).
 #[tauri::command]
 async fn content_list_engines<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
     let path = match store_path(&app) {
@@ -769,16 +774,9 @@ async fn content_list_engines<R: Runtime>(app: AppHandle<R>) -> Result<CliResult
         Ok(s) => s,
         Err(e) => return Ok(CliResult::err(e)),
     };
-    let engines: Vec<_> = store
-        .snapshot
-        .map(|s| {
-            refresh_against_disk(s)
-                .roots
-                .into_iter()
-                .flat_map(|r| r.engines)
-                .collect()
-        })
-        .unwrap_or_default();
+    let mut state = refresh_against_disk(store.snapshot.unwrap_or_default());
+    state.roots = ensure_portable_seed(state.roots);
+    let engines: Vec<_> = state.roots.into_iter().flat_map(|r| r.engines).collect();
     Ok(CliResult::ok(json!({ "engines": engines })))
 }
 
@@ -1662,6 +1660,38 @@ mod tests {
         assert_eq!(seeded.len(), 1);
         assert!(seeded[0].exists && seeded[0].valid);
         assert_eq!(seeded[0].path, display_path(&canonical(&base)));
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn content_list_engines_recovers_engines_after_a_dead_cross_machine_snapshot() {
+        // Issue #539: content_list_engines shares refresh_against_disk with
+        // content_state_load but was missing the ensure_portable_seed re-anchoring
+        // from #524, so a copied snapshot with only a dead foreign root listed no
+        // engines even though a valid portable folder with an installed engine sat
+        // right next to the executable. This mirrors that sequence directly.
+        let base = std::env::temp_dir().join("coilbox_list_engines_crossmachine_test");
+        let _ = std::fs::remove_dir_all(&base);
+        let engine_dir = base.join("engine").join("105.1.1");
+        std::fs::create_dir_all(&engine_dir).unwrap();
+        std::fs::write(engine_dir.join("spring"), b"fake").unwrap();
+
+        let state = ContentState {
+            schema_version: SCHEMA_VERSION,
+            roots: vec![stale_root(foreign_path(), RootSource::Auto, true)],
+            last_scan_at: Some(0),
+        };
+        let refreshed = refresh_against_disk(state);
+        assert!(refreshed.roots.is_empty());
+
+        let seeded = ensure_portable_seed_in(refreshed.roots, Some(base.clone()));
+        let engines: Vec<_> = seeded.into_iter().flat_map(|r| r.engines).collect();
+        assert_eq!(
+            engines.len(),
+            1,
+            "the re-anchored portable root's engine must surface in the flattened list"
+        );
 
         let _ = std::fs::remove_dir_all(&base);
     }
