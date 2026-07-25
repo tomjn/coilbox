@@ -1,17 +1,21 @@
-import { Button } from "@picoframe/frame";
+import { Button, useSetting } from "@picoframe/frame";
 import {
   ArrowLeft,
+  Calendar,
   Clapperboard,
+  Flag,
   ImageOff,
   PackageOpen,
   Play,
   Swords,
+  Trophy,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdvancedMode } from "@/general/advanced";
+import { isProfileHidden } from "@/profile/hidden";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import {
   MapLayerToggle,
@@ -21,6 +25,8 @@ import {
 import { unitsyncArchiveTree } from "../bindings";
 import {
   classifyArchive,
+  useContentState,
+  useReplayStats,
   useScanTargetSelection,
   useUnitsyncHeightmap,
   useUnitsyncMapInfo,
@@ -28,16 +34,24 @@ import {
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
+import { refightFilenames, useReplayUserState } from "../replayUserState";
+import { allPlayers, guessPrimaryPlayer, mapRecordFor } from "../stats";
 import { usePlayMap } from "../usePlayMap";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { mapSizeLabel } from "./components/MapThumb";
 import { OptionsList } from "./components/OptionsList";
+import { StatCard } from "./components/StatWidgets";
 import {
   DetailError,
   DetailLoading,
   NotFound,
   WarningBanner,
 } from "./components/states";
+
+function playedAt(ms: number): string {
+  if (!ms) return "never";
+  return new Date(ms).toLocaleDateString(undefined, { dateStyle: "medium" });
+}
 
 /** Keys shown in the headline; everything else goes in the metadata table. */
 const HEADLINE_KEYS = new Set(["name", "description"]);
@@ -79,6 +93,37 @@ export default function MapDetailPage() {
     selected?.enginePath,
     selected?.rootPath,
     decoded,
+  );
+
+  // Per-map record (#460): a distribution profile can hide stats entirely, in
+  // which case the roots stay empty so `useReplayStats` never ingests.
+  const statsHidden = isProfileHidden("multiplayer.stats");
+  const { state: contentState } = useContentState();
+  const statsRoots = useMemo(
+    () => (statsHidden ? [] : (contentState?.roots ?? []).map((r) => r.path)),
+    [contentState, statsHidden],
+  );
+  const { records: statRecords, ingesting: statsIngesting } = useReplayStats(
+    statsRoots,
+    selected?.enginePath,
+  );
+  const { state: replayUserState } = useReplayUserState();
+  const refights = useMemo(
+    () => refightFilenames(replayUserState),
+    [replayUserState],
+  );
+  const [storedStatsPlayer] = useSetting("content.statsPlayer", "");
+  const statsPlayer = useMemo(() => {
+    const players = allPlayers(statRecords, refights);
+    return (
+      players.find((p) => p.name === storedStatsPlayer)?.name ??
+      guessPrimaryPlayer(statRecords, refights) ??
+      ""
+    );
+  }, [statRecords, refights, storedStatsPlayer]);
+  const mapRecord = useMemo(
+    () => mapRecordFor(statRecords, decoded, statsPlayer, refights),
+    [statRecords, decoded, statsPlayer, refights],
   );
 
   if (error && !data)
@@ -207,6 +252,59 @@ export default function MapDetailPage() {
       {mapInfo.info?.warnings?.length ? (
         <WarningBanner warnings={mapInfo.info.warnings} noun="map" />
       ) : null}
+
+      {!statsHidden && (
+        <section className="rounded-lg border border-border/60 bg-card p-4">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
+            <Trophy className="size-4 text-muted-foreground" />
+            Your record on this map
+          </h2>
+          {statsIngesting && statRecords.length === 0 ? (
+            <Skeleton className="h-16 rounded bg-muted" />
+          ) : mapRecord.games === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No replays recorded on this map yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatCard
+                icon={<Swords className="size-3.5" />}
+                label="Games"
+                value={String(mapRecord.games)}
+              />
+              <StatCard
+                icon={<Trophy className="size-3.5" />}
+                label="Win rate"
+                value={
+                  mapRecord.winRate == null
+                    ? "—"
+                    : `${Math.round(mapRecord.winRate * 100)}%`
+                }
+                sub={
+                  mapRecord.decided > 0
+                    ? `${mapRecord.wins}W · ${mapRecord.losses}L`
+                    : "outcome unknown"
+                }
+              />
+              <StatCard
+                icon={<Calendar className="size-3.5" />}
+                label="Last played"
+                value={playedAt(mapRecord.lastPlayedMs)}
+              />
+              <StatCard
+                icon={<Flag className="size-3.5" />}
+                label="Top faction"
+                value={mapRecord.favouriteFaction?.key ?? "—"}
+                sub={
+                  mapRecord.favouriteFaction
+                    ? `${mapRecord.favouriteFaction.wins}W of ${mapRecord.favouriteFaction.games}`
+                    : undefined
+                }
+              />
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
