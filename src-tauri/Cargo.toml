@@ -50,3 +50,12 @@ windows = { version = "0.62", features = [
   "Win32_System_JobObjects",
   "Win32_System_Threading",
 ] }
+
+# Windows/Linux only (issue #483): the OS has no while-running deep-link delivery
+# there, so a second `coilbox://` launch starts a new process instead of reaching
+# the running one. This plugin catches that second launch and, with the
+# `deep-link` feature, forwards its argv straight into
+# `tauri_plugin_deep_link::handle_cli_arguments`. macOS gets warm-start deep links
+# from the OS already, so it does not need this and must not double-register it.
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
