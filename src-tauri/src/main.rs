@@ -83,7 +83,33 @@ fn main() {
     // elsewhere.
     win_job::confine_children_to_job();
 
-    let mut builder = tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // Windows/Linux (issue #483): a second launch carrying a `coilbox://` link
+    // (e.g. from clicking one in Discord) starts a brand new process rather than
+    // the OS delivering the URL to the one already running, unlike macOS. This
+    // plugin intercepts that second launch and kills it, and because the
+    // `deep-link` feature is enabled it hands the launch's argv straight to
+    // `tauri_plugin_deep_link::handle_cli_arguments`, which validates the URL
+    // against the configured `coilbox` scheme and emits the same
+    // `deep-link://new-url` event the frontend's `onOpenUrl` listener already
+    // handles for macOS warm starts (see `DeepLinkHandler`, issue #388). The
+    // callback below only covers the no-URL case: raise the existing window, the
+    // ordinary single-instance behaviour. The plugin's docs require registering
+    // it before any other plugin, and macOS already gets warm-start links from
+    // the OS, so it is compiled out there to avoid double-handling.
+    #[cfg(not(target_os = "macos"))]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            use tauri::Manager;
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }));
+    }
+
+    builder = builder
         .plugin(picoframe_core::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
