@@ -53,10 +53,21 @@ function SelectContent({
   children,
   position = "item-aligned",
   align = "center",
+  container,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
+}: React.ComponentProps<typeof SelectPrimitive.Content> & {
+  /**
+   * Where to portal the open list. Defaults to `document.body`.
+   *
+   * Pass the surrounding dialog or drawer element when the select lives inside
+   * one. A list portalled to the body sits outside the dialog's DOM subtree, so
+   * the dialog reads a click on the list as a click outside itself and closes,
+   * taking the whole drawer with it.
+   */
+  container?: HTMLElement | null;
+}) {
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={container ?? undefined}>
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -38,12 +38,32 @@ export function OptionSelect({
   className?: string;
   size?: "sm" | "default";
 }) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // Portal the open list into the surrounding dialog or drawer when there is
+  // one. Left on the body, a click on the list counts as a click outside the
+  // drawer and dismisses it, losing everything the user had filled in.
+  const [container, setContainer] = useState<HTMLElement | null>(null);
   return (
-    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger size={size} className={cn("w-full", className)}>
+    <Select
+      value={value}
+      onValueChange={onValueChange}
+      disabled={disabled}
+      onOpenChange={(open) => {
+        if (open) {
+          setContainer(
+            triggerRef.current?.closest<HTMLElement>('[role="dialog"]') ?? null,
+          );
+        }
+      }}
+    >
+      <SelectTrigger
+        ref={triggerRef}
+        size={size}
+        className={cn("w-full", className)}
+      >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent container={container}>
         {options.map((o) => (
           <SelectItem key={o.value} value={o.value} description={o.description}>
             {o.icon ? (
