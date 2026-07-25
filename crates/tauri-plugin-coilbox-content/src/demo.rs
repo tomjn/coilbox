@@ -22,7 +22,7 @@ use crate::model::{AllyTeamInfo, ChatLine, DemoChat, DemoInfo, PlayerInfo, Repla
 
 /// Folders under a data root that hold client demos. The engine writes to
 /// `demos/` (`DemoRecorder.cpp`); some lobbies/users use `replays/`.
-const DEMO_DIRS: &[&str] = &["demos", "replays"];
+pub(crate) const DEMO_DIRS: &[&str] = &["demos", "replays"];
 const DEMO_EXTS: &[&str] = &[".sdfz", ".sdf"];
 
 /// `demotool` can decode the full 7 MB+ stream; keep a hard ceiling so a corrupt

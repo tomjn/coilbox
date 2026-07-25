@@ -1,4 +1,5 @@
 import { useSetting } from "@picoframe/frame";
+import { listen } from "@tauri-apps/api/event";
 import {
   useCallback,
   useEffect,
@@ -19,6 +20,8 @@ import {
   contentStateLoad,
   contentStatsIngest,
   contentStatsQuery,
+  contentStatsWatchStart,
+  contentStatsWatchStop,
   type DemoInfo,
   type EngineConfigResult,
   type GameInfoResult,
@@ -31,6 +34,7 @@ import {
   type ReplayFile,
   type SaveFile,
   type ScanResult,
+  STATS_UPDATED_EVENT,
   type StartPos,
   type StatRecord,
   type UnitBuildpicsResult,
@@ -1498,6 +1502,67 @@ export function useReplayStats(roots: string[], enginePath?: string) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Query-only refresh (no re-decode): used after the live watcher (#462) has
+  // already ingested and saved a newly-arrived replay in the background, so
+  // an open view just re-reads the store rather than re-running a full pass.
+  // `watcherTotal`, when given, updates the visible total record count. It's
+  // always the whole store's count, not just this one background pass. The
+  // rest of `summary` (e.g. `failed`) is left as the last full scan reported,
+  // since a single-file background pass can't speak to the whole library.
+  const refreshFromQuery = useCallback(async (watcherTotal?: number) => {
+    try {
+      const q = await contentStatsQuery(undefined);
+      setRecords(q.records);
+      if (watcherTotal != null) {
+        setSummary((prev) => (prev ? { ...prev, total: watcherTotal } : prev));
+      }
+    } catch {
+      // Leave the last-known records in place.
+    }
+  }, []);
+
+  // Keep the live watcher pointed at the current roots/engine for as long as
+  // this hook is mounted, so a replay dropped into the demos folder while the
+  // Stats view (or dossier) is open lands without reopening it. Scan-on-open
+  // (the effect above) remains the fallback for replays that arrived while
+  // nothing was watching.
+  useEffect(() => {
+    const rootList = rootsKey ? rootsKey.split("|") : [];
+    if (rootList.length === 0) {
+      contentStatsWatchStop(undefined).catch(() => {});
+      return;
+    }
+    contentStatsWatchStart({
+      roots: rootList,
+      enginePath: enginePath ?? "",
+    }).catch(() => {
+      // No live watcher this session. Scan-on-open above still keeps the
+      // store fresh on the next open.
+    });
+    return () => {
+      contentStatsWatchStop(undefined).catch(() => {});
+    };
+  }, [rootsKey, enginePath]);
+
+  // Refresh from the store whenever the watcher reports a background ingest.
+  useEffect(() => {
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    listen<IngestSummary>(STATS_UPDATED_EVENT, (e) => {
+      refreshFromQuery(e.payload.total);
+    }).then((fn) => {
+      if (cancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [refreshFromQuery]);
 
   return { records, summary, ingesting, error, refresh };
 }

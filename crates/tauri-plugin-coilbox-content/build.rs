@@ -18,6 +18,8 @@ const COMMANDS: &[&str] = &[
     "content_demo_info",
     "content_stats_ingest",
     "content_stats_query",
+    "content_stats_watch_start",
+    "content_stats_watch_stop",
     "content_demo_chat",
     "content_rewrite_demo",
     "content_delete_replay",
