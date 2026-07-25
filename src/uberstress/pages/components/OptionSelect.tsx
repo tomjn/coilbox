@@ -1,4 +1,4 @@
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -39,23 +39,16 @@ export function OptionSelect({
   size?: "sm" | "default";
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
-  // Portal the open list into the surrounding dialog or drawer when there is
-  // one. Left on the body, a click on the list counts as a click outside the
-  // drawer and dismisses it, losing everything the user had filled in.
-  const [container, setContainer] = useState<HTMLElement | null>(null);
+  // Inside a dialog or drawer the list renders in place instead of portalling
+  // to the body. A portalled list is not a DOM descendant of the drawer, so a
+  // click on it reads as a click outside and dismisses the drawer, losing
+  // everything the user had filled in.
+  const [inDialog, setInDialog] = useState(false);
+  useEffect(() => {
+    setInDialog(!!triggerRef.current?.closest('[role="dialog"]'));
+  }, []);
   return (
-    <Select
-      value={value}
-      onValueChange={onValueChange}
-      disabled={disabled}
-      onOpenChange={(open) => {
-        if (open) {
-          setContainer(
-            triggerRef.current?.closest<HTMLElement>('[role="dialog"]') ?? null,
-          );
-        }
-      }}
-    >
+    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
         ref={triggerRef}
         size={size}
@@ -63,7 +56,10 @@ export function OptionSelect({
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent container={container}>
+      <SelectContent
+        portalled={!inDialog}
+        position={inDialog ? "popper" : undefined}
+      >
         {options.map((o) => (
           <SelectItem key={o.value} value={o.value} description={o.description}>
             {o.icon ? (
