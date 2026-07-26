@@ -1,4 +1,4 @@
-import { Button, useDrawer } from "@picoframe/frame";
+import { Button, useDrawer, useHideSidebar } from "@picoframe/frame";
 import { ArrowLeft, Check, Trophy, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
@@ -46,6 +46,8 @@ import { RunHud } from "./components/RunHud";
  * transitions — this page is a dispatcher.
  */
 export default function RunPage() {
+  // The node map wants the full width. The nav stays reachable from the top bar.
+  useHideSidebar();
   const { runId } = useParams();
   const { run, loading, save } = useRun(runId);
   const { meta, save: saveMeta } = useRunMeta();

@@ -1,3 +1,4 @@
+import { useHideSidebar } from "@picoframe/frame";
 import { ArrowLeft, ChevronRight, CircleCheck, Lock } from "lucide-react";
 import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router";
@@ -18,6 +19,8 @@ import { CampaignIconBox, CampaignImage } from "./components/CampaignImage";
  * mission with no manual refresh.
  */
 export default function CampaignDetailPage() {
+  // Campaign play runs full width. The nav stays reachable from the top bar.
+  useHideSidebar();
   const { id } = useParams();
   const { campaigns, loading } = useCampaigns();
   const { progress } = useCampaignProgress();
