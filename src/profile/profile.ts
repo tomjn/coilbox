@@ -267,6 +267,15 @@ export interface Profile {
    * toggle persists over the profile seed.
    */
   advanced?: boolean;
+  /**
+   * Whether Coilbox checks for new releases of itself. Defaults to true. Set false
+   * in a build whose Coilbox binary the distributor ships and updates themselves:
+   * no launch check runs, so no "Update available" pill or toast appears, and the
+   * Updates settings section drops its check/install controls. Independent of
+   * {@link Profile.release}, so the game archive a distribution delivers keeps
+   * updating either way.
+   */
+  updater?: boolean;
   /** GitHub repo ("owner/name") whose latest release ships this game's archive. */
   release?: { repo: string };
   /**
@@ -528,6 +537,16 @@ export function getProfile(): Profile {
 /** Where the loaded profile came from. */
 export function getProfileSource(): ProfileSource {
   return loadedSource;
+}
+
+/**
+ * Whether Coilbox's self-updater runs (profile `updater`, default true). Read by
+ * the updater provider, which skips its launch check when this is false, and by the
+ * Updates settings section. A lock, not a seed: there's no user toggle, because the
+ * point is that the distributor owns the binary.
+ */
+export function isUpdaterEnabled(): boolean {
+  return loaded.updater !== false;
 }
 
 /** Curated map packs this profile ships (empty when it defines none). */

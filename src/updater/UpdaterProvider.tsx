@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { notify } from "../notify/notify";
+import { isUpdaterEnabled } from "../profile/profile";
 import {
   checkForUpdate,
   currentVersion,
@@ -94,10 +95,12 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
       .catch(() => setVersion(null));
   }, []);
 
-  // Fire one background check on launch — release builds only. Dev builds ship
-  // the 0.0.0 placeholder version and would treat every release as newer.
+  // Fire one background check on launch, in release builds only. Dev builds ship
+  // the 0.0.0 placeholder version and would treat every release as newer. A
+  // distribution profile with `updater: false` also opts out, so a bundled build
+  // never offers its players an upstream Coilbox the distributor didn't ship.
   useEffect(() => {
-    if (!import.meta.env.DEV) void runCheck();
+    if (!import.meta.env.DEV && isUpdaterEnabled()) void runCheck();
   }, [runCheck]);
 
   return (

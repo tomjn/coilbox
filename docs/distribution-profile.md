@@ -494,6 +494,18 @@ Points Coilbox at a GitHub repository whose **releases** ship the game's archive
 
 "Latest" is whatever GitHub marks as the latest release. If that release also carries an asset named exactly `profile.json`, Coilbox installs it into `.coilbox/` alongside the game archive; because the profile is read once at startup, the app then prompts for a restart to apply the updated profile.
 
+### `updater` (boolean)
+
+Turns off Coilbox's check for new releases of **itself**. On by default. Set it to `false` when you ship and update the Coilbox binary yourself, so your players are never offered an upstream build you didn't test with your game.
+
+```json
+{ "version": 1, "updater": false }
+```
+
+With the updater off there's no check at launch, so no "Update available" pill in the top bar and no update toast. Settings > Updates still shows the running version (useful when a player reports a bug) but drops the check and install buttons. To remove that section from the settings nav as well, add `"hideSettings": ["updates"]`.
+
+This is separate from [`release`](#release-object): your own game archive keeps updating from your repo either way.
+
 ### `mapLists` (object[])
 
 Curated **map packs** offered for bulk download on the Maps download page — a tournament set, a galactic-conquest galaxy, "space maps", etc. Each pack has an `id`, a `title`, an optional `blurb`, and a `maps[]` array; **Download all** queues every not-yet-present map in the pack through the normal download queue.
