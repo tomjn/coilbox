@@ -7,6 +7,7 @@ const COMMANDS: &[&str] = &[
     "profile_asset",
     "profile_file",
     "profile_pages",
+    "profile_scaffold",
 ];
 
 fn main() {

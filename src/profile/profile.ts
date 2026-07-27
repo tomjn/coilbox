@@ -268,6 +268,15 @@ export interface Profile {
    */
   advanced?: boolean;
   /**
+   * Whether the profile authoring tools appear in the Distribution profile settings
+   * section: "Reload profile" (re-reads this file and re-applies it without an app
+   * restart) and, when no profile is loaded yet, "Create profile.json". Defaults to
+   * true, so authoring a profile needs no opt-in. Set false in a shipped build so a
+   * player can't reload or replace the distribution's branding by accident. A lock,
+   * not a seed, for the same reason as {@link Profile.updater}.
+   */
+  authoring?: boolean;
+  /**
    * Whether Coilbox checks for new releases of itself. Defaults to true. Set false
    * in a build whose Coilbox binary the distributor ships and updates themselves:
    * no launch check runs, so no "Update available" pill or toast appears, and the
@@ -547,6 +556,15 @@ export function getProfileSource(): ProfileSource {
  */
 export function isUpdaterEnabled(): boolean {
   return loaded.updater !== false;
+}
+
+/**
+ * Whether the profile authoring tools are offered (profile `authoring`, default
+ * true). Read by the Distribution profile settings section, which drops its reload
+ * and scaffold controls when this is false.
+ */
+export function isProfileAuthoringEnabled(): boolean {
+  return loaded.authoring !== false;
 }
 
 /** Curated map packs this profile ships (empty when it defines none). */

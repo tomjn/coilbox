@@ -1,8 +1,28 @@
-import { Button } from "@picoframe/frame";
-import { ClipboardCheck, Package } from "lucide-react";
+import { Button, useTheme } from "@picoframe/frame";
+import { relaunch } from "@tauri-apps/plugin-process";
+import {
+  ClipboardCheck,
+  FilePlus2,
+  Loader2,
+  Package,
+  RefreshCw,
+} from "lucide-react";
 import { useState } from "react";
+import { useAdvancedModeSetting } from "../general/advanced";
+import { useFullscreenSetting } from "../general/fullscreen";
+import {
+  buildScaffoldProfile,
+  installedGameNames,
+  reloadProfile,
+  type ScaffoldResult,
+  scaffoldProfile,
+} from "./authoring";
 import HealthChecklist from "./HealthChecklist";
-import { getProfile, getProfileSource } from "./profile";
+import {
+  getProfile,
+  getProfileSource,
+  isProfileAuthoringEnabled,
+} from "./profile";
 
 /**
  * Read-only "Distribution profile" settings section. Because a profile silently
@@ -23,6 +43,7 @@ export default function ProfileSettings() {
           No distribution profile loaded — standard Coilbox.
         </p>
         <ProfileValidation />
+        <ProfileAuthoring />
       </div>
     );
   }
@@ -62,6 +83,10 @@ export default function ProfileSettings() {
             label="Coilbox updates"
             value={profile.updater === false ? "Off" : "On"}
           />
+          <Row
+            label="Authoring tools"
+            value={profile.authoring === false ? "Off" : "On"}
+          />
           <Row label="Quit button" value={profile.quit ? "Shown" : "Hidden"} />
           <Row
             label="Welcome screen"
@@ -74,6 +99,7 @@ export default function ProfileSettings() {
         </dl>
       </section>
       <ProfileValidation />
+      <ProfileAuthoring />
     </div>
   );
 }
@@ -102,6 +128,113 @@ function ProfileValidation() {
       {run > 0 && <HealthChecklist key={run} />}
     </section>
   );
+}
+
+/**
+ * Profile authoring tools (issue #406). Exactly one of the two is useful at a time, so
+ * only one is shown. With a profile loaded, "Reload profile" re-reads the file and
+ * re-applies it without an app restart. Without one, "Create profile.json" scaffolds a
+ * starter from the current app state. Reload can't help before a profile exists,
+ * because Coilbox resolves the portable folder once at startup and a folder with no
+ * `profile.json` isn't one. The whole block goes away on `"authoring": false`, so a
+ * shipped distribution doesn't hand players a way to reload or replace its branding.
+ */
+function ProfileAuthoring() {
+  const { mode, accent } = useTheme();
+  const [advanced] = useAdvancedModeSetting();
+  const [fullscreen] = useFullscreenSetting();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<ScaffoldResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!isProfileAuthoringEnabled()) return null;
+  const loaded = getProfileSource() !== "default";
+
+  const scaffold = async () => {
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const installedGames = await installedGameNames();
+      const profile = buildScaffoldProfile({
+        title: getProfile().title ?? "Coilbox",
+        mode,
+        accent,
+        advanced,
+        fullscreen,
+        installedGames,
+      });
+      setResult(await scaffoldProfile(profile));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Authoring
+      </h3>
+      <p className="text-sm text-muted-foreground">
+        {loaded
+          ? "Reload re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need an app restart. You stay on this page, but anything in progress elsewhere resets."
+          : "Start a distribution profile from how Coilbox is set up right now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {loaded ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={reloadProfile}
+          >
+            <RefreshCw size={15} aria-hidden />
+            Reload profile
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={busy}
+            onClick={scaffold}
+          >
+            {busy ? (
+              <Loader2 size={15} className="animate-spin" aria-hidden />
+            ) : (
+              <FilePlus2 size={15} aria-hidden />
+            )}
+            Create profile.json
+          </Button>
+        )}
+      </div>
+      {error && <p className="break-words text-sm text-destructive">{error}</p>}
+      {result &&
+        (result.written ? (
+          <div className="space-y-2">
+            <p className="text-sm">
+              Wrote <Path value={result.path} />. Restart Coilbox to load it.
+            </p>
+            <Button type="button" size="sm" onClick={() => relaunch()}>
+              Restart Coilbox
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm">
+            A profile is already there: <Path value={result.path} />. Edit that
+            file, then restart Coilbox to pick it up.
+          </p>
+        ))}
+    </section>
+  );
+}
+
+function Path({ value }: { value: string }) {
+  return <span className="font-mono text-xs">{value}</span>;
 }
 
 function Header() {

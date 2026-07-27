@@ -181,6 +181,16 @@ The `<game>` arg matches a game's name or shortname (case-insensitive); on a sin
 
 Open **Settings > Distribution profile**. It shows whether a profile is loaded, where it came from (`file` / `default`), and a summary of everything it's changing. If no profile is loaded it reads "No distribution profile loaded — standard Coilbox".
 
+## Writing and iterating on a profile
+
+Settings > Distribution profile carries two authoring controls. Which one you see depends on whether a profile is loaded.
+
+**No profile yet: Create profile.json.** Writes a starter profile into `.coilbox/` beside the app, filled in from how Coilbox is set up right now: the title, colour scheme, accent, advanced mode and fullscreen you can see on screen, plus a [`gameFilter`](#gamefilter-object) when exactly one game is installed. It never overwrites a profile that is already there. Coilbox has to restart to pick the new file up, because a `.coilbox` folder with no `profile.json` in it is not a portable install yet, so the button offers the restart.
+
+**Profile loaded: Reload profile.** Re-reads `profile.json` and applies it to the running app, so the edit loop is a reload rather than a restart. Everything applies, including the parts that otherwise only run at startup: theme, hidden nav, top bar, links, custom pages, welcome and splash. You stay on the page you were on, so you can sit on the screen you are styling and reload after each edit. Anything in progress elsewhere in the app resets, exactly as a restart would reset it.
+
+Both controls disappear when the profile sets [`"authoring": false`](#authoring-boolean), which is what you ship.
+
 ## Fields
 
 Every field is optional except `version`. Unknown fields are ignored, and a malformed file falls back to defaults rather than breaking the app.
@@ -505,6 +515,16 @@ Turns off Coilbox's check for new releases of **itself**. On by default. Set it 
 With the updater off there's no check at launch, so no "Update available" pill in the top bar and no update toast. Settings > Updates still shows the running version (useful when a player reports a bug) but drops the check and install buttons. To remove that section from the settings nav as well, add `"hideSettings": ["updates"]`.
 
 This is separate from [`release`](#release-object): your own game archive keeps updating from your repo either way.
+
+### `authoring` (boolean)
+
+Removes the [profile authoring tools](#writing-and-iterating-on-a-profile) from Settings > Distribution profile. On by default. Set it to `false` in the profile you ship, so a player can't reload or replace your branding by accident.
+
+```json
+{ "version": 1, "authoring": false }
+```
+
+The rest of the section stays: a player reporting a problem can still see what the profile is changing, and still run the validation checks. Only the Reload and Create buttons go.
 
 ### `mapLists` (object[])
 

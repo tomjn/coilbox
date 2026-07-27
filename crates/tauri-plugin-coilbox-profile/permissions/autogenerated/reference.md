@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows reading the bundler-supplied distribution profile, its assets, and custom pages.
+Allows reading the bundler-supplied distribution profile, its assets, and custom pages, and scaffolding a new profile.
 
 #### This default permission set includes the following:
 
@@ -8,6 +8,7 @@ Allows reading the bundler-supplied distribution profile, its assets, and custom
 - `allow-profile-asset`
 - `allow-profile-file`
 - `allow-profile-pages`
+- `allow-profile-scaffold`
 
 ## Permission Table
 
@@ -118,6 +119,32 @@ Enables the profile_pages command without any pre-configured scope.
 <td>
 
 Denies the profile_pages command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-profile:allow-profile-scaffold`
+
+</td>
+<td>
+
+Enables the profile_scaffold command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-profile:deny-profile-scaffold`
+
+</td>
+<td>
+
+Denies the profile_scaffold command without any pre-configured scope.
 
 </td>
 </tr>
