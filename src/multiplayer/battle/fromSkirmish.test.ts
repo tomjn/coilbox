@@ -257,7 +257,7 @@ describe("draftToHostSeed", () => {
       you(),
       ai({ ai: { kind: "native", shortName: "BARb", name: "BARbarian" } }),
     ];
-    const sp = reconcileParticipantAis(participants, SPLINTER_AIS);
+    const sp = reconcileParticipantAis(participants, SPLINTER_AIS, true);
     const spBot = sp.participants.find((p) => p.kind === "ai");
     const seed = draftToHostSeed({
       draft: mkDraft({ participants }),

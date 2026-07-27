@@ -41,11 +41,16 @@ export function ImportPackForm({
   const gameArchive = scan.data?.games.find(
     (g) => g.name === pending?.game.name,
   )?.primaryArchive.name;
-  const { ais } = useSkirmishAis(
+  const { ais, loaded: aisLoaded } = useSkirmishAis(
     target?.enginePath,
     target?.dataDir,
     gameArchive,
   );
+  // Only reconcile against the pack game's own settled list. Without the game
+  // installed (or scanned) `gameArchive` is undefined and this query returns the
+  // engine's natives, which would rewrite every bundled preset's AI to a native
+  // the game doesn't offer, permanently, at save time.
+  const aisReady = !!gameArchive && aisLoaded;
 
   const importCode = async (code: string) => {
     const result = decodeSetupPack(code);
@@ -75,7 +80,7 @@ export function ImportPackForm({
         // AI list before saving. With no AI list yet (a just-downloaded game the
         // scan hasn't caught up on) this is a no-op and the preset saves as-is,
         // to be reconciled later when it meets the game on the Skirmish page.
-        const res = reconcileParticipantAis(draft.participants, ais);
+        const res = reconcileParticipantAis(draft.participants, ais, aisReady);
         allSubs.push(...res.substitutions);
         savePreset(names[i], { ...draft, participants: res.participants });
       });

@@ -36,7 +36,7 @@ const bot = (id: string, ai?: Participant["ai"]): Participant => ({
 describe("reconcileParticipantAis", () => {
   it("keeps an AI that is available in this game (no flag, no change)", () => {
     const parts = [you(), bot("a", { kind: "lua", shortName: "SurvivalAI" })];
-    const res = reconcileParticipantAis(parts, GAME_AIS);
+    const res = reconcileParticipantAis(parts, GAME_AIS, true);
     expect(res.changed).toBe(false);
     expect(res.substitutions).toEqual([]);
     expect(res.participants).toBe(parts);
@@ -44,7 +44,7 @@ describe("reconcileParticipantAis", () => {
 
   it("remaps an unavailable AI and reports the substitution", () => {
     const parts = [you(), bot("a", { kind: "native", shortName: "DAI" })];
-    const res = reconcileParticipantAis(parts, GAME_AIS);
+    const res = reconcileParticipantAis(parts, GAME_AIS, true);
     expect(res.changed).toBe(true);
     expect(res.participants[1].ai?.shortName).toBe("SimpleAI");
     expect(res.substitutions).toEqual([{ from: "DAI", to: "SimpleAI" }]);
@@ -57,7 +57,7 @@ describe("reconcileParticipantAis", () => {
       bot("b", { kind: "native", shortName: "DAI" }),
       bot("c", { kind: "native", shortName: "DAI" }),
     ];
-    const res = reconcileParticipantAis(parts, GAME_AIS);
+    const res = reconcileParticipantAis(parts, GAME_AIS, true);
     expect(res.substitutions).toHaveLength(3);
     expect(res.substitutions.every((s) => s.to === "SimpleAI")).toBe(true);
     for (const p of res.participants.slice(1))
@@ -66,7 +66,7 @@ describe("reconcileParticipantAis", () => {
 
   it("leaves a genuinely empty AI slot for the fill pass (never counts it)", () => {
     const parts = [you(), bot("a", undefined)];
-    const res = reconcileParticipantAis(parts, GAME_AIS);
+    const res = reconcileParticipantAis(parts, GAME_AIS, true);
     expect(res.changed).toBe(false);
     expect(res.participants[1].ai).toBeUndefined();
     expect(res.substitutions).toEqual([]);
@@ -74,7 +74,7 @@ describe("reconcileParticipantAis", () => {
 
   it("does nothing with no AI data (degrades, keeps picks intact)", () => {
     const parts = [you(), bot("a", { kind: "native", shortName: "DAI" })];
-    const res = reconcileParticipantAis(parts, []);
+    const res = reconcileParticipantAis(parts, [], true);
     expect(res.changed).toBe(false);
     expect(res.participants).toBe(parts);
     expect(res.participants[1].ai?.shortName).toBe("DAI");
@@ -82,13 +82,26 @@ describe("reconcileParticipantAis", () => {
 
   it("counts an unavailable AI as unresolved when the game has no usable AI", () => {
     const parts = [you(), bot("a", { kind: "native", shortName: "DAI" })];
-    const res = reconcileParticipantAis(parts, [
-      skAi("Sandbox"),
-      skAi("NullAI", "native"),
-    ]);
+    const res = reconcileParticipantAis(
+      parts,
+      [skAi("Sandbox"), skAi("NullAI", "native")],
+      true,
+    );
     expect(res.unresolvedCount).toBe(1);
     expect(res.changed).toBe(false);
     expect(res.participants[1].ai?.shortName).toBe("DAI");
+  });
+
+  it("does nothing until the list is ready (the pre-game natives list)", () => {
+    // Before a game is selected the AI list is the engine's natives, which lack
+    // the game's Lua AIs. Reconciling then would swap a valid pick for a native.
+    const natives = [skAi("BARb", "native"), skAi("NullAI", "native")];
+    const parts = [you(), bot("a", { kind: "lua", shortName: "SimpleAI" })];
+    const res = reconcileParticipantAis(parts, natives, false);
+    expect(res.changed).toBe(false);
+    expect(res.participants).toBe(parts);
+    expect(res.participants[1].ai?.shortName).toBe("SimpleAI");
+    expect(res.substitutions).toEqual([]);
   });
 
   it("handles a differing cross-version list (matches by shortName)", () => {
@@ -98,7 +111,7 @@ describe("reconcileParticipantAis", () => {
       you(),
       bot("a", { kind: "native", shortName: "SurvivalAI" }),
     ];
-    const res = reconcileParticipantAis(parts, newer);
+    const res = reconcileParticipantAis(parts, newer, true);
     expect(res.changed).toBe(true);
     expect(res.substitutions).toEqual([{ from: "SurvivalAI", to: "SimpleAI" }]);
   });
