@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { encodeContainerCode } from "../container/container";
 import { buildDeepLink, buildImportCodeLink, buildJoinLink } from "./build";
 import {
   MAX_CODE_LENGTH,
@@ -78,6 +79,23 @@ describe("buildDeepLink", () => {
       });
       expect(built.ok).toBe(true);
       if (!built.ok) return;
+      expect(parseDeepLink(built.url)).toEqual({
+        kind: "import",
+        source: { type: "code", code },
+      });
+    });
+
+    it("carries a compressed code's prefix dot without percent-encoding it", () => {
+      const code = encodeContainerCode("preset", 1, { hello: "world" });
+      const built = buildDeepLink({
+        kind: "import",
+        source: { type: "code", code },
+      });
+      expect(built.ok).toBe(true);
+      if (!built.ok) return;
+      // The marker dot survives the link verbatim (issue #557): a percent-encoded
+      // one would bloat every code by two characters for no gain.
+      expect(built.url).toContain(`code=${code}`);
       expect(parseDeepLink(built.url)).toEqual({
         kind: "import",
         source: { type: "code", code },

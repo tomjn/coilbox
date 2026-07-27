@@ -5,8 +5,10 @@
  * setup packs) wraps its payload in this envelope, so opening any file or
  * pasting any code tells you immediately what it holds and which schema version
  * produced it, without guessing from the payload shape. The same envelope is
- * used for BOTH raw `.json` files AND base64url-wrapped codes, so one decode and
- * identify path serves both (a code is just `base64url(JSON.stringify(envelope))`).
+ * used for BOTH raw `.json` files AND pasteable codes, so one decode and
+ * identify path serves both. A code is
+ * `"cbz1." + base64url(deflate(JSON.stringify(envelope)))`; codes shared before
+ * issue #557 were uncompressed base64url and still decode.
  *
  * Compatibility ("this comes from a newer version of coilbox") is derived from
  * two integers, not the app's semver. The app version is a deliberately poor
@@ -25,6 +27,8 @@
  * Issue #388 (deep links) calls {@link identify} to validate an incoming payload
  * before applying it.
  */
+
+import { deflateSync, inflateSync, strFromU8, strToU8 } from "fflate";
 
 /** Top-level marker present on every coilbox container. */
 export const CONTAINER_FORMAT = "coilbox";
@@ -62,10 +66,29 @@ export interface Container<P = unknown> {
   payload: P;
 }
 
-/** Encode a UTF-8 string as base64url (no padding). Safely round-trips any JSON
- * (unicode names and the like), unlike a bare `btoa`. */
-export function base64UrlEncode(text: string): string {
-  const bytes = new TextEncoder().encode(text);
+/**
+ * Marks a code whose JSON is raw-DEFLATE compressed (issue #557). A setup pack
+ * carrying a unit restriction list ran to 4,000+ characters, past the ~2,000
+ * character URL limit plenty of software enforces, so codes are compressed
+ * before base64url.
+ *
+ * The dot is deliberate: it is outside the base64url alphabet, so an
+ * uncompressed code shared before #557 can never be mistaken for a compressed
+ * one. It also needs no percent-encoding in a `coilbox://import?code=` link.
+ */
+export const COMPRESSED_CODE_PREFIX = "cbz1.";
+
+/**
+ * Largest JSON we will inflate from a code. A code arrives from outside the app
+ * and DEFLATE reaches roughly 1000:1, so an unbounded inflate turns a small
+ * link into a huge allocation. `fflate` fills a fixed `out` buffer and
+ * truncates rather than growing, which turns that into a failed `JSON.parse`
+ * and a "corrupted" message. Matches `MAX_IMPORT_BYTES` in
+ * `../deeplink/fetchImport.ts`, the same ceiling a fetched import gets.
+ */
+const MAX_INFLATED_BYTES = 512 * 1024;
+
+function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
   return btoa(binary)
@@ -74,15 +97,25 @@ export function base64UrlEncode(text: string): string {
     .replace(/=+$/, "");
 }
 
-/** Decode a base64url string back to UTF-8 text. Throws on invalid input. */
-export function base64UrlDecode(code: string): string {
+function base64UrlToBytes(code: string): Uint8Array {
   const padded = code.replace(/-/g, "+").replace(/_/g, "/");
   const pad =
     padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
   const binary = atob(padded + pad);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
+  return bytes;
+}
+
+/** Encode a UTF-8 string as base64url (no padding). Safely round-trips any JSON
+ * (unicode names and the like), unlike a bare `btoa`. */
+export function base64UrlEncode(text: string): string {
+  return bytesToBase64Url(new TextEncoder().encode(text));
+}
+
+/** Decode a base64url string back to UTF-8 text. Throws on invalid input. */
+export function base64UrlDecode(code: string): string {
+  return new TextDecoder().decode(base64UrlToBytes(code));
 }
 
 /** Build a canonical container around a payload. */
@@ -110,29 +143,65 @@ export function encodeContainerJson<P>(
   return JSON.stringify(makeContainer(kind, kindVersion, payload), null, 2);
 }
 
-/** Encode a payload as a canonical container's pasteable base64url code. */
+/**
+ * Encode a payload as a canonical container's pasteable code: compressed, then
+ * base64url, behind {@link COMPRESSED_CODE_PREFIX}. Compression roughly thirds a
+ * long code (issue #557) and still shortens even a near-empty container, since
+ * the envelope's own keys compress, so there is no size below which plain
+ * base64url wins.
+ *
+ * Only codes are compressed. `.json` exports stay readable text.
+ */
 export function encodeContainerCode<P>(
   kind: ContainerKind,
   kindVersion: number,
   payload: P,
 ): string {
-  return base64UrlEncode(
-    JSON.stringify(makeContainer(kind, kindVersion, payload)),
-  );
+  const json = JSON.stringify(makeContainer(kind, kindVersion, payload));
+  const bytes = deflateSync(strToU8(json), { level: 9 });
+  return COMPRESSED_CODE_PREFIX + bytesToBase64Url(bytes);
+}
+
+/** Inflate a `cbz1.` code back to its JSON text, or `null` if it is corrupt,
+ * truncated, or larger than {@link MAX_INFLATED_BYTES}. */
+function inflateCode(code: string): string | null {
+  try {
+    const bytes = base64UrlToBytes(code.slice(COMPRESSED_CODE_PREFIX.length));
+    if (bytes.length === 0) return null;
+    return strFromU8(
+      inflateSync(bytes, { out: new Uint8Array(MAX_INFLATED_BYTES) }),
+    );
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Decode container text that is EITHER raw JSON or a base64url code into a plain
- * object, or `null` when neither parses. Raw JSON is tried first (a `.json`
- * file), then base64url (a pasted code), so one call handles both surfaces.
+ * Decode container text that is raw JSON, a compressed code, or a plain
+ * base64url code into a plain object, or `null` when none parse. Raw JSON is
+ * tried first (a `.json` file), then a code.
+ *
+ * Codes shared before issue #557 carry no prefix and are plain base64url, so
+ * both code forms decode here and no already-pasted code stops working.
  */
 export function decodeContainerText(text: string): unknown | null {
   const trimmed = text.trim();
   if (trimmed === "") return null;
+
+  if (trimmed.startsWith(COMPRESSED_CODE_PREFIX)) {
+    const json = inflateCode(trimmed);
+    if (json === null) return null;
+    try {
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
+  }
+
   try {
     return JSON.parse(trimmed);
   } catch {
-    // Not raw JSON. Fall through to try a base64url code.
+    // Not raw JSON. Fall through to try a plain base64url code.
   }
   try {
     return JSON.parse(base64UrlDecode(trimmed));

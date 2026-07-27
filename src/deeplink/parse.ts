@@ -12,7 +12,7 @@
  * Grammar (the action is the URL's authority, params are the query string):
  *
  *   coilbox://join?server=<host[:port]>&battle=<id>[&password=<pw>]
- *   coilbox://import?code=<base64url container code>
+ *   coilbox://import?code=<container code>
  *   coilbox://import?url=<https url>
  *   coilbox://open?screen=<name>[&id=<id>]
  *

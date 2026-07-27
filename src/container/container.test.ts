@@ -3,6 +3,7 @@ import {
   asContainer,
   base64UrlDecode,
   base64UrlEncode,
+  COMPRESSED_CODE_PREFIX,
   CONTAINER_FORMAT,
   CONTAINER_VERSION,
   decodeContainerText,
@@ -29,6 +30,52 @@ describe("container envelope", () => {
     expect(code).not.toMatch(/[+/=]/);
     const value = decodeContainerText(code);
     expect(asContainer(value)?.payload).toEqual({ mode: "conquest" });
+  });
+
+  it("emits a compressed code marked with the compression prefix", () => {
+    const code = encodeContainerCode("preset", 1, { hello: "world" });
+    expect(code.startsWith(COMPRESSED_CODE_PREFIX)).toBe(true);
+    // URL-safe throughout: base64url alphabet plus the single marker dot.
+    expect(code).toMatch(/^cbz1\.[A-Za-z0-9_-]+$/);
+  });
+
+  it("makes a long code much shorter than plain base64url", () => {
+    // A restriction list is the realistic worst case (issue #557).
+    const payload = {
+      disabledUnits: Array.from({ length: 173 }, (_, i) => `corunit${i}`),
+    };
+    const compressed = encodeContainerCode("preset", 1, payload);
+    const plain = base64UrlEncode(
+      JSON.stringify(makeContainer("preset", 1, payload)),
+    );
+    expect(compressed.length).toBeLessThan(plain.length / 2);
+    expect(decodeContainerText(compressed)).toEqual(
+      makeContainer("preset", 1, payload),
+    );
+  });
+
+  it("round-trips unicode through a compressed code", () => {
+    const payload = { name: "ÉtoileÑo 星" };
+    const value = decodeContainerText(
+      encodeContainerCode("campaign", 1, payload),
+    );
+    expect(asContainer(value)?.payload).toEqual(payload);
+  });
+
+  it("still reads a plain base64url code shared before compression", () => {
+    const legacy = base64UrlEncode(
+      JSON.stringify(makeContainer("setup-pack", 1, { maps: ["a"] })),
+    );
+    expect(asContainer(decodeContainerText(legacy))?.kind).toBe("setup-pack");
+  });
+
+  it("reports a corrupted compressed code as unreadable, never throws", () => {
+    expect(
+      decodeContainerText(`${COMPRESSED_CODE_PREFIX}not-real-deflate`),
+    ).toBe(null);
+    const code = encodeContainerCode("preset", 1, { hello: "world" });
+    expect(decodeContainerText(code.slice(0, code.length - 6))).toBe(null);
+    expect(decodeContainerText(COMPRESSED_CODE_PREFIX)).toBe(null);
   });
 
   it("round-trips unicode through base64url", () => {
@@ -63,6 +110,13 @@ describe("identify", () => {
   it("identifies a payload passed as a base64url code", () => {
     const code = encodeContainerCode("setup-pack", 1, {});
     expect(identify(code).kind).toBe("setup-pack");
+  });
+
+  it("identifies a compressed code and reports a corrupted one as unknown", () => {
+    expect(identify(encodeContainerCode("challenge", 1, {})).kind).toBe(
+      "challenge",
+    );
+    expect(identify(`${COMPRESSED_CODE_PREFIX}garbage`).kind).toBe("unknown");
   });
 
   it("identifies an already-parsed object", () => {
