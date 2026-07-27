@@ -2,8 +2,8 @@
  * Shared codec for challenge codes - the compact, pasteable text that carries a
  * conquest galaxy's or warpath run's seed + generation settings so a second
  * player can recreate the identical galaxy/run locally (issue #376). Zero
- * infrastructure: the code is just base64url(JSON), small enough to paste into
- * Discord or any chat client.
+ * infrastructure: the code is just the container's compressed JSON (issue #557),
+ * small enough to paste into Discord or any chat client.
  *
  * As of issue #479 a challenge rides in the canonical coilbox container
  * (`../container/container.ts`) with `kind: "challenge"`. The conquest/warpath
