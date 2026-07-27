@@ -203,7 +203,16 @@ export default function SkirmishPage() {
   const gamesLoading = scan.loading && games.length === 0;
 
   const gameInfo = useUnitsyncGameInfo(enginePath, dataDir, gameArchive);
-  const { ais } = useSkirmishAis(enginePath, dataDir, gameArchive);
+  const { ais, loaded: aisLoaded } = useSkirmishAis(
+    enginePath,
+    dataDir,
+    gameArchive,
+  );
+  // Whether `ais` is the selected game's own settled list. A query with no game
+  // yet (the scan still loading) returns the engine's natives, which lack the
+  // game's Lua AIs, so both the fill and reconcile passes below wait for this.
+  // Mirrors `addableAisReady` in `useBattleRoom` (#531).
+  const aisReady = !!gameArchive && aisLoaded;
   const [lastAi, setLastAi] = useLastAi();
   const minimap = useUnitsyncMinimap(enginePath, dataDir, selectedMap?.name);
   const overlay = useMapOverlayLayer(enginePath, dataDir, selectedMap?.name);
@@ -267,7 +276,11 @@ export default function SkirmishPage() {
   // Auto-select the last AI the user picked for any still-empty AI slot (the
   // default opponent, or one added before the AI list had loaded). Restored
   // participants already carry their `ai`, so this only fills genuine blanks.
+  // Waits for the game's own list: filling from the natives fallback writes an
+  // AI the game may not offer, which the pass below then flags as a
+  // substitution the user never made.
   useEffect(() => {
+    if (!aisReady) return;
     const preset = defaultAi(lastAi, ais);
     if (!preset) return;
     setParticipants((ps) => {
@@ -281,7 +294,7 @@ export default function SkirmishPage() {
       });
       return changed ? next : ps;
     });
-  }, [lastAi, ais]);
+  }, [lastAi, ais, aisReady]);
 
   // Reconcile every AI slot against the selected game's actual AI list (#501).
   // Presets and drafts are reused across games and versions, so switching the
@@ -290,16 +303,22 @@ export default function SkirmishPage() {
   // the AI list changes. Reads the current participants via a ref so an edit
   // doesn't re-trigger it. Remaps present-but-unavailable AIs to a valid default
   // and surfaces the swap, leaving genuine blanks to the fill pass above.
+  //
+  // Gated on `aisReady`: running while the game is still loading reconciled
+  // against the engine's natives, swapping a valid Lua pick out and back again
+  // once the real list landed, so the notice returned on every visit and no
+  // pick ever stuck. While not ready the notice is left alone rather than
+  // cleared, so a game switch doesn't blank it mid-flight.
   const participantsRef = useRef(participants);
   participantsRef.current = participants;
   useEffect(() => {
-    if (ais.length === 0) return;
-    const res = reconcileParticipantAis(participantsRef.current, ais);
+    if (!aisReady || ais.length === 0) return;
+    const res = reconcileParticipantAis(participantsRef.current, ais, aisReady);
     if (res.changed) setParticipants(res.participants);
     // Clear a stale notice too, so switching to a game that offers every AI
     // doesn't leave the previous game's substitution message on screen.
     setAiNotice(summarizeSubstitutions(res.substitutions) ?? null);
-  }, [ais]);
+  }, [ais, aisReady]);
 
   // Persist the working draft (debounced — one write after edits settle, not per
   // keystroke). Transient run state (running/error) is intentionally excluded.
@@ -364,10 +383,16 @@ export default function SkirmishPage() {
   };
   const removeParticipant = (id: string) =>
     setParticipants((ps) => ps.filter((p) => p.id !== id));
+  // Added before the game's AI list settles, the slot is left blank for the fill
+  // pass rather than seeded from the engine's natives.
   const addAi = () =>
     setParticipants((ps) => [
       ...ps,
-      makeAiParticipant(ps, RANDOM_SIDE, defaultAi(lastAi, ais)),
+      makeAiParticipant(
+        ps,
+        RANDOM_SIDE,
+        aisReady ? defaultAi(lastAi, ais) : undefined,
+      ),
     ]);
 
   // Derive the engine `BattleConfig` from the current setup, or null if a game

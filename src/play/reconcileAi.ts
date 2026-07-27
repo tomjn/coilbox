@@ -21,10 +21,19 @@ import type { Participant } from "./participants";
  * (from unitsync, keyed by the installed archive, so it is that version's list).
  * With an empty list (no unitsync AI data) nothing is changed, so a degraded
  * scan never wipes valid picks.
+ *
+ * `ready` is the caller's "this list is the selected game's own, and it has
+ * settled" flag (`!!gameArchive && loaded` from `useSkirmishAis`, mirroring
+ * `addableAisReady` in `useBattleRoom`). It is a required argument because
+ * getting it wrong is silent and destructive: a query with no game returns the
+ * engine's *native* AIs only, so reconciling against it swaps a valid Lua pick
+ * (SimpleAI) for a native (BARb), which the real game list then swaps back on
+ * the next pass: a flip-flop that rewrites the persisted draft on every visit.
  */
 export function reconcileParticipantAis(
   participants: Participant[],
   ais: Pick<SkirmishAi, "shortName" | "kind" | "name">[],
+  ready: boolean,
 ): {
   participants: Participant[];
   substitutions: AiSubstitution[];
@@ -35,7 +44,7 @@ export function reconcileParticipantAis(
   let unresolvedCount = 0;
   let changed = false;
 
-  if (ais.length === 0) {
+  if (!ready || ais.length === 0) {
     return { participants, substitutions, unresolvedCount, changed };
   }
 
