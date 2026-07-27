@@ -7,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
   allServers,
@@ -22,12 +23,14 @@ import {
 import { RegisterForm } from "../lobby-servers/RegisterForm";
 import { useMultiplayer } from "./store";
 
-type DotStatus = "off" | "connecting" | "on" | "error";
+type DotStatus = "off" | "connecting" | "on" | "away" | "error";
 
 const DOT_CLASS: Record<DotStatus, string> = {
   off: "bg-muted-foreground/50",
   connecting: "bg-amber-500 animate-pulse",
   on: "bg-green-500",
+  // Matches the amber "Away" dot the chat member list uses (see presence.ts).
+  away: "bg-amber-500",
   error: "bg-destructive",
 };
 
@@ -35,6 +38,7 @@ const LABEL: Record<DotStatus, string> = {
   off: "Multiplayer: log in",
   connecting: "Multiplayer: connecting",
   on: "Multiplayer: connected",
+  away: "Multiplayer: away",
   error: "Multiplayer: connection error",
 };
 
@@ -53,6 +57,7 @@ export default function LobbyStatusButton() {
     loginPopoverOpen,
     openLoginPopover,
     closeLoginPopover,
+    status: clientStatus,
   } = useMultiplayer();
 
   const hasAccounts = accountsCfg.accounts.length > 0;
@@ -60,7 +65,8 @@ export default function LobbyStatusButton() {
 
   let status: DotStatus = "off";
   if (activeKey != null) {
-    status = mirror.phase === "ready" ? "on" : "connecting";
+    if (mirror.phase !== "ready") status = "connecting";
+    else status = clientStatus.away ? "away" : "on";
   } else if (busy) {
     status = "connecting";
   } else if (mirror.error || mirror.phase === "denied") {
@@ -106,6 +112,9 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     connect,
     disconnect,
     cancelConnect,
+    status,
+    manualAway,
+    setManualAway,
   } = useMultiplayer();
 
   const [lastLogin] = useLastLogin();
@@ -167,6 +176,29 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
             {ready ? activeKey : `Connecting… (${mirror.phase ?? "…"})`}
           </p>
         </div>
+        <label
+          htmlFor="lobby-manual-away"
+          className="flex items-center justify-between gap-3"
+        >
+          <span className="flex flex-col">
+            <span className="text-sm font-medium">Away</span>
+            <span className="text-xs text-muted-foreground">
+              {/* The idle watcher owns the away bit unless the user takes it,
+                  so say which of the two is showing right now. */}
+              {manualAway
+                ? "Others see you as away until you turn this off."
+                : status.away
+                  ? "You've been set away automatically while idle."
+                  : "Tell others you're not at the keyboard."}
+            </span>
+          </span>
+          <Switch
+            id="lobby-manual-away"
+            checked={manualAway}
+            onCheckedChange={setManualAway}
+            disabled={!ready}
+          />
+        </label>
         <Link
           to="/chat"
           onClick={onNavigate}

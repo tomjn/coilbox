@@ -11,6 +11,14 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  AUTO_AWAY_ENABLED_KEY,
+  AUTO_AWAY_MINUTES_KEY,
+  clampAwayMinutes,
+  DEFAULT_AUTO_AWAY_MINUTES,
+  MAX_AUTO_AWAY_MINUTES,
+  MIN_AUTO_AWAY_MINUTES,
+} from "../../multiplayer/awayStatus";
 import { ConsoleDrawer } from "../../multiplayer/ConsoleDrawer";
 import { serverKeyFor, useMultiplayer } from "../../multiplayer/store";
 import {
@@ -55,6 +63,14 @@ export default function LobbyServersSettings() {
   const [autoConnect, setAutoConnect] = useSetting<boolean>(
     "multiplayer.autoConnect",
     false,
+  );
+  const [autoAway, setAutoAway] = useSetting<boolean>(
+    AUTO_AWAY_ENABLED_KEY,
+    true,
+  );
+  const [awayMinutes, setAwayMinutes] = useSetting<number>(
+    AUTO_AWAY_MINUTES_KEY,
+    DEFAULT_AUTO_AWAY_MINUTES,
   );
 
   const servers = allServers(customCfg.servers);
@@ -149,6 +165,30 @@ export default function LobbyServersSettings() {
             checked={autoRejoin}
             onChange={setAutoRejoin}
           />
+          <CheckField
+            label="Set me away when idle"
+            hint="Show as away to everyone else after a spell without input. Using Coilbox again clears it. Away you set by hand stays until you clear it."
+            checked={autoAway}
+            onChange={setAutoAway}
+          />
+          {autoAway && (
+            <Field
+              label="Minutes before away"
+              className="max-w-40 pl-6"
+              hint={`${MIN_AUTO_AWAY_MINUTES} to ${MAX_AUTO_AWAY_MINUTES}.`}
+            >
+              <Input
+                type="number"
+                min={MIN_AUTO_AWAY_MINUTES}
+                max={MAX_AUTO_AWAY_MINUTES}
+                value={awayMinutes}
+                onChange={(e) => setAwayMinutes(Number(e.target.value))}
+                // Half-typed values are usable while typing and corrected on the
+                // way out, so the field can never be left showing what it isn't.
+                onBlur={() => setAwayMinutes(clampAwayMinutes(awayMinutes))}
+              />
+            </Field>
+          )}
         </div>
       </section>
 

@@ -30,7 +30,6 @@ import {
   mpSetBattleStatus,
   mpSetScriptTags,
   mpSetStartRect,
-  mpSetStatus,
   mpUpdateBattleInfo,
   mpUpdateBot,
 } from "../bindings";
@@ -177,7 +176,8 @@ export interface BattleRoomView {
     colorHex?: string;
     spectator?: boolean;
   }) => void;
-  /** Set our own in-game flag (MYSTATUS): the host flips this to start the match. */
+  /** Set our own in-game flag: the host flips this to start the match. Sending is
+   *  the provider's job, since MYSTATUS carries the away bit on the same line. */
   setIngame: (ingame: boolean) => void;
   /** Host controls over another member (self-hosted battles only; no-op otherwise). */
   hostControls: {
@@ -236,7 +236,7 @@ export interface BattleRoomView {
 }
 
 export function useBattleRoom(): BattleRoomView {
-  const { mirror, activeKey } = useMultiplayer();
+  const { mirror, activeKey, setIngame } = useMultiplayer();
   const state = mirror.state;
 
   // The team colour we remember across battles and app restarts. Empty means
@@ -509,17 +509,6 @@ export function useBattleRoom(): BattleRoomView {
       }).then(clearErr, setErr);
     },
     [activeKey, battle, setErr, clearErr],
-  );
-
-  const setIngame = useCallback(
-    (ingame: boolean) => {
-      if (!activeKey) return;
-      mpSetStatus({ serverKey: activeKey, ingame, away: false }).then(
-        clearErr,
-        setErr,
-      );
-    },
-    [activeKey, clearErr, setErr],
   );
 
   // Host-only actions over other members. Gated by the UI (only rendered when
