@@ -1,10 +1,25 @@
 import { Button } from "@picoframe/frame";
+import { isUpdaterEnabled } from "../../profile/profile";
 import { useUpdater } from "../UpdaterProvider";
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Why the check/install controls are absent, or null when they should show. The
+ * version above them stays visible either way, so a player can still report which
+ * build they're on. The profile is checked before the dev-build case because it's
+ * the governing reason when set, and because it's the only way to see this state
+ * under `tauri dev`.
+ */
+function inertReason(): string | null {
+  if (!isUpdaterEnabled())
+    return "Updates for this build are managed by its distributor.";
+  if (import.meta.env.DEV) return "Updates are disabled in development builds.";
+  return null;
 }
 
 /** Settings section at /settings/updates. */
@@ -21,6 +36,7 @@ export default function UpdatesSettingsSection() {
     runInstall,
     restart,
   } = useUpdater();
+  const inert = inertReason();
 
   return (
     <div className="flex flex-col gap-4">
@@ -29,10 +45,8 @@ export default function UpdatesSettingsSection() {
         <div className="text-lg font-medium">{version ?? "…"}</div>
       </div>
 
-      {import.meta.env.DEV ? (
-        <p className="text-sm text-muted-foreground">
-          Updates are disabled in development builds.
-        </p>
+      {inert ? (
+        <p className="text-sm text-muted-foreground">{inert}</p>
       ) : (
         <>
           <div className="flex items-center gap-3">

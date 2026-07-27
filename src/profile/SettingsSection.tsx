@@ -58,6 +58,10 @@ export default function ProfileSettings() {
           />
           <Row label="Game filter" value={filterText ?? "None"} />
           <Row label="Update repo" value={profile.release?.repo ?? "None"} />
+          <Row
+            label="Coilbox updates"
+            value={profile.updater === false ? "Off" : "On"}
+          />
           <Row label="Quit button" value={profile.quit ? "Shown" : "Hidden"} />
           <Row
             label="Welcome screen"
