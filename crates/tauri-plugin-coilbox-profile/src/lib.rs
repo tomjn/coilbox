@@ -192,6 +192,55 @@ async fn profile_pages() -> CliResult {
     CliResult::ok(json!({ "pages": pages }))
 }
 
+/// Pure core of [`profile_scaffold`]: write `<app_dir>/.coilbox/profile.json`, but
+/// only when nothing is there yet. Returns the target path and whether it was written.
+/// An existing file is left alone (`false`) and never overwritten, because it is the
+/// distributor's authored work. Anchored on `app_dir` rather than
+/// [`coilbox_portable::portable_root`] on purpose, since the root only resolves once a
+/// `profile.json` exists, which is exactly what this creates.
+fn scaffold_profile_in(
+    app_dir: Option<PathBuf>,
+    json: &str,
+    exists: impl Fn(&Path) -> bool,
+    write: impl Fn(&Path, &str) -> std::io::Result<()>,
+) -> Result<(String, bool), String> {
+    let app_dir = app_dir.ok_or_else(|| "could not resolve the app directory".to_string())?;
+    let target = app_dir.join(".coilbox").join("profile.json");
+    let path = target.display().to_string();
+    if exists(&target) {
+        return Ok((path, false));
+    }
+    write(&target, json).map_err(|e| format!("could not write {path}: {e}"))?;
+    Ok((path, true))
+}
+
+/// Create the parent directory then write the file, the real writer for
+/// [`scaffold_profile_in`]. `.coilbox` usually does not exist yet on the install this
+/// scaffolds into.
+fn write_new_file(path: &Path, contents: &str) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, contents)
+}
+
+/// `profile_scaffold` writes a starter `profile.json` into `<app_dir>/.coilbox/` so a
+/// distributor can start from a real file instead of a blank one. The frontend composes
+/// the JSON (it owns the schema), this only places it. Returns `{ path, written }`, with
+/// `written: false` when a profile is already there.
+#[tauri::command]
+async fn profile_scaffold(json: String) -> CliResult {
+    match scaffold_profile_in(
+        coilbox_portable::app_dir(),
+        &json,
+        |p| p.exists(),
+        write_new_file,
+    ) {
+        Ok((path, written)) => CliResult::ok(json!({ "path": path, "written": written })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-profile"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-profile")
@@ -199,7 +248,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             profile_load,
             profile_asset,
             profile_file,
-            profile_pages
+            profile_pages,
+            profile_scaffold
         ])
         .build()
 }
@@ -376,6 +426,65 @@ mod tests {
             |_| panic!("reader must not run without a portable root"),
         );
         assert!(out.is_empty());
+    }
+
+    #[test]
+    fn scaffold_writes_profile_next_to_the_app() {
+        let written = std::cell::RefCell::new(None);
+        let out = scaffold_profile_in(
+            Some(PathBuf::from("/pkg")),
+            r#"{"version":1}"#,
+            |_| false,
+            |p, text| {
+                *written.borrow_mut() = Some((p.to_path_buf(), text.to_string()));
+                Ok(())
+            },
+        );
+        assert_eq!(out, Ok(("/pkg/.coilbox/profile.json".to_string(), true)));
+        assert_eq!(
+            written.into_inner(),
+            Some((
+                PathBuf::from("/pkg/.coilbox/profile.json"),
+                r#"{"version":1}"#.to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn scaffold_never_overwrites_an_existing_profile() {
+        let out = scaffold_profile_in(
+            Some(PathBuf::from("/pkg")),
+            r#"{"version":1}"#,
+            |p| {
+                assert_eq!(p, Path::new("/pkg/.coilbox/profile.json"));
+                true
+            },
+            |_, _| panic!("writer must not run when a profile is already there"),
+        );
+        assert_eq!(out, Ok(("/pkg/.coilbox/profile.json".to_string(), false)));
+    }
+
+    #[test]
+    fn scaffold_errors_without_an_app_dir() {
+        let out = scaffold_profile_in(
+            None,
+            r#"{"version":1}"#,
+            |_| panic!("existence check must not run without an app dir"),
+            |_, _| panic!("writer must not run without an app dir"),
+        );
+        assert!(out.is_err());
+    }
+
+    #[test]
+    fn scaffold_reports_a_write_failure() {
+        let out = scaffold_profile_in(
+            Some(PathBuf::from("/pkg")),
+            r#"{"version":1}"#,
+            |_| false,
+            |_, _| Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied)),
+        );
+        let err = out.expect_err("a failed write must surface");
+        assert!(err.contains("/pkg/.coilbox/profile.json"), "{err}");
     }
 
     #[test]

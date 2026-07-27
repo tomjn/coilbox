@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-profile-scaffold"
+description = "Enables the profile_scaffold command without any pre-configured scope."
+commands.allow = ["profile_scaffold"]
+
+[[permission]]
+identifier = "deny-profile-scaffold"
+description = "Denies the profile_scaffold command without any pre-configured scope."
+commands.deny = ["profile_scaffold"]
