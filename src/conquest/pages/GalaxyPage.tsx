@@ -1,4 +1,4 @@
-import { Button } from "@picoframe/frame";
+import { Button, useHideSidebar } from "@picoframe/frame";
 import {
   ArrowLeft,
   Dices,
@@ -59,6 +59,8 @@ import { FactionDot, SidePicker } from "./components/RunSetup";
  * run yet.
  */
 export default function GalaxyPage() {
+  // The galaxy is full-bleed. The nav stays reachable from the top bar.
+  useHideSidebar();
   const { id } = useParams();
   const { galaxies, loading, error } = useGalaxies();
   const loaded = galaxies.find((g) => g.galaxy.id === id);

@@ -1,4 +1,4 @@
-import { Button, buttonVariants, cn } from "@picoframe/frame";
+import { Button, buttonVariants, cn, useHideSidebar } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
@@ -44,6 +44,9 @@ import { PanoramaScroller } from "./components/PanoramaScroller";
  * promise and its exit code stay in one place.
  */
 export default function MissionBriefingPage() {
+  // The panorama is full-bleed. Held here, outside the keyed remount below, so
+  // the sidebar does not flash back between missions.
+  useHideSidebar();
   const { id, missionId } = useParams();
   // Key on the mission so navigating to the next mission's briefing (from the
   // victory screen) remounts with a fresh phase instead of inheriting "victory".
