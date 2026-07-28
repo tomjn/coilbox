@@ -20,7 +20,7 @@ const legoPlugin: FramePlugin = {
       items: [
         {
           id: "lego.parts",
-          label: "Parts",
+          label: "Lego Parts",
           to: "/lego/parts",
           order: 0,
           icon: Blocks,
@@ -42,7 +42,7 @@ const legoPlugin: FramePlugin = {
     {
       path: "lego/parts",
       lazy: gateAdvanced(() => import("./pages/PartsPage")),
-      crumb: "Parts",
+      crumb: "Lego Parts",
     },
   ],
   settings: [],
