@@ -128,6 +128,14 @@ function PartViewport({
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
+    // The canvas is sized in CSS and its drawing buffer separately, so setSize
+    // is told not to touch the style. Without these the canvas takes its
+    // intrinsic size, which is the buffer size including the pixel ratio, and
+    // ends up larger than the container. That resizes the container, which
+    // resizes the canvas, and the view flickers between the two.
+    renderer.domElement.style.display = "block";
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
 
     const scene = new THREE.Scene();
     addStandardLights(scene);
