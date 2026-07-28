@@ -1,14 +1,10 @@
-import { Button, Input } from "@picoframe/frame";
 import { Blocks, TriangleAlert } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-import {
-  type LegoPartInfo,
-  type LoadedPack,
-  loadPack,
-  oneOfEachShape,
-} from "../pack";
+import { usePartFilter } from "../filter";
+import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
 import { PartDetail } from "./components/PartDetail";
+import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 
 type Status =
@@ -25,8 +21,6 @@ type Status =
  */
 export default function PartsPage() {
   const [status, setStatus] = useState<Status>({ state: "loading" });
-  const [query, setQuery] = useState("");
-  const [colourway, setColourway] = useState<string | null>(null);
   const [selected, setSelected] = useState<LegoPartInfo | null>(null);
 
   useEffect(() => {
@@ -46,22 +40,8 @@ export default function PartsPage() {
   }, []);
 
   const pack = status.state === "ready" ? status.pack : null;
-
-  const parts = useMemo(() => {
-    if (!pack) return [];
-    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-    const matching = pack.parts.filter((part) => {
-      if (colourway && part.colourway !== colourway) return false;
-      if (terms.length === 0) return true;
-      const haystack =
-        `${part.name} ${part.tags.join(" ")} ${part.material} ${part.sourceNames.join(" ")}`.toLowerCase();
-      return terms.every((term) => haystack.includes(term));
-    });
-    // Most pieces exist in all three colourways. Showing every one makes the
-    // grid three times longer without offering three times the choice, so it
-    // collapses to one per shape until a colourway is picked.
-    return colourway ? matching : oneOfEachShape(matching);
-  }, [pack, query, colourway]);
+  const filter = usePartFilter(pack);
+  const parts = filter.parts;
 
   return (
     <div className="flex h-full flex-col">
@@ -80,45 +60,18 @@ export default function PartsPage() {
 
       {pack ? (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search parts"
-              className="w-56"
-              aria-label="Search parts"
-            />
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant={colourway === null ? "default" : "outline"}
-                onClick={() => setColourway(null)}
-              >
-                All
-              </Button>
-              {pack.manifest.categories.map((category) => (
-                <Button
-                  key={category.id}
-                  size="sm"
-                  variant={colourway === category.id ? "default" : "outline"}
-                  onClick={() => setColourway(category.id)}
-                >
-                  {category.label}
-                </Button>
-              ))}
-            </div>
-            <span className="ml-auto text-sm text-muted-foreground">
-              {colourway
-                ? `${parts.length} parts`
-                : `${parts.length} shapes, ${pack.parts.length} parts in all`}
-            </span>
-          </div>
+          <PartFilters
+            pack={pack}
+            query={filter.query}
+            onQuery={filter.setQuery}
+            colourway={filter.colourway}
+            onColourway={filter.setColourway}
+            shown={parts.length}
+            className="border-b border-border px-6 py-3"
+          />
 
           {parts.length === 0 ? (
-            <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-              Nothing matches. Try a shape like "beam", a size like "tiny", or
-              clear the search.
-            </p>
+            <NoMatches />
           ) : (
             <div className="flex min-h-0 flex-1">
               <PartPicker

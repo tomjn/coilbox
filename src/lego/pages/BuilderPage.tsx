@@ -3,6 +3,7 @@ import { Blocks, Plus, Save, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
+import { usePartFilter } from "../filter";
 import {
   childrenOf,
   descendantIds,
@@ -15,6 +16,8 @@ import {
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
 import { saveProject, saveThumbnail, useLegoProjects } from "../projects";
 import { ModelViewport } from "./components/ModelViewport";
+import { NameInput } from "./components/NameInput";
+import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 
 /**
@@ -37,6 +40,7 @@ export default function BuilderPage() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const filter = usePartFilter(pack);
 
   useEffect(() => {
     loadPack().then(setPack, () => setPack(null));
@@ -206,6 +210,12 @@ export default function BuilderPage() {
     }));
   }
 
+  // Setting the export name by hand breaks its link to the title, because the
+  // two no longer match and `renameUnit` only follows while they do.
+  function renameExport(unitName: string) {
+    edit((project) => ({ ...project, unitName }));
+  }
+
   function renameSelected(name: string) {
     if (!selectedId) return;
     edit((project) => ({
@@ -239,10 +249,15 @@ export default function BuilderPage() {
             aria-label="Unit name"
             className="h-7 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
           />
-          <p className="px-1 text-xs text-muted-foreground">
+          <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
             {draft.pieces.length}{" "}
-            {draft.pieces.length === 1 ? "piece" : "pieces"} · exports as{" "}
-            {draft.unitName}
+            {draft.pieces.length === 1 ? "piece" : "pieces"} · exports as
+            <NameInput
+              value={draft.unitName}
+              onCommit={renameExport}
+              aria-label="Export name"
+              className="h-6 w-48 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
+            />
           </p>
         </div>
         <span className="text-xs text-muted-foreground">
@@ -321,10 +336,10 @@ export default function BuilderPage() {
               >
                 Name
               </label>
-              <Input
+              <NameInput
                 id="lego-piece-name"
                 value={selected.name}
-                onChange={(event) => renameSelected(event.target.value)}
+                onCommit={renameSelected}
                 className="mt-1"
               />
               <p className="mt-1 text-xs text-muted-foreground">
@@ -337,11 +352,26 @@ export default function BuilderPage() {
         </aside>
       </div>
 
-      {/* Flex, not block: the picker sizes itself with flex-1 and its contents
-          are absolutely positioned, so in a block parent it collapses to
-          nothing and the panel looks empty. */}
-      <div className="flex h-56 shrink-0 border-t border-border">
-        <PartPicker pack={pack} parts={pack.parts} onSelect={addPart} />
+      <div className="flex h-72 shrink-0 flex-col border-t border-border">
+        <PartFilters
+          pack={pack}
+          query={filter.query}
+          onQuery={filter.setQuery}
+          colourway={filter.colourway}
+          onColourway={filter.setColourway}
+          shown={filter.parts.length}
+          className="border-b border-border px-3 py-2"
+        />
+        {/* Flex, not block: the picker sizes itself with flex-1 and its contents
+            are absolutely positioned, so in a block parent it collapses to
+            nothing and the panel looks empty. */}
+        <div className="flex min-h-0 flex-1">
+          {filter.parts.length === 0 ? (
+            <NoMatches />
+          ) : (
+            <PartPicker pack={pack} parts={filter.parts} onSelect={addPart} />
+          )}
+        </div>
       </div>
     </div>
   );
