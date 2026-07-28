@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ROLES } from "../animPresets";
 import { insertCompound, subtreeAsCompound } from "../compounds";
 import { usePartFilter } from "../filter";
 import {
@@ -31,6 +32,7 @@ import {
   useLegoProjects,
 } from "../projects";
 import { canReparent, reparentPiece } from "../reparent";
+import { AnimationPanel } from "./components/AnimationPanel";
 import { CompoundPicker } from "./components/CompoundPicker";
 import { ExportDrawer } from "./components/ExportDrawer";
 import { ModelViewport } from "./components/ModelViewport";
@@ -38,6 +40,9 @@ import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 import { PieceTree } from "./components/PieceTree";
+
+/** Radix needs a non-empty value, so "no role" gets one of its own. */
+const NO_ROLE = "none";
 
 /**
  * Assemble one unit.
@@ -60,7 +65,9 @@ export default function BuilderPage() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [strip, setStrip] = useState<"parts" | "compounds">("parts");
+  const [aside, setAside] = useState<"pieces" | "animation">("pieces");
   const [exporting, setExporting] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const filter = usePartFilter(pack);
 
@@ -268,6 +275,17 @@ export default function BuilderPage() {
     edit((project) => ({ ...project, unitName }));
   }
 
+  function setRole(pieceId: string, role: string | undefined) {
+    edit((project) => ({
+      ...project,
+      pieces: project.pieces.map((piece) => {
+        if (piece.id !== pieceId) return piece;
+        const { role: _dropped, ...rest } = piece;
+        return role ? { ...rest, role } : rest;
+      }),
+    }));
+  }
+
   function renameSelected(name: string) {
     if (!selectedId) return;
     edit((project) => ({
@@ -353,6 +371,7 @@ export default function BuilderPage() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             onTransform={transformPiece}
+            playing={playing}
             onReady={(canvas) => {
               canvasRef.current = canvas;
             }}
@@ -360,110 +379,173 @@ export default function BuilderPage() {
         </div>
 
         <aside className="flex w-72 shrink-0 flex-col border-l border-border">
-          <div className="flex items-center gap-1 border-b border-border px-3 py-2">
-            <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="flex gap-1 border-b border-border px-3 py-2">
+            <Button
+              size="sm"
+              variant={aside === "pieces" ? "default" : "ghost"}
+              onClick={() => setAside("pieces")}
+            >
               Pieces
-            </h2>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ml-auto"
-              onClick={addEmpty}
-              title="Add an empty piece, which is how flares and aim points are made"
-            >
-              <Plus size={14} />
             </Button>
             <Button
               size="sm"
-              variant="ghost"
-              onClick={() => void saveSelectionAsCompound()}
-              disabled={!selectedId}
-              title="Save the selected piece and everything under it, to reuse in another unit"
-              aria-label="Save the selection as a compound"
+              variant={aside === "animation" ? "default" : "ghost"}
+              onClick={() => setAside("animation")}
             >
-              <PackagePlus size={14} />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={removeSelected}
-              disabled={!selectedId || selectedId === draft.rootPieceId}
-              aria-label="Delete the selected piece"
-            >
-              <Trash2 size={14} />
+              Animation
             </Button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto py-1">
-            <PieceTree
+          {aside === "animation" ? (
+            <AnimationPanel
               project={draft}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onReparent={reparent}
+              playing={playing}
+              onPlayingChange={setPlaying}
+              onChange={(animations) =>
+                edit((project) => ({ ...project, animations }))
+              }
             />
-          </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-1 border-b border-border px-3 py-2">
+                <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Pieces
+                </h2>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto"
+                  onClick={addEmpty}
+                  title="Add an empty piece, which is how flares and aim points are made"
+                >
+                  <Plus size={14} />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void saveSelectionAsCompound()}
+                  disabled={!selectedId}
+                  title="Save the selected piece and everything under it, to reuse in another unit"
+                  aria-label="Save the selection as a compound"
+                >
+                  <PackagePlus size={14} />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={removeSelected}
+                  disabled={!selectedId || selectedId === draft.rootPieceId}
+                  aria-label="Delete the selected piece"
+                >
+                  <Trash2 size={14} />
+                </Button>
+              </div>
 
-          {selected ? (
-            <div className="border-t border-border px-3 py-2">
-              <label
-                className="text-xs text-muted-foreground"
-                htmlFor="lego-piece-name"
-              >
-                Name
-              </label>
-              <NameInput
-                id="lego-piece-name"
-                value={selected.name}
-                onCommit={renameSelected}
-                className="mt-1"
-              />
-              {selected.id === draft.rootPieceId ? null : (
-                // The same move as dragging a row onto another, for anyone not
-                // using a pointer.
-                <div className="mt-2">
-                  <span className="text-xs text-muted-foreground">
-                    Hangs off
-                  </span>
-                  <Select
-                    value={selected.parentId ?? draft.rootPieceId}
-                    onValueChange={(parentId) =>
-                      reparent(selected.id, parentId)
-                    }
+              <div className="min-h-0 flex-1 overflow-y-auto py-1">
+                <PieceTree
+                  project={draft}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  onReparent={reparent}
+                />
+              </div>
+
+              {selected ? (
+                <div className="border-t border-border px-3 py-2">
+                  <label
+                    className="text-xs text-muted-foreground"
+                    htmlFor="lego-piece-name"
                   >
-                    <SelectTrigger
-                      size="sm"
-                      className="mt-1 w-full"
-                      aria-label="Parent piece"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {parentOptions(draft, selected.id).map(
-                        ({ piece, depth }) => (
-                          <SelectItem
-                            key={piece.id}
-                            value={piece.id}
-                            // Indent on the item, not inside its text: Radix
-                            // mirrors the text into the trigger, and the
-                            // padding would come with it.
-                            style={{ paddingLeft: 8 + depth * 12 }}
-                          >
-                            {piece.name}
-                          </SelectItem>
-                        ),
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+                    Name
+                  </label>
+                  <NameInput
+                    id="lego-piece-name"
+                    value={selected.name}
+                    onCommit={renameSelected}
+                    className="mt-1"
+                  />
+                  {selected.id === draft.rootPieceId ? null : (
+                    // The same move as dragging a row onto another, for anyone not
+                    // using a pointer.
+                    <div className="mt-2">
+                      <span className="text-xs text-muted-foreground">
+                        Hangs off
+                      </span>
+                      <Select
+                        value={selected.parentId ?? draft.rootPieceId}
+                        onValueChange={(parentId) =>
+                          reparent(selected.id, parentId)
+                        }
+                      >
+                        <SelectTrigger
+                          size="sm"
+                          className="mt-1 w-full"
+                          aria-label="Parent piece"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {parentOptions(draft, selected.id).map(
+                            ({ piece, depth }) => (
+                              <SelectItem
+                                key={piece.id}
+                                value={piece.id}
+                                // Indent on the item, not inside its text: Radix
+                                // mirrors the text into the trigger, and the
+                                // padding would come with it.
+                                style={{ paddingLeft: 8 + depth * 12 }}
+                              >
+                                {piece.name}
+                              </SelectItem>
+                            ),
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-              <p className="mt-2 text-xs text-muted-foreground">
-                {selected.partId
-                  ? "Geometry."
-                  : "Empty, so it carries other pieces and can be an emit point."}
-              </p>
-            </div>
-          ) : null}
+                  <div className="mt-2">
+                    <span className="text-xs text-muted-foreground">Role</span>
+                    <Select
+                      value={selected.role ?? NO_ROLE}
+                      onValueChange={(role) =>
+                        setRole(
+                          selected.id,
+                          role === NO_ROLE ? undefined : role,
+                        )
+                      }
+                    >
+                      <SelectTrigger
+                        size="sm"
+                        className="mt-1 w-full"
+                        aria-label="Animation role"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_ROLE}>None</SelectItem>
+                        {ROLES.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      What this piece is, so the animation presets know what to
+                      move.
+                    </p>
+                  </div>
+
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {selected.partId
+                      ? "Geometry."
+                      : "Empty, so it carries other pieces and can be an emit point."}
+                  </p>
+                </div>
+              ) : null}
+            </>
+          )}
         </aside>
       </div>
 

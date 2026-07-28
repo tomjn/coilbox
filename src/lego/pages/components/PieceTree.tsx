@@ -12,6 +12,7 @@
 
 import { useRef, useState } from "react";
 
+import { roleLabel } from "../../animPresets";
 import { childrenOf, type LegoProject, pieceById } from "../../model";
 import { canReparent } from "../../reparent";
 
@@ -160,7 +161,11 @@ function Rows({
             style={{ paddingLeft: 12 + depth * 14 }}
           >
             <span className="truncate">{piece.name}</span>
-            {piece.partId ? null : (
+            {piece.role ? (
+              <span className="ml-auto shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">
+                {roleLabel(piece.role)}
+              </span>
+            ) : piece.partId ? null : (
               <span className="ml-auto text-xs text-muted-foreground">
                 empty
               </span>

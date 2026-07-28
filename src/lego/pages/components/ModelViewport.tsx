@@ -18,6 +18,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 
 import { useReduceMotion } from "../../../general/display";
+import { type AnimPreset, presetById } from "../../animPresets";
 import { addStandardLights, partMaterial } from "../../geometry";
 import { descendantIds, type LegoPiece, type LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
@@ -51,6 +52,9 @@ interface Props {
   onTransform: (pieceId: string, change: Partial<LegoPiece>) => void;
   /** Handed the canvas so the page can save a thumbnail from it. */
   onReady?: (canvas: HTMLCanvasElement) => void;
+  /** Runs the applied presets. Nothing is written: stopping restores the rest
+   *  pose exactly, because it comes back from the document. */
+  playing?: boolean;
 }
 
 export function ModelViewport({
@@ -60,6 +64,7 @@ export function ModelViewport({
   onSelect,
   onTransform,
   onReady,
+  playing = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
@@ -277,6 +282,37 @@ export function ModelViewport({
     state.render();
   }, [mode]);
 
+  // Playback. The gizmo comes off first: it would be dragging a transform that
+  // is overwritten on the next frame. Stopping puts the scene back from the
+  // document, which is the rest pose by definition.
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state || !playing || reduceMotion) return;
+
+    state.gizmo.detach();
+    const started = performance.now();
+    let frame = 0;
+
+    const tick = (now: number) => {
+      applyAnimation(state, projectRef.current, (now - started) / 1000);
+      state.render();
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      const current = sceneRef.current;
+      if (!current) return;
+      syncScene(current, packRef.current, projectRef.current);
+      const group = selectedId ? current.groups.get(selectedId) : undefined;
+      if (group && selectedId !== projectRef.current.rootPieceId) {
+        current.gizmo.attach(group);
+      }
+      current.render();
+    };
+  }, [playing, reduceMotion, selectedId]);
+
   useEffect(() => {
     const state = sceneRef.current;
     if (state) state.onSnapChange = setSnapped;
@@ -453,6 +489,50 @@ function applySnap(state: SceneState) {
     delta.applyMatrix3(inverse);
   }
   group.position.add(delta);
+}
+
+/**
+ * Pose every animated piece for one moment in time.
+ *
+ * Each piece starts from its rest transform in the document and takes the sum
+ * of every applied preset's delta, so two presets touching the same piece add
+ * up rather than one winning. Pieces no preset animates are left alone.
+ */
+function applyAnimation(state: SceneState, project: LegoProject, t: number) {
+  const applied = (project.animations ?? [])
+    .map((entry) => ({
+      preset: presetById(entry.presetId),
+      params: entry.params,
+    }))
+    .filter(
+      (
+        entry,
+      ): entry is { preset: AnimPreset; params: Record<string, number> } =>
+        entry.preset !== undefined,
+    );
+  if (applied.length === 0) return;
+
+  for (const piece of project.pieces) {
+    if (!piece.role) continue;
+    const group = state.groups.get(piece.id);
+    if (!group) continue;
+
+    let moved = false;
+    const position: Vec3 = [...piece.position];
+    const rotation: Vec3 = [...piece.rotation];
+    for (const { preset, params } of applied) {
+      const delta = preset.track(t, params, piece.role);
+      if (!delta) continue;
+      moved = true;
+      for (let axis = 0; axis < 3; axis++) {
+        position[axis] += delta.position?.[axis] ?? 0;
+        rotation[axis] += delta.rotation?.[axis] ?? 0;
+      }
+    }
+    if (!moved) continue;
+    group.position.set(...position);
+    group.rotation.set(...rotation);
+  }
 }
 
 /** Write the dragged transform back to the document, once the drag is over. */

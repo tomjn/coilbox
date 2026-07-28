@@ -61,6 +61,8 @@ export interface LegoProject {
   mid?: [number, number, number];
   unitDef?: Record<string, string | number | boolean>;
   notes?: string;
+  /** Canned animations applied to this unit, from `animPresets.ts`. */
+  animations?: { presetId: string; params: Record<string, number> }[];
   /** Where this unit was last exported, so exporting again does not ask. */
   exportDir?: string;
   /** Whether that export also placed the shared atlas. Defaults to true. */
@@ -271,6 +273,9 @@ export function parseLegoProjectJson(json: string): LegoProject | null {
       ? { unitDef: d.unitDef as Record<string, string | number | boolean> }
       : {}),
     ...(typeof d.notes === "string" ? { notes: d.notes } : {}),
+    ...(Array.isArray(d.animations)
+      ? { animations: d.animations.map(parseApplied).filter((a) => a !== null) }
+      : {}),
     ...(typeof d.exportDir === "string" ? { exportDir: d.exportDir } : {}),
     ...(typeof d.exportTexture === "boolean"
       ? { exportTexture: d.exportTexture }
@@ -306,6 +311,28 @@ function parsePiece(raw: unknown): LegoPiece | null {
         }
       : {}),
   };
+}
+
+/**
+ * One applied animation preset. Unknown preset ids survive parsing, because a
+ * document written by a newer build should not lose them on a round trip here.
+ */
+function parseApplied(
+  raw: unknown,
+): { presetId: string; params: Record<string, number> } | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const a = raw as Record<string, unknown>;
+  if (typeof a.presetId !== "string" || a.presetId === "") return null;
+
+  const params: Record<string, number> = {};
+  if (typeof a.params === "object" && a.params !== null) {
+    for (const [key, value] of Object.entries(a.params)) {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        params[key] = value;
+      }
+    }
+  }
+  return { presetId: a.presetId, params };
 }
 
 function parseAnchor(raw: unknown): LegoAnchor | null {
