@@ -9,6 +9,7 @@ Allows the unit builder's project storage, thumbnail and reveal commands.
 - `allow-lego-delete`
 - `allow-lego-thumb-save`
 - `allow-lego-open-path`
+- `allow-lego-export`
 
 ## Permission Table
 
@@ -41,6 +42,32 @@ Enables the lego_delete command without any pre-configured scope.
 <td>
 
 Denies the lego_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:allow-lego-export`
+
+</td>
+<td>
+
+Enables the lego_export command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:deny-lego-export`
+
+</td>
+<td>
+
+Denies the lego_export command without any pre-configured scope.
 
 </td>
 </tr>

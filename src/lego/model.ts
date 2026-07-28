@@ -61,6 +61,10 @@ export interface LegoProject {
   mid?: [number, number, number];
   unitDef?: Record<string, string | number | boolean>;
   notes?: string;
+  /** Where this unit was last exported, so exporting again does not ask. */
+  exportDir?: string;
+  /** Whether that export also placed the shared atlas. Defaults to true. */
+  exportTexture?: boolean;
 }
 
 /**
@@ -267,6 +271,10 @@ export function parseLegoProjectJson(json: string): LegoProject | null {
       ? { unitDef: d.unitDef as Record<string, string | number | boolean> }
       : {}),
     ...(typeof d.notes === "string" ? { notes: d.notes } : {}),
+    ...(typeof d.exportDir === "string" ? { exportDir: d.exportDir } : {}),
+    ...(typeof d.exportTexture === "boolean"
+      ? { exportTexture: d.exportTexture }
+      : {}),
   };
 }
 

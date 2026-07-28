@@ -1,5 +1,7 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 
+import type { S3oBuild } from "./s3oBuild";
+
 /** A stored document. The JSON is parsed here, not in Rust. */
 export interface LegoStoredItem {
   id: string;
@@ -38,6 +40,21 @@ export const legoThumbSave = defineCommand<
   { id: string; png: number[] },
   Record<string, never>
 >("coilbox-lego", "lego_thumb_save");
+
+/**
+ * Write a built unit into a game folder: `objects3d/<unit>.s3o`, and the pack's
+ * atlas into `unittextures/` when `atlas` is given. Every unit built from a pack
+ * names the same texture, so one copy serves all of them.
+ */
+export const legoExport = defineCommand<
+  {
+    dir: string;
+    unitName: string;
+    atlas: string | null;
+    model: S3oBuild;
+  },
+  { model: string; texture: string | null }
+>("coilbox-lego", "lego_export");
 
 /** Reveal an exported unit in the file manager. */
 export const legoOpenPath = defineCommand<

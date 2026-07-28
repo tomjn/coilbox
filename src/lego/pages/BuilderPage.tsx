@@ -1,5 +1,5 @@
 import { Button, Input, useHideSidebar } from "@picoframe/frame";
-import { Blocks, PackagePlus, Plus, Save, Trash2 } from "lucide-react";
+import { Blocks, PackagePlus, Plus, Save, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
@@ -32,6 +32,7 @@ import {
 } from "../projects";
 import { canReparent, reparentPiece } from "../reparent";
 import { CompoundPicker } from "./components/CompoundPicker";
+import { ExportDrawer } from "./components/ExportDrawer";
 import { ModelViewport } from "./components/ModelViewport";
 import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
@@ -59,6 +60,7 @@ export default function BuilderPage() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [strip, setStrip] = useState<"parts" | "compounds">("parts");
+  const [exporting, setExporting] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const filter = usePartFilter(pack);
 
@@ -320,7 +322,20 @@ export default function BuilderPage() {
         >
           <Save size={16} /> Save now
         </Button>
+        <Button onClick={() => setExporting(true)}>
+          <Upload size={16} /> Export
+        </Button>
       </header>
+
+      <ExportDrawer
+        open={exporting}
+        onOpenChange={setExporting}
+        project={draft}
+        pack={pack}
+        onRemember={(settings) =>
+          edit((project) => ({ ...project, ...settings }))
+        }
+      />
 
       {problems.length > 0 ? (
         <ul className="border-b border-border px-6 py-2 text-xs text-muted-foreground">

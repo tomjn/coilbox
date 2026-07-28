@@ -1299,16 +1299,22 @@
           "markdownDescription": "Denies the dl_versions command without any pre-configured scope."
         },
         {
-          "description": "Allows the unit builder's project storage, thumbnail and reveal commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`",
+          "description": "Allows the unit builder's project storage, thumbnail and reveal commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`\n- `allow-lego-export`",
           "type": "string",
           "const": "coilbox-lego:default",
-          "markdownDescription": "Allows the unit builder's project storage, thumbnail and reveal commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`"
+          "markdownDescription": "Allows the unit builder's project storage, thumbnail and reveal commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`\n- `allow-lego-export`"
         },
         {
           "description": "Enables the lego_delete command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-lego:allow-lego-delete",
           "markdownDescription": "Enables the lego_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the lego_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lego:allow-lego-export",
+          "markdownDescription": "Enables the lego_export command without any pre-configured scope."
         },
         {
           "description": "Enables the lego_list command without any pre-configured scope.",
@@ -1339,6 +1345,12 @@
           "type": "string",
           "const": "coilbox-lego:deny-lego-delete",
           "markdownDescription": "Denies the lego_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the lego_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lego:deny-lego-export",
+          "markdownDescription": "Denies the lego_export command without any pre-configured scope."
         },
         {
           "description": "Denies the lego_list command without any pre-configured scope.",

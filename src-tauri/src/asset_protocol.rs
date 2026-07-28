@@ -31,7 +31,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 
 use tauri::http::{header, Request, Response, StatusCode};
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Runtime};
 
 /// Percent-decode a single path segment (`%20` → space, etc.). Returns `None` on a
 /// malformed escape or non-UTF-8 result. Deliberately does NOT treat `+` as space —
@@ -120,34 +120,6 @@ fn resolve_path(
         }
         _ => None,
     }
-}
-
-/// Where the parts pack lives, in order of precedence:
-///
-/// 1. `.coilbox/legoparts` beside the executable, so a distribution can ship its
-///    own parts library without a rebuild.
-/// 2. The bundled copy under the resource directory.
-/// 3. The source tree, in debug builds only. `bundle.resources` is assembled by
-///    `tauri build`, so under `tauri dev` there is nothing beside the binary and
-///    the pack would otherwise be missing for the whole of development.
-fn legopack_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
-    let portable = coilbox_portable::portable_root().map(|root| root.join("legoparts"));
-    if let Some(dir) = portable.filter(|dir| dir.is_dir()) {
-        return Some(dir);
-    }
-
-    let bundled = app.path().resource_dir().ok().map(|d| d.join("legoparts"));
-    if let Some(dir) = bundled.clone().filter(|dir| dir.is_dir()) {
-        return Some(dir);
-    }
-
-    if cfg!(debug_assertions) {
-        let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("legoparts");
-        if source.is_dir() {
-            return Some(source);
-        }
-    }
-    bundled
 }
 
 /// Parse a single-range `Range: bytes=…` header against a known length, returning the
@@ -264,7 +236,7 @@ pub fn handle<R: Runtime>(
                 .ok()
                 .map(|d| d.join("campaign").join("media"))
         },
-        || legopack_dir(app),
+        || tauri_plugin_coilbox_lego::legopack_dir(app),
         || {
             coilbox_portable::data_dir(app)
                 .ok()

@@ -4881,6 +4881,7 @@ name = "tauri-plugin-coilbox-lego"
 version = "0.0.0"
 dependencies = [
  "coilbox-portable",
+ "coilbox-s3o",
  "picoframe-core",
  "serde",
  "serde_json",

@@ -15,13 +15,13 @@
 
 use coilbox_portable::valid_id;
 use picoframe_core::CliResult;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::{
     plugin::{Builder, TauriPlugin},
-    AppHandle, Runtime,
+    AppHandle, Manager, Runtime,
 };
 
 /// Generous for a bounded thumbnail and small enough that a mistake cannot fill
@@ -200,6 +200,180 @@ async fn lego_open_path(path: String) -> CliResult {
     }
 }
 
+/// Where the parts pack lives, in order of precedence:
+///
+/// 1. `.coilbox/legoparts` beside the executable, so a distribution can ship its
+///    own parts library without a rebuild.
+/// 2. The bundled copy under the resource directory.
+/// 3. The source tree, in debug builds only. `bundle.resources` is assembled by
+///    `tauri build`, so under `tauri dev` there is nothing beside the binary and
+///    the pack would otherwise be missing for the whole of development.
+///
+/// Public because the app serves the same folder over `coilbox://`, and the
+/// pack's location belongs with the rest of the pack's code.
+pub fn legopack_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    let portable = coilbox_portable::portable_root().map(|root| root.join("legoparts"));
+    if let Some(dir) = portable.filter(|dir| dir.is_dir()) {
+        return Some(dir);
+    }
+
+    let bundled = app.path().resource_dir().ok().map(|d| d.join("legoparts"));
+    if let Some(dir) = bundled.clone().filter(|dir| dir.is_dir()) {
+        return Some(dir);
+    }
+
+    if cfg!(debug_assertions) {
+        let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../src-tauri/legoparts")
+            .canonicalize()
+            .ok();
+        if let Some(dir) = source.filter(|dir| dir.is_dir()) {
+            return Some(dir);
+        }
+    }
+    bundled
+}
+
+/// A unit name becomes a file name and a Lua identifier, so it is held to the
+/// same rule the frontend normalises to rather than to `valid_id`, which does
+/// not allow the underscores unit names are full of.
+fn valid_unit_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+/// A texture file name from the pack, never a path.
+fn valid_atlas_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 128
+        && !name.contains(['/', '\\'])
+        && name != "."
+        && name != ".."
+        && name.to_ascii_lowercase().ends_with(".png")
+}
+
+#[derive(Deserialize)]
+struct ExportVertex {
+    pos: [f32; 3],
+    normal: [f32; 3],
+    uv: [f32; 2],
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportPiece {
+    name: String,
+    offset: [f32; 3],
+    vertices: Vec<ExportVertex>,
+    indices: Vec<u32>,
+    children: Vec<ExportPiece>,
+}
+
+#[derive(Deserialize)]
+struct ExportModel {
+    radius: f32,
+    height: f32,
+    mid: [f32; 3],
+    texture1: String,
+    texture2: String,
+    root: ExportPiece,
+}
+
+impl From<ExportPiece> for coilbox_s3o::Piece {
+    fn from(piece: ExportPiece) -> Self {
+        Self {
+            name: piece.name,
+            // The builder only ever emits triangles. Strips and quads exist in
+            // the format, but the engine converts both on load.
+            primitive_type: coilbox_s3o::PrimitiveType::Triangles,
+            offset: piece.offset,
+            vertices: piece
+                .vertices
+                .into_iter()
+                .map(|v| coilbox_s3o::Vertex {
+                    pos: v.pos,
+                    normal: v.normal,
+                    uv: v.uv,
+                })
+                .collect(),
+            indices: piece.indices,
+            children: piece.children.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// `lego_export` writes a built unit into a game folder.
+///
+/// The model goes to `objects3d/<unit>.s3o`. The atlas is shared: every unit
+/// built from a pack names the same texture, so one copy in `unittextures/`
+/// serves all of them and re-exporting a second unit does not add a second PNG.
+#[tauri::command]
+async fn lego_export<R: Runtime>(
+    app: AppHandle<R>,
+    dir: String,
+    unit_name: String,
+    atlas: Option<String>,
+    model: ExportModel,
+) -> CliResult {
+    if !valid_unit_name(&unit_name) {
+        return CliResult::err(format!(
+            "invalid unit name: {unit_name}. Lower case letters, digits and underscores only."
+        ));
+    }
+    let root = PathBuf::from(&dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return CliResult::err(format!("not a folder: {dir}"));
+    }
+
+    let bytes = match coilbox_s3o::write(&coilbox_s3o::Model {
+        radius: model.radius,
+        height: model.height,
+        mid: model.mid,
+        texture1: model.texture1,
+        texture2: model.texture2,
+        root: model.root.into(),
+    }) {
+        Ok(bytes) => bytes,
+        Err(e) => return CliResult::err(format!("could not build the model: {e}")),
+    };
+
+    let models = root.join("objects3d");
+    if let Err(e) = std::fs::create_dir_all(&models) {
+        return CliResult::err(format!("could not create {}: {e}", models.display()));
+    }
+    let model_path = models.join(format!("{unit_name}.s3o"));
+    if let Err(e) = std::fs::write(&model_path, &bytes) {
+        return CliResult::err(format!("could not write {}: {e}", model_path.display()));
+    }
+
+    let mut texture_path = None;
+    if let Some(atlas) = atlas {
+        if !valid_atlas_name(&atlas) {
+            return CliResult::err(format!("invalid texture name: {atlas}"));
+        }
+        let Some(source) = legopack_dir(&app).map(|dir| dir.join(&atlas)) else {
+            return CliResult::err("no parts pack is installed".to_string());
+        };
+        let textures = root.join("unittextures");
+        if let Err(e) = std::fs::create_dir_all(&textures) {
+            return CliResult::err(format!("could not create {}: {e}", textures.display()));
+        }
+        let target = textures.join(&atlas);
+        if let Err(e) = std::fs::copy(&source, &target) {
+            return CliResult::err(format!("could not copy the texture: {e}"));
+        }
+        texture_path = Some(target.to_string_lossy().to_string());
+    }
+
+    CliResult::ok(json!({
+        "model": model_path.to_string_lossy(),
+        "texture": texture_path,
+    }))
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-lego")
         .invoke_handler(tauri::generate_handler![
@@ -207,7 +381,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_save,
             lego_delete,
             lego_thumb_save,
-            lego_open_path
+            lego_open_path,
+            lego_export
         ])
         .build()
 }
@@ -241,5 +416,24 @@ mod tests {
     #[test]
     fn read_json_dir_treats_a_missing_folder_as_empty() {
         assert!(read_json_dir(Path::new("/definitely/not/here")).is_empty());
+    }
+
+    #[test]
+    fn a_unit_name_is_a_lua_safe_file_stem() {
+        assert!(valid_unit_name("arm_walker2"));
+        // Upper case would give a file name a script could not address.
+        assert!(!valid_unit_name("ArmWalker"));
+        assert!(!valid_unit_name("arm walker"));
+        assert!(!valid_unit_name("../escape"));
+        assert!(!valid_unit_name(""));
+    }
+
+    #[test]
+    fn an_atlas_name_is_a_png_file_name_and_never_a_path() {
+        assert!(valid_atlas_name("lego2skin2048_2-2.png"));
+        assert!(!valid_atlas_name("../../etc/passwd.png"));
+        assert!(!valid_atlas_name("sub/atlas.png"));
+        assert!(!valid_atlas_name("atlas.exe"));
+        assert!(!valid_atlas_name(".."));
     }
 }
