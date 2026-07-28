@@ -2,7 +2,13 @@ import { Button, Input } from "@picoframe/frame";
 import { Blocks, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
+import {
+  type LegoPartInfo,
+  type LoadedPack,
+  loadPack,
+  oneOfEachShape,
+} from "../pack";
+import { PartDetail } from "./components/PartDetail";
 import { PartPicker } from "./components/PartPicker";
 
 type Status =
@@ -44,13 +50,17 @@ export default function PartsPage() {
   const parts = useMemo(() => {
     if (!pack) return [];
     const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-    return pack.parts.filter((part) => {
+    const matching = pack.parts.filter((part) => {
       if (colourway && part.colourway !== colourway) return false;
       if (terms.length === 0) return true;
       const haystack =
         `${part.name} ${part.tags.join(" ")} ${part.material} ${part.sourceNames.join(" ")}`.toLowerCase();
       return terms.every((term) => haystack.includes(term));
     });
+    // Most pieces exist in all three colourways. Showing every one makes the
+    // grid three times longer without offering three times the choice, so it
+    // collapses to one per shape until a colourway is picked.
+    return colourway ? matching : oneOfEachShape(matching);
   }, [pack, query, colourway]);
 
   return (
@@ -98,9 +108,9 @@ export default function PartsPage() {
               ))}
             </div>
             <span className="ml-auto text-sm text-muted-foreground">
-              {parts.length === pack.parts.length
+              {colourway
                 ? `${parts.length} parts`
-                : `${parts.length} of ${pack.parts.length} parts`}
+                : `${parts.length} shapes, ${pack.parts.length} parts in all`}
             </span>
           </div>
 
@@ -110,12 +120,22 @@ export default function PartsPage() {
               clear the search.
             </p>
           ) : (
-            <PartPicker
-              pack={pack}
-              parts={parts}
-              selectedId={selected?.id}
-              onSelect={setSelected}
-            />
+            <div className="flex min-h-0 flex-1">
+              <PartPicker
+                pack={pack}
+                parts={parts}
+                selectedId={selected?.id}
+                onSelect={setSelected}
+              />
+              {selected ? (
+                <PartDetail
+                  pack={pack}
+                  part={selected}
+                  onSelect={setSelected}
+                  onClose={() => setSelected(null)}
+                />
+              ) : null}
+            </div>
           )}
         </>
       ) : null}

@@ -72,6 +72,7 @@ export function writePack({
 
     index.push({
       ...meta,
+      shapeId: mesh.shapeId,
       vFirst: vertexCursor / VERTEX_STRIDE,
       vCount: mesh.vertices.length / 8,
       iFirst: indexCursor / 2,

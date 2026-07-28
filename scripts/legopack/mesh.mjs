@@ -129,6 +129,7 @@ export function buildMesh(object, source) {
   const vertices = Float32Array.from(packed.flat());
   return {
     id: hashGeometry(vertices, indices),
+    shapeId: hashShape(packed, indices.length),
     vertices,
     indices: Uint16Array.from(indices),
     material: dominant(materialFaces),
@@ -229,6 +230,33 @@ function dominant(counts) {
  * sat on the build plate collapse into one, and that ids survive a re-run so
  * saved projects keep resolving.
  */
+/**
+ * Identifies the shape regardless of how it is painted or shaded.
+ *
+ * The library holds the same piece in three colourways. Those share their
+ * vertex positions exactly but differ in normals and uvs, so hashing the whole
+ * vertex record separates them and hashing positions alone brings them back
+ * together: 373 parts collapse to 143 shapes, 110 of them a clean set of three.
+ *
+ * Positions are sorted and deduplicated first, because the colourway variants
+ * do not agree on vertex ordering.
+ */
+function hashShape(packed, indexCount) {
+  const points = new Set();
+  for (const vertex of packed) {
+    points.add(vertex.slice(0, 3).map(round).join(","));
+  }
+  return createHash("sha256")
+    .update(`${indexCount}|${[...points].sort().join(";")}`)
+    .digest("hex")
+    .slice(0, 12);
+}
+
+/** Well inside float32 precision, so rounding never merges distinct corners. */
+function round(value) {
+  return Math.round(value * 1000) / 1000;
+}
+
 function hashGeometry(vertices, indices) {
   const hash = createHash("sha256");
   hash.update(

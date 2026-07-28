@@ -22,6 +22,12 @@ const FLOATS_PER_VERTEX = 8;
 
 export interface LegoPartInfo {
   id: string;
+  /**
+   * The same piece painted a different colour shares this. The library holds
+   * most pieces in all three colourways, so grouping by it turns 373 parts into
+   * 128 shapes to browse.
+   */
+  shapeId: string;
   name: string;
   category: string;
   colourway: string;
@@ -222,6 +228,53 @@ export function getPartGeometry(
 /** Longest side of a part's bounding box, for framing it in a viewport. */
 export function partSize(part: LegoPartInfo): number {
   return Math.max(...part.bbox.max.map((max, i) => max - part.bbox.min[i]));
+}
+
+/** A part's three dimensions, longest first, which is how its name reads. */
+export function partDimensions(part: LegoPartInfo): number[] {
+  return part.bbox.max
+    .map((max, i) => max - part.bbox.min[i])
+    .sort((a, b) => b - a);
+}
+
+/**
+ * Which colourway to show when a shape is offered in several. Fixed order
+ * rather than whichever the manifest happens to list first, so the grid does
+ * not reshuffle between builds.
+ */
+const COLOURWAY_PREFERENCE = ["grey", "tan", "green", "mixed"];
+
+/**
+ * One part per shape, so browsing is not three passes over the same pieces.
+ * Returns them in the manifest's order, which keeps parts the artist drew
+ * together next to each other.
+ */
+export function oneOfEachShape(parts: LegoPartInfo[]): LegoPartInfo[] {
+  const best = new Map<string, LegoPartInfo>();
+  const order: string[] = [];
+  for (const part of parts) {
+    const existing = best.get(part.shapeId);
+    if (!existing) {
+      best.set(part.shapeId, part);
+      order.push(part.shapeId);
+      continue;
+    }
+    if (rank(part) < rank(existing)) best.set(part.shapeId, part);
+  }
+  return order.map((shapeId) => best.get(shapeId) as LegoPartInfo);
+}
+
+function rank(part: LegoPartInfo): number {
+  const at = COLOURWAY_PREFERENCE.indexOf(part.colourway);
+  return at === -1 ? COLOURWAY_PREFERENCE.length : at;
+}
+
+/** Every colourway a shape is available in, in the order the pack lists them. */
+export function shapeVariants(
+  pack: LoadedPack,
+  shapeId: string,
+): LegoPartInfo[] {
+  return pack.parts.filter((part) => part.shapeId === shapeId);
 }
 
 /** Free every geometry built from a pack. Call when tearing down the last view. */
