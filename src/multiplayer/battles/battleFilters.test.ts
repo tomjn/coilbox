@@ -13,6 +13,7 @@ function mk(p: Partial<Battle>): Battle {
     host: "host",
     ip: "",
     port: "",
+    natType: "0",
     map: "Map",
     maphash: "",
     modname: "Game",

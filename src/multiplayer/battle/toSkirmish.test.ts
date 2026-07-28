@@ -38,6 +38,7 @@ function mkBattle(p: Partial<Battle> = {}): Battle {
     host: "host",
     ip: "",
     port: "",
+    natType: "0",
     map: "Comet Catcher Remake 1.8",
     maphash: "",
     modname: "Beyond All Reason test-1234",

@@ -30,10 +30,11 @@ const DEFAULT_HOST_PORT = 8452;
  * "Host a battle" affordance for the Battles hub: a compact popover collecting the
  * game, map, title, size and (optional) password, then firing OPENBATTLE via the
  * parent's `onHost`. The engine is the preferred one (no picker), and the mod/map
- * hashes come from unitsync so joining clients can sync. With "hole punching" on
- * the battle opens as natType 1 (the server relays each joiner's IP so NATed
- * players can connect); off, it's a plain natType 0 battle that needs `port`
- * reachable (public IP, LAN, or a manual port-forward).
+ * hashes come from unitsync so joining clients can sync. The battle opens as a
+ * plain natType 0 one that needs `port` reachable (public IP, LAN, or a manual
+ * port-forward), which is the only mode coilbox implements. "Hole punching"
+ * opts into advertising natType 1 instead, for a host who knows their joiners
+ * bring their own traversal.
  */
 export function HostBattlePopover({
   disabled,
@@ -89,9 +90,11 @@ export function HostBattlePopover({
   const [maxPlayers, setMaxPlayers] = useState(8);
   const [port, setPort] = useState(DEFAULT_HOST_PORT);
   const [password, setPassword] = useState("");
-  // Default on: most home hosts are behind NAT, and the server-side hole punching
-  // lets those players connect. Uncheck for a public IP / forwarded port.
-  const [holePunch, setHolePunch] = useState(true);
+  // Default off. natType 1 tells joiners that the lobbies either side will open
+  // a path through the routers between them, and nothing in coilbox does that
+  // work, so all it bought was a battle that looked joinable and was not.
+  // Direct is what we implement, so direct is what we advertise.
+  const [holePunch, setHolePunch] = useState(false);
 
   // Default the game/map to the first scanned entry once a scan lands.
   useEffect(() => {
@@ -280,9 +283,8 @@ export function HostBattlePopover({
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {holePunch
-                      ? "The server relays each joiner's IP so players behind a router can connect. Some may still fail — forwarding port " +
-                        `${port} is the reliable fallback.`
-                      : `Players connect directly to port ${port}; forward it on your router or others can't join.`}
+                      ? `Tells joiners they need help getting through your router. Coilbox does not do that work yet, so forwarding port ${port} is still what makes joins succeed.`
+                      : `Players connect straight to port ${port}. Forward it on your router or others cannot join.`}
                   </span>
                 </span>
               </label>

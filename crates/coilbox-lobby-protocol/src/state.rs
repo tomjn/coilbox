@@ -116,6 +116,11 @@ pub struct Battle {
     pub host: String,
     pub ip: String,
     pub port: String,
+    /// The host's declared NAT traversal mode: `"0"` for a directly reachable
+    /// port, `"1"` for hole punching, `"2"` for fixed source ports. We only
+    /// implement the direct case, so anything else is worth telling a joining
+    /// player about rather than letting the engine hang on it.
+    pub nat_type: String,
     pub map: String,
     pub maphash: String,
     pub modname: String,

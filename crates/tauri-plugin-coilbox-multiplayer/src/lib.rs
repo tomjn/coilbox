@@ -11,6 +11,7 @@
 
 mod conn;
 mod dmlog;
+mod probe;
 mod tls;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -1293,11 +1294,38 @@ fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> 
         Some(conn) => {
             let state = lock_or_recover(&conn.state);
             match battle_to_config(&state) {
-                Ok(config) => CliResult::ok(json!({ "config": config })),
+                // The NAT mode rides alongside the config rather than inside it:
+                // it is a lobby-level fact about how to reach the host, not
+                // something the engine's start script has a slot for.
+                Ok(config) => {
+                    let nat_type = state
+                        .current_battle
+                        .and_then(|id| state.battles.get(&id))
+                        .map(|b| b.nat_type.clone())
+                        .unwrap_or_default();
+                    CliResult::ok(json!({ "config": config, "natType": nat_type }))
+                }
                 Err(e) => CliResult::err(e),
             }
         }
         None => CliResult::err(format!("not connected: {server_key}")),
+    }
+}
+
+/// `mp_probe_host`: ask whether a battle host's game port refuses us outright.
+///
+/// Read the [`probe`] module docs before acting on the result. Only `refused`
+/// and `unresolved` mean anything. `silent` is the normal answer from a
+/// perfectly healthy host, so it must never be surfaced as a problem.
+#[tauri::command]
+async fn mp_probe_host(host: String, port: u16) -> CliResult {
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        probe::probe(&host, port, probe::PROBE_TIMEOUT).as_str()
+    })
+    .await;
+    match outcome {
+        Ok(o) => CliResult::ok(json!({ "outcome": o })),
+        Err(e) => CliResult::err(format!("probe failed to run: {e}")),
     }
 }
 
@@ -1409,6 +1437,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_remove_script_tags,
             mp_build_battle_config,
             mp_build_host_config,
+            mp_probe_host,
             mp_chat_logs,
             mp_chat_log_open,
         ])
