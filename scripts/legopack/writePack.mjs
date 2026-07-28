@@ -5,9 +5,8 @@
  * search and filtering never touch the geometry, and the app can show a full
  * picker before the blob has finished arriving.
  *
- * It ships gzipped because the raw blob is 23 MB and gzips to under 5, which is
- * what both the repository and the installer pay. The frontend inflates it once
- * with fflate, which is already a dependency.
+ * It ships gzipped because that is what both the repository and the installer
+ * pay for it. The frontend inflates it once with fflate, already a dependency.
  *
  * The vertex record is deliberately the same 32 bytes as the s3o vertex record,
  * so exporting a part is a transform and a copy rather than a conversion.
@@ -34,7 +33,6 @@ const BLOB_HEADER_SIZE = 32;
  * @param {string} options.licence
  * @param {Array<{ mesh: import("./mesh.mjs").PartMesh, meta: object }>} options.parts
  * @param {{ width: number, height: number }} options.atlas
- * @param {Buffer} options.atlasPng
  * @param {Array<{ id: string, label: string }>} options.categories
  */
 export function writePack({
@@ -45,7 +43,6 @@ export function writePack({
   licence,
   parts,
   atlas,
-  atlasPng,
   categories,
 }) {
   mkdirSync(outDir, { recursive: true });
@@ -83,7 +80,9 @@ export function writePack({
       uvBox: { min: trim(mesh.uvBox.min), max: trim(mesh.uvBox.max) },
       pivot: meta.pivot ?? [0, 0, 0],
       uvIncomplete:
-        mesh.stats.facesWithoutUv > 0 ? mesh.stats.facesWithoutUv : undefined,
+        mesh.stats.cornersWithoutUv > 0
+          ? mesh.stats.cornersWithoutUv
+          : undefined,
     });
 
     vertexCursor += mesh.vertices.byteLength;
@@ -103,7 +102,6 @@ export function writePack({
   const gzipped = gzipSync(blob, { level: 9 });
 
   writeFileSync(join(outDir, "parts.bin.gz"), gzipped);
-  writeFileSync(join(outDir, "atlas.png"), atlasPng);
 
   const manifest = {
     schemaVersion: PACK_SCHEMA_VERSION,
@@ -132,7 +130,6 @@ export function writePack({
     parts: parts.length,
     blobBytes: blob.length,
     gzippedBytes: gzipped.length,
-    atlasBytes: atlasPng.length,
     manifestBytes: Buffer.byteLength(json),
   };
 }

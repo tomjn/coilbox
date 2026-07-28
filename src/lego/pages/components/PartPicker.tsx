@@ -38,8 +38,12 @@ const GAP = 8;
 const PITCH = CELL + GAP;
 /** Rows kept either side of the viewport, so scrolling never shows a gap. */
 const OVERSCAN = 2;
-/** How a part sits when it is not being looked at. */
-const REST_PITCH = -0.42;
+/**
+ * How a part sits when it is not being looked at. The pitch is positive so the
+ * part's top tilts towards the camera: negative tips it away and shows the
+ * underside instead.
+ */
+const REST_PITCH = 0.42;
 const REST_YAW = 0.72;
 /** Radians per second while hovered. One turn takes about six seconds. */
 const SPIN_RATE = 1.05;

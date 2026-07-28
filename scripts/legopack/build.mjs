@@ -1,30 +1,28 @@
 #!/usr/bin/env bun
-
 /**
- * Builds the lego parts pack from Splinter Faction's Wings3D source files.
+ * Builds the lego parts pack from Splinter Faction's parts library.
  *
- * Run once, output committed. The app never parses `.wings`, so this is the
- * only place that knows the format:
+ * Run once, output committed. The app never parses OBJ, so this is the only
+ * place that knows the source format:
  *
- *   bun run lego:pack --wings <legosv2.wings> --atlas <atlas.bmp>
+ *   bun run lego:pack --obj <legosv2.obj> --atlas <lego2skin.png>
  *
  * Add `--verify <partId|sourceName>` to dump one part as OBJ and stop. Look at
  * it in Blender before trusting a full run: a UV or winding mistake in the
  * conversion would otherwise be baked into every part in the pack.
  *
- * Sources are not checked in. They live in the Splinter Faction repository and
- * are reused with the author's permission, recorded in the pack's LICENCE.txt.
+ * Sources are not checked in. They come from Splinter Faction and are reused
+ * with the author's permission, recorded in the pack's LICENCE.txt.
  */
 
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { COLOURWAYS, categorise } from "./categorise.mjs";
 import { buildMesh } from "./mesh.mjs";
-import { encodePng, readBmp } from "./png.mjs";
-import { readWings } from "./wings.mjs";
+import { readObj } from "./obj.mjs";
 import { writePack } from "./writePack.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -35,7 +33,7 @@ const OVERRIDES = join(
 );
 
 const LICENCE = [
-  "Geometry and texture derived from Splinter Faction's Lego Models.",
+  "Geometry and texture from Splinter Faction's lego parts library.",
   "https://github.com/SplinterFaction/SplinterFaction",
   "",
   'Reused with the permission of the author, Scary le poo, who confirmed on 2026-07-28 that the assets are "free and clear".',
@@ -47,18 +45,18 @@ main();
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  if (!args.wings) {
-    fail("--wings <path to legosv2.wings> is required");
+  if (!args.obj) {
+    fail("--obj <path to legosv2.obj> is required");
   }
 
-  const wingsBytes = readFileSync(args.wings);
-  log(`reading ${basename(args.wings)} (${mb(wingsBytes.length)})`);
-  const wings = readWings(wingsBytes);
+  const objBytes = readFileSync(args.obj);
+  log(`reading ${basename(args.obj)} (${mb(objBytes.length)})`);
+  const source = readObj(objBytes.toString("utf8"));
   log(
-    `  ${wings.objects.length} objects, materials: ${wings.materials.join(", ")}`,
+    `  ${source.objects.length} objects, ${source.positions.length} positions, ${source.uvs.length} uvs, ${source.normals.length} normals`,
   );
 
-  const { parts, stats } = buildParts(wings, args.verify);
+  const { parts, stats } = buildParts(source, args.verify);
 
   if (args.verify) {
     const match = parts.find(
@@ -73,13 +71,13 @@ function main() {
   }
 
   if (!args.atlas) {
-    fail("--atlas <path to the atlas .bmp> is required");
+    fail("--atlas <path to the atlas .png> is required");
   }
   const atlasBytes = readFileSync(args.atlas);
-  log(`reading ${basename(args.atlas)} (${mb(atlasBytes.length)})`);
-  const image = readBmp(atlasBytes);
-  log(`  ${image.width}x${image.height}`);
-  const atlasPng = encodePng(image);
+  const atlas = readPngSize(atlasBytes);
+  log(
+    `reading ${basename(args.atlas)} (${mb(atlasBytes.length)}, ${atlas.width}x${atlas.height})`,
+  );
 
   const overrides = readOverrides();
   const meta = categorise(parts, overrides);
@@ -91,20 +89,67 @@ function main() {
     packId: "splinterfaction-legosv2",
     version: args.version ?? "1",
     source: {
-      wings: basename(args.wings),
-      wingsSha256: sha256(wingsBytes),
+      obj: basename(args.obj),
+      objSha256: sha256(objBytes),
       atlas: basename(args.atlas),
       atlasSha256: sha256(atlasBytes),
     },
     licence: LICENCE,
     parts: parts.map(({ mesh }, i) => ({ mesh, meta: meta[i] })),
-    atlas: { width: image.width, height: image.height },
-    atlasPng,
+    atlas,
     categories: COLOURWAYS,
   });
+  // The atlas already is a PNG, so it goes across untouched.
+  copyFileSync(args.atlas, join(outDir, "atlas.png"));
   writeFileSync(join(outDir, "LICENCE.txt"), `${LICENCE}\n`);
 
-  report(stats, written, meta, audit);
+  report(stats, written, meta, audit, atlasBytes.length);
+}
+
+function buildParts(source, quiet) {
+  const byId = new Map();
+  const stats = {
+    objects: source.objects.length,
+    empty: 0,
+    failed: 0,
+    duplicates: 0,
+    triangles: 0,
+    fanFallbacks: 0,
+    flipped: 0,
+    degenerate: 0,
+    cornersWithoutUv: 0,
+  };
+
+  for (const object of source.objects) {
+    let mesh;
+    try {
+      mesh = buildMesh(object, source);
+    } catch (error) {
+      stats.failed++;
+      if (!quiet) log(`  ! ${object.name}: ${error.message}`);
+      continue;
+    }
+    if (!mesh) {
+      stats.empty++;
+      continue;
+    }
+
+    const existing = byId.get(mesh.id);
+    if (existing) {
+      existing.sourceNames.push(object.name);
+      stats.duplicates++;
+      continue;
+    }
+
+    byId.set(mesh.id, { mesh, sourceNames: [object.name] });
+    stats.triangles += mesh.stats.triangles;
+    stats.fanFallbacks += mesh.stats.fanFallbacks;
+    stats.flipped += mesh.stats.flipped;
+    stats.degenerate += mesh.stats.degenerate;
+    stats.cornersWithoutUv += mesh.stats.cornersWithoutUv;
+  }
+
+  return { parts: [...byId.values()], stats };
 }
 
 /**
@@ -112,15 +157,9 @@ function main() {
  * triangle's winding agrees with its own vertex normals. Runs on the finished
  * data rather than on the way there, so it catches a mistake anywhere in the
  * conversion.
- *
- * It does not come out at zero. A handful of faces in the parts file are not
- * planar, and a triangle cut from one can end up more than a right angle from
- * the smoothed corner normals however it is wound. Those faces are ambiguous in
- * the source, so the number is reported rather than fixed.
  */
 function auditParts(parts) {
   let triangles = 0;
-  let disagreeing = 0;
   const badParts = [];
 
   for (const { mesh, sourceNames } of parts) {
@@ -145,70 +184,19 @@ function auditParts(parts) {
     if (bad) badParts.push({ id: mesh.id, name: sourceNames[0], bad });
   }
 
-  disagreeing = badParts.reduce((sum, part) => sum + part.bad, 0);
   return {
     triangles,
-    disagreeing,
+    disagreeing: badParts.reduce((sum, part) => sum + part.bad, 0),
     parts: badParts.length,
     worst: badParts.sort((a, b) => b.bad - a.bad)[0],
   };
-}
-
-function buildParts(wings, quiet) {
-  const byId = new Map();
-  const stats = {
-    objects: wings.objects.length,
-    empty: 0,
-    failed: 0,
-    duplicates: 0,
-    triangles: 0,
-    fanFallbacks: 0,
-    windingCorrections: 0,
-    degenerate: 0,
-    partsWithMissingUv: 0,
-    facesWithoutUv: 0,
-  };
-
-  for (const object of wings.objects) {
-    let mesh;
-    try {
-      mesh = buildMesh(object);
-    } catch (error) {
-      stats.failed++;
-      if (!quiet) log(`  ! ${object.name}: ${error.message}`);
-      continue;
-    }
-    if (!mesh) {
-      stats.empty++;
-      continue;
-    }
-
-    const existing = byId.get(mesh.id);
-    if (existing) {
-      existing.sourceNames.push(object.name);
-      stats.duplicates++;
-      continue;
-    }
-
-    byId.set(mesh.id, { mesh, sourceNames: [object.name] });
-    stats.triangles += mesh.stats.triangles;
-    stats.fanFallbacks += mesh.stats.fanFallbacks;
-    stats.windingCorrections += mesh.stats.windingCorrections;
-    stats.degenerate += mesh.stats.degenerate;
-    if (mesh.stats.facesWithoutUv > 0) {
-      stats.partsWithMissingUv++;
-      stats.facesWithoutUv += mesh.stats.facesWithoutUv;
-    }
-  }
-
-  return { parts: [...byId.values()], stats };
 }
 
 /**
  * Nothing is silently dropped, so anything that did not make it into the pack
  * is named here rather than left for someone to notice later.
  */
-function report(stats, written, meta, audit) {
+function report(stats, written, meta, audit, atlasBytes) {
   log("");
   log(`objects read            ${stats.objects}`);
   log(`  no geometry           ${stats.empty}`);
@@ -223,15 +211,13 @@ function report(stats, written, meta, audit) {
     `fan fallbacks           ${stats.fanFallbacks}  (faces ear clipping could not split)`,
   );
   log(
-    `winding corrections     ${stats.windingCorrections}  (triangles turned to face the way their face does)`,
+    `triangles turned round  ${stats.flipped}  (wound against their own normals in the source)`,
   );
   log(
     `degenerate dropped      ${stats.degenerate}  (zero area, draws nothing)`,
   );
-  log(
-    `faces with no uv        ${stats.facesWithoutUv} across ${stats.partsWithMissingUv} parts, filled with the part average and flagged uvIncomplete`,
-  );
-  log("");
+  log(`corners with no uv      ${stats.cornersWithoutUv}`);
+
   const share = ((100 * audit.disagreeing) / audit.triangles).toFixed(3);
   log(
     `winding audit           ${audit.disagreeing} of ${audit.triangles} triangles (${share}%) disagree with their own normals, across ${audit.parts} parts`,
@@ -245,7 +231,7 @@ function report(stats, written, meta, audit) {
   log(
     `parts.bin               ${mb(written.blobBytes)} raw, ${mb(written.gzippedBytes)} gzipped`,
   );
-  log(`atlas.png               ${mb(written.atlasBytes)}`);
+  log(`atlas.png               ${mb(atlasBytes)}`);
   log(`pack.json               ${mb(written.manifestBytes)}`);
   log("");
 
@@ -257,6 +243,15 @@ function report(stats, written, meta, audit) {
       `${field.padEnd(10)} ${[...counts].map(([key, n]) => `${key} ${n}`).join(", ")}`,
     );
   }
+}
+
+function readPngSize(bytes) {
+  const magic = [0x89, 0x50, 0x4e, 0x47];
+  if (magic.some((b, i) => bytes[i] !== b)) {
+    fail("the atlas must be a PNG");
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return { width: view.getUint32(16), height: view.getUint32(20) };
 }
 
 function readOverrides() {

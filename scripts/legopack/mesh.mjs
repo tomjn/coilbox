@@ -1,13 +1,17 @@
 /**
- * Turns one Wings object into a renderable, exportable part: triangles, one
- * vertex per distinct (position, normal, uv), recentred on its own bounding box
- * and identified by a hash of its geometry.
+ * Turns one object from the parts OBJ into a renderable, exportable part:
+ * triangles, one vertex per distinct (position, normal, uv), recentred on its
+ * own bounding box and identified by a hash of its geometry.
+ *
+ * The library ships a normal for every face corner, so this never has to guess
+ * a winding convention. Each triangle is wound to agree with its own normals,
+ * which is the invariant every shipped s3o model holds to and the one the
+ * engine's lighting depends on.
  */
 
 import { createHash } from "node:crypto";
 
-import { cornerNormals } from "./normals.mjs";
-import { faceLoops, triangulate } from "./winged.mjs";
+import { newellNormal, tessellate } from "./tessellate.mjs";
 
 /**
  * @typedef {object} PartMesh
@@ -22,64 +26,64 @@ import { faceLoops, triangulate } from "./winged.mjs";
  */
 
 /**
- * @param {import("./wings.mjs").WingsObject} object
- * @returns {PartMesh | null} null when the object has no geometry
+ * @param {import("./obj.mjs").ObjObject} object
+ * @param {ReturnType<import("./obj.mjs").readObj>} source shared vertex arrays
+ * @returns {PartMesh | null} null when the object has no usable geometry
  */
-export function buildMesh(object) {
-  if (object.edges.length === 0 || object.vertices.length === 0) return null;
+export function buildMesh(object, source) {
+  const { positions, uvs, normals } = source;
+  if (object.faces.length === 0) return null;
 
-  const loops = faceLoops(object);
-  const normals = cornerNormals(object, loops);
-
-  const fill = meanUv(loops);
-  let cornersWithoutUv = 0;
-  let facesWithoutUv = 0;
   let fanFallbacks = 0;
-  let windingCorrections = 0;
+  let flipped = 0;
   let degenerate = 0;
+  let cornersWithoutUv = 0;
+  let cornersWithoutNormal = 0;
 
-  const positions = [];
   const packed = [];
   const indices = [];
   const seen = new Map();
   const materialFaces = new Map();
 
-  for (let face = 0; face < loops.length; face++) {
-    const loop = loops[face];
-    if (loop.corners.every((corner) => corner.uv === null)) facesWithoutUv++;
+  for (const face of object.faces) {
     materialFaces.set(
-      loop.material,
-      (materialFaces.get(loop.material) ?? 0) + 1,
+      face.material,
+      (materialFaces.get(face.material) ?? 0) + 1,
     );
 
-    const { triangles, fanFallback, corrected } = triangulate(
-      loop.corners,
-      object.vertices,
-    );
+    const { triangles, fanFallback } = tessellate(face.corners, positions);
     if (fanFallback) fanFallbacks++;
-    windingCorrections += corrected;
+
+    // The face's own plane decides which way its triangles should face. Using
+    // the shipped normals rather than a winding rule means a face wound the
+    // wrong way in the source still comes out right.
+    const outward = faceNormal(face, positions, normals);
 
     for (const triangle of triangles) {
       const emitted = [];
       for (const cornerIndex of triangle) {
-        const corner = loop.corners[cornerIndex];
-        const pos = object.vertices[corner.v];
-        const normal = normals[face][cornerIndex];
-        let uv = corner.uv;
-        if (uv === null) {
+        const corner = face.corners[cornerIndex];
+        const position = positions[corner.v];
+        if (!position) continue;
+
+        let normal = corner.vn === null ? null : normals[corner.vn];
+        if (!normal) {
+          cornersWithoutNormal++;
+          normal = outward;
+        }
+        let uv = corner.vt === null ? null : uvs[corner.vt];
+        if (!uv) {
           cornersWithoutUv++;
-          uv = fill;
+          uv = [0, 0];
         }
 
         const vertex = [
-          Math.fround(pos[0]),
-          Math.fround(pos[1]),
-          Math.fround(pos[2]),
+          Math.fround(position[0]),
+          Math.fround(position[1]),
+          Math.fround(position[2]),
           Math.fround(normal[0]),
           Math.fround(normal[1]),
           Math.fround(normal[2]),
-          // Some parts sample a neighbouring atlas column through negative u,
-          // so uvs are not clamped to 0..1 and the texture must repeat.
           Math.fround(uv[0]),
           Math.fround(uv[1]),
         ];
@@ -89,19 +93,19 @@ export function buildMesh(object) {
           index = packed.length;
           seen.set(key, index);
           packed.push(vertex);
-          positions.push(vertex.slice(0, 3));
         }
         emitted.push(index);
       }
 
-      // Degeneracy has to be judged here rather than on the source positions.
-      // Vertices are rounded to float32 and then merged, so a triangle that had
-      // area in the Wings file can collapse to a line or a point by this point.
-      // Keeping one would draw nothing and leave the engine unable to compute a
-      // normal for it.
-      if (isDegenerate(emitted, packed)) {
+      if (emitted.length !== 3 || isDegenerate(emitted, packed)) {
+        // Judged after rounding to float32 and merging duplicates, because a
+        // triangle with area in the source can collapse to a line by here.
         degenerate++;
         continue;
+      }
+      if (!facesOutward(emitted, packed, outward)) {
+        emitted.reverse();
+        flipped++;
       }
       indices.push(...emitted);
     }
@@ -116,18 +120,13 @@ export function buildMesh(object) {
 
   // Recentre on the bounding box so a part's own origin is its middle, which is
   // what makes the derived snap anchors symmetric.
-  const bbox = bounds(positions, 3);
+  const bbox = bounds(packed, 0, 3);
   const centre = bbox.min.map((min, i) => (min + bbox.max[i]) / 2);
   for (const vertex of packed) {
     for (let i = 0; i < 3; i++) vertex[i] = Math.fround(vertex[i] - centre[i]);
   }
 
   const vertices = Float32Array.from(packed.flat());
-  const uvBox = bounds(
-    packed.map((v) => v.slice(6, 8)),
-    2,
-  );
-
   return {
     id: hashGeometry(vertices, indices),
     vertices,
@@ -137,18 +136,53 @@ export function buildMesh(object) {
       min: bbox.min.map((min, i) => min - centre[i]),
       max: bbox.max.map((max, i) => max - centre[i]),
     },
-    uvBox,
+    uvBox: bounds(packed, 6, 2),
     plateOrigin: centre,
     stats: {
-      faces: loops.length,
+      faces: object.faces.length,
       triangles: indices.length / 3,
       fanFallbacks,
-      windingCorrections,
+      flipped,
       degenerate,
-      facesWithoutUv,
       cornersWithoutUv,
+      cornersWithoutNormal,
     },
   };
+}
+
+/**
+ * Outward direction for a face: the mean of its corner normals, falling back to
+ * the polygon's own plane when it has none.
+ */
+function faceNormal(face, positions, normals) {
+  const sum = [0, 0, 0];
+  let count = 0;
+  for (const corner of face.corners) {
+    const normal = corner.vn === null ? null : normals[corner.vn];
+    if (!normal) continue;
+    for (let i = 0; i < 3; i++) sum[i] += normal[i];
+    count++;
+  }
+  if (count > 0 && Math.hypot(...sum) > 1e-9) return sum;
+
+  const points = face.corners
+    .map((corner) => positions[corner.v])
+    .filter(Boolean);
+  return points.length >= 3 ? newellNormal(points) : [0, 1, 0];
+}
+
+function facesOutward([i, j, k], packed, outward) {
+  const [a, b, c] = [packed[i], packed[j], packed[k]];
+  const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const w = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  const face = [
+    u[1] * w[2] - u[2] * w[1],
+    u[2] * w[0] - u[0] * w[2],
+    u[0] * w[1] - u[1] * w[0],
+  ];
+  return (
+    face[0] * outward[0] + face[1] * outward[1] + face[2] * outward[2] >= 0
+  );
 }
 
 function isDegenerate([i, j, k], packed) {
@@ -165,34 +199,14 @@ function isDegenerate([i, j, k], packed) {
   );
 }
 
-/**
- * A face Wings never unwrapped has no UV at all. Rather than sending it to the
- * atlas origin, which is an arbitrary colour, give it the part's average UV so
- * it blends with the rest of the part. Parts where this happens are flagged in
- * the manifest.
- */
-function meanUv(loops) {
-  let u = 0;
-  let v = 0;
-  let count = 0;
-  for (const loop of loops) {
-    for (const corner of loop.corners) {
-      if (corner.uv === null) continue;
-      u += corner.uv[0];
-      v += corner.uv[1];
-      count++;
-    }
-  }
-  return count === 0 ? [0, 0] : [u / count, v / count];
-}
-
-function bounds(rows, width) {
+function bounds(rows, offset, width) {
   const min = new Array(width).fill(Number.POSITIVE_INFINITY);
   const max = new Array(width).fill(Number.NEGATIVE_INFINITY);
   for (const row of rows) {
     for (let i = 0; i < width; i++) {
-      if (row[i] < min[i]) min[i] = row[i];
-      if (row[i] > max[i]) max[i] = row[i];
+      const value = row[offset + i];
+      if (value < min[i]) min[i] = value;
+      if (value > max[i]) max[i] = value;
     }
   }
   return { min, max };

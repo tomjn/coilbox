@@ -97,6 +97,15 @@ async function fetchPack(): Promise<LoadedPack> {
   const raw = new Uint8Array(await response.arrayBuffer());
   const blob = manifest.geometry.encoding === "gzip" ? gunzipSync(raw) : raw;
 
+  // The manifest holds every part's offset into the blob, so a manifest paired
+  // with the wrong blob indexes the wrong bytes and draws nonsense rather than
+  // failing. That happens whenever a pack is replaced under a running app.
+  if (blob.length !== manifest.geometry.bytes) {
+    throw new Error(
+      `parts pack is inconsistent: the manifest describes ${manifest.geometry.bytes} bytes of geometry but ${manifest.geometry.file} holds ${blob.length}. Reload, and rebuild the pack if it persists.`,
+    );
+  }
+
   return { ...readBlob(blob, manifest), manifest };
 }
 
