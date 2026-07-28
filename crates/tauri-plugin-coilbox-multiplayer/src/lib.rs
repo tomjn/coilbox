@@ -1294,7 +1294,17 @@ fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> 
         Some(conn) => {
             let state = lock_or_recover(&conn.state);
             match battle_to_config(&state) {
-                Ok(config) => CliResult::ok(json!({ "config": config })),
+                // The NAT mode rides alongside the config rather than inside it:
+                // it is a lobby-level fact about how to reach the host, not
+                // something the engine's start script has a slot for.
+                Ok(config) => {
+                    let nat_type = state
+                        .current_battle
+                        .and_then(|id| state.battles.get(&id))
+                        .map(|b| b.nat_type.clone())
+                        .unwrap_or_default();
+                    CliResult::ok(json!({ "config": config, "natType": nat_type }))
+                }
                 Err(e) => CliResult::err(e),
             }
         }

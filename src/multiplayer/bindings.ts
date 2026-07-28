@@ -111,6 +111,11 @@ export interface Battle {
   host: string;
   ip: string;
   port: string;
+  /**
+   * The host's declared NAT traversal mode: `"0"` direct, `"1"` hole punching,
+   * `"2"` fixed source ports. Coilbox only does the direct case.
+   */
+  natType: string;
   map: string;
   maphash: string;
   modname: string;
@@ -632,10 +637,14 @@ export const mpRemoveScriptTags = defineCommand<
   { sent: boolean }
 >("coilbox-multiplayer", "mp_remove_script_tags");
 
-/** Map the current battle to a `play` `BattleConfig` ready to pass to `playLaunch`. */
+/**
+ * Map the current battle to a `play` `BattleConfig` ready to pass to `playLaunch`,
+ * plus the host's declared NAT mode, which the engine's script has no slot for but
+ * the launcher needs in order to warn about a host we cannot reach.
+ */
 export const mpBuildBattleConfig = defineCommand<
   { serverKey: string },
-  { config: BattleConfig }
+  { config: BattleConfig; natType: string }
 >("coilbox-multiplayer", "mp_build_battle_config");
 
 /**

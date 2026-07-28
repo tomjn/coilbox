@@ -422,7 +422,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         ServerMessage::BattleOpened {
             id,
             battle_type: _,
-            nat_type: _,
+            nat_type,
             host,
             ip,
             port,
@@ -448,6 +448,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                 host,
                 ip,
                 port,
+                nat_type,
                 map,
                 maphash,
                 modname,
@@ -1345,6 +1346,20 @@ mod tests {
         assert_eq!(b.map, "NewMap");
         reduce(&mut s, parse_line("BATTLECLOSED 9"));
         assert!(!s.battles.contains_key(&9));
+    }
+
+    #[test]
+    fn battle_keeps_the_hosts_declared_nat_type() {
+        let mut s = LobbyState::new();
+        reduce(
+            &mut s,
+            parse_line(
+                "BATTLEOPENED 9 0 1 alice 1.2.3.4 8452 12 0 0 -1 spring\t105\tMap\tTitle\tBAR",
+            ),
+        );
+        // Field 3, between the battle type and the founder. A joiner needs it to
+        // know the host expects hole punching rather than a direct connection.
+        assert_eq!(s.battles.get(&9).unwrap().nat_type, "1");
     }
 
     #[test]
