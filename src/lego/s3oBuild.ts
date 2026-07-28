@@ -49,42 +49,90 @@ export interface S3oBuild {
   root: S3oPiece;
 }
 
+/** One piece, flattened the way the format stores it. */
+export interface BakedPiece {
+  name: string;
+  /** Translation from the parent piece, in engine axes. */
+  offset: [number, number, number];
+  vertices: S3oVertex[];
+  indices: number[];
+}
+
+/**
+ * Every piece with its rotation and scale baked into its own vertices.
+ *
+ * This is what an s3o holds and therefore what the engine animates: rigid
+ * geometry at a translation, with nothing left to inherit. Upspring does the
+ * same on save, `ApplyTransform(true, true, false)` per object, which is
+ * rotation and scale removed and position kept.
+ *
+ * Shared by the exporter and by the viewport's playback, so what you watch is
+ * what you ship.
+ */
+export function bakedPieces(
+  project: LegoProject,
+  pack: LoadedPack,
+): { pieces: Map<string, BakedPiece>; world: THREE.Vector3[] } {
+  const pieces = new Map<string, BakedPiece>();
+  const world: THREE.Vector3[] = [];
+  const root = pieceById(project, project.rootPieceId);
+  if (root) {
+    bakePiece(
+      project,
+      pack,
+      root,
+      new THREE.Matrix4(),
+      new THREE.Vector3(),
+      pieces,
+      world,
+    );
+  }
+  return { pieces, world };
+}
+
 export function buildS3o(
   project: LegoProject,
   pack: LoadedPack,
   textures: { texture1: string; texture2?: string },
 ): S3oBuild | null {
-  const root = pieceById(project, project.rootPieceId);
-  if (!root) return null;
-
-  // Collected while walking, because the header describes the whole model and
-  // the walk is already visiting every vertex in world space.
-  const world: THREE.Vector3[] = [];
-  const built = buildPiece(
-    project,
-    pack,
-    root,
-    new THREE.Matrix4(),
-    new THREE.Vector3(),
-    world,
-  );
+  if (!pieceById(project, project.rootPieceId)) return null;
+  const { pieces, world } = bakedPieces(project, pack);
 
   return {
     ...header(world),
     texture1: textures.texture1,
     texture2: textures.texture2 ?? "",
-    root: built,
+    root: assemble(project, pieces, project.rootPieceId),
   };
 }
 
-function buildPiece(
+function assemble(
+  project: LegoProject,
+  pieces: Map<string, BakedPiece>,
+  pieceId: string,
+): S3oPiece {
+  const baked = pieces.get(pieceId) as BakedPiece;
+  return {
+    name: baked.name,
+    primitiveType: 0,
+    offset: baked.offset,
+    vertices: baked.vertices,
+    indices: baked.indices,
+    children: childrenOf(project, pieceId).map((child) =>
+      assemble(project, pieces, child.id),
+    ),
+  };
+}
+
+function bakePiece(
   project: LegoProject,
   pack: LoadedPack,
   piece: LegoPiece,
   parentWorld: THREE.Matrix4,
   parentTranslation: THREE.Vector3,
+  pieces: Map<string, BakedPiece>,
   world: THREE.Vector3[],
-): S3oPiece {
+): void {
   const local = new THREE.Matrix4().compose(
     new THREE.Vector3(...piece.position),
     new THREE.Quaternion().setFromEuler(new THREE.Euler(...piece.rotation)),
@@ -104,9 +152,8 @@ function buildPiece(
     world,
   );
 
-  return {
+  pieces.set(piece.id, {
     name: piece.name,
-    primitiveType: 0,
     offset: [
       translation.x - parentTranslation.x,
       translation.y - parentTranslation.y,
@@ -114,10 +161,11 @@ function buildPiece(
     ],
     vertices,
     indices,
-    children: childrenOf(project, piece.id).map((child) =>
-      buildPiece(project, pack, child, matrix, translation, world),
-    ),
-  };
+  });
+
+  for (const child of childrenOf(project, piece.id)) {
+    bakePiece(project, pack, child, matrix, translation, pieces, world);
+  }
 }
 
 /**
@@ -144,12 +192,19 @@ function bakeGeometry(
   const normalMatrix = new THREE.Matrix3().copy(linear).invert().transpose();
   const point = new THREE.Vector3();
   const normal = new THREE.Vector3();
+  // The origin is the point the piece turns about, so the geometry moves to
+  // sit around it rather than the other way round.
+  const pivot = piece.pivot ?? [0, 0, 0];
 
   const vertices: S3oVertex[] = [];
   for (let i = 0; i < part.vCount; i++) {
     const at = (part.vFirst + i) * FLOATS_PER_VERTEX;
     point
-      .set(pack.vertices[at], pack.vertices[at + 1], pack.vertices[at + 2])
+      .set(
+        pack.vertices[at] - pivot[0],
+        pack.vertices[at + 1] - pivot[1],
+        pack.vertices[at + 2] - pivot[2],
+      )
       .applyMatrix3(linear);
     normal
       .set(pack.vertices[at + 3], pack.vertices[at + 4], pack.vertices[at + 5])

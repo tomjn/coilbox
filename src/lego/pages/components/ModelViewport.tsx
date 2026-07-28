@@ -2,9 +2,14 @@
  * The unit as it is being assembled.
  *
  * The scene graph mirrors the piece hierarchy one to one: a `Group` per piece,
- * carrying a `Mesh` when the piece has a part. That means a piece's transform is
- * applied by three exactly as the engine will apply it, so what is on screen is
- * what gets exported, and reparenting is a `Group` move rather than maths.
+ * carrying a `Mesh` when the piece has a part. While editing, each group holds
+ * the piece's own position, rotation and scale, which is what the gizmo writes
+ * back to and what reparenting moves.
+ *
+ * Playback swaps that for the baked form the format actually stores: rotation
+ * and scale folded into each piece's vertices, groups carrying a translation
+ * and nothing else. See `showBaked`. That is the only shape in which animation
+ * behaves as the engine's does.
  *
  * Lifecycle follows MapPreview3D: build once, mutate in place, render on
  * demand, and dispose everything. Rebuilding on every edit would throw away the
@@ -12,16 +17,25 @@
  */
 
 import { Button } from "@picoframe/frame";
+import { Move, RotateCw, Scaling } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 
+import { ButtonGroup } from "@/components/ui/button-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useReduceMotion } from "../../../general/display";
 import { type AnimPreset, presetById } from "../../animPresets";
 import { addStandardLights, partMaterial } from "../../geometry";
 import { descendantIds, type LegoPiece, type LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
+import { type BakedPiece, bakedPieces } from "../../s3oBuild";
 import {
   localAnchors,
   nearestSnap,
@@ -32,11 +46,36 @@ import {
 export type GizmoMode = "translate" | "rotate" | "scale";
 
 /** Buttons as well as keys, so turning a piece is not a keyboard secret. */
-const MODES: { id: GizmoMode; label: string; key: string }[] = [
-  { id: "translate", label: "Move", key: "G" },
-  { id: "rotate", label: "Turn", key: "R" },
-  { id: "scale", label: "Scale", key: "S" },
+const MODES: {
+  id: GizmoMode;
+  label: string;
+  key: string;
+  Icon: typeof Move;
+}[] = [
+  { id: "translate", label: "Move", key: "G", Icon: Move },
+  { id: "rotate", label: "Turn", key: "R", Icon: RotateCw },
+  { id: "scale", label: "Scale", key: "S", Icon: Scaling },
 ];
+
+/**
+ * The dots drawn on a selected piece.
+ *
+ * The origin is a different colour from the snap anchors because it means
+ * something else: it is where the piece turns and where its children hang,
+ * while the anchors are where it seats against its neighbours.
+ */
+const ORIGIN_COLOUR = 0x8b5cf6;
+const FACE_COLOUR = 0x38bdf8;
+const CORNER_COLOUR = 0xfbbf24;
+/**
+ * Dot sizes in CSS pixels, constant however far the camera is.
+ *
+ * Small: a part can carry fifteen of these and they have to sit on the model
+ * rather than cover it. The origin is drawn larger because there is one of it
+ * and it is the one you go looking for.
+ */
+const ANCHOR_DOT = 4;
+const ORIGIN_DOT = 9;
 
 /** How close two anchors must be before a piece seats against another. */
 const SNAP_DISTANCE = 0.45;
@@ -55,6 +94,8 @@ interface Props {
   /** Runs the applied presets. Nothing is written: stopping restores the rest
    *  pose exactly, because it comes back from the document. */
   playing?: boolean;
+  /** Scale handles keep the piece's proportions. */
+  uniformScale?: boolean;
 }
 
 export function ModelViewport({
@@ -65,6 +106,7 @@ export function ModelViewport({
   onTransform,
   onReady,
   playing = false,
+  uniformScale = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
@@ -139,6 +181,12 @@ export function ModelViewport({
       root,
       outline,
       groups: new Map(),
+      baked: [],
+      rest: new Map(),
+      uniformScale: false,
+      anchors: null,
+      dots: dotMaterial(ANCHOR_DOT, renderer.getPixelRatio(), true),
+      originDot: dotMaterial(ORIGIN_DOT, renderer.getPixelRatio(), false),
       render,
       snapping: true,
       onSnapChange: () => {},
@@ -162,6 +210,7 @@ export function ModelViewport({
     });
 
     gizmo.addEventListener("objectChange", () => {
+      forceUniformScale(state);
       applySnap(state);
       state.outline.setFromObject(gizmo.object ?? root);
       render();
@@ -238,6 +287,10 @@ export function ModelViewport({
       gizmo.detach();
       gizmo.getHelper().removeFromParent();
       gizmo.dispose();
+      clearAnchors(state);
+      state.dots.dispose();
+      state.originDot.dispose();
+      disposeBaked(state);
       grid.dispose();
       outline.dispose();
       renderer.dispose();
@@ -247,13 +300,16 @@ export function ModelViewport({
   }, [reduceMotion]);
 
   // Structure and transforms both land here, because a piece added and a piece
-  // moved are the same operation on the same map.
+  // moved are the same operation on the same map. While playing, the bake goes
+  // back over the top: changing an animation's parameters must not drop the
+  // scene back to its unbaked form mid-cycle.
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
     syncScene(state, pack, project);
+    if (playing && !reduceMotion) showBaked(state, pack, project);
     state.render();
-  }, [pack, project]);
+  }, [pack, project, playing, reduceMotion]);
 
   useEffect(() => {
     const state = sceneRef.current;
@@ -275,12 +331,27 @@ export function ModelViewport({
     state.render();
   }, [selectedId]);
 
+  // Declared after the scene sync, so the group a new piece needs already
+  // exists by the time this looks for it. Playback clears them: the baked scene
+  // has no pivot left to point at.
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    showAnchors(state, pack, project, playing ? null : selectedId);
+    state.render();
+  }, [pack, project, selectedId, playing]);
+
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
     state.gizmo.setMode(mode);
     state.render();
   }, [mode]);
+
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (state) state.uniformScale = uniformScale;
+  }, [uniformScale]);
 
   // Playback. The gizmo comes off first: it would be dragging a transform that
   // is overwritten on the next frame. Stopping puts the scene back from the
@@ -290,6 +361,7 @@ export function ModelViewport({
     if (!state || !playing || reduceMotion) return;
 
     state.gizmo.detach();
+    showBaked(state, packRef.current, projectRef.current);
     const started = performance.now();
     let frame = 0;
 
@@ -304,6 +376,7 @@ export function ModelViewport({
       cancelAnimationFrame(frame);
       const current = sceneRef.current;
       if (!current) return;
+      disposeBaked(current);
       syncScene(current, packRef.current, projectRef.current);
       const group = selectedId ? current.groups.get(selectedId) : undefined;
       if (group && selectedId !== projectRef.current.rootPieceId) {
@@ -349,27 +422,65 @@ export function ModelViewport({
     // rather than a fixed colour, so it deepens whatever the theme is.
     <div className="relative h-full w-full bg-black/30">
       <div ref={containerRef} className="h-full w-full" />
-      <div className="absolute left-3 top-3 flex flex-col items-start gap-2">
-        <div className="flex gap-1">
-          {MODES.map(({ id, label, key }) => (
-            <Button
-              key={id}
-              size="sm"
-              variant={mode === id ? "default" : "outline"}
-              onClick={() => setMode(id)}
-              title={`${label} (${key})`}
-            >
-              {label}
-            </Button>
+
+      {/* Down the left edge and vertically centred, out of the way of the
+          unit's own chrome at the top of the view. */}
+      <TooltipProvider delayDuration={300}>
+        <ButtonGroup
+          orientation="vertical"
+          className="absolute left-3 top-1/2 -translate-y-1/2"
+        >
+          {MODES.map(({ id, label, key, Icon }) => (
+            <Tooltip key={id}>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant={mode === id ? "default" : "outline"}
+                  onClick={() => setMode(id)}
+                  aria-label={label}
+                  aria-pressed={mode === id}
+                >
+                  <Icon className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {label} ({key})
+              </TooltipContent>
+            </Tooltip>
           ))}
-        </div>
-        <span className="pointer-events-none text-xs text-muted-foreground">
+        </ButtonGroup>
+      </TooltipProvider>
+
+      {/* Notes and the key sit at the bottom, where they can be read when
+          wanted and ignored when not. */}
+      <div className="pointer-events-none absolute bottom-3 left-3 flex flex-col gap-1 text-xs text-muted-foreground">
+        {selectedId && !playing ? (
+          <div className="flex gap-3">
+            <Dot colour="#8b5cf6" label="Turns here" />
+            <Dot colour="#38bdf8" label="Faces" />
+            <Dot colour="#fbbf24" label="Corners" />
+          </div>
+        ) : null}
+        <span>
           {snapped
             ? "Snapped. Hold Alt to place freely"
             : "Hold Alt to place freely"}
         </span>
       </div>
     </div>
+  );
+}
+
+/** A key to the dots drawn on the selected piece. */
+function Dot({ colour, label }: { colour: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      <span
+        className="size-1.5 rounded-full"
+        style={{ backgroundColor: colour }}
+      />
+      {label}
+    </span>
   );
 }
 
@@ -383,6 +494,19 @@ interface SceneState {
   outline: THREE.BoxHelper;
   /** Piece id to the group holding it, so selection and edits can find it. */
   groups: Map<string, THREE.Group>;
+  /** Geometry built for playback, which this owns and must free. The shared
+   *  part cache is not ours to dispose. */
+  baked: THREE.BufferGeometry[];
+  /** Read during a drag, so the lock can be toggled mid-session. */
+  uniformScale: boolean;
+  /** The selected piece's origin and anchors, or nothing when none is. */
+  anchors: THREE.Group | null;
+  /** Small dots for the snap anchors, coloured per vertex by kind. */
+  dots: THREE.PointsMaterial;
+  /** A larger dot for the origin, which is one point and a different idea. */
+  originDot: THREE.PointsMaterial;
+  /** Each piece's baked offset while playing, the pose deltas are added to. */
+  rest: Map<string, [number, number, number]>;
   render: () => void;
   snapping: boolean;
   onSnapChange: (snapped: boolean) => void;
@@ -411,8 +535,18 @@ function worldAnchors(
   group.updateWorldMatrix(true, false);
 
   const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
+  // Anchors come from the part's bounding box, which is in part space, so they
+  // shift with the pivot exactly as the geometry does.
+  const pivot = piece.pivot ?? [0, 0, 0];
   const local = part
-    ? localAnchors(part.bbox).map((anchor) => anchor.position)
+    ? localAnchors(part.bbox).map(
+        (anchor) =>
+          [
+            anchor.position[0] - pivot[0],
+            anchor.position[1] - pivot[1],
+            anchor.position[2] - pivot[2],
+          ] as Vec3,
+      )
     : [[0, 0, 0] as Vec3];
 
   const point = new THREE.Vector3();
@@ -422,6 +556,36 @@ function worldAnchors(
       .applyMatrix4(group.matrixWorld);
     return [point.x, point.y, point.z] as Vec3;
   });
+}
+
+/**
+ * Hold a piece's proportions while a scale handle is dragged.
+ *
+ * `TransformControls` scales one axis per handle. With the lock on, the axis
+ * the pointer actually moved sets a ratio and all three follow it, so a part
+ * keeps its shape and only its size changes.
+ */
+function forceUniformScale(state: SceneState) {
+  if (!state.uniformScale || state.gizmo.getMode() !== "scale") return;
+  const group = state.gizmo.object;
+  const pieceId = group ? pieceIdOf(group) : null;
+  if (!group || !pieceId) return;
+
+  const piece = state.projectRef.current.pieces.find((p) => p.id === pieceId);
+  if (!piece) return;
+
+  // The axis furthest from unchanged is the one being dragged.
+  let ratio = 1;
+  for (let axis = 0; axis < 3; axis++) {
+    const from = piece.scale[axis] || 1;
+    const candidate = group.scale.getComponent(axis) / from;
+    if (Math.abs(candidate - 1) > Math.abs(ratio - 1)) ratio = candidate;
+  }
+  group.scale.set(
+    piece.scale[0] * ratio,
+    piece.scale[1] * ratio,
+    piece.scale[2] * ratio,
+  );
 }
 
 /**
@@ -492,11 +656,224 @@ function applySnap(state: SceneState) {
 }
 
 /**
+ * Rebuild the scene as the format stores it: rigid geometry at a translation.
+ *
+ * A piece's rotation and scale go into its own vertices, exactly as the s3o
+ * writer does and as Upspring does on save. Nothing is left for a child to
+ * inherit, so turning a piece turns it and its children rigidly, which is all
+ * the engine can do. Animating the unbaked document instead re-applies an
+ * ancestor's scale to a turning child every frame, which pulls the mesh about.
+ *
+ * Only used for playback. Editing keeps the document's own transforms on the
+ * groups, because that is what the gizmo writes back to.
+ */
+function showBaked(state: SceneState, pack: LoadedPack, project: LegoProject) {
+  // Baking again on every change to the document, so freeing what the last
+  // bake built belongs here rather than only at the end of playback.
+  disposeBaked(state);
+  const { pieces } = bakedPieces(project, pack);
+
+  for (const [pieceId, baked] of pieces) {
+    const group = state.groups.get(pieceId);
+    if (!group) continue;
+
+    group.position.set(...baked.offset);
+    group.rotation.set(0, 0, 0);
+    group.scale.set(1, 1, 1);
+    state.rest.set(pieceId, baked.offset);
+
+    const mesh = group.children.find((child) => child instanceof THREE.Mesh) as
+      | THREE.Mesh
+      | undefined;
+    if (baked.vertices.length === 0) {
+      mesh?.removeFromParent();
+      continue;
+    }
+
+    const geometry = bakedGeometry(baked);
+    state.baked.push(geometry);
+    if (mesh) {
+      mesh.geometry = geometry;
+      // Baked vertices already sit around the origin, so the offset the
+      // editing scene puts on the mesh has to come back off.
+      mesh.position.set(0, 0, 0);
+    } else {
+      const added = new THREE.Mesh(geometry, partMaterial(pack.manifest));
+      added.userData.pieceId = pieceId;
+      group.add(added);
+    }
+  }
+}
+
+function bakedGeometry(baked: BakedPiece): THREE.BufferGeometry {
+  const positions = new Float32Array(baked.vertices.length * 3);
+  const normals = new Float32Array(baked.vertices.length * 3);
+  const uvs = new Float32Array(baked.vertices.length * 2);
+  baked.vertices.forEach((vertex, i) => {
+    positions.set(vertex.pos, i * 3);
+    normals.set(vertex.normal, i * 3);
+    uvs.set(vertex.uv, i * 2);
+  });
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geometry.setIndex(
+    new THREE.BufferAttribute(new Uint32Array(baked.indices), 1),
+  );
+  return geometry;
+}
+
+/**
+ * A round dot rather than the square a point sprite draws by default.
+ *
+ * Squares read as blocks of the model at this size, and a grid of them on a
+ * boxy part is unreadable. One canvas, drawn once, shared by every dot.
+ */
+let dotSprite: THREE.Texture | null = null;
+
+function circleSprite(): THREE.Texture {
+  if (dotSprite) return dotSprite;
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+  if (context) {
+    context.beginPath();
+    context.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+    context.fillStyle = "#fff";
+    context.fill();
+    // A dark rim, so a pale dot still reads against a pale part.
+    context.lineWidth = 4;
+    context.strokeStyle = "rgba(0,0,0,0.65)";
+    context.stroke();
+  }
+  dotSprite = new THREE.CanvasTexture(canvas);
+  return dotSprite;
+}
+
+function dotMaterial(
+  size: number,
+  pixelRatio: number,
+  vertexColours: boolean,
+): THREE.PointsMaterial {
+  return new THREE.PointsMaterial({
+    // `gl_PointSize` is in device pixels, so the ratio has to come back out or
+    // the dots halve on a retina display.
+    size: size * pixelRatio,
+    sizeAttenuation: false,
+    vertexColors: vertexColours,
+    color: vertexColours ? 0xffffff : ORIGIN_COLOUR,
+    map: circleSprite(),
+    alphaTest: 0.5,
+    depthTest: false,
+    transparent: true,
+  });
+}
+
+/**
+ * Draw the selected piece's origin and its snap anchors.
+ *
+ * The dots are a child of the piece's group, so they follow it without being
+ * repositioned, and they sit in part space alongside the mesh, which is why
+ * the pivot comes off them exactly as it comes off the geometry.
+ *
+ * `depthTest` is off: the origin is usually inside the part, and a marker you
+ * cannot see is no marker at all.
+ */
+function showAnchors(
+  state: SceneState,
+  pack: LoadedPack,
+  project: LegoProject,
+  pieceId: string | null,
+) {
+  clearAnchors(state);
+  if (!pieceId) return;
+
+  const piece = project.pieces.find((p) => p.id === pieceId);
+  const group = state.groups.get(pieceId);
+  if (!piece || !group) return;
+
+  const pivot = piece.pivot ?? [0, 0, 0];
+  const marks = new THREE.Group();
+
+  // The origin is its own object, drawn larger. There is one of it, and it is
+  // the one you go looking for.
+  marks.add(points([0, 0, 0], null, state.originDot));
+
+  const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
+  if (part) {
+    const positions: number[] = [];
+    const colours: number[] = [];
+    for (const anchor of localAnchors(part.bbox)) {
+      if (anchor.kind === "centre" && pivot.every((value) => value === 0)) {
+        // The middle and the origin coincide, and two dots in one place read
+        // as one dot of the wrong colour.
+        continue;
+      }
+      positions.push(
+        anchor.position[0] - pivot[0],
+        anchor.position[1] - pivot[1],
+        anchor.position[2] - pivot[2],
+      );
+      const colour = new THREE.Color(
+        anchor.kind === "corner" ? CORNER_COLOUR : FACE_COLOUR,
+      );
+      colours.push(colour.r, colour.g, colour.b);
+    }
+    marks.add(points(positions, colours, state.dots));
+  }
+
+  group.add(marks);
+  state.anchors = marks;
+}
+
+function points(
+  positions: number[],
+  colours: number[] | null,
+  material: THREE.PointsMaterial,
+): THREE.Points {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  if (colours) {
+    geometry.setAttribute(
+      "color",
+      new THREE.Float32BufferAttribute(colours, 3),
+    );
+  }
+  const object = new THREE.Points(geometry, material);
+  object.renderOrder = 2;
+  // Not selectable: a click has to fall through to the piece behind it.
+  object.raycast = () => {};
+  return object;
+}
+
+function clearAnchors(state: SceneState) {
+  state.anchors?.traverse((object) => {
+    if (object instanceof THREE.Points) object.geometry.dispose();
+  });
+  state.anchors?.removeFromParent();
+  state.anchors = null;
+}
+
+/** Free the geometry playback built. The shared part cache is untouched. */
+function disposeBaked(state: SceneState) {
+  for (const geometry of state.baked) geometry.dispose();
+  state.baked = [];
+  state.rest = new Map();
+}
+
+/**
  * Pose every animated piece for one moment in time.
  *
- * Each piece starts from its rest transform in the document and takes the sum
- * of every applied preset's delta, so two presets touching the same piece add
- * up rather than one winning. Pieces no preset animates are left alone.
+ * Each piece sits at its baked offset and takes the sum of every applied
+ * preset's delta as a rotation about its own origin, so two presets touching
+ * the same piece add up rather than one winning.
  */
 function applyAnimation(state: SceneState, project: LegoProject, t: number) {
   const applied = (project.animations ?? [])
@@ -515,21 +892,22 @@ function applyAnimation(state: SceneState, project: LegoProject, t: number) {
   for (const piece of project.pieces) {
     if (!piece.role) continue;
     const group = state.groups.get(piece.id);
-    if (!group) continue;
+    const offset = state.rest.get(piece.id);
+    if (!group || !offset) continue;
 
-    let moved = false;
-    const position: Vec3 = [...piece.position];
-    const rotation: Vec3 = [...piece.rotation];
+    // From the baked pose, not the document's: the geometry already carries
+    // the piece's own rotation and scale, so a delta is a plain turn about
+    // its origin, which is the only thing the engine does.
+    const position: Vec3 = [...offset];
+    const rotation: Vec3 = [0, 0, 0];
     for (const { preset, params } of applied) {
       const delta = preset.track(t, params, piece.role);
       if (!delta) continue;
-      moved = true;
       for (let axis = 0; axis < 3; axis++) {
         position[axis] += delta.position?.[axis] ?? 0;
         rotation[axis] += delta.rotation?.[axis] ?? 0;
       }
     }
-    if (!moved) continue;
     group.position.set(...position);
     group.rotation.set(...rotation);
   }
@@ -575,13 +953,20 @@ function syncScene(state: SceneState, pack: LoadedPack, project: LegoProject) {
     state.groups.delete(id);
   }
 
+  // Every group first, then the parenting. The document does not promise that
+  // a parent comes before its children, and reparenting a piece leaves it
+  // wherever it already was in the array. Doing both in one pass hung any
+  // piece whose parent came later off the scene root instead, until some
+  // later edit happened to sync again.
   for (const piece of project.pieces) {
-    let group = state.groups.get(piece.id);
-    if (!group) {
-      group = new THREE.Group();
-      group.userData.pieceId = piece.id;
-      state.groups.set(piece.id, group);
-    }
+    if (state.groups.has(piece.id)) continue;
+    const group = new THREE.Group();
+    group.userData.pieceId = piece.id;
+    state.groups.set(piece.id, group);
+  }
+
+  for (const piece of project.pieces) {
+    const group = state.groups.get(piece.id) as THREE.Group;
 
     // Reparent before transforming, so a piece that moved branch and position
     // in one edit ends up in the right place.
@@ -607,11 +992,16 @@ function syncScene(state: SceneState, pack: LoadedPack, project: LegoProject) {
       mesh?.removeFromParent();
       continue;
     }
+    // The mesh sits back from the piece's origin by its pivot, so the origin
+    // is the point the piece turns about rather than the part's middle.
+    const pivot = piece.pivot ?? [0, 0, 0];
     if (mesh) {
       mesh.geometry = geometry;
+      mesh.position.set(-pivot[0], -pivot[1], -pivot[2]);
     } else {
       const added = new THREE.Mesh(geometry, partMaterial(pack.manifest));
       added.userData.pieceId = piece.id;
+      added.position.set(-pivot[0], -pivot[1], -pivot[2]);
       group.add(added);
     }
   }

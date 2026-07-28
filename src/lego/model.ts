@@ -30,6 +30,12 @@ export interface LegoPiece {
   partId: string | null;
   /** Relative to the parent piece. */
   position: [number, number, number];
+  /**
+   * Where this piece's origin sits in its part, in the part's own space and
+   * before rotation and scale. Absent means the part's middle, which is where
+   * the pack recentres every part. This is the point the piece turns about.
+   */
+  pivot?: [number, number, number];
   /** Radians, XYZ euler. Baked into vertices on export, see the plan's D3. */
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -297,6 +303,10 @@ function parsePiece(raw: unknown): LegoPiece | null {
     position: parseVec3(p.position) ?? [0, 0, 0],
     rotation: parseVec3(p.rotation) ?? [0, 0, 0],
     scale: parseVec3(p.scale) ?? [1, 1, 1],
+    ...(() => {
+      const pivot = parseVec3(p.pivot);
+      return pivot ? { pivot } : {};
+    })(),
     ...(p.mirror === true ? { mirror: true } : {}),
     ...(typeof p.role === "string" ? { role: p.role } : {}),
     ...(Array.isArray(p.tags)
