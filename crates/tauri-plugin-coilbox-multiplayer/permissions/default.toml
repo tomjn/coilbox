@@ -51,6 +51,7 @@ permissions = [
   "allow-mp-remove-script-tags",
   "allow-mp-build-battle-config",
   "allow-mp-build-host-config",
+  "allow-mp-probe-host",
   "allow-mp-chat-logs",
   "allow-mp-chat-log-open",
 ]

@@ -52,6 +52,7 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-remove-script-tags`
 - `allow-mp-build-battle-config`
 - `allow-mp-build-host-config`
+- `allow-mp-probe-host`
 - `allow-mp-chat-logs`
 - `allow-mp-chat-log-open`
 
@@ -814,6 +815,32 @@ Enables the mp_open_battle command without any pre-configured scope.
 <td>
 
 Denies the mp_open_battle command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-probe-host`
+
+</td>
+<td>
+
+Enables the mp_probe_host command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-probe-host`
+
+</td>
+<td>
+
+Denies the mp_probe_host command without any pre-configured scope.
 
 </td>
 </tr>

@@ -647,3 +647,17 @@ export const mpBuildHostConfig = defineCommand<
   { serverKey: string },
   { config: BattleConfig }
 >("coilbox-multiplayer", "mp_build_host_config");
+
+/** What a single UDP probe found out about a battle host's game port. */
+export type HostProbeOutcome = "unresolved" | "refused" | "silent" | "replied";
+
+/**
+ * Probe a battle host's game port with one empty datagram. Only `"refused"` and
+ * `"unresolved"` are evidence of a problem. `"silent"` is what a perfectly
+ * healthy host returns, because the engine answers unrecognised datagrams with
+ * nothing, so it must never be reported as a failure.
+ */
+export const mpProbeHost = defineCommand<
+  { host: string; port: number },
+  { outcome: HostProbeOutcome }
+>("coilbox-multiplayer", "mp_probe_host");
