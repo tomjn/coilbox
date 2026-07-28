@@ -70,6 +70,34 @@ export interface TrackDelta {
   rotation?: [number, number, number];
 }
 
+/** Callins a preset can contribute to in a generated unit script. */
+export type LuaHook =
+  | "Create"
+  | "StartMoving"
+  | "StopMoving"
+  | "Activate"
+  | "Deactivate"
+  | "AimWeapon1"
+  | "AimFromWeapon1"
+  | "QueryWeapon1";
+
+export interface EmitContext {
+  /**
+   * Names of the pieces carrying a role, in document order. Asking marks them
+   * used, so the script declares a local for exactly what it references.
+   */
+  pieces(role: string): string[];
+  params: Record<string, number>;
+  /** A signal number of this preset's own, for stopping its threads. */
+  signal: string;
+}
+
+export interface EmitResult {
+  /** Threads and helpers, written above the callins. */
+  functions: string[];
+  hooks: Partial<Record<LuaHook, string[]>>;
+}
+
 export interface AnimPreset {
   id: string;
   label: string;
@@ -85,6 +113,8 @@ export interface AnimPreset {
     params: Record<string, number>,
     role: string,
   ): TrackDelta | null;
+  /** Lua for a unit script. Null when the unit has none of its pieces. */
+  emit(ctx: EmitContext): EmitResult | null;
 }
 
 /** A preset as applied to a unit, which is what the document stores. */
@@ -108,6 +138,103 @@ function value(
   const given = params[id];
   if (typeof given === "number" && Number.isFinite(given)) return given;
   return preset.params.find((param) => param.id === id)?.fallback ?? 0;
+}
+
+const AXES = ["x_axis", "y_axis", "z_axis"];
+/**
+ * Poses per cycle in a generated thread.
+ *
+ * Four is the fewest that reads as motion. Two would sample a sine at its
+ * zero crossings and emit a thread that stands still.
+ */
+const CYCLE_STEPS = 4;
+
+function lua(n: number): string {
+  // Fixed precision, so the same project always writes the same file.
+  return Number(n.toFixed(4)).toString();
+}
+
+/**
+ * A looping thread that walks a preset's own `track` around one cycle.
+ *
+ * Sampling `track` rather than writing the motion out a second time means the
+ * script and the viewport cannot drift apart: change the maths and both follow.
+ * Turn speeds are worked out from how far each piece has to move in the time
+ * the step allows, so the pose is reached rather than overshot or lagged.
+ */
+function cycleThread(
+  preset: AnimPreset,
+  ctx: EmitContext,
+  options: { name: string; period: number },
+): EmitResult | null {
+  const targets = preset.animates.flatMap((role) =>
+    ctx.pieces(role).map((piece) => ({ role, piece })),
+  );
+  if (targets.length === 0) return null;
+
+  const stepSeconds = options.period / CYCLE_STEPS;
+
+  // Sample the whole cycle before writing any of it. A step's move is measured
+  // against the step before it, and the first step follows the last, because
+  // the thread loops. Measuring the first against a rest pose would be right
+  // once and wrong on every lap after that.
+  const poses = Array.from({ length: CYCLE_STEPS }, (_, step) => {
+    const t = (step / CYCLE_STEPS) * options.period;
+    const pose = new Map<string, number[]>();
+    for (const { role, piece } of targets) {
+      const rotation = preset.track(t, ctx.params, role)?.rotation;
+      // Rounded before anything is compared, or floating point dust reads as
+      // movement and emits a turn of nothing at a speed of nothing.
+      if (rotation)
+        pose.set(
+          piece,
+          rotation.map((r) => Number(r.toFixed(4))),
+        );
+    }
+    return pose;
+  });
+
+  const body: string[] = [];
+  const movedAxes = new Map<string, Set<number>>();
+
+  for (let step = 0; step < CYCLE_STEPS; step++) {
+    const before = poses[(step + CYCLE_STEPS - 1) % CYCLE_STEPS];
+    for (const [piece, rotation] of poses[step]) {
+      const was = before.get(piece) ?? [0, 0, 0];
+      for (let axis = 0; axis < 3; axis++) {
+        if (rotation[axis] === was[axis]) continue;
+        const speed = Math.abs(rotation[axis] - was[axis]) / stepSeconds;
+        body.push(
+          `    Turn(${piece}, ${AXES[axis]}, ${lua(rotation[axis])}, ${lua(speed)})`,
+        );
+        movedAxes.set(piece, (movedAxes.get(piece) ?? new Set()).add(axis));
+      }
+    }
+    body.push(`    Sleep(${Math.round(stepSeconds * 1000)})`);
+  }
+
+  // Back to rest on stop, or the unit keeps whatever pose it stopped in. Only
+  // the axes this preset actually turns, so the reset does not fight another
+  // preset holding the same piece on a different axis.
+  const rest = [...movedAxes].flatMap(([piece, axes]) =>
+    [...axes].map((axis) => `  Turn(${piece}, ${AXES[axis]}, 0, 4)`),
+  );
+
+  return {
+    functions: [
+      `local function ${options.name}()`,
+      `  SetSignalMask(${ctx.signal})`,
+      "  while true do",
+      ...body,
+      "  end",
+      "end",
+      "",
+      `local function ${options.name}Stop()`,
+      ...rest,
+      "end",
+    ],
+    hooks: {},
+  };
 }
 
 const LEG_SEGMENTS = ["thigh", "shin", "foot"] as const;
@@ -227,6 +354,9 @@ export const WALK_BIPED: AnimPreset = {
   track(t, params, role) {
     return walkTrack(this, t, params, role, "biped");
   },
+  emit(ctx) {
+    return walkEmit(this, ctx);
+  },
 };
 
 export const WALK_QUAD: AnimPreset = {
@@ -245,7 +375,26 @@ export const WALK_QUAD: AnimPreset = {
   track(t, params, role) {
     return walkTrack(this, t, params, role, "quad");
   },
+  emit(ctx) {
+    return walkEmit(this, ctx);
+  },
 };
+
+/** Walking starts and stops with the unit, so it hangs off the move callins. */
+function walkEmit(preset: AnimPreset, ctx: EmitContext): EmitResult | null {
+  const thread = cycleThread(preset, ctx, {
+    name: "walk",
+    period: Math.max(value(preset, ctx.params, "period"), 0.05),
+  });
+  if (!thread) return null;
+  return {
+    functions: thread.functions,
+    hooks: {
+      StartMoving: [`  Signal(${ctx.signal})`, "  StartThread(walk)"],
+      StopMoving: [`  Signal(${ctx.signal})`, "  walkStop()"],
+    },
+  };
+}
 
 export const TURRET_TRACK: AnimPreset = {
   id: "turret.track",
@@ -298,6 +447,37 @@ export const TURRET_TRACK: AnimPreset = {
     }
     return null;
   },
+  /**
+   * A turret aims rather than loops, so this is the one preset that emits
+   * callins instead of a thread. The sweep in the viewport is a demonstration
+   * of the motion. In a game the target decides where it points.
+   */
+  emit(ctx) {
+    const turret = ctx.pieces("turret")[0];
+    if (!turret) return null;
+    const barrel = ctx.pieces("barrel")[0];
+    const flare = ctx.pieces("flare")[0];
+    const speed = lua(deg(value(this, ctx.params, "sweep")));
+
+    const aim = [
+      `  Signal(${ctx.signal})`,
+      `  SetSignalMask(${ctx.signal})`,
+      `  Turn(${turret}, y_axis, heading, ${speed})`,
+      ...(barrel ? [`  Turn(${barrel}, x_axis, -pitch, ${speed})`] : []),
+      `  WaitForTurn(${turret}, y_axis)`,
+      ...(barrel ? [`  WaitForTurn(${barrel}, x_axis)`] : []),
+      "  return true",
+    ];
+
+    return {
+      functions: [],
+      hooks: {
+        AimWeapon1: aim,
+        AimFromWeapon1: [`  return ${turret}`],
+        QueryWeapon1: [`  return ${flare ?? barrel ?? turret}`],
+      },
+    };
+  },
 };
 
 export const WHEELS_ROLL: AnimPreset = {
@@ -320,6 +500,21 @@ export const WHEELS_ROLL: AnimPreset = {
   track(t, params, role) {
     if (role !== "wheel") return null;
     return { rotation: [TAU * value(this, params, "rate") * t, 0, 0] };
+  },
+  /** Continuous, so `Spin` rather than a thread of `Turn` calls. */
+  emit(ctx) {
+    const wheels = ctx.pieces("wheel");
+    if (wheels.length === 0) return null;
+    const speed = lua(TAU * value(this, ctx.params, "rate"));
+    return {
+      functions: [],
+      hooks: {
+        StartMoving: wheels.map(
+          (wheel) => `  Spin(${wheel}, x_axis, ${speed})`,
+        ),
+        StopMoving: wheels.map((wheel) => `  StopSpin(${wheel}, x_axis)`),
+      },
+    };
   },
 };
 
@@ -374,6 +569,21 @@ export const BUILDARM: AnimPreset = {
     if (role === "buildarm.nozzle") return { rotation: [-lift, 0, 0] };
     return null;
   },
+  emit(ctx) {
+    const thread = cycleThread(this, ctx, {
+      name: "buildArm",
+      period: Math.max(value(this, ctx.params, "period"), 0.05),
+    });
+    if (!thread) return null;
+    return {
+      functions: thread.functions,
+      hooks: {
+        // A builder animates while it is working, which is what Activate means.
+        Activate: [`  Signal(${ctx.signal})`, "  StartThread(buildArm)"],
+        Deactivate: [`  Signal(${ctx.signal})`, "  buildArmStop()"],
+      },
+    };
+  },
 };
 
 export const OPEN_CLOSE: AnimPreset = {
@@ -409,6 +619,21 @@ export const OPEN_CLOSE: AnimPreset = {
     // Shut at rest, so a unit that is not playing looks closed.
     const openness = (1 - Math.cos((t / period) * TAU)) * 0.5;
     return { rotation: [0, deg(value(this, params, "open")) * openness, 0] };
+  },
+  emit(ctx) {
+    const thread = cycleThread(this, ctx, {
+      name: "doors",
+      period: Math.max(value(this, ctx.params, "period"), 0.05),
+    });
+    if (!thread) return null;
+    return {
+      functions: thread.functions,
+      hooks: {
+        Activate: [`  Signal(${ctx.signal})`, "  StartThread(doors)"],
+        // Shutting is not optional: a door left open is a hole in the model.
+        Deactivate: [`  Signal(${ctx.signal})`, "  doorsStop()"],
+      },
+    };
   },
 };
 

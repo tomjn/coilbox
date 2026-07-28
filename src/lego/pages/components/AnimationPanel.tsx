@@ -7,7 +7,8 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { Pause, Play } from "lucide-react";
+import { FileCode, Pause, Play } from "lucide-react";
+import { useState } from "react";
 
 import { Slider } from "@/components/ui/slider";
 import { useReduceMotion } from "../../../general/display";
@@ -20,6 +21,7 @@ import {
   unmetRequirements,
 } from "../../animPresets";
 import type { LegoProject } from "../../model";
+import { ScriptDrawer } from "./ScriptDrawer";
 
 interface Props {
   project: LegoProject;
@@ -35,6 +37,7 @@ export function AnimationPanel({
   onChange,
 }: Props) {
   const reduceMotion = useReduceMotion();
+  const [showScript, setShowScript] = useState(false);
   const applied = project.animations ?? [];
   const counts = countRoles(project.pieces);
 
@@ -75,7 +78,22 @@ export function AnimationPanel({
               ? "Apply one below."
               : `${applied.length} applied`}
         </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="ml-auto"
+          onClick={() => setShowScript(true)}
+          title="The unit script these animations generate"
+        >
+          <FileCode size={14} />
+        </Button>
       </div>
+
+      <ScriptDrawer
+        open={showScript}
+        onOpenChange={setShowScript}
+        project={project}
+      />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {PRESETS.map((preset) => {
