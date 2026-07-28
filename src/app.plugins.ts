@@ -8,6 +8,7 @@ import deepLinkPlugin from "./deeplink";
 import downloadsPlugin from "./downloads";
 import gameUpdatesPlugin from "./game-updates";
 import generalPlugin from "./general";
+import legoPlugin from "./lego";
 import lobbyServersPlugin from "./lobby-servers";
 import mapconvPlugin from "./mapconv";
 import multiplayerPlugin from "./multiplayer";
@@ -27,6 +28,7 @@ export const plugins: FramePlugin[] = [
   uberstressPlugin,
   mapconvPlugin,
   animationPlugin,
+  legoPlugin,
   contentPlugin,
   playPlugin,
   campaignPlugin,

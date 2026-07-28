@@ -13,6 +13,9 @@
 //!   - `coilbox://localhost/campaign/<id>/<file>` → `<data_dir>/campaign/media/<id>/<file>`
 //!     (user-authored campaign AV; `data_dir` is the OS app-data dir on a normal
 //!     install, so this works with no `.coilbox` folder)
+//!   - `coilbox://localhost/legopack/<file>`      → `.coilbox/legoparts/<file>` if
+//!     present, else `<resource_dir>/legoparts/<file>` (the unit builder's parts
+//!     library, portable-first so a distribution can ship its own)
 //!
 //! Every segment is percent-decoded and rejected if it contains path syntax, so a
 //! request can never escape its root. Any miss (no root, unsafe path, absent file)
@@ -28,7 +31,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 
 use tauri::http::{header, Request, Response, StatusCode};
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Manager, Runtime};
 
 /// Percent-decode a single path segment (`%20` → space, etc.). Returns `None` on a
 /// malformed escape or non-UTF-8 result. Deliberately does NOT treat `+` as space —
@@ -81,6 +84,7 @@ fn resolve_path(
     segments: &[String],
     portable: Option<PathBuf>,
     campaign_base: impl FnOnce() -> Option<PathBuf>,
+    legopack_base: impl FnOnce() -> Option<PathBuf>,
 ) -> Option<PathBuf> {
     let (root, rest) = segments.split_first()?;
     match root.as_str() {
@@ -99,8 +103,43 @@ fn resolve_path(
             let base = campaign_base()?.join(id);
             Some(file.iter().fold(base, |p, s| p.join(s)))
         }
+        "legopack" => {
+            // legopack/<file...>: the unit builder's parts library.
+            if rest.is_empty() {
+                return None;
+            }
+            Some(rest.iter().fold(legopack_base()?, |p, s| p.join(s)))
+        }
         _ => None,
     }
+}
+
+/// Where the parts pack lives, in order of precedence:
+///
+/// 1. `.coilbox/legoparts` beside the executable, so a distribution can ship its
+///    own parts library without a rebuild.
+/// 2. The bundled copy under the resource directory.
+/// 3. The source tree, in debug builds only. `bundle.resources` is assembled by
+///    `tauri build`, so under `tauri dev` there is nothing beside the binary and
+///    the pack would otherwise be missing for the whole of development.
+fn legopack_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    let portable = coilbox_portable::portable_root().map(|root| root.join("legoparts"));
+    if let Some(dir) = portable.filter(|dir| dir.is_dir()) {
+        return Some(dir);
+    }
+
+    let bundled = app.path().resource_dir().ok().map(|d| d.join("legoparts"));
+    if let Some(dir) = bundled.clone().filter(|dir| dir.is_dir()) {
+        return Some(dir);
+    }
+
+    if cfg!(debug_assertions) {
+        let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("legoparts");
+        if source.is_dir() {
+            return Some(source);
+        }
+    }
+    bundled
 }
 
 /// Parse a single-range `Range: bytes=…` header against a known length, returning the
@@ -138,12 +177,18 @@ fn parse_range(header: Option<&str>, len: u64) -> Option<(u64, u64)> {
 fn not_found() -> Response<Cow<'static, [u8]>> {
     Response::builder()
         .status(StatusCode::NOT_FOUND)
+        .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
         .body(Cow::Owned(Vec::new()))
         .expect("static 404 response is valid")
 }
 
 /// Build the file response for `full`, honouring a `Range` request with a 206 that
 /// reads only the requested window (so large video never loads fully into memory).
+///
+/// Responses carry `Access-Control-Allow-Origin: *`, which the `<img>` and
+/// `<video>` uses never needed but `fetch()` does. Without it WKWebView rejects
+/// a custom-scheme fetch before it ever reaches a status code. The scheme only
+/// ever serves files under its own roots, and the webview is its only client.
 fn serve_file(full: &PathBuf, range: Option<&str>) -> Response<Cow<'static, [u8]>> {
     let Ok(meta) = std::fs::metadata(full) else {
         return not_found();
@@ -175,6 +220,7 @@ fn serve_file(full: &PathBuf, range: Option<&str>) -> Response<Cow<'static, [u8]
                 .header(header::CONTENT_RANGE, format!("bytes {start}-{end}/{len}"))
                 .header(header::CONTENT_LENGTH, count.to_string())
                 .header(header::CACHE_CONTROL, "no-cache")
+                .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .body(Cow::Owned(buf))
                 .expect("range response builder inputs are valid")
         }
@@ -185,6 +231,7 @@ fn serve_file(full: &PathBuf, range: Option<&str>) -> Response<Cow<'static, [u8]
                 .header(header::ACCEPT_RANGES, "bytes")
                 .header(header::CONTENT_LENGTH, len.to_string())
                 .header(header::CACHE_CONTROL, "no-cache")
+                .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .body(Cow::Owned(bytes))
                 .expect("full response builder inputs are valid"),
             Err(_) => not_found(),
@@ -201,11 +248,16 @@ pub fn handle<R: Runtime>(
     let Some(segments) = safe_segments(request.uri().path()) else {
         return not_found();
     };
-    let full = resolve_path(&segments, coilbox_portable::portable_root(), || {
-        coilbox_portable::data_dir(app)
-            .ok()
-            .map(|d| d.join("campaign").join("media"))
-    });
+    let full = resolve_path(
+        &segments,
+        coilbox_portable::portable_root(),
+        || {
+            coilbox_portable::data_dir(app)
+                .ok()
+                .map(|d| d.join("campaign").join("media"))
+        },
+        || legopack_dir(app),
+    );
     let Some(full) = full else {
         return not_found();
     };
@@ -245,14 +297,19 @@ mod tests {
     #[test]
     fn resolve_portable_joins_under_root() {
         let segs = vec!["portable".into(), "images".into(), "x.jpg".into()];
-        let got = resolve_path(&segs, Some(PathBuf::from("/pkg/.coilbox")), || None);
+        let got = resolve_path(
+            &segs,
+            Some(PathBuf::from("/pkg/.coilbox")),
+            || None,
+            || None,
+        );
         assert_eq!(got, Some(PathBuf::from("/pkg/.coilbox/images/x.jpg")));
     }
 
     #[test]
     fn resolve_portable_none_without_root() {
         let segs = vec!["portable".into(), "x.jpg".into()];
-        assert_eq!(resolve_path(&segs, None, || None), None);
+        assert_eq!(resolve_path(&segs, None, || None, || None), None);
     }
 
     #[test]
@@ -260,22 +317,36 @@ mod tests {
         let base = || Some(PathBuf::from("/data/campaign/media"));
         let ok = vec!["campaign".into(), "camp-1".into(), "intro.mp4".into()];
         assert_eq!(
-            resolve_path(&ok, None, base),
+            resolve_path(&ok, None, base, || None),
             Some(PathBuf::from("/data/campaign/media/camp-1/intro.mp4"))
         );
         // missing file segment
         let no_file = vec!["campaign".into(), "camp-1".into()];
-        assert_eq!(resolve_path(&no_file, None, base), None);
+        assert_eq!(resolve_path(&no_file, None, base, || None), None);
         // bad id
         let bad = vec!["campaign".into(), "../x".into(), "intro.mp4".into()];
-        assert_eq!(resolve_path(&bad, None, base), None);
+        assert_eq!(resolve_path(&bad, None, base, || None), None);
+    }
+
+    #[test]
+    fn resolve_legopack_joins_under_its_base() {
+        let base = || Some(PathBuf::from("/res/legoparts"));
+        let segs = vec!["legopack".into(), "parts.bin.gz".into()];
+        assert_eq!(
+            resolve_path(&segs, None, || None, base),
+            Some(PathBuf::from("/res/legoparts/parts.bin.gz"))
+        );
+        // no file segment, and no pack installed
+        let bare = vec!["legopack".into()];
+        assert_eq!(resolve_path(&bare, None, || None, base), None);
+        assert_eq!(resolve_path(&segs, None, || None, || None), None);
     }
 
     #[test]
     fn resolve_unknown_root_is_none() {
         let segs = vec!["secret".into(), "x".into()];
         assert_eq!(
-            resolve_path(&segs, Some(PathBuf::from("/pkg")), || None),
+            resolve_path(&segs, Some(PathBuf::from("/pkg")), || None, || None),
             None
         );
     }
