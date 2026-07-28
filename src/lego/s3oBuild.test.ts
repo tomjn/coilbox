@@ -183,10 +183,29 @@ describe("buildS3o", () => {
     const build = buildS3o(doc, pack(), TEXTURES);
 
     // The corners land at (0,3,0), (1,3,0) and (0,3,1), so the top is 3 and
-    // the furthest corner from the origin is one metre out and three up.
+    // the middle is half a metre along x and z.
     expect(build?.height).toBeCloseTo(3);
-    expect(build?.radius).toBeCloseTo(Math.sqrt(1 + 9));
     expect(round(build?.mid ?? [])).toEqual([0.5, 3, 0.5]);
+    // Measured from mid, not the origin: every corner is the same half-diagonal
+    // away from the middle.
+    expect(build?.radius).toBeCloseTo(Math.hypot(0.5, 0.5));
+  });
+
+  it("does not inflate the radius of a unit built away from the origin", () => {
+    const near = buildS3o(
+      project([{ id: "a", name: "a", parentId: "root" }]),
+      pack(),
+      TEXTURES,
+    );
+    const far = buildS3o(
+      project([{ id: "a", name: "a", parentId: "root", position: [40, 0, 0] }]),
+      pack(),
+      TEXTURES,
+    );
+
+    // The same geometry, moved. Its collision sphere is the same size, because
+    // the sphere is centred on the model rather than on the world origin.
+    expect(far?.radius).toBeCloseTo(near?.radius ?? -1, 5);
   });
 
   it("writes zeros for a unit with no geometry, deferring to the engine", () => {

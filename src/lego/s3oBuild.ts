@@ -180,6 +180,13 @@ function bakeGeometry(
 /**
  * The model header, from every vertex in world space.
  *
+ * `radius` is measured from `mid`, not from the origin. `mid` is the middle of
+ * the collision sphere and `radius` is that sphere's radius, so the two go
+ * together. Confirmed against a shipped model: `ammobox2.s3o` has a header
+ * radius of 12.749866, which is exactly its furthest vertex from its `mid`,
+ * where the furthest from the origin is 17.6037. Measuring from the origin
+ * inflates the sphere of any unit not built centred on it.
+ *
  * `radius` and `height` are only honoured above 0.01, so a unit with no
  * geometry writes zeros and lets the engine work them out.
  */
@@ -196,7 +203,7 @@ function header(world: THREE.Vector3[]): {
   let radius = 0;
   let height = 0;
   for (const point of world) {
-    radius = Math.max(radius, point.length());
+    radius = Math.max(radius, point.distanceTo(centre));
     height = Math.max(height, point.y);
   }
   return { radius, height, mid: [centre.x, centre.y, centre.z] };

@@ -28,6 +28,10 @@ Texture names are NUL-terminated strings anywhere in the file. An offset of 0 me
 
 `radius` and `height` are only used when greater than `0.01`. Below that the engine computes its own from the geometry, which is a deliberate way to defer to it. `mid` is always taken from the header, and is the offset from the origin, which sits on the ground plane, to the middle of the collision sphere.
 
+**`radius` is measured from `mid`, not from the origin.** The two describe one sphere, so they have to share a centre. Checked against `ammobox2.s3o`: its header radius of 12.749866 is exactly its furthest vertex from its own `mid`, where the furthest from the origin is 17.6037. A generator that measures from the origin gives every model built off-centre a collision sphere far larger than its geometry.
+
+`height` is looser. `ammobox2.s3o` declares 18 where its geometry reaches 16.353, so it is an authored figure rather than a derived one, and writing the true top of the model is fine.
+
 ### Piece, 52 bytes
 
 | Offset | Type | Field |
