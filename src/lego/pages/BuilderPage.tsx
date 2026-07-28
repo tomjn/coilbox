@@ -1,5 +1,5 @@
 import { Button, Input, useHideSidebar } from "@picoframe/frame";
-import { Blocks, Plus, Save, Trash2 } from "lucide-react";
+import { Blocks, PackagePlus, Plus, Save, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
@@ -10,8 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { insertCompound, subtreeAsCompound } from "../compounds";
 import { usePartFilter } from "../filter";
 import {
+  childrenOf,
   descendantIds,
   type LegoPiece,
   type LegoProject,
@@ -20,8 +22,16 @@ import {
   uniquePieceName,
 } from "../model";
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
-import { saveProject, saveThumbnail, useLegoProjects } from "../projects";
+import {
+  deleteCompound,
+  saveCompound,
+  saveProject,
+  saveThumbnail,
+  useLegoCompounds,
+  useLegoProjects,
+} from "../projects";
 import { canReparent, reparentPiece } from "../reparent";
+import { CompoundPicker } from "./components/CompoundPicker";
 import { ModelViewport } from "./components/ModelViewport";
 import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
@@ -40,6 +50,7 @@ export default function BuilderPage() {
   // The viewport wants the width, and the nav stays reachable from the top bar.
   useHideSidebar();
   const { projects, loading } = useLegoProjects();
+  const { compounds } = useLegoCompounds();
   const stored = projects.find((project) => project.id === id);
 
   const [pack, setPack] = useState<LoadedPack | null>(null);
@@ -47,6 +58,7 @@ export default function BuilderPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [strip, setStrip] = useState<"parts" | "compounds">("parts");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const filter = usePartFilter(pack);
 
@@ -201,6 +213,31 @@ export default function BuilderPage() {
     edit((project) => reparentPiece(project, pieceId, parentId));
   }
 
+  async function saveSelectionAsCompound() {
+    if (!draft || !selectedId) return;
+    const compound = subtreeAsCompound(draft, selectedId, {
+      id: crypto.randomUUID(),
+      now: new Date().toISOString(),
+      newId: () => crypto.randomUUID(),
+    });
+    if (!compound) return;
+    await saveCompound(compound);
+    // Showing where it went is the only confirmation the save needs.
+    setStrip("compounds");
+  }
+
+  function addCompound(compound: LegoProject) {
+    if (!draft) return;
+    const inserted = insertCompound(
+      draft,
+      compound,
+      selectedId ?? draft.rootPieceId,
+      () => crypto.randomUUID(),
+    );
+    edit(() => inserted.project);
+    setSelectedId(inserted.rootPieceId);
+  }
+
   function transformPiece(pieceId: string, change: Partial<LegoPiece>) {
     edit((project) => ({
       ...project,
@@ -324,6 +361,16 @@ export default function BuilderPage() {
             <Button
               size="sm"
               variant="ghost"
+              onClick={() => void saveSelectionAsCompound()}
+              disabled={!selectedId}
+              title="Save the selected piece and everything under it, to reuse in another unit"
+              aria-label="Save the selection as a compound"
+            >
+              <PackagePlus size={14} />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
               onClick={removeSelected}
               disabled={!selectedId || selectedId === draft.rootPieceId}
               aria-label="Delete the selected piece"
@@ -376,15 +423,20 @@ export default function BuilderPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {draft.pieces
-                        .filter((piece) =>
-                          canReparent(draft, selected.id, piece.id),
-                        )
-                        .map((piece) => (
-                          <SelectItem key={piece.id} value={piece.id}>
+                      {parentOptions(draft, selected.id).map(
+                        ({ piece, depth }) => (
+                          <SelectItem
+                            key={piece.id}
+                            value={piece.id}
+                            // Indent on the item, not inside its text: Radix
+                            // mirrors the text into the trigger, and the
+                            // padding would come with it.
+                            style={{ paddingLeft: 8 + depth * 12 }}
+                          >
                             {piece.name}
                           </SelectItem>
-                        ))}
+                        ),
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -401,20 +453,48 @@ export default function BuilderPage() {
       </div>
 
       <div className="flex h-72 shrink-0 flex-col border-t border-border">
-        <PartFilters
-          pack={pack}
-          query={filter.query}
-          onQuery={filter.setQuery}
-          colourway={filter.colourway}
-          onColourway={filter.setColourway}
-          shown={filter.parts.length}
-          className="border-b border-border px-3 py-2"
-        />
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant={strip === "parts" ? "default" : "ghost"}
+              onClick={() => setStrip("parts")}
+            >
+              Parts
+            </Button>
+            <Button
+              size="sm"
+              variant={strip === "compounds" ? "default" : "ghost"}
+              onClick={() => setStrip("compounds")}
+            >
+              Compounds
+            </Button>
+          </div>
+          {strip === "parts" ? (
+            <PartFilters
+              pack={pack}
+              query={filter.query}
+              onQuery={filter.setQuery}
+              colourway={filter.colourway}
+              onColourway={filter.setColourway}
+              shown={filter.parts.length}
+              className="flex-1"
+            />
+          ) : null}
+        </div>
+
         {/* Flex, not block: the picker sizes itself with flex-1 and its contents
             are absolutely positioned, so in a block parent it collapses to
             nothing and the panel looks empty. */}
         <div className="flex min-h-0 flex-1">
-          {filter.parts.length === 0 ? (
+          {strip === "compounds" ? (
+            <CompoundPicker
+              pack={pack}
+              compounds={compounds}
+              onInsert={addCompound}
+              onDelete={(compoundId) => void deleteCompound(compoundId)}
+            />
+          ) : filter.parts.length === 0 ? (
             <NoMatches />
           ) : (
             <PartPicker pack={pack} parts={filter.parts} onSelect={addPart} />
@@ -423,4 +503,27 @@ export default function BuilderPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * Every piece that could carry `pieceId`, in tree order and with its depth.
+ *
+ * The picker reads as the hierarchy it is choosing from, rather than a flat
+ * list in which two pieces called `barrel` are indistinguishable.
+ */
+function parentOptions(
+  project: LegoProject,
+  pieceId: string,
+): { piece: LegoPiece; depth: number }[] {
+  const options: { piece: LegoPiece; depth: number }[] = [];
+  const visit = (parentId: string | null, depth: number) => {
+    for (const child of childrenOf(project, parentId)) {
+      if (canReparent(project, pieceId, child.id)) {
+        options.push({ piece: child, depth });
+      }
+      visit(child.id, depth + 1);
+    }
+  };
+  visit(null, 0);
+  return options;
 }

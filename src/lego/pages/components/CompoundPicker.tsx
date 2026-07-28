@@ -1,0 +1,324 @@
+/**
+ * Saved sub-assemblies, drawn rather than listed.
+ *
+ * Built the way the parts grid is: one canvas behind a transparent scroller
+ * holding one real button per cell, so the grid stays keyboard reachable and
+ * every cell has a name. Nothing is pre-rendered to a file. A compound is
+ * assembled live from the same geometry the builder uses, so it looks the same
+ * here as it will once inserted, and a preview can never go stale.
+ *
+ * There is no virtualisation, unlike the parts grid. Compounds are made by hand
+ * one at a time, so there are tens of them where there are hundreds of parts.
+ */
+
+import { Button } from "@picoframe/frame";
+import { Trash2 } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import * as THREE from "three";
+
+import { useReduceMotion } from "../../../general/display";
+import { addStandardLights, partMaterial } from "../../geometry";
+import { type LegoProject, walkPieces } from "../../model";
+import { getPartGeometry, type LoadedPack } from "../../pack";
+
+/** Cell size in pixels: a square of model, with the name under it. */
+const CELL = 108;
+const LABEL = 24;
+const GAP = 8;
+const PITCH_X = CELL + GAP;
+const PITCH_Y = CELL + LABEL + GAP;
+/** How a compound sits when it is not being looked at. */
+const REST_PITCH = 0.42;
+const REST_YAW = 0.72;
+/** Radians per second while hovered. One turn takes about six seconds. */
+const SPIN_RATE = 1.05;
+
+interface Props {
+  pack: LoadedPack;
+  compounds: LegoProject[];
+  /** Absent on the parts browser, which has no unit to insert into. */
+  onInsert?: (compound: LegoProject) => void;
+  onDelete: (id: string) => void;
+}
+
+export function CompoundPicker({ pack, compounds, onInsert, onDelete }: Props) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stateRef = useRef<GridState | null>(null);
+  const [columns, setColumns] = useState(1);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const reduceMotion = useReduceMotion();
+
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    const scroller = scrollRef.current;
+    if (!canvas || !scroller) return;
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    const scene = new THREE.Scene();
+    addStandardLights(scene);
+
+    // Orthographic, so a cell is the same size on screen wherever it sits.
+    const camera = new THREE.OrthographicCamera(0, 1, 0, -1, -1000, 1000);
+    camera.position.set(0, 0, 100);
+
+    const state: GridState = {
+      renderer,
+      scene,
+      camera,
+      holders: new Map(),
+      order: [],
+      columns: 1,
+      onColumns: setColumns,
+    };
+    stateRef.current = state;
+
+    const draw = () => {
+      const width = scroller.clientWidth;
+      const height = scroller.clientHeight;
+      if (width === 0 || height === 0) return;
+      renderer.setSize(width, height, false);
+      const next = Math.max(1, Math.floor((width + GAP) / PITCH_X));
+      if (next !== state.columns) {
+        state.columns = next;
+        state.onColumns(next);
+      }
+      layout(state, scroller.scrollTop, height);
+    };
+
+    const observer = new ResizeObserver(draw);
+    observer.observe(scroller);
+    const onScroll = () =>
+      layout(state, scroller.scrollTop, scroller.clientHeight);
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    draw();
+
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      observer.disconnect();
+      for (const holder of state.holders.values()) scene.remove(holder);
+      renderer.dispose();
+      stateRef.current = null;
+    };
+  }, []);
+
+  // The geometry is shared and cached, so a compound that is still here keeps
+  // the object it already had and only new ones are built.
+  useEffect(() => {
+    const state = stateRef.current;
+    const scroller = scrollRef.current;
+    if (!state || !scroller) return;
+
+    const wanted = new Set(compounds.map((compound) => compound.id));
+    for (const [id, holder] of state.holders) {
+      if (wanted.has(id)) continue;
+      state.scene.remove(holder);
+      state.holders.delete(id);
+    }
+    for (const compound of compounds) {
+      if (state.holders.has(compound.id)) continue;
+      const holder = buildHolder(pack, compound);
+      state.scene.add(holder);
+      state.holders.set(compound.id, holder);
+    }
+    state.order = compounds.map((compound) => compound.id);
+    layout(state, scroller.scrollTop, scroller.clientHeight);
+  }, [pack, compounds]);
+
+  // Turn the compound under the pointer, so its far side can be seen without
+  // inserting it. Runs only while one is hovered.
+  useEffect(() => {
+    const state = stateRef.current;
+    if (!state || hovered === null || reduceMotion) return;
+
+    let frame = 0;
+    let previous = performance.now();
+    let yaw = REST_YAW;
+
+    const tick = (now: number) => {
+      const holder = state.holders.get(hovered);
+      if (holder) {
+        yaw += ((now - previous) / 1000) * SPIN_RATE;
+        holder.rotation.y = yaw;
+        state.renderer.render(state.scene, state.camera);
+      }
+      previous = now;
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      const holder = state.holders.get(hovered);
+      if (holder) {
+        holder.rotation.y = REST_YAW;
+        state.renderer.render(state.scene, state.camera);
+      }
+    };
+  }, [hovered, reduceMotion]);
+
+  if (compounds.length === 0) {
+    return (
+      <p className="flex-1 px-6 py-10 text-center text-sm text-muted-foreground">
+        Nothing saved yet. In a unit, select a piece and choose Save as compound
+        to keep the assembly under it for reuse.
+      </p>
+    );
+  }
+
+  const rows = Math.ceil(compounds.length / columns);
+
+  return (
+    <div className="relative min-h-0 flex-1">
+      <canvas
+        ref={canvasRef}
+        className="pointer-events-none absolute inset-0 h-full w-full"
+      />
+      <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
+        <div
+          className="relative"
+          style={{ height: Math.max(rows * PITCH_Y - GAP, 0) }}
+        >
+          {compounds.map((compound, index) => (
+            <div
+              key={compound.id}
+              className="group absolute"
+              style={{
+                left: (index % columns) * PITCH_X,
+                top: Math.floor(index / columns) * PITCH_Y,
+                width: CELL,
+                height: CELL + LABEL,
+              }}
+            >
+              {/* A button whether or not it inserts: pointing at a cell or
+                  tabbing to it turns the compound, which is how its far side
+                  gets seen. The parts browser has no unit to insert into, so
+                  there it only turns. */}
+              <button
+                type="button"
+                onClick={onInsert ? () => onInsert(compound) : undefined}
+                onMouseEnter={() => setHovered(compound.id)}
+                onMouseLeave={() =>
+                  setHovered((at) => (at === compound.id ? null : at))
+                }
+                onFocus={() => setHovered(compound.id)}
+                onBlur={() =>
+                  setHovered((at) => (at === compound.id ? null : at))
+                }
+                title={
+                  onInsert
+                    ? `Add ${compound.name} to the unit`
+                    : `${compound.name}, ${compound.pieces.length} pieces`
+                }
+                className="flex h-full w-full flex-col justify-end rounded border border-transparent pb-1 text-center hover:border-border hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className="truncate px-1 text-xs">{compound.name}</span>
+              </button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="absolute right-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                onClick={() => onDelete(compound.id)}
+                aria-label={`Delete the ${compound.name} compound`}
+              >
+                <Trash2 size={14} />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface GridState {
+  renderer: THREE.WebGLRenderer;
+  scene: THREE.Scene;
+  camera: THREE.OrthographicCamera;
+  /** Compound id to the object drawn for it, one per compound. */
+  holders: Map<string, THREE.Group>;
+  /** The order the cells are in, which is the order the list is in. */
+  order: string[];
+  columns: number;
+  onColumns: (columns: number) => void;
+}
+
+/**
+ * One compound, ready to be dropped into a cell.
+ *
+ * The holder carries the cell's placement and the resting pose, and its child
+ * carries the compound itself, shifted so the assembly's middle sits on the
+ * holder's origin. Two objects rather than one, because the shift has to happen
+ * before the holder scales and turns it.
+ */
+function buildHolder(pack: LoadedPack, compound: LegoProject): THREE.Group {
+  const holder = new THREE.Group();
+  const centred = new THREE.Group();
+  holder.add(centred);
+
+  const groups = new Map<string, THREE.Group>();
+  const assembly = new THREE.Group();
+  centred.add(assembly);
+
+  // Depth first from the root, so a piece's parent is always in place first.
+  for (const piece of walkPieces(compound)) {
+    const group = new THREE.Group();
+    group.position.set(...piece.position);
+    group.rotation.set(...piece.rotation);
+    group.scale.set(...piece.scale);
+    const parent =
+      piece.id === compound.rootPieceId
+        ? assembly
+        : (groups.get(piece.parentId as string) ?? assembly);
+    parent.add(group);
+    groups.set(piece.id, group);
+
+    const geometry = piece.partId ? getPartGeometry(pack, piece.partId) : null;
+    if (geometry)
+      group.add(new THREE.Mesh(geometry, partMaterial(pack.manifest)));
+  }
+
+  // A compound of nothing but empty pieces has no size to fit, and dividing by
+  // it would send the holder to infinity.
+  const box = new THREE.Box3().setFromObject(assembly);
+  if (!box.isEmpty()) {
+    const size = box.getSize(new THREE.Vector3());
+    const centre = box.getCenter(new THREE.Vector3());
+    holder.scale.setScalar(
+      (CELL * 0.58) / Math.max(size.x, size.y, size.z, 0.001),
+    );
+    centred.position.copy(centre).negate();
+  }
+  holder.rotation.set(REST_PITCH, REST_YAW, 0);
+  return holder;
+}
+
+/** Put every compound in its cell and draw once. World units are pixels. */
+function layout(state: GridState, scrollTop: number, viewportHeight: number) {
+  const { renderer, camera, columns, order, holders } = state;
+  if (viewportHeight === 0) return;
+
+  camera.left = 0;
+  camera.right = renderer.domElement.clientWidth;
+  camera.top = -scrollTop;
+  camera.bottom = -scrollTop - viewportHeight;
+  camera.updateProjectionMatrix();
+
+  order.forEach((id, index) => {
+    const holder = holders.get(id);
+    if (!holder) return;
+    holder.position.set(
+      (index % columns) * PITCH_X + CELL / 2,
+      -(Math.floor(index / columns) * PITCH_Y + CELL / 2),
+      0,
+    );
+  });
+
+  renderer.render(state.scene, state.camera);
+}

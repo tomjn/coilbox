@@ -1,8 +1,11 @@
+import { Button } from "@picoframe/frame";
 import { Blocks, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { usePartFilter } from "../filter";
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
+import { deleteCompound, useLegoCompounds } from "../projects";
+import { CompoundPicker } from "./components/CompoundPicker";
 import { PartDetail } from "./components/PartDetail";
 import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
@@ -22,6 +25,8 @@ type Status =
 export default function PartsPage() {
   const [status, setStatus] = useState<Status>({ state: "loading" });
   const [selected, setSelected] = useState<LegoPartInfo | null>(null);
+  const [tab, setTab] = useState<"parts" | "compounds">("parts");
+  const { compounds } = useLegoCompounds();
 
   useEffect(() => {
     let live = true;
@@ -60,17 +65,49 @@ export default function PartsPage() {
 
       {pack ? (
         <>
-          <PartFilters
-            pack={pack}
-            query={filter.query}
-            onQuery={filter.setQuery}
-            colourway={filter.colourway}
-            onColourway={filter.setColourway}
-            shown={parts.length}
-            className="border-b border-border px-6 py-3"
-          />
+          <div className="flex items-center gap-2 border-b border-border px-6 py-3">
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant={tab === "parts" ? "default" : "ghost"}
+                onClick={() => setTab("parts")}
+              >
+                Parts
+              </Button>
+              <Button
+                size="sm"
+                variant={tab === "compounds" ? "default" : "ghost"}
+                onClick={() => setTab("compounds")}
+              >
+                Compounds
+              </Button>
+            </div>
+            {tab === "parts" ? (
+              <PartFilters
+                pack={pack}
+                query={filter.query}
+                onQuery={filter.setQuery}
+                colourway={filter.colourway}
+                onColourway={filter.setColourway}
+                shown={parts.length}
+                className="flex-1"
+              />
+            ) : (
+              <span className="ml-auto text-sm text-muted-foreground">
+                Assemblies you saved while building. Open a unit to use one.
+              </span>
+            )}
+          </div>
 
-          {parts.length === 0 ? (
+          {tab === "compounds" ? (
+            <div className="flex min-h-0 flex-1">
+              <CompoundPicker
+                pack={pack}
+                compounds={compounds}
+                onDelete={(id) => void deleteCompound(id)}
+              />
+            </div>
+          ) : parts.length === 0 ? (
             <NoMatches />
           ) : (
             <div className="flex min-h-0 flex-1">

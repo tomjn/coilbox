@@ -1,10 +1,13 @@
 /**
- * Session store for saved units.
+ * Session store for saved units and compounds.
  *
  * Same shape as `src/campaign/campaigns.ts`: a module-level cache so navigating
  * back to the overview does not re-read every document, and a listener set so a
  * save in the builder updates the overview without a round trip through the
  * router.
+ *
+ * Units and compounds are the same document in different folders, so one read
+ * covers both and the builder never has to ask twice.
  */
 
 import { useEffect, useState } from "react";
@@ -12,28 +15,36 @@ import { useEffect, useState } from "react";
 import { legoDelete, legoList, legoSave, legoThumbSave } from "./bindings";
 import { type LegoProject, parseLegoProjectJson } from "./model";
 
-let cache: LegoProject[] | null = null;
-const listeners = new Set<(projects: LegoProject[]) => void>();
-
-/** Read and parse every stored project, skipping any that will not load. */
-async function fetchProjects(): Promise<LegoProject[]> {
-  const { projects } = await legoList({});
-  const loaded: LegoProject[] = [];
-  for (const item of projects) {
-    const project = parseLegoProjectJson(item.json);
-    if (project) {
-      loaded.push(project);
-    } else {
-      // One unreadable document must not hide every other unit.
-      console.warn("skipping a unit that could not be read", item.id);
-    }
-  }
-  return loaded.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+interface LegoStore {
+  projects: LegoProject[];
+  compounds: LegoProject[];
 }
 
-/** Re-read from disk and push the result to every mounted `useLegoProjects`. */
-export async function refreshProjects(): Promise<LegoProject[]> {
-  const loaded = await fetchProjects();
+let cache: LegoStore | null = null;
+const listeners = new Set<(store: LegoStore) => void>();
+
+/** Read and parse every stored document, skipping any that will not load. */
+async function fetchStore(): Promise<LegoStore> {
+  const { projects, compounds } = await legoList({});
+  const parse = (items: { id: string; json: string }[]) => {
+    const loaded: LegoProject[] = [];
+    for (const item of items) {
+      const document = parseLegoProjectJson(item.json);
+      if (document) {
+        loaded.push(document);
+      } else {
+        // One unreadable document must not hide every other unit.
+        console.warn("skipping a document that could not be read", item.id);
+      }
+    }
+    return loaded.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  };
+  return { projects: parse(projects), compounds: parse(compounds) };
+}
+
+/** Re-read from disk and push the result to every mounted hook. */
+export async function refreshProjects(): Promise<LegoStore> {
+  const loaded = await fetchStore();
   cache = loaded;
   for (const listener of listeners) listener(loaded);
   return loaded;
@@ -58,6 +69,25 @@ export async function saveProject(project: LegoProject): Promise<LegoProject> {
 
 export async function deleteProject(id: string): Promise<void> {
   await legoDelete({ kind: "project", id });
+  await refreshProjects();
+}
+
+/** Save a reusable sub-assembly. Stored beside units, in its own folder. */
+export async function saveCompound(
+  compound: LegoProject,
+): Promise<LegoProject> {
+  const stamped = { ...compound, updatedAt: new Date().toISOString() };
+  await legoSave({
+    kind: "compound",
+    id: stamped.id,
+    json: JSON.stringify(stamped),
+  });
+  await refreshProjects();
+  return stamped;
+}
+
+export async function deleteCompound(id: string): Promise<void> {
+  await legoDelete({ kind: "compound", id });
   await refreshProjects();
 }
 
@@ -101,14 +131,16 @@ export async function saveThumbnail(
   await legoThumbSave({ id, png: Array.from(bytes) });
 }
 
-/** Every saved unit, newest first. Stays in step with saves made elsewhere. */
-export function useLegoProjects() {
-  const [projects, setProjects] = useState<LegoProject[]>(cache ?? []);
+const EMPTY: LegoStore = { projects: [], compounds: [] };
+
+/** Everything on disk, newest first. Stays in step with saves made elsewhere. */
+function useLegoStore() {
+  const [store, setStore] = useState<LegoStore>(cache ?? EMPTY);
   const [loading, setLoading] = useState(cache === null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const listener = (loaded: LegoProject[]) => setProjects(loaded);
+    const listener = (loaded: LegoStore) => setStore(loaded);
     listeners.add(listener);
     return () => {
       listeners.delete(listener);
@@ -117,17 +149,17 @@ export function useLegoProjects() {
 
   useEffect(() => {
     if (cache) {
-      setProjects(cache);
+      setStore(cache);
       setLoading(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
-    fetchProjects()
+    fetchStore()
       .then((loaded) => {
         cache = loaded;
         if (!cancelled) {
-          setProjects(loaded);
+          setStore(loaded);
           setError(null);
         }
       })
@@ -142,5 +174,17 @@ export function useLegoProjects() {
     };
   }, []);
 
-  return { projects, loading, error };
+  return { store, loading, error };
+}
+
+/** Every saved unit, newest first. */
+export function useLegoProjects() {
+  const { store, loading, error } = useLegoStore();
+  return { projects: store.projects, loading, error };
+}
+
+/** Every saved sub-assembly, newest first. */
+export function useLegoCompounds() {
+  const { store, loading, error } = useLegoStore();
+  return { compounds: store.compounds, loading, error };
 }

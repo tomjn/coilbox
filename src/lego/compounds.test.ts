@@ -1,0 +1,206 @@
+import { describe, expect, it } from "vitest";
+
+import { insertCompound, subtreeAsCompound } from "./compounds";
+import {
+  childrenOf,
+  type LegoPiece,
+  type LegoProject,
+  newProject,
+} from "./model";
+
+function project(pieces: Partial<LegoPiece>[]): LegoProject {
+  const base = newProject({
+    id: "p",
+    rootPieceId: "root",
+    name: "walker",
+    packId: "lego",
+    packVersion: "1",
+    now: "2026-07-28T00:00:00Z",
+  });
+  return {
+    ...base,
+    pieces: [
+      ...base.pieces,
+      ...pieces.map((piece, i) => ({
+        id: `piece${i}`,
+        name: `piece${i}`,
+        parentId: "root",
+        partId: null,
+        position: [0, 0, 0] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number],
+        scale: [1, 1, 1] as [number, number, number],
+        ...piece,
+      })),
+    ],
+  };
+}
+
+/** Predictable ids, so a test can say which piece it means. */
+function counter(prefix: string) {
+  let n = 0;
+  return () => `${prefix}${n++}`;
+}
+
+const TURRET = project([
+  {
+    id: "turret",
+    name: "turret",
+    parentId: "root",
+    position: [0, 4, 0],
+    rotation: [0, 1, 0],
+    scale: [2, 2, 2],
+  },
+  { id: "barrel", name: "barrel", parentId: "turret", position: [0, 0, 3] },
+  { id: "flare", name: "flare", parentId: "barrel", position: [0, 0, 1] },
+]);
+
+describe("subtreeAsCompound", () => {
+  it("takes the piece and everything under it, and nothing else", () => {
+    const compound = subtreeAsCompound(TURRET, "turret", {
+      id: "c1",
+      now: "2026-07-28T00:00:00Z",
+      newId: counter("new"),
+    });
+
+    expect(compound?.pieces.map((piece) => piece.name)).toEqual([
+      "turret",
+      "barrel",
+      "flare",
+    ]);
+  });
+
+  it("stands the subtree root at the origin, untransformed", () => {
+    const compound = subtreeAsCompound(TURRET, "turret", {
+      id: "c1",
+      now: "2026-07-28T00:00:00Z",
+      newId: counter("new"),
+    });
+    const root = compound?.pieces.find(
+      (piece) => piece.id === compound.rootPieceId,
+    );
+
+    expect(root?.parentId).toBeNull();
+    expect(root?.position).toEqual([0, 0, 0]);
+    expect(root?.rotation).toEqual([0, 0, 0]);
+    expect(root?.scale).toEqual([1, 1, 1]);
+  });
+
+  it("keeps the arrangement below the root", () => {
+    const compound = subtreeAsCompound(TURRET, "turret", {
+      id: "c1",
+      now: "2026-07-28T00:00:00Z",
+      newId: counter("new"),
+    }) as LegoProject;
+    const barrel = compound.pieces.find((piece) => piece.name === "barrel");
+
+    expect(barrel?.position).toEqual([0, 0, 3]);
+    expect(childrenOf(compound, barrel?.id ?? null)).toHaveLength(1);
+  });
+
+  it("gives every piece a fresh id, so it cannot collide on insert", () => {
+    const compound = subtreeAsCompound(TURRET, "turret", {
+      id: "c1",
+      now: "2026-07-28T00:00:00Z",
+      newId: counter("new"),
+    }) as LegoProject;
+
+    expect(compound.pieces.map((piece) => piece.id)).toEqual([
+      "new0",
+      "new1",
+      "new2",
+    ]);
+  });
+
+  it("is null for a piece that is not there", () => {
+    expect(
+      subtreeAsCompound(TURRET, "ghost", {
+        id: "c1",
+        now: "2026-07-28T00:00:00Z",
+        newId: counter("new"),
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("insertCompound", () => {
+  const compound = subtreeAsCompound(TURRET, "turret", {
+    id: "c1",
+    now: "2026-07-28T00:00:00Z",
+    newId: counter("c"),
+  }) as LegoProject;
+
+  it("hangs the compound's root off the chosen piece", () => {
+    const host = project([{ id: "hull", name: "hull", parentId: "root" }]);
+
+    const { project: after, rootPieceId } = insertCompound(
+      host,
+      compound,
+      "hull",
+      counter("i"),
+    );
+
+    expect(after.pieces).toHaveLength(host.pieces.length + 3);
+    expect(
+      after.pieces.find((piece) => piece.id === rootPieceId)?.parentId,
+    ).toBe("hull");
+  });
+
+  it("falls back to the unit's root when the parent has gone", () => {
+    const host = project([]);
+
+    const { project: after, rootPieceId } = insertCompound(
+      host,
+      compound,
+      "ghost",
+      counter("i"),
+    );
+
+    expect(
+      after.pieces.find((piece) => piece.id === rootPieceId)?.parentId,
+    ).toBe("root");
+  });
+
+  it("renames pieces that clash with ones already in the unit", () => {
+    const host = project([{ id: "b", name: "barrel", parentId: "root" }]);
+
+    const { project: after } = insertCompound(
+      host,
+      compound,
+      "root",
+      counter("i"),
+    );
+
+    expect(after.pieces.map((piece) => piece.name)).toContain("barrel2");
+    expect(
+      after.pieces.filter((piece) => piece.name === "barrel"),
+    ).toHaveLength(1);
+  });
+
+  it("keeps the compound's own hierarchy", () => {
+    const host = project([]);
+
+    const { project: after, rootPieceId } = insertCompound(
+      host,
+      compound,
+      "root",
+      counter("i"),
+    );
+    const barrel = childrenOf(after, rootPieceId)[0];
+
+    expect(barrel.name).toBe("barrel");
+    expect(childrenOf(after, barrel.id).map((piece) => piece.name)).toEqual([
+      "flare",
+    ]);
+  });
+
+  it("inserting twice gives two independent copies", () => {
+    const host = project([]);
+
+    const once = insertCompound(host, compound, "root", counter("a"));
+    const twice = insertCompound(once.project, compound, "root", counter("b"));
+    const ids = twice.project.pieces.map((piece) => piece.id);
+
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(twice.project.pieces).toHaveLength(host.pieces.length + 6);
+  });
+});
