@@ -1,0 +1,3 @@
+{
+  "_comment": "Hand curation for the parts pack, keyed by part id. Merged over the values the converter derives, so anything set here wins. Fields: name, category, colourway, tags (appended), pivot, hidden. Ships near empty on purpose: the pack is searchable without it, and curating is an improvement rather than a prerequisite."
+}
