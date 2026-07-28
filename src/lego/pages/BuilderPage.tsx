@@ -3,9 +3,15 @@ import { Blocks, Plus, Save, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { usePartFilter } from "../filter";
 import {
-  childrenOf,
   descendantIds,
   type LegoPiece,
   type LegoProject,
@@ -15,10 +21,12 @@ import {
 } from "../model";
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
 import { saveProject, saveThumbnail, useLegoProjects } from "../projects";
+import { canReparent, reparentPiece } from "../reparent";
 import { ModelViewport } from "./components/ModelViewport";
 import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
+import { PieceTree } from "./components/PieceTree";
 
 /**
  * Assemble one unit.
@@ -188,6 +196,11 @@ export default function BuilderPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // The piece stays where it is on screen: only what carries it changes.
+  function reparent(pieceId: string, parentId: string) {
+    edit((project) => reparentPiece(project, pieceId, parentId));
+  }
+
   function transformPiece(pieceId: string, change: Partial<LegoPiece>) {
     edit((project) => ({
       ...project,
@@ -322,9 +335,9 @@ export default function BuilderPage() {
           <div className="min-h-0 flex-1 overflow-y-auto py-1">
             <PieceTree
               project={draft}
-              parentId={null}
               selectedId={selectedId}
               onSelect={setSelectedId}
+              onReparent={reparent}
             />
           </div>
 
@@ -342,7 +355,42 @@ export default function BuilderPage() {
                 onCommit={renameSelected}
                 className="mt-1"
               />
-              <p className="mt-1 text-xs text-muted-foreground">
+              {selected.id === draft.rootPieceId ? null : (
+                // The same move as dragging a row onto another, for anyone not
+                // using a pointer.
+                <div className="mt-2">
+                  <span className="text-xs text-muted-foreground">
+                    Hangs off
+                  </span>
+                  <Select
+                    value={selected.parentId ?? draft.rootPieceId}
+                    onValueChange={(parentId) =>
+                      reparent(selected.id, parentId)
+                    }
+                  >
+                    <SelectTrigger
+                      size="sm"
+                      className="mt-1 w-full"
+                      aria-label="Parent piece"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {draft.pieces
+                        .filter((piece) =>
+                          canReparent(draft, selected.id, piece.id),
+                        )
+                        .map((piece) => (
+                          <SelectItem key={piece.id} value={piece.id}>
+                            {piece.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <p className="mt-2 text-xs text-muted-foreground">
                 {selected.partId
                   ? "Geometry."
                   : "Empty, so it carries other pieces and can be an emit point."}
@@ -374,53 +422,5 @@ export default function BuilderPage() {
         </div>
       </div>
     </div>
-  );
-}
-
-/** The piece hierarchy, indented by depth. */
-function PieceTree({
-  project,
-  parentId,
-  selectedId,
-  onSelect,
-  depth = 0,
-}: {
-  project: LegoProject;
-  parentId: string | null;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  depth?: number;
-}) {
-  return (
-    <ul>
-      {childrenOf(project, parentId).map((piece) => (
-        <li key={piece.id}>
-          <button
-            type="button"
-            onClick={() => onSelect(piece.id)}
-            className={`flex w-full items-center gap-2 px-3 py-1 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-              piece.id === selectedId
-                ? "bg-primary/15 text-foreground"
-                : "hover:bg-muted/50"
-            }`}
-            style={{ paddingLeft: 12 + depth * 14 }}
-          >
-            <span className="truncate">{piece.name}</span>
-            {piece.partId ? null : (
-              <span className="ml-auto text-xs text-muted-foreground">
-                empty
-              </span>
-            )}
-          </button>
-          <PieceTree
-            project={project}
-            parentId={piece.id}
-            selectedId={selectedId}
-            onSelect={onSelect}
-            depth={depth + 1}
-          />
-        </li>
-      ))}
-    </ul>
   );
 }
