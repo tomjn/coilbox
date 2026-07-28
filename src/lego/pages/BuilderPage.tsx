@@ -19,9 +19,9 @@ import { PartPicker } from "./components/PartPicker";
 /**
  * Assemble one unit.
  *
- * The document is held in local state and written on save rather than on every
- * nudge, so a drag is not a hundred disk writes. The overview stays in step
- * because saving goes through the shared store.
+ * The document is held in local state and written shortly after the last edit,
+ * so a drag is not a hundred disk writes and leaving the page does not lose
+ * work. The overview stays in step because saving goes through the shared store.
  */
 export default function BuilderPage() {
   const { id } = useParams<{ id: string }>();
@@ -54,6 +54,42 @@ export default function BuilderPage() {
   const edit = useCallback((change: (project: LegoProject) => LegoProject) => {
     setDraft((current) => (current ? change(current) : current));
     setDirty(true);
+  }, []);
+
+  // Write shortly after the last edit rather than on every one, so a drag is
+  // not a hundred disk writes but navigating away never loses work. Leaving the
+  // page saves immediately, because the timer dies with the component.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+
+  const persist = useCallback(async (project: LegoProject) => {
+    setSaving(true);
+    try {
+      const written = await saveProject(project);
+      setDirty(false);
+      // The thumbnail comes from the live canvas, so it can only be refreshed
+      // while the viewport is still mounted.
+      if (canvasRef.current) await saveThumbnail(written.id, canvasRef.current);
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!dirty || !draft) return;
+    const timer = setTimeout(() => void persist(draft), 800);
+    return () => clearTimeout(timer);
+  }, [dirty, draft, persist]);
+
+  useEffect(() => {
+    return () => {
+      // Leaving before the timer fires still writes the document. The canvas is
+      // already going, so this one cannot refresh the thumbnail.
+      if (dirtyRef.current && draftRef.current)
+        void saveProject(draftRef.current);
+    };
   }, []);
 
   function addPart(part: LegoPartInfo) {
@@ -131,19 +167,6 @@ export default function BuilderPage() {
     }));
   }
 
-  async function save() {
-    if (!draft) return;
-    setSaving(true);
-    try {
-      const written = await saveProject(draft);
-      setDraft(written);
-      setDirty(false);
-      if (canvasRef.current) await saveThumbnail(written.id, canvasRef.current);
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (loading || !draft || !pack) {
     return (
       <p className="px-6 py-10 text-center text-sm text-muted-foreground">
@@ -167,8 +190,15 @@ export default function BuilderPage() {
             {draft.pieces.length === 1 ? "piece" : "pieces"} · {draft.unitName}
           </p>
         </div>
-        <Button className="ml-auto" onClick={save} disabled={!dirty || saving}>
-          <Save size={16} /> {dirty ? "Save" : "Saved"}
+        <span className="ml-auto text-xs text-muted-foreground">
+          {saving ? "Saving" : dirty ? "Unsaved changes" : "Saved"}
+        </span>
+        <Button
+          variant="outline"
+          onClick={() => draft && void persist(draft)}
+          disabled={saving}
+        >
+          <Save size={16} /> Save now
         </Button>
       </header>
 
@@ -251,7 +281,10 @@ export default function BuilderPage() {
         </aside>
       </div>
 
-      <div className="h-56 shrink-0 border-t border-border">
+      {/* Flex, not block: the picker sizes itself with flex-1 and its contents
+          are absolutely positioned, so in a block parent it collapses to
+          nothing and the panel looks empty. */}
+      <div className="flex h-56 shrink-0 border-t border-border">
         <PartPicker pack={pack} parts={pack.parts} onSelect={addPart} />
       </div>
     </div>
