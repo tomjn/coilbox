@@ -1,0 +1,22 @@
+[package]
+name = "tauri-plugin-coilbox-lego"
+version = "0.0.0"
+description = "Unit builder storage plugin for Coilbox (Rust half): stores lego unit projects, reusable compounds and their thumbnails. ACL identifier: coilbox-lego"
+edition = "2021"
+license = "MIT"
+# Tauri requires `links` to equal `package.name`. The ACL identifier is this
+# name with the `tauri-plugin-` prefix stripped -> `coilbox-lego`.
+links = "tauri-plugin-coilbox-lego"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+picoframe-core = "0.0.4"
+coilbox-portable = { path = "../coilbox-portable" }
+
+[dev-dependencies]
+tempfile = "3"

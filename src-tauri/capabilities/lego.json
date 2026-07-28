@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "lego",
+  "description": "Grants the unit builder's project storage, thumbnail and reveal commands to the main window, plus the save dialog used to choose where a unit is exported.",
+  "windows": ["main"],
+  "permissions": ["coilbox-lego:default", "dialog:allow-open", "dialog:allow-save"]
+}

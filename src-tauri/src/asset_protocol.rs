@@ -85,6 +85,7 @@ fn resolve_path(
     portable: Option<PathBuf>,
     campaign_base: impl FnOnce() -> Option<PathBuf>,
     legopack_base: impl FnOnce() -> Option<PathBuf>,
+    lego_base: impl FnOnce() -> Option<PathBuf>,
 ) -> Option<PathBuf> {
     let (root, rest) = segments.split_first()?;
     match root.as_str() {
@@ -109,6 +110,13 @@ fn resolve_path(
                 return None;
             }
             Some(rest.iter().fold(legopack_base()?, |p, s| p.join(s)))
+        }
+        "lego" => {
+            // lego/<file>: unit thumbnails, one flat folder.
+            let [file] = rest else {
+                return None;
+            };
+            Some(lego_base()?.join(file))
         }
         _ => None,
     }
@@ -257,6 +265,11 @@ pub fn handle<R: Runtime>(
                 .map(|d| d.join("campaign").join("media"))
         },
         || legopack_dir(app),
+        || {
+            coilbox_portable::data_dir(app)
+                .ok()
+                .map(|d| d.join("lego").join("thumbs"))
+        },
     );
     let Some(full) = full else {
         return not_found();
@@ -302,6 +315,7 @@ mod tests {
             Some(PathBuf::from("/pkg/.coilbox")),
             || None,
             || None,
+            || None,
         );
         assert_eq!(got, Some(PathBuf::from("/pkg/.coilbox/images/x.jpg")));
     }
@@ -309,7 +323,7 @@ mod tests {
     #[test]
     fn resolve_portable_none_without_root() {
         let segs = vec!["portable".into(), "x.jpg".into()];
-        assert_eq!(resolve_path(&segs, None, || None, || None), None);
+        assert_eq!(resolve_path(&segs, None, || None, || None, || None), None);
     }
 
     #[test]
@@ -317,15 +331,15 @@ mod tests {
         let base = || Some(PathBuf::from("/data/campaign/media"));
         let ok = vec!["campaign".into(), "camp-1".into(), "intro.mp4".into()];
         assert_eq!(
-            resolve_path(&ok, None, base, || None),
+            resolve_path(&ok, None, base, || None, || None),
             Some(PathBuf::from("/data/campaign/media/camp-1/intro.mp4"))
         );
         // missing file segment
         let no_file = vec!["campaign".into(), "camp-1".into()];
-        assert_eq!(resolve_path(&no_file, None, base, || None), None);
+        assert_eq!(resolve_path(&no_file, None, base, || None, || None), None);
         // bad id
         let bad = vec!["campaign".into(), "../x".into(), "intro.mp4".into()];
-        assert_eq!(resolve_path(&bad, None, base, || None), None);
+        assert_eq!(resolve_path(&bad, None, base, || None, || None), None);
     }
 
     #[test]
@@ -333,20 +347,39 @@ mod tests {
         let base = || Some(PathBuf::from("/res/legoparts"));
         let segs = vec!["legopack".into(), "parts.bin.gz".into()];
         assert_eq!(
-            resolve_path(&segs, None, || None, base),
+            resolve_path(&segs, None, || None, base, || None),
             Some(PathBuf::from("/res/legoparts/parts.bin.gz"))
         );
         // no file segment, and no pack installed
         let bare = vec!["legopack".into()];
-        assert_eq!(resolve_path(&bare, None, || None, base), None);
-        assert_eq!(resolve_path(&segs, None, || None, || None), None);
+        assert_eq!(resolve_path(&bare, None, || None, base, || None), None);
+        assert_eq!(resolve_path(&segs, None, || None, || None, || None), None);
+    }
+
+    #[test]
+    fn resolve_lego_serves_one_flat_folder() {
+        let base = || Some(PathBuf::from("/data/lego/thumbs"));
+        let segs = vec!["lego".into(), "abc.png".into()];
+        assert_eq!(
+            resolve_path(&segs, None, || None, || None, base),
+            Some(PathBuf::from("/data/lego/thumbs/abc.png"))
+        );
+        // Thumbnails are not nested, so a deeper path is not a thumbnail.
+        let nested = vec!["lego".into(), "sub".into(), "abc.png".into()];
+        assert_eq!(resolve_path(&nested, None, || None, || None, base), None);
     }
 
     #[test]
     fn resolve_unknown_root_is_none() {
         let segs = vec!["secret".into(), "x".into()];
         assert_eq!(
-            resolve_path(&segs, Some(PathBuf::from("/pkg")), || None, || None),
+            resolve_path(
+                &segs,
+                Some(PathBuf::from("/pkg")),
+                || None,
+                || None,
+                || None
+            ),
             None
         );
     }

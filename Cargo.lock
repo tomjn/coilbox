@@ -573,6 +573,7 @@ dependencies = [
  "tauri-plugin-coilbox-conquest",
  "tauri-plugin-coilbox-content",
  "tauri-plugin-coilbox-downloads",
+ "tauri-plugin-coilbox-lego",
  "tauri-plugin-coilbox-lobby-servers",
  "tauri-plugin-coilbox-mapconv",
  "tauri-plugin-coilbox-multiplayer",
@@ -608,6 +609,10 @@ version = "0.0.0"
 dependencies = [
  "tauri",
 ]
+
+[[package]]
+name = "coilbox-s3o"
+version = "0.0.0"
 
 [[package]]
 name = "coilbox-springlua"
@@ -4869,6 +4874,19 @@ dependencies = [
  "sevenz-rust2",
  "tauri",
  "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-coilbox-lego"
+version = "0.0.0"
+dependencies = [
+ "coilbox-portable",
+ "picoframe-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tempfile",
 ]
 
 [[package]]
