@@ -11,6 +11,7 @@
  * shared geometry cache and the camera position with it.
  */
 
+import { Button } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -28,6 +29,13 @@ import {
 } from "../../snapping";
 
 export type GizmoMode = "translate" | "rotate" | "scale";
+
+/** Buttons as well as keys, so turning a piece is not a keyboard secret. */
+const MODES: { id: GizmoMode; label: string; key: string }[] = [
+  { id: "translate", label: "Move", key: "G" },
+  { id: "rotate", label: "Turn", key: "R" },
+  { id: "scale", label: "Scale", key: "S" },
+];
 
 /** How close two anchors must be before a piece seats against another. */
 const SNAP_DISTANCE = 0.45;
@@ -135,10 +143,17 @@ export function ModelViewport({
     };
     sceneRef.current = state;
 
-    // Orbiting while dragging a handle would fight the drag.
-    gizmo.addEventListener("dragging-changed", (event) => {
-      controls.enabled = !event.value;
-      if (!event.value) commitGizmo(state);
+    // `mouseDown` and `mouseUp`, not `dragging-changed`: this version of
+    // TransformControls does not dispatch that one, so listening for it left
+    // orbit running during a drag, and never wrote the moved transform back.
+    // The next edit then resynced the scene from a document that still had
+    // every piece at the origin.
+    gizmo.addEventListener("mouseDown", () => {
+      controls.enabled = false;
+    });
+    gizmo.addEventListener("mouseUp", () => {
+      controls.enabled = true;
+      commitGizmo(state);
     });
 
     gizmo.addEventListener("objectChange", () => {
@@ -169,14 +184,33 @@ export function ModelViewport({
       frame = requestAnimationFrame(tick);
     }
 
-    // Clicking empty space clears the selection, which is how you get back to
-    // editing the unit as a whole.
+    // Selection happens on release, not on press, and only when the pointer
+    // barely moved. Selecting on press meant a click that missed a gizmo handle
+    // by a pixel cleared the selection and detached the gizmo before the drag
+    // could start, and dragging empty space to orbit cleared it too.
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
+    let pressedAt: { x: number; y: number } | null = null;
+    let pressedOnGizmo = false;
+
     const onPointerDown = (event: PointerEvent) => {
-      // The gizmo shares this canvas, so a click on one of its handles would
-      // otherwise select whatever happens to be behind it and abandon the drag.
-      if (gizmo.dragging || gizmo.axis !== null) return;
+      pressedAt = { x: event.clientX, y: event.clientY };
+      // Whether a handle was grabbed has to be read now rather than on release.
+      // TransformControls registered its listeners on this canvas first, so its
+      // pointerdown has already set these, and its pointerup clears them again
+      // before this handler's pointerup would ever see them.
+      pressedOnGizmo = gizmo.dragging || gizmo.axis !== null;
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      const from = pressedAt;
+      const onGizmo = pressedOnGizmo;
+      pressedAt = null;
+      pressedOnGizmo = false;
+      if (!from || onGizmo) return;
+      // Anything past a few pixels was an orbit or a drag, not a click.
+      if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > 4)
+        return;
+
       const bounds = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
       pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
@@ -185,12 +219,14 @@ export function ModelViewport({
       onSelectRef.current(pieceIdOf(hit?.object ?? null));
     };
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
+    renderer.domElement.addEventListener("pointerup", onPointerUp);
 
     onReadyRef.current?.(renderer.domElement);
 
     return () => {
       cancelAnimationFrame(frame);
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
+      renderer.domElement.removeEventListener("pointerup", onPointerUp);
       observer.disconnect();
       controls.removeEventListener("change", render);
       controls.dispose();
@@ -277,14 +313,23 @@ export function ModelViewport({
     // rather than a fixed colour, so it deepens whatever the theme is.
     <div className="relative h-full w-full bg-black/30">
       <div ref={containerRef} className="h-full w-full" />
-      <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1 text-xs text-muted-foreground">
-        <span>
-          {mode === "translate" ? "Move" : mode === "rotate" ? "Turn" : "Scale"}
-          {" · G, R, S"}
-        </span>
-        <span>
+      <div className="absolute left-3 top-3 flex flex-col items-start gap-2">
+        <div className="flex gap-1">
+          {MODES.map(({ id, label, key }) => (
+            <Button
+              key={id}
+              size="sm"
+              variant={mode === id ? "default" : "outline"}
+              onClick={() => setMode(id)}
+              title={`${label} (${key})`}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+        <span className="pointer-events-none text-xs text-muted-foreground">
           {snapped
-            ? "Snapped, hold Alt to place freely"
+            ? "Snapped. Hold Alt to place freely"
             : "Hold Alt to place freely"}
         </span>
       </div>

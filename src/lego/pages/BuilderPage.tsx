@@ -1,4 +1,4 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, Input, useHideSidebar } from "@picoframe/frame";
 import { Blocks, Plus, Save, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
@@ -26,6 +26,8 @@ import { PartPicker } from "./components/PartPicker";
  */
 export default function BuilderPage() {
   const { id } = useParams<{ id: string }>();
+  // The viewport wants the width, and the nav stays reachable from the top bar.
+  useHideSidebar();
   const { projects, loading } = useLegoProjects();
   const stored = projects.find((project) => project.id === id);
 
@@ -156,12 +158,51 @@ export default function BuilderPage() {
     setSelectedId(draft.rootPieceId);
   }
 
+  // The key handler is registered once, so it reaches the current selection
+  // through a ref rather than the one it was created with.
+  const removeSelectedRef = useRef(removeSelected);
+  removeSelectedRef.current = removeSelected;
+
+  // Backspace deletes the selected piece, which is what it does in every other
+  // 3D tool. Without this the webview treats it as browser Back and the whole
+  // page navigates away mid-edit.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Backspace" && event.key !== "Delete") return;
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      removeSelectedRef.current();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   function transformPiece(pieceId: string, change: Partial<LegoPiece>) {
     edit((project) => ({
       ...project,
       pieces: project.pieces.map((piece) =>
         piece.id === pieceId ? { ...piece, ...change } : piece,
       ),
+    }));
+  }
+
+  function renameUnit(name: string) {
+    edit((project) => ({
+      ...project,
+      name,
+      // The export name follows the title only while it has not been set to
+      // something of its own, so a deliberate override is never overwritten.
+      unitName:
+        project.unitName === normalisePieceName(project.name)
+          ? normalisePieceName(name)
+          : project.unitName,
     }));
   }
 
@@ -191,16 +232,20 @@ export default function BuilderPage() {
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-border px-6 py-3">
         <Blocks size={18} />
-        <div className="min-w-0">
-          <h1 className="truncate text-sm font-semibold leading-tight">
-            {draft.name}
-          </h1>
-          <p className="truncate text-xs text-muted-foreground">
+        <div className="min-w-0 flex-1">
+          <Input
+            value={draft.name}
+            onChange={(event) => renameUnit(event.target.value)}
+            aria-label="Unit name"
+            className="h-7 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
+          />
+          <p className="px-1 text-xs text-muted-foreground">
             {draft.pieces.length}{" "}
-            {draft.pieces.length === 1 ? "piece" : "pieces"} · {draft.unitName}
+            {draft.pieces.length === 1 ? "piece" : "pieces"} · exports as{" "}
+            {draft.unitName}
           </p>
         </div>
-        <span className="ml-auto text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {saving ? "Saving" : dirty ? "Unsaved changes" : "Saved"}
         </span>
         <Button
