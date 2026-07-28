@@ -1,8 +1,22 @@
 import { Button, Input, useHideSidebar } from "@picoframe/frame";
-import { Blocks, PackagePlus, Plus, Save, Trash2, Upload } from "lucide-react";
+import {
+  Blocks,
+  ChevronDown,
+  ChevronUp,
+  ClipboardPaste,
+  Copy,
+  PackagePlus,
+  Plus,
+  Redo,
+  Save,
+  Trash2,
+  Undo,
+  Upload,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
+import { ButtonGroup } from "@/components/ui/button-group";
 import {
   Select,
   SelectContent,
@@ -23,6 +37,7 @@ import {
   uniquePieceName,
 } from "../model";
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
+import { currentPivot, pivotChoices, setPivot } from "../pivot";
 import {
   deleteCompound,
   saveCompound,
@@ -40,9 +55,15 @@ import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 import { PieceTree } from "./components/PieceTree";
+import { TransformFields } from "./components/TransformFields";
 
 /** Radix needs a non-empty value, so "no role" gets one of its own. */
 const NO_ROLE = "none";
+
+/** Undo steps kept. Whole documents, but a unit is a few hundred numbers. */
+const HISTORY_LIMIT = 60;
+/** Edits closer together than this are one gesture, so they undo together. */
+const COALESCE_MS = 400;
 
 /**
  * Assemble one unit.
@@ -65,9 +86,14 @@ export default function BuilderPage() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [strip, setStrip] = useState<"parts" | "compounds">("parts");
+  const [stripOpen, setStripOpen] = useState(true);
+  /** A lifted subtree waiting to be pasted. In memory, not the OS clipboard. */
+  const [clipboard, setClipboard] = useState<LegoProject | null>(null);
   const [aside, setAside] = useState<"pieces" | "animation">("pieces");
   const [exporting, setExporting] = useState(false);
   const [playing, setPlaying] = useState(false);
+  /** A preference, not part of the unit, so it lives with the session. */
+  const [uniformScale, setUniformScale] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const filter = usePartFilter(pack);
 
@@ -87,16 +113,74 @@ export default function BuilderPage() {
     [draft],
   );
 
-  const edit = useCallback((change: (project: LegoProject) => LegoProject) => {
-    setDraft((current) => (current ? change(current) : current));
-    setDirty(true);
-  }, []);
-
   // Write shortly after the last edit rather than on every one, so a drag is
   // not a hundred disk writes but navigating away never loses work. Leaving the
   // page saves immediately, because the timer dies with the component.
   const draftRef = useRef(draft);
   draftRef.current = draft;
+
+  /**
+   * Undo history: whole documents, not a log of operations.
+   *
+   * A unit is small and every edit already returns a fresh one, so keeping
+   * copies costs little and cannot drift from the operations the way a replay
+   * log can. Bounded, because a long session should not grow without end.
+   */
+  const [past, setPast] = useState<LegoProject[]>([]);
+  const [future, setFuture] = useState<LegoProject[]>([]);
+  const lastEditAt = useRef(0);
+
+  const edit = useCallback((change: (project: LegoProject) => LegoProject) => {
+    const current = draftRef.current;
+    if (!current) return;
+    const next = change(current);
+    if (next === current) return;
+
+    // Edits in quick succession are one gesture. Dragging a slider should undo
+    // in a single step, not sixty.
+    const now = Date.now();
+    const continues = now - lastEditAt.current < COALESCE_MS;
+    lastEditAt.current = now;
+
+    setPast((entries) =>
+      continues && entries.length > 0
+        ? entries
+        : [...entries, current].slice(-HISTORY_LIMIT),
+    );
+    setFuture([]);
+    setDraft(next);
+    setDirty(true);
+  }, []);
+
+  const undo = useCallback(() => {
+    const current = draftRef.current;
+    if (!current) return;
+    setPast((entries) => {
+      const previous = entries.at(-1);
+      if (!previous) return entries;
+      setFuture((ahead) => [...ahead, current]);
+      setDraft(previous);
+      setDirty(true);
+      // The next edit starts a fresh step rather than folding into whatever
+      // was being done before the undo.
+      lastEditAt.current = 0;
+      return entries.slice(0, -1);
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    const current = draftRef.current;
+    if (!current) return;
+    setFuture((ahead) => {
+      const next = ahead.at(-1);
+      if (!next) return ahead;
+      setPast((entries) => [...entries, current]);
+      setDraft(next);
+      setDirty(true);
+      lastEditAt.current = 0;
+      return ahead.slice(0, -1);
+    });
+  }, []);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
 
@@ -193,16 +277,22 @@ export default function BuilderPage() {
 
   // The key handler is registered once, so it reaches the current selection
   // through a ref rather than the one it was created with.
-  const removeSelectedRef = useRef(removeSelected);
-  removeSelectedRef.current = removeSelected;
+  const shortcutsRef = useRef({
+    remove: removeSelected,
+    undo,
+    redo,
+    copy: () => {},
+    paste: () => {},
+    duplicate: () => {},
+  });
 
   // Backspace deletes the selected piece, which is what it does in every other
   // 3D tool. Without this the webview treats it as browser Back and the whole
   // page navigates away mid-edit.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Backspace" && event.key !== "Delete") return;
       const target = event.target;
+      // Never steal a key from a field. Undo in a text box is the browser's.
       if (
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
@@ -210,8 +300,41 @@ export default function BuilderPage() {
       ) {
         return;
       }
-      event.preventDefault();
-      removeSelectedRef.current();
+
+      const shortcuts = shortcutsRef.current;
+      const command = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+
+      if (command && key === "z") {
+        event.preventDefault();
+        if (event.shiftKey) shortcuts.redo();
+        else shortcuts.undo();
+        return;
+      }
+      if (command && key === "y") {
+        event.preventDefault();
+        shortcuts.redo();
+        return;
+      }
+      if (command && key === "c") {
+        event.preventDefault();
+        shortcuts.copy();
+        return;
+      }
+      if (command && key === "v") {
+        event.preventDefault();
+        shortcuts.paste();
+        return;
+      }
+      if (command && key === "d") {
+        event.preventDefault();
+        shortcuts.duplicate();
+        return;
+      }
+      if (event.key === "Backspace" || event.key === "Delete") {
+        event.preventDefault();
+        shortcuts.remove();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -275,6 +398,65 @@ export default function BuilderPage() {
     edit((project) => ({ ...project, unitName }));
   }
 
+  function movePivot(pieceId: string, pivot: [number, number, number]) {
+    edit((project) => setPivot(project, pieceId, pivot));
+  }
+
+  /**
+   * Copy, paste and duplicate are the compound machinery without the file.
+   * A subtree lifted out and put back is the same operation whether it goes
+   * via the clipboard or straight back into the unit.
+   */
+  function lift(pieceId: string): LegoProject | null {
+    if (!draft) return null;
+    return subtreeAsCompound(draft, pieceId, {
+      id: crypto.randomUUID(),
+      now: new Date().toISOString(),
+      newId: () => crypto.randomUUID(),
+    });
+  }
+
+  function drop(cutting: LegoProject, parentId: string) {
+    if (!draft) return;
+    const inserted = insertCompound(draft, cutting, parentId, () =>
+      crypto.randomUUID(),
+    );
+    edit(() => inserted.project);
+    setSelectedId(inserted.rootPieceId);
+  }
+
+  function copySelection() {
+    if (!selectedId) return;
+    setClipboard(lift(selectedId));
+  }
+
+  function pasteClipboard() {
+    if (!clipboard || !draft) return;
+    drop(clipboard, selectedId ?? draft.rootPieceId);
+  }
+
+  function duplicateSelection() {
+    if (!draft || !selectedId || selectedId === draft.rootPieceId) return;
+    const cutting = lift(selectedId);
+    // Alongside the original rather than inside it, which is what duplicate
+    // means everywhere else.
+    const parentId =
+      draft.pieces.find((piece) => piece.id === selectedId)?.parentId ??
+      draft.rootPieceId;
+    if (cutting) drop(cutting, parentId);
+  }
+
+  // Rebound every render, so a shortcut always runs against the current
+  // selection rather than the one the listener was created with.
+  shortcutsRef.current = {
+    remove: removeSelected,
+    undo,
+    redo,
+    copy: copySelection,
+    paste: pasteClipboard,
+    duplicate: duplicateSelection,
+  };
+
   function setRole(pieceId: string, role: string | undefined) {
     edit((project) => ({
       ...project,
@@ -307,44 +489,14 @@ export default function BuilderPage() {
   }
 
   const selected = draft.pieces.find((piece) => piece.id === selectedId);
+  // Empty pieces have no part, so no bounding box to offer pivots from. They
+  // are already a bare point, which is its own pivot.
+  const selectedPart = selected?.partId
+    ? (pack.byId.get(selected.partId) ?? null)
+    : null;
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-border px-6 py-3">
-        <Blocks size={18} />
-        <div className="min-w-0 flex-1">
-          <Input
-            value={draft.name}
-            onChange={(event) => renameUnit(event.target.value)}
-            aria-label="Unit name"
-            className="h-7 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
-          />
-          <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
-            {draft.pieces.length}{" "}
-            {draft.pieces.length === 1 ? "piece" : "pieces"} · exports as
-            <NameInput
-              value={draft.unitName}
-              onCommit={renameExport}
-              aria-label="Export name"
-              className="h-6 w-48 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
-            />
-          </p>
-        </div>
-        <span className="text-xs text-muted-foreground">
-          {saving ? "Saving" : dirty ? "Unsaved changes" : "Saved"}
-        </span>
-        <Button
-          variant="outline"
-          onClick={() => draft && void persist(draft)}
-          disabled={saving}
-        >
-          <Save size={16} /> Save now
-        </Button>
-        <Button onClick={() => setExporting(true)}>
-          <Upload size={16} /> Export
-        </Button>
-      </header>
-
       <ExportDrawer
         open={exporting}
         onOpenChange={setExporting}
@@ -355,16 +507,81 @@ export default function BuilderPage() {
         }
       />
 
-      {problems.length > 0 ? (
-        <ul className="border-b border-border px-6 py-2 text-xs text-muted-foreground">
-          {problems.map((problem) => (
-            <li key={problem}>{problem}</li>
-          ))}
-        </ul>
-      ) : null}
-
       <div className="flex min-h-0 flex-1">
-        <div className="min-h-0 flex-1">
+        {/* The unit's chrome floats over the view rather than taking a strip
+            off the top of it. The 3D is the point of this screen. */}
+        <div className="relative min-h-0 flex-1">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 p-3">
+            <div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
+              <Blocks size={16} className="shrink-0 text-muted-foreground" />
+              <div className="min-w-0">
+                <Input
+                  value={draft.name}
+                  onChange={(event) => renameUnit(event.target.value)}
+                  aria-label="Unit name"
+                  className="h-6 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
+                />
+                <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
+                  {draft.pieces.length}{" "}
+                  {draft.pieces.length === 1 ? "piece" : "pieces"} · exports as
+                  <NameInput
+                    value={draft.unitName}
+                    onCommit={renameExport}
+                    aria-label="Export name"
+                    className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
+                  />
+                </p>
+              </div>
+            </div>
+
+            <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
+              <ButtonGroup>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={undo}
+                  disabled={past.length === 0}
+                  aria-label="Undo"
+                  title="Undo (Cmd Z)"
+                >
+                  <Undo size={14} />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={redo}
+                  disabled={future.length === 0}
+                  aria-label="Redo"
+                  title="Redo (Cmd Shift Z)"
+                >
+                  <Redo size={14} />
+                </Button>
+              </ButtonGroup>
+              <span className="text-xs text-muted-foreground">
+                {saving ? "Saving" : dirty ? "Unsaved changes" : "Saved"}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => draft && void persist(draft)}
+                disabled={saving}
+              >
+                <Save size={14} /> Save
+              </Button>
+              <Button size="sm" onClick={() => setExporting(true)}>
+                <Upload size={14} /> Export
+              </Button>
+            </div>
+          </div>
+
+          {problems.length > 0 ? (
+            <ul className="pointer-events-none absolute inset-x-0 top-20 z-10 mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
+              {problems.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
+            </ul>
+          ) : null}
+
           <ModelViewport
             pack={pack}
             project={draft}
@@ -372,6 +589,7 @@ export default function BuilderPage() {
             onSelect={setSelectedId}
             onTransform={transformPiece}
             playing={playing}
+            uniformScale={uniformScale}
             onReady={(canvas) => {
               canvasRef.current = canvas;
             }}
@@ -379,22 +597,24 @@ export default function BuilderPage() {
         </div>
 
         <aside className="flex w-72 shrink-0 flex-col border-l border-border">
-          <div className="flex gap-1 border-b border-border px-3 py-2">
+          <ButtonGroup className="m-2">
             <Button
               size="sm"
-              variant={aside === "pieces" ? "default" : "ghost"}
+              variant={aside === "pieces" ? "default" : "outline"}
               onClick={() => setAside("pieces")}
+              aria-pressed={aside === "pieces"}
             >
               Pieces
             </Button>
             <Button
               size="sm"
-              variant={aside === "animation" ? "default" : "ghost"}
+              variant={aside === "animation" ? "default" : "outline"}
               onClick={() => setAside("animation")}
+              aria-pressed={aside === "animation"}
             >
               Animation
             </Button>
-          </div>
+          </ButtonGroup>
 
           {aside === "animation" ? (
             <AnimationPanel
@@ -423,6 +643,26 @@ export default function BuilderPage() {
                 <Button
                   size="sm"
                   variant="ghost"
+                  onClick={duplicateSelection}
+                  disabled={!selectedId || selectedId === draft.rootPieceId}
+                  title="Duplicate the selected piece and everything under it (Cmd D)"
+                  aria-label="Duplicate the selection"
+                >
+                  <Copy size={14} />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={pasteClipboard}
+                  disabled={!clipboard}
+                  title="Paste under the selected piece (Cmd V)"
+                  aria-label="Paste"
+                >
+                  <ClipboardPaste size={14} />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
                   onClick={() => void saveSelectionAsCompound()}
                   disabled={!selectedId}
                   title="Save the selected piece and everything under it, to reuse in another unit"
@@ -441,7 +681,7 @@ export default function BuilderPage() {
                 </Button>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto py-1">
+              <div className="min-h-32 flex-1 overflow-y-auto py-1">
                 <PieceTree
                   project={draft}
                   selectedId={selectedId}
@@ -451,7 +691,10 @@ export default function BuilderPage() {
               </div>
 
               {selected ? (
-                <div className="border-t border-border px-3 py-2">
+                // Capped and scrollable. The panel grew as pieces gained a
+                // parent, a pivot and a role, and without a limit it squeezed
+                // the tree above it down to a single clipped row.
+                <div className="max-h-[55%] shrink-0 overflow-y-auto border-t border-border px-3 py-2">
                   <label
                     className="text-xs text-muted-foreground"
                     htmlFor="lego-piece-name"
@@ -463,6 +706,13 @@ export default function BuilderPage() {
                     value={selected.name}
                     onCommit={renameSelected}
                     className="mt-1"
+                  />
+
+                  <TransformFields
+                    piece={selected}
+                    onChange={(change) => transformPiece(selected.id, change)}
+                    uniformScale={uniformScale}
+                    onUniformScaleChange={setUniformScale}
                   />
                   {selected.id === draft.rootPieceId ? null : (
                     // The same move as dragging a row onto another, for anyone not
@@ -503,6 +753,44 @@ export default function BuilderPage() {
                       </Select>
                     </div>
                   )}
+
+                  {selectedPart ? (
+                    <div className="mt-2">
+                      <span className="text-xs text-muted-foreground">
+                        Turns about
+                      </span>
+                      <Select
+                        value={
+                          currentPivot(selectedPart, selected.pivot) ?? "middle"
+                        }
+                        onValueChange={(id) => {
+                          const choice = pivotChoices(selectedPart).find(
+                            (option) => option.id === id,
+                          );
+                          if (choice) movePivot(selected.id, choice.position);
+                        }}
+                      >
+                        <SelectTrigger
+                          size="sm"
+                          className="mt-1 w-full"
+                          aria-label="Pivot point"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {pivotChoices(selectedPart).map((choice) => (
+                            <SelectItem key={choice.id} value={choice.id}>
+                              {choice.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        The point this piece turns about, and that its children
+                        hang from. A leg wants its top, not its middle.
+                      </p>
+                    </div>
+                  ) : null}
 
                   <div className="mt-2">
                     <span className="text-xs text-muted-foreground">Role</span>
@@ -549,25 +837,50 @@ export default function BuilderPage() {
         </aside>
       </div>
 
-      <div className="flex h-72 shrink-0 flex-col border-t border-border">
-        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-          <div className="flex gap-1">
+      {/* Collapsible: most of a session is spent moving what is already there,
+          not reaching for another part. */}
+      <div
+        className={`flex shrink-0 flex-col border-t border-border ${
+          stripOpen ? "h-72" : ""
+        }`}
+      >
+        <div className="flex items-center gap-2 px-3 py-2">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setStripOpen(!stripOpen)}
+            aria-expanded={stripOpen}
+            aria-label={stripOpen ? "Hide the parts" : "Show the parts"}
+          >
+            {stripOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </Button>
+
+          <ButtonGroup>
             <Button
               size="sm"
-              variant={strip === "parts" ? "default" : "ghost"}
-              onClick={() => setStrip("parts")}
+              variant={strip === "parts" ? "default" : "outline"}
+              onClick={() => {
+                setStrip("parts");
+                setStripOpen(true);
+              }}
+              aria-pressed={strip === "parts"}
             >
               Parts
             </Button>
             <Button
               size="sm"
-              variant={strip === "compounds" ? "default" : "ghost"}
-              onClick={() => setStrip("compounds")}
+              variant={strip === "compounds" ? "default" : "outline"}
+              onClick={() => {
+                setStrip("compounds");
+                setStripOpen(true);
+              }}
+              aria-pressed={strip === "compounds"}
             >
               Compounds
             </Button>
-          </div>
-          {strip === "parts" ? (
+          </ButtonGroup>
+
+          {stripOpen && strip === "parts" ? (
             <PartFilters
               pack={pack}
               query={filter.query}
@@ -583,20 +896,22 @@ export default function BuilderPage() {
         {/* Flex, not block: the picker sizes itself with flex-1 and its contents
             are absolutely positioned, so in a block parent it collapses to
             nothing and the panel looks empty. */}
-        <div className="flex min-h-0 flex-1">
-          {strip === "compounds" ? (
-            <CompoundPicker
-              pack={pack}
-              compounds={compounds}
-              onInsert={addCompound}
-              onDelete={(compoundId) => void deleteCompound(compoundId)}
-            />
-          ) : filter.parts.length === 0 ? (
-            <NoMatches />
-          ) : (
-            <PartPicker pack={pack} parts={filter.parts} onSelect={addPart} />
-          )}
-        </div>
+        {stripOpen ? (
+          <div className="flex min-h-0 flex-1 border-t border-border">
+            {strip === "compounds" ? (
+              <CompoundPicker
+                pack={pack}
+                compounds={compounds}
+                onInsert={addCompound}
+                onDelete={(compoundId) => void deleteCompound(compoundId)}
+              />
+            ) : filter.parts.length === 0 ? (
+              <NoMatches />
+            ) : (
+              <PartPicker pack={pack} parts={filter.parts} onSelect={addPart} />
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -143,22 +143,35 @@ function Rows({
   overId: string | null;
   depth?: number;
 }) {
+  const siblings = childrenOf(project, parentId);
+
   return (
-    <ul>
-      {childrenOf(project, parentId).map((piece) => (
-        <li key={piece.id}>
+    // The rails are drawn on the list, not per row, so they run unbroken behind
+    // a whole branch. `last:before:h-3` stops the vertical rail at the elbow of
+    // the final child rather than carrying on past it.
+    <ul className={depth > 0 ? "relative" : ""}>
+      {siblings.map((piece) => (
+        <li
+          key={piece.id}
+          className={
+            depth > 0
+              ? "relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-px before:bg-border last:before:h-3 after:absolute after:left-0 after:top-3 after:h-px after:w-2 after:bg-border"
+              : ""
+          }
+          style={depth > 0 ? { marginLeft: 14 } : undefined}
+        >
           <button
             type="button"
             data-piece-id={piece.id}
             onClick={() => onSelect(piece.id)}
-            className={`flex w-full items-center gap-2 px-3 py-1 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`flex w-full items-center gap-2 py-1 pr-3 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               piece.id === overId
                 ? "bg-primary/25 ring-1 ring-inset ring-primary"
                 : piece.id === selectedId
                   ? "bg-primary/15 text-foreground"
                   : "hover:bg-muted/50"
             } ${piece.id === draggingId ? "opacity-50" : ""}`}
-            style={{ paddingLeft: 12 + depth * 14 }}
+            style={{ paddingLeft: 12 }}
           >
             <span className="truncate">{piece.name}</span>
             {piece.role ? (

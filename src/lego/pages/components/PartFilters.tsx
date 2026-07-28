@@ -8,6 +8,8 @@
 
 import { Button, cn, Input } from "@picoframe/frame";
 
+import { ButtonGroup } from "@/components/ui/button-group";
+
 import type { LoadedPack } from "../../pack";
 
 interface Props {
@@ -39,11 +41,12 @@ export function PartFilters({
         className="w-56"
         aria-label="Search parts"
       />
-      <div className="flex gap-1">
+      <ButtonGroup>
         <Button
           size="sm"
           variant={colourway === null ? "default" : "outline"}
           onClick={() => onColourway(null)}
+          aria-pressed={colourway === null}
         >
           All
         </Button>
@@ -53,11 +56,12 @@ export function PartFilters({
             size="sm"
             variant={colourway === category.id ? "default" : "outline"}
             onClick={() => onColourway(category.id)}
+            aria-pressed={colourway === category.id}
           >
             {category.label}
           </Button>
         ))}
-      </div>
+      </ButtonGroup>
       <span className="ml-auto text-sm text-muted-foreground">
         {colourway
           ? `${shown} parts`
