@@ -272,7 +272,10 @@ export function ModelViewport({
   }, []);
 
   return (
-    <div className="relative h-full w-full">
+    // Darker than the page behind it, so the unit reads as being in its own
+    // space and pale parts have something to sit against. A translucent tint
+    // rather than a fixed colour, so it deepens whatever the theme is.
+    <div className="relative h-full w-full bg-black/30">
       <div ref={containerRef} className="h-full w-full" />
       <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1 text-xs text-muted-foreground">
         <span>
