@@ -49,6 +49,11 @@ export function legoPackUrl(file: string): string {
   return schemeUrl("legopack", file);
 }
 
+/** URL for a saved unit's overview thumbnail. */
+export function legoThumbUrl(projectId: string): string {
+  return schemeUrl("lego", `${projectId}.png`);
+}
+
 /**
  * Whether a URL string is a local reference to be rewritten to the asset protocol
  * (as opposed to an absolute URL, data/blob URI, in-page anchor, or already-app-
