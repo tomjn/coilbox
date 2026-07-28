@@ -6,6 +6,7 @@ import { useParams } from "react-router";
 import {
   childrenOf,
   descendantIds,
+  type LegoPiece,
   type LegoProject,
   normalisePieceName,
   projectProblems,
@@ -155,6 +156,15 @@ export default function BuilderPage() {
     setSelectedId(draft.rootPieceId);
   }
 
+  function transformPiece(pieceId: string, change: Partial<LegoPiece>) {
+    edit((project) => ({
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === pieceId ? { ...piece, ...change } : piece,
+      ),
+    }));
+  }
+
   function renameSelected(name: string) {
     if (!selectedId) return;
     edit((project) => ({
@@ -217,6 +227,7 @@ export default function BuilderPage() {
             project={draft}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            onTransform={transformPiece}
             onReady={(canvas) => {
               canvasRef.current = canvas;
             }}

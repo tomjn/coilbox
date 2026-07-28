@@ -11,20 +11,36 @@
  * shared geometry cache and the camera position with it.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { TransformControls } from "three/addons/controls/TransformControls.js";
 
 import { useReduceMotion } from "../../../general/display";
 import { addStandardLights, partMaterial } from "../../geometry";
-import type { LegoProject } from "../../model";
+import { descendantIds, type LegoPiece, type LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
+import {
+  localAnchors,
+  nearestSnap,
+  snapRotation,
+  type Vec3,
+} from "../../snapping";
+
+export type GizmoMode = "translate" | "rotate" | "scale";
+
+/** How close two anchors must be before a piece seats against another. */
+const SNAP_DISTANCE = 0.45;
+/** Rotation lands on 15 degree steps unless snapping is held off. */
+const ROTATION_STEP = Math.PI / 12;
 
 interface Props {
   pack: LoadedPack;
   project: LegoProject;
   selectedId: string | null;
   onSelect: (pieceId: string | null) => void;
+  /** Committed when a drag ends, not on every frame of it. */
+  onTransform: (pieceId: string, change: Partial<LegoPiece>) => void;
   /** Handed the canvas so the page can save a thumbnail from it. */
   onReady?: (canvas: HTMLCanvasElement) => void;
 }
@@ -34,11 +50,14 @@ export function ModelViewport({
   project,
   selectedId,
   onSelect,
+  onTransform,
   onReady,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
   const reduceMotion = useReduceMotion();
+  const [mode, setMode] = useState<GizmoMode>("translate");
+  const [snapped, setSnapped] = useState(false);
 
   // The scene is built once and never rebuilt on a prop change, because that
   // would reset the camera mid-edit. Callbacks therefore go through refs rather
@@ -47,6 +66,14 @@ export function ModelViewport({
   onSelectRef.current = onSelect;
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
+  const onTransformRef = useRef(onTransform);
+  onTransformRef.current = onTransform;
+  // The gizmo reads the document every frame of a drag to find what to snap
+  // against, and a stale copy would snap to where pieces used to be.
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  const packRef = useRef(pack);
+  packRef.current = pack;
 
   // Built once. Everything after this mutates the scene rather than remaking it.
   useEffect(() => {
@@ -86,17 +113,39 @@ export function ModelViewport({
     const render = () => renderer.render(scene, camera);
     controls.addEventListener("change", render);
 
+    const gizmo = new TransformControls(camera, renderer.domElement);
+    gizmo.setSpace("local");
+    scene.add(gizmo.getHelper());
+
     const state: SceneState = {
       renderer,
       scene,
       camera,
       controls,
+      gizmo,
       root,
       outline,
       groups: new Map(),
       render,
+      snapping: true,
+      onSnapChange: () => {},
+      projectRef,
+      packRef,
+      onTransformRef,
     };
     sceneRef.current = state;
+
+    // Orbiting while dragging a handle would fight the drag.
+    gizmo.addEventListener("dragging-changed", (event) => {
+      controls.enabled = !event.value;
+      if (!event.value) commitGizmo(state);
+    });
+
+    gizmo.addEventListener("objectChange", () => {
+      applySnap(state);
+      state.outline.setFromObject(gizmo.object ?? root);
+      render();
+    });
 
     const resize = () => {
       const { clientWidth, clientHeight } = container;
@@ -125,6 +174,9 @@ export function ModelViewport({
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const onPointerDown = (event: PointerEvent) => {
+      // The gizmo shares this canvas, so a click on one of its handles would
+      // otherwise select whatever happens to be behind it and abandon the drag.
+      if (gizmo.dragging || gizmo.axis !== null) return;
       const bounds = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
       pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
@@ -142,6 +194,9 @@ export function ModelViewport({
       observer.disconnect();
       controls.removeEventListener("change", render);
       controls.dispose();
+      gizmo.detach();
+      gizmo.getHelper().removeFromParent();
+      gizmo.dispose();
       grid.dispose();
       outline.dispose();
       renderer.dispose();
@@ -166,13 +221,72 @@ export function ModelViewport({
     if (group) {
       state.outline.setFromObject(group);
       state.outline.visible = true;
+      // The root has nothing to move relative to, so it gets no handles.
+      if (selectedId === projectRef.current.rootPieceId) {
+        state.gizmo.detach();
+      } else {
+        state.gizmo.attach(group);
+      }
     } else {
       state.outline.visible = false;
+      state.gizmo.detach();
     }
     state.render();
   }, [selectedId]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.gizmo.setMode(mode);
+    state.render();
+  }, [mode]);
+
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (state) state.onSnapChange = setSnapped;
+  }, []);
+
+  // Held rather than toggled: snapping is on, and letting go of it is a
+  // deliberate act for the one piece that has to sit off the grid.
+  useEffect(() => {
+    const setSnapping = (on: boolean) => {
+      const state = sceneRef.current;
+      if (state) state.snapping = on;
+    };
+    const down = (event: KeyboardEvent) => {
+      if (event.altKey) setSnapping(false);
+      if (event.target instanceof HTMLInputElement) return;
+      if (event.key === "g") setMode("translate");
+      if (event.key === "r") setMode("rotate");
+      if (event.key === "s") setMode("scale");
+    };
+    const up = (event: KeyboardEvent) => {
+      if (!event.altKey) setSnapping(true);
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, []);
+
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
+      <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1 text-xs text-muted-foreground">
+        <span>
+          {mode === "translate" ? "Move" : mode === "rotate" ? "Turn" : "Scale"}
+          {" · G, R, S"}
+        </span>
+        <span>
+          {snapped
+            ? "Snapped, hold Alt to place freely"
+            : "Hold Alt to place freely"}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 interface SceneState {
@@ -180,11 +294,131 @@ interface SceneState {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   controls: OrbitControls;
+  gizmo: TransformControls;
   root: THREE.Group;
   outline: THREE.BoxHelper;
   /** Piece id to the group holding it, so selection and edits can find it. */
   groups: Map<string, THREE.Group>;
   render: () => void;
+  snapping: boolean;
+  onSnapChange: (snapped: boolean) => void;
+  /** Read during a drag, so the helpers see the current document, not the one
+   *  the scene was built with. */
+  projectRef: { current: LegoProject };
+  packRef: { current: LoadedPack };
+  onTransformRef: {
+    current: (pieceId: string, change: Partial<LegoPiece>) => void;
+  };
+}
+
+/**
+ * Every anchor of a piece, in world space.
+ *
+ * A piece with no part has only its own origin, which is what makes an empty
+ * piece something you can still seat against a corner.
+ */
+function worldAnchors(
+  state: SceneState,
+  pack: LoadedPack,
+  piece: LegoPiece,
+): Vec3[] {
+  const group = state.groups.get(piece.id);
+  if (!group) return [];
+  group.updateWorldMatrix(true, false);
+
+  const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
+  const local = part
+    ? localAnchors(part.bbox).map((anchor) => anchor.position)
+    : [[0, 0, 0] as Vec3];
+
+  const point = new THREE.Vector3();
+  return local.map((position) => {
+    point
+      .set(position[0], position[1], position[2])
+      .applyMatrix4(group.matrixWorld);
+    return [point.x, point.y, point.z] as Vec3;
+  });
+}
+
+/**
+ * Seat the dragged piece against the nearest anchor of any other piece.
+ *
+ * Applied live rather than on release, so the piece visibly clicks into place
+ * and there is no jump at the end of a drag. Rotation lands on 15 degree steps
+ * for the same reason.
+ */
+function applySnap(state: SceneState) {
+  const group = state.gizmo.object;
+  const pieceId = group ? pieceIdOf(group) : null;
+  if (!group || !pieceId) return;
+
+  const project = state.projectRef.current;
+  const pack = state.packRef.current;
+  const piece = project.pieces.find((p) => p.id === pieceId);
+  if (!piece) return;
+
+  if (!state.snapping) {
+    state.onSnapChange(false);
+    return;
+  }
+
+  if (state.gizmo.getMode() === "rotate") {
+    const snappedRotation = snapRotation(
+      [group.rotation.x, group.rotation.y, group.rotation.z],
+      ROTATION_STEP,
+    );
+    group.rotation.set(...snappedRotation);
+    state.onSnapChange(true);
+    return;
+  }
+  if (state.gizmo.getMode() !== "translate") {
+    state.onSnapChange(false);
+    return;
+  }
+
+  // A piece never snaps to itself or to anything hanging off it, or dragging a
+  // parent would try to seat it against the children it is carrying.
+  const own = new Set(descendantIds(project, pieceId));
+  const targets: Vec3[] = [];
+  for (const other of project.pieces) {
+    if (own.has(other.id)) continue;
+    targets.push(...worldAnchors(state, pack, other));
+  }
+
+  const snap = nearestSnap(
+    worldAnchors(state, pack, piece),
+    targets,
+    SNAP_DISTANCE,
+  );
+  state.onSnapChange(snap !== null);
+  if (!snap) return;
+
+  // The delta is in world space and the group's position is relative to its
+  // parent, so it has to be rotated into the parent's frame before it is added.
+  const delta = new THREE.Vector3(...snap.delta);
+  const parent = group.parent;
+  if (parent) {
+    parent.updateWorldMatrix(true, false);
+    const inverse = new THREE.Matrix3()
+      .setFromMatrix4(parent.matrixWorld)
+      .invert();
+    delta.applyMatrix3(inverse);
+  }
+  group.position.add(delta);
+}
+
+/** Write the dragged transform back to the document, once the drag is over. */
+function commitGizmo(state: SceneState) {
+  const group = state.gizmo.object;
+  const pieceId = group ? pieceIdOf(group) : null;
+  if (!group || !pieceId) return;
+
+  state.onTransformRef.current(pieceId, {
+    position: [group.position.x, group.position.y, group.position.z],
+    rotation: [group.rotation.x, group.rotation.y, group.rotation.z],
+    scale: [group.scale.x, group.scale.y, group.scale.z],
+  });
+  state.onSnapChange(false);
 }
 
 /** Walk up until something claims a piece, since a hit lands on the mesh. */
