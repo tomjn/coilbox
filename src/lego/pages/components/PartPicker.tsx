@@ -23,6 +23,7 @@ import {
 } from "react";
 import * as THREE from "three";
 
+import { useReduceMotion } from "../../../general/display";
 import { addStandardLights, partMaterial } from "../../geometry";
 import {
   getPartGeometry,
@@ -37,6 +38,11 @@ const GAP = 8;
 const PITCH = CELL + GAP;
 /** Rows kept either side of the viewport, so scrolling never shows a gap. */
 const OVERSCAN = 2;
+/** How a part sits when it is not being looked at. */
+const REST_PITCH = -0.42;
+const REST_YAW = 0.72;
+/** Radians per second while hovered. One turn takes about six seconds. */
+const SPIN_RATE = 1.05;
 
 interface Props {
   pack: LoadedPack;
@@ -61,6 +67,8 @@ export function PartPicker({ pack, parts, selectedId, onSelect }: Props) {
     lastRow: 0,
   });
   const [focusIndex, setFocusIndex] = useState(0);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const reduceMotion = useReduceMotion();
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -89,6 +97,7 @@ export function PartPicker({ pack, parts, selectedId, onSelect }: Props) {
       columns: 1,
       parts: [],
       onView: setView,
+      meshByIndex: new Map(),
     };
     stateRef.current = state;
 
@@ -140,6 +149,39 @@ export function PartPicker({ pack, parts, selectedId, onSelect }: Props) {
       ?.querySelector<HTMLButtonElement>(`[data-index="${focusIndex}"]`)
       ?.focus();
   }, [focusIndex]);
+
+  // Turn the part under the pointer, so its far side can be seen without
+  // opening anything. This is the only continuous loop in the picker: it runs
+  // while one part is hovered and stops the moment it is not.
+  useEffect(() => {
+    const state = stateRef.current;
+    if (!state || hoverIndex === null || reduceMotion) return;
+
+    let frame = 0;
+    let previous = performance.now();
+    let yaw = REST_YAW;
+
+    const tick = (now: number) => {
+      const mesh = state.meshByIndex.get(hoverIndex);
+      if (mesh) {
+        yaw += ((now - previous) / 1000) * SPIN_RATE;
+        mesh.rotation.y = yaw;
+        state.renderer.render(state.scene, state.camera);
+      }
+      previous = now;
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      const mesh = state.meshByIndex.get(hoverIndex);
+      if (mesh) {
+        mesh.rotation.y = REST_YAW;
+        state.renderer.render(state.scene, state.camera);
+      }
+    };
+  }, [hoverIndex, reduceMotion]);
 
   const move = useCallback(
     (delta: number) => {
@@ -205,7 +247,16 @@ export function PartPicker({ pack, parts, selectedId, onSelect }: Props) {
                 tabIndex={index === focusIndex ? 0 : -1}
                 aria-pressed={part.id === selectedId}
                 title={`${part.name}, ${part.tags.join(", ")}`}
-                onFocus={() => setFocusIndex(index)}
+                onMouseEnter={() => setHoverIndex(index)}
+                onMouseLeave={() =>
+                  setHoverIndex((at) => (at === index ? null : at))
+                }
+                onFocus={() => {
+                  setFocusIndex(index);
+                  // Keyboard users get the same look at the part as the pointer.
+                  setHoverIndex(index);
+                }}
+                onBlur={() => setHoverIndex((at) => (at === index ? null : at))}
                 onKeyDown={onKeyDown}
                 onClick={() => onSelect?.(part)}
                 className={`absolute rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
@@ -239,6 +290,9 @@ interface ViewportState {
   parts: LegoPartInfo[];
   pack?: LoadedPack;
   onView: (view: Visible) => void;
+  /** Which pooled mesh is currently standing in for which part, so the spin
+   *  can find the one under the pointer. Rebuilt on every layout. */
+  meshByIndex: Map<number, THREE.Mesh>;
 }
 
 /**
@@ -267,9 +321,11 @@ function layout(
   camera.updateProjectionMatrix();
 
   let used = 0;
+  state.meshByIndex.clear();
   for (let row = firstRow; row <= lastRow; row++) {
     for (let column = 0; column < columns; column++) {
-      const part = parts[row * columns + column];
+      const index = row * columns + column;
+      const part = parts[index];
       if (!part) continue;
       const geometry = getPartGeometry(pack, part.id);
       if (!geometry) continue;
@@ -277,13 +333,16 @@ function layout(
       let mesh = pool[used];
       if (!mesh) {
         mesh = new THREE.Mesh(geometry, partMaterial(pack.manifest));
-        // A three quarter view reads better than face on for boxy parts.
-        mesh.rotation.set(-0.42, 0.72, 0);
         pool.push(mesh);
         scene.add(mesh);
       }
       mesh.geometry = geometry;
       mesh.visible = true;
+      // A three quarter view reads better than face on for boxy parts. Reset
+      // every time, because a pooled mesh may have been left mid spin by a
+      // part that has since scrolled away.
+      mesh.rotation.set(REST_PITCH, REST_YAW, 0);
+      state.meshByIndex.set(index, mesh);
 
       // Fit the part to its cell. Scaling per part means a tiny sliver and a
       // whole hull section are both legible.
