@@ -19,7 +19,14 @@ import { useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { legoExport, legoOpenPath } from "../../bindings";
+import {
+  legoExport,
+  legoExportGlb,
+  legoExportObj,
+  legoOpenPath,
+} from "../../bindings";
+import { exportGlb } from "../../exportGlb";
+import { buildObj } from "../../exportObj";
 import { buildLuaScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
@@ -36,6 +43,8 @@ interface Props {
     exportDir: string;
     exportTexture: boolean;
     exportScript: boolean;
+    exportGlb: boolean;
+    exportObj: boolean;
   }) => void;
 }
 
@@ -50,6 +59,9 @@ type Result =
       scriptKept: boolean;
       unitDef: string | null;
       unitDefKept: boolean;
+      glb: string | null;
+      obj: string | null;
+      mtl: string | null;
     }
   | { state: "failed"; message: string };
 
@@ -65,6 +77,8 @@ export function ExportDrawer({
     project.exportTexture !== false,
   );
   const [withScript, setWithScript] = useState(project.exportScript !== false);
+  const [withGlb, setWithGlb] = useState(project.exportGlb === true);
+  const [withObj, setWithObj] = useState(project.exportObj === true);
   const [result, setResult] = useState<Result>({ state: "idle" });
 
   const atlas = pack.manifest.textures.tex1;
@@ -101,12 +115,54 @@ export function ExportDrawer({
         unitDef: buildUnitDef(project, model.radius),
         model,
       });
+
+      let glbPath: string | null = null;
+      if (withGlb) {
+        const bytes = await exportGlb(project, pack);
+        if (bytes) {
+          const glbWritten = await legoExportGlb({
+            dir,
+            unitName: project.unitName,
+            bytes: Array.from(new Uint8Array(bytes)),
+          });
+          glbPath = glbWritten.path;
+        }
+      }
+
+      let objPath: string | null = null;
+      let mtlPath: string | null = null;
+      if (withObj) {
+        const objBuild = buildObj(project, pack, {
+          unitName: project.unitName,
+          textureName: atlas,
+        });
+        if (objBuild) {
+          const objWritten = await legoExportObj({
+            dir,
+            unitName: project.unitName,
+            obj: objBuild.obj,
+            mtl: objBuild.mtl,
+            atlas,
+          });
+          objPath = objWritten.obj;
+          mtlPath = objWritten.mtl;
+        }
+      }
+
       onRemember({
         exportDir: dir,
         exportTexture: withTexture,
         exportScript: withScript,
+        exportGlb: withGlb,
+        exportObj: withObj,
       });
-      setResult({ state: "done", ...written });
+      setResult({
+        state: "done",
+        ...written,
+        glb: glbPath,
+        obj: objPath,
+        mtl: mtlPath,
+      });
     } catch (error) {
       setResult({
         state: "failed",
@@ -189,6 +245,51 @@ export function ExportDrawer({
             </div>
 
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
+              <span className="text-sm font-medium">For Blender</span>
+              <p className="text-xs text-muted-foreground">
+                Neither is read by the engine. Both are for taking the unit into
+                Blender, to check it against the <code>.s3o</code> or finish it
+                by hand, and both go into a <code>blender</code> folder
+                alongside the game's own.
+              </p>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="lego-export-glb"
+                checked={withGlb}
+                onCheckedChange={(checked) => setWithGlb(checked === true)}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="lego-export-glb">Also write a .glb</Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  <code>{project.unitName}.glb</code>, with the texture
+                  embedded.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="lego-export-obj"
+                checked={withObj}
+                onCheckedChange={(checked) => setWithObj(checked === true)}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="lego-export-obj">
+                  Also write an .obj and .mtl
+                </Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  <code>{project.unitName}.obj</code> and{" "}
+                  <code>{project.unitName}.mtl</code>, with a copy of{" "}
+                  <code>{atlas}</code> next to them so the material resolves.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
               <Button
                 onClick={() => void runExport()}
                 disabled={!dir || result.state === "working"}
@@ -220,6 +321,15 @@ export function ExportDrawer({
                     The unit definition was already there and has been left
                     alone.
                   </p>
+                ) : null}
+                {result.glb ? (
+                  <code className="break-all">{result.glb}</code>
+                ) : null}
+                {result.obj ? (
+                  <code className="break-all">{result.obj}</code>
+                ) : null}
+                {result.mtl ? (
+                  <code className="break-all">{result.mtl}</code>
                 ) : null}
                 <Button
                   variant="outline"

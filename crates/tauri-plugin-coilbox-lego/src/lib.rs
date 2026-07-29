@@ -436,6 +436,92 @@ async fn lego_export<R: Runtime>(
     }))
 }
 
+/// `lego_export_glb` writes a unit's `.glb` into a game folder.
+///
+/// Kept out of `objects3d`, in its own `blender/` folder: a `.glb` is not
+/// something the engine reads, only something to open in Blender to check
+/// the unit or finish it by hand.
+#[tauri::command]
+async fn lego_export_glb(dir: String, unit_name: String, bytes: Vec<u8>) -> CliResult {
+    if !valid_unit_name(&unit_name) {
+        return CliResult::err(format!(
+            "invalid unit name: {unit_name}. Lower case letters, digits and underscores only."
+        ));
+    }
+    let root = PathBuf::from(&dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return CliResult::err(format!("not a folder: {dir}"));
+    }
+
+    let blender = root.join("blender");
+    if let Err(e) = std::fs::create_dir_all(&blender) {
+        return CliResult::err(format!("could not create {}: {e}", blender.display()));
+    }
+    let target = blender.join(format!("{unit_name}.glb"));
+    match std::fs::write(&target, &bytes) {
+        Ok(()) => CliResult::ok(json!({ "path": target.to_string_lossy() })),
+        Err(e) => CliResult::err(format!("could not write {}: {e}", target.display())),
+    }
+}
+
+/// `lego_export_obj` writes a unit's `.obj` and `.mtl` into a game folder,
+/// alongside a copy of the atlas the `.mtl` names.
+///
+/// The copy is what makes the reference resolve: the caller's `.mtl` points
+/// `map_Kd` at `atlas` by file name alone, so that file has to actually sit
+/// next to it rather than only in `unittextures/` elsewhere in the game
+/// folder.
+#[tauri::command]
+async fn lego_export_obj<R: Runtime>(
+    app: AppHandle<R>,
+    dir: String,
+    unit_name: String,
+    obj: String,
+    mtl: String,
+    atlas: String,
+) -> CliResult {
+    if !valid_unit_name(&unit_name) {
+        return CliResult::err(format!(
+            "invalid unit name: {unit_name}. Lower case letters, digits and underscores only."
+        ));
+    }
+    if !valid_atlas_name(&atlas) {
+        return CliResult::err(format!("invalid texture name: {atlas}"));
+    }
+    let root = PathBuf::from(&dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return CliResult::err(format!("not a folder: {dir}"));
+    }
+
+    let blender = root.join("blender");
+    if let Err(e) = std::fs::create_dir_all(&blender) {
+        return CliResult::err(format!("could not create {}: {e}", blender.display()));
+    }
+
+    let obj_path = blender.join(format!("{unit_name}.obj"));
+    if let Err(e) = std::fs::write(&obj_path, obj) {
+        return CliResult::err(format!("could not write {}: {e}", obj_path.display()));
+    }
+    let mtl_path = blender.join(format!("{unit_name}.mtl"));
+    if let Err(e) = std::fs::write(&mtl_path, mtl) {
+        return CliResult::err(format!("could not write {}: {e}", mtl_path.display()));
+    }
+
+    let Some(source) = legopack_dir(&app).map(|dir| dir.join(&atlas)) else {
+        return CliResult::err("no parts pack is installed".to_string());
+    };
+    let texture_path = blender.join(&atlas);
+    if let Err(e) = std::fs::copy(&source, &texture_path) {
+        return CliResult::err(format!("could not copy the texture: {e}"));
+    }
+
+    CliResult::ok(json!({
+        "obj": obj_path.to_string_lossy(),
+        "mtl": mtl_path.to_string_lossy(),
+        "texture": texture_path.to_string_lossy(),
+    }))
+}
+
 /// `lego_scratch_game` prepares the `.sdd` a unit is tested in.
 ///
 /// It writes one file, the `modinfo.lua` the frontend generated, into
@@ -478,6 +564,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_thumb_save,
             lego_open_path,
             lego_export,
+            lego_export_glb,
+            lego_export_obj,
             lego_scratch_game
         ])
         .build()

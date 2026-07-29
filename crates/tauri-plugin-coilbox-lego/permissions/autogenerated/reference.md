@@ -10,6 +10,8 @@ Allows the unit builder's project storage, thumbnail, reveal and test-game comma
 - `allow-lego-thumb-save`
 - `allow-lego-open-path`
 - `allow-lego-export`
+- `allow-lego-export-glb`
+- `allow-lego-export-obj`
 - `allow-lego-scratch-game`
 
 ## Permission Table
@@ -69,6 +71,58 @@ Enables the lego_export command without any pre-configured scope.
 <td>
 
 Denies the lego_export command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:allow-lego-export-glb`
+
+</td>
+<td>
+
+Enables the lego_export_glb command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:deny-lego-export-glb`
+
+</td>
+<td>
+
+Denies the lego_export_glb command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:allow-lego-export-obj`
+
+</td>
+<td>
+
+Enables the lego_export_obj command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:deny-lego-export-obj`
+
+</td>
+<td>
+
+Denies the lego_export_obj command without any pre-configured scope.
 
 </td>
 </tr>

@@ -9,5 +9,7 @@ permissions = [
   "allow-lego-thumb-save",
   "allow-lego-open-path",
   "allow-lego-export",
+  "allow-lego-export-glb",
+  "allow-lego-export-obj",
   "allow-lego-scratch-game",
 ]
