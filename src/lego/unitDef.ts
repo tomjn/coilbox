@@ -25,7 +25,8 @@ const ELMOS_PER_FOOTPRINT = 16;
 /** A conservative stand-in health value, easy to find and retune by hand. */
 const DEFAULT_MAX_DAMAGE = 1000;
 
-function luaString(value: string): string {
+/** Quote a value as a Lua string literal. Shared with the scratch game's modinfo. */
+export function luaString(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 

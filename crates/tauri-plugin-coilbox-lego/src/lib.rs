@@ -245,6 +245,19 @@ fn valid_unit_name(name: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
+/// The scratch game's folder name, held to a shape no real game folder has:
+/// coilbox's own prefix and a `.sdd` suffix. That is what keeps this command
+/// from being pointed at an installed game and rewriting its `modinfo.lua`.
+fn valid_scratch_folder(folder: &str) -> bool {
+    folder.starts_with("coilbox-lego-")
+        && folder.ends_with(".sdd")
+        && folder.len() <= 64
+        && !folder.contains("..")
+        && folder
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.')
+}
+
 /// A texture file name from the pack, never a path.
 fn valid_atlas_name(name: &str) -> bool {
     !name.is_empty()
@@ -423,6 +436,39 @@ async fn lego_export<R: Runtime>(
     }))
 }
 
+/// `lego_scratch_game` prepares the `.sdd` a unit is tested in.
+///
+/// It writes one file, the `modinfo.lua` the frontend generated, into
+/// `<data_dir>/games/<folder>`. The unit itself follows through `lego_export`,
+/// which treats the result as any other game folder. Nothing else in the
+/// content root is touched, so removing that one folder undoes the lot.
+#[tauri::command]
+async fn lego_scratch_game(data_dir: String, folder: String, modinfo: String) -> CliResult {
+    if !valid_scratch_folder(&folder) {
+        return CliResult::err(format!("not a scratch game folder: {folder}"));
+    }
+    let root = PathBuf::from(&data_dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return CliResult::err(format!("not a content root: {data_dir}"));
+    }
+
+    let dir = root.join("games").join(&folder);
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return CliResult::err(format!("could not create {}: {e}", dir.display()));
+    }
+
+    let target = dir.join("modinfo.lua");
+    // Removing before writing bumps the folder's own modification time, which
+    // is what the engine's archive scanner keys its cache off. Rewriting the
+    // file in place leaves the folder looking untouched, and a unit added since
+    // the last scan would never load.
+    let _ = std::fs::remove_file(&target);
+    match std::fs::write(&target, modinfo) {
+        Ok(()) => CliResult::ok(json!({ "dir": dir.to_string_lossy() })),
+        Err(e) => CliResult::err(format!("could not write {}: {e}", target.display())),
+    }
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-lego")
         .invoke_handler(tauri::generate_handler![
@@ -431,7 +477,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_delete,
             lego_thumb_save,
             lego_open_path,
-            lego_export
+            lego_export,
+            lego_scratch_game
         ])
         .build()
 }
@@ -475,6 +522,18 @@ mod tests {
         assert!(!valid_unit_name("arm walker"));
         assert!(!valid_unit_name("../escape"));
         assert!(!valid_unit_name(""));
+    }
+
+    #[test]
+    fn a_scratch_folder_is_ours_and_could_never_be_a_real_game() {
+        assert!(valid_scratch_folder("coilbox-lego-test.sdd"));
+        // A real install's game folder must never be a valid target.
+        assert!(!valid_scratch_folder("ba1211.sdd"));
+        assert!(!valid_scratch_folder("Beyond All Reason.sdd"));
+        assert!(!valid_scratch_folder("coilbox-lego-test.sdz"));
+        assert!(!valid_scratch_folder("../coilbox-lego-test.sdd"));
+        assert!(!valid_scratch_folder("coilbox-lego-../x.sdd"));
+        assert!(!valid_scratch_folder(""));
     }
 
     #[test]

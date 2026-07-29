@@ -69,6 +69,17 @@ export const legoExport = defineCommand<
   }
 >("coilbox-lego", "lego_export");
 
+/**
+ * Prepare the scratch `.sdd` a unit is tested in, at
+ * `<dataDir>/games/<folder>`, and write the `modinfo.lua` the caller
+ * generated. The unit goes in afterwards through `legoExport`, which treats it
+ * as any other game folder. `folder` must be coilbox's own scratch name.
+ */
+export const legoScratchGame = defineCommand<
+  { dataDir: string; folder: string; modinfo: string },
+  { dir: string }
+>("coilbox-lego", "lego_scratch_game");
+
 /** Reveal an exported unit in the file manager. */
 export const legoOpenPath = defineCommand<
   { path: string },

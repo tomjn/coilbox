@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the unit builder's project storage, thumbnail and reveal commands."
+description = "Allows the unit builder's project storage, thumbnail, reveal and test-game commands."
 permissions = [
   "allow-lego-list",
   "allow-lego-save",
@@ -9,4 +9,5 @@ permissions = [
   "allow-lego-thumb-save",
   "allow-lego-open-path",
   "allow-lego-export",
+  "allow-lego-scratch-game",
 ]
