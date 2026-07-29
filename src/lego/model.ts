@@ -285,6 +285,17 @@ export function parseLegoProjectJson(json: string): LegoProject | null {
   } catch {
     return null;
   }
+  return parseLegoProjectData(data);
+}
+
+/**
+ * The same parse as `parseLegoProjectJson`, from already-parsed data.
+ *
+ * Split out for callers that hold a project nested inside a larger JSON
+ * document, such as a clipboard envelope, and would otherwise have to
+ * `JSON.stringify` it back out just to parse it again.
+ */
+export function parseLegoProjectData(data: unknown): LegoProject | null {
   if (typeof data !== "object" || data === null) return null;
   const d = data as Record<string, unknown>;
 

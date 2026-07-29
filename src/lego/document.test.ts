@@ -201,30 +201,6 @@ describe("undo and redo", () => {
   });
 });
 
-describe("clipboard", () => {
-  it("holds a cutting until something else is copied", () => {
-    const cutting = project("arm");
-
-    const copied = reduceDocument(opened, { type: "copy", cutting });
-    expect(copied.clipboard).toBe(cutting);
-    // Copying is not an edit, so it neither dirties the unit nor undoes.
-    expect(copied.dirty).toBe(false);
-    expect(copied.past).toEqual([]);
-
-    expect(
-      reduceDocument(copied, { type: "copy", cutting: null }).clipboard,
-    ).toBe(null);
-  });
-
-  it("survives an undo, so a lifted subtree outlives the edit it came from", () => {
-    const copied = run(opened, { type: "copy", cutting: project("arm") });
-
-    const undone = run(copied, rename("one", 1000), { type: "undo" });
-
-    expect(undone.clipboard?.name).toBe("arm");
-  });
-});
-
 describe("selection", () => {
   it("starts on the root once the document arrives", () => {
     expect(opened.selectedId).toBe("root");

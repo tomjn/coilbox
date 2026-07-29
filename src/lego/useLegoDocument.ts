@@ -1,10 +1,13 @@
 /**
- * The builder's document: React state, autosave and the clipboard operations.
+ * The builder's document: React state, autosave, and lifting a subtree for
+ * copy, paste and duplicate.
  *
  * The document lives in memory for the length of a session and is written
  * shortly after the last edit, so a drag is not a hundred disk writes and
  * leaving the page never loses work. The overview stays in step because saving
  * goes through the shared store. Every transition it makes is in `document.ts`.
+ * Copy and paste themselves, the system clipboard and the parts pack, are the
+ * page's concern: see `BuilderPage.tsx` and `clipboard.ts`.
  */
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
@@ -22,17 +25,18 @@ export interface LegoDocumentSession {
   saving: boolean;
   canUndo: boolean;
   canRedo: boolean;
-  clipboard: LegoProject | null;
   selectedId: string | null;
   select: (id: string | null) => void;
   edit: (change: (project: LegoProject) => LegoProject) => void;
   undo: () => void;
   redo: () => void;
   save: () => void;
-  copy: (pieceId: string) => void;
+  /** Copies a piece and everything under it into a self-contained document,
+   *  ready to serialize onto the system clipboard. Null off the edge of the
+   *  document, same as everything else keyed by piece id. */
+  lift: (pieceId: string) => LegoProject | null;
   /** Puts a subtree under `parentId`, answering with its new root piece. */
   insert: (cutting: LegoProject, parentId: string) => string | null;
-  paste: (parentId: string) => string | null;
   duplicate: (pieceId: string) => string | null;
   /** How the viewport hands over the means to grab a thumbnail. */
   onCapture: (capture: () => HTMLCanvasElement) => void;
@@ -104,9 +108,9 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
   }, []);
 
   /**
-   * Copy, paste and duplicate are the compound machinery without the file.
-   * A subtree lifted out and put back is the same operation whether it goes
-   * via the clipboard or straight back into the unit.
+   * Copy and duplicate are the compound machinery without the file. A subtree
+   * lifted out and put back is the same operation whether it goes via the
+   * system clipboard or straight back into the unit.
    */
   function lift(pieceId: string): LegoProject | null {
     if (!project) return null;
@@ -133,7 +137,6 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
     saving,
     canUndo: state.past.length > 0,
     canRedo: state.future.length > 0,
-    clipboard: state.clipboard,
     selectedId: state.selectedId,
     select,
     edit,
@@ -142,10 +145,8 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
     save: () => {
       if (project) void persist(project);
     },
-    copy: (pieceId) => dispatch({ type: "copy", cutting: lift(pieceId) }),
+    lift,
     insert,
-    paste: (parentId) =>
-      state.clipboard ? insert(state.clipboard, parentId) : null,
     duplicate: (pieceId) => {
       const cutting = lift(pieceId);
       if (!cutting || !project) return null;

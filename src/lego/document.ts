@@ -1,9 +1,11 @@
 /**
- * The unit being edited, its undo history, its selection and its clipboard.
+ * The unit being edited, its undo history and its selection.
  *
  * A plain reducer with no React and no disk in it, so undo, redo and the
  * coalescing that folds a drag into one step can be exercised directly.
  * `useLegoDocument` is the wiring around it: React state, a timer and the disk.
+ * Copy and paste live on the system clipboard, not here, so they cross windows
+ * and survive a reload: see clipboard.ts.
  */
 
 import { type LegoProject, pieceById } from "./model";
@@ -24,8 +26,6 @@ export interface LegoDocument {
   project: LegoProject | null;
   past: LegoProject[];
   future: LegoProject[];
-  /** A lifted subtree waiting to be pasted. In memory, not the OS clipboard. */
-  clipboard: LegoProject | null;
   dirty: boolean;
   /** When the last edit landed, so a gesture can fold into one undo step. */
   editedAt: number;
@@ -42,7 +42,6 @@ export const emptyDocument: LegoDocument = {
   project: null,
   past: [],
   future: [],
-  clipboard: null,
   dirty: false,
   editedAt: 0,
   selectedId: null,
@@ -53,7 +52,6 @@ export type LegoDocumentAction =
   | { type: "edit"; change: (project: LegoProject) => LegoProject; at: number }
   | { type: "undo" }
   | { type: "redo" }
-  | { type: "copy"; cutting: LegoProject | null }
   | { type: "saved" }
   | { type: "select"; id: string | null };
 
@@ -153,9 +151,6 @@ export function reduceDocument(
         selectedId: reseatSelection(state.selectedId, current, next),
       };
     }
-
-    case "copy":
-      return { ...state, clipboard: action.cutting };
 
     case "saved":
       return { ...state, dirty: false };

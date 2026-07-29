@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
+import { toast } from "sonner";
 
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
@@ -26,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ROLES } from "../animPresets";
+import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { subtreeAsCompound } from "../compounds";
 import { usePartFilter } from "../filter";
 import {
@@ -202,12 +204,12 @@ export default function BuilderPage() {
       }
       if (command && key === "c") {
         event.preventDefault();
-        shortcuts.copy();
+        void shortcuts.copy();
         return;
       }
       if (command && key === "v") {
         event.preventDefault();
-        shortcuts.paste();
+        void shortcuts.paste();
         return;
       }
       if (command && key === "d") {
@@ -280,14 +282,49 @@ export default function BuilderPage() {
     edit((project) => setPivot(project, pieceId, pivot));
   }
 
-  function copySelection() {
+  async function copySelection() {
     if (!selectedId) return;
-    doc.copy(selectedId);
+    const lifted = doc.lift(selectedId);
+    if (!lifted) return;
+    try {
+      await navigator.clipboard.writeText(serializeClipboardPiece(lifted));
+    } catch (e) {
+      toast.error("Couldn't copy to the clipboard", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    }
   }
 
-  function pasteClipboard() {
-    if (!draft) return;
-    const inserted = doc.paste(selectedId ?? draft.rootPieceId);
+  async function pasteClipboard() {
+    if (!draft || !pack) return;
+
+    let text: string;
+    try {
+      text = await navigator.clipboard.readText();
+    } catch (e) {
+      toast.error("Couldn't read the clipboard", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+      return;
+    }
+
+    const knownPartIds = new Set(pack.parts.map((part) => part.id));
+    const result = parseClipboardPiece(text, knownPartIds);
+    if (!result.ok) {
+      toast.error("Couldn't paste", { description: result.reason });
+      return;
+    }
+    if (result.piece.missingParts.length > 0) {
+      const count = result.piece.missingParts.length;
+      toast.warning(
+        `Pasted, but ${count} ${count === 1 ? "piece isn't" : "pieces aren't"} in this pack and won't show geometry until reassigned.`,
+      );
+    }
+
+    const inserted = doc.insert(
+      result.piece.project,
+      selectedId ?? draft.rootPieceId,
+    );
     if (inserted) setSelectedId(inserted);
   }
 
@@ -540,8 +577,7 @@ export default function BuilderPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={pasteClipboard}
-                  disabled={!doc.clipboard}
+                  onClick={() => void pasteClipboard()}
                   title="Paste under the selected piece (Cmd V)"
                   aria-label="Paste"
                 >
