@@ -60,7 +60,7 @@ const NO_ROLE = "none";
 /**
  * Assemble one unit.
  *
- * The layout and the selection. The document itself, its history, its clipboard
+ * The layout. The document itself, its history, its selection, its clipboard
  * and its saving are `useLegoDocument`.
  */
 export default function BuilderPage() {
@@ -68,12 +68,11 @@ export default function BuilderPage() {
   // The viewport wants the width, and the nav stays reachable from the top bar.
   useHideSidebar();
   const doc = useLegoDocument(id);
-  const { edit } = doc;
+  const { edit, selectedId, select: setSelectedId } = doc;
   const draft = doc.project;
   const { compounds } = useLegoCompounds();
 
   const [pack, setPack] = useState<LoadedPack | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [strip, setStrip] = useState<"parts" | "compounds">("parts");
   const [stripOpen, setStripOpen] = useState(true);
   const [aside, setAside] = useState<"pieces" | "animation">("pieces");
@@ -87,13 +86,6 @@ export default function BuilderPage() {
   useEffect(() => {
     loadPack().then(setPack, () => setPack(null));
   }, []);
-
-  // Start on the root once the document arrives, and stay wherever the builder
-  // moves to after that.
-  const rootPieceId = draft?.rootPieceId;
-  useEffect(() => {
-    setSelectedId((current) => current ?? rootPieceId ?? null);
-  }, [rootPieceId]);
 
   const problems = useMemo(
     () => (draft ? projectProblems(draft) : []),
@@ -160,7 +152,8 @@ export default function BuilderPage() {
       ...project,
       pieces: project.pieces.filter((piece) => !doomed.has(piece.id)),
     }));
-    setSelectedId(draft.rootPieceId);
+    // The edit above already reseats the selection to the removed piece's
+    // parent, since it is no longer in the resulting project.
   }
 
   // The key handler is registered once, so it reaches the current selection

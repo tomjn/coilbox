@@ -23,6 +23,8 @@ export interface LegoDocumentSession {
   canUndo: boolean;
   canRedo: boolean;
   clipboard: LegoProject | null;
+  selectedId: string | null;
+  select: (id: string | null) => void;
   edit: (change: (project: LegoProject) => LegoProject) => void;
   undo: () => void;
   redo: () => void;
@@ -36,7 +38,10 @@ export interface LegoDocumentSession {
   onCapture: (capture: () => HTMLCanvasElement) => void;
 }
 
-/** The document behind the builder: edits, history, clipboard and saving. */
+/**
+ * The document behind the builder: edits, history, selection, clipboard and
+ * saving.
+ */
 export function useLegoDocument(id: string | undefined): LegoDocumentSession {
   const { projects, loading } = useLegoProjects();
   const stored = projects.find((project) => project.id === id);
@@ -55,6 +60,10 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
   }, []);
   const undo = useCallback(() => dispatch({ type: "undo" }), []);
   const redo = useCallback(() => dispatch({ type: "redo" }), []);
+  const select = useCallback(
+    (id: string | null) => dispatch({ type: "select", id }),
+    [],
+  );
 
   const persist = useCallback(async (target: LegoProject) => {
     setSaving(true);
@@ -125,6 +134,8 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
     canUndo: state.past.length > 0,
     canRedo: state.future.length > 0,
     clipboard: state.clipboard,
+    selectedId: state.selectedId,
+    select,
     edit,
     undo,
     redo,
