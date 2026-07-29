@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { DDSLoader } from "three/addons/loaders/DDSLoader.js";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import type { MapAppearance } from "../../bindings";
 import { getImageInfo } from "../../imageCache";
@@ -345,218 +346,219 @@ export function MapPreview3D({
 
   // Build the three.js scene from the loaded maps + dimensions. Fully torn down
   // on any dependency change or unmount, so navigating away leaks no GL context.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `appearance` is tracked via the stable `appSig`; `autoSpin`/`initialWater` are applied live (below) so they seed the build without forcing a rebuild
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!srcs || !container || worldWidth <= 0 || worldHeight <= 0) return;
+  useCanvas3D(
+    containerRef,
+    ({ renderer, resize: fitCanvas }) => {
+      if (!srcs || worldWidth <= 0 || worldHeight <= 0) return;
 
-    let cancelled = false;
-    const disposables: { dispose(): void }[] = [];
-    let renderer: THREE.WebGLRenderer | undefined;
-    let controls: OrbitControls | undefined;
-    let observer: ResizeObserver | undefined;
-    let animationFrame: number | undefined;
-    let spinStart: (() => void) | undefined;
-    let spinEnd: (() => void) | undefined;
+      let cancelled = false;
+      const disposables: { dispose(): void }[] = [];
+      let controls: OrbitControls | undefined;
+      let fitCamera: ((width: number, height: number) => void) | undefined;
+      let animationFrame: number | undefined;
+      let spinStart: (() => void) | undefined;
+      let spinEnd: (() => void) | undefined;
 
-    const longest = Math.max(worldWidth, worldHeight);
-    const s = BASE / longest;
-    const planeW = worldWidth * s;
-    const planeH = worldHeight * s;
+      const longest = Math.max(worldWidth, worldHeight);
+      const s = BASE / longest;
+      const planeW = worldWidth * s;
+      const planeH = worldHeight * s;
 
-    (async () => {
-      const loader = new THREE.TextureLoader();
-      let colorTex: THREE.Texture;
-      let heightTex: THREE.Texture;
-      try {
-        [colorTex, heightTex] = await Promise.all([
-          loader.loadAsync(srcs.texture),
-          loader.loadAsync(srcs.height),
-        ]);
-      } catch {
-        if (!cancelled) setFailed(true);
-        return;
-      }
-      if (cancelled) {
-        colorTex?.dispose();
-        heightTex?.dispose();
-        return;
-      }
-      colorTex.colorSpace = THREE.SRGBColorSpace;
-      heightTex.colorSpace = THREE.NoColorSpace;
-      disposables.push(colorTex, heightTex);
-
-      // Detail texture: the map's own `detailtex` (data URL) when supplied, else a
-      // generic procedural one. Tiled and multiplied over the base colour below to
-      // break up the low-res base texture's blur when zoomed in.
-      let detailTex: THREE.Texture;
-      if (detailSrc) {
+      (async () => {
+        const loader = new THREE.TextureLoader();
+        let colorTex: THREE.Texture;
+        let heightTex: THREE.Texture;
         try {
-          detailTex = await loader.loadAsync(detailSrc);
-          detailTex.wrapS = THREE.RepeatWrapping;
-          detailTex.wrapT = THREE.RepeatWrapping;
+          [colorTex, heightTex] = await Promise.all([
+            loader.loadAsync(srcs.texture),
+            loader.loadAsync(srcs.height),
+          ]);
         } catch {
-          detailTex = makeProceduralDetail();
-        }
-      } else {
-        detailTex = makeProceduralDetail();
-      }
-      if (cancelled) {
-        detailTex.dispose();
-        return;
-      }
-      detailTex.colorSpace = THREE.NoColorSpace;
-      disposables.push(detailTex);
-
-      const scene = new THREE.Scene();
-      // Sky colour from mapinfo becomes the backdrop; otherwise stay transparent
-      // so the card background shows through. `showSky=false` keeps it transparent
-      // regardless, so the canvas layers over whatever is behind it.
-      if (showSky && appearance?.skyColor)
-        scene.background = colorFrom(appearance.skyColor, 0);
-
-      // If the map declares a skybox DDS, decode it and (when it's a cube map) use
-      // it as the sky, replacing the flat colour. Done before the water reflection
-      // capture below so the water mirrors the real sky. Any failure — a fetch/parse
-      // error, an unsupported DDS variant (DX10/BC7 fail in DDSLoader), or a
-      // non-cubemap DDS — silently falls back to the flat `skyColor` sky.
-      if (showSky && skyboxSrc) {
-        const cube = await loadSkyboxCube(skyboxSrc);
-        if (cancelled) {
-          cube?.dispose();
+          if (!cancelled) setFailed(true);
           return;
         }
-        if (cube) {
-          scene.background = cube;
-          disposables.push(cube);
+        if (cancelled) {
+          colorTex?.dispose();
+          heightTex?.dispose();
+          return;
         }
-      }
+        colorTex.colorSpace = THREE.SRGBColorSpace;
+        heightTex.colorSpace = THREE.NoColorSpace;
+        disposables.push(colorTex, heightTex);
 
-      const segments = forceWireframe ? WIRE_SEGMENTS : SEGMENTS;
-      const geo = new THREE.PlaneGeometry(planeW, planeH, segments, segments);
-      geo.rotateX(-Math.PI / 2); // lie flat in XZ; displacement then runs along +Y
-      disposables.push(geo);
+        // Detail texture: the map's own `detailtex` (data URL) when supplied, else a
+        // generic procedural one. Tiled and multiplied over the base colour below to
+        // break up the low-res base texture's blur when zoomed in.
+        let detailTex: THREE.Texture;
+        if (detailSrc) {
+          try {
+            detailTex = await loader.loadAsync(detailSrc);
+            detailTex.wrapS = THREE.RepeatWrapping;
+            detailTex.wrapT = THREE.RepeatWrapping;
+          } catch {
+            detailTex = makeProceduralDetail();
+          }
+        } else {
+          detailTex = makeProceduralDetail();
+        }
+        if (cancelled) {
+          detailTex.dispose();
+          return;
+        }
+        detailTex.colorSpace = THREE.NoColorSpace;
+        disposables.push(detailTex);
 
-      // `voidWater` maps (asteroid/space) render nothing below the sea plane: the
-      // engine shows the skybox through it. Emulate that by clipping the terrain at
-      // world y = 0 (keep y >= 0), so submerged geometry is discarded rather than
-      // drawn as solid ground. Clipping is opt-in per material via `clippingPlanes`
-      // + `renderer.localClippingEnabled` (set after the renderer is created).
-      const voidWater = appearance?.voidWater === true;
-      const voidClip = voidWater
-        ? [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)]
-        : undefined;
+        const scene = new THREE.Scene();
+        // Sky colour from mapinfo becomes the backdrop; otherwise stay transparent
+        // so the card background shows through. `showSky=false` keeps it transparent
+        // regardless, so the canvas layers over whatever is behind it.
+        if (showSky && appearance?.skyColor)
+          scene.background = colorFrom(appearance.skyColor, 0);
 
-      // A wireframe relief drops the diffuse texture entirely and draws the mesh as
-      // an unlit uniform-colour grid, so the displaced geometry reads as the terrain
-      // shape on its own.
-      const material = new THREE.MeshStandardMaterial({
-        map: forceWireframe ? undefined : colorTex,
-        color: forceWireframe ? 0x8fb3c9 : 0xffffff,
-        displacementMap: heightTex,
-        displacementScale: (maxHeight - minHeight) * s,
-        displacementBias: minHeight * s,
-        roughness: 1,
-        metalness: 0,
-        wireframe: forceWireframe || wantWire.current,
-        clippingPlanes: voidClip,
-      });
-      // Tiled detail-texture multiply, patched into the standard material: after
-      // the base colour is sampled, modulate it by the detail texture sampled at a
-      // higher tiling frequency. `detail * 2` centres neutral at mid-grey (engine
-      // convention); `detailStrength` fades the whole effect. Skipped for the
-      // wireframe render, which has no diffuse to modulate.
-      if (!forceWireframe)
-        material.onBeforeCompile = (shader) => {
-          shader.uniforms.detailMap = { value: detailTex };
-          shader.uniforms.detailRepeat = {
-            value: new THREE.Vector2(
-              (DETAIL_TILES * planeW) / BASE,
-              (DETAIL_TILES * planeH) / BASE,
-            ),
-          };
-          shader.uniforms.detailStrength = { value: DETAIL_STRENGTH };
-          shader.fragmentShader = shader.fragmentShader
-            .replace(
-              "#include <common>",
-              `#include <common>
+        // If the map declares a skybox DDS, decode it and (when it's a cube map) use
+        // it as the sky, replacing the flat colour. Done before the water reflection
+        // capture below so the water mirrors the real sky. Any failure — a fetch/parse
+        // error, an unsupported DDS variant (DX10/BC7 fail in DDSLoader), or a
+        // non-cubemap DDS — silently falls back to the flat `skyColor` sky.
+        if (showSky && skyboxSrc) {
+          const cube = await loadSkyboxCube(skyboxSrc);
+          if (cancelled) {
+            cube?.dispose();
+            return;
+          }
+          if (cube) {
+            scene.background = cube;
+            disposables.push(cube);
+          }
+        }
+
+        const segments = forceWireframe ? WIRE_SEGMENTS : SEGMENTS;
+        const geo = new THREE.PlaneGeometry(planeW, planeH, segments, segments);
+        geo.rotateX(-Math.PI / 2); // lie flat in XZ; displacement then runs along +Y
+        disposables.push(geo);
+
+        // `voidWater` maps (asteroid/space) render nothing below the sea plane: the
+        // engine shows the skybox through it. Emulate that by clipping the terrain at
+        // world y = 0 (keep y >= 0), so submerged geometry is discarded rather than
+        // drawn as solid ground. Clipping is opt-in per material via `clippingPlanes`
+        // + `renderer.localClippingEnabled`, set on the shared canvas below.
+        const voidWater = appearance?.voidWater === true;
+        const voidClip = voidWater
+          ? [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)]
+          : undefined;
+
+        // A wireframe relief drops the diffuse texture entirely and draws the mesh as
+        // an unlit uniform-colour grid, so the displaced geometry reads as the terrain
+        // shape on its own.
+        const material = new THREE.MeshStandardMaterial({
+          map: forceWireframe ? undefined : colorTex,
+          color: forceWireframe ? 0x8fb3c9 : 0xffffff,
+          displacementMap: heightTex,
+          displacementScale: (maxHeight - minHeight) * s,
+          displacementBias: minHeight * s,
+          roughness: 1,
+          metalness: 0,
+          wireframe: forceWireframe || wantWire.current,
+          clippingPlanes: voidClip,
+        });
+        // Tiled detail-texture multiply, patched into the standard material: after
+        // the base colour is sampled, modulate it by the detail texture sampled at a
+        // higher tiling frequency. `detail * 2` centres neutral at mid-grey (engine
+        // convention); `detailStrength` fades the whole effect. Skipped for the
+        // wireframe render, which has no diffuse to modulate.
+        if (!forceWireframe)
+          material.onBeforeCompile = (shader) => {
+            shader.uniforms.detailMap = { value: detailTex };
+            shader.uniforms.detailRepeat = {
+              value: new THREE.Vector2(
+                (DETAIL_TILES * planeW) / BASE,
+                (DETAIL_TILES * planeH) / BASE,
+              ),
+            };
+            shader.uniforms.detailStrength = { value: DETAIL_STRENGTH };
+            shader.fragmentShader = shader.fragmentShader
+              .replace(
+                "#include <common>",
+                `#include <common>
 uniform sampler2D detailMap;
 uniform vec2 detailRepeat;
 uniform float detailStrength;`,
-            )
-            .replace(
-              "#include <map_fragment>",
-              `#include <map_fragment>
+              )
+              .replace(
+                "#include <map_fragment>",
+                `#include <map_fragment>
 {
   vec3 detail = texture2D( detailMap, vMapUv * detailRepeat ).rgb;
   diffuseColor.rgb *= mix( vec3( 1.0 ), detail * 2.0, detailStrength );
 }`,
-            );
-        };
-      disposables.push(material);
-      materialRef.current = material;
-      scene.add(new THREE.Mesh(geo, material));
-
-      // Translucent water plane at world height 0 (== scene y 0). Subdivided so
-      // the animation loop below can ripple its surface.
-      const waterGeo = new THREE.PlaneGeometry(
-        planeW,
-        planeH,
-        WATER_SEG,
-        WATER_SEG,
-      );
-      waterGeo.rotateX(-Math.PI / 2);
-      const waterMat = new THREE.MeshStandardMaterial({
-        color: colorFrom(appearance?.waterColor, 0x2f6f9f),
-        transparent: true,
-        opacity: appearance?.waterAlpha ?? 0.55,
-        // Low roughness + the scene environment map (set below) make the surface
-        // glossy and mirror-like, so it reads as reflective water rather than a
-        // matte sheet; the ripple normals then distort that reflection.
-        roughness: 0.1,
-        metalness: 0,
-        envMapIntensity: 0.1,
-      });
-      // Depth-based water colouring (`water.absorb`/`baseColor`/`minColor`): sample
-      // the terrain heightmap under each water fragment to get its depth below the
-      // sea plane, then attenuate from `baseColor` (shallow) toward `minColor` (deep)
-      // by `exp(-absorb * depth)` — the engine's Beer-Lambert-style absorption, so
-      // shallows read bright and deeps read murky instead of a flat tinted sheet.
-      // Depth is in engine world units (elmos, unscaled), which is how `absorb` is
-      // calibrated; the surface reflection is layered on top unchanged. Only enabled
-      // when the map specifies `absorb`; otherwise the flat `waterColor` stands.
-      if (appearance?.waterAbsorb) {
-        const ab = appearance.waterAbsorb;
-        const base = colorFrom(
-          appearance.waterBaseColor ?? appearance.waterColor,
-          0x2f6f9f,
-        );
-        const min = appearance.waterMinColor
-          ? colorFrom(appearance.waterMinColor, 0)
-          : base.clone().multiplyScalar(0.2);
-        waterMat.onBeforeCompile = (shader) => {
-          shader.uniforms.wHeightTex = { value: heightTex };
-          shader.uniforms.wAbsorb = {
-            value: new THREE.Vector3(ab[0], ab[1], ab[2]),
+              );
           };
-          shader.uniforms.wBase = { value: base };
-          shader.uniforms.wMin = { value: min };
-          shader.uniforms.wHeightScale = { value: maxHeight - minHeight };
-          shader.uniforms.wHeightBias = { value: minHeight };
-          shader.uniforms.wPlane = { value: new THREE.Vector2(planeW, planeH) };
-          shader.vertexShader = shader.vertexShader
-            .replace(
-              "#include <common>",
-              "#include <common>\nvarying vec3 vWaterPos;",
-            )
-            .replace(
-              "#include <project_vertex>",
-              "#include <project_vertex>\nvWaterPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;",
-            );
-          shader.fragmentShader = shader.fragmentShader
-            .replace(
-              "#include <common>",
-              `#include <common>
+        disposables.push(material);
+        materialRef.current = material;
+        scene.add(new THREE.Mesh(geo, material));
+
+        // Translucent water plane at world height 0 (== scene y 0). Subdivided so
+        // the animation loop below can ripple its surface.
+        const waterGeo = new THREE.PlaneGeometry(
+          planeW,
+          planeH,
+          WATER_SEG,
+          WATER_SEG,
+        );
+        waterGeo.rotateX(-Math.PI / 2);
+        const waterMat = new THREE.MeshStandardMaterial({
+          color: colorFrom(appearance?.waterColor, 0x2f6f9f),
+          transparent: true,
+          opacity: appearance?.waterAlpha ?? 0.55,
+          // Low roughness + the scene environment map (set below) make the surface
+          // glossy and mirror-like, so it reads as reflective water rather than a
+          // matte sheet; the ripple normals then distort that reflection.
+          roughness: 0.1,
+          metalness: 0,
+          envMapIntensity: 0.1,
+        });
+        // Depth-based water colouring (`water.absorb`/`baseColor`/`minColor`): sample
+        // the terrain heightmap under each water fragment to get its depth below the
+        // sea plane, then attenuate from `baseColor` (shallow) toward `minColor` (deep)
+        // by `exp(-absorb * depth)` — the engine's Beer-Lambert-style absorption, so
+        // shallows read bright and deeps read murky instead of a flat tinted sheet.
+        // Depth is in engine world units (elmos, unscaled), which is how `absorb` is
+        // calibrated; the surface reflection is layered on top unchanged. Only enabled
+        // when the map specifies `absorb`; otherwise the flat `waterColor` stands.
+        if (appearance?.waterAbsorb) {
+          const ab = appearance.waterAbsorb;
+          const base = colorFrom(
+            appearance.waterBaseColor ?? appearance.waterColor,
+            0x2f6f9f,
+          );
+          const min = appearance.waterMinColor
+            ? colorFrom(appearance.waterMinColor, 0)
+            : base.clone().multiplyScalar(0.2);
+          waterMat.onBeforeCompile = (shader) => {
+            shader.uniforms.wHeightTex = { value: heightTex };
+            shader.uniforms.wAbsorb = {
+              value: new THREE.Vector3(ab[0], ab[1], ab[2]),
+            };
+            shader.uniforms.wBase = { value: base };
+            shader.uniforms.wMin = { value: min };
+            shader.uniforms.wHeightScale = { value: maxHeight - minHeight };
+            shader.uniforms.wHeightBias = { value: minHeight };
+            shader.uniforms.wPlane = {
+              value: new THREE.Vector2(planeW, planeH),
+            };
+            shader.vertexShader = shader.vertexShader
+              .replace(
+                "#include <common>",
+                "#include <common>\nvarying vec3 vWaterPos;",
+              )
+              .replace(
+                "#include <project_vertex>",
+                "#include <project_vertex>\nvWaterPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;",
+              );
+            shader.fragmentShader = shader.fragmentShader
+              .replace(
+                "#include <common>",
+                `#include <common>
 varying vec3 vWaterPos;
 uniform sampler2D wHeightTex;
 uniform vec3 wAbsorb;
@@ -565,312 +567,305 @@ uniform vec3 wMin;
 uniform float wHeightScale;
 uniform float wHeightBias;
 uniform vec2 wPlane;`,
-            )
-            .replace(
-              "#include <map_fragment>",
-              `#include <map_fragment>
+              )
+              .replace(
+                "#include <map_fragment>",
+                `#include <map_fragment>
 {
   vec2 wuv = vec2( 0.5 + vWaterPos.x / wPlane.x, 0.5 - vWaterPos.z / wPlane.y );
   float nh = texture2D( wHeightTex, wuv ).x;
   float depth = max( 0.0, -( nh * wHeightScale + wHeightBias ) );
   diffuseColor.rgb = mix( wMin, wBase, exp( -wAbsorb * depth ) );
 }`,
-            );
-        };
-      }
-      disposables.push(waterGeo, waterMat);
-      const waterMesh = new THREE.Mesh(waterGeo, waterMat);
-      waterMesh.visible = wantWater.current;
-      waterRef.current = waterMesh;
-      scene.add(waterMesh);
-
-      // Ambient fill tinted by the map's ground ambient colour (its non-sun-lit
-      // mood); defaults to neutral white when the map doesn't specify one.
-      scene.add(
-        new THREE.AmbientLight(
-          colorFrom(appearance?.groundAmbientColor, 0xffffff),
-          0.8,
-        ),
-      );
-      const sun = new THREE.DirectionalLight(
-        colorFrom(appearance?.sunColor, 0xffffff),
-        2.2,
-      );
-      const sd = appearance?.sunDir;
-      // Light from the map's sun direction (clamp Y so it never lights from
-      // below); otherwise a sensible default raking angle.
-      if (sd)
-        sun.position
-          .set(sd[0], Math.max(sd[1], 0.2), sd[2])
-          .multiplyScalar(BASE);
-      else sun.position.set(BASE * 0.5, BASE * 0.9, BASE * 0.35);
-      scene.add(sun);
-
-      // Optional high overcast from `atmosphere.cloudColor`/`cloudDensity`: a faint
-      // translucent plane above the terrain, tinted by the cloud colour with
-      // opacity scaled by density. Held above the camera's reach so it never comes
-      // between the eye and the map (see the height below). Suppressed for wireframe
-      // relief and wherever the caller opts out (`showClouds`, e.g. mission previews).
-      // It drifts in the animation loop below (static under reduced motion).
-      let cloudTex: THREE.Texture | undefined;
-      const hasClouds =
-        !!appearance?.cloudColor && showClouds && !forceWireframe;
-      if (hasClouds) {
-        cloudTex = makeProceduralCloud();
-        cloudTex.repeat.set(2, 2);
-        const cloudMat = new THREE.MeshBasicMaterial({
-          color: colorFrom(appearance?.cloudColor, 0xffffff),
-          map: cloudTex,
-          transparent: true,
-          opacity: Math.min(0.35, (appearance?.cloudDensity ?? 0.5) * 0.5),
-          depthWrite: false,
-          side: THREE.DoubleSide,
-          fog: false,
-        });
-        const cloudGeo = new THREE.PlaneGeometry(planeW * 2, planeH * 2);
-        cloudGeo.rotateX(-Math.PI / 2);
-        const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
-        // Above the camera's max orbit distance (`maxDistance` is BASE * 3) so a
-        // top-down / zoomed-out view stays under the clouds — they read as a high
-        // ceiling, never a sheet drawn over the map.
-        cloudMesh.position.y = Math.max(maxHeight * s, 0) + BASE * 3.5;
-        scene.add(cloudMesh);
-        disposables.push(cloudGeo, cloudMat, cloudTex);
-      }
-
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.localClippingEnabled = voidWater; // honour the terrain clip plane
-      renderer.setClearColor(0x000000, 0); // transparent; the card shows through
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      container.appendChild(renderer.domElement);
-      renderer.domElement.style.display = "block";
-      renderer.domElement.style.width = "100%";
-      renderer.domElement.style.height = "100%";
-
-      // Capture the terrain + sky into a prefiltered environment map once, so the
-      // water reflects the actual islands and sky (image-based reflection). The
-      // water is hidden during the capture and, if the map has no sky colour, a
-      // neutral sky is used just for the reflection so glossy water isn't mirror-
-      // black. Static (not re-rendered on orbit) — a good approximation for a
-      // slowly-orbited preview, and far cheaper than live planar reflections.
-      // Applied to the water material only (not `scene.environment`), so it never
-      // adds image-based light to the terrain — that must match the flat minimap.
-      const pmrem = new THREE.PMREMGenerator(renderer);
-      const prevBg = scene.background;
-      if (!prevBg) scene.background = new THREE.Color(0x9fb8cc);
-      waterMesh.visible = false;
-      const envRT = pmrem.fromScene(scene, 0, 0.1, 1000);
-      scene.background = prevBg;
-      waterMesh.visible = wantWater.current;
-      waterMat.envMap = envRT.texture;
-      waterMat.needsUpdate = true;
-      pmrem.dispose();
-      disposables.push(envRT);
-      // Distance fog for maps that declare `atmosphere.fogColor`. Distances are
-      // approximate — mapinfo expresses fogStart/fogEnd as fractions of the engine's
-      // viewRange, which a standalone preview lacks, so they're derived from the
-      // fixed scene scale. Attached only after the reflection capture above, so it
-      // never tints the water's environment map.
-      if (appearance?.fogColor)
-        scene.fog = new THREE.Fog(
-          colorFrom(appearance.fogColor, 0xb3b3cc),
-          BASE * 0.6,
-          BASE * 2.8,
-        );
-
-      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-      camera.position.set(0, BASE * 0.7, BASE * 1.0);
-
-      controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = false;
-      controls.target.set(0, 0, 0);
-      controls.minDistance = BASE * 0.12;
-      controls.maxDistance = BASE * 3;
-      controls.maxPolarAngle = Math.PI * 0.49;
-      controls.enableZoom = enableZoom;
-      controls.enablePan = enablePan;
-      if (interactive) {
-        // Zoom toward the cursor (not the scene centre) and pan with the middle
-        // button; orbit stays on the left. Clamp the dolly range and keep the
-        // camera above the map plane so you can't zoom through the terrain or
-        // drop underneath it.
-        controls.zoomToCursor = true;
-        controls.mouseButtons = {
-          LEFT: THREE.MOUSE.ROTATE,
-          MIDDLE: THREE.MOUSE.PAN,
-          RIGHT: THREE.MOUSE.PAN,
-        };
-      } else {
-        // Non-interactive backdrop: no pointer input, but `update()` still advances
-        // the auto-orbit from the animation loop below.
-        controls.enabled = false;
-      }
-      // Auto-orbit (disabled under reduced motion). `wantSpin` also gates the
-      // pause-on-drag listeners so an interactive slot resumes spinning on release.
-      // A signed `autoSpin` also picks the direction: a negative value reverses the
-      // orbit via a negative `autoRotateSpeed`.
-      const wantSpin = autoSpin != null && autoSpin !== 0 && !reduceMotion;
-      controls.autoRotate = wantSpin;
-      controls.autoRotateSpeed = 2.0 * (autoSpin ?? 1);
-      controlsRef.current = controls;
-      if (wantSpin && interactive) {
-        spinStart = () => {
-          if (controls) controls.autoRotate = false;
-        };
-        spinEnd = () => {
-          if (controls) controls.autoRotate = true;
-        };
-        controls.addEventListener("start", spinStart);
-        controls.addEventListener("end", spinEnd);
-      }
-
-      // Keep the camera above the terrain's highest point (peak displaced Y is
-      // `maxHeight * s`), with a small margin. OrbitControls' distance/angle
-      // clamps are relative to the moving zoom-to-cursor target and can't see
-      // the surface, so this hard Y floor is what actually stops you zooming
-      // under the map. Never below the water plane at y 0.
-      const camFloor = Math.max(maxHeight * s, 0) + BASE * 0.02;
-      const render = () => {
-        if (camera.position.y < camFloor) camera.position.y = camFloor;
-        renderer?.render(scene, camera);
-      };
-      renderRef.current = render;
-      controls.addEventListener("change", render);
-
-      // Animated water ripples. The scene otherwise renders on demand (orbit /
-      // resize / toggle); this is the only continuous loop, and it runs only
-      // while the water is visible so a dry map or a hidden plane stays idle.
-      // Ripples are driven mostly by the surface NORMALS, not geometry: a layered
-      // high-frequency wave field's analytic slope (`dx`/`dz`) tilts each vertex
-      // normal so the ripples catch the directional light, while the actual Y
-      // displacement stays a hair (`dispAmp`). Decoupling the two lets the ripples
-      // be dense and fine without crests poking up through terrain that sits near
-      // the water line. Skipped under `prefers-reduced-motion`, leaving it flat.
-      const waterPos = waterGeo.attributes.position;
-      const waterNor = waterGeo.attributes.normal;
-      const dispAmp = BASE * 0.0004;
-      const slope = 0.012; // normal-tilt strength (independent of wave height)
-      // Per-wave phase gradients, constant across the animation: WX/WZ are the
-      // x/z components of the direction × frequency; AKX/AKZ fold in amplitude
-      // for the analytic normal slope.
-      const wn = RIPPLE_WAVES.length;
-      const wWX = new Float64Array(wn);
-      const wWZ = new Float64Array(wn);
-      const wAmp = new Float64Array(wn);
-      const wSpd = new Float64Array(wn);
-      const wAKX = new Float64Array(wn);
-      const wAKZ = new Float64Array(wn);
-      for (let j = 0; j < wn; j++) {
-        const [ang, freq, amp, spd] = RIPPLE_WAVES[j];
-        const wx = Math.cos(ang) * freq;
-        const wz = Math.sin(ang) * freq;
-        wWX[j] = wx;
-        wWZ[j] = wz;
-        wAmp[j] = amp;
-        wSpd[j] = spd;
-        wAKX[j] = amp * wx;
-        wAKZ[j] = amp * wz;
-      }
-      const tmpN = new THREE.Vector3();
-      const rippleWater = (t: number) => {
-        for (let i = 0; i < waterPos.count; i++) {
-          const x = waterPos.getX(i);
-          const z = waterPos.getZ(i);
-          let h = 0;
-          let dx = 0;
-          let dz = 0;
-          for (let j = 0; j < wn; j++) {
-            const ph = wWX[j] * x + wWZ[j] * z + wSpd[j] * t;
-            const c = Math.cos(ph);
-            h += wAmp[j] * Math.sin(ph);
-            dx += wAKX[j] * c;
-            dz += wAKZ[j] * c;
-          }
-          waterPos.setY(i, h * dispAmp);
-          tmpN.set(-dx * slope, 1, -dz * slope).normalize();
-          waterNor.setXYZ(i, tmpN.x, tmpN.y, tmpN.z);
+              );
+          };
         }
-        waterPos.needsUpdate = true;
-        waterNor.needsUpdate = true;
-      };
-      // One continuous loop drives both the ripples and the auto-orbit; it idles
-      // (renders nothing) whenever neither is active, so a static, dry, non-spinning
-      // preview stays on-demand. `controls.autoRotate` is read live so the editor's
-      // spin-speed changes and the pause-on-drag listeners take effect without a
-      // rebuild. Skipped entirely under `prefers-reduced-motion`.
-      if (!reduceMotion) {
-        const animate = () => {
-          animationFrame = requestAnimationFrame(animate);
-          const spinning = !!controls?.autoRotate;
-          const waterVisible = !!waterRef.current?.visible;
-          if (!spinning && !waterVisible && !cloudTex) return;
-          if (waterVisible) rippleWater(performance.now() / 1000);
-          // Drift the overcast slowly across the sky.
-          if (cloudTex) {
-            cloudTex.offset.x += 0.00002;
-            cloudTex.offset.y += 0.00001;
-          }
-          // `update()` advances the orbit and fires "change" → render(); a
-          // water- or cloud-only frame renders directly.
-          if (spinning) controls?.update();
-          else render();
+        disposables.push(waterGeo, waterMat);
+        const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+        waterMesh.visible = wantWater.current;
+        waterRef.current = waterMesh;
+        scene.add(waterMesh);
+
+        // Ambient fill tinted by the map's ground ambient colour (its non-sun-lit
+        // mood); defaults to neutral white when the map doesn't specify one.
+        scene.add(
+          new THREE.AmbientLight(
+            colorFrom(appearance?.groundAmbientColor, 0xffffff),
+            0.8,
+          ),
+        );
+        const sun = new THREE.DirectionalLight(
+          colorFrom(appearance?.sunColor, 0xffffff),
+          2.2,
+        );
+        const sd = appearance?.sunDir;
+        // Light from the map's sun direction (clamp Y so it never lights from
+        // below); otherwise a sensible default raking angle.
+        if (sd)
+          sun.position
+            .set(sd[0], Math.max(sd[1], 0.2), sd[2])
+            .multiplyScalar(BASE);
+        else sun.position.set(BASE * 0.5, BASE * 0.9, BASE * 0.35);
+        scene.add(sun);
+
+        // Optional high overcast from `atmosphere.cloudColor`/`cloudDensity`: a faint
+        // translucent plane above the terrain, tinted by the cloud colour with
+        // opacity scaled by density. Held above the camera's reach so it never comes
+        // between the eye and the map (see the height below). Suppressed for wireframe
+        // relief and wherever the caller opts out (`showClouds`, e.g. mission previews).
+        // It drifts in the animation loop below (static under reduced motion).
+        let cloudTex: THREE.Texture | undefined;
+        const hasClouds =
+          !!appearance?.cloudColor && showClouds && !forceWireframe;
+        if (hasClouds) {
+          cloudTex = makeProceduralCloud();
+          cloudTex.repeat.set(2, 2);
+          const cloudMat = new THREE.MeshBasicMaterial({
+            color: colorFrom(appearance?.cloudColor, 0xffffff),
+            map: cloudTex,
+            transparent: true,
+            opacity: Math.min(0.35, (appearance?.cloudDensity ?? 0.5) * 0.5),
+            depthWrite: false,
+            side: THREE.DoubleSide,
+            fog: false,
+          });
+          const cloudGeo = new THREE.PlaneGeometry(planeW * 2, planeH * 2);
+          cloudGeo.rotateX(-Math.PI / 2);
+          const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+          // Above the camera's max orbit distance (`maxDistance` is BASE * 3) so a
+          // top-down / zoomed-out view stays under the clouds — they read as a high
+          // ceiling, never a sheet drawn over the map.
+          cloudMesh.position.y = Math.max(maxHeight * s, 0) + BASE * 3.5;
+          scene.add(cloudMesh);
+          disposables.push(cloudGeo, cloudMat, cloudTex);
+        }
+
+        renderer.localClippingEnabled = voidWater; // honour the terrain clip plane
+        renderer.setClearColor(0x000000, 0); // transparent; the card shows through
+        // Capture the terrain + sky into a prefiltered environment map once, so the
+        // water reflects the actual islands and sky (image-based reflection). The
+        // water is hidden during the capture and, if the map has no sky colour, a
+        // neutral sky is used just for the reflection so glossy water isn't mirror-
+        // black. Static (not re-rendered on orbit) — a good approximation for a
+        // slowly-orbited preview, and far cheaper than live planar reflections.
+        // Applied to the water material only (not `scene.environment`), so it never
+        // adds image-based light to the terrain — that must match the flat minimap.
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        const prevBg = scene.background;
+        if (!prevBg) scene.background = new THREE.Color(0x9fb8cc);
+        waterMesh.visible = false;
+        const envRT = pmrem.fromScene(scene, 0, 0.1, 1000);
+        scene.background = prevBg;
+        waterMesh.visible = wantWater.current;
+        waterMat.envMap = envRT.texture;
+        waterMat.needsUpdate = true;
+        pmrem.dispose();
+        disposables.push(envRT);
+        // Distance fog for maps that declare `atmosphere.fogColor`. Distances are
+        // approximate — mapinfo expresses fogStart/fogEnd as fractions of the engine's
+        // viewRange, which a standalone preview lacks, so they're derived from the
+        // fixed scene scale. Attached only after the reflection capture above, so it
+        // never tints the water's environment map.
+        if (appearance?.fogColor)
+          scene.fog = new THREE.Fog(
+            colorFrom(appearance.fogColor, 0xb3b3cc),
+            BASE * 0.6,
+            BASE * 2.8,
+          );
+
+        const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+        camera.position.set(0, BASE * 0.7, BASE * 1.0);
+        // The canvas is sized from the moment it exists. The camera is the one
+        // thing that arrives after the build, so it catches up here.
+        fitCamera = (width, height) => {
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
         };
-        animationFrame = requestAnimationFrame(animate);
-      }
 
-      const resize = () => {
-        if (!renderer) return;
-        const w = container.clientWidth || 1;
-        const h = container.clientHeight || 1;
-        renderer.setSize(w, h, false);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        render();
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = false;
+        controls.target.set(0, 0, 0);
+        controls.minDistance = BASE * 0.12;
+        controls.maxDistance = BASE * 3;
+        controls.maxPolarAngle = Math.PI * 0.49;
+        controls.enableZoom = enableZoom;
+        controls.enablePan = enablePan;
+        if (interactive) {
+          // Zoom toward the cursor (not the scene centre) and pan with the middle
+          // button; orbit stays on the left. Clamp the dolly range and keep the
+          // camera above the map plane so you can't zoom through the terrain or
+          // drop underneath it.
+          controls.zoomToCursor = true;
+          controls.mouseButtons = {
+            LEFT: THREE.MOUSE.ROTATE,
+            MIDDLE: THREE.MOUSE.PAN,
+            RIGHT: THREE.MOUSE.PAN,
+          };
+        } else {
+          // Non-interactive backdrop: no pointer input, but `update()` still advances
+          // the auto-orbit from the animation loop below.
+          controls.enabled = false;
+        }
+        // Auto-orbit (disabled under reduced motion). `wantSpin` also gates the
+        // pause-on-drag listeners so an interactive slot resumes spinning on release.
+        // A signed `autoSpin` also picks the direction: a negative value reverses the
+        // orbit via a negative `autoRotateSpeed`.
+        const wantSpin = autoSpin != null && autoSpin !== 0 && !reduceMotion;
+        controls.autoRotate = wantSpin;
+        controls.autoRotateSpeed = 2.0 * (autoSpin ?? 1);
+        controlsRef.current = controls;
+        if (wantSpin && interactive) {
+          spinStart = () => {
+            if (controls) controls.autoRotate = false;
+          };
+          spinEnd = () => {
+            if (controls) controls.autoRotate = true;
+          };
+          controls.addEventListener("start", spinStart);
+          controls.addEventListener("end", spinEnd);
+        }
+
+        // Keep the camera above the terrain's highest point (peak displaced Y is
+        // `maxHeight * s`), with a small margin. OrbitControls' distance/angle
+        // clamps are relative to the moving zoom-to-cursor target and can't see
+        // the surface, so this hard Y floor is what actually stops you zooming
+        // under the map. Never below the water plane at y 0.
+        const camFloor = Math.max(maxHeight * s, 0) + BASE * 0.02;
+        const render = () => {
+          if (camera.position.y < camFloor) camera.position.y = camFloor;
+          renderer.render(scene, camera);
+        };
+        renderRef.current = render;
+        controls.addEventListener("change", render);
+
+        // Animated water ripples. The scene otherwise renders on demand (orbit /
+        // resize / toggle); this is the only continuous loop, and it runs only
+        // while the water is visible so a dry map or a hidden plane stays idle.
+        // Ripples are driven mostly by the surface NORMALS, not geometry: a layered
+        // high-frequency wave field's analytic slope (`dx`/`dz`) tilts each vertex
+        // normal so the ripples catch the directional light, while the actual Y
+        // displacement stays a hair (`dispAmp`). Decoupling the two lets the ripples
+        // be dense and fine without crests poking up through terrain that sits near
+        // the water line. Skipped under `prefers-reduced-motion`, leaving it flat.
+        const waterPos = waterGeo.attributes.position;
+        const waterNor = waterGeo.attributes.normal;
+        const dispAmp = BASE * 0.0004;
+        const slope = 0.012; // normal-tilt strength (independent of wave height)
+        // Per-wave phase gradients, constant across the animation: WX/WZ are the
+        // x/z components of the direction × frequency; AKX/AKZ fold in amplitude
+        // for the analytic normal slope.
+        const wn = RIPPLE_WAVES.length;
+        const wWX = new Float64Array(wn);
+        const wWZ = new Float64Array(wn);
+        const wAmp = new Float64Array(wn);
+        const wSpd = new Float64Array(wn);
+        const wAKX = new Float64Array(wn);
+        const wAKZ = new Float64Array(wn);
+        for (let j = 0; j < wn; j++) {
+          const [ang, freq, amp, spd] = RIPPLE_WAVES[j];
+          const wx = Math.cos(ang) * freq;
+          const wz = Math.sin(ang) * freq;
+          wWX[j] = wx;
+          wWZ[j] = wz;
+          wAmp[j] = amp;
+          wSpd[j] = spd;
+          wAKX[j] = amp * wx;
+          wAKZ[j] = amp * wz;
+        }
+        const tmpN = new THREE.Vector3();
+        const rippleWater = (t: number) => {
+          for (let i = 0; i < waterPos.count; i++) {
+            const x = waterPos.getX(i);
+            const z = waterPos.getZ(i);
+            let h = 0;
+            let dx = 0;
+            let dz = 0;
+            for (let j = 0; j < wn; j++) {
+              const ph = wWX[j] * x + wWZ[j] * z + wSpd[j] * t;
+              const c = Math.cos(ph);
+              h += wAmp[j] * Math.sin(ph);
+              dx += wAKX[j] * c;
+              dz += wAKZ[j] * c;
+            }
+            waterPos.setY(i, h * dispAmp);
+            tmpN.set(-dx * slope, 1, -dz * slope).normalize();
+            waterNor.setXYZ(i, tmpN.x, tmpN.y, tmpN.z);
+          }
+          waterPos.needsUpdate = true;
+          waterNor.needsUpdate = true;
+        };
+        // One continuous loop drives both the ripples and the auto-orbit; it idles
+        // (renders nothing) whenever neither is active, so a static, dry, non-spinning
+        // preview stays on-demand. `controls.autoRotate` is read live so the editor's
+        // spin-speed changes and the pause-on-drag listeners take effect without a
+        // rebuild. Skipped entirely under `prefers-reduced-motion`.
+        if (!reduceMotion) {
+          const animate = () => {
+            animationFrame = requestAnimationFrame(animate);
+            const spinning = !!controls?.autoRotate;
+            const waterVisible = !!waterRef.current?.visible;
+            if (!spinning && !waterVisible && !cloudTex) return;
+            if (waterVisible) rippleWater(performance.now() / 1000);
+            // Drift the overcast slowly across the sky.
+            if (cloudTex) {
+              cloudTex.offset.x += 0.00002;
+              cloudTex.offset.y += 0.00001;
+            }
+            // `update()` advances the orbit and fires "change" → render(); a
+            // water- or cloud-only frame renders directly.
+            if (spinning) controls?.update();
+            else render();
+          };
+          animationFrame = requestAnimationFrame(animate);
+        }
+
+        fitCanvas();
+        if (!cancelled) setBuilt(true);
+      })();
+
+      return {
+        render: () => renderRef.current?.(),
+        resize: (width, height) => fitCamera?.(width, height),
+        dispose: () => {
+          cancelled = true;
+          setBuilt(false);
+          if (animationFrame !== undefined)
+            cancelAnimationFrame(animationFrame);
+          if (controls) {
+            if (renderRef.current)
+              controls.removeEventListener("change", renderRef.current);
+            if (spinStart) controls.removeEventListener("start", spinStart);
+            if (spinEnd) controls.removeEventListener("end", spinEnd);
+            controls.dispose();
+          }
+          for (const d of disposables) d.dispose();
+          materialRef.current = null;
+          waterRef.current = null;
+          renderRef.current = null;
+          controlsRef.current = null;
+        },
       };
-      observer = new ResizeObserver(resize);
-      observer.observe(container);
-      resize();
-      if (!cancelled) setBuilt(true);
-    })();
-
-    return () => {
-      cancelled = true;
-      setBuilt(false);
-      if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
-      observer?.disconnect();
-      if (controls) {
-        if (renderRef.current)
-          controls.removeEventListener("change", renderRef.current);
-        if (spinStart) controls.removeEventListener("start", spinStart);
-        if (spinEnd) controls.removeEventListener("end", spinEnd);
-        controls.dispose();
-      }
-      for (const d of disposables) d.dispose();
-      if (renderer) {
-        renderer.domElement.remove();
-        renderer.dispose();
-      }
-      materialRef.current = null;
-      waterRef.current = null;
-      renderRef.current = null;
-      controlsRef.current = null;
-    };
-  }, [
-    srcs,
-    detailSrc,
-    minHeight,
-    maxHeight,
-    worldWidth,
-    worldHeight,
-    appSig,
-    skyboxSrc,
-    forceWireframe,
-    showSky,
-    interactive,
-    enableZoom,
-    enablePan,
-    reduceMotion,
-  ]);
+    },
+    // `appearance` is tracked through the stable `appSig`. `autoSpin` and
+    // `initialWater` are applied live below, so they seed the build without
+    // forcing a rebuild.
+    [
+      srcs,
+      detailSrc,
+      minHeight,
+      maxHeight,
+      worldWidth,
+      worldHeight,
+      appSig,
+      skyboxSrc,
+      forceWireframe,
+      showSky,
+      interactive,
+      enableZoom,
+      enablePan,
+      reduceMotion,
+    ],
+  );
 
   // Spring's water plane sits at world height 0, so water is only visible where
   // terrain drops below it. Default the toggle off for a "dry" map (lowest point

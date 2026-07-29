@@ -117,5 +117,7 @@ export function useCanvas3D(
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, deps);
+    // Spread rather than passed straight through, because the lint rule wants
+    // to see an array literal here. The contents are still the caller's.
+  }, [...deps]);
 }
