@@ -140,7 +140,9 @@ export function AnimationPanel({
                             ? "°"
                             : param.unit === "s"
                               ? " s"
-                              : "/s"}
+                              : param.unit === "m"
+                                ? " m"
+                                : "/s"}
                         </span>
                       </div>
                       <Slider

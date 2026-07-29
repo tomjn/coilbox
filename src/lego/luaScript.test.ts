@@ -213,6 +213,56 @@ describe("buildLuaScript", () => {
     expect(lua).toContain("Explode(base, SFX.SHATTER)");
   });
 
+  it("starts hovering on Create, since it never stands down", () => {
+    const lua = buildLuaScript(
+      project(
+        [{ id: "h", name: "hull", role: "base" }],
+        [{ presetId: "hover.bob", params: {} }],
+      ),
+    );
+
+    expect(lua).toContain("local function hover()");
+    expect(lua).toMatch(
+      /function script\.Create\(\)\n {2}Signal\(SIG_HOVER_BOB\)\n {2}StartThread\(hover\)/,
+    );
+    expect(lua).toContain("Move(hull, y_axis,");
+    expect(lua).toContain("Turn(hull, z_axis,");
+    expect(lua).toContain("hoverStop()");
+  });
+
+  it("aims from and fires from the aim point when there is no turret", () => {
+    const lua = buildLuaScript(
+      project(
+        [{ id: "a", name: "gimbal", role: "aim" }],
+        [{ presetId: "aim.track", params: {} }],
+      ),
+    );
+
+    expect(lua).toContain("Turn(gimbal, y_axis, heading,");
+    expect(lua).toContain("Turn(gimbal, x_axis, -pitch,");
+    expect(lua).toMatch(
+      /function script\.AimFromWeapon1\(\)\n {2}return gimbal/,
+    );
+    expect(lua).toMatch(/function script\.QueryWeapon1\(\)\n {2}return gimbal/);
+  });
+
+  it("starts idle sway on stopping and stands it down on moving", () => {
+    const lua = buildLuaScript(
+      project(
+        [{ id: "h", name: "hull", role: "base" }],
+        [{ presetId: "idle.sway", params: {} }],
+      ),
+    );
+
+    expect(lua).toContain("local function idleSway()");
+    expect(lua).toMatch(
+      /function script\.StopMoving\(\)\n {2}Signal\(SIG_IDLE_SWAY\)\n {2}StartThread\(idleSway\)/,
+    );
+    expect(lua).toMatch(
+      /function script\.StartMoving\(\)\n {2}Signal\(SIG_IDLE_SWAY\)\n {2}idleSwayStop\(\)/,
+    );
+  });
+
   it("ends with exactly one newline and no triple blank lines", () => {
     const lua = buildLuaScript(project(LEGS));
 

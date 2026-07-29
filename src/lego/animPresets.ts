@@ -56,8 +56,8 @@ export function isRole(value: string): boolean {
 export interface PresetParam {
   id: string;
   label: string;
-  /** Degrees, seconds or turns per second. Converted inside `track`. */
-  unit: "deg" | "s" | "hz";
+  /** Degrees, seconds, turns per second or metres. Converted inside `track`. */
+  unit: "deg" | "s" | "hz" | "m";
   min: number;
   max: number;
   step: number;
@@ -154,13 +154,19 @@ function lua(n: number): string {
   return Number(n.toFixed(4)).toString();
 }
 
+interface CyclePose {
+  rotation?: number[];
+  position?: number[];
+}
+
 /**
  * A looping thread that walks a preset's own `track` around one cycle.
  *
  * Sampling `track` rather than writing the motion out a second time means the
  * script and the viewport cannot drift apart: change the maths and both follow.
- * Turn speeds are worked out from how far each piece has to move in the time
- * the step allows, so the pose is reached rather than overshot or lagged.
+ * Turn and Move speeds are worked out from how far each piece has to travel in
+ * the time the step allows, so the pose is reached rather than overshot or
+ * lagged.
  */
 function cycleThread(
   preset: AnimPreset,
@@ -180,45 +186,74 @@ function cycleThread(
   // once and wrong on every lap after that.
   const poses = Array.from({ length: CYCLE_STEPS }, (_, step) => {
     const t = (step / CYCLE_STEPS) * options.period;
-    const pose = new Map<string, number[]>();
+    const pose = new Map<string, CyclePose>();
     for (const { role, piece } of targets) {
-      const rotation = preset.track(t, ctx.params, role)?.rotation;
+      const delta = preset.track(t, ctx.params, role);
+      if (!delta) continue;
       // Rounded before anything is compared, or floating point dust reads as
-      // movement and emits a turn of nothing at a speed of nothing.
-      if (rotation)
-        pose.set(
-          piece,
-          rotation.map((r) => Number(r.toFixed(4))),
-        );
+      // movement and emits a turn or move of nothing at a speed of nothing.
+      const entry: CyclePose = {
+        rotation: delta.rotation?.map((r) => Number(r.toFixed(4))),
+        position: delta.position?.map((p) => Number(p.toFixed(4))),
+      };
+      if (entry.rotation || entry.position) pose.set(piece, entry);
     }
     return pose;
   });
 
   const body: string[] = [];
-  const movedAxes = new Map<string, Set<number>>();
+  const movedRotation = new Map<string, Set<number>>();
+  const movedPosition = new Map<string, Set<number>>();
 
   for (let step = 0; step < CYCLE_STEPS; step++) {
     const before = poses[(step + CYCLE_STEPS - 1) % CYCLE_STEPS];
-    for (const [piece, rotation] of poses[step]) {
-      const was = before.get(piece) ?? [0, 0, 0];
-      for (let axis = 0; axis < 3; axis++) {
-        if (rotation[axis] === was[axis]) continue;
-        const speed = Math.abs(rotation[axis] - was[axis]) / stepSeconds;
-        body.push(
-          `    Turn(${piece}, ${AXES[axis]}, ${lua(rotation[axis])}, ${lua(speed)})`,
-        );
-        movedAxes.set(piece, (movedAxes.get(piece) ?? new Set()).add(axis));
+    for (const [piece, pose] of poses[step]) {
+      const was = before.get(piece);
+      if (pose.rotation) {
+        const from = was?.rotation ?? [0, 0, 0];
+        for (let axis = 0; axis < 3; axis++) {
+          if (pose.rotation[axis] === from[axis]) continue;
+          const speed =
+            Math.abs(pose.rotation[axis] - from[axis]) / stepSeconds;
+          body.push(
+            `    Turn(${piece}, ${AXES[axis]}, ${lua(pose.rotation[axis])}, ${lua(speed)})`,
+          );
+          movedRotation.set(
+            piece,
+            (movedRotation.get(piece) ?? new Set()).add(axis),
+          );
+        }
+      }
+      if (pose.position) {
+        const from = was?.position ?? [0, 0, 0];
+        for (let axis = 0; axis < 3; axis++) {
+          if (pose.position[axis] === from[axis]) continue;
+          const speed =
+            Math.abs(pose.position[axis] - from[axis]) / stepSeconds;
+          body.push(
+            `    Move(${piece}, ${AXES[axis]}, ${lua(pose.position[axis])}, ${lua(speed)})`,
+          );
+          movedPosition.set(
+            piece,
+            (movedPosition.get(piece) ?? new Set()).add(axis),
+          );
+        }
       }
     }
     body.push(`    Sleep(${Math.round(stepSeconds * 1000)})`);
   }
 
   // Back to rest on stop, or the unit keeps whatever pose it stopped in. Only
-  // the axes this preset actually turns, so the reset does not fight another
+  // the axes this preset actually moves, so the reset does not fight another
   // preset holding the same piece on a different axis.
-  const rest = [...movedAxes].flatMap(([piece, axes]) =>
-    [...axes].map((axis) => `  Turn(${piece}, ${AXES[axis]}, 0, 4)`),
-  );
+  const rest = [
+    ...[...movedRotation].flatMap(([piece, axes]) =>
+      [...axes].map((axis) => `  Turn(${piece}, ${AXES[axis]}, 0, 4)`),
+    ),
+    ...[...movedPosition].flatMap(([piece, axes]) =>
+      [...axes].map((axis) => `  Move(${piece}, ${AXES[axis]}, 0, 4)`),
+    ),
+  ];
 
   return {
     functions: [
@@ -637,6 +672,203 @@ export const OPEN_CLOSE: AnimPreset = {
   },
 };
 
+export const HOVER_BOB: AnimPreset = {
+  id: "hover.bob",
+  label: "Hover and bob",
+  description:
+    "Bobs the body up and down and rocks it gently side to side, the way an aircraft or hovercraft sits while holding position.",
+  requires: [{ role: "base", count: 1 }],
+  animates: ["base"],
+  params: [
+    {
+      id: "period",
+      label: "Cycle time",
+      unit: "s",
+      min: 0.5,
+      max: 8,
+      step: 0.5,
+      fallback: 2.5,
+    },
+    {
+      id: "height",
+      label: "Bob height",
+      unit: "m",
+      min: 0,
+      max: 2,
+      step: 0.05,
+      fallback: 0.3,
+    },
+    {
+      id: "sway",
+      label: "Rock",
+      unit: "deg",
+      min: 0,
+      max: 20,
+      step: 1,
+      fallback: 4,
+    },
+  ],
+  track(t, params, role) {
+    if (role !== "base") return null;
+    const period = Math.max(value(this, params, "period"), 0.05);
+    const phase = (t / period) * TAU;
+    return {
+      position: [0, value(this, params, "height") * Math.sin(phase), 0],
+      // In phase with the bob, so the body is level at rest and rocks
+      // furthest to one side exactly as it reaches the top of the bob.
+      rotation: [0, 0, deg(value(this, params, "sway")) * Math.sin(phase)],
+    };
+  },
+  emit(ctx) {
+    const thread = cycleThread(this, ctx, {
+      name: "hover",
+      period: Math.max(value(this, ctx.params, "period"), 0.05),
+    });
+    if (!thread) return null;
+    return {
+      functions: thread.functions,
+      // Holding position is what the unit does for its whole life, not
+      // something it starts and stops, so this starts once on Create and is
+      // never told to stand down.
+      hooks: {
+        Create: [`  Signal(${ctx.signal})`, "  StartThread(hover)"],
+      },
+    };
+  },
+};
+
+export const AIM_TRACK: AnimPreset = {
+  id: "aim.track",
+  label: "Aim point",
+  description:
+    "Turns and lifts a single piece to face a target, for a unit with no separate turret and barrel.",
+  requires: [{ role: "aim", count: 1 }],
+  animates: ["aim"],
+  params: [
+    {
+      id: "period",
+      label: "Sweep time",
+      unit: "s",
+      min: 0.5,
+      max: 12,
+      step: 0.5,
+      fallback: 4,
+    },
+    {
+      id: "sweep",
+      label: "Turn",
+      unit: "deg",
+      min: 0,
+      max: 180,
+      step: 5,
+      fallback: 60,
+    },
+    {
+      id: "pitch",
+      label: "Lift",
+      unit: "deg",
+      min: 0,
+      max: 60,
+      step: 1,
+      fallback: 12,
+    },
+  ],
+  track(t, params, role) {
+    if (role !== "aim") return null;
+    const period = Math.max(value(this, params, "period"), 0.05);
+    const phase = (t / period) * TAU;
+    // Lifts and settles twice per sweep, never dipping below rest, the same
+    // shape turret.track gives its barrel.
+    const lift = (1 - Math.cos(phase * 2)) * 0.5;
+    return {
+      rotation: [
+        -deg(value(this, params, "pitch")) * lift,
+        deg(value(this, params, "sweep")) * Math.sin(phase),
+        0,
+      ],
+    };
+  },
+  /**
+   * Aims rather than loops, so this emits callins instead of a thread, exactly
+   * as turret.track does for its own pair of pieces.
+   */
+  emit(ctx) {
+    const aim = ctx.pieces("aim")[0];
+    if (!aim) return null;
+    const speed = lua(deg(value(this, ctx.params, "sweep")));
+
+    return {
+      functions: [],
+      hooks: {
+        AimWeapon1: [
+          `  Signal(${ctx.signal})`,
+          `  SetSignalMask(${ctx.signal})`,
+          `  Turn(${aim}, y_axis, heading, ${speed})`,
+          `  Turn(${aim}, x_axis, -pitch, ${speed})`,
+          `  WaitForTurn(${aim}, y_axis)`,
+          `  WaitForTurn(${aim}, x_axis)`,
+          "  return true",
+        ],
+        AimFromWeapon1: [`  return ${aim}`],
+        QueryWeapon1: [`  return ${aim}`],
+      },
+    };
+  },
+};
+
+export const IDLE_SWAY: AnimPreset = {
+  id: "idle.sway",
+  label: "Idle sway",
+  description:
+    "A slow turn back and forth while the unit stands still: a gentle body sway, or a scanning dish if that is what the piece is.",
+  requires: [{ role: "base", count: 1 }],
+  animates: ["base"],
+  params: [
+    {
+      id: "period",
+      label: "Cycle time",
+      unit: "s",
+      min: 1,
+      max: 20,
+      step: 0.5,
+      fallback: 6,
+    },
+    {
+      id: "turn",
+      label: "Turn",
+      unit: "deg",
+      min: 0,
+      max: 60,
+      step: 1,
+      fallback: 8,
+    },
+  ],
+  track(t, params, role) {
+    if (role !== "base") return null;
+    const period = Math.max(value(this, params, "period"), 0.05);
+    const phase = (t / period) * TAU;
+    return {
+      rotation: [0, deg(value(this, params, "turn")) * Math.sin(phase), 0],
+    };
+  },
+  emit(ctx) {
+    const thread = cycleThread(this, ctx, {
+      name: "idleSway",
+      period: Math.max(value(this, ctx.params, "period"), 0.05),
+    });
+    if (!thread) return null;
+    return {
+      functions: thread.functions,
+      hooks: {
+        // The opposite of walking: idle motion picks up once the unit stops,
+        // and stands down the moment it moves again.
+        StopMoving: [`  Signal(${ctx.signal})`, "  StartThread(idleSway)"],
+        StartMoving: [`  Signal(${ctx.signal})`, "  idleSwayStop()"],
+      },
+    };
+  },
+};
+
 export const PRESETS: AnimPreset[] = [
   WALK_BIPED,
   WALK_QUAD,
@@ -644,6 +876,9 @@ export const PRESETS: AnimPreset[] = [
   WHEELS_ROLL,
   BUILDARM,
   OPEN_CLOSE,
+  HOVER_BOB,
+  AIM_TRACK,
+  IDLE_SWAY,
 ];
 
 export function presetById(id: string): AnimPreset | undefined {

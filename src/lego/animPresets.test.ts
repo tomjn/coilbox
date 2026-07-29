@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AIM_TRACK,
   BUILDARM,
   countRoles,
+  HOVER_BOB,
+  IDLE_SWAY,
   isRole,
   OPEN_CLOSE,
   PRESETS,
@@ -36,6 +39,28 @@ function yaw(
   const delta = preset.track(t, params, role);
   if (!delta?.rotation) throw new Error(`${role} is not moved at ${t}`);
   return Number(((delta.rotation[1] * 180) / Math.PI).toFixed(4));
+}
+
+function roll(
+  preset: (typeof PRESETS)[number],
+  t: number,
+  role: string,
+  params: Record<string, number> = {},
+): number {
+  const delta = preset.track(t, params, role);
+  if (!delta?.rotation) throw new Error(`${role} is not moved at ${t}`);
+  return Number(((delta.rotation[2] * 180) / Math.PI).toFixed(4));
+}
+
+function height(
+  preset: (typeof PRESETS)[number],
+  t: number,
+  role: string,
+  params: Record<string, number> = {},
+): number {
+  const delta = preset.track(t, params, role);
+  if (!delta?.position) throw new Error(`${role} is not moved at ${t}`);
+  return delta.position[1];
 }
 
 describe("roles", () => {
@@ -226,5 +251,55 @@ describe("open.close", () => {
 
     expect(yaw(OPEN_CLOSE, 2, "door", params)).toBeCloseTo(80, 3);
     expect(yaw(OPEN_CLOSE, 4, "door", params)).toBeCloseTo(0, 3);
+  });
+});
+
+describe("hover.bob", () => {
+  it("sits level at the start of the cycle", () => {
+    expect(height(HOVER_BOB, 0, "base")).toBeCloseTo(0, 4);
+    expect(roll(HOVER_BOB, 0, "base")).toBeCloseTo(0, 4);
+  });
+
+  it("bobs up and back down within one period", () => {
+    const params = { period: 2, height: 0.4 };
+
+    expect(height(HOVER_BOB, 0.5, "base", params)).toBeCloseTo(0.4, 4);
+    expect(height(HOVER_BOB, 1, "base", params)).toBeCloseTo(0, 4);
+    expect(height(HOVER_BOB, 1.5, "base", params)).toBeCloseTo(-0.4, 4);
+  });
+
+  it("rocks in phase with the bob", () => {
+    const params = { period: 2, sway: 5 };
+
+    expect(roll(HOVER_BOB, 0.5, "base", params)).toBeCloseTo(5, 3);
+    expect(roll(HOVER_BOB, 1, "base", params)).toBeCloseTo(0, 4);
+    expect(roll(HOVER_BOB, 1.5, "base", params)).toBeCloseTo(-5, 3);
+  });
+});
+
+describe("aim.track", () => {
+  it("sweeps both ways about its rest position", () => {
+    expect(yaw(AIM_TRACK, 0, "aim")).toBe(0);
+    expect(yaw(AIM_TRACK, 1, "aim")).toBe(60);
+    expect(yaw(AIM_TRACK, 3, "aim")).toBe(-60);
+  });
+
+  it("only ever lifts, never dips below rest", () => {
+    for (let t = 0; t < 4; t += 0.1) {
+      expect(pitch(AIM_TRACK, t, "aim")).toBeLessThanOrEqual(0);
+    }
+  });
+});
+
+describe("idle.sway", () => {
+  it("starts at rest", () => {
+    expect(yaw(IDLE_SWAY, 0, "base")).toBe(0);
+  });
+
+  it("turns one way then the other within a period", () => {
+    const params = { period: 4, turn: 10 };
+
+    expect(yaw(IDLE_SWAY, 1, "base", params)).toBeCloseTo(10, 4);
+    expect(yaw(IDLE_SWAY, 3, "base", params)).toBeCloseTo(-10, 4);
   });
 });
