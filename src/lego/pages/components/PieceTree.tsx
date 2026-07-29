@@ -242,11 +242,7 @@ function Rows({
                   <span className="ml-auto shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">
                     {roleLabel(piece.role)}
                   </span>
-                ) : piece.partId ? null : (
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    empty
-                  </span>
-                )}
+                ) : null}
               </button>
               <Button
                 size="icon"
