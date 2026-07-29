@@ -13,9 +13,10 @@
 
 import { Button, Input } from "@picoframe/frame";
 import { Pencil, Trash2 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
+import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { validateCompoundName } from "../../compounds";
 import { addStandardLights, partMaterial } from "../../geometry";
@@ -58,7 +59,7 @@ export function CompoundPicker({
   onRename,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<GridState | null>(null);
   const [columns, setColumns] = useState(1);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -90,64 +91,52 @@ export function CompoundPicker({
     });
   }
 
-  useLayoutEffect(() => {
-    const canvas = canvasRef.current;
-    const scroller = scrollRef.current;
-    if (!canvas || !scroller) return;
+  useCanvas3D(
+    hostRef,
+    ({ renderer }) => {
+      const scroller = scrollRef.current;
+      if (!scroller) return;
 
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: true,
-    });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      const scene = new THREE.Scene();
+      addStandardLights(scene);
 
-    const scene = new THREE.Scene();
-    addStandardLights(scene);
+      // Orthographic, so a cell is the same size on screen wherever it sits.
+      const camera = new THREE.OrthographicCamera(0, 1, 0, -1, -1000, 1000);
+      camera.position.set(0, 0, 100);
 
-    // Orthographic, so a cell is the same size on screen wherever it sits.
-    const camera = new THREE.OrthographicCamera(0, 1, 0, -1, -1000, 1000);
-    camera.position.set(0, 0, 100);
+      const state: GridState = {
+        renderer,
+        scene,
+        camera,
+        holders: new Map(),
+        order: [],
+        columns: 1,
+        onColumns: setColumns,
+      };
+      stateRef.current = state;
 
-    const state: GridState = {
-      renderer,
-      scene,
-      camera,
-      holders: new Map(),
-      order: [],
-      columns: 1,
-      onColumns: setColumns,
-    };
-    stateRef.current = state;
+      const render = () =>
+        layout(state, scroller.scrollTop, scroller.clientHeight);
+      scroller.addEventListener("scroll", render, { passive: true });
 
-    const draw = () => {
-      const width = scroller.clientWidth;
-      const height = scroller.clientHeight;
-      if (width === 0 || height === 0) return;
-      renderer.setSize(width, height, false);
-      const next = Math.max(1, Math.floor((width + GAP) / PITCH_X));
-      if (next !== state.columns) {
-        state.columns = next;
-        state.onColumns(next);
-      }
-      layout(state, scroller.scrollTop, height);
-    };
-
-    const observer = new ResizeObserver(draw);
-    observer.observe(scroller);
-    const onScroll = () =>
-      layout(state, scroller.scrollTop, scroller.clientHeight);
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    draw();
-
-    return () => {
-      scroller.removeEventListener("scroll", onScroll);
-      observer.disconnect();
-      for (const holder of state.holders.values()) scene.remove(holder);
-      renderer.dispose();
-      stateRef.current = null;
-    };
-  }, []);
+      return {
+        render,
+        resize: (width) => {
+          const next = Math.max(1, Math.floor((width + GAP) / PITCH_X));
+          if (next !== state.columns) {
+            state.columns = next;
+            state.onColumns(next);
+          }
+        },
+        dispose: () => {
+          scroller.removeEventListener("scroll", render);
+          for (const holder of state.holders.values()) scene.remove(holder);
+          stateRef.current = null;
+        },
+      };
+    },
+    [],
+  );
 
   // The geometry is shared and cached, so a compound that is still here keeps
   // the object it already had and only new ones are built.
@@ -217,10 +206,7 @@ export function CompoundPicker({
 
   return (
     <div className="relative min-h-0 flex-1">
-      <canvas
-        ref={canvasRef}
-        className="pointer-events-none absolute inset-0 h-full w-full"
-      />
+      <div ref={hostRef} className="pointer-events-none absolute inset-0" />
       <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
         <div
           className="relative"
