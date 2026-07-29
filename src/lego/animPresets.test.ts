@@ -17,6 +17,7 @@ import {
   WALK_BIPED,
   WALK_QUAD,
   WHEELS_ROLL,
+  WRECK_POSE,
 } from "./animPresets";
 
 /** The x rotation a preset gives a role, in degrees, for readable assertions. */
@@ -329,6 +330,30 @@ describe("recoil", () => {
     const cycle = 0.1 + 0.4 + 0.6;
     expect(depth(RECOIL, cycle, "barrel", params)).toBeCloseTo(0, 4);
     expect(depth(RECOIL, cycle + 0.1, "barrel", params)).toBeCloseTo(-0.5, 4);
+  });
+});
+
+describe("wreck.pose", () => {
+  const params = { sink: 0.2, tilt: 15 };
+
+  it("gives the same pose whatever moment it is asked for", () => {
+    expect(height(WRECK_POSE, 0, "base", params)).toBeCloseTo(
+      height(WRECK_POSE, 9.7, "base", params),
+      6,
+    );
+    expect(roll(WRECK_POSE, 0, "base", params)).toBeCloseTo(
+      roll(WRECK_POSE, 9.7, "base", params),
+      6,
+    );
+  });
+
+  it("sinks down and tilts by the given amount", () => {
+    expect(height(WRECK_POSE, 0, "base", params)).toBeCloseTo(-0.2, 4);
+    expect(roll(WRECK_POSE, 0, "base", params)).toBeCloseTo(15, 4);
+  });
+
+  it("leaves every other role alone", () => {
+    expect(WRECK_POSE.track(0, params, "turret")).toBeNull();
   });
 });
 

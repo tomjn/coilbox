@@ -80,7 +80,8 @@ export type LuaHook =
   | "AimWeapon1"
   | "AimFromWeapon1"
   | "QueryWeapon1"
-  | "Shot1";
+  | "Shot1"
+  | "Killed";
 
 export interface EmitContext {
   /**
@@ -971,6 +972,74 @@ export const IDLE_SWAY: AnimPreset = {
   },
 };
 
+export const WRECK_POSE: AnimPreset = {
+  id: "wreck.pose",
+  label: "Wreck pose",
+  description:
+    "Poses the body as a collapsed wreck the instant the unit is killed. Not an animation: there is nothing to sample over time, so the piece snaps straight into the pose and stays there.",
+  requires: [{ role: "base", count: 1 }],
+  animates: ["base"],
+  params: [
+    {
+      id: "sink",
+      label: "Sink",
+      unit: "m",
+      min: 0,
+      max: 1,
+      step: 0.05,
+      fallback: 0.15,
+    },
+    {
+      id: "tilt",
+      label: "Tilt",
+      unit: "deg",
+      min: 0,
+      max: 45,
+      step: 1,
+      fallback: 12,
+    },
+  ],
+  /**
+   * `t` is accepted, as every preset's `track` must, but not read: a wreck is
+   * a single pose, not a cycle, so the delta is the same whatever moment it
+   * is asked for. That is what lets the viewport preview it with the existing
+   * playback loop and no change to how presets are sampled.
+   */
+  track(_t, params, role) {
+    if (role !== "base") return null;
+    return {
+      position: [0, -value(this, params, "sink"), 0],
+      rotation: [0, 0, deg(value(this, params, "tilt"))],
+    };
+  },
+  /**
+   * Killed is the real death callin (`bos2lua.ts` keeps its name unchanged
+   * converting BOS to Lua, the same evidence that placed recoil on `Shot1`).
+   * It already runs once, so this needs no thread and no signal, unlike a
+   * looping preset or one that might restart mid-flight.
+   *
+   * The pose is written as an instant `Move`/`Turn`, with no speed argument,
+   * because a wreck does not ease into place: it is simply what the unit
+   * looks like once it stops being alive.
+   */
+  emit(ctx) {
+    const base = ctx.pieces("base")[0];
+    if (!base) return null;
+    const sink = value(this, ctx.params, "sink");
+    const tilt = value(this, ctx.params, "tilt");
+
+    return {
+      functions: [],
+      hooks: {
+        Killed: [
+          `  Move(${base}, y_axis, -${lua(sink)})`,
+          `  Turn(${base}, z_axis, ${lua(deg(tilt))})`,
+        ],
+      },
+    };
+  },
+};
+
 export const PRESETS: AnimPreset[] = [
   WALK_BIPED,
   WALK_QUAD,
@@ -982,6 +1051,7 @@ export const PRESETS: AnimPreset[] = [
   AIM_TRACK,
   RECOIL,
   IDLE_SWAY,
+  WRECK_POSE,
 ];
 
 export function presetById(id: string): AnimPreset | undefined {

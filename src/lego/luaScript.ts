@@ -51,7 +51,15 @@ function localName(piece: string): string {
   return RESERVED.has(piece) ? `p_${piece}` : piece;
 }
 
-/** The callins, in the order they are written. */
+/**
+ * The callins, in the order they are written.
+ *
+ * `Killed` is deliberately not here: it always explodes the root piece and
+ * returns 1 regardless of what is applied, so it keeps its own hardcoded
+ * block below. A preset can still contribute to it through `hooks`, same as
+ * any other callin, that block just reads the map directly instead of going
+ * through this list.
+ */
 const HOOKS: { hook: LuaHook; signature: string }[] = [
   { hook: "Create", signature: "script.Create()" },
   { hook: "StartMoving", signature: "script.StartMoving()" },
@@ -145,6 +153,7 @@ export function buildLuaScript(project: LegoProject): string {
 
   out.push(
     "function script.Killed(recentDamage, maxHealth)",
+    ...(hooks.get("Killed") ?? []),
     ...(root ? [`  Explode(${localName(root)}, SFX.SHATTER)`] : []),
     "  return 1",
     "end",

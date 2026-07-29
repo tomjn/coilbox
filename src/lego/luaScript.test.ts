@@ -289,6 +289,29 @@ describe("buildLuaScript", () => {
     expect(lua).not.toContain("SIG_RECOIL");
   });
 
+  it("poses the body in Killed before the explode, with no thread", () => {
+    const lua = buildLuaScript(
+      project(
+        [{ id: "h", name: "hull", role: "base" }],
+        [{ presetId: "wreck.pose", params: { sink: 0.2, tilt: 15 } }],
+      ),
+    );
+
+    expect(lua).toMatch(
+      /function script\.Killed\(recentDamage, maxHealth\)\n {2}Move\(hull, y_axis, -0\.2\)\n {2}Turn\(hull, z_axis, 0\.2618\)\n {2}Explode\(base, SFX\.SHATTER\)\n {2}return 1/,
+    );
+    // A one-shot pose hangs directly off the callin, unlike a looping preset.
+    expect(lua).not.toContain("local function wreck");
+  });
+
+  it("still explodes and returns from Killed when there is no wreck pose applied", () => {
+    const lua = buildLuaScript(project([]));
+
+    expect(lua).toMatch(
+      /function script\.Killed\(recentDamage, maxHealth\)\n {2}Explode\(base, SFX\.SHATTER\)\n {2}return 1/,
+    );
+  });
+
   it("ends with exactly one newline and no triple blank lines", () => {
     const lua = buildLuaScript(project(LEGS));
 
