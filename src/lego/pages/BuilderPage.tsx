@@ -3,14 +3,10 @@ import {
   Blocks,
   ChevronDown,
   ChevronUp,
-  ClipboardPaste,
-  Copy,
-  PackagePlus,
   Plus,
   Redo,
   Rocket,
   Save,
-  Trash2,
   Undo,
   Upload,
 } from "lucide-react";
@@ -517,6 +513,13 @@ export default function BuilderPage() {
             uniformScale={uniformScale}
             onGround={() => edit((project) => sitOnGround(project, pack))}
             onReady={doc.onCapture}
+            onDuplicate={duplicateSelection}
+            canDuplicate={!!selectedId && selectedId !== draft.rootPieceId}
+            onPaste={() => void pasteClipboard()}
+            onSaveAsCompound={() => void saveSelectionAsCompound()}
+            canSaveAsCompound={!!selectedId}
+            onDelete={removeSelected}
+            canDelete={!!selectedId && selectedId !== draft.rootPieceId}
           />
         </div>
 
@@ -563,44 +566,6 @@ export default function BuilderPage() {
                   title="Add an empty piece, which is how flares and aim points are made"
                 >
                   <Plus size={14} />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={duplicateSelection}
-                  disabled={!selectedId || selectedId === draft.rootPieceId}
-                  title="Duplicate the selected piece and everything under it (Cmd D)"
-                  aria-label="Duplicate the selection"
-                >
-                  <Copy size={14} />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void pasteClipboard()}
-                  title="Paste under the selected piece (Cmd V)"
-                  aria-label="Paste"
-                >
-                  <ClipboardPaste size={14} />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void saveSelectionAsCompound()}
-                  disabled={!selectedId}
-                  title="Save the selected piece and everything under it, to reuse in another unit"
-                  aria-label="Save the selection as a compound"
-                >
-                  <PackagePlus size={14} />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={removeSelected}
-                  disabled={!selectedId || selectedId === draft.rootPieceId}
-                  aria-label="Delete the selected piece"
-                >
-                  <Trash2 size={14} />
                 </Button>
               </div>
 
