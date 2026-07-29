@@ -11,12 +11,13 @@
  * one at a time, so there are tens of them where there are hundreds of parts.
  */
 
-import { Button } from "@picoframe/frame";
-import { Trash2 } from "lucide-react";
+import { Button, Input } from "@picoframe/frame";
+import { Pencil, Trash2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 import { useReduceMotion } from "../../../general/display";
+import { validateCompoundName } from "../../compounds";
 import { addStandardLights, partMaterial } from "../../geometry";
 import { type LegoProject, walkPieces } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
@@ -39,15 +40,55 @@ interface Props {
   /** Absent on the parts browser, which has no unit to insert into. */
   onInsert?: (compound: LegoProject) => void;
   onDelete: (id: string) => void;
+  onRename: (compound: LegoProject, name: string) => void;
 }
 
-export function CompoundPicker({ pack, compounds, onInsert, onDelete }: Props) {
+/** The name field being edited, and why it cannot be saved yet, if at all. */
+interface Renaming {
+  id: string;
+  draft: string;
+  error: string | null;
+}
+
+export function CompoundPicker({
+  pack,
+  compounds,
+  onInsert,
+  onDelete,
+  onRename,
+}: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<GridState | null>(null);
   const [columns, setColumns] = useState(1);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<Renaming | null>(null);
   const reduceMotion = useReduceMotion();
+
+  function startRename(compound: LegoProject) {
+    setRenaming({ id: compound.id, draft: compound.name, error: null });
+  }
+
+  function cancelRename() {
+    setRenaming(null);
+  }
+
+  /**
+   * Enter and blur both land here. An empty or clashing name keeps the field
+   * open with a reason rather than reverting, so a mistyped name does not
+   * quietly vanish: the fix is to correct it or press Escape to give up.
+   */
+  function commitRename() {
+    setRenaming((current) => {
+      if (!current) return current;
+      const error = validateCompoundName(compounds, current.id, current.draft);
+      if (error) return { ...current, error };
+      const trimmed = current.draft.trim();
+      const compound = compounds.find((c) => c.id === current.id);
+      if (compound && trimmed !== compound.name) onRename(compound, trimmed);
+      return null;
+    });
+  }
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -185,52 +226,101 @@ export function CompoundPicker({ pack, compounds, onInsert, onDelete }: Props) {
           className="relative"
           style={{ height: Math.max(rows * PITCH_Y - GAP, 0) }}
         >
-          {compounds.map((compound, index) => (
-            <div
-              key={compound.id}
-              className="group absolute"
-              style={{
-                left: (index % columns) * PITCH_X,
-                top: Math.floor(index / columns) * PITCH_Y,
-                width: CELL,
-                height: CELL + LABEL,
-              }}
-            >
-              {/* A button whether or not it inserts: pointing at a cell or
-                  tabbing to it turns the compound, which is how its far side
-                  gets seen. The parts browser has no unit to insert into, so
-                  there it only turns. */}
-              <button
-                type="button"
-                onClick={onInsert ? () => onInsert(compound) : undefined}
-                onMouseEnter={() => setHovered(compound.id)}
-                onMouseLeave={() =>
-                  setHovered((at) => (at === compound.id ? null : at))
-                }
-                onFocus={() => setHovered(compound.id)}
-                onBlur={() =>
-                  setHovered((at) => (at === compound.id ? null : at))
-                }
-                title={
-                  onInsert
-                    ? `Add ${compound.name} to the unit`
-                    : `${compound.name}, ${compound.pieces.length} pieces`
-                }
-                className="flex h-full w-full flex-col justify-end rounded border border-transparent pb-1 text-center hover:border-border hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          {compounds.map((compound, index) => {
+            const isRenaming = renaming?.id === compound.id;
+            return (
+              <div
+                key={compound.id}
+                className="group absolute"
+                style={{
+                  left: (index % columns) * PITCH_X,
+                  top: Math.floor(index / columns) * PITCH_Y,
+                  width: CELL,
+                  height: CELL + LABEL,
+                }}
               >
-                <span className="truncate px-1 text-xs">{compound.name}</span>
-              </button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="absolute right-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-                onClick={() => onDelete(compound.id)}
-                aria-label={`Delete the ${compound.name} compound`}
-              >
-                <Trash2 size={14} />
-              </Button>
-            </div>
-          ))}
+                {/* A button whether or not it inserts: pointing at a cell or
+                    tabbing to it turns the compound, which is how its far side
+                    gets seen. The parts browser has no unit to insert into, so
+                    there it only turns. Renaming covers its label with a field
+                    but leaves it in place, so hover and spin still work. */}
+                <button
+                  type="button"
+                  onClick={onInsert ? () => onInsert(compound) : undefined}
+                  onMouseEnter={() => setHovered(compound.id)}
+                  onMouseLeave={() =>
+                    setHovered((at) => (at === compound.id ? null : at))
+                  }
+                  onFocus={() => setHovered(compound.id)}
+                  onBlur={() =>
+                    setHovered((at) => (at === compound.id ? null : at))
+                  }
+                  title={
+                    onInsert
+                      ? `Add ${compound.name} to the unit`
+                      : `${compound.name}, ${compound.pieces.length} pieces`
+                  }
+                  className="flex h-full w-full flex-col justify-end rounded border border-transparent pb-1 text-center hover:border-border hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="truncate px-1 text-xs">
+                    {isRenaming ? "" : compound.name}
+                  </span>
+                </button>
+                {isRenaming ? (
+                  <div className="absolute inset-x-1 bottom-1">
+                    <Input
+                      autoFocus
+                      value={renaming.draft}
+                      onChange={(event) =>
+                        setRenaming({
+                          id: compound.id,
+                          draft: event.target.value,
+                          error: null,
+                        })
+                      }
+                      onFocus={(event) => event.target.select()}
+                      onBlur={commitRename}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          commitRename();
+                        } else if (event.key === "Escape") {
+                          event.preventDefault();
+                          cancelRename();
+                        }
+                      }}
+                      aria-label={`Rename the ${compound.name} compound`}
+                      aria-invalid={renaming.error ? true : undefined}
+                      className="h-5 bg-background px-1 text-xs"
+                    />
+                    {renaming.error ? (
+                      <p className="truncate text-[10px] text-destructive">
+                        {renaming.error}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute left-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                  onClick={() => startRename(compound)}
+                  aria-label={`Rename the ${compound.name} compound`}
+                >
+                  <Pencil size={14} />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute right-0 top-0 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                  onClick={() => onDelete(compound.id)}
+                  aria-label={`Delete the ${compound.name} compound`}
+                >
+                  <Trash2 size={14} />
+                </Button>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

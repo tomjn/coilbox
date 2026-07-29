@@ -65,6 +65,30 @@ export function subtreeAsCompound(
 }
 
 /**
+ * Whether `name` can replace the given compound's name, and why not if it
+ * cannot.
+ *
+ * A compound's name is a free-text label, not a piece name, so it is not run
+ * through `normalisePieceName`. It only has to be non-empty and not collide
+ * with a sibling, because the grid tells compounds apart by name alone.
+ */
+export function validateCompoundName(
+  compounds: LegoProject[],
+  id: string,
+  name: string,
+): string | null {
+  const trimmed = name.trim();
+  if (trimmed === "") return "Name cannot be empty";
+  const clash = compounds.some(
+    (compound) =>
+      compound.id !== id &&
+      compound.name.trim().toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (clash) return "Another compound already has this name";
+  return null;
+}
+
+/**
  * Add a compound's pieces to a unit, hanging off `parentId`.
  *
  * Names are made unique as they land, because a script addresses pieces by

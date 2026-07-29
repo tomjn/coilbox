@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { usePartFilter } from "../filter";
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
-import { deleteCompound, useLegoCompounds } from "../projects";
+import { deleteCompound, saveCompound, useLegoCompounds } from "../projects";
 import { CompoundPicker } from "./components/CompoundPicker";
 import { PartDetail } from "./components/PartDetail";
 import { NoMatches, PartFilters } from "./components/PartFilters";
@@ -105,6 +105,9 @@ export default function PartsPage() {
                 pack={pack}
                 compounds={compounds}
                 onDelete={(id) => void deleteCompound(id)}
+                onRename={(compound, name) =>
+                  void saveCompound({ ...compound, name })
+                }
               />
             </div>
           ) : parts.length === 0 ? (

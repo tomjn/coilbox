@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { insertCompound, subtreeAsCompound } from "./compounds";
+import {
+  insertCompound,
+  subtreeAsCompound,
+  validateCompoundName,
+} from "./compounds";
 import {
   childrenOf,
   type LegoPiece,
@@ -202,5 +206,32 @@ describe("insertCompound", () => {
 
     expect(new Set(ids).size).toBe(ids.length);
     expect(twice.project.pieces).toHaveLength(host.pieces.length + 6);
+  });
+});
+
+describe("validateCompoundName", () => {
+  const compounds: LegoProject[] = [
+    { ...project([]), id: "a", name: "turret" },
+    { ...project([]), id: "b", name: "wheel" },
+  ];
+
+  it("accepts a name nothing else is using", () => {
+    expect(validateCompoundName(compounds, "a", "hull")).toBeNull();
+  });
+
+  it("rejects an empty name", () => {
+    expect(validateCompoundName(compounds, "a", "   ")).toBe(
+      "Name cannot be empty",
+    );
+  });
+
+  it("rejects a name another compound already has, regardless of case", () => {
+    expect(validateCompoundName(compounds, "a", "Wheel")).toBe(
+      "Another compound already has this name",
+    );
+  });
+
+  it("does not clash with the compound's own current name", () => {
+    expect(validateCompoundName(compounds, "a", "turret")).toBeNull();
   });
 });
