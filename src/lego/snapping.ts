@@ -69,6 +69,8 @@ export interface Snap {
   distance: number;
   /** Where the two anchors meet once the delta is applied. */
   at: Vec3;
+  /** Which of the target anchors won, so the caller can say whose it is. */
+  targetIndex: number;
 }
 
 /**
@@ -87,14 +89,14 @@ export function nearestSnap(
   let best: Snap | null = null;
 
   for (const from of moving) {
-    for (const to of targets) {
+    for (const [index, to] of targets.entries()) {
       const dx = to[0] - from[0];
       const dy = to[1] - from[1];
       const dz = to[2] - from[2];
       const distance = Math.hypot(dx, dy, dz);
       if (distance > threshold) continue;
       if (best && distance >= best.distance) continue;
-      best = { delta: [dx, dy, dz], distance, at: to };
+      best = { delta: [dx, dy, dz], distance, at: to, targetIndex: index };
     }
   }
 

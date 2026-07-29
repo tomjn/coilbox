@@ -47,6 +47,7 @@ import {
   useLegoProjects,
 } from "../projects";
 import { canReparent, reparentPiece } from "../reparent";
+import { sitOnGround } from "../s3oBuild";
 import { AnimationPanel } from "./components/AnimationPanel";
 import { CompoundPicker } from "./components/CompoundPicker";
 import { ExportDrawer } from "./components/ExportDrawer";
@@ -94,7 +95,7 @@ export default function BuilderPage() {
   const [playing, setPlaying] = useState(false);
   /** A preference, not part of the unit, so it lives with the session. */
   const [uniformScale, setUniformScale] = useState(true);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const captureRef = useRef<(() => HTMLCanvasElement) | null>(null);
   const filter = usePartFilter(pack);
 
   useEffect(() => {
@@ -189,9 +190,11 @@ export default function BuilderPage() {
     try {
       const written = await saveProject(project);
       setDirty(false);
-      // The thumbnail comes from the live canvas, so it can only be refreshed
-      // while the viewport is still mounted.
-      if (canvasRef.current) await saveThumbnail(written.id, canvasRef.current);
+      // Draw a fresh frame and copy it in the same breath. The viewport's
+      // drawing buffer is gone the moment its frame is composited, so a
+      // thumbnail taken from the canvas at any other time is blank.
+      const capture = captureRef.current;
+      if (capture) await saveThumbnail(written.id, capture());
     } finally {
       setSaving(false);
     }
@@ -590,8 +593,9 @@ export default function BuilderPage() {
             onTransform={transformPiece}
             playing={playing}
             uniformScale={uniformScale}
-            onReady={(canvas) => {
-              canvasRef.current = canvas;
+            onGround={() => edit((project) => sitOnGround(project, pack))}
+            onReady={(capture) => {
+              captureRef.current = capture;
             }}
           />
         </div>

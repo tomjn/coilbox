@@ -17,7 +17,13 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { Move, RotateCw, Scaling } from "lucide-react";
+import {
+  ArrowDownToLine,
+  Grid3x3,
+  Move,
+  RotateCw,
+  Scaling,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -76,6 +82,14 @@ const CORNER_COLOUR = 0xfbbf24;
  */
 const ANCHOR_DOT = 4;
 const ORIGIN_DOT = 9;
+/** The pair that actually seated, and the piece it seated against. */
+const SEAT_COLOUR = 0x34d399;
+const SEAT_DOT = 11;
+/** A target anchor nothing is near. Warms towards `SEAT_COLOUR` on approach. */
+const TARGET_COLD = 0x64748b;
+
+/** Where the camera starts, and where Reset view puts it back. */
+const HOME_CAMERA: [number, number, number] = [9, 7, 11];
 
 /** How close two anchors must be before a piece seats against another. */
 const SNAP_DISTANCE = 0.45;
@@ -89,13 +103,20 @@ interface Props {
   onSelect: (pieceId: string | null) => void;
   /** Committed when a drag ends, not on every frame of it. */
   onTransform: (pieceId: string, change: Partial<LegoPiece>) => void;
-  /** Handed the canvas so the page can save a thumbnail from it. */
-  onReady?: (canvas: HTMLCanvasElement) => void;
+  /**
+   * Handed a function that draws a frame and returns the canvas, rather than
+   * the canvas itself. WebGL discards its drawing buffer once the frame is
+   * composited, so reading the canvas at any later moment gives a blank image.
+   * The caller has to copy the pixels in the same task as the draw.
+   */
+  onReady?: (capture: () => HTMLCanvasElement) => void;
   /** Runs the applied presets. Nothing is written: stopping restores the rest
    *  pose exactly, because it comes back from the document. */
   playing?: boolean;
   /** Scale handles keep the piece's proportions. */
   uniformScale?: boolean;
+  /** Drop the unit onto y = 0. Absent hides the button. */
+  onGround?: () => void;
 }
 
 export function ModelViewport({
@@ -107,12 +128,24 @@ export function ModelViewport({
   onReady,
   playing = false,
   uniformScale = false,
+  onGround,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
+  const compassRef = useRef<SVGSVGElement>(null);
   const reduceMotion = useReduceMotion();
   const [mode, setMode] = useState<GizmoMode>("translate");
   const [snapped, setSnapped] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
+
+  function resetView() {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.camera.position.set(...HOME_CAMERA);
+    state.controls.target.set(0, 0, 0);
+    state.controls.update();
+    state.render();
+  }
 
   // The scene is built once and never rebuilt on a prop change, because that
   // would reset the camera mid-edit. Callbacks therefore go through refs rather
@@ -149,6 +182,12 @@ export function ModelViewport({
     const grid = new THREE.GridHelper(40, 40, 0x556070, 0x2c333f);
     scene.add(grid);
 
+    // Which way is which, drawn at the origin. Short, because it is a compass
+    // and not a measure.
+    const axes = new THREE.AxesHelper(2);
+    axes.position.y = 0.01;
+    scene.add(axes);
+
     const root = new THREE.Group();
     scene.add(root);
 
@@ -156,8 +195,26 @@ export function ModelViewport({
     outline.visible = false;
     scene.add(outline);
 
+    // Green, and only ever seen mid-drag: the piece being seated against, and
+    // the point the two anchors meet at.
+    const seatOutline = new THREE.BoxHelper(root, SEAT_COLOUR);
+    seatOutline.visible = false;
+    scene.add(seatOutline);
+
+    const seatMark = new THREE.Points(
+      new THREE.BufferGeometry().setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute([0, 0, 0], 3),
+      ),
+      dotMaterial(SEAT_DOT, renderer.getPixelRatio(), false, SEAT_COLOUR),
+    );
+    seatMark.visible = false;
+    seatMark.renderOrder = 3;
+    seatMark.raycast = () => {};
+    scene.add(seatMark);
+
     const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 500);
-    camera.position.set(9, 7, 11);
+    camera.position.set(...HOME_CAMERA);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = !reduceMotion;
@@ -165,7 +222,11 @@ export function ModelViewport({
     controls.minDistance = 1;
     controls.maxDistance = 120;
 
-    const render = () => renderer.render(scene, camera);
+    const render = () => {
+      renderer.render(scene, camera);
+      // After the render, so the camera's inverse matrix is the one just used.
+      if (compassRef.current) paintCompass(compassRef.current, camera);
+    };
     controls.addEventListener("change", render);
 
     const gizmo = new TransformControls(camera, renderer.domElement);
@@ -180,11 +241,16 @@ export function ModelViewport({
       gizmo,
       root,
       outline,
+      grid,
+      axes,
       groups: new Map(),
       baked: [],
       rest: new Map(),
       uniformScale: false,
       anchors: null,
+      targetAnchors: null,
+      seatMark,
+      seatOutline,
       dots: dotMaterial(ANCHOR_DOT, renderer.getPixelRatio(), true),
       originDot: dotMaterial(ORIGIN_DOT, renderer.getPixelRatio(), false),
       render,
@@ -203,10 +269,19 @@ export function ModelViewport({
     // every piece at the origin.
     gizmo.addEventListener("mouseDown", () => {
       controls.enabled = false;
+      // Built once per drag: the other pieces do not move while one is dragged,
+      // so their anchors are fixed for the length of it.
+      const pieceId = gizmo.object ? pieceIdOf(gizmo.object) : null;
+      if (gizmo.getMode() === "translate") {
+        showTargetAnchors(state, packRef.current, projectRef.current, pieceId);
+      }
     });
     gizmo.addEventListener("mouseUp", () => {
       controls.enabled = true;
+      showTargetAnchors(state, packRef.current, projectRef.current, null);
+      showSeat(state, null);
       commitGizmo(state);
+      render();
     });
 
     gizmo.addEventListener("objectChange", () => {
@@ -275,7 +350,10 @@ export function ModelViewport({
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointerup", onPointerUp);
 
-    onReadyRef.current?.(renderer.domElement);
+    onReadyRef.current?.(() => {
+      render();
+      return renderer.domElement;
+    });
 
     return () => {
       cancelAnimationFrame(frame);
@@ -288,6 +366,10 @@ export function ModelViewport({
       gizmo.getHelper().removeFromParent();
       gizmo.dispose();
       clearAnchors(state);
+      state.targetAnchors?.geometry.dispose();
+      state.seatMark.geometry.dispose();
+      (state.seatMark.material as THREE.PointsMaterial).dispose();
+      state.seatOutline.dispose();
       state.dots.dispose();
       state.originDot.dispose();
       disposeBaked(state);
@@ -352,6 +434,14 @@ export function ModelViewport({
     const state = sceneRef.current;
     if (state) state.uniformScale = uniformScale;
   }, [uniformScale]);
+
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.grid.visible = showGrid;
+    state.axes.visible = showGrid;
+    state.render();
+  }, [showGrid]);
 
   // Playback. The gizmo comes off first: it would be dragging a transform that
   // is overwritten on the next frame. Stopping puts the scene back from the
@@ -426,30 +516,65 @@ export function ModelViewport({
       {/* Down the left edge and vertically centred, out of the way of the
           unit's own chrome at the top of the view. */}
       <TooltipProvider delayDuration={300}>
-        <ButtonGroup
-          orientation="vertical"
-          className="absolute left-3 top-1/2 -translate-y-1/2"
-        >
-          {MODES.map(({ id, label, key, Icon }) => (
-            <Tooltip key={id}>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant={mode === id ? "default" : "outline"}
-                  onClick={() => setMode(id)}
-                  aria-label={label}
-                  aria-pressed={mode === id}
-                >
-                  <Icon className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                {label} ({key})
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </ButtonGroup>
+        <div className="absolute left-3 top-1/2 flex -translate-y-1/2 flex-col gap-2">
+          <ButtonGroup orientation="vertical">
+            {MODES.map(({ id, label, key, Icon }) => (
+              <Tooltip key={id}>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant={mode === id ? "default" : "outline"}
+                    onClick={() => setMode(id)}
+                    aria-label={label}
+                    aria-pressed={mode === id}
+                  >
+                    <Icon className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {label} ({key})
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </ButtonGroup>
+
+          {/* A group of its own. The three above are a mode you are in, this
+              is a thing you do once. */}
+          {onGround ? (
+            <ButtonGroup orientation="vertical">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={onGround}
+                    aria-label="Sit the unit on the ground"
+                  >
+                    <ArrowDownToLine className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Sit on the ground</TooltipContent>
+              </Tooltip>
+            </ButtonGroup>
+          ) : null}
+        </div>
       </TooltipProvider>
+
+      {/* Camera and scene, in the opposite corner from the notes. Stacked
+          rather than side by side, so the compass keeps the corner and the
+          buttons do not push it inward. */}
+      <ButtonGroup className="absolute bottom-3 right-3">
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={() => setShowGrid(!showGrid)}
+          aria-pressed={showGrid}
+          title={showGrid ? "Hide the ground grid" : "Show the ground grid"}
+        >
+          <Grid3x3 className="size-4" />
+        </Button>
+        <AxisCompass svgRef={compassRef} onClick={resetView} />
+      </ButtonGroup>
 
       {/* Notes and the key sit at the bottom, where they can be read when
           wanted and ignored when not. */}
@@ -468,6 +593,105 @@ export function ModelViewport({
         </span>
       </div>
     </div>
+  );
+}
+
+/**
+ * Which way the world's axes point from where the camera is.
+ *
+ * Painted straight into the SVG from the render loop rather than through React
+ * state: the camera moves every frame while orbiting, and re-rendering the tree
+ * sixty times a second to move three lines would be absurd.
+ */
+function paintCompass(svg: SVGSVGElement, camera: THREE.Camera) {
+  const basis = new THREE.Matrix3().setFromMatrix4(camera.matrixWorldInverse);
+  const point = new THREE.Vector3();
+
+  for (const [axis, x, y, z] of [
+    ["x", 1, 0, 0],
+    ["y", 0, 1, 0],
+    ["z", 0, 0, 1],
+  ] as const) {
+    point.set(x, y, z).applyMatrix3(basis);
+    const line = svg.querySelector(`[data-axis="${axis}"]`);
+    const label = svg.querySelector(`[data-label="${axis}"]`);
+    // Screen y grows downward, so the camera-space y is negated.
+    const tipX = COMPASS_MID + point.x * COMPASS_ARM;
+    const tipY = COMPASS_MID - point.y * COMPASS_ARM;
+    line?.setAttribute("x2", String(tipX));
+    line?.setAttribute("y2", String(tipY));
+    label?.setAttribute("x", String(tipX));
+    label?.setAttribute("y", String(tipY));
+    // An axis pointing away from the camera is drawn faint, so the near end of
+    // each pair is the readable one.
+    const towards = (point.z + 1) / 2;
+    line?.setAttribute("opacity", String(0.35 + towards * 0.65));
+    label?.setAttribute("opacity", String(0.35 + towards * 0.65));
+  }
+}
+
+const COMPASS_SIZE = 32;
+const COMPASS_MID = COMPASS_SIZE / 2;
+const COMPASS_ARM = 11;
+
+/** The three world axes as seen from here, and a click to face front again. */
+function AxisCompass({
+  svgRef,
+  onClick,
+}: {
+  svgRef: React.RefObject<SVGSVGElement | null>;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      size="icon"
+      variant="outline"
+      onClick={onClick}
+      title="Reset the view"
+      aria-label="Reset the view"
+    >
+      {/* A `size-` class of its own, or the button's own icon rule shrinks any
+          bare svg to 16px and the compass becomes a smudge. */}
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${COMPASS_SIZE} ${COMPASS_SIZE}`}
+        className="size-7"
+        aria-hidden
+        role="presentation"
+      >
+        {(
+          [
+            ["x", "#f87171"],
+            ["y", "#4ade80"],
+            ["z", "#60a5fa"],
+          ] as const
+        ).map(([axis, colour]) => (
+          <g key={axis}>
+            <line
+              data-axis={axis}
+              x1={COMPASS_MID}
+              y1={COMPASS_MID}
+              x2={COMPASS_MID}
+              y2={COMPASS_MID}
+              stroke={colour}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+            />
+            <text
+              data-label={axis}
+              x={COMPASS_MID}
+              y={COMPASS_MID}
+              fill={colour}
+              fontSize={9}
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              {axis.toUpperCase()}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </Button>
   );
 }
 
@@ -492,6 +716,9 @@ interface SceneState {
   gizmo: TransformControls;
   root: THREE.Group;
   outline: THREE.BoxHelper;
+  /** The ground and the compass, both of which can be switched off. */
+  grid: THREE.GridHelper;
+  axes: THREE.AxesHelper;
   /** Piece id to the group holding it, so selection and edits can find it. */
   groups: Map<string, THREE.Group>;
   /** Geometry built for playback, which this owns and must free. The shared
@@ -501,6 +728,11 @@ interface SceneState {
   uniformScale: boolean;
   /** The selected piece's origin and anchors, or nothing when none is. */
   anchors: THREE.Group | null;
+  /** Every other piece's anchors, shown only while something is being dragged. */
+  targetAnchors: THREE.Points | null;
+  /** A dot on the pair that seated, and a box round the piece it seated to. */
+  seatMark: THREE.Points;
+  seatOutline: THREE.BoxHelper;
   /** Small dots for the snap anchors, coloured per vertex by kind. */
   dots: THREE.PointsMaterial;
   /** A larger dot for the origin, which is one point and a different idea. */
@@ -624,21 +856,16 @@ function applySnap(state: SceneState) {
     return;
   }
 
-  // A piece never snaps to itself or to anything hanging off it, or dragging a
-  // parent would try to seat it against the children it is carrying.
-  const own = new Set(descendantIds(project, pieceId));
-  const targets: Vec3[] = [];
-  for (const other of project.pieces) {
-    if (own.has(other.id)) continue;
-    targets.push(...worldAnchors(state, pack, other));
-  }
+  const { points, owners } = snapTargets(state, pack, project, pieceId);
+  const mine = worldAnchors(state, pack, piece);
+  paintProximity(state, mine, points);
 
-  const snap = nearestSnap(
-    worldAnchors(state, pack, piece),
-    targets,
-    SNAP_DISTANCE,
-  );
+  const snap = nearestSnap(mine, points, SNAP_DISTANCE);
   state.onSnapChange(snap !== null);
+  showSeat(
+    state,
+    snap ? { at: snap.at, owner: owners[snap.targetIndex] } : null,
+  );
   if (!snap) return;
 
   // The delta is in world space and the group's position is relative to its
@@ -653,6 +880,123 @@ function applySnap(state: SceneState) {
     delta.applyMatrix3(inverse);
   }
   group.position.add(delta);
+}
+
+/**
+ * Every anchor a dragged piece could seat against, and whose each one is.
+ *
+ * A piece never snaps to itself or to anything hanging off it, or dragging a
+ * parent would try to seat it against the children it is carrying.
+ */
+function snapTargets(
+  state: SceneState,
+  pack: LoadedPack,
+  project: LegoProject,
+  pieceId: string,
+): { points: Vec3[]; owners: string[] } {
+  const own = new Set(descendantIds(project, pieceId));
+  const points: Vec3[] = [];
+  const owners: string[] = [];
+  for (const other of project.pieces) {
+    if (own.has(other.id)) continue;
+    for (const anchor of worldAnchors(state, pack, other)) {
+      points.push(anchor);
+      owners.push(other.id);
+    }
+  }
+  return { points, owners };
+}
+
+/**
+ * Show what a drag is seating against: a dot where the two anchors meet, and a
+ * box round the piece whose anchor it is.
+ *
+ * Without this a snap is a piece jumping for no visible reason. There are
+ * fifteen anchors on each piece and any pair within reach can win, so the only
+ * useful answer to "what just happened" is to point at the pair that did.
+ */
+function showSeat(
+  state: SceneState,
+  seat: { at: Vec3; owner: string | undefined } | null,
+) {
+  if (!seat) {
+    state.seatMark.visible = false;
+    state.seatOutline.visible = false;
+    return;
+  }
+
+  state.seatMark.position.set(...seat.at);
+  state.seatMark.visible = true;
+
+  const group = seat.owner ? state.groups.get(seat.owner) : undefined;
+  if (group) {
+    state.seatOutline.setFromObject(group);
+    state.seatOutline.visible = true;
+  } else {
+    state.seatOutline.visible = false;
+  }
+}
+
+/** Every other piece's anchors, so a drag can see what it is aiming at. */
+function showTargetAnchors(
+  state: SceneState,
+  pack: LoadedPack,
+  project: LegoProject,
+  pieceId: string | null,
+) {
+  state.targetAnchors?.geometry.dispose();
+  state.targetAnchors?.removeFromParent();
+  state.targetAnchors = null;
+  if (!pieceId) return;
+
+  const { points: positions } = snapTargets(state, pack, project, pieceId);
+  if (positions.length === 0) return;
+
+  // Every point starts cold. `paintProximity` warms them as the drag closes in.
+  const cold = new THREE.Color(TARGET_COLD);
+  const colours = positions.flatMap(() => [cold.r, cold.g, cold.b]);
+
+  const object = points(positions.flat(), colours, state.dots);
+  state.scene.add(object);
+  state.targetAnchors = object;
+}
+
+/**
+ * Warm each target anchor as the dragged piece approaches it.
+ *
+ * A snap is otherwise a step function: nothing, nothing, then a jump. Colouring
+ * by distance turns it into something you can aim with, and the point that goes
+ * fully green is the one about to take the piece.
+ */
+function paintProximity(state: SceneState, moving: Vec3[], targets: Vec3[]) {
+  const object = state.targetAnchors;
+  if (!object) return;
+  const colours = object.geometry.getAttribute("color");
+  if (!colours || colours.count !== targets.length) return;
+
+  const cold = new THREE.Color(TARGET_COLD);
+  const hot = new THREE.Color(SEAT_COLOUR);
+  const shade = new THREE.Color();
+
+  targets.forEach((target, index) => {
+    let nearest = Number.POSITIVE_INFINITY;
+    for (const from of moving) {
+      nearest = Math.min(
+        nearest,
+        Math.hypot(
+          target[0] - from[0],
+          target[1] - from[1],
+          target[2] - from[2],
+        ),
+      );
+    }
+    // Warms from twice the snapping distance, so a point starts to glow before
+    // it can actually take the piece.
+    const closeness = 1 - Math.min(nearest / (SNAP_DISTANCE * 2), 1);
+    shade.copy(cold).lerp(hot, closeness * closeness);
+    colours.setXYZ(index, shade.r, shade.g, shade.b);
+  });
+  colours.needsUpdate = true;
 }
 
 /**
@@ -758,6 +1102,7 @@ function dotMaterial(
   size: number,
   pixelRatio: number,
   vertexColours: boolean,
+  colour: number = ORIGIN_COLOUR,
 ): THREE.PointsMaterial {
   return new THREE.PointsMaterial({
     // `gl_PointSize` is in device pixels, so the ratio has to come back out or
@@ -765,7 +1110,7 @@ function dotMaterial(
     size: size * pixelRatio,
     sizeAttenuation: false,
     vertexColors: vertexColours,
-    color: vertexColours ? 0xffffff : ORIGIN_COLOUR,
+    color: vertexColours ? 0xffffff : colour,
     map: circleSprite(),
     alphaTest: 0.5,
     depthTest: false,
