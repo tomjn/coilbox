@@ -310,6 +310,9 @@ impl From<ExportPiece> for coilbox_s3o::Piece {
 /// The model goes to `objects3d/<unit>.s3o`. The atlas is shared: every unit
 /// built from a pack names the same texture, so one copy in `unittextures/`
 /// serves all of them and re-exporting a second unit does not add a second PNG.
+/// The unit script and the unit definition both land under their own folder
+/// and, like the script, the definition is written once and then left for
+/// hand edits: a re-export never overwrites one that is already there.
 #[tauri::command]
 async fn lego_export<R: Runtime>(
     app: AppHandle<R>,
@@ -317,6 +320,7 @@ async fn lego_export<R: Runtime>(
     unit_name: String,
     atlas: Option<String>,
     script: Option<String>,
+    unit_def: Option<String>,
     model: ExportModel,
 ) -> CliResult {
     if !valid_unit_name(&unit_name) {
@@ -389,11 +393,33 @@ async fn lego_export<R: Runtime>(
         }
     }
 
+    // The unit definition follows the same rule as the script: written once
+    // and then left alone, so hand-tuned fields survive a re-export after a
+    // geometry change.
+    let mut unit_def_path = None;
+    let mut unit_def_kept = false;
+    if let Some(unit_def) = unit_def {
+        let units = root.join("units");
+        if let Err(e) = std::fs::create_dir_all(&units) {
+            return CliResult::err(format!("could not create {}: {e}", units.display()));
+        }
+        let target = units.join(format!("{unit_name}.lua"));
+        if target.exists() {
+            unit_def_kept = true;
+        } else if let Err(e) = std::fs::write(&target, unit_def) {
+            return CliResult::err(format!("could not write {}: {e}", target.display()));
+        } else {
+            unit_def_path = Some(target.to_string_lossy().to_string());
+        }
+    }
+
     CliResult::ok(json!({
         "model": model_path.to_string_lossy(),
         "texture": texture_path,
         "script": script_path,
         "scriptKept": script_kept,
+        "unitDef": unit_def_path,
+        "unitDefKept": unit_def_kept,
     }))
 }
 

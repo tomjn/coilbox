@@ -53,6 +53,8 @@ export const legoExport = defineCommand<
     atlas: string | null;
     /** Written only when the game has no script for this unit yet. */
     script: string | null;
+    /** Written only when the game has no unit definition for it yet. */
+    unitDef: string | null;
     model: S3oBuild;
   },
   {
@@ -61,6 +63,9 @@ export const legoExport = defineCommand<
     script: string | null;
     /** True when a script was already there and was left as it was. */
     scriptKept: boolean;
+    unitDef: string | null;
+    /** True when a unit definition was already there and was left as it was. */
+    unitDefKept: boolean;
   }
 >("coilbox-lego", "lego_export");
 
