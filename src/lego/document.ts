@@ -1,12 +1,12 @@
 /**
- * The unit being edited, its undo history and its clipboard.
+ * The unit being edited, its undo history, its selection and its clipboard.
  *
  * A plain reducer with no React and no disk in it, so undo, redo and the
  * coalescing that folds a drag into one step can be exercised directly.
  * `useLegoDocument` is the wiring around it: React state, a timer and the disk.
  */
 
-import type { LegoProject } from "./model";
+import { type LegoProject, pieceById } from "./model";
 
 /** Undo steps kept. Whole documents, but a unit is a few hundred numbers. */
 export const HISTORY_LIMIT = 60;
@@ -29,6 +29,13 @@ export interface LegoDocument {
   dirty: boolean;
   /** When the last edit landed, so a gesture can fold into one undo step. */
   editedAt: number;
+  /**
+   * The piece the builder is pointed at. Lives here, not in the page, because
+   * every transition that can remove a piece has to decide what becomes of a
+   * selection that named it. Reseated to the nearest surviving ancestor,
+   * because that is where the pieces it lost were hanging off.
+   */
+  selectedId: string | null;
 }
 
 export const emptyDocument: LegoDocument = {
@@ -38,6 +45,7 @@ export const emptyDocument: LegoDocument = {
   clipboard: null,
   dirty: false,
   editedAt: 0,
+  selectedId: null,
 };
 
 export type LegoDocumentAction =
@@ -46,7 +54,34 @@ export type LegoDocumentAction =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "copy"; cutting: LegoProject | null }
-  | { type: "saved" };
+  | { type: "saved" }
+  | { type: "select"; id: string | null };
+
+/**
+ * What a selection becomes when the piece it names is gone from `to`.
+ *
+ * Walks up the vanished piece's ancestors as they stood in `from`, the project
+ * it is leaving, and lands on the first one that still exists on the other
+ * side. Falls all the way back to the root, or to nothing if even that is
+ * gone. A parent is where the missing piece was hanging off, so it is the
+ * nearest thing left to "where the builder was working".
+ */
+function reseatSelection(
+  selectedId: string | null,
+  from: LegoProject,
+  to: LegoProject,
+): string | null {
+  if (selectedId === null) return null;
+  const survives = new Set(to.pieces.map((piece) => piece.id));
+  if (survives.has(selectedId)) return selectedId;
+
+  let piece = pieceById(from, selectedId);
+  while (piece?.parentId) {
+    if (survives.has(piece.parentId)) return piece.parentId;
+    piece = pieceById(from, piece.parentId);
+  }
+  return survives.has(to.rootPieceId) ? to.rootPieceId : null;
+}
 
 export function reduceDocument(
   state: LegoDocument,
@@ -56,7 +91,13 @@ export function reduceDocument(
     case "open":
       // Take a copy once the document arrives. Later refreshes of the shared
       // list must not overwrite edits in progress.
-      return state.project ? state : { ...state, project: action.project };
+      return state.project
+        ? state
+        : {
+            ...state,
+            project: action.project,
+            selectedId: action.project.rootPieceId,
+          };
 
     case "edit": {
       const current = state.project;
@@ -77,6 +118,7 @@ export function reduceDocument(
         future: [],
         dirty: true,
         editedAt: action.at,
+        selectedId: reseatSelection(state.selectedId, current, next),
       };
     }
 
@@ -93,6 +135,7 @@ export function reduceDocument(
         // The next edit starts a fresh step rather than folding into whatever
         // was being done before the undo.
         editedAt: 0,
+        selectedId: reseatSelection(state.selectedId, current, previous),
       };
     }
 
@@ -107,6 +150,7 @@ export function reduceDocument(
         future: state.future.slice(0, -1),
         dirty: true,
         editedAt: 0,
+        selectedId: reseatSelection(state.selectedId, current, next),
       };
     }
 
@@ -115,5 +159,8 @@ export function reduceDocument(
 
     case "saved":
       return { ...state, dirty: false };
+
+    case "select":
+      return { ...state, selectedId: action.id };
   }
 }

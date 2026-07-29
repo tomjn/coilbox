@@ -8,7 +8,7 @@ import {
   type LegoDocumentAction,
   reduceDocument,
 } from "./document";
-import { type LegoProject, newProject } from "./model";
+import { type LegoPiece, type LegoProject, newProject } from "./model";
 
 function project(name: string): LegoProject {
   return newProject({
@@ -21,6 +21,18 @@ function project(name: string): LegoProject {
   });
 }
 
+function piece(id: string, parentId: string): LegoPiece {
+  return {
+    id,
+    name: id,
+    parentId,
+    partId: null,
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+  };
+}
+
 const opened: LegoDocument = reduceDocument(emptyDocument, {
   type: "open",
   project: project("walker"),
@@ -29,6 +41,23 @@ const opened: LegoDocument = reduceDocument(emptyDocument, {
 /** Rename the unit at a given moment, which is the smallest edit there is. */
 function rename(name: string, at: number): LegoDocumentAction {
   return { type: "edit", change: (doc) => ({ ...doc, name }), at };
+}
+
+/** Add a child piece under `parentId`, to build a tree to reseat against. */
+function addPiece(
+  id: string,
+  parentId: string,
+  at: number,
+): LegoDocumentAction {
+  return {
+    type: "edit",
+    at,
+    change: (doc) => ({ ...doc, pieces: [...doc.pieces, piece(id, parentId)] }),
+  };
+}
+
+function select(id: string | null): LegoDocumentAction {
+  return { type: "select", id };
 }
 
 function run(
@@ -193,5 +222,106 @@ describe("clipboard", () => {
     const undone = run(copied, rename("one", 1000), { type: "undo" });
 
     expect(undone.clipboard?.name).toBe("arm");
+  });
+});
+
+describe("selection", () => {
+  it("starts on the root once the document arrives", () => {
+    expect(opened.selectedId).toBe("root");
+  });
+
+  it("moves where it is told", () => {
+    expect(reduceDocument(opened, select("root")).selectedId).toBe("root");
+  });
+
+  it("reseats to the parent when undo removes the selected piece", () => {
+    const built = run(opened, addPiece("child", "root", 1000), select("child"));
+    expect(built.selectedId).toBe("child");
+
+    const undone = reduceDocument(built, { type: "undo" });
+    expect(undone.project?.pieces.map((p) => p.id)).toEqual(["root"]);
+    expect(undone.selectedId).toBe("root");
+  });
+
+  it("reseats to the parent when a delete removes the selected piece", () => {
+    const built = run(opened, addPiece("child", "root", 1000), select("child"));
+
+    const deleted = reduceDocument(built, {
+      type: "edit",
+      at: 5000,
+      change: (doc) => ({
+        ...doc,
+        pieces: doc.pieces.filter((piece) => piece.id !== "child"),
+      }),
+    });
+
+    expect(deleted.selectedId).toBe("root");
+  });
+
+  it("reseats to redo the same way, since it is the same kind of jump", () => {
+    const built = run(opened, addPiece("child", "root", 1000), select("child"));
+    const undone = reduceDocument(built, { type: "undo" });
+    // The selection already settled on root during the undo. Going forward
+    // again does not chase the child back down, because root is still there.
+    const redone = reduceDocument(undone, { type: "redo" });
+    expect(redone.selectedId).toBe("root");
+  });
+
+  it("walks up to the nearest surviving ancestor, not straight to the root", () => {
+    const built = run(
+      opened,
+      addPiece("mid", "root", 1000),
+      addPiece("leaf", "mid", 6000),
+      select("leaf"),
+    );
+
+    // Only the step that added "leaf" undoes here, so "mid" survives and is
+    // where the selection should land: it is where "leaf" hung off, not the
+    // furthest thing away.
+    const undone = reduceDocument(built, { type: "undo" });
+    expect(undone.project?.pieces.map((p) => p.id)).toEqual(["root", "mid"]);
+    expect(undone.selectedId).toBe("mid");
+  });
+
+  it("walks up past a whole removed branch to whatever is left", () => {
+    const built = run(
+      opened,
+      // Both pieces land in the same edit, so undoing it takes both at once.
+      {
+        type: "edit",
+        at: 1000,
+        change: (doc) => ({
+          ...doc,
+          pieces: [...doc.pieces, piece("mid", "root"), piece("leaf", "mid")],
+        }),
+      },
+      select("leaf"),
+    );
+
+    const undone = reduceDocument(built, { type: "undo" });
+    expect(undone.project?.pieces.map((p) => p.id)).toEqual(["root"]);
+    expect(undone.selectedId).toBe("root");
+  });
+
+  it("clears the selection rather than guess, if even the root has gone", () => {
+    const built = run(opened, addPiece("child", "root", 1000), select("child"));
+
+    // Not a shape the app produces, but the reducer takes whatever `change`
+    // hands it, so this is the only way to put it in a state with no root to
+    // fall back to.
+    const broken = reduceDocument(built, {
+      type: "edit",
+      at: 5000,
+      change: (doc) => ({ ...doc, pieces: [] }),
+    });
+
+    expect(broken.selectedId).toBe(null);
+  });
+
+  it("leaves an untouched selection alone", () => {
+    const built = run(opened, addPiece("child", "root", 1000), select("root"));
+
+    const edited = reduceDocument(built, rename("gunship", 6000));
+    expect(edited.selectedId).toBe("root");
   });
 });
