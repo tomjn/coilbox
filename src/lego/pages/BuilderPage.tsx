@@ -925,6 +925,9 @@ export default function BuilderPage() {
                 compounds={compounds}
                 onInsert={addCompound}
                 onDelete={(compoundId) => void deleteCompound(compoundId)}
+                onRename={(compound, name) =>
+                  void saveCompound({ ...compound, name })
+                }
               />
             ) : filter.parts.length === 0 ? (
               <NoMatches />
