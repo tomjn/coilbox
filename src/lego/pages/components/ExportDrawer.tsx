@@ -3,7 +3,9 @@
  *
  * The destination is a game folder, chosen once and remembered on the project,
  * so exporting again after a change is one click. The model lands in
- * `objects3d/` and the pack's atlas, if asked for, in `unittextures/`.
+ * `objects3d/` and the pack's atlas, if asked for, in `unittextures/`. A unit
+ * definition always goes to `units/`, since without one the engine has
+ * nothing to spawn.
  *
  * The atlas is shared. Every unit built from a pack names the same texture
  * file, so five units need one PNG installed, not five.
@@ -22,6 +24,7 @@ import { buildLuaScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { buildS3o } from "../../s3oBuild";
+import { buildUnitDef } from "../../unitDef";
 
 interface Props {
   open: boolean;
@@ -45,6 +48,8 @@ type Result =
       texture: string | null;
       script: string | null;
       scriptKept: boolean;
+      unitDef: string | null;
+      unitDefKept: boolean;
     }
   | { state: "failed"; message: string };
 
@@ -90,6 +95,10 @@ export function ExportDrawer({
         unitName: project.unitName,
         atlas: withTexture ? atlas : null,
         script: withScript ? buildLuaScript(project) : null,
+        // Unlike the atlas and the script, there is no scenario where a
+        // built unit should export without one: with no unit definition the
+        // engine has nothing to spawn.
+        unitDef: buildUnitDef(project, model.radius),
         model,
       });
       onRemember({
@@ -201,6 +210,15 @@ export function ExportDrawer({
                 {result.scriptKept ? (
                   <p className="text-muted-foreground">
                     The unit script was already there and has been left alone.
+                  </p>
+                ) : null}
+                {result.unitDef ? (
+                  <code className="break-all">{result.unitDef}</code>
+                ) : null}
+                {result.unitDefKept ? (
+                  <p className="text-muted-foreground">
+                    The unit definition was already there and has been left
+                    alone.
                   </p>
                 ) : null}
                 <Button
