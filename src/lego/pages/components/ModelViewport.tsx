@@ -19,10 +19,14 @@
 import { Button } from "@picoframe/frame";
 import {
   ArrowDownToLine,
+  ClipboardPaste,
+  Copy,
   Grid3x3,
   Move,
+  PackagePlus,
   RotateCw,
   Scaling,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
@@ -156,6 +160,22 @@ interface Props {
   uniformScale?: boolean;
   /** Drop the unit onto y = 0. Absent hides the button. */
   onGround?: () => void;
+  /** Duplicate the selected piece and everything under it (Cmd D). */
+  onDuplicate: () => void;
+  canDuplicate: boolean;
+  /**
+   * Paste under the selected piece (Cmd V). Always enabled: it reads the
+   * system clipboard on click, so there is nothing to check synchronously
+   * before then, and a mistaken paste reports itself rather than needing
+   * to be prevented.
+   */
+  onPaste: () => void;
+  /** Save the selected piece and everything under it, to reuse in another unit. */
+  onSaveAsCompound: () => void;
+  canSaveAsCompound: boolean;
+  /** Delete the selected piece (Backspace). */
+  onDelete: () => void;
+  canDelete: boolean;
 }
 
 export function ModelViewport({
@@ -170,6 +190,13 @@ export function ModelViewport({
   playing = false,
   uniformScale = false,
   onGround,
+  onDuplicate,
+  canDuplicate,
+  onPaste,
+  onSaveAsCompound,
+  canSaveAsCompound,
+  onDelete,
+  canDelete,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
@@ -730,6 +757,66 @@ export function ModelViewport({
               </Tooltip>
             </ButtonGroup>
           ) : null}
+
+          {/* A third group: what you do to the selected piece, rather than a
+              mode or a one-off on the whole unit. */}
+          <ButtonGroup orientation="vertical">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={onDuplicate}
+                  disabled={!canDuplicate}
+                  aria-label="Duplicate the selection"
+                >
+                  <Copy className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Duplicate (Cmd D)</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={onPaste}
+                  aria-label="Paste"
+                >
+                  <ClipboardPaste className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Paste (Cmd V)</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={onSaveAsCompound}
+                  disabled={!canSaveAsCompound}
+                  aria-label="Save the selection as a compound"
+                >
+                  <PackagePlus className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Save as a compound</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={onDelete}
+                  disabled={!canDelete}
+                  aria-label="Delete the selected piece"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Delete (Backspace)</TooltipContent>
+            </Tooltip>
+          </ButtonGroup>
         </div>
       </TooltipProvider>
 
