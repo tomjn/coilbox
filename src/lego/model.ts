@@ -75,6 +75,10 @@ export interface LegoProject {
   exportTexture?: boolean;
   /** Whether it also wrote a unit script when the game had none. */
   exportScript?: boolean;
+  /** Whether that export also wrote a .glb, for taking the unit into Blender. */
+  exportGlb?: boolean;
+  /** Whether that export also wrote an .obj and .mtl, for the same reason. */
+  exportObj?: boolean;
 }
 
 /**
@@ -308,6 +312,8 @@ export function parseLegoProjectJson(json: string): LegoProject | null {
     ...(typeof d.exportScript === "boolean"
       ? { exportScript: d.exportScript }
       : {}),
+    ...(typeof d.exportGlb === "boolean" ? { exportGlb: d.exportGlb } : {}),
+    ...(typeof d.exportObj === "boolean" ? { exportObj: d.exportObj } : {}),
   };
   // A document saved before pieces were written in save order, or hand-edited,
   // may not have its parents first. Normalise here so the invariant holds the

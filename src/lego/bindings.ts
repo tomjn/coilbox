@@ -70,6 +70,36 @@ export const legoExport = defineCommand<
 >("coilbox-lego", "lego_export");
 
 /**
+ * Write a unit's `.glb` into a game folder, at `blender/<unit>.glb`. Separate
+ * from `objects3d`, since a `.glb` is not something the engine reads: it is
+ * for taking the unit into Blender, either to check it against the `.s3o` or
+ * to finish it by hand.
+ */
+export const legoExportGlb = defineCommand<
+  { dir: string; unitName: string; bytes: number[] },
+  { path: string }
+>("coilbox-lego", "lego_export_glb");
+
+/**
+ * Write a unit's `.obj` and `.mtl` into a game folder, at
+ * `blender/<unit>.obj` and `.mtl`, alongside a copy of the atlas the `.mtl`
+ * points its `map_Kd` at. The copy is what makes the reference resolve: an
+ * `.mtl` naming a texture that lives only in `unittextures/` elsewhere in the
+ * game folder would not open correctly relocated on its own.
+ */
+export const legoExportObj = defineCommand<
+  {
+    dir: string;
+    unitName: string;
+    obj: string;
+    mtl: string;
+    /** The atlas file name to copy in beside the .obj and .mtl. */
+    atlas: string;
+  },
+  { obj: string; mtl: string; texture: string }
+>("coilbox-lego", "lego_export_obj");
+
+/**
  * Prepare the scratch `.sdd` a unit is tested in, at
  * `<dataDir>/games/<folder>`, and write the `modinfo.lua` the caller
  * generated. The unit goes in afterwards through `legoExport`, which treats it
