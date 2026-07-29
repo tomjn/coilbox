@@ -36,6 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { type AnimPreset, presetById } from "../../animPresets";
 import { addStandardLights, partMaterial } from "../../geometry";
@@ -174,222 +175,212 @@ export function ModelViewport({
   packRef.current = pack;
 
   // Built once. Everything after this mutates the scene rather than remaking it.
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+  useCanvas3D(
+    containerRef,
+    (canvas) => {
+      const { renderer } = canvas;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
-    renderer.domElement.style.display = "block";
-    renderer.domElement.style.width = "100%";
-    renderer.domElement.style.height = "100%";
+      const scene = new THREE.Scene();
+      addStandardLights(scene);
 
-    const scene = new THREE.Scene();
-    addStandardLights(scene);
+      // Units stand on y = 0, so the grid is the ground the engine will use.
+      const grid = new THREE.GridHelper(40, 40, 0x556070, 0x2c333f);
+      scene.add(grid);
 
-    // Units stand on y = 0, so the grid is the ground the engine will use.
-    const grid = new THREE.GridHelper(40, 40, 0x556070, 0x2c333f);
-    scene.add(grid);
+      // Which way is which, drawn at the origin. Short, because it is a compass
+      // and not a measure.
+      const axes = new THREE.AxesHelper(2);
+      axes.position.y = 0.01;
+      scene.add(axes);
 
-    // Which way is which, drawn at the origin. Short, because it is a compass
-    // and not a measure.
-    const axes = new THREE.AxesHelper(2);
-    axes.position.y = 0.01;
-    scene.add(axes);
+      const root = new THREE.Group();
+      scene.add(root);
 
-    const root = new THREE.Group();
-    scene.add(root);
+      const outline = new THREE.BoxHelper(root, 0x8b5cf6);
+      outline.visible = false;
+      scene.add(outline);
 
-    const outline = new THREE.BoxHelper(root, 0x8b5cf6);
-    outline.visible = false;
-    scene.add(outline);
+      // Green, and only ever seen mid-drag: the piece being seated against, and
+      // the point the two anchors meet at.
+      const seatOutline = new THREE.BoxHelper(root, SEAT_COLOUR);
+      seatOutline.visible = false;
+      scene.add(seatOutline);
 
-    // Green, and only ever seen mid-drag: the piece being seated against, and
-    // the point the two anchors meet at.
-    const seatOutline = new THREE.BoxHelper(root, SEAT_COLOUR);
-    seatOutline.visible = false;
-    scene.add(seatOutline);
+      const seatMark = new THREE.Points(
+        new THREE.BufferGeometry().setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute([0, 0, 0], 3),
+        ),
+        dotMaterial(SEAT_DOT, renderer.getPixelRatio(), false, SEAT_COLOUR),
+      );
+      seatMark.visible = false;
+      seatMark.renderOrder = 3;
+      seatMark.raycast = () => {};
+      scene.add(seatMark);
 
-    const seatMark = new THREE.Points(
-      new THREE.BufferGeometry().setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute([0, 0, 0], 3),
-      ),
-      dotMaterial(SEAT_DOT, renderer.getPixelRatio(), false, SEAT_COLOUR),
-    );
-    seatMark.visible = false;
-    seatMark.renderOrder = 3;
-    seatMark.raycast = () => {};
-    scene.add(seatMark);
+      const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 500);
+      camera.position.set(...HOME_CAMERA);
 
-    const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 500);
-    camera.position.set(...HOME_CAMERA);
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = !reduceMotion;
+      controls.maxPolarAngle = Math.PI * 0.495;
+      controls.minDistance = 1;
+      controls.maxDistance = 120;
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = !reduceMotion;
-    controls.maxPolarAngle = Math.PI * 0.495;
-    controls.minDistance = 1;
-    controls.maxDistance = 120;
-
-    const render = () => {
-      renderer.render(scene, camera);
-      // After the render, so the camera's inverse matrix is the one just used.
-      if (compassRef.current) paintCompass(compassRef.current, camera);
-    };
-    controls.addEventListener("change", render);
-
-    const gizmo = new TransformControls(camera, renderer.domElement);
-    gizmo.setSpace("local");
-    scene.add(gizmo.getHelper());
-
-    const state: SceneState = {
-      renderer,
-      scene,
-      camera,
-      controls,
-      gizmo,
-      root,
-      outline,
-      grid,
-      axes,
-      groups: new Map(),
-      baked: [],
-      rest: new Map(),
-      uniformScale: false,
-      anchors: null,
-      targetAnchors: null,
-      seatMark,
-      seatOutline,
-      dots: dotMaterial(ANCHOR_DOT, renderer.getPixelRatio(), true),
-      originDot: dotMaterial(ORIGIN_DOT, renderer.getPixelRatio(), false),
-      render,
-      snapping: true,
-      onSnapChange: () => {},
-      projectRef,
-      packRef,
-      onTransformRef,
-    };
-    sceneRef.current = state;
-
-    // `mouseDown` and `mouseUp`, not `dragging-changed`: this version of
-    // TransformControls does not dispatch that one, so listening for it left
-    // orbit running during a drag, and never wrote the moved transform back.
-    // The next edit then resynced the scene from a document that still had
-    // every piece at the origin.
-    gizmo.addEventListener("mouseDown", () => {
-      controls.enabled = false;
-      // Built once per drag: the other pieces do not move while one is dragged,
-      // so their anchors are fixed for the length of it.
-      const pieceId = gizmo.object ? pieceIdOf(gizmo.object) : null;
-      if (gizmo.getMode() === "translate") {
-        showTargetAnchors(state, packRef.current, projectRef.current, pieceId);
-      }
-    });
-    gizmo.addEventListener("mouseUp", () => {
-      controls.enabled = true;
-      showTargetAnchors(state, packRef.current, projectRef.current, null);
-      showSeat(state, null);
-      commitGizmo(state);
-      render();
-    });
-
-    gizmo.addEventListener("objectChange", () => {
-      forceUniformScale(state);
-      applySnap(state);
-      state.outline.setFromObject(gizmo.object ?? root);
-      render();
-    });
-
-    const resize = () => {
-      const { clientWidth, clientHeight } = container;
-      if (clientWidth === 0 || clientHeight === 0) return;
-      renderer.setSize(clientWidth, clientHeight, false);
-      camera.aspect = clientWidth / clientHeight;
-      camera.updateProjectionMatrix();
-      render();
-    };
-    const observer = new ResizeObserver(resize);
-    observer.observe(container);
-    resize();
-
-    let frame = 0;
-    if (!reduceMotion) {
-      const tick = () => {
-        controls.update();
-        render();
-        frame = requestAnimationFrame(tick);
+      const render = () => {
+        renderer.render(scene, camera);
+        // After the render, so the camera's inverse matrix is the one just used.
+        if (compassRef.current) paintCompass(compassRef.current, camera);
       };
-      frame = requestAnimationFrame(tick);
-    }
+      controls.addEventListener("change", render);
 
-    // Selection happens on release, not on press, and only when the pointer
-    // barely moved. Selecting on press meant a click that missed a gizmo handle
-    // by a pixel cleared the selection and detached the gizmo before the drag
-    // could start, and dragging empty space to orbit cleared it too.
-    const raycaster = new THREE.Raycaster();
-    const pointer = new THREE.Vector2();
-    let pressedAt: { x: number; y: number } | null = null;
-    let pressedOnGizmo = false;
+      const gizmo = new TransformControls(camera, renderer.domElement);
+      gizmo.setSpace("local");
+      scene.add(gizmo.getHelper());
 
-    const onPointerDown = (event: PointerEvent) => {
-      pressedAt = { x: event.clientX, y: event.clientY };
-      // Whether a handle was grabbed has to be read now rather than on release.
-      // TransformControls registered its listeners on this canvas first, so its
-      // pointerdown has already set these, and its pointerup clears them again
-      // before this handler's pointerup would ever see them.
-      pressedOnGizmo = gizmo.dragging || gizmo.axis !== null;
-    };
-    const onPointerUp = (event: PointerEvent) => {
-      const from = pressedAt;
-      const onGizmo = pressedOnGizmo;
-      pressedAt = null;
-      pressedOnGizmo = false;
-      if (!from || onGizmo) return;
-      // Anything past a few pixels was an orbit or a drag, not a click.
-      if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > 4)
-        return;
+      const state: SceneState = {
+        renderer,
+        scene,
+        camera,
+        controls,
+        gizmo,
+        root,
+        outline,
+        grid,
+        axes,
+        groups: new Map(),
+        baked: [],
+        rest: new Map(),
+        uniformScale: false,
+        anchors: null,
+        targetAnchors: null,
+        seatMark,
+        seatOutline,
+        dots: dotMaterial(ANCHOR_DOT, renderer.getPixelRatio(), true),
+        originDot: dotMaterial(ORIGIN_DOT, renderer.getPixelRatio(), false),
+        render,
+        snapping: true,
+        onSnapChange: () => {},
+        projectRef,
+        packRef,
+        onTransformRef,
+      };
+      sceneRef.current = state;
 
-      const bounds = renderer.domElement.getBoundingClientRect();
-      pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
-      pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
-      raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObject(root, true)[0];
-      onSelectRef.current(pieceIdOf(hit?.object ?? null));
-    };
-    renderer.domElement.addEventListener("pointerdown", onPointerDown);
-    renderer.domElement.addEventListener("pointerup", onPointerUp);
+      // `mouseDown` and `mouseUp`, not `dragging-changed`: this version of
+      // TransformControls does not dispatch that one, so listening for it left
+      // orbit running during a drag, and never wrote the moved transform back.
+      // The next edit then resynced the scene from a document that still had
+      // every piece at the origin.
+      gizmo.addEventListener("mouseDown", () => {
+        controls.enabled = false;
+        // Built once per drag: the other pieces do not move while one is dragged,
+        // so their anchors are fixed for the length of it.
+        const pieceId = gizmo.object ? pieceIdOf(gizmo.object) : null;
+        if (gizmo.getMode() === "translate") {
+          showTargetAnchors(
+            state,
+            packRef.current,
+            projectRef.current,
+            pieceId,
+          );
+        }
+      });
+      gizmo.addEventListener("mouseUp", () => {
+        controls.enabled = true;
+        showTargetAnchors(state, packRef.current, projectRef.current, null);
+        showSeat(state, null);
+        commitGizmo(state);
+        render();
+      });
 
-    onReadyRef.current?.(() => {
-      render();
-      return renderer.domElement;
-    });
+      gizmo.addEventListener("objectChange", () => {
+        forceUniformScale(state);
+        applySnap(state);
+        state.outline.setFromObject(gizmo.object ?? root);
+        render();
+      });
 
-    return () => {
-      cancelAnimationFrame(frame);
-      renderer.domElement.removeEventListener("pointerdown", onPointerDown);
-      renderer.domElement.removeEventListener("pointerup", onPointerUp);
-      observer.disconnect();
-      controls.removeEventListener("change", render);
-      controls.dispose();
-      gizmo.detach();
-      gizmo.getHelper().removeFromParent();
-      gizmo.dispose();
-      clearAnchors(state);
-      state.targetAnchors?.geometry.dispose();
-      state.seatMark.geometry.dispose();
-      (state.seatMark.material as THREE.PointsMaterial).dispose();
-      state.seatOutline.dispose();
-      state.dots.dispose();
-      state.originDot.dispose();
-      disposeBaked(state);
-      grid.dispose();
-      outline.dispose();
-      renderer.dispose();
-      renderer.domElement.remove();
-      sceneRef.current = null;
-    };
-  }, [reduceMotion]);
+      let frame = 0;
+      if (!reduceMotion) {
+        const tick = () => {
+          controls.update();
+          render();
+          frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+      }
+
+      // Selection happens on release, not on press, and only when the pointer
+      // barely moved. Selecting on press meant a click that missed a gizmo handle
+      // by a pixel cleared the selection and detached the gizmo before the drag
+      // could start, and dragging empty space to orbit cleared it too.
+      const raycaster = new THREE.Raycaster();
+      const pointer = new THREE.Vector2();
+      let pressedAt: { x: number; y: number } | null = null;
+      let pressedOnGizmo = false;
+
+      const onPointerDown = (event: PointerEvent) => {
+        pressedAt = { x: event.clientX, y: event.clientY };
+        // Whether a handle was grabbed has to be read now rather than on release.
+        // TransformControls registered its listeners on this canvas first, so its
+        // pointerdown has already set these, and its pointerup clears them again
+        // before this handler's pointerup would ever see them.
+        pressedOnGizmo = gizmo.dragging || gizmo.axis !== null;
+      };
+      const onPointerUp = (event: PointerEvent) => {
+        const from = pressedAt;
+        const onGizmo = pressedOnGizmo;
+        pressedAt = null;
+        pressedOnGizmo = false;
+        if (!from || onGizmo) return;
+        // Anything past a few pixels was an orbit or a drag, not a click.
+        if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > 4)
+          return;
+
+        const bounds = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+        pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const hit = raycaster.intersectObject(root, true)[0];
+        onSelectRef.current(pieceIdOf(hit?.object ?? null));
+      };
+      renderer.domElement.addEventListener("pointerdown", onPointerDown);
+      renderer.domElement.addEventListener("pointerup", onPointerUp);
+
+      onReadyRef.current?.(canvas.capture);
+
+      return {
+        render,
+        resize: (width, height) => {
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
+        },
+        dispose: () => {
+          cancelAnimationFrame(frame);
+          renderer.domElement.removeEventListener("pointerdown", onPointerDown);
+          renderer.domElement.removeEventListener("pointerup", onPointerUp);
+          controls.removeEventListener("change", render);
+          controls.dispose();
+          gizmo.detach();
+          gizmo.getHelper().removeFromParent();
+          gizmo.dispose();
+          clearAnchors(state);
+          state.targetAnchors?.geometry.dispose();
+          state.seatMark.geometry.dispose();
+          (state.seatMark.material as THREE.PointsMaterial).dispose();
+          state.seatOutline.dispose();
+          state.dots.dispose();
+          state.originDot.dispose();
+          disposeBaked(state);
+          grid.dispose();
+          outline.dispose();
+          sceneRef.current = null;
+        },
+      };
+    },
+    [reduceMotion],
+  );
 
   // Structure and transforms both land here, because a piece added and a piece
   // moved are the same operation on the same map. While playing, the bake goes
