@@ -39,6 +39,7 @@ import {
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { type AnimPreset, presetById } from "../../animPresets";
+import { frameBox } from "../../framing";
 import { addStandardLights, partMaterial } from "../../geometry";
 import { descendantIds, type LegoPiece, type LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
@@ -167,6 +168,10 @@ export function ModelViewport({
   onReadyRef.current = onReady;
   const onTransformRef = useRef(onTransform);
   onTransformRef.current = onTransform;
+  // F reads this from the keydown listener below, which is registered once
+  // and would otherwise only ever see the selection at mount.
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
   // The gizmo reads the document every frame of a drag to find what to snap
   // against, and a stale copy would snap to where pieces used to be.
   const projectRef = useRef(project);
@@ -495,6 +500,10 @@ export function ModelViewport({
       if (event.key === "g") setMode("translate");
       if (event.key === "r") setMode("rotate");
       if (event.key === "s") setMode("scale");
+      if (event.key === "f" && !event.metaKey && !event.ctrlKey) {
+        const state = sceneRef.current;
+        if (state) focusSelection(state, selectedIdRef.current);
+      }
     };
     const up = (event: KeyboardEvent) => {
       if (!event.altKey) setSnapping(true);
@@ -1278,6 +1287,44 @@ function applyAnimation(state: SceneState, project: LegoProject, t: number) {
     group.position.set(...position);
     group.rotation.set(...rotation);
   }
+}
+
+/**
+ * Frame a piece: move the orbit target to its world-space bounding box and
+ * pull the camera in along the direction it is already looking.
+ *
+ * With nothing selected, `pieceId` is null and the whole unit is framed
+ * instead. That reads as more useful than F doing nothing, and matches other
+ * 3D tools' "frame all" behaviour for an empty selection.
+ */
+function focusSelection(state: SceneState, pieceId: string | null) {
+  const object = pieceId ? state.groups.get(pieceId) : state.root;
+  if (!object) return;
+
+  const box = new THREE.Box3().setFromObject(object);
+  if (box.isEmpty()) return;
+
+  // The direction from the target to the camera, not the camera to the
+  // target: keeping this fixed and only moving the target and the distance
+  // along it is what stops F from spinning the view to a new angle.
+  const offset = new THREE.Vector3().subVectors(
+    state.camera.position,
+    state.controls.target,
+  );
+
+  const { target, position } = frameBox(
+    {
+      min: [box.min.x, box.min.y, box.min.z],
+      max: [box.max.x, box.max.y, box.max.z],
+    },
+    [offset.x, offset.y, offset.z],
+    THREE.MathUtils.degToRad(state.camera.fov),
+  );
+
+  state.controls.target.set(...target);
+  state.camera.position.set(...position);
+  state.controls.update();
+  state.render();
 }
 
 /** Write the dragged transform back to the document, once the drag is over. */
