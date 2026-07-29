@@ -702,12 +702,21 @@ export default function BuilderPage() {
                 </Button>
               </div>
 
-              <div className="min-h-32 flex-1 overflow-y-auto py-1">
-                <PieceTree
-                  project={draft}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                  onReparent={reparent}
+              <div className="relative min-h-32 flex-1">
+                <div className="h-full overflow-y-auto py-1">
+                  <PieceTree
+                    project={draft}
+                    selectedId={selectedId}
+                    onSelect={setSelectedId}
+                    onReparent={reparent}
+                  />
+                </div>
+                {/* Fades the last row rather than clipping it mid-line, so a
+                    partly visible row reads as "more below" rather than a
+                    rendering fault. */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-background to-transparent"
                 />
               </div>
 
