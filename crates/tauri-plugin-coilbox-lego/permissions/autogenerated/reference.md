@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows the unit builder's project storage, thumbnail and reveal commands.
+Allows the unit builder's project storage, thumbnail, reveal and test-game commands.
 
 #### This default permission set includes the following:
 
@@ -10,6 +10,7 @@ Allows the unit builder's project storage, thumbnail and reveal commands.
 - `allow-lego-thumb-save`
 - `allow-lego-open-path`
 - `allow-lego-export`
+- `allow-lego-scratch-game`
 
 ## Permission Table
 
@@ -146,6 +147,32 @@ Enables the lego_save command without any pre-configured scope.
 <td>
 
 Denies the lego_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:allow-lego-scratch-game`
+
+</td>
+<td>
+
+Enables the lego_scratch_game command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:deny-lego-scratch-game`
+
+</td>
+<td>
+
+Denies the lego_scratch_game command without any pre-configured scope.
 
 </td>
 </tr>

@@ -8,6 +8,7 @@ import {
   PackagePlus,
   Plus,
   Redo,
+  Rocket,
   Save,
   Trash2,
   Undo,
@@ -56,6 +57,7 @@ import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 import { PieceTree } from "./components/PieceTree";
+import { TestDrawer } from "./components/TestDrawer";
 import { TransformFields } from "./components/TransformFields";
 
 /** Radix needs a non-empty value, so "no role" gets one of its own. */
@@ -92,6 +94,7 @@ export default function BuilderPage() {
   const [clipboard, setClipboard] = useState<LegoProject | null>(null);
   const [aside, setAside] = useState<"pieces" | "animation">("pieces");
   const [exporting, setExporting] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [playing, setPlaying] = useState(false);
   /** A preference, not part of the unit, so it lives with the session. */
   const [uniformScale, setUniformScale] = useState(true);
@@ -510,6 +513,13 @@ export default function BuilderPage() {
         }
       />
 
+      <TestDrawer
+        open={testing}
+        onOpenChange={setTesting}
+        project={draft}
+        pack={pack}
+      />
+
       <div className="flex min-h-0 flex-1">
         {/* The unit's chrome floats over the view rather than taking a strip
             off the top of it. The 3D is the point of this screen. */}
@@ -570,6 +580,13 @@ export default function BuilderPage() {
                 disabled={saving}
               >
                 <Save size={14} /> Save
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setTesting(true)}
+              >
+                <Rocket size={14} /> Test in game
               </Button>
               <Button size="sm" onClick={() => setExporting(true)}>
                 <Upload size={14} /> Export

@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "lego_thumb_save",
     "lego_open_path",
     "lego_export",
+    "lego_scratch_game",
 ];
 
 fn main() {
