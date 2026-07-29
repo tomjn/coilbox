@@ -163,6 +163,30 @@ export function descendantIds(project: LegoProject, pieceId: string): string[] {
 }
 
 /**
+ * Whether a piece is hidden, either itself or because an ancestor is.
+ *
+ * The viewport hides a piece by making its group invisible, and three.js
+ * already stops there without drawing anything under it. This mirrors that
+ * for the tree, so a child row does not read as shown when nothing under a
+ * hidden ancestor actually is. A cycle stops the walk rather than looping.
+ */
+export function isEffectivelyHidden(
+  project: LegoProject,
+  pieceId: string,
+): boolean {
+  const seen = new Set<string>();
+  let current = pieceById(project, pieceId);
+  while (current && !seen.has(current.id)) {
+    if (current.hidden) return true;
+    seen.add(current.id);
+    current = current.parentId
+      ? pieceById(project, current.parentId)
+      : undefined;
+  }
+  return false;
+}
+
+/**
  * Everything wrong with a project, as sentences meant to be shown.
  *
  * Separate from parsing because the editor can hold a document mid-edit that is
