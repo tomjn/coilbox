@@ -245,6 +245,17 @@ fn valid_unit_name(name: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
+/// Whether an export target is coilbox's own scratch game rather than a real
+/// install, judged by the shape of the target folder's own name. Used to waive
+/// the write-once rule below: a real game folder's hand edits must survive a
+/// re-export, but the scratch `.sdd` the Test drawer writes into is coilbox's
+/// own throwaway and should always reflect the unit as it stands right now.
+fn is_scratch_dir(root: &Path) -> bool {
+    root.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(valid_scratch_folder)
+}
+
 /// The scratch game's folder name, held to a shape no real game folder has:
 /// coilbox's own prefix and a `.sdd` suffix. That is what keeps this command
 /// from being pointed at an installed game and rewriting its `modinfo.lua`.
@@ -325,7 +336,10 @@ impl From<ExportPiece> for coilbox_s3o::Piece {
 /// serves all of them and re-exporting a second unit does not add a second PNG.
 /// The unit script and the unit definition both land under their own folder
 /// and, like the script, the definition is written once and then left for
-/// hand edits: a re-export never overwrites one that is already there.
+/// hand edits: a re-export never overwrites one that is already there. The one
+/// exception is coilbox's own scratch game (see [`is_scratch_dir`]), which has
+/// no hand edits worth keeping and must always show the unit as it stands now,
+/// so both files are overwritten unconditionally there.
 #[tauri::command]
 async fn lego_export<R: Runtime>(
     app: AppHandle<R>,
@@ -345,6 +359,7 @@ async fn lego_export<R: Runtime>(
     if !root.is_absolute() || !root.is_dir() {
         return CliResult::err(format!("not a folder: {dir}"));
     }
+    let scratch = is_scratch_dir(&root);
 
     let bytes = match coilbox_s3o::write(&coilbox_s3o::Model {
         radius: model.radius,
@@ -388,7 +403,8 @@ async fn lego_export<R: Runtime>(
 
     // The unit script is written once and then left alone. It is meant to be
     // edited by hand, and re-exporting a model after a change to the geometry
-    // must not throw that away.
+    // must not throw that away. The scratch game is the one exception: it has
+    // no hand edits worth keeping, so it always gets the current script.
     let mut script_path = None;
     let mut script_kept = false;
     if let Some(script) = script {
@@ -397,7 +413,7 @@ async fn lego_export<R: Runtime>(
             return CliResult::err(format!("could not create {}: {e}", scripts.display()));
         }
         let target = scripts.join(format!("{unit_name}.lua"));
-        if target.exists() {
+        if target.exists() && !scratch {
             script_kept = true;
         } else if let Err(e) = std::fs::write(&target, script) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
@@ -406,9 +422,9 @@ async fn lego_export<R: Runtime>(
         }
     }
 
-    // The unit definition follows the same rule as the script: written once
-    // and then left alone, so hand-tuned fields survive a re-export after a
-    // geometry change.
+    // The unit definition follows the same rule as the script, scratch
+    // exception included: written once and left alone in a real game folder,
+    // always refreshed in coilbox's own scratch game.
     let mut unit_def_path = None;
     let mut unit_def_kept = false;
     if let Some(unit_def) = unit_def {
@@ -417,7 +433,7 @@ async fn lego_export<R: Runtime>(
             return CliResult::err(format!("could not create {}: {e}", units.display()));
         }
         let target = units.join(format!("{unit_name}.lua"));
-        if target.exists() {
+        if target.exists() && !scratch {
             unit_def_kept = true;
         } else if let Err(e) = std::fs::write(&target, unit_def) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
@@ -622,6 +638,20 @@ mod tests {
         assert!(!valid_scratch_folder("../coilbox-lego-test.sdd"));
         assert!(!valid_scratch_folder("coilbox-lego-../x.sdd"));
         assert!(!valid_scratch_folder(""));
+    }
+
+    #[test]
+    fn is_scratch_dir_reads_the_last_path_component() {
+        assert!(is_scratch_dir(Path::new(
+            "/data/games/coilbox-lego-test.sdd"
+        )));
+        // A real install's game folder must never read as scratch, however it
+        // is spelled or nested.
+        assert!(!is_scratch_dir(Path::new("/data/games/ba1211.sdd")));
+        assert!(!is_scratch_dir(Path::new(
+            "/data/games/coilbox-lego-test.sdd/objects3d"
+        )));
+        assert!(!is_scratch_dir(Path::new("/")));
     }
 
     #[test]
