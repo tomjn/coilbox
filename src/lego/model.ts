@@ -162,6 +162,14 @@ export function descendantIds(project: LegoProject, pieceId: string): string[] {
   return out;
 }
 
+/** A piece's kind, for the tree's type icon: whether it draws a part, or is
+ *  a hierarchy node, flare, aim point or emitter with no vertices of its own. */
+export type PieceKind = "geometry" | "empty";
+
+export function pieceKind(piece: LegoPiece): PieceKind {
+  return piece.partId ? "geometry" : "empty";
+}
+
 /**
  * Whether a piece is hidden, either itself or because an ancestor is.
  *

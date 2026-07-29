@@ -11,7 +11,7 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { Eye, EyeOff } from "lucide-react";
+import { Box, Dot, Eye, EyeOff } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { roleLabel } from "../../animPresets";
@@ -20,6 +20,7 @@ import {
   isEffectivelyHidden,
   type LegoProject,
   pieceById,
+  pieceKind,
 } from "../../model";
 import { canReparent } from "../../reparent";
 
@@ -216,16 +217,32 @@ function Rows({
                 }`}
                 style={{ paddingLeft: 12 }}
               >
+                <span
+                  className="shrink-0 text-muted-foreground"
+                  role="img"
+                  aria-label={
+                    pieceKind(piece) === "geometry"
+                      ? "Geometry piece"
+                      : "Empty piece"
+                  }
+                  title={
+                    pieceKind(piece) === "geometry"
+                      ? "Has geometry"
+                      : "Empty piece: a hierarchy node, flare, aim point or emitter"
+                  }
+                >
+                  {pieceKind(piece) === "geometry" ? (
+                    <Box size={14} />
+                  ) : (
+                    <Dot size={14} />
+                  )}
+                </span>
                 <span className="truncate">{piece.name}</span>
                 {piece.role ? (
                   <span className="ml-auto shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">
                     {roleLabel(piece.role)}
                   </span>
-                ) : piece.partId ? null : (
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    empty
-                  </span>
-                )}
+                ) : null}
               </button>
               <Button
                 size="icon"

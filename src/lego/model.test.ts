@@ -10,6 +10,7 @@ import {
   normalisePieceName,
   orderedPieces,
   parseLegoProjectJson,
+  pieceKind,
   projectProblems,
   uniquePieceName,
   walkPieces,
@@ -162,6 +163,16 @@ describe("isEffectivelyHidden", () => {
       piece("b", "a"),
     ]);
     expect(isEffectivelyHidden(doc, "a")).toBe(false);
+  });
+});
+
+describe("pieceKind", () => {
+  it("is geometry when a piece references a part", () => {
+    expect(pieceKind({ ...piece("a", null), partId: "leg" })).toBe("geometry");
+  });
+
+  it("is empty for a hierarchy node, flare, aim point or emitter", () => {
+    expect(pieceKind(piece("a", null))).toBe("empty");
   });
 });
 
