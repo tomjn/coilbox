@@ -14,15 +14,10 @@
  * move between them.
  */
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
+import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { addStandardLights, partMaterial } from "../../geometry";
 import {
@@ -63,7 +58,7 @@ interface Visible {
 
 export function PartPicker({ pack, parts, selectedId, onSelect }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<ViewportState | null>(null);
   const [view, setView] = useState<Visible>({
     columns: 1,
@@ -74,61 +69,49 @@ export function PartPicker({ pack, parts, selectedId, onSelect }: Props) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const reduceMotion = useReduceMotion();
 
-  useLayoutEffect(() => {
-    const canvas = canvasRef.current;
-    const scroller = scrollRef.current;
-    if (!canvas || !scroller) return;
+  useCanvas3D(
+    hostRef,
+    ({ renderer }) => {
+      const scroller = scrollRef.current;
+      if (!scroller) return;
 
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: true,
-    });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      const scene = new THREE.Scene();
+      addStandardLights(scene);
 
-    const scene = new THREE.Scene();
-    addStandardLights(scene);
+      // Orthographic, so a cell is the same size on screen wherever it sits.
+      const camera = new THREE.OrthographicCamera(0, 1, 0, -1, -1000, 1000);
+      camera.position.set(0, 0, 100);
 
-    // Orthographic, so a cell is the same size on screen wherever it sits.
-    const camera = new THREE.OrthographicCamera(0, 1, 0, -1, -1000, 1000);
-    camera.position.set(0, 0, 100);
+      const state: ViewportState = {
+        renderer,
+        scene,
+        camera,
+        pool: [],
+        columns: 1,
+        parts: [],
+        onView: setView,
+        meshByIndex: new Map(),
+      };
+      stateRef.current = state;
 
-    const state: ViewportState = {
-      renderer,
-      scene,
-      camera,
-      pool: [],
-      columns: 1,
-      parts: [],
-      onView: setView,
-      meshByIndex: new Map(),
-    };
-    stateRef.current = state;
+      const render = () =>
+        layout(state, scroller.scrollTop, scroller.clientHeight);
+      scroller.addEventListener("scroll", render, { passive: true });
 
-    const draw = () => {
-      const width = scroller.clientWidth;
-      const height = scroller.clientHeight;
-      if (width === 0 || height === 0) return;
-      renderer.setSize(width, height, false);
-      state.columns = Math.max(1, Math.floor((width + GAP) / PITCH));
-      layout(state, scroller.scrollTop, height);
-    };
-
-    const observer = new ResizeObserver(draw);
-    observer.observe(scroller);
-    const onScroll = () =>
-      layout(state, scroller.scrollTop, scroller.clientHeight);
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    draw();
-
-    return () => {
-      scroller.removeEventListener("scroll", onScroll);
-      observer.disconnect();
-      for (const mesh of state.pool) scene.remove(mesh);
-      renderer.dispose();
-      stateRef.current = null;
-    };
-  }, []);
+      return {
+        render,
+        resize: (width) => {
+          state.columns = Math.max(1, Math.floor((width + GAP) / PITCH));
+        },
+        dispose: () => {
+          scroller.removeEventListener("scroll", render);
+          for (const mesh of state.pool) scene.remove(mesh);
+          stateRef.current = null;
+        },
+      };
+    },
+    [],
+  );
 
   // Filtering changes which parts are in the grid, not how it is drawn, so the
   // renderer and its geometry cache survive.
@@ -230,10 +213,7 @@ export function PartPicker({ pack, parts, selectedId, onSelect }: Props) {
 
   return (
     <div className="relative min-h-0 flex-1">
-      <canvas
-        ref={canvasRef}
-        className="pointer-events-none absolute inset-0 h-full w-full"
-      />
+      <div ref={hostRef} className="pointer-events-none absolute inset-0" />
       <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
         <div
           className="relative"
