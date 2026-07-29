@@ -1,12 +1,20 @@
-import { Button } from "@picoframe/frame";
-import { Blocks, Plus, Trash2 } from "lucide-react";
+import { Button, Input } from "@picoframe/frame";
+import { Blocks, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 
 import { legoThumbUrl } from "../../lib/assetUrl";
 import { newProject } from "../model";
 import { loadPack } from "../pack";
+import { validateProjectName } from "../projectNames";
 import { deleteProject, saveProject, useLegoProjects } from "../projects";
+
+/** The name field being edited, and why it cannot be saved yet, if at all. */
+interface Renaming {
+  id: string;
+  draft: string;
+  error: string | null;
+}
 
 /**
  * The units you have built.
@@ -19,6 +27,7 @@ export default function ProjectsPage() {
   const { projects, loading, error } = useLegoProjects();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<Renaming | null>(null);
   const navigate = useNavigate();
 
   async function create() {
@@ -48,6 +57,33 @@ export default function ProjectsPage() {
   async function remove(id: string, name: string) {
     if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
     await deleteProject(id);
+  }
+
+  function startRename(id: string, name: string) {
+    setRenaming({ id, draft: name, error: null });
+  }
+
+  function cancelRename() {
+    setRenaming(null);
+  }
+
+  /**
+   * Enter and blur both land here. An empty or clashing name keeps the field
+   * open with a reason rather than reverting, so a mistyped name does not
+   * quietly vanish: the fix is to correct it or press Escape to give up.
+   */
+  function commitRename() {
+    setRenaming((current) => {
+      if (!current) return current;
+      const error = validateProjectName(projects, current.id, current.draft);
+      if (error) return { ...current, error };
+      const trimmed = current.draft.trim();
+      const project = projects.find((p) => p.id === current.id);
+      if (project && trimmed !== project.name) {
+        void saveProject({ ...project, name: trimmed });
+      }
+      return null;
+    });
   }
 
   return (
@@ -96,41 +132,93 @@ export default function ProjectsPage() {
         </div>
       ) : (
         <ul className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(220px,1fr))] content-start gap-4 overflow-y-auto p-6">
-          {projects.map((project) => (
-            <li
-              key={project.id}
-              className="group relative rounded border border-border transition-colors hover:border-foreground/30"
-            >
-              <Link to={`/lego/${project.id}`} className="block">
-                <img
-                  src={legoThumbUrl(project.id)}
-                  alt=""
-                  className="aspect-square w-full rounded-t bg-muted object-cover"
-                  // A unit saved before its first render has no thumbnail yet.
-                  onError={(event) => {
-                    event.currentTarget.style.visibility = "hidden";
-                  }}
-                />
-                <div className="px-3 py-2">
-                  <p className="truncate text-sm font-medium">{project.name}</p>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {project.pieces.length}{" "}
-                    {project.pieces.length === 1 ? "piece" : "pieces"} ·{" "}
-                    {project.unitName}
-                  </p>
-                </div>
-              </Link>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="absolute right-1 top-1 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-                aria-label={`Delete ${project.name}`}
-                onClick={() => remove(project.id, project.name)}
+          {projects.map((project) => {
+            const isRenaming = renaming?.id === project.id;
+            return (
+              <li
+                key={project.id}
+                className="group relative rounded border border-border transition-colors hover:border-foreground/30"
               >
-                <Trash2 size={14} />
-              </Button>
-            </li>
-          ))}
+                <Link to={`/lego/${project.id}`} className="block">
+                  <img
+                    src={legoThumbUrl(project.id)}
+                    alt=""
+                    className="aspect-square w-full rounded-t bg-muted object-cover"
+                    // A unit saved before its first render has no thumbnail yet.
+                    onError={(event) => {
+                      event.currentTarget.style.visibility = "hidden";
+                    }}
+                  />
+                  <div className="px-3 py-2">
+                    <p className="truncate text-sm font-medium">
+                      {isRenaming ? "" : project.name}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {isRenaming
+                        ? ""
+                        : `${project.pieces.length} ${
+                            project.pieces.length === 1 ? "piece" : "pieces"
+                          } · ${project.unitName}`}
+                    </p>
+                  </div>
+                </Link>
+                {isRenaming ? (
+                  // A sibling of the Link, not a descendant, so a click here
+                  // never bubbles into its navigation.
+                  <div className="absolute inset-x-0 bottom-0 rounded-b bg-background px-3 py-2">
+                    <Input
+                      autoFocus
+                      value={renaming.draft}
+                      onChange={(event) =>
+                        setRenaming({
+                          id: project.id,
+                          draft: event.target.value,
+                          error: null,
+                        })
+                      }
+                      onFocus={(event) => event.target.select()}
+                      onBlur={commitRename}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          commitRename();
+                        } else if (event.key === "Escape") {
+                          event.preventDefault();
+                          cancelRename();
+                        }
+                      }}
+                      aria-label={`Rename ${project.name}`}
+                      aria-invalid={renaming.error ? true : undefined}
+                      className="h-6 text-sm"
+                    />
+                    {renaming.error ? (
+                      <p className="mt-0.5 truncate text-xs text-destructive">
+                        {renaming.error}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute left-1 top-1 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                  aria-label={`Rename ${project.name}`}
+                  onClick={() => startRename(project.id, project.name)}
+                >
+                  <Pencil size={14} />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute right-1 top-1 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                  aria-label={`Delete ${project.name}`}
+                  onClick={() => remove(project.id, project.name)}
+                >
+                  <Trash2 size={14} />
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
