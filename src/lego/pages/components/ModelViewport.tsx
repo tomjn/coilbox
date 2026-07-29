@@ -1316,6 +1316,11 @@ function syncScene(state: SceneState, pack: LoadedPack, project: LegoProject) {
 
   for (const [id, group] of state.groups) {
     if (wanted.has(id)) continue;
+    // The gizmo has to come off before the group leaves the scene graph, or
+    // TransformControls warns on the next render that its object is gone.
+    // This is the only place a group's removal is decided, so it is the only
+    // place that can know to detach.
+    if (state.gizmo.object === group) state.gizmo.detach();
     group.removeFromParent();
     state.groups.delete(id);
   }
