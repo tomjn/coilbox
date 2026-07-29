@@ -468,7 +468,7 @@ export default function BuilderPage() {
           />
         </div>
 
-        <aside className="flex w-72 shrink-0 flex-col border-l border-border">
+        <aside className="flex w-72 shrink-0 flex-col overflow-hidden border-l border-border">
           <ButtonGroup className="m-2">
             <Button
               size="sm"
@@ -572,10 +572,13 @@ export default function BuilderPage() {
               </div>
 
               {selected ? (
-                // Capped and scrollable. The panel grew as pieces gained a
-                // parent, a pivot and a role, and without a limit it squeezed
-                // the tree above it down to a single clipped row.
-                <div className="max-h-[55%] shrink-0 overflow-y-auto border-t border-border px-3 py-2">
+                // Capped and scrollable, and free to shrink further still: the
+                // 55% cap is against the whole aside, so it can outgrow what
+                // is actually left once the tree has taken its own minimum.
+                // Without shrink enabled here, that excess pushed past the
+                // aside's own box and over whatever sat below it (the parts
+                // drawer) instead of scrolling.
+                <div className="max-h-[55%] min-h-0 overflow-y-auto border-t border-border px-3 py-2">
                   <label
                     className="text-xs text-muted-foreground"
                     htmlFor="lego-piece-name"
