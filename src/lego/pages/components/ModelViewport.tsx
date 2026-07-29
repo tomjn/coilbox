@@ -294,6 +294,12 @@ export function ModelViewport({
       controls.maxPolarAngle = Math.PI * 0.495;
       controls.minDistance = 1;
       controls.maxDistance = 120;
+      // The point under the pointer stays under it as the wheel dollies,
+      // rather than everything converging on the orbit target. OrbitControls
+      // moves the target itself to keep looking the same way from the new
+      // position, which is why F still frames correctly afterwards: it reads
+      // the target fresh rather than a value cached from before the zoom.
+      controls.zoomToCursor = true;
 
       const render = () => {
         renderer.render(scene, camera);
