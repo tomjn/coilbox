@@ -87,8 +87,8 @@ export default function PartsPage() {
                 pack={pack}
                 query={filter.query}
                 onQuery={filter.setQuery}
-                colourway={filter.colourway}
-                onColourway={filter.setColourway}
+                category={filter.category}
+                onCategory={filter.setCategory}
                 shown={parts.length}
                 className="flex-1"
               />

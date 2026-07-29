@@ -25,16 +25,33 @@ function part(overrides: Partial<LegoPartInfo> & { id: string }): LegoPartInfo {
   };
 }
 
-/** The same shape in three colourways, which is how most of the pack is built. */
+/**
+ * The same geometry, offered in three categories. Each is its own part with
+ * its own texture, not one shape with a colour option, so filtering never
+ * folds them together.
+ */
 const TRIO = [
-  part({ id: "beam_grey", shapeId: "beam", colourway: "grey" }),
-  part({ id: "beam_tan", shapeId: "beam", colourway: "tan" }),
-  part({ id: "beam_green", shapeId: "beam", colourway: "green" }),
+  part({
+    id: "beam_grey",
+    shapeId: "beam",
+    category: "grey",
+    colourway: "grey",
+  }),
+  part({ id: "beam_tan", shapeId: "beam", category: "tan", colourway: "tan" }),
+  part({
+    id: "beam_green",
+    shapeId: "beam",
+    category: "green",
+    colourway: "green",
+  }),
 ];
 
 describe("filterParts", () => {
-  it("collapses colourways to one part per shape until one is picked", () => {
-    expect(filterParts(TRIO, "", null)).toHaveLength(1);
+  it("shows every category when none is picked", () => {
+    expect(filterParts(TRIO, "", null)).toEqual(TRIO);
+  });
+
+  it("keeps only the picked category", () => {
     expect(filterParts(TRIO, "", "tan")).toEqual([TRIO[1]]);
   });
 
@@ -61,10 +78,10 @@ describe("filterParts", () => {
     expect(filterParts(parts, "beam nothing", null)).toEqual([]);
   });
 
-  it("applies the search and the colourway together", () => {
+  it("applies the search and the category together", () => {
     const parts = [
       ...TRIO,
-      part({ id: "hull_tan", shapeId: "hull", colourway: "tan", name: "hull" }),
+      part({ id: "hull_tan", shapeId: "hull", category: "tan", name: "hull" }),
     ];
 
     expect(filterParts(parts, "beam", "tan").map((p) => p.id)).toEqual([

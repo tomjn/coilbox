@@ -889,8 +889,8 @@ export default function BuilderPage() {
               pack={pack}
               query={filter.query}
               onQuery={filter.setQuery}
-              colourway={filter.colourway}
-              onColourway={filter.setColourway}
+              category={filter.category}
+              onCategory={filter.setCategory}
               shown={filter.parts.length}
               className="flex-1"
             />

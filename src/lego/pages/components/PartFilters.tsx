@@ -1,9 +1,13 @@
 /**
- * Search box and colourway buttons for a parts grid.
+ * Search box and category buttons for a parts grid.
  *
  * Shared by the parts browser and the builder's parts strip so both filter the
  * same way and read the same. The state lives in the caller, through
  * `usePartFilter`, because the caller is what needs the filtered list.
+ *
+ * A shape offered in grey, tan and green is three parts, not one shape with a
+ * colour option: each has its own texture, so each is independent inventory.
+ * Category narrows which of them match, and "All" is a genuine all.
  */
 
 import { Button, cn, Input } from "@picoframe/frame";
@@ -16,8 +20,9 @@ interface Props {
   pack: LoadedPack;
   query: string;
   onQuery: (query: string) => void;
-  colourway: string | null;
-  onColourway: (colourway: string | null) => void;
+  /** null means every category. */
+  category: string | null;
+  onCategory: (category: string | null) => void;
   /** How many the grid is showing, so the count follows the filter. */
   shown: number;
   className?: string;
@@ -27,8 +32,8 @@ export function PartFilters({
   pack,
   query,
   onQuery,
-  colourway,
-  onColourway,
+  category,
+  onCategory,
   shown,
   className,
 }: Props) {
@@ -44,28 +49,26 @@ export function PartFilters({
       <ButtonGroup>
         <Button
           size="sm"
-          variant={colourway === null ? "default" : "outline"}
-          onClick={() => onColourway(null)}
-          aria-pressed={colourway === null}
+          variant={category === null ? "default" : "outline"}
+          onClick={() => onCategory(null)}
+          aria-pressed={category === null}
         >
           All
         </Button>
-        {pack.manifest.categories.map((category) => (
+        {pack.manifest.categories.map((c) => (
           <Button
-            key={category.id}
+            key={c.id}
             size="sm"
-            variant={colourway === category.id ? "default" : "outline"}
-            onClick={() => onColourway(category.id)}
-            aria-pressed={colourway === category.id}
+            variant={category === c.id ? "default" : "outline"}
+            onClick={() => onCategory(c.id)}
+            aria-pressed={category === c.id}
           >
-            {category.label}
+            {c.label}
           </Button>
         ))}
       </ButtonGroup>
       <span className="ml-auto text-sm text-muted-foreground">
-        {colourway
-          ? `${shown} parts`
-          : `${shown} shapes, ${pack.parts.length} parts in all`}
+        {shown} parts
       </span>
     </div>
   );
