@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-lego-save"
+description = "Enables the lego_save command without any pre-configured scope."
+commands.allow = ["lego_save"]
+
+[[permission]]
+identifier = "deny-lego-save"
+description = "Denies the lego_save command without any pre-configured scope."
+commands.deny = ["lego_save"]

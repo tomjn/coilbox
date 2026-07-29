@@ -44,6 +44,16 @@ export function campaignMediaUrl(campaignId: string, file: string): string {
   return schemeUrl("campaign", `${campaignId}/${file}`);
 }
 
+/** URL for a file in the unit builder's parts pack, under `legopack/<file>`. */
+export function legoPackUrl(file: string): string {
+  return schemeUrl("legopack", file);
+}
+
+/** URL for a saved unit's overview thumbnail. */
+export function legoThumbUrl(projectId: string): string {
+  return schemeUrl("lego", `${projectId}.png`);
+}
+
 /**
  * Whether a URL string is a local reference to be rewritten to the asset protocol
  * (as opposed to an absolute URL, data/blob URI, in-page anchor, or already-app-

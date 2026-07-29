@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-lego-delete"
+description = "Enables the lego_delete command without any pre-configured scope."
+commands.allow = ["lego_delete"]
+
+[[permission]]
+identifier = "deny-lego-delete"
+description = "Denies the lego_delete command without any pre-configured scope."
+commands.deny = ["lego_delete"]

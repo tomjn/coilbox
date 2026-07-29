@@ -44,6 +44,8 @@ export default defineConfig({
           { text: "Branding catalog", link: "/branding-catalog" },
           { text: "Map packs", link: "/map-packs" },
           { text: "Routes", link: "/routes" },
+          { text: "The s3o model format", link: "/s3o-format" },
+          { text: "Lego parts pack", link: "/lego-parts-pack" },
         ],
       },
       {

@@ -1,0 +1,6 @@
+Geometry and texture from Splinter Faction's lego parts library.
+https://github.com/SplinterFaction/SplinterFaction
+
+Reused with the permission of the author, Scary le poo, who confirmed on 2026-07-28 that the assets are "free and clear".
+
+The pack format is documented in docs/lego-parts-pack.md. Any pack following it can replace this one.

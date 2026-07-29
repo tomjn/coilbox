@@ -1,0 +1,8 @@
+[package]
+name = "coilbox-s3o"
+version = "0.0.0"
+description = "Reader and writer for the Spring/Recoil .s3o model format. Dependency-free; used by the lego unit builder to export models the engine can load."
+edition = "2021"
+license = "MIT"
+
+[dependencies]

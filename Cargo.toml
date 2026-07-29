@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "src-tauri",
   "crates/coilbox-portable",
+  "crates/coilbox-s3o",
   "crates/coilbox-lobby-protocol",
   "crates/coilbox-springlua",
   "crates/coilbox-thumb-cache",
@@ -14,6 +15,7 @@ members = [
   "crates/tauri-plugin-coilbox-content",
   "crates/tauri-plugin-coilbox-play",
   "crates/tauri-plugin-coilbox-campaign",
+  "crates/tauri-plugin-coilbox-lego",
   "crates/tauri-plugin-coilbox-conquest",
   "crates/tauri-plugin-coilbox-runlite",
   "crates/tauri-plugin-coilbox-profile",
