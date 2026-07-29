@@ -90,6 +90,44 @@ export function bakedPieces(
   return { pieces, world };
 }
 
+/**
+ * Drop the whole unit so its lowest point rests on the ground.
+ *
+ * The engine stands a unit on y = 0, so geometry below that is buried and
+ * geometry above it hovers. Only the root piece moves: everything hangs off it,
+ * so the unit keeps its shape and only its height changes.
+ *
+ * Returns the project unchanged when it is already sitting on the ground, or
+ * when there is no geometry to measure.
+ */
+export function sitOnGround(
+  project: LegoProject,
+  pack: LoadedPack,
+): LegoProject {
+  const { world } = bakedPieces(project, pack);
+  if (world.length === 0) return project;
+
+  let lowest = Number.POSITIVE_INFINITY;
+  for (const point of world) lowest = Math.min(lowest, point.y);
+  if (Math.abs(lowest) < 1e-6) return project;
+
+  return {
+    ...project,
+    pieces: project.pieces.map((piece) =>
+      piece.id === project.rootPieceId
+        ? {
+            ...piece,
+            position: [
+              piece.position[0],
+              piece.position[1] - lowest,
+              piece.position[2],
+            ],
+          }
+        : piece,
+    ),
+  };
+}
+
 export function buildS3o(
   project: LegoProject,
   pack: LoadedPack,

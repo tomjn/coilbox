@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
-import { buildS3o, type S3oPiece } from "./s3oBuild";
+import { buildS3o, type S3oPiece, sitOnGround } from "./s3oBuild";
 
 /**
  * A pack holding one part: a single triangle on the x/z plane, one metre out
@@ -214,6 +214,56 @@ describe("buildS3o", () => {
     expect(build?.radius).toBe(0);
     expect(build?.height).toBe(0);
     expect(build?.mid).toEqual([0, 0, 0]);
+  });
+
+  it("sits a floating unit down on the ground", () => {
+    const doc = project([
+      { id: "up", name: "up", parentId: "root", position: [0, 4, 0] },
+    ]);
+
+    const grounded = sitOnGround(doc, pack());
+
+    expect(buildS3o(doc, pack(), TEXTURES)?.height).toBeCloseTo(4);
+    // The part is flat, so its lowest point is its only point: it lands on 0.
+    expect(buildS3o(grounded, pack(), TEXTURES)?.height).toBeCloseTo(0);
+  });
+
+  it("lifts a buried unit up out of the ground", () => {
+    const doc = project([
+      { id: "down", name: "down", parentId: "root", position: [0, -3, 0] },
+    ]);
+
+    const grounded = sitOnGround(doc, pack());
+    const root = grounded.pieces.find((piece) => piece.id === "root");
+
+    expect(root?.position).toEqual([0, 3, 0]);
+  });
+
+  it("moves only the root, so the unit keeps its shape", () => {
+    const doc = project([
+      { id: "a", name: "a", parentId: "root", position: [0, 5, 0] },
+      { id: "b", name: "b", parentId: "a", position: [0, 2, 0] },
+    ]);
+
+    const grounded = sitOnGround(doc, pack());
+
+    for (const id of ["a", "b"]) {
+      expect(
+        grounded.pieces.find((piece) => piece.id === id)?.position,
+      ).toEqual(doc.pieces.find((piece) => piece.id === id)?.position);
+    }
+  });
+
+  it("leaves a unit already on the ground alone", () => {
+    const doc = project([{ id: "a", name: "a", parentId: "root" }]);
+
+    expect(sitOnGround(doc, pack())).toBe(doc);
+  });
+
+  it("has nothing to measure on a unit with no geometry", () => {
+    const doc = project([]);
+
+    expect(sitOnGround(doc, pack())).toBe(doc);
   });
 
   it("carries the texture names through", () => {
