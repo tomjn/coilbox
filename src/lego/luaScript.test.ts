@@ -59,6 +59,7 @@ describe("buildLuaScript", () => {
       "script.AimWeapon1(heading, pitch)",
       "script.AimFromWeapon1()",
       "script.QueryWeapon1()",
+      "script.Shot1()",
       "script.Killed(recentDamage, maxHealth)",
     ]) {
       expect(lua).toContain(`function ${hook}`);
@@ -261,6 +262,31 @@ describe("buildLuaScript", () => {
     expect(lua).toMatch(
       /function script\.StartMoving\(\)\n {2}Signal\(SIG_IDLE_SWAY\)\n {2}idleSwayStop\(\)/,
     );
+  });
+
+  it("kicks the barrel back on Shot1 and eases it home, with no thread", () => {
+    const lua = buildLuaScript(
+      project(
+        [{ id: "b", name: "barrel", role: "barrel" }],
+        [{ presetId: "recoil", params: {} }],
+      ),
+    );
+
+    expect(lua).toMatch(
+      /function script\.Shot1\(\)\n {2}Signal\(SIG_RECOIL\)\n {2}SetSignalMask\(SIG_RECOIL\)\n {2}Move\(barrel, z_axis, -0\.2,/,
+    );
+    expect(lua).toContain("WaitForMove(barrel, z_axis)");
+    expect(lua).toContain("Move(barrel, z_axis, 0,");
+    // A one-shot hangs directly off the callin, unlike a looping preset.
+    expect(lua).not.toContain("local function recoil");
+  });
+
+  it("emits nothing for recoil when there is no barrel", () => {
+    const lua = buildLuaScript(
+      project([], [{ presetId: "recoil", params: {} }]),
+    );
+
+    expect(lua).not.toContain("SIG_RECOIL");
   });
 
   it("ends with exactly one newline and no triple blank lines", () => {

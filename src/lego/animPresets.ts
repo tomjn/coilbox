@@ -79,7 +79,8 @@ export type LuaHook =
   | "Deactivate"
   | "AimWeapon1"
   | "AimFromWeapon1"
-  | "QueryWeapon1";
+  | "QueryWeapon1"
+  | "Shot1";
 
 export interface EmitContext {
   /**
@@ -816,6 +817,107 @@ export const AIM_TRACK: AnimPreset = {
   },
 };
 
+/**
+ * Rest between test-fires in the preview, once the kick has eased home.
+ *
+ * Not a param: it has no counterpart in the emitted script, which fires
+ * whenever the weapon does and nothing else. It only exists so a preview at
+ * rest keeps demonstrating the motion instead of firing once and going still.
+ */
+const RECOIL_PREVIEW_PAUSE = 0.6;
+
+export const RECOIL: AnimPreset = {
+  id: "recoil",
+  label: "Recoil on firing",
+  description:
+    "Kicks the barrel back along its own bore when the weapon fires, and eases it home. A one-shot, not a loop: the preview repeats it on a timer so there is something to watch.",
+  requires: [{ role: "barrel", count: 1 }],
+  animates: ["barrel"],
+  params: [
+    {
+      id: "kick",
+      label: "Kick distance",
+      unit: "m",
+      min: 0.02,
+      max: 1,
+      step: 0.02,
+      fallback: 0.2,
+    },
+    {
+      id: "kickTime",
+      label: "Kick time",
+      unit: "s",
+      min: 0.02,
+      max: 0.3,
+      step: 0.01,
+      fallback: 0.05,
+    },
+    {
+      id: "returnTime",
+      label: "Return time",
+      unit: "s",
+      min: 0.05,
+      max: 1.5,
+      step: 0.05,
+      fallback: 0.35,
+    },
+  ],
+  /**
+   * Turret sweep already claims y_axis for heading and x_axis for pitch, and a
+   * barrel modelled the way Spring content is built points down its own rest
+   * z_axis. That leaves z as the barrel's bore, which is what recoil pulls
+   * back along.
+   *
+   * The preview loops the kick and its return on a fixed cycle, exactly the
+   * demonstration turret.track already gives its own sweep: in a game this
+   * runs once per shot, but a preview with nothing to watch after the first
+   * frame is not a preview.
+   */
+  track(t, params, role) {
+    if (role !== "barrel") return null;
+    const kick = value(this, params, "kick");
+    const kickTime = Math.max(value(this, params, "kickTime"), 0.01);
+    const returnTime = Math.max(value(this, params, "returnTime"), 0.01);
+    const cycle = kickTime + returnTime + RECOIL_PREVIEW_PAUSE;
+    const phase = t - Math.floor(t / cycle) * cycle;
+
+    let depth = 0;
+    if (phase < kickTime) {
+      depth = kick * (phase / kickTime);
+    } else if (phase < kickTime + returnTime) {
+      depth = kick * (1 - (phase - kickTime) / returnTime);
+    }
+    return { position: [0, 0, -depth] };
+  },
+  /**
+   * A one-shot hangs off Shot1 directly, the same as turret.track's aim hangs
+   * off AimWeapon1: no thread, because the callin is already its own thread,
+   * started fresh by the engine every time the weapon fires. Signal and
+   * SetSignalMask stop a kick still easing home from an earlier shot, so rapid
+   * fire restarts the motion cleanly rather than piling moves on top of it.
+   */
+  emit(ctx) {
+    const barrel = ctx.pieces("barrel")[0];
+    if (!barrel) return null;
+    const kick = value(this, ctx.params, "kick");
+    const kickTime = Math.max(value(this, ctx.params, "kickTime"), 0.01);
+    const returnTime = Math.max(value(this, ctx.params, "returnTime"), 0.01);
+
+    return {
+      functions: [],
+      hooks: {
+        Shot1: [
+          `  Signal(${ctx.signal})`,
+          `  SetSignalMask(${ctx.signal})`,
+          `  Move(${barrel}, z_axis, -${lua(kick)}, ${lua(kick / kickTime)})`,
+          `  WaitForMove(${barrel}, z_axis)`,
+          `  Move(${barrel}, z_axis, 0, ${lua(kick / returnTime)})`,
+        ],
+      },
+    };
+  },
+};
+
 export const IDLE_SWAY: AnimPreset = {
   id: "idle.sway",
   label: "Idle sway",
@@ -878,6 +980,7 @@ export const PRESETS: AnimPreset[] = [
   OPEN_CLOSE,
   HOVER_BOB,
   AIM_TRACK,
+  RECOIL,
   IDLE_SWAY,
 ];
 
