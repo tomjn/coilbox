@@ -14,7 +14,7 @@ import {
   Undo,
   Upload,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ROLES } from "../animPresets";
-import { insertCompound, subtreeAsCompound } from "../compounds";
+import { subtreeAsCompound } from "../compounds";
 import { usePartFilter } from "../filter";
 import {
   childrenOf,
@@ -39,16 +39,10 @@ import {
 } from "../model";
 import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
-import {
-  deleteCompound,
-  saveCompound,
-  saveProject,
-  saveThumbnail,
-  useLegoCompounds,
-  useLegoProjects,
-} from "../projects";
+import { deleteCompound, saveCompound, useLegoCompounds } from "../projects";
 import { canReparent, reparentPiece } from "../reparent";
 import { sitOnGround } from "../s3oBuild";
+import { useLegoDocument } from "../useLegoDocument";
 import { AnimationPanel } from "./components/AnimationPanel";
 import { CompoundPicker } from "./components/CompoundPicker";
 import { ExportDrawer } from "./components/ExportDrawer";
@@ -63,167 +57,55 @@ import { TransformFields } from "./components/TransformFields";
 /** Radix needs a non-empty value, so "no role" gets one of its own. */
 const NO_ROLE = "none";
 
-/** Undo steps kept. Whole documents, but a unit is a few hundred numbers. */
-const HISTORY_LIMIT = 60;
-/** Edits closer together than this are one gesture, so they undo together. */
-const COALESCE_MS = 400;
-
 /**
  * Assemble one unit.
  *
- * The document is held in local state and written shortly after the last edit,
- * so a drag is not a hundred disk writes and leaving the page does not lose
- * work. The overview stays in step because saving goes through the shared store.
+ * The layout and the selection. The document itself, its history, its clipboard
+ * and its saving are `useLegoDocument`.
  */
 export default function BuilderPage() {
   const { id } = useParams<{ id: string }>();
   // The viewport wants the width, and the nav stays reachable from the top bar.
   useHideSidebar();
-  const { projects, loading } = useLegoProjects();
+  const doc = useLegoDocument(id);
+  const { edit } = doc;
+  const draft = doc.project;
   const { compounds } = useLegoCompounds();
-  const stored = projects.find((project) => project.id === id);
 
   const [pack, setPack] = useState<LoadedPack | null>(null);
-  const [draft, setDraft] = useState<LegoProject | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [strip, setStrip] = useState<"parts" | "compounds">("parts");
   const [stripOpen, setStripOpen] = useState(true);
-  /** A lifted subtree waiting to be pasted. In memory, not the OS clipboard. */
-  const [clipboard, setClipboard] = useState<LegoProject | null>(null);
   const [aside, setAside] = useState<"pieces" | "animation">("pieces");
   const [exporting, setExporting] = useState(false);
   const [testing, setTesting] = useState(false);
   const [playing, setPlaying] = useState(false);
   /** A preference, not part of the unit, so it lives with the session. */
   const [uniformScale, setUniformScale] = useState(true);
-  const captureRef = useRef<(() => HTMLCanvasElement) | null>(null);
   const filter = usePartFilter(pack);
 
   useEffect(() => {
     loadPack().then(setPack, () => setPack(null));
   }, []);
 
-  // Take a copy once the document arrives. Later refreshes of the shared list
-  // must not overwrite edits in progress.
+  // Start on the root once the document arrives, and stay wherever the builder
+  // moves to after that.
+  const rootPieceId = draft?.rootPieceId;
   useEffect(() => {
-    setDraft((current) => current ?? stored ?? null);
-    setSelectedId((current) => current ?? stored?.rootPieceId ?? null);
-  }, [stored]);
+    setSelectedId((current) => current ?? rootPieceId ?? null);
+  }, [rootPieceId]);
 
   const problems = useMemo(
     () => (draft ? projectProblems(draft) : []),
     [draft],
   );
 
-  // Write shortly after the last edit rather than on every one, so a drag is
-  // not a hundred disk writes but navigating away never loses work. Leaving the
-  // page saves immediately, because the timer dies with the component.
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-
-  /**
-   * Undo history: whole documents, not a log of operations.
-   *
-   * A unit is small and every edit already returns a fresh one, so keeping
-   * copies costs little and cannot drift from the operations the way a replay
-   * log can. Bounded, because a long session should not grow without end.
-   */
-  const [past, setPast] = useState<LegoProject[]>([]);
-  const [future, setFuture] = useState<LegoProject[]>([]);
-  const lastEditAt = useRef(0);
-
-  const edit = useCallback((change: (project: LegoProject) => LegoProject) => {
-    const current = draftRef.current;
-    if (!current) return;
-    const next = change(current);
-    if (next === current) return;
-
-    // Edits in quick succession are one gesture. Dragging a slider should undo
-    // in a single step, not sixty.
-    const now = Date.now();
-    const continues = now - lastEditAt.current < COALESCE_MS;
-    lastEditAt.current = now;
-
-    setPast((entries) =>
-      continues && entries.length > 0
-        ? entries
-        : [...entries, current].slice(-HISTORY_LIMIT),
-    );
-    setFuture([]);
-    setDraft(next);
-    setDirty(true);
-  }, []);
-
-  const undo = useCallback(() => {
-    const current = draftRef.current;
-    if (!current) return;
-    setPast((entries) => {
-      const previous = entries.at(-1);
-      if (!previous) return entries;
-      setFuture((ahead) => [...ahead, current]);
-      setDraft(previous);
-      setDirty(true);
-      // The next edit starts a fresh step rather than folding into whatever
-      // was being done before the undo.
-      lastEditAt.current = 0;
-      return entries.slice(0, -1);
-    });
-  }, []);
-
-  const redo = useCallback(() => {
-    const current = draftRef.current;
-    if (!current) return;
-    setFuture((ahead) => {
-      const next = ahead.at(-1);
-      if (!next) return ahead;
-      setPast((entries) => [...entries, current]);
-      setDraft(next);
-      setDirty(true);
-      lastEditAt.current = 0;
-      return ahead.slice(0, -1);
-    });
-  }, []);
-  const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
-
-  const persist = useCallback(async (project: LegoProject) => {
-    setSaving(true);
-    try {
-      const written = await saveProject(project);
-      setDirty(false);
-      // Draw a fresh frame and copy it in the same breath. The viewport's
-      // drawing buffer is gone the moment its frame is composited, so a
-      // thumbnail taken from the canvas at any other time is blank.
-      const capture = captureRef.current;
-      if (capture) await saveThumbnail(written.id, capture());
-    } finally {
-      setSaving(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!dirty || !draft) return;
-    const timer = setTimeout(() => void persist(draft), 800);
-    return () => clearTimeout(timer);
-  }, [dirty, draft, persist]);
-
-  useEffect(() => {
-    return () => {
-      // Leaving before the timer fires still writes the document. The canvas is
-      // already going, so this one cannot refresh the thumbnail.
-      if (dirtyRef.current && draftRef.current)
-        void saveProject(draftRef.current);
-    };
-  }, []);
-
   function addPart(part: LegoPartInfo) {
+    const pieceId = crypto.randomUUID();
     edit((project) => {
       // New pieces hang off whatever is selected, so building outward from a
       // hull section is the default rather than something to set up.
       const parentId = selectedId ?? project.rootPieceId;
-      const pieceId = crypto.randomUUID();
       return {
         ...project,
         pieces: [
@@ -246,8 +128,8 @@ export default function BuilderPage() {
   }
 
   function addEmpty() {
+    const pieceId = crypto.randomUUID();
     edit((project) => {
-      const pieceId = crypto.randomUUID();
       return {
         ...project,
         pieces: [
@@ -285,8 +167,8 @@ export default function BuilderPage() {
   // through a ref rather than the one it was created with.
   const shortcutsRef = useRef({
     remove: removeSelected,
-    undo,
-    redo,
+    undo: doc.undo,
+    redo: doc.redo,
     copy: () => {},
     paste: () => {},
     duplicate: () => {},
@@ -366,14 +248,8 @@ export default function BuilderPage() {
 
   function addCompound(compound: LegoProject) {
     if (!draft) return;
-    const inserted = insertCompound(
-      draft,
-      compound,
-      selectedId ?? draft.rootPieceId,
-      () => crypto.randomUUID(),
-    );
-    edit(() => inserted.project);
-    setSelectedId(inserted.rootPieceId);
+    const inserted = doc.insert(compound, selectedId ?? draft.rootPieceId);
+    if (inserted) setSelectedId(inserted);
   }
 
   function transformPiece(pieceId: string, change: Partial<LegoPiece>) {
@@ -408,56 +284,29 @@ export default function BuilderPage() {
     edit((project) => setPivot(project, pieceId, pivot));
   }
 
-  /**
-   * Copy, paste and duplicate are the compound machinery without the file.
-   * A subtree lifted out and put back is the same operation whether it goes
-   * via the clipboard or straight back into the unit.
-   */
-  function lift(pieceId: string): LegoProject | null {
-    if (!draft) return null;
-    return subtreeAsCompound(draft, pieceId, {
-      id: crypto.randomUUID(),
-      now: new Date().toISOString(),
-      newId: () => crypto.randomUUID(),
-    });
-  }
-
-  function drop(cutting: LegoProject, parentId: string) {
-    if (!draft) return;
-    const inserted = insertCompound(draft, cutting, parentId, () =>
-      crypto.randomUUID(),
-    );
-    edit(() => inserted.project);
-    setSelectedId(inserted.rootPieceId);
-  }
-
   function copySelection() {
     if (!selectedId) return;
-    setClipboard(lift(selectedId));
+    doc.copy(selectedId);
   }
 
   function pasteClipboard() {
-    if (!clipboard || !draft) return;
-    drop(clipboard, selectedId ?? draft.rootPieceId);
+    if (!draft) return;
+    const inserted = doc.paste(selectedId ?? draft.rootPieceId);
+    if (inserted) setSelectedId(inserted);
   }
 
   function duplicateSelection() {
     if (!draft || !selectedId || selectedId === draft.rootPieceId) return;
-    const cutting = lift(selectedId);
-    // Alongside the original rather than inside it, which is what duplicate
-    // means everywhere else.
-    const parentId =
-      draft.pieces.find((piece) => piece.id === selectedId)?.parentId ??
-      draft.rootPieceId;
-    if (cutting) drop(cutting, parentId);
+    const inserted = doc.duplicate(selectedId);
+    if (inserted) setSelectedId(inserted);
   }
 
   // Rebound every render, so a shortcut always runs against the current
   // selection rather than the one the listener was created with.
   shortcutsRef.current = {
     remove: removeSelected,
-    undo,
-    redo,
+    undo: doc.undo,
+    redo: doc.redo,
     copy: copySelection,
     paste: pasteClipboard,
     duplicate: duplicateSelection,
@@ -486,10 +335,10 @@ export default function BuilderPage() {
     }));
   }
 
-  if (loading || !draft || !pack) {
+  if (doc.loading || !draft || !pack) {
     return (
       <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-        {loading ? "Opening the unit." : "This unit could not be opened."}
+        {doc.loading ? "Opening the unit." : "This unit could not be opened."}
       </p>
     );
   }
@@ -552,8 +401,8 @@ export default function BuilderPage() {
                 <Button
                   size="icon"
                   variant="outline"
-                  onClick={undo}
-                  disabled={past.length === 0}
+                  onClick={doc.undo}
+                  disabled={!doc.canUndo}
                   aria-label="Undo"
                   title="Undo (Cmd Z)"
                 >
@@ -562,8 +411,8 @@ export default function BuilderPage() {
                 <Button
                   size="icon"
                   variant="outline"
-                  onClick={redo}
-                  disabled={future.length === 0}
+                  onClick={doc.redo}
+                  disabled={!doc.canRedo}
                   aria-label="Redo"
                   title="Redo (Cmd Shift Z)"
                 >
@@ -571,13 +420,17 @@ export default function BuilderPage() {
                 </Button>
               </ButtonGroup>
               <span className="text-xs text-muted-foreground">
-                {saving ? "Saving" : dirty ? "Unsaved changes" : "Saved"}
+                {doc.saving
+                  ? "Saving"
+                  : doc.dirty
+                    ? "Unsaved changes"
+                    : "Saved"}
               </span>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => draft && void persist(draft)}
-                disabled={saving}
+                onClick={() => doc.save()}
+                disabled={doc.saving}
               >
                 <Save size={14} /> Save
               </Button>
@@ -611,9 +464,7 @@ export default function BuilderPage() {
             playing={playing}
             uniformScale={uniformScale}
             onGround={() => edit((project) => sitOnGround(project, pack))}
-            onReady={(capture) => {
-              captureRef.current = capture;
-            }}
+            onReady={doc.onCapture}
           />
         </div>
 
@@ -675,7 +526,7 @@ export default function BuilderPage() {
                   size="sm"
                   variant="ghost"
                   onClick={pasteClipboard}
-                  disabled={!clipboard}
+                  disabled={!doc.clipboard}
                   title="Paste under the selected piece (Cmd V)"
                   aria-label="Paste"
                 >
