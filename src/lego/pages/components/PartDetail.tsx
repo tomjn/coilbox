@@ -8,10 +8,11 @@
 
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { addStandardLights, partMaterial } from "../../geometry";
 import {
@@ -120,80 +121,63 @@ function PartViewport({
   const containerRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReduceMotion();
 
-  useEffect(() => {
-    const container = containerRef.current;
-    const geometry = getPartGeometry(pack, part.id);
-    if (!container || !geometry) return;
+  useCanvas3D(
+    containerRef,
+    ({ renderer }) => {
+      const geometry = getPartGeometry(pack, part.id);
+      if (!geometry) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
-    // The canvas is sized in CSS and its drawing buffer separately, so setSize
-    // is told not to touch the style. Without these the canvas takes its
-    // intrinsic size, which is the buffer size including the pixel ratio, and
-    // ends up larger than the container. That resizes the container, which
-    // resizes the canvas, and the view flickers between the two.
-    renderer.domElement.style.display = "block";
-    renderer.domElement.style.width = "100%";
-    renderer.domElement.style.height = "100%";
+      const scene = new THREE.Scene();
+      addStandardLights(scene);
+      scene.add(new THREE.Mesh(geometry, partMaterial(pack.manifest)));
 
-    const scene = new THREE.Scene();
-    addStandardLights(scene);
-    scene.add(new THREE.Mesh(geometry, partMaterial(pack.manifest)));
+      // Frame the part rather than the scene, so a sliver fills the view as much
+      // as a hull section does.
+      const radius = Math.max(partSize(part), 0.001);
+      const camera = new THREE.PerspectiveCamera(
+        35,
+        1,
+        radius / 100,
+        radius * 100,
+      );
+      camera.position.set(radius * 1.6, radius * 1.2, radius * 1.9);
 
-    // Frame the part rather than the scene, so a sliver fills the view as much
-    // as a hull section does.
-    const radius = Math.max(partSize(part), 0.001);
-    const camera = new THREE.PerspectiveCamera(
-      35,
-      1,
-      radius / 100,
-      radius * 100,
-    );
-    camera.position.set(radius * 1.6, radius * 1.2, radius * 1.9);
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = !reduceMotion;
+      controls.enablePan = false;
+      controls.minDistance = radius * 0.8;
+      controls.maxDistance = radius * 6;
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = !reduceMotion;
-    controls.enablePan = false;
-    controls.minDistance = radius * 0.8;
-    controls.maxDistance = radius * 6;
+      const render = () => renderer.render(scene, camera);
+      controls.addEventListener("change", render);
 
-    const render = () => renderer.render(scene, camera);
-    controls.addEventListener("change", render);
-
-    const resize = () => {
-      const { clientWidth, clientHeight } = container;
-      if (clientWidth === 0 || clientHeight === 0) return;
-      renderer.setSize(clientWidth, clientHeight, false);
-      camera.aspect = clientWidth / clientHeight;
-      camera.updateProjectionMatrix();
-      render();
-    };
-    const observer = new ResizeObserver(resize);
-    observer.observe(container);
-    resize();
-
-    // Damping needs a frame loop to settle. Without it the view still moves,
-    // it just stops the moment the pointer does.
-    let frame = 0;
-    if (!reduceMotion) {
-      const tick = () => {
-        controls.update();
-        render();
+      // Damping needs a frame loop to settle. Without it the view still moves,
+      // it just stops the moment the pointer does.
+      let frame = 0;
+      if (!reduceMotion) {
+        const tick = () => {
+          controls.update();
+          render();
+          frame = requestAnimationFrame(tick);
+        };
         frame = requestAnimationFrame(tick);
-      };
-      frame = requestAnimationFrame(tick);
-    }
+      }
 
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-      controls.removeEventListener("change", render);
-      controls.dispose();
-      renderer.dispose();
-      renderer.domElement.remove();
-    };
-  }, [pack, part, reduceMotion]);
+      return {
+        render,
+        resize: (width, height) => {
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
+        },
+        dispose: () => {
+          cancelAnimationFrame(frame);
+          controls.removeEventListener("change", render);
+          controls.dispose();
+        },
+      };
+    },
+    [pack, part, reduceMotion],
+  );
 
   return (
     <div
