@@ -51,9 +51,17 @@ export const legoExport = defineCommand<
     dir: string;
     unitName: string;
     atlas: string | null;
+    /** Written only when the game has no script for this unit yet. */
+    script: string | null;
     model: S3oBuild;
   },
-  { model: string; texture: string | null }
+  {
+    model: string;
+    texture: string | null;
+    script: string | null;
+    /** True when a script was already there and was left as it was. */
+    scriptKept: boolean;
+  }
 >("coilbox-lego", "lego_export");
 
 /** Reveal an exported unit in the file manager. */

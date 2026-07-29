@@ -18,6 +18,7 @@ import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { legoExport, legoOpenPath } from "../../bindings";
+import { buildLuaScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { buildS3o } from "../../s3oBuild";
@@ -28,13 +29,23 @@ interface Props {
   project: LegoProject;
   pack: LoadedPack;
   /** Remembered on the document, so the next export does not ask again. */
-  onRemember: (settings: { exportDir: string; exportTexture: boolean }) => void;
+  onRemember: (settings: {
+    exportDir: string;
+    exportTexture: boolean;
+    exportScript: boolean;
+  }) => void;
 }
 
 type Result =
   | { state: "idle" }
   | { state: "working" }
-  | { state: "done"; model: string; texture: string | null }
+  | {
+      state: "done";
+      model: string;
+      texture: string | null;
+      script: string | null;
+      scriptKept: boolean;
+    }
   | { state: "failed"; message: string };
 
 export function ExportDrawer({
@@ -48,6 +59,7 @@ export function ExportDrawer({
   const [withTexture, setWithTexture] = useState(
     project.exportTexture !== false,
   );
+  const [withScript, setWithScript] = useState(project.exportScript !== false);
   const [result, setResult] = useState<Result>({ state: "idle" });
 
   const atlas = pack.manifest.textures.tex1;
@@ -77,9 +89,14 @@ export function ExportDrawer({
         dir,
         unitName: project.unitName,
         atlas: withTexture ? atlas : null,
+        script: withScript ? buildLuaScript(project) : null,
         model,
       });
-      onRemember({ exportDir: dir, exportTexture: withTexture });
+      onRemember({
+        exportDir: dir,
+        exportTexture: withTexture,
+        exportScript: withScript,
+      });
       setResult({ state: "done", ...written });
     } catch (error) {
       setResult({
@@ -125,6 +142,26 @@ export function ExportDrawer({
 
             <div className="flex items-start gap-2">
               <Checkbox
+                id="lego-export-script"
+                checked={withScript}
+                onCheckedChange={(checked) => setWithScript(checked === true)}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="lego-export-script">
+                  Write a unit script if there is none
+                </Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Puts <code>{project.unitName}.lua</code> in{" "}
+                  <code>scripts</code>, generated from the animations applied to
+                  this unit. An existing script is never overwritten, so hand
+                  edits survive a re-export.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <Checkbox
                 id="lego-export-texture"
                 checked={withTexture}
                 onCheckedChange={(checked) => setWithTexture(checked === true)}
@@ -157,6 +194,14 @@ export function ExportDrawer({
                 <code className="break-all">{result.model}</code>
                 {result.texture ? (
                   <code className="break-all">{result.texture}</code>
+                ) : null}
+                {result.script ? (
+                  <code className="break-all">{result.script}</code>
+                ) : null}
+                {result.scriptKept ? (
+                  <p className="text-muted-foreground">
+                    The unit script was already there and has been left alone.
+                  </p>
                 ) : null}
                 <Button
                   variant="outline"

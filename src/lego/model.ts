@@ -73,6 +73,8 @@ export interface LegoProject {
   exportDir?: string;
   /** Whether that export also placed the shared atlas. Defaults to true. */
   exportTexture?: boolean;
+  /** Whether it also wrote a unit script when the game had none. */
+  exportScript?: boolean;
 }
 
 /**
@@ -285,6 +287,9 @@ export function parseLegoProjectJson(json: string): LegoProject | null {
     ...(typeof d.exportDir === "string" ? { exportDir: d.exportDir } : {}),
     ...(typeof d.exportTexture === "boolean"
       ? { exportTexture: d.exportTexture }
+      : {}),
+    ...(typeof d.exportScript === "boolean"
+      ? { exportScript: d.exportScript }
       : {}),
   };
 }

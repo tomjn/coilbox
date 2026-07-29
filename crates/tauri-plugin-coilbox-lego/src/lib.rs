@@ -316,6 +316,7 @@ async fn lego_export<R: Runtime>(
     dir: String,
     unit_name: String,
     atlas: Option<String>,
+    script: Option<String>,
     model: ExportModel,
 ) -> CliResult {
     if !valid_unit_name(&unit_name) {
@@ -368,9 +369,31 @@ async fn lego_export<R: Runtime>(
         texture_path = Some(target.to_string_lossy().to_string());
     }
 
+    // The unit script is written once and then left alone. It is meant to be
+    // edited by hand, and re-exporting a model after a change to the geometry
+    // must not throw that away.
+    let mut script_path = None;
+    let mut script_kept = false;
+    if let Some(script) = script {
+        let scripts = root.join("scripts");
+        if let Err(e) = std::fs::create_dir_all(&scripts) {
+            return CliResult::err(format!("could not create {}: {e}", scripts.display()));
+        }
+        let target = scripts.join(format!("{unit_name}.lua"));
+        if target.exists() {
+            script_kept = true;
+        } else if let Err(e) = std::fs::write(&target, script) {
+            return CliResult::err(format!("could not write {}: {e}", target.display()));
+        } else {
+            script_path = Some(target.to_string_lossy().to_string());
+        }
+    }
+
     CliResult::ok(json!({
         "model": model_path.to_string_lossy(),
         "texture": texture_path,
+        "script": script_path,
+        "scriptKept": script_kept,
     }))
 }
 
