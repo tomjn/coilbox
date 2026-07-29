@@ -83,6 +83,19 @@ const ORIGIN_COLOUR = 0x8b5cf6;
 const FACE_COLOUR = 0x38bdf8;
 const CORNER_COLOUR = 0xfbbf24;
 /**
+ * Hover reuses the face anchors' sky blue rather than a new hex: it already
+ * means "something to interact with", and it reads clearly apart from the
+ * selection outline's violet.
+ */
+const HOVER_COLOUR = FACE_COLOUR;
+/**
+ * How strongly the hover and selection washes tint a piece's own faces.
+ * Selection is the stronger claim, so it gets the stronger tint. Both stay
+ * low: a wash that hides the part's texture is too strong to be "subtle".
+ */
+const HOVER_OVERLAY_OPACITY = 0.12;
+const SELECT_OVERLAY_OPACITY = 0.22;
+/**
  * Dot sizes in CSS pixels, constant however far the camera is.
  *
  * Small: a part can carry fifteen of these and they have to sit on the model
@@ -122,6 +135,14 @@ interface Props {
   /** Committed when a drag ends, not on every frame of it. */
   onTransform: (pieceId: string, change: Partial<LegoPiece>) => void;
   /**
+   * The piece to highlight as hovered regardless of where the pointer is, e.g.
+   * because the sidebar's tree row for it is hovered instead of the canvas.
+   */
+  hoveredId?: string | null;
+  /** Told whenever the piece under the pointer in this view changes, so the
+   *  sidebar tree can highlight the matching row. */
+  onHover?: (pieceId: string | null) => void;
+  /**
    * Handed a function that draws a frame and returns the canvas, rather than
    * the canvas itself. WebGL discards its drawing buffer once the frame is
    * composited, so reading the canvas at any later moment gives a blank image.
@@ -143,6 +164,8 @@ export function ModelViewport({
   selectedId,
   onSelect,
   onTransform,
+  hoveredId,
+  onHover,
   onReady,
   playing = false,
   uniformScale = false,
@@ -174,8 +197,11 @@ export function ModelViewport({
   onReadyRef.current = onReady;
   const onTransformRef = useRef(onTransform);
   onTransformRef.current = onTransform;
+  const onHoverRef = useRef(onHover);
+  onHoverRef.current = onHover;
   // F reads this from the keydown listener below, which is registered once
-  // and would otherwise only ever see the selection at mount.
+  // and would otherwise only ever see the selection at mount. The hover code
+  // reads it too, to skip drawing a hover treatment on the selected piece.
   const selectedIdRef = useRef(selectedId);
   selectedIdRef.current = selectedId;
   // The gizmo reads the document every frame of a drag to find what to snap
@@ -210,6 +236,37 @@ export function ModelViewport({
       const outline = new THREE.BoxHelper(root, 0x8b5cf6);
       outline.visible = false;
       scene.add(outline);
+
+      // Sky blue, and thinner reading than the selection outline: the piece
+      // under the pointer, not yet clicked.
+      const hoverOutline = new THREE.BoxHelper(root, HOVER_COLOUR);
+      hoverOutline.visible = false;
+      scene.add(hoverOutline);
+
+      // A wash over the piece's own faces rather than its bounding box, so it
+      // follows the part's silhouette. Unparented until first shown: a mesh
+      // with nowhere to sit has nothing to draw.
+      const hoverOverlayMaterial = overlayMaterial(
+        HOVER_COLOUR,
+        HOVER_OVERLAY_OPACITY,
+      );
+      const hoverOverlay = new THREE.Mesh(
+        new THREE.BufferGeometry(),
+        hoverOverlayMaterial,
+      );
+      hoverOverlay.visible = false;
+      hoverOverlay.raycast = () => {};
+
+      const selectOverlayMaterial = overlayMaterial(
+        ORIGIN_COLOUR,
+        SELECT_OVERLAY_OPACITY,
+      );
+      const selectOverlay = new THREE.Mesh(
+        new THREE.BufferGeometry(),
+        selectOverlayMaterial,
+      );
+      selectOverlay.visible = false;
+      selectOverlay.raycast = () => {};
 
       // Green, and only ever seen mid-drag: the piece being seated against, and
       // the point the two anchors meet at.
@@ -257,6 +314,10 @@ export function ModelViewport({
         gizmo,
         root,
         outline,
+        hoverOutline,
+        hoverOverlay,
+        selectOverlay,
+        hoveredId: null,
         grid,
         axes,
         groups: new Map(),
@@ -275,8 +336,15 @@ export function ModelViewport({
         projectRef,
         packRef,
         onTransformRef,
+        selectedIdRef,
+        onHoverRef,
       };
       sceneRef.current = state;
+
+      // Read by the pointermove handler below, so a drag pins the hover
+      // highlight rather than having it flicker onto whatever the gizmo drags
+      // the cursor over.
+      let dragging = false;
 
       // `mouseDown` and `mouseUp`, not `dragging-changed`: this version of
       // TransformControls does not dispatch that one, so listening for it left
@@ -285,6 +353,8 @@ export function ModelViewport({
       // every piece at the origin.
       gizmo.addEventListener("mouseDown", () => {
         controls.enabled = false;
+        dragging = true;
+        setHoveredAndNotify(state, null);
         // Built once per drag: the other pieces do not move while one is dragged,
         // so their anchors are fixed for the length of it.
         const pieceId = gizmo.object ? pieceIdOf(gizmo.object) : null;
@@ -299,6 +369,7 @@ export function ModelViewport({
       });
       gizmo.addEventListener("mouseUp", () => {
         controls.enabled = true;
+        dragging = false;
         showTargetAnchors(state, packRef.current, projectRef.current, null);
         showSeat(state, null);
         commitGizmo(state);
@@ -359,6 +430,45 @@ export function ModelViewport({
       renderer.domElement.addEventListener("pointerdown", onPointerDown);
       renderer.domElement.addEventListener("pointerup", onPointerUp);
 
+      // Raycasting on every `pointermove` would run it far more often than the
+      // screen can show a result, so a move only records where the pointer is
+      // and asks for a frame. The frame itself does the one raycast that
+      // frame gets, and only re-renders if the hovered piece actually changed.
+      let hoverFrame = 0;
+      let hoverAt: { x: number; y: number } | null = null;
+
+      const checkHover = () => {
+        hoverFrame = 0;
+        if (!hoverAt || dragging) return;
+        pointer.x = hoverAt.x;
+        pointer.y = hoverAt.y;
+        raycaster.setFromCamera(pointer, camera);
+        let found: string | null = null;
+        for (const hit of raycaster.intersectObject(root, true)) {
+          const id = pieceIdOf(hit.object);
+          if (id && !isEffectivelyHidden(projectRef.current, id)) {
+            found = id;
+            break;
+          }
+        }
+        setHoveredAndNotify(state, found);
+      };
+      const onPointerMove = (event: PointerEvent) => {
+        if (dragging) return;
+        const bounds = renderer.domElement.getBoundingClientRect();
+        hoverAt = {
+          x: ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+          y: -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
+        };
+        if (!hoverFrame) hoverFrame = requestAnimationFrame(checkHover);
+      };
+      const onPointerLeave = () => {
+        hoverAt = null;
+        if (!dragging) setHoveredAndNotify(state, null);
+      };
+      renderer.domElement.addEventListener("pointermove", onPointerMove);
+      renderer.domElement.addEventListener("pointerleave", onPointerLeave);
+
       onReadyRef.current?.(canvas.capture);
 
       return {
@@ -369,8 +479,14 @@ export function ModelViewport({
         },
         dispose: () => {
           cancelAnimationFrame(frame);
+          cancelAnimationFrame(hoverFrame);
           renderer.domElement.removeEventListener("pointerdown", onPointerDown);
           renderer.domElement.removeEventListener("pointerup", onPointerUp);
+          renderer.domElement.removeEventListener("pointermove", onPointerMove);
+          renderer.domElement.removeEventListener(
+            "pointerleave",
+            onPointerLeave,
+          );
           controls.removeEventListener("change", render);
           controls.dispose();
           gizmo.detach();
@@ -381,6 +497,12 @@ export function ModelViewport({
           state.seatMark.geometry.dispose();
           (state.seatMark.material as THREE.PointsMaterial).dispose();
           state.seatOutline.dispose();
+          state.hoverOutline.dispose();
+          // Not the overlays' geometry: it is always a borrowed reference to a
+          // piece's own mesh geometry (or the pack's cache, or the bake), never
+          // something these meshes own.
+          hoverOverlayMaterial.dispose();
+          selectOverlayMaterial.dispose();
           state.dots.dispose();
           state.originDot.dispose();
           disposeBaked(state);
@@ -422,6 +544,7 @@ export function ModelViewport({
     ) {
       state.outline.setFromObject(group);
       state.outline.visible = true;
+      showOverlay(state.selectOverlay, group);
       // The root has nothing to move relative to, so it gets no handles.
       if (selectedId === project.rootPieceId) {
         state.gizmo.detach();
@@ -430,10 +553,28 @@ export function ModelViewport({
       }
     } else {
       state.outline.visible = false;
+      hideOverlay(state.selectOverlay);
       state.gizmo.detach();
     }
+    // The new selection may be the piece already showing a hover treatment,
+    // which now has to stand down in favour of the (stronger) selected look.
+    applyHoverVisual(state);
     state.render();
   }, [selectedId, project]);
+
+  // Independent of the pointer: the hovered piece can arrive from the sidebar
+  // tree instead of a raycast, and does not report back up when it does, so
+  // this never fights with what the pointer itself is over. Unlike the
+  // pointer-driven path this always redraws rather than bailing out when the
+  // id has not changed, so an edit to the hovered piece itself (a transform
+  // typed into a field, an undo) still keeps its outline and wash in step.
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.hoveredId = resolveHovered(project, hoveredId ?? null);
+    applyHoverVisual(state);
+    state.render();
+  }, [hoveredId, project]);
 
   // Declared after the scene sync, so the group a new piece needs already
   // exists by the time this looks for it. Playback clears them: the baked scene
@@ -742,6 +883,15 @@ interface SceneState {
   gizmo: TransformControls;
   root: THREE.Group;
   outline: THREE.BoxHelper;
+  /** The hovered piece's outline and face wash, drawn the same way as the
+   *  selected piece's but in a different colour and never both on one piece. */
+  hoverOutline: THREE.BoxHelper;
+  hoverOverlay: THREE.Mesh;
+  /** The selected piece's face wash. `outline` is the box around it. */
+  selectOverlay: THREE.Mesh;
+  /** The piece currently under the pointer, in this view or the sidebar tree.
+   *  Never a hidden piece, and never the selected piece: see `applyHoverVisual`. */
+  hoveredId: string | null;
   /** The ground and the compass, both of which can be switched off. */
   grid: THREE.GridHelper;
   axes: THREE.AxesHelper;
@@ -775,6 +925,10 @@ interface SceneState {
   onTransformRef: {
     current: (pieceId: string, change: Partial<LegoPiece>) => void;
   };
+  /** The latest selection, so hover code can skip a piece that is already
+   *  selected without waiting for a render to see the new prop. */
+  selectedIdRef: { current: string | null };
+  onHoverRef: { current: ((pieceId: string | null) => void) | undefined };
 }
 
 /**
@@ -976,6 +1130,123 @@ function showSeat(
     state.seatOutline.visible = true;
   } else {
     state.seatOutline.visible = false;
+  }
+}
+
+/**
+ * A flat, unlit tint for the hover and selection washes.
+ *
+ * `polygonOffset` pulls the wash slightly forward in the depth buffer without
+ * moving a vertex, which is what stops it z-fighting with the very surface it
+ * sits on. `depthWrite` stays off so it never itself occludes anything drawn
+ * after it.
+ */
+function overlayMaterial(
+  colour: number,
+  opacity: number,
+): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    color: colour,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  });
+}
+
+/**
+ * Sit a wash mesh over a piece's own faces, not its bounding box, by pointing
+ * it at the same geometry as the piece's mesh and copying that mesh's local
+ * transform. The geometry is a borrowed reference: it belongs to the pack's
+ * shared cache or, while playing, to the bake, and this mesh must never
+ * dispose it.
+ *
+ * A piece with no part (an empty hierarchy node) has no mesh to trace, so
+ * there is nothing to wash and the overlay is hidden instead.
+ */
+function showOverlay(overlay: THREE.Mesh, group: THREE.Group) {
+  const mesh = group.children.find((child) => child instanceof THREE.Mesh) as
+    | THREE.Mesh
+    | undefined;
+  if (!mesh) {
+    hideOverlay(overlay);
+    return;
+  }
+  overlay.geometry = mesh.geometry;
+  overlay.position.copy(mesh.position);
+  overlay.rotation.copy(mesh.rotation);
+  overlay.scale.copy(mesh.scale);
+  group.add(overlay);
+  overlay.visible = true;
+}
+
+function hideOverlay(overlay: THREE.Mesh) {
+  overlay.visible = false;
+}
+
+/**
+ * Resolve what should count as hovered, apply the outline and wash for it,
+ * and report the result back to whichever raycast or pointer event asked.
+ *
+ * Split from `applyHoveredId` because a change coming from the `hoveredId`
+ * prop (the sidebar tree hovering a row) must not itself call back out through
+ * `onHoverRef`: that would immediately overwrite the tree's own hover state,
+ * most visibly for a hidden piece, which resolves to nothing here but is still
+ * exactly what the tree row is hovering.
+ */
+function setHoveredAndNotify(state: SceneState, pieceId: string | null) {
+  const previous = state.hoveredId;
+  const resolved = applyHoveredId(state, pieceId);
+  if (resolved !== previous) state.onHoverRef.current?.(resolved);
+}
+
+/**
+ * Resolve, store and draw the hovered piece, without notifying anyone.
+ *
+ * A hidden piece (or one behind a hidden ancestor) resolves to nothing: there
+ * is nothing on screen to point at, so there is nothing to hover.
+ */
+function applyHoveredId(
+  state: SceneState,
+  pieceId: string | null,
+): string | null {
+  const resolved = resolveHovered(state.projectRef.current, pieceId);
+  if (resolved !== state.hoveredId) {
+    state.hoveredId = resolved;
+    applyHoverVisual(state);
+    state.render();
+  }
+  return resolved;
+}
+
+/** Never a hidden piece, or one behind a hidden ancestor: there is nothing on
+ *  screen for either of those to point at. */
+function resolveHovered(
+  project: LegoProject,
+  pieceId: string | null,
+): string | null {
+  return pieceId && !isEffectivelyHidden(project, pieceId) ? pieceId : null;
+}
+
+/**
+ * Draw (or clear) the hover outline and wash for whatever `state.hoveredId` is
+ * now. The selected piece is skipped even if it is also the hovered one: its
+ * own outline, wash and gizmo already say enough, and a second wash in a
+ * different colour on the same faces would only look muddy.
+ */
+function applyHoverVisual(state: SceneState) {
+  const id = state.hoveredId;
+  const group =
+    id && id !== state.selectedIdRef.current ? state.groups.get(id) : undefined;
+  if (group) {
+    state.hoverOutline.setFromObject(group);
+    state.hoverOutline.visible = true;
+    showOverlay(state.hoverOverlay, group);
+  } else {
+    state.hoverOutline.visible = false;
+    hideOverlay(state.hoverOverlay);
   }
 }
 
