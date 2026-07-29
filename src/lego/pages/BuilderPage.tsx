@@ -81,6 +81,9 @@ export default function BuilderPage() {
   const [playing, setPlaying] = useState(false);
   /** A preference, not part of the unit, so it lives with the session. */
   const [uniformScale, setUniformScale] = useState(true);
+  /** Shared between the viewport and the tree, so hovering a piece in either
+   *  highlights it in the other. */
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const filter = usePartFilter(pack);
 
   useEffect(() => {
@@ -471,6 +474,8 @@ export default function BuilderPage() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             onTransform={transformPiece}
+            hoveredId={hoveredId}
+            onHover={setHoveredId}
             playing={playing}
             uniformScale={uniformScale}
             onGround={() => edit((project) => sitOnGround(project, pack))}
@@ -571,6 +576,8 @@ export default function BuilderPage() {
                     onSelect={setSelectedId}
                     onReparent={reparent}
                     onToggleHidden={toggleHidden}
+                    hoveredId={hoveredId}
+                    onHoverChange={setHoveredId}
                   />
                 </div>
                 {/* Fades the last row rather than clipping it mid-line, so a

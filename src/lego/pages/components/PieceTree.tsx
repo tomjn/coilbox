@@ -32,6 +32,12 @@ interface Props {
   onSelect: (pieceId: string) => void;
   onReparent: (pieceId: string, parentId: string) => void;
   onToggleHidden: (pieceId: string) => void;
+  /** The piece to highlight as hovered, e.g. because the pointer is over its
+   *  mesh in the 3D view instead of over its row here. */
+  hoveredId?: string | null;
+  /** Told when the pointer starts or stops being over a row, so the 3D view
+   *  can highlight the matching piece. */
+  onHoverChange?: (pieceId: string | null) => void;
 }
 
 interface Drag {
@@ -48,6 +54,8 @@ export function PieceTree({
   onSelect,
   onReparent,
   onToggleHidden,
+  hoveredId,
+  onHoverChange,
 }: Props) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const pressed = useRef<{ pieceId: string; x: number; y: number } | null>(
@@ -116,6 +124,8 @@ export function PieceTree({
         onToggleHidden={onToggleHidden}
         draggingId={drag?.pieceId ?? null}
         overId={drag?.over ?? null}
+        hoveredId={hoveredId ?? null}
+        onHoverChange={onHoverChange}
       />
 
       {drag && carried ? (
@@ -144,6 +154,8 @@ function Rows({
   onToggleHidden,
   draggingId,
   overId,
+  hoveredId,
+  onHoverChange,
   depth = 0,
 }: {
   project: LegoProject;
@@ -153,6 +165,8 @@ function Rows({
   onToggleHidden: (pieceId: string) => void;
   draggingId: string | null;
   overId: string | null;
+  hoveredId: string | null;
+  onHoverChange?: (pieceId: string | null) => void;
   depth?: number;
 }) {
   const siblings = childrenOf(project, parentId);
@@ -176,14 +190,22 @@ function Rows({
             }
             style={depth > 0 ? { marginLeft: 14 } : undefined}
           >
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: a visual hover cue for the 3D view, the row's own actions stay reachable through the nested button */}
             <div
               data-piece-id={piece.id}
+              // Dragging a row over another already means something (a
+              // reparent target), so a hover report from mid-drag is
+              // suppressed rather than fighting that with a second highlight.
+              onMouseEnter={() => !draggingId && onHoverChange?.(piece.id)}
+              onMouseLeave={() => !draggingId && onHoverChange?.(null)}
               className={`group flex items-center pr-1 text-sm ${
                 piece.id === overId
                   ? "bg-primary/25 ring-1 ring-inset ring-primary"
                   : piece.id === selectedId
                     ? "bg-primary/15 text-foreground"
-                    : "hover:bg-muted/50"
+                    : piece.id === hoveredId
+                      ? "bg-accent text-accent-foreground"
+                      : "hover:bg-muted/50"
               } ${piece.id === draggingId ? "opacity-50" : ""}`}
             >
               <button
@@ -230,6 +252,8 @@ function Rows({
               onToggleHidden={onToggleHidden}
               draggingId={draggingId}
               overId={overId}
+              hoveredId={hoveredId}
+              onHoverChange={onHoverChange}
               depth={depth + 1}
             />
           </li>
