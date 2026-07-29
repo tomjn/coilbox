@@ -7,6 +7,7 @@ import {
   type LegoProject,
   newProject,
   normalisePieceName,
+  orderedPieces,
   parseLegoProjectJson,
   projectProblems,
   uniquePieceName,
@@ -78,6 +79,34 @@ describe("walkPieces", () => {
       piece("b", "a"),
     ]);
     expect(walkPieces(doc).map((p) => p.id)).toEqual(["root"]);
+  });
+});
+
+describe("orderedPieces", () => {
+  it("puts a piece after its parent even when the array does not", () => {
+    // Reparenting moves a piece in the tree but leaves it where it was in the
+    // array, so `a1` sits ahead of its parent `a` here.
+    const doc = project([
+      piece("root", null),
+      piece("a1", "a"),
+      piece("a", "root"),
+      piece("b", "root"),
+    ]);
+    expect(orderedPieces(doc).map((p) => p.id)).toEqual([
+      "root",
+      "a",
+      "a1",
+      "b",
+    ]);
+  });
+
+  it("keeps a piece a cycle leaves unreachable, rather than dropping it", () => {
+    const doc = project([
+      piece("root", null),
+      piece("a", "b"),
+      piece("b", "a"),
+    ]);
+    expect(orderedPieces(doc).map((p) => p.id)).toEqual(["root", "a", "b"]);
   });
 });
 
@@ -163,6 +192,16 @@ describe("parseLegoProjectJson", () => {
       { ...piece("a", "root"), partId: "abc", role: "turret" },
     ]);
     expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it("puts pieces parent-first, for a document saved before that was true", () => {
+    const doc = project([
+      piece("root", null),
+      piece("a1", "a"),
+      piece("a", "root"),
+    ]);
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+    expect(parsed?.pieces.map((p) => p.id)).toEqual(["root", "a", "a1"]);
   });
 
   it("loads a project that has problems, rather than refusing to open it", () => {

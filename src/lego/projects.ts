@@ -13,7 +13,7 @@
 import { useEffect, useState } from "react";
 
 import { legoDelete, legoList, legoSave, legoThumbSave } from "./bindings";
-import { type LegoProject, parseLegoProjectJson } from "./model";
+import { type LegoProject, orderedPieces, parseLegoProjectJson } from "./model";
 
 interface LegoStore {
   projects: LegoProject[];
@@ -57,7 +57,11 @@ export async function refreshProjects(): Promise<LegoStore> {
  * it and the overview's ordering stays meaningful.
  */
 export async function saveProject(project: LegoProject): Promise<LegoProject> {
-  const stamped = { ...project, updatedAt: new Date().toISOString() };
+  const stamped = {
+    ...project,
+    pieces: orderedPieces(project),
+    updatedAt: new Date().toISOString(),
+  };
   await legoSave({
     kind: "project",
     id: stamped.id,
@@ -76,7 +80,11 @@ export async function deleteProject(id: string): Promise<void> {
 export async function saveCompound(
   compound: LegoProject,
 ): Promise<LegoProject> {
-  const stamped = { ...compound, updatedAt: new Date().toISOString() };
+  const stamped = {
+    ...compound,
+    pieces: orderedPieces(compound),
+    updatedAt: new Date().toISOString(),
+  };
   await legoSave({
     kind: "compound",
     id: stamped.id,
