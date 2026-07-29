@@ -130,6 +130,23 @@ export function walkPieces(project: LegoProject): LegoPiece[] {
   return out;
 }
 
+/**
+ * Every piece in save order: depth-first from the root, so a parent always
+ * comes before its children. Reparenting only changes a piece's `parentId`,
+ * not its place in the array, so this is what has to keep that true.
+ *
+ * A cycle or a missing parent can leave pieces unreachable from the root.
+ * Those follow in their existing order rather than being dropped, because
+ * silently losing pieces on save would be worse than a document
+ * `projectProblems` already flags as broken.
+ */
+export function orderedPieces(project: LegoProject): LegoPiece[] {
+  const ordered = walkPieces(project);
+  const reached = new Set(ordered.map((piece) => piece.id));
+  const stray = project.pieces.filter((piece) => !reached.has(piece.id));
+  return [...ordered, ...stray];
+}
+
 /** A piece and everything under it, for deleting or saving as a compound. */
 export function descendantIds(project: LegoProject, pieceId: string): string[] {
   const out: string[] = [];
@@ -262,7 +279,7 @@ export function parseLegoProjectJson(json: string): LegoProject | null {
   if (pieces.length === 0) return null;
 
   const mid = parseVec3(d.mid);
-  return {
+  const project: LegoProject = {
     schemaVersion: LEGO_SCHEMA_VERSION,
     id: d.id,
     name: d.name,
@@ -292,6 +309,10 @@ export function parseLegoProjectJson(json: string): LegoProject | null {
       ? { exportScript: d.exportScript }
       : {}),
   };
+  // A document saved before pieces were written in save order, or hand-edited,
+  // may not have its parents first. Normalise here so the invariant holds the
+  // moment a project is in memory, not only after its next save.
+  return { ...project, pieces: orderedPieces(project) };
 }
 
 function parsePiece(raw: unknown): LegoPiece | null {
