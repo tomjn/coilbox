@@ -10,10 +10,17 @@
  * in the panel below the tree does the same move from the keyboard.
  */
 
+import { Button } from "@picoframe/frame";
+import { Eye, EyeOff } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { roleLabel } from "../../animPresets";
-import { childrenOf, type LegoProject, pieceById } from "../../model";
+import {
+  childrenOf,
+  isEffectivelyHidden,
+  type LegoProject,
+  pieceById,
+} from "../../model";
 import { canReparent } from "../../reparent";
 
 /** How far the pointer moves before a press on a row counts as a drag. */
@@ -24,6 +31,7 @@ interface Props {
   selectedId: string | null;
   onSelect: (pieceId: string) => void;
   onReparent: (pieceId: string, parentId: string) => void;
+  onToggleHidden: (pieceId: string) => void;
 }
 
 interface Drag {
@@ -39,6 +47,7 @@ export function PieceTree({
   selectedId,
   onSelect,
   onReparent,
+  onToggleHidden,
 }: Props) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const pressed = useRef<{ pieceId: string; x: number; y: number } | null>(
@@ -104,6 +113,7 @@ export function PieceTree({
         parentId={null}
         selectedId={selectedId}
         onSelect={onSelect}
+        onToggleHidden={onToggleHidden}
         draggingId={drag?.pieceId ?? null}
         overId={drag?.over ?? null}
       />
@@ -131,6 +141,7 @@ function Rows({
   parentId,
   selectedId,
   onSelect,
+  onToggleHidden,
   draggingId,
   overId,
   depth = 0,
@@ -139,6 +150,7 @@ function Rows({
   parentId: string | null;
   selectedId: string | null;
   onSelect: (pieceId: string) => void;
+  onToggleHidden: (pieceId: string) => void;
   draggingId: string | null;
   overId: string | null;
   depth?: number;
@@ -150,51 +162,79 @@ function Rows({
     // a whole branch. `last:before:h-3` stops the vertical rail at the elbow of
     // the final child rather than carrying on past it.
     <ul className={depth > 0 ? "relative" : ""}>
-      {siblings.map((piece) => (
-        <li
-          key={piece.id}
-          className={
-            depth > 0
-              ? "relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-px before:bg-border last:before:h-3 after:absolute after:left-0 after:top-3 after:h-px after:w-2 after:bg-border"
-              : ""
-          }
-          style={depth > 0 ? { marginLeft: 14 } : undefined}
-        >
-          <button
-            type="button"
-            data-piece-id={piece.id}
-            onClick={() => onSelect(piece.id)}
-            className={`flex w-full items-center gap-2 py-1 pr-3 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-              piece.id === overId
-                ? "bg-primary/25 ring-1 ring-inset ring-primary"
-                : piece.id === selectedId
-                  ? "bg-primary/15 text-foreground"
-                  : "hover:bg-muted/50"
-            } ${piece.id === draggingId ? "opacity-50" : ""}`}
-            style={{ paddingLeft: 12 }}
+      {siblings.map((piece) => {
+        // Only ancestors count towards the dimming: a piece's own toggle
+        // always acts on its own flag, whatever an ancestor is doing.
+        const dimmed = isEffectivelyHidden(project, piece.id);
+        return (
+          <li
+            key={piece.id}
+            className={
+              depth > 0
+                ? "relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-px before:bg-border last:before:h-3 after:absolute after:left-0 after:top-3 after:h-px after:w-2 after:bg-border"
+                : ""
+            }
+            style={depth > 0 ? { marginLeft: 14 } : undefined}
           >
-            <span className="truncate">{piece.name}</span>
-            {piece.role ? (
-              <span className="ml-auto shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">
-                {roleLabel(piece.role)}
-              </span>
-            ) : piece.partId ? null : (
-              <span className="ml-auto text-xs text-muted-foreground">
-                empty
-              </span>
-            )}
-          </button>
-          <Rows
-            project={project}
-            parentId={piece.id}
-            selectedId={selectedId}
-            onSelect={onSelect}
-            draggingId={draggingId}
-            overId={overId}
-            depth={depth + 1}
-          />
-        </li>
-      ))}
+            <div
+              data-piece-id={piece.id}
+              className={`group flex items-center pr-1 text-sm ${
+                piece.id === overId
+                  ? "bg-primary/25 ring-1 ring-inset ring-primary"
+                  : piece.id === selectedId
+                    ? "bg-primary/15 text-foreground"
+                    : "hover:bg-muted/50"
+              } ${piece.id === draggingId ? "opacity-50" : ""}`}
+            >
+              <button
+                type="button"
+                onClick={() => onSelect(piece.id)}
+                className={`flex min-w-0 flex-1 items-center gap-2 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  dimmed ? "text-muted-foreground" : ""
+                }`}
+                style={{ paddingLeft: 12 }}
+              >
+                <span className="truncate">{piece.name}</span>
+                {piece.role ? (
+                  <span className="ml-auto shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">
+                    {roleLabel(piece.role)}
+                  </span>
+                ) : piece.partId ? null : (
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    empty
+                  </span>
+                )}
+              </button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={`h-6 w-6 shrink-0 transition-opacity focus:opacity-100 group-hover:opacity-100 ${
+                  piece.hidden ? "opacity-100" : "opacity-0"
+                }`}
+                onClick={() => onToggleHidden(piece.id)}
+                aria-label={
+                  piece.hidden ? `Show ${piece.name}` : `Hide ${piece.name}`
+                }
+                title={
+                  piece.hidden ? "Show in the viewport" : "Hide in the viewport"
+                }
+              >
+                {piece.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
+              </Button>
+            </div>
+            <Rows
+              project={project}
+              parentId={piece.id}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              onToggleHidden={onToggleHidden}
+              draggingId={draggingId}
+              overId={overId}
+              depth={depth + 1}
+            />
+          </li>
+        );
+      })}
     </ul>
   );
 }

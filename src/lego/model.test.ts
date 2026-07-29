@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   descendantIds,
+  isEffectivelyHidden,
   LEGO_SCHEMA_VERSION,
   type LegoPiece,
   type LegoProject,
@@ -119,6 +120,48 @@ describe("descendantIds", () => {
       piece("b", "root"),
     ]);
     expect(descendantIds(doc, "a")).toEqual(["a", "a1"]);
+  });
+});
+
+describe("isEffectivelyHidden", () => {
+  it("is false when neither a piece nor its ancestors are hidden", () => {
+    const doc = project([piece("root", null), piece("a", "root")]);
+    expect(isEffectivelyHidden(doc, "a")).toBe(false);
+  });
+
+  it("is true for a piece hidden on itself", () => {
+    const doc = project([
+      piece("root", null),
+      { ...piece("a", "root"), hidden: true },
+    ]);
+    expect(isEffectivelyHidden(doc, "a")).toBe(true);
+  });
+
+  it("is true for a piece whose ancestor is hidden, even though its own flag is unset", () => {
+    const doc = project([
+      piece("root", null),
+      { ...piece("a", "root"), hidden: true },
+      piece("a1", "a"),
+    ]);
+    expect(isEffectivelyHidden(doc, "a1")).toBe(true);
+  });
+
+  it("does not hide a sibling of a hidden piece", () => {
+    const doc = project([
+      piece("root", null),
+      { ...piece("a", "root"), hidden: true },
+      piece("b", "root"),
+    ]);
+    expect(isEffectivelyHidden(doc, "b")).toBe(false);
+  });
+
+  it("stops rather than looping when a piece is its own ancestor", () => {
+    const doc = project([
+      piece("root", null),
+      piece("a", "b"),
+      piece("b", "a"),
+    ]);
+    expect(isEffectivelyHidden(doc, "a")).toBe(false);
   });
 });
 

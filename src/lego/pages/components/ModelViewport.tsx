@@ -41,7 +41,13 @@ import { useReduceMotion } from "../../../general/display";
 import { type AnimPreset, presetById } from "../../animPresets";
 import { frameBox } from "../../framing";
 import { addStandardLights, partMaterial } from "../../geometry";
-import { descendantIds, type LegoPiece, type LegoProject } from "../../model";
+import {
+  descendantIds,
+  isEffectivelyHidden,
+  type LegoPiece,
+  type LegoProject,
+  pieceById,
+} from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { type BakedPiece, bakedPieces } from "../../s3oBuild";
 import {
@@ -402,12 +408,22 @@ export function ModelViewport({
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    const group = selectedId ? state.groups.get(selectedId) : undefined;
-    if (group) {
+    const piece = selectedId ? pieceById(project, selectedId) : undefined;
+    const group = piece ? state.groups.get(piece.id) : undefined;
+    // A hidden piece keeps its row selectable, so unhiding it stays reachable,
+    // but there is nothing on screen to outline or drag: attaching the gizmo
+    // to an invisible object would just fight the pointer over thin air. An
+    // ancestor being hidden counts too, since that hides this piece as well.
+    if (
+      group &&
+      piece &&
+      selectedId &&
+      !isEffectivelyHidden(project, selectedId)
+    ) {
       state.outline.setFromObject(group);
       state.outline.visible = true;
       // The root has nothing to move relative to, so it gets no handles.
-      if (selectedId === projectRef.current.rootPieceId) {
+      if (selectedId === project.rootPieceId) {
         state.gizmo.detach();
       } else {
         state.gizmo.attach(group);
@@ -417,7 +433,7 @@ export function ModelViewport({
       state.gizmo.detach();
     }
     state.render();
-  }, [selectedId]);
+  }, [selectedId, project]);
 
   // Declared after the scene sync, so the group a new piece needs already
   // exists by the time this looks for it. Playback clears them: the baked scene

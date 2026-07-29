@@ -328,6 +328,23 @@ export default function BuilderPage() {
     }));
   }
 
+  // Editor only: `hidden` never reaches the export, so this is the only
+  // reducer that touches it. Shown is the absence of the key, not `false`,
+  // matching how `role` is dropped rather than written empty above.
+  function toggleHidden(pieceId: string) {
+    edit((project) => ({
+      ...project,
+      pieces: project.pieces.map((piece) => {
+        if (piece.id !== pieceId) return piece;
+        if (piece.hidden) {
+          const { hidden: _dropped, ...rest } = piece;
+          return rest;
+        }
+        return { ...piece, hidden: true };
+      }),
+    }));
+  }
+
   if (doc.loading || !draft || !pack) {
     return (
       <p className="px-6 py-10 text-center text-sm text-muted-foreground">
@@ -553,6 +570,7 @@ export default function BuilderPage() {
                     selectedId={selectedId}
                     onSelect={setSelectedId}
                     onReparent={reparent}
+                    onToggleHidden={toggleHidden}
                   />
                 </div>
                 {/* Fades the last row rather than clipping it mid-line, so a
