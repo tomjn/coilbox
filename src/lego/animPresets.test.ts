@@ -10,6 +10,7 @@ import {
   OPEN_CLOSE,
   PRESETS,
   presetById,
+  RECOIL,
   ROLES,
   TURRET_TRACK,
   unmetRequirements,
@@ -61,6 +62,18 @@ function height(
   const delta = preset.track(t, params, role);
   if (!delta?.position) throw new Error(`${role} is not moved at ${t}`);
   return delta.position[1];
+}
+
+/** The z translation a preset gives a role: recoil's own axis. */
+function depth(
+  preset: (typeof PRESETS)[number],
+  t: number,
+  role: string,
+  params: Record<string, number> = {},
+): number {
+  const delta = preset.track(t, params, role);
+  if (!delta?.position) throw new Error(`${role} is not moved at ${t}`);
+  return delta.position[2];
 }
 
 describe("roles", () => {
@@ -288,6 +301,34 @@ describe("aim.track", () => {
     for (let t = 0; t < 4; t += 0.1) {
       expect(pitch(AIM_TRACK, t, "aim")).toBeLessThanOrEqual(0);
     }
+  });
+});
+
+describe("recoil", () => {
+  const params = { kick: 0.5, kickTime: 0.1, returnTime: 0.4 };
+
+  it("sits at rest the instant the shot starts", () => {
+    expect(depth(RECOIL, 0, "barrel", params)).toBeCloseTo(0, 4);
+  });
+
+  it("kicks back to its full distance at the end of the kick", () => {
+    expect(depth(RECOIL, 0.1, "barrel", params)).toBeCloseTo(-0.5, 4);
+  });
+
+  it("eases back to rest once it has had time to return", () => {
+    expect(depth(RECOIL, 0.1 + 0.4, "barrel", params)).toBeCloseTo(0, 4);
+  });
+
+  it("never kicks forward, only back", () => {
+    for (let t = 0; t < 2; t += 0.05) {
+      expect(depth(RECOIL, t, "barrel", params)).toBeLessThanOrEqual(0);
+    }
+  });
+
+  it("repeats the kick after a rest, so a preview has something to watch", () => {
+    const cycle = 0.1 + 0.4 + 0.6;
+    expect(depth(RECOIL, cycle, "barrel", params)).toBeCloseTo(0, 4);
+    expect(depth(RECOIL, cycle + 0.1, "barrel", params)).toBeCloseTo(-0.5, 4);
   });
 });
 

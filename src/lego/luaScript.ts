@@ -61,6 +61,7 @@ const HOOKS: { hook: LuaHook; signature: string }[] = [
   { hook: "AimWeapon1", signature: "script.AimWeapon1(heading, pitch)" },
   { hook: "AimFromWeapon1", signature: "script.AimFromWeapon1()" },
   { hook: "QueryWeapon1", signature: "script.QueryWeapon1()" },
+  { hook: "Shot1", signature: "script.Shot1()" },
 ];
 
 /** What a callin returns when no preset has anything to say. */
