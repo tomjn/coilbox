@@ -45,6 +45,7 @@ import { type BakedPiece, bakedPieces } from "../../s3oBuild";
 import {
   localAnchors,
   nearestSnap,
+  screenPixelsToWorld,
   snapRotation,
   type Vec3,
 } from "../../snapping";
@@ -91,8 +92,17 @@ const TARGET_COLD = 0x64748b;
 /** Where the camera starts, and where Reset view puts it back. */
 const HOME_CAMERA: [number, number, number] = [9, 7, 11];
 
-/** How close two anchors must be before a piece seats against another. */
-const SNAP_DISTANCE = 0.45;
+/**
+ * How close two anchors must be before a piece seats against another,
+ * expressed as screen pixels rather than world units, so a snap reaches the
+ * same distance on screen whatever the camera is doing.
+ *
+ * At the home camera position and a typical panel height, 0.45 world units
+ * (the fixed figure this replaces) works out to about 23px, so 24px keeps
+ * the default snap feeling much the same. It also sits in the 20-30px range
+ * that feels natural for a snap radius in other 3D tools.
+ */
+const SNAP_PIXELS = 24;
 /** Rotation lands on 15 degree steps unless snapping is held off. */
 const ROTATION_STEP = Math.PI / 12;
 
@@ -858,9 +868,25 @@ function applySnap(state: SceneState) {
 
   const { points, owners } = snapTargets(state, pack, project, pieceId);
   const mine = worldAnchors(state, pack, piece);
-  paintProximity(state, mine, points);
 
-  const snap = nearestSnap(mine, points, SNAP_DISTANCE);
+  // Screen-scaled, so the snap reaches the same number of pixels whether the
+  // camera is zoomed in tight or pulled right back. Measured to the dragged
+  // piece itself, not the camera's orbit target, so seating a piece far from
+  // the pivot does not get a threshold sized for somewhere else in the scene.
+  const distance = state.camera.position.distanceTo(
+    group.getWorldPosition(new THREE.Vector3()),
+  );
+  const viewportHeight = state.renderer.getSize(new THREE.Vector2()).y;
+  const threshold = screenPixelsToWorld(
+    THREE.MathUtils.degToRad(state.camera.fov),
+    viewportHeight,
+    distance,
+    SNAP_PIXELS,
+  );
+
+  paintProximity(state, mine, points, threshold);
+
+  const snap = nearestSnap(mine, points, threshold);
   state.onSnapChange(snap !== null);
   showSeat(
     state,
@@ -968,7 +994,12 @@ function showTargetAnchors(
  * by distance turns it into something you can aim with, and the point that goes
  * fully green is the one about to take the piece.
  */
-function paintProximity(state: SceneState, moving: Vec3[], targets: Vec3[]) {
+function paintProximity(
+  state: SceneState,
+  moving: Vec3[],
+  targets: Vec3[],
+  threshold: number,
+) {
   const object = state.targetAnchors;
   if (!object) return;
   const colours = object.geometry.getAttribute("color");
@@ -992,7 +1023,7 @@ function paintProximity(state: SceneState, moving: Vec3[], targets: Vec3[]) {
     }
     // Warms from twice the snapping distance, so a point starts to glow before
     // it can actually take the piece.
-    const closeness = 1 - Math.min(nearest / (SNAP_DISTANCE * 2), 1);
+    const closeness = 1 - Math.min(nearest / (threshold * 2), 1);
     shade.copy(cold).lerp(hot, closeness * closeness);
     colours.setXYZ(index, shade.r, shade.g, shade.b);
   });

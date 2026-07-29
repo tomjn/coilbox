@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { localAnchors, nearestSnap, snapRotation, type Vec3 } from "./snapping";
+import {
+  localAnchors,
+  nearestSnap,
+  screenPixelsToWorld,
+  snapRotation,
+  type Vec3,
+} from "./snapping";
 
 const UNIT = { min: [-1, -1, -1] as Vec3, max: [1, 1, 1] as Vec3 };
 
@@ -83,5 +89,70 @@ describe("snapRotation", () => {
   it("leaves the rotation alone when there is no step", () => {
     const free: Vec3 = [0.123, 0.456, 0.789];
     expect(snapRotation(free, 0)).toEqual(free);
+  });
+});
+
+describe("screenPixelsToWorld", () => {
+  // A 90 degree vertical FOV makes tan(fov/2) exactly 1, so the numbers stay
+  // simple: worldPerPixel = 2 * distance / viewportHeightPx.
+  const WIDE_FOV = Math.PI / 2;
+
+  it("matches the projection maths for a round FOV", () => {
+    const threshold = screenPixelsToWorld(WIDE_FOV, 100, 10, 1);
+    expect(threshold).toBeCloseTo(0.2);
+  });
+
+  it("grows with distance, so a snap reaches just as far zoomed out", () => {
+    const near = screenPixelsToWorld(WIDE_FOV, 100, 10, 5);
+    const far = screenPixelsToWorld(WIDE_FOV, 100, 20, 5);
+    expect(far).toBeCloseTo(near * 2);
+  });
+
+  it("shrinks with viewport height, so a bigger canvas is not a bigger reach", () => {
+    const small = screenPixelsToWorld(WIDE_FOV, 100, 10, 5);
+    const large = screenPixelsToWorld(WIDE_FOV, 200, 10, 5);
+    expect(large).toBeCloseTo(small / 2);
+  });
+
+  it("scales linearly with the pixel figure", () => {
+    const single = screenPixelsToWorld(WIDE_FOV, 100, 10, 1);
+    const triple = screenPixelsToWorld(WIDE_FOV, 100, 10, 3);
+    expect(triple).toBeCloseTo(single * 3);
+  });
+
+  it("stays close to the old fixed 0.45 at the home camera distance", () => {
+    // The home camera sits at [9, 7, 11], about 15.8 world units from a piece
+    // at the origin, with a 40 degree vertical FOV and roughly a 580px tall
+    // panel. 24px lands close to the old fixed figure so the default snap
+    // does not change character.
+    const fov = (40 * Math.PI) / 180;
+    const distance = Math.hypot(9, 7, 11);
+    const threshold = screenPixelsToWorld(fov, 580, distance, 24);
+
+    expect(threshold).toBeGreaterThan(0.4);
+    expect(threshold).toBeLessThan(0.55);
+  });
+
+  it("never collapses to zero for a piece at or behind the camera", () => {
+    expect(screenPixelsToWorld(WIDE_FOV, 100, 0, 5)).toBeGreaterThan(0);
+    expect(screenPixelsToWorld(WIDE_FOV, 100, -3, 5)).toBeGreaterThan(0);
+  });
+
+  it("clamps to a minimum so an extreme zoom in cannot vanish", () => {
+    const tiny = screenPixelsToWorld(WIDE_FOV, 100, 0.001, 0.001);
+    expect(tiny).toBeGreaterThan(0);
+    expect(tiny).toBeLessThan(0.1);
+  });
+
+  it("clamps to a maximum so an extreme zoom out cannot grab the whole scene", () => {
+    const huge = screenPixelsToWorld(WIDE_FOV, 10, 100000, 50);
+    expect(huge).toBeLessThanOrEqual(3);
+  });
+
+  it("guards against a collapsed or zero viewport height", () => {
+    expect(Number.isFinite(screenPixelsToWorld(WIDE_FOV, 0, 10, 5))).toBe(true);
+    expect(Number.isFinite(screenPixelsToWorld(WIDE_FOV, -50, 10, 5))).toBe(
+      true,
+    );
   });
 });

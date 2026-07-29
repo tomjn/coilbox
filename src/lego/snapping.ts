@@ -110,3 +110,44 @@ export function snapRotation(rotation: Vec3, stepRadians: number): Vec3 {
     (angle) => Math.round(angle / stepRadians) * stepRadians,
   ) as Vec3;
 }
+
+/** A piece this close to the camera cannot shrink the threshold to zero. */
+const MIN_CAMERA_DISTANCE = 0.5;
+/** The threshold never drops below this many world units, however tight the
+ *  zoom. */
+const MIN_SCREEN_THRESHOLD = 0.05;
+/** The threshold never grows past this many world units, however far the
+ *  zoom is pulled back, so a snap cannot reach across the whole scene. */
+const MAX_SCREEN_THRESHOLD = 3;
+
+/**
+ * Convert a fixed number of screen pixels into a world-space distance, for a
+ * perspective camera looking at something `distance` world units away.
+ *
+ * A snap should reach the same number of screen pixels whether the camera is
+ * zoomed in tight or pulled right back. A perspective camera covers more
+ * world space per pixel the further away it looks, so the pixel figure is
+ * projected through the vertical field of view and the viewport height to
+ * land back in world units at the piece's own distance.
+ *
+ * Distance and viewport height are clamped away from zero, and the result is
+ * clamped to a sane range, so a piece sitting at the camera or an extreme
+ * zoom cannot collapse the threshold to zero or blow it up to grab
+ * everything on screen.
+ */
+export function screenPixelsToWorld(
+  verticalFovRadians: number,
+  viewportHeightPx: number,
+  distance: number,
+  pixels: number,
+): number {
+  const safeDistance = Math.max(distance, MIN_CAMERA_DISTANCE);
+  const safeHeight = Math.max(viewportHeightPx, 1);
+  const worldPerPixel =
+    (2 * safeDistance * Math.tan(verticalFovRadians / 2)) / safeHeight;
+  const threshold = pixels * worldPerPixel;
+  return Math.min(
+    Math.max(threshold, MIN_SCREEN_THRESHOLD),
+    MAX_SCREEN_THRESHOLD,
+  );
+}
