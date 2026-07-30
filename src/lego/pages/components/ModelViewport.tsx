@@ -85,6 +85,7 @@ import {
   pieceById,
 } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
+import { seatPieceMesh } from "../../pivot";
 import {
   buildReferenceUnit,
   disposeReferenceUnit,
@@ -2857,19 +2858,16 @@ function syncScene(state: SceneState, pack: LoadedPack, project: LegoProject) {
       mesh?.removeFromParent();
       continue;
     }
-    // The mesh sits back from the piece's origin by its pivot, so the origin
-    // is the point the piece turns about rather than the part's middle.
-    const pivot = piece.pivot ?? [0, 0, 0];
     if (mesh) {
       mesh.geometry = geometry;
       // Reassigned rather than left as it was, because the unit's atlas can
       // change under a mesh that already exists.
       mesh.material = material;
-      mesh.position.set(-pivot[0], -pivot[1], -pivot[2]);
+      seatPieceMesh(mesh, piece.pivot);
     } else {
       const added = new THREE.Mesh(geometry, material);
       added.userData.pieceId = piece.id;
-      added.position.set(-pivot[0], -pivot[1], -pivot[2]);
+      seatPieceMesh(added, piece.pivot);
       group.add(added);
     }
   }
