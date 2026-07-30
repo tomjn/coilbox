@@ -3,6 +3,8 @@ import {
   Blocks,
   ChevronDown,
   ChevronUp,
+  Copy,
+  FlipHorizontal2,
   Plus,
   Redo,
   Rocket,
@@ -26,6 +28,7 @@ import { ROLES } from "../animPresets";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { subtreeAsCompound } from "../compounds";
 import { usePartFilter } from "../filter";
+import { canMirror, mirrorPiece } from "../mirror";
 import {
   childrenOf,
   descendantIds,
@@ -359,6 +362,24 @@ function Builder({ id }: { id: string | undefined }) {
     if (!draft || !selectedId || selectedId === draft.rootPieceId) return;
     const inserted = doc.duplicate(selectedId);
     if (inserted) setSelectedId(inserted);
+  }
+
+  function mirrorSelection() {
+    if (!selectedId) return;
+    edit((project) => mirrorPiece(project, selectedId));
+  }
+
+  // A copy, because the case this is for is one leg becoming the other and the
+  // first leg is meant to stay. Duplicating first means the naming, the new ids
+  // and the missing-part reporting are the ones paste and duplicate already
+  // use, rather than a third set. The two edits land inside the coalescing
+  // window, so one undo takes the mirrored copy away whole.
+  function mirrorCopyOfSelection() {
+    if (!draft || !selectedId || selectedId === draft.rootPieceId) return;
+    const inserted = doc.duplicate(selectedId);
+    if (!inserted) return;
+    edit((project) => mirrorPiece(project, inserted));
+    setSelectedId(inserted);
   }
 
   // Rebound every render, so a shortcut always runs against the current
@@ -748,6 +769,37 @@ function Builder({ id }: { id: string | undefined }) {
                     uniformScale={uniformScale}
                     onUniformScaleChange={setUniformScale}
                   />
+                  {canMirror(draft, selected.id) ? (
+                    <div className="mt-2">
+                      <span className="text-xs text-muted-foreground">
+                        Mirror
+                      </span>
+                      <ButtonGroup className="mt-1 flex w-full">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={mirrorSelection}
+                        >
+                          <FlipHorizontal2 size={14} /> In place
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={mirrorCopyOfSelection}
+                        >
+                          <Copy size={14} /> As a copy
+                        </Button>
+                      </ButtonGroup>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Across the unit's centre line, taking everything under
+                        this piece with it. A copy is how one leg becomes the
+                        other.
+                      </p>
+                    </div>
+                  ) : null}
+
                   {selected.id === draft.rootPieceId ? null : (
                     // The same move as dragging a row onto another, for anyone not
                     // using a pointer.
