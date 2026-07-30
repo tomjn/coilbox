@@ -29,3 +29,8 @@ docs/mockups/
 # VitePress docs-site build artifacts (the site itself lives in docs/, its output
 # and dev cache do not). `dist` above already covers docs/.vitepress/dist.
 docs/.vitepress/cache/
+
+# Full logs from `bun run check` (scripts/check.sh), which mirrors the checks
+# CI runs. Written here instead of a path an agent invents at the filesystem
+# root.
+check-output/
