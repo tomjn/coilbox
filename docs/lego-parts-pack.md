@@ -16,6 +16,46 @@ legoparts/
 
 Coilbox looks for `.coilbox/legoparts/` beside the executable first, then the bundled copy. Dropping a pack into the portable path replaces the built-in one.
 
+## Extension packs
+
+A pack can add parts to another pack's atlas. That is an extension pack, and it is how a game adds its own pieces without reworking the texture or losing access to the ones already there.
+
+Extension packs live one folder each under `<data_dir>/lego/packs/`, alongside the projects and thumbnails. In portable mode that is inside `.coilbox`, so a distribution can ship extension packs the same way it ships everything else. The Lego Parts screen shows the exact path.
+
+```
+<data_dir>/lego/packs/
+  aliens/
+    pack.json
+    parts.bin.gz
+```
+
+An extension pack is a normal pack with three differences:
+
+- `extends` names the base pack it adds to, by id.
+- It has no `atlas` and no `textures`. It uses the base pack's, which is what lets its parts sit in the same unit as the base pack's. Repeating the base pack's `textures.tex1` is allowed and means the same thing.
+- It ships no atlas file. There is one atlas for the whole library.
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "coilbox-aliens",
+  "extends": "splinterfaction-legosv2",
+  "version": "1",
+  "licence": "...",
+  "geometry": { "file": "parts.bin.gz", "encoding": "gzip", "bytes": 4096, "vertexStride": 32 },
+  "categories": [{ "id": "chitin", "label": "Chitin" }],
+  "parts": [...]
+}
+```
+
+A pack that extends nothing, extends a pack that is not installed, or names a texture other than the base pack's is skipped, and the Lego Parts screen says why. The atlas rule is not a policy choice: an s3o names one texture and every piece in the model samples it, so a unit is bound to exactly one atlas and there is no way to export a mix.
+
+**Part ids have to be unique across packs.** Ids are global, and the first pack to claim one keeps it: the base pack loads first, then extension packs by folder name. A later pack's part whose id is already taken is skipped and reported. Nothing silently changes what an id draws, which is what would otherwise break every saved unit that used it. Content-hash ids, as `scripts/legopack/` generates, give this for free.
+
+Parts from every loaded pack sit in one grid, filtered by pack alongside the existing search and category. A unit is free to mix them.
+
+A unit records the base pack it was built against. Opening one whose pack is not installed still works: the pieces keep their names, hierarchy and transforms, and any piece whose part is missing draws nothing and is counted in the warnings above the viewport.
+
 ## pack.json
 
 The manifest is the index. Search and filtering run entirely against it, so a picker can be browsed before the geometry has finished loading.

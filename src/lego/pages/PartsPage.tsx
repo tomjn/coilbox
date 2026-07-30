@@ -7,7 +7,7 @@ import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
 import { deleteCompound, saveCompound, useLegoCompounds } from "../projects";
 import { CompoundPicker } from "./components/CompoundPicker";
 import { PartDetail } from "./components/PartDetail";
-import { NoMatches, PartFilters } from "./components/PartFilters";
+import { NoMatches, PackProblems, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 
 type Status =
@@ -65,6 +65,7 @@ export default function PartsPage() {
 
       {pack ? (
         <>
+          <PackProblems pack={pack} />
           <div className="flex items-center gap-2 border-b border-border px-6 py-3">
             <div className="flex gap-1">
               <Button
@@ -89,6 +90,8 @@ export default function PartsPage() {
                 onQuery={filter.setQuery}
                 category={filter.category}
                 onCategory={filter.setCategory}
+                packId={filter.packId}
+                onPackId={filter.setPackId}
                 shown={parts.length}
                 className="flex-1"
               />

@@ -35,7 +35,12 @@ import {
   projectProblems,
   uniquePieceName,
 } from "../model";
-import { type LegoPartInfo, type LoadedPack, loadPack } from "../pack";
+import {
+  type LegoPartInfo,
+  type LoadedPack,
+  loadPack,
+  projectPackProblems,
+} from "../pack";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
 import { deleteCompound, saveCompound, useLegoCompounds } from "../projects";
 import { canReparent, reparentPiece } from "../reparent";
@@ -98,9 +103,17 @@ function Builder({ id }: { id: string | undefined }) {
     loadPack().then(setPack, () => setPack(null));
   }, []);
 
+  // The document's own problems, plus anything wrong between it and the packs
+  // installed. Both are things to say rather than reasons to refuse the unit.
   const problems = useMemo(
-    () => (draft ? projectProblems(draft) : []),
-    [draft],
+    () =>
+      draft
+        ? [
+            ...projectProblems(draft),
+            ...(pack ? projectPackProblems(draft, pack) : []),
+          ]
+        : [],
+    [draft, pack],
   );
 
   function addPart(part: LegoPartInfo) {
@@ -797,6 +810,8 @@ function Builder({ id }: { id: string | undefined }) {
               onQuery={filter.setQuery}
               category={filter.category}
               onCategory={filter.setCategory}
+              packId={filter.packId}
+              onPackId={filter.setPackId}
               shown={filter.parts.length}
               className="flex-1"
             />

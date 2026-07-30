@@ -8,6 +8,7 @@ permissions = [
   "allow-lego-delete",
   "allow-lego-thumb-save",
   "allow-lego-open-path",
+  "allow-lego-packs",
   "allow-lego-export",
   "allow-lego-export-glb",
   "allow-lego-export-obj",

@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "lego_delete",
     "lego_thumb_save",
     "lego_open_path",
+    "lego_packs",
     "lego_export",
     "lego_export_glb",
     "lego_export_obj",

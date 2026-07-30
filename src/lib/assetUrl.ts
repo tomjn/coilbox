@@ -44,9 +44,18 @@ export function campaignMediaUrl(campaignId: string, file: string): string {
   return schemeUrl("campaign", `${campaignId}/${file}`);
 }
 
-/** URL for a file in the unit builder's parts pack, under `legopack/<file>`. */
+/** URL for a file in the unit builder's base parts pack, under `legopack/<file>`. */
 export function legoPackUrl(file: string): string {
   return schemeUrl("legopack", file);
+}
+
+/**
+ * URL for a file in an installed extension parts pack, under
+ * `legopacks/<pack>/<file>`. `pack` is the pack's folder name, which is what
+ * `legoPacks` lists.
+ */
+export function legoExtraPackUrl(pack: string, file: string): string {
+  return schemeUrl("legopacks", `${pack}/${file}`);
 }
 
 /** URL for a saved unit's overview thumbnail. */

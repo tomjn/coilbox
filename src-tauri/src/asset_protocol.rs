@@ -14,8 +14,10 @@
 //!     (user-authored campaign AV; `data_dir` is the OS app-data dir on a normal
 //!     install, so this works with no `.coilbox` folder)
 //!   - `coilbox://localhost/legopack/<file>`      → `.coilbox/legoparts/<file>` if
-//!     present, else `<resource_dir>/legoparts/<file>` (the unit builder's parts
-//!     library, portable-first so a distribution can ship its own)
+//!     present, else `<resource_dir>/legoparts/<file>` (the unit builder's base
+//!     parts pack, portable-first so a distribution can ship its own)
+//!   - `coilbox://localhost/legopacks/<name>/<file>` → `<data_dir>/lego/packs/<name>/<file>`
+//!     (extension parts packs, which add parts to the base pack's atlas)
 //!
 //! Every segment is percent-decoded and rejected if it contains path syntax, so a
 //! request can never escape its root. Any miss (no root, unsafe path, absent file)
@@ -85,6 +87,7 @@ fn resolve_path(
     portable: Option<PathBuf>,
     campaign_base: impl FnOnce() -> Option<PathBuf>,
     legopack_base: impl FnOnce() -> Option<PathBuf>,
+    extra_packs_base: impl FnOnce() -> Option<PathBuf>,
     lego_base: impl FnOnce() -> Option<PathBuf>,
 ) -> Option<PathBuf> {
     let (root, rest) = segments.split_first()?;
@@ -105,11 +108,20 @@ fn resolve_path(
             Some(file.iter().fold(base, |p, s| p.join(s)))
         }
         "legopack" => {
-            // legopack/<file...>: the unit builder's parts library.
+            // legopack/<file...>: the unit builder's base parts pack.
             if rest.is_empty() {
                 return None;
             }
             Some(rest.iter().fold(legopack_base()?, |p, s| p.join(s)))
+        }
+        "legopacks" => {
+            // legopacks/<name>/<file...>: one installed extension pack.
+            let (name, file) = rest.split_first()?;
+            if file.is_empty() {
+                return None;
+            }
+            let base = extra_packs_base()?.join(name);
+            Some(file.iter().fold(base, |p, s| p.join(s)))
         }
         "lego" => {
             // lego/<file>: unit thumbnails, one flat folder.
@@ -237,6 +249,7 @@ pub fn handle<R: Runtime>(
                 .map(|d| d.join("campaign").join("media"))
         },
         || tauri_plugin_coilbox_lego::legopack_dir(app),
+        || tauri_plugin_coilbox_lego::extra_packs_dir(app),
         || {
             coilbox_portable::data_dir(app)
                 .ok()
@@ -288,6 +301,7 @@ mod tests {
             || None,
             || None,
             || None,
+            || None,
         );
         assert_eq!(got, Some(PathBuf::from("/pkg/.coilbox/images/x.jpg")));
     }
@@ -295,7 +309,10 @@ mod tests {
     #[test]
     fn resolve_portable_none_without_root() {
         let segs = vec!["portable".into(), "x.jpg".into()];
-        assert_eq!(resolve_path(&segs, None, || None, || None, || None), None);
+        assert_eq!(
+            resolve_path(&segs, None, || None, || None, || None, || None),
+            None
+        );
     }
 
     #[test]
@@ -303,15 +320,21 @@ mod tests {
         let base = || Some(PathBuf::from("/data/campaign/media"));
         let ok = vec!["campaign".into(), "camp-1".into(), "intro.mp4".into()];
         assert_eq!(
-            resolve_path(&ok, None, base, || None, || None),
+            resolve_path(&ok, None, base, || None, || None, || None),
             Some(PathBuf::from("/data/campaign/media/camp-1/intro.mp4"))
         );
         // missing file segment
         let no_file = vec!["campaign".into(), "camp-1".into()];
-        assert_eq!(resolve_path(&no_file, None, base, || None, || None), None);
+        assert_eq!(
+            resolve_path(&no_file, None, base, || None, || None, || None),
+            None
+        );
         // bad id
         let bad = vec!["campaign".into(), "../x".into(), "intro.mp4".into()];
-        assert_eq!(resolve_path(&bad, None, base, || None, || None), None);
+        assert_eq!(
+            resolve_path(&bad, None, base, || None, || None, || None),
+            None
+        );
     }
 
     #[test]
@@ -319,13 +342,19 @@ mod tests {
         let base = || Some(PathBuf::from("/res/legoparts"));
         let segs = vec!["legopack".into(), "parts.bin.gz".into()];
         assert_eq!(
-            resolve_path(&segs, None, || None, base, || None),
+            resolve_path(&segs, None, || None, base, || None, || None),
             Some(PathBuf::from("/res/legoparts/parts.bin.gz"))
         );
         // no file segment, and no pack installed
         let bare = vec!["legopack".into()];
-        assert_eq!(resolve_path(&bare, None, || None, base, || None), None);
-        assert_eq!(resolve_path(&segs, None, || None, || None, || None), None);
+        assert_eq!(
+            resolve_path(&bare, None, || None, base, || None, || None),
+            None
+        );
+        assert_eq!(
+            resolve_path(&segs, None, || None, || None, || None, || None),
+            None
+        );
     }
 
     #[test]
@@ -333,12 +362,15 @@ mod tests {
         let base = || Some(PathBuf::from("/data/lego/thumbs"));
         let segs = vec!["lego".into(), "abc.png".into()];
         assert_eq!(
-            resolve_path(&segs, None, || None, || None, base),
+            resolve_path(&segs, None, || None, || None, || None, base),
             Some(PathBuf::from("/data/lego/thumbs/abc.png"))
         );
         // Thumbnails are not nested, so a deeper path is not a thumbnail.
         let nested = vec!["lego".into(), "sub".into(), "abc.png".into()];
-        assert_eq!(resolve_path(&nested, None, || None, || None, base), None);
+        assert_eq!(
+            resolve_path(&nested, None, || None, || None, || None, base),
+            None
+        );
     }
 
     #[test]
@@ -348,6 +380,7 @@ mod tests {
             resolve_path(
                 &segs,
                 Some(PathBuf::from("/pkg")),
+                || None,
                 || None,
                 || None,
                 || None

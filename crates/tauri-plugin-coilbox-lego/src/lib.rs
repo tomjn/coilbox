@@ -9,6 +9,7 @@
 //!   - `thumbs/<id>.png` overview thumbnails, served by the `lego` root of the
 //!     `coilbox://` scheme
 //!   - `out/<id>/` where an export lands unless told otherwise
+//!   - `packs/<name>/` extension parts packs, served by the `legopacks` root
 //!
 //! Registered as `"coilbox-lego"`, so the frontend invokes
 //! `plugin:coilbox-lego|<cmd>`.
@@ -232,6 +233,55 @@ pub fn legopack_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
         }
     }
     bundled
+}
+
+/// Where extension parts packs live: one folder per pack under
+/// `<data_dir>/lego/packs/`.
+///
+/// Separate from the base pack's own folder because that may be the bundled
+/// copy, which sits inside the application and cannot be added to. In portable
+/// mode `data_dir` is under `.coilbox`, so a distribution can ship extension
+/// packs the same way it ships everything else.
+///
+/// Public because the app serves the same folder over `coilbox://`.
+pub fn extra_packs_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    lego_dir(app).ok().map(|dir| dir.join("packs"))
+}
+
+/// Folder names of the extension packs installed, sorted so the load order the
+/// frontend applies is the same on every run.
+///
+/// A pack is a folder holding a `pack.json`. Anything else in there is skipped
+/// rather than reported: the folder is a user's own, and a stray file in it is
+/// not a fault worth raising.
+fn installed_packs(dir: &Path) -> Vec<String> {
+    let mut names = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return names;
+    };
+    for entry in entries.flatten() {
+        if !entry.path().join("pack.json").is_file() {
+            continue;
+        }
+        if let Some(name) = entry.file_name().to_str() {
+            names.push(name.to_string());
+        }
+    }
+    names.sort();
+    names
+}
+
+/// `lego_packs` lists the extension parts packs installed beside the base pack.
+///
+/// The folder is reported whether or not it exists, because "where do I put a
+/// pack" is a question the UI has to be able to answer.
+#[tauri::command]
+async fn lego_packs<R: Runtime>(app: AppHandle<R>) -> CliResult {
+    let Some(dir) = extra_packs_dir(&app) else {
+        return CliResult::err("could not resolve the parts pack folder".to_string());
+    };
+    let names = installed_packs(&dir);
+    CliResult::ok(json!({ "dir": dir.to_string_lossy(), "names": names }))
 }
 
 /// A unit name becomes a file name and a Lua identifier, so it is held to the
@@ -579,6 +629,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_delete,
             lego_thumb_save,
             lego_open_path,
+            lego_packs,
             lego_export,
             lego_export_glb,
             lego_export_obj,
@@ -616,6 +667,25 @@ mod tests {
     #[test]
     fn read_json_dir_treats_a_missing_folder_as_empty() {
         assert!(read_json_dir(Path::new("/definitely/not/here")).is_empty());
+    }
+
+    #[test]
+    fn installed_packs_are_folders_with_a_manifest_in_name_order() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        for name in ["zebra", "aliens"] {
+            std::fs::create_dir_all(dir.path().join(name)).expect("mkdir");
+            std::fs::write(dir.path().join(name).join("pack.json"), "{}").expect("write");
+        }
+        // A folder with no manifest is not a pack, and neither is a loose file.
+        std::fs::create_dir_all(dir.path().join("notes")).expect("mkdir");
+        std::fs::write(dir.path().join("pack.json"), "{}").expect("write");
+
+        assert_eq!(installed_packs(dir.path()), vec!["aliens", "zebra"]);
+    }
+
+    #[test]
+    fn installed_packs_treats_a_missing_folder_as_empty() {
+        assert!(installed_packs(Path::new("/definitely/not/here")).is_empty());
     }
 
     #[test]

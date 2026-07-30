@@ -93,6 +93,13 @@ export function PartDetail({ pack, part, onSelect, onClose }: Props) {
           {part.uvBox.max.map((n) => n.toFixed(2)).join(", ")}
         </dd>
 
+        {pack.library.packs.length > 1 ? (
+          <>
+            <dt className="text-muted-foreground">Pack</dt>
+            <dd>{part.packId}</dd>
+          </>
+        ) : null}
+
         <dt className="text-muted-foreground">Part id</dt>
         <dd className="font-mono">{part.id}</dd>
 

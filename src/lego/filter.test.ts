@@ -5,6 +5,7 @@ import type { LegoPartInfo } from "./pack";
 
 function part(overrides: Partial<LegoPartInfo> & { id: string }): LegoPartInfo {
   return {
+    packId: "base",
     shapeId: overrides.id,
     name: overrides.id,
     category: "grey",
@@ -87,5 +88,26 @@ describe("filterParts", () => {
     expect(filterParts(parts, "beam", "tan").map((p) => p.id)).toEqual([
       "beam_tan",
     ]);
+  });
+
+  it("keeps only the picked pack, and stacks with the rest", () => {
+    const parts = [
+      ...TRIO,
+      part({
+        id: "beam_alien",
+        packId: "aliens",
+        name: "beam",
+        category: "tan",
+      }),
+    ];
+
+    expect(filterParts(parts, "", null, "aliens").map((p) => p.id)).toEqual([
+      "beam_alien",
+    ]);
+    expect(
+      filterParts(parts, "beam", "tan", "aliens").map((p) => p.id),
+    ).toEqual(["beam_alien"]);
+    // Every pack, which is what the picker starts on however many are loaded.
+    expect(filterParts(parts, "", null, null)).toEqual(parts);
   });
 });

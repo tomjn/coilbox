@@ -12,6 +12,7 @@ import type { LegoPartInfo, LoadedPack } from "./pack";
 function pack(): LoadedPack {
   const part: LegoPartInfo = {
     id: "tri",
+    packId: "lego",
     shapeId: "tri",
     name: "tri",
     category: "grey",
@@ -35,6 +36,7 @@ function pack(): LoadedPack {
   ]);
   return {
     manifest: {} as LoadedPack["manifest"],
+    library: { packs: [], dir: "", problems: [] },
     parts: [part],
     byId: new Map([["tri", part]]),
     vertices,

@@ -9,6 +9,7 @@ Allows the unit builder's project storage, thumbnail, reveal and test-game comma
 - `allow-lego-delete`
 - `allow-lego-thumb-save`
 - `allow-lego-open-path`
+- `allow-lego-packs`
 - `allow-lego-export`
 - `allow-lego-export-glb`
 - `allow-lego-export-obj`
@@ -175,6 +176,32 @@ Enables the lego_open_path command without any pre-configured scope.
 <td>
 
 Denies the lego_open_path command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:allow-lego-packs`
+
+</td>
+<td>
+
+Enables the lego_packs command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:deny-lego-packs`
+
+</td>
+<td>
+
+Denies the lego_packs command without any pre-configured scope.
 
 </td>
 </tr>
