@@ -42,15 +42,20 @@ export const legoThumbSave = defineCommand<
 >("coilbox-lego", "lego_thumb_save");
 
 /**
- * Write a built unit into a game folder: `objects3d/<unit>.s3o`, and the pack's
- * atlas into `unittextures/` when `atlas` is given. Every unit built from a pack
- * names the same texture, so one copy serves all of them.
+ * Write a built unit into a game folder: `objects3d/<unit>.s3o`, and the unit's
+ * atlas into `unittextures/` when `atlas` is given. Units sharing an atlas share
+ * the one copy, so exporting a second unit does not add a second PNG.
  */
 export const legoExport = defineCommand<
   {
     dir: string;
     unitName: string;
     atlas: string | null;
+    /**
+     * Which pack ships that atlas, by folder under the extension packs
+     * directory. Null for the base pack's own atlas.
+     */
+    atlasPack: string | null;
     /** Written only when the game has no script for this unit yet. */
     script: string | null;
     /** Written only when the game has no unit definition for it yet. */
@@ -95,6 +100,8 @@ export const legoExportObj = defineCommand<
     mtl: string;
     /** The atlas file name to copy in beside the .obj and .mtl. */
     atlas: string;
+    /** Which pack ships it, as `legoExport` takes it. */
+    atlasPack: string | null;
   },
   { obj: string; mtl: string; texture: string }
 >("coilbox-lego", "lego_export_obj");

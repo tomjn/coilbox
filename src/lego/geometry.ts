@@ -1,21 +1,20 @@
 /**
  * Materials for drawing parts, one per texture in use.
  *
- * Every part in a pack samples that pack's atlas, so views that share an atlas
- * can share one material and put hundreds of meshes on screen without a
- * material switch between any of them. The cache is keyed by the atlas's
- * resolved URL rather than by the pack's id or version: the material's only
- * real dependency is the texture it samples. An id/version bump that ships
- * the same atlas file should reuse the material rather than reload the
- * texture, and the id/version alone cannot tell two different atlases apart.
- * The URL is the narrowest thing that is genuinely unique to what actually
- * gets uploaded to the GPU.
+ * Every part shares one UV layout, so views drawing the same atlas can share
+ * one material and put hundreds of meshes on screen without a material switch
+ * between any of them. The cache is keyed by the atlas's resolved URL rather
+ * than by the pack's id or version: the material's only real dependency is the
+ * texture it samples. An id/version bump that ships the same atlas file should
+ * reuse the material rather than reload the texture, and the id/version alone
+ * cannot tell two different atlases apart. The URL is the narrowest thing that
+ * is genuinely unique to what actually gets uploaded to the GPU, which is also
+ * what lets two units on screen in different atlases each get their own.
  */
 
 import * as THREE from "three";
 
-import { legoPackUrl } from "../lib/assetUrl";
-import type { LegoPackManifest } from "./pack";
+import { atlasUrl, type LegoAtlas } from "./atlas";
 
 interface CachedMaterial {
   material: THREE.MeshStandardMaterial;
@@ -24,36 +23,34 @@ interface CachedMaterial {
 
 const materials = new Map<string, CachedMaterial>();
 
-/** The cache key for a manifest's material: the atlas texture it samples. */
-export function materialCacheKey(manifest: LegoPackManifest): string {
-  return legoPackUrl(manifest.textures.tex1);
+/** The cache key for an atlas's material: the texture it samples. */
+export function materialCacheKey(atlas: LegoAtlas): string {
+  return atlasUrl(atlas);
 }
 
-export function partMaterial(
-  manifest: LegoPackManifest,
-): THREE.MeshStandardMaterial {
-  const textureUrl = materialCacheKey(manifest);
+export function partMaterial(atlas: LegoAtlas): THREE.MeshStandardMaterial {
+  const textureUrl = materialCacheKey(atlas);
   const cached = materials.get(textureUrl);
   if (cached) return cached.material;
 
-  const atlas = new THREE.TextureLoader().load(textureUrl);
-  atlas.colorSpace = THREE.SRGBColorSpace;
+  const texture = new THREE.TextureLoader().load(textureUrl);
+  texture.colorSpace = THREE.SRGBColorSpace;
   // Some parts reach a neighbouring atlas column through negative u, so the
   // texture has to repeat. Clamping would smear those parts' edge pixels.
-  atlas.wrapS = THREE.RepeatWrapping;
-  atlas.wrapT = THREE.RepeatWrapping;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
   // The atlas is a dense sheet of small pieces. Without mipmaps a part shown
   // small shimmers, and anisotropy keeps it readable at a glancing angle.
-  atlas.generateMipmaps = true;
-  atlas.minFilter = THREE.LinearMipmapLinearFilter;
-  atlas.anisotropy = 4;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.anisotropy = 4;
 
   const material = new THREE.MeshStandardMaterial({
-    map: atlas,
+    map: texture,
     roughness: 0.75,
     metalness: 0.05,
   });
-  materials.set(textureUrl, { material, texture: atlas });
+  materials.set(textureUrl, { material, texture });
   return material;
 }
 

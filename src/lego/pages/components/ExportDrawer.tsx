@@ -3,12 +3,13 @@
  *
  * The destination is a game folder, chosen once and remembered on the project,
  * so exporting again after a change is one click. The model lands in
- * `objects3d/` and the pack's atlas, if asked for, in `unittextures/`. A unit
+ * `objects3d/` and the unit's atlas, if asked for, in `unittextures/`. A unit
  * definition always goes to `units/`, since without one the engine has
  * nothing to spawn.
  *
- * The atlas is shared. Every unit built from a pack names the same texture
- * file, so five units need one PNG installed, not five.
+ * Exactly one atlas is written, the unit's own, because that is all an s3o can
+ * name. Units sharing an atlas share the one PNG, so five units in one atlas
+ * need one file installed, not five.
  */
 
 import { Button } from "@picoframe/frame";
@@ -19,6 +20,7 @@ import { useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { unitAtlas } from "../../atlas";
 import {
   legoExport,
   legoExportGlb,
@@ -81,7 +83,15 @@ export function ExportDrawer({
   const [withObj, setWithObj] = useState(project.exportObj === true);
   const [result, setResult] = useState<Result>({ state: "idle" });
 
-  const atlas = pack.manifest.textures.tex1;
+  // Whichever atlas the unit samples, installed or not. The s3o names it
+  // either way, so an atlas installed later puts a re-export right without the
+  // unit having to change.
+  const unit = unitAtlas(project, pack.library.atlases);
+  const atlas = unit.texture;
+  const atlasPack = unit.installed?.folder ?? null;
+  // Everything that needs the atlas file itself, rather than only its name,
+  // needs it to actually be installed.
+  const haveAtlas = unit.installed !== null;
 
   async function chooseFolder() {
     const picked = await open({
@@ -107,7 +117,8 @@ export function ExportDrawer({
       const written = await legoExport({
         dir,
         unitName: project.unitName,
-        atlas: withTexture ? atlas : null,
+        atlas: withTexture && haveAtlas ? atlas : null,
+        atlasPack,
         script: withScript ? buildLuaScript(project) : null,
         // Unlike the atlas and the script, there is no scenario where a
         // built unit should export without one: with no unit definition the
@@ -117,8 +128,8 @@ export function ExportDrawer({
       });
 
       let glbPath: string | null = null;
-      if (withGlb) {
-        const bytes = await exportGlb(project, pack);
+      if (withGlb && unit.installed) {
+        const bytes = await exportGlb(project, pack, unit.installed);
         if (bytes) {
           const glbWritten = await legoExportGlb({
             dir,
@@ -131,7 +142,7 @@ export function ExportDrawer({
 
       let objPath: string | null = null;
       let mtlPath: string | null = null;
-      if (withObj) {
+      if (withObj && haveAtlas) {
         const objBuild = buildObj(project, pack, {
           unitName: project.unitName,
           textureName: atlas,
@@ -143,6 +154,7 @@ export function ExportDrawer({
             obj: objBuild.obj,
             mtl: objBuild.mtl,
             atlas,
+            atlasPack,
           });
           objPath = objWritten.obj;
           mtlPath = objWritten.mtl;
@@ -228,7 +240,8 @@ export function ExportDrawer({
             <div className="flex items-start gap-2">
               <Checkbox
                 id="lego-export-texture"
-                checked={withTexture}
+                checked={withTexture && haveAtlas}
+                disabled={!haveAtlas}
                 onCheckedChange={(checked) => setWithTexture(checked === true)}
                 className="mt-0.5"
               />
@@ -238,11 +251,20 @@ export function ExportDrawer({
                 </Label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Copies <code>{atlas}</code> into <code>unittextures</code>.
-                  Every unit built from this pack uses it, so this only needs
+                  Every unit sampling this atlas uses it, so this only needs
                   doing once per game.
                 </p>
               </div>
             </div>
+
+            {haveAtlas ? null : (
+              <p className="text-xs text-muted-foreground">
+                <code>{atlas}</code> is not installed, so the texture cannot be
+                copied and the Blender files cannot be written. The{" "}
+                <code>.s3o</code> still names it, so installing the atlas pack
+                and exporting again completes the unit.
+              </p>
+            )}
 
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
               <span className="text-sm font-medium">For Blender</span>
@@ -257,7 +279,8 @@ export function ExportDrawer({
             <div className="flex items-start gap-2">
               <Checkbox
                 id="lego-export-glb"
-                checked={withGlb}
+                checked={withGlb && haveAtlas}
+                disabled={!haveAtlas}
                 onCheckedChange={(checked) => setWithGlb(checked === true)}
                 className="mt-0.5"
               />
@@ -273,7 +296,8 @@ export function ExportDrawer({
             <div className="flex items-start gap-2">
               <Checkbox
                 id="lego-export-obj"
-                checked={withObj}
+                checked={withObj && haveAtlas}
+                disabled={!haveAtlas}
                 onCheckedChange={(checked) => setWithObj(checked === true)}
                 className="mt-0.5"
               />

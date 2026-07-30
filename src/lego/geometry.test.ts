@@ -5,7 +5,7 @@ import {
   materialCacheKey,
   partMaterial,
 } from "./geometry";
-import type { LegoPackManifest } from "./pack";
+import type { LegoAtlas } from "./atlas";
 
 // TextureLoader starts an image load through the DOM the moment a material is
 // built. Vitest's node test environment has no document, and the load itself
@@ -19,46 +19,33 @@ globalThis.document = {
     }) as unknown as HTMLImageElement,
 } as unknown as Document;
 
-function manifest(
-  tex1: string,
-  overrides: Partial<Pick<LegoPackManifest, "id" | "version">> = {},
-): LegoPackManifest {
-  return {
-    schemaVersion: 1,
-    id: "test-pack",
-    version: "1.0.0",
-    licence: "CC0",
-    atlas: { width: 2048, height: 2048 },
-    textures: { tex1 },
-    geometry: {
-      file: "parts.bin.gz",
-      encoding: "gzip",
-      bytes: 0,
-      vertexStride: 8,
-    },
-    categories: [],
-    parts: [],
-    ...overrides,
-  };
+function atlas(tex1: string, overrides: Partial<LegoAtlas> = {}): LegoAtlas {
+  return { tex1, packId: "test-pack", folder: null, ...overrides };
 }
 
 describe("materialCacheKey", () => {
   it("is the same for the same texture", () => {
-    expect(materialCacheKey(manifest("atlas.png"))).toBe(
-      materialCacheKey(manifest("atlas.png")),
+    expect(materialCacheKey(atlas("atlas.png"))).toBe(
+      materialCacheKey(atlas("atlas.png")),
     );
   });
 
   it("differs when the texture differs", () => {
-    expect(materialCacheKey(manifest("atlas.png"))).not.toBe(
-      materialCacheKey(manifest("reskin.png")),
+    expect(materialCacheKey(atlas("atlas.png"))).not.toBe(
+      materialCacheKey(atlas("reskin.png")),
     );
   });
 
-  it("ignores the pack id and version, since neither identifies the texture", () => {
-    const a = manifest("atlas.png", { id: "pack-a", version: "1.0.0" });
-    const b = manifest("atlas.png", { id: "pack-b", version: "2.0.0" });
+  it("ignores which pack ships it, since that does not identify the texture", () => {
+    const a = atlas("atlas.png", { packId: "pack-a" });
+    const b = atlas("atlas.png", { packId: "pack-b" });
     expect(materialCacheKey(a)).toBe(materialCacheKey(b));
+  });
+
+  it("tells the base pack's atlas from one installed as a pack", () => {
+    expect(materialCacheKey(atlas("atlas.png"))).not.toBe(
+      materialCacheKey(atlas("atlas.png", { folder: "desert" })),
+    );
   });
 });
 
@@ -67,20 +54,20 @@ describe("partMaterial", () => {
     disposeSharedMaterial();
   });
 
-  it("returns the same material for the same manifest", () => {
-    const m = manifest("atlas.png");
+  it("returns the same material for the same atlas", () => {
+    const m = atlas("atlas.png");
     expect(partMaterial(m)).toBe(partMaterial(m));
   });
 
   it("returns a different material when the texture differs", () => {
-    const a = partMaterial(manifest("atlas.png"));
-    const b = partMaterial(manifest("reskin.png"));
+    const a = partMaterial(atlas("atlas.png"));
+    const b = partMaterial(atlas("reskin.png"));
     expect(a).not.toBe(b);
     expect(a.map).not.toBe(b.map);
   });
 
   it("rebuilds the material after disposal", () => {
-    const m = manifest("atlas.png");
+    const m = atlas("atlas.png");
     const before = partMaterial(m);
     disposeSharedMaterial();
     expect(partMaterial(m)).not.toBe(before);

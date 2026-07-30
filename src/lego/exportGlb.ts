@@ -19,8 +19,7 @@
 
 import * as THREE from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
-
-import { legoPackUrl } from "../lib/assetUrl";
+import { atlasUrl, type LegoAtlas } from "./atlas";
 import { childrenOf, type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
 import { type BakedPiece, bakedPieces } from "./s3oBuild";
@@ -81,7 +80,10 @@ function bakedGeometry(baked: BakedPiece): THREE.BufferGeometry {
 }
 
 /**
- * The unit as a `.glb`'s bytes, with the pack's atlas embedded.
+ * The unit as a `.glb`'s bytes, with the unit's own atlas embedded.
+ *
+ * The atlas is passed in rather than read off the pack, because which one a
+ * unit samples is the unit's own choice and this has to embed that one.
  *
  * Not unit tested: `GLTFExporter` needs a DOM to rasterise the texture, which
  * this reaches for the moment it runs and vitest cannot provide.
@@ -89,13 +91,12 @@ function bakedGeometry(baked: BakedPiece): THREE.BufferGeometry {
 export async function exportGlb(
   project: LegoProject,
   pack: LoadedPack,
+  atlas: LegoAtlas,
 ): Promise<ArrayBuffer | null> {
   const scene = buildGlbScene(project, pack);
   if (!scene) return null;
 
-  const texture = await new THREE.TextureLoader().loadAsync(
-    legoPackUrl(pack.manifest.textures.tex1),
-  );
+  const texture = await new THREE.TextureLoader().loadAsync(atlasUrl(atlas));
   texture.colorSpace = THREE.SRGBColorSpace;
   // Some parts reach a neighbouring atlas column through negative u, same
   // reason partMaterial in geometry.ts repeats rather than clamps.

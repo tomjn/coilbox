@@ -329,6 +329,42 @@ fn valid_atlas_name(name: &str) -> bool {
         && name.to_ascii_lowercase().ends_with(".png")
 }
 
+/// An installed pack's folder name, never a path. It comes from the frontend,
+/// which read it out of `lego_packs`, and it becomes a directory to read from.
+fn valid_pack_folder(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 128
+        && !name.contains(['/', '\\'])
+        && name != "."
+        && name != ".."
+}
+
+/// Where an atlas file is read from: the base pack, or the atlas pack that
+/// ships it. `pack` is a folder under the extension packs directory, and `None`
+/// means the base pack's own atlas.
+fn atlas_source<R: Runtime>(
+    app: &AppHandle<R>,
+    pack: Option<&str>,
+    atlas: &str,
+) -> Result<PathBuf, String> {
+    if !valid_atlas_name(atlas) {
+        return Err(format!("invalid texture name: {atlas}"));
+    }
+    match pack {
+        None => legopack_dir(app)
+            .map(|dir| dir.join(atlas))
+            .ok_or_else(|| "no parts pack is installed".to_string()),
+        Some(folder) => {
+            if !valid_pack_folder(folder) {
+                return Err(format!("invalid pack folder: {folder}"));
+            }
+            extra_packs_dir(app)
+                .map(|dir| dir.join(folder).join(atlas))
+                .ok_or_else(|| "could not resolve the parts pack folder".to_string())
+        }
+    }
+}
+
 #[derive(Deserialize)]
 struct ExportVertex {
     pos: [f32; 3],
@@ -381,9 +417,11 @@ impl From<ExportPiece> for coilbox_s3o::Piece {
 
 /// `lego_export` writes a built unit into a game folder.
 ///
-/// The model goes to `objects3d/<unit>.s3o`. The atlas is shared: every unit
-/// built from a pack names the same texture, so one copy in `unittextures/`
-/// serves all of them and re-exporting a second unit does not add a second PNG.
+/// The model goes to `objects3d/<unit>.s3o`. The atlas is shared by every unit
+/// that samples it, so one copy in `unittextures/` serves all of them and
+/// re-exporting a second unit does not add a second PNG. `atlas_pack` says
+/// which installed pack ships it, since a unit may sample an atlas pack's
+/// texture rather than the base pack's.
 /// The unit script and the unit definition both land under their own folder
 /// and, like the script, the definition is written once and then left for
 /// hand edits: a re-export never overwrites one that is already there. The one
@@ -396,6 +434,7 @@ async fn lego_export<R: Runtime>(
     dir: String,
     unit_name: String,
     atlas: Option<String>,
+    atlas_pack: Option<String>,
     script: Option<String>,
     unit_def: Option<String>,
     model: ExportModel,
@@ -434,11 +473,9 @@ async fn lego_export<R: Runtime>(
 
     let mut texture_path = None;
     if let Some(atlas) = atlas {
-        if !valid_atlas_name(&atlas) {
-            return CliResult::err(format!("invalid texture name: {atlas}"));
-        }
-        let Some(source) = legopack_dir(&app).map(|dir| dir.join(&atlas)) else {
-            return CliResult::err("no parts pack is installed".to_string());
+        let source = match atlas_source(&app, atlas_pack.as_deref(), &atlas) {
+            Ok(path) => path,
+            Err(e) => return CliResult::err(e),
         };
         let textures = root.join("unittextures");
         if let Err(e) = std::fs::create_dir_all(&textures) {
@@ -545,15 +582,17 @@ async fn lego_export_obj<R: Runtime>(
     obj: String,
     mtl: String,
     atlas: String,
+    atlas_pack: Option<String>,
 ) -> CliResult {
     if !valid_unit_name(&unit_name) {
         return CliResult::err(format!(
             "invalid unit name: {unit_name}. Lower case letters, digits and underscores only."
         ));
     }
-    if !valid_atlas_name(&atlas) {
-        return CliResult::err(format!("invalid texture name: {atlas}"));
-    }
+    let source = match atlas_source(&app, atlas_pack.as_deref(), &atlas) {
+        Ok(path) => path,
+        Err(e) => return CliResult::err(e),
+    };
     let root = PathBuf::from(&dir);
     if !root.is_absolute() || !root.is_dir() {
         return CliResult::err(format!("not a folder: {dir}"));
@@ -573,9 +612,6 @@ async fn lego_export_obj<R: Runtime>(
         return CliResult::err(format!("could not write {}: {e}", mtl_path.display()));
     }
 
-    let Some(source) = legopack_dir(&app).map(|dir| dir.join(&atlas)) else {
-        return CliResult::err("no parts pack is installed".to_string());
-    };
     let texture_path = blender.join(&atlas);
     if let Err(e) = std::fs::copy(&source, &texture_path) {
         return CliResult::err(format!("could not copy the texture: {e}"));
@@ -731,5 +767,15 @@ mod tests {
         assert!(!valid_atlas_name("sub/atlas.png"));
         assert!(!valid_atlas_name("atlas.exe"));
         assert!(!valid_atlas_name(".."));
+    }
+
+    #[test]
+    fn a_pack_folder_is_a_single_directory_name() {
+        assert!(valid_pack_folder("desert-atlas"));
+        // It is joined onto the packs directory, so it must not walk out of it.
+        assert!(!valid_pack_folder(".."));
+        assert!(!valid_pack_folder("../legoparts"));
+        assert!(!valid_pack_folder("nested/pack"));
+        assert!(!valid_pack_folder(""));
     }
 }

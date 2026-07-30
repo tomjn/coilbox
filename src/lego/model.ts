@@ -55,8 +55,16 @@ export interface LegoProject {
   name: string;
   /** Lower case. The base name of every exported file. */
   unitName: string;
+  /** The parts library this unit was built against, and its version. */
   packId: string;
   packVersion: string;
+  /**
+   * The atlas this unit samples, by texture file name, which is what the s3o
+   * names. Absent means the base pack's own atlas, so a unit built before atlas
+   * packs existed needs no migration. Never the pack id: an atlas is bound to
+   * the file that lands in a game's `unittextures/`, not to whoever shipped it.
+   */
+  atlas?: string;
   createdAt: string;
   updatedAt: string;
   rootPieceId: string;
@@ -252,6 +260,8 @@ export function newProject(options: {
   unitName?: string;
   packId: string;
   packVersion: string;
+  /** Left off for the base pack's atlas, which is what most units use. */
+  atlas?: string;
   now: string;
 }): LegoProject {
   return {
@@ -261,6 +271,7 @@ export function newProject(options: {
     unitName: normalisePieceName(options.unitName ?? options.name),
     packId: options.packId,
     packVersion: options.packVersion,
+    ...(options.atlas ? { atlas: options.atlas } : {}),
     createdAt: options.now,
     updatedAt: options.now,
     rootPieceId: options.rootPieceId,
@@ -334,6 +345,9 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       typeof d.unitName === "string" ? d.unitName : normalisePieceName(d.name),
     packId: typeof d.packId === "string" ? d.packId : "",
     packVersion: typeof d.packVersion === "string" ? d.packVersion : "",
+    ...(typeof d.atlas === "string" && d.atlas !== ""
+      ? { atlas: d.atlas }
+      : {}),
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
     rootPieceId: d.rootPieceId,

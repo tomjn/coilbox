@@ -3,10 +3,16 @@
  * individual parts.
  *
  * There is one base pack and any number of extension packs, and the loaded
- * result merges them into a single library. Every pack samples the base pack's
- * atlas, because an s3o names one texture and every piece in the model uses it,
- * so parts from different packs mix freely inside one unit. An extension pack
- * that brings its own atlas is not loaded, and says so.
+ * result merges them into a single library. Every parts pack samples the base
+ * pack's atlas, because an s3o names one texture and every piece in the model
+ * uses it, so parts from different packs mix freely inside one unit. A parts
+ * pack that brings its own atlas is not loaded, and says so.
+ *
+ * An atlas pack is the other axis: it brings a texture and no parts, redrawing
+ * the same sheet the base pack's UVs already point into. That is what makes
+ * several atlases possible without ever letting one unit need two of them: the
+ * parts library stays one library, and a unit picks which of the installed
+ * atlases it samples.
  *
  * Packs are fetched once and cached for the session. `pack.json` is the
  * searchable index, so filtering never touches the geometry blob, and the
@@ -19,6 +25,7 @@ import { gunzipSync } from "fflate";
 import * as THREE from "three";
 
 import { legoExtraPackUrl, legoPackUrl } from "../lib/assetUrl";
+import { type LegoAtlas, unitAtlas } from "./atlas";
 import { legoPacks } from "./bindings";
 import type { LegoProject } from "./model";
 
@@ -93,6 +100,24 @@ export interface LegoPackManifest {
 export type RawPackManifest = Omit<LegoPackManifest, "atlas" | "textures"> &
   Partial<Pick<LegoPackManifest, "atlas" | "textures">>;
 
+/**
+ * An atlas pack's manifest as `pack.json` holds it: `reskins`, an atlas and a
+ * texture, and nothing else. `parts` and `geometry` are typed here only so a
+ * pack that brings them can be told it cannot.
+ */
+export interface RawAtlasManifest {
+  schemaVersion: number;
+  id: string;
+  version: string;
+  licence?: string;
+  /** The parts pack whose atlas this one replaces, by id. */
+  reskins: string;
+  atlas?: { width: number; height: number };
+  textures?: { tex1: string; tex2?: string };
+  parts?: unknown[];
+  geometry?: unknown;
+}
+
 /** One pack's manifest and geometry, before packs are merged into a library. */
 export interface PackSource {
   manifest: LegoPackManifest;
@@ -104,6 +129,12 @@ export interface PackSource {
 export interface PackLibrary {
   /** Every pack that loaded, base pack first, then extensions by folder name. */
   packs: LegoPackManifest[];
+  /**
+   * Every atlas a unit can be built against, the base pack's first. Separate
+   * from `packs` because an atlas pack has no parts, so it must never appear as
+   * something to filter the parts grid by.
+   */
+  atlases: LegoAtlas[];
   /** Where extension packs are installed, so the UI can say where to put one. */
   dir: string;
   /**
@@ -117,8 +148,10 @@ export interface PackLibrary {
 export interface LoadedPack {
   /**
    * The base pack's manifest, carrying every loaded pack's parts and
-   * categories. Singular because every pack shares one atlas, so there is one
-   * texture to sample and one to export however many packs are installed.
+   * categories. Singular because every parts pack shares one UV layout, so
+   * there is one parts library however many packs are installed. Its
+   * `textures.tex1` is the base atlas, which is what a unit samples unless it
+   * names one of the alternatives in `library.atlases`.
    */
   manifest: LegoPackManifest;
   parts: LegoPartInfo[];
@@ -152,8 +185,10 @@ export function loadPack(): Promise<LoadedPack> {
  *
  * The atlas check is the one that matters: an s3o names a single texture, so
  * mixing parts from two atlases in one unit is not something the format can
- * express. Rejecting a pack that brings its own atlas here is what keeps that
- * unreachable, rather than letting it fail at export.
+ * express. Rejecting a parts pack that brings its own atlas here is what keeps
+ * that unreachable, rather than letting it fail at export. A pack whose atlas
+ * is a reskin of the base pack's, and which therefore brings no parts of its
+ * own, never reaches here: that is `readAtlasPack`.
  */
 export function extensionProblem(
   base: LegoPackManifest,
@@ -170,7 +205,7 @@ export function extensionProblem(
     return `"${folder}" calls itself "${raw.id}", which is the base pack's own id.`;
   }
   if (!raw.extends) {
-    return `"${folder}" names no base pack, so it cannot be added to one. An extension pack sets "extends" to the id of the pack whose atlas it uses.`;
+    return `"${folder}" names no base pack, so it cannot be added to one. An extension pack sets "extends" to the id of the pack whose atlas it uses, and an atlas pack sets "reskins" to the id of the pack whose atlas it replaces.`;
   }
   if (raw.extends !== base.id) {
     return `"${folder}" extends "${raw.extends}", and the installed base pack is "${base.id}".`;
@@ -179,6 +214,63 @@ export function extensionProblem(
     return `"${folder}" names its own texture, "${raw.textures.tex1}", rather than the base pack's "${base.textures.tex1}". A unit samples one texture, so a pack with its own atlas cannot be mixed into another.`;
   }
   return null;
+}
+
+/** An atlas pack's atlas, or the reason it cannot be installed. */
+export type AtlasPackResult = { problem: string } | { atlas: LegoAtlas };
+
+/**
+ * Read an atlas pack: a pack that redraws the base pack's atlas and brings no
+ * parts of its own.
+ *
+ * The parts stay the base pack's, so a unit's atlas is a choice of texture and
+ * never a choice of inventory. That is what keeps the format's one rule met
+ * without a migration: whichever atlas a unit samples, every part it can use is
+ * mapped into it, so switching cannot leave a piece with nowhere to sample from.
+ * A pack that brings parts as well as an atlas would be a second parts library,
+ * which is a different thing and is refused here.
+ *
+ * `installed` is every atlas accepted so far, base pack first. Two atlases
+ * cannot share a file name: they would land on top of each other in a game's
+ * `unittextures/`, and a unit naming that file would draw whichever won.
+ */
+export function readAtlasPack(
+  base: LegoPackManifest,
+  raw: RawAtlasManifest,
+  folder: string,
+  installed: LegoAtlas[],
+): AtlasPackResult {
+  if (raw.schemaVersion !== SUPPORTED_SCHEMA) {
+    return {
+      problem: `"${folder}" uses pack schema ${raw.schemaVersion}, and this build understands ${SUPPORTED_SCHEMA}.`,
+    };
+  }
+  if (!raw.id) {
+    return { problem: `"${folder}" has no pack id.` };
+  }
+  if (raw.reskins !== base.id) {
+    return {
+      problem: `"${folder}" reskins "${raw.reskins}", and the installed base pack is "${base.id}".`,
+    };
+  }
+  if (raw.parts !== undefined || raw.geometry !== undefined) {
+    return {
+      problem: `"${folder}" brings parts as well as an atlas. An atlas pack reskins the parts that are already there, so it has no "parts" and no "geometry" of its own.`,
+    };
+  }
+  const tex1 = raw.textures?.tex1;
+  if (!tex1) {
+    return {
+      problem: `"${folder}" names no texture, so there is no atlas to use. An atlas pack sets "textures.tex1" to the name of the PNG it ships.`,
+    };
+  }
+  const clash = installed.find((atlas) => atlas.tex1 === tex1);
+  if (clash) {
+    return {
+      problem: `"${folder}" ships its atlas as "${tex1}", which is what "${clash.packId}" already calls its own. Two atlases in one game folder need different file names.`,
+    };
+  }
+  return { atlas: { tex1, packId: raw.id, folder } };
 }
 
 /**
@@ -263,11 +355,12 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
  * What is wrong between a saved unit and the packs installed, as sentences
  * meant to be shown.
  *
- * Neither case refuses to open the unit. A piece whose part is missing keeps
- * its name, its place in the hierarchy and its transform, all of which is real
+ * No case refuses to open the unit. A piece whose part is missing keeps its
+ * name, its place in the hierarchy and its transform, all of which is real
  * work, and an unresolved `partId` is already how the viewport draws a piece
  * with no geometry. This is the same call paste makes for a piece from another
- * pack: report it, do not drop it.
+ * pack: report it, do not drop it. A missing atlas is the same again: the unit
+ * keeps naming it, so installing the atlas pack later puts the unit right.
  */
 export function projectPackProblems(
   project: LegoProject,
@@ -278,6 +371,13 @@ export function projectPackProblems(
   if (project.packId && !installed.includes(project.packId)) {
     problems.push(
       `This unit was built against the "${project.packId}" pack, and that pack is not installed.`,
+    );
+  }
+
+  const atlas = unitAtlas(project, pack.library.atlases);
+  if (!atlas.installed) {
+    problems.push(
+      `This unit's atlas, "${atlas.texture}", is not installed, so it is drawn with "${atlas.drawWith.tex1}" instead. An export still names its own.`,
     );
   }
 
@@ -319,9 +419,13 @@ function concatUint16(blocks: Uint16Array[]): Uint16Array {
 }
 
 /**
- * Read the base pack, then every extension pack installed, and merge them.
+ * Read the base pack, then every pack installed beside it, and merge them.
  *
- * Only a missing or broken base pack is fatal. An extension pack that will not
+ * A pack in that folder is one of two things, and `reskins` is what says which:
+ * an extension pack adding parts to the base pack's atlas, or an atlas pack
+ * redrawing that atlas and adding no parts.
+ *
+ * Only a missing or broken base pack is fatal. An installed pack that will not
  * load is skipped with a reason, because the rest of the library still works
  * and there would otherwise be no way to fix the one at fault.
  */
@@ -329,6 +433,13 @@ async function fetchLibrary(): Promise<LoadedPack> {
   const base = await fetchPack((file) => legoPackUrl(file));
   const problems: string[] = [];
   const sources: PackSource[] = [base];
+  const atlases: LegoAtlas[] = [
+    {
+      tex1: base.manifest.textures.tex1,
+      packId: base.manifest.id,
+      folder: null,
+    },
+  ];
 
   let dir = "";
   let names: string[] = [];
@@ -343,12 +454,26 @@ async function fetchLibrary(): Promise<LoadedPack> {
   }
 
   for (const folder of names) {
+    const url = (file: string) => legoExtraPackUrl(folder, file);
     try {
-      sources.push(
-        await fetchExtension(base.manifest, folder, (file) =>
-          legoExtraPackUrl(folder, file),
-        ),
+      const raw = await fetchJson<RawPackManifest | RawAtlasManifest>(
+        url("pack.json"),
       );
+      if ("reskins" in raw) {
+        const result = readAtlasPack(base.manifest, raw, folder, atlases);
+        if ("problem" in result) throw new Error(result.problem);
+        atlases.push(result.atlas);
+      } else {
+        const problem = extensionProblem(base.manifest, raw, folder);
+        if (problem) throw new Error(problem);
+        sources.push(
+          await fetchPack(url, {
+            ...raw,
+            atlas: base.manifest.atlas,
+            textures: base.manifest.textures,
+          }),
+        );
+      }
     } catch (error) {
       problems.push(error instanceof Error ? error.message : String(error));
     }
@@ -363,22 +488,11 @@ async function fetchLibrary(): Promise<LoadedPack> {
     indices: merged.indices,
     library: {
       packs: sources.map((source) => source.manifest),
+      atlases,
       dir,
       problems: [...problems, ...merged.problems],
     },
   };
-}
-
-/** An extension pack, with the base pack's atlas filled in. */
-async function fetchExtension(
-  base: LegoPackManifest,
-  folder: string,
-  url: (file: string) => string,
-): Promise<PackSource> {
-  const raw = await fetchJson<RawPackManifest>(url("pack.json"));
-  const problem = extensionProblem(base, raw, folder);
-  if (problem) throw new Error(problem);
-  return fetchPack(url, { ...raw, atlas: base.atlas, textures: base.textures });
 }
 
 async function fetchPack(

@@ -22,6 +22,7 @@ import {
 } from "../../../play/config";
 import { usePlay } from "../../../play/PlayProvider";
 import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
+import { unitAtlas } from "../../atlas";
 import { legoExport, legoOpenPath, legoScratchGame } from "../../bindings";
 import { buildLuaScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
@@ -118,9 +119,11 @@ export function TestDrawer({ open, onOpenChange, project, pack }: Props) {
 
   async function run() {
     if (!target || !game || !map) return;
-    const model = buildS3o(project, pack, {
-      texture1: pack.manifest.textures.tex1,
-    });
+    // The unit's own atlas, and only its own: an s3o names one texture. A unit
+    // whose atlas is not installed still tests, untextured, rather than failing
+    // on a file that cannot be copied.
+    const atlas = unitAtlas(project, pack.library.atlases);
+    const model = buildS3o(project, pack, { texture1: atlas.texture });
     if (!model) {
       setPhase({ state: "failed", message: "This unit has no root piece." });
       return;
@@ -136,7 +139,8 @@ export function TestDrawer({ open, onOpenChange, project, pack }: Props) {
       await legoExport({
         dir,
         unitName: project.unitName,
-        atlas: pack.manifest.textures.tex1,
+        atlas: atlas.installed ? atlas.texture : null,
+        atlasPack: atlas.installed?.folder ?? null,
         script: buildLuaScript(project),
         unitDef: buildUnitDef(project, model.radius),
         model,

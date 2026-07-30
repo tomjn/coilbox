@@ -18,6 +18,7 @@ import * as THREE from "three";
 
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
+import { baseAtlas } from "../../atlas";
 import { validateCompoundName } from "../../compounds";
 import { addStandardLights, partMaterial } from "../../geometry";
 import { type LegoProject, walkPieces } from "../../model";
@@ -359,7 +360,7 @@ function buildHolder(pack: LoadedPack, compound: LegoProject): THREE.Group {
 
     const geometry = piece.partId ? getPartGeometry(pack, piece.partId) : null;
     if (geometry)
-      group.add(new THREE.Mesh(geometry, partMaterial(pack.manifest)));
+      group.add(new THREE.Mesh(geometry, partMaterial(baseAtlas(pack))));
   }
 
   // A compound of nothing but empty pieces has no size to fit, and dividing by

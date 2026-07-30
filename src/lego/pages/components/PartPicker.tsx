@@ -19,6 +19,7 @@ import * as THREE from "three";
 
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
+import { baseAtlas } from "../../atlas";
 import { addStandardLights, partMaterial } from "../../geometry";
 import {
   getPartGeometry,
@@ -316,7 +317,7 @@ function layout(
 
       let mesh = pool[used];
       if (!mesh) {
-        mesh = new THREE.Mesh(geometry, partMaterial(pack.manifest));
+        mesh = new THREE.Mesh(geometry, partMaterial(baseAtlas(pack)));
         pool.push(mesh);
         scene.add(mesh);
       }
