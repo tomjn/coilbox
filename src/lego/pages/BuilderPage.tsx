@@ -40,6 +40,7 @@ import { currentPivot, pivotChoices, setPivot } from "../pivot";
 import { deleteCompound, saveCompound, useLegoCompounds } from "../projects";
 import { canReparent, reparentPiece } from "../reparent";
 import { sitOnGround } from "../s3oBuild";
+import { isShortcut } from "../shortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { AnimationPanel } from "./components/AnimationPanel";
 import { CompoundPicker } from "./components/CompoundPicker";
@@ -193,36 +194,33 @@ function Builder({ id }: { id: string | undefined }) {
       }
 
       const shortcuts = shortcutsRef.current;
-      const command = event.metaKey || event.ctrlKey;
-      const key = event.key.toLowerCase();
 
-      if (command && key === "z") {
+      if (isShortcut("undo", event)) {
         event.preventDefault();
-        if (event.shiftKey) shortcuts.redo();
-        else shortcuts.undo();
+        shortcuts.undo();
         return;
       }
-      if (command && key === "y") {
+      if (isShortcut("redo", event)) {
         event.preventDefault();
         shortcuts.redo();
         return;
       }
-      if (command && key === "c") {
+      if (isShortcut("copy", event)) {
         event.preventDefault();
         void shortcuts.copy();
         return;
       }
-      if (command && key === "v") {
+      if (isShortcut("paste", event)) {
         event.preventDefault();
         void shortcuts.paste();
         return;
       }
-      if (command && key === "d") {
+      if (isShortcut("duplicate", event)) {
         event.preventDefault();
         shortcuts.duplicate();
         return;
       }
-      if (event.key === "Backspace" || event.key === "Delete") {
+      if (isShortcut("delete", event)) {
         event.preventDefault();
         shortcuts.remove();
       }
