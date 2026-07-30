@@ -153,7 +153,7 @@ export function TestDrawer({ open, onOpenChange, project, pack }: Props) {
             }
           : null,
         script: buildLuaScript(project),
-        unitDef: buildUnitDef(project, { x: model.sizeX, z: model.sizeZ }),
+        unitDef: buildUnitDef(project, model),
         model,
       });
 

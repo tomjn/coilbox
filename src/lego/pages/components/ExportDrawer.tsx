@@ -134,7 +134,7 @@ export function ExportDrawer({
         // Unlike the atlas and the script, there is no scenario where a
         // built unit should export without one: with no unit definition the
         // engine has nothing to spawn.
-        unitDef: buildUnitDef(project, { x: model.sizeX, z: model.sizeZ }),
+        unitDef: buildUnitDef(project, model),
         model,
       });
 

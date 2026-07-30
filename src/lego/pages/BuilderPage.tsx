@@ -67,6 +67,7 @@ import { useLegoDocument } from "../useLegoDocument";
 import { AnchorList } from "./components/AnchorList";
 import { AnimationPanel } from "./components/AnimationPanel";
 import { AtlasPicker } from "./components/AtlasPicker";
+import { CollisionPanel } from "./components/CollisionPanel";
 import { CompoundPicker } from "./components/CompoundPicker";
 import { ExportDrawer } from "./components/ExportDrawer";
 import { ModelViewport } from "./components/ModelViewport";
@@ -107,7 +108,9 @@ function Builder({ id }: { id: string | undefined }) {
   const [pack, setPack] = useState<LoadedPack | null>(null);
   const [strip, setStrip] = useState<"parts" | "compounds">("parts");
   const [stripOpen, setStripOpen] = useState(true);
-  const [aside, setAside] = useState<"pieces" | "animation">("pieces");
+  const [aside, setAside] = useState<"pieces" | "animation" | "collision">(
+    "pieces",
+  );
   const [exporting, setExporting] = useState(false);
   const [testing, setTesting] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -804,6 +807,13 @@ function Builder({ id }: { id: string | undefined }) {
               placingAnchor={placingAnchor}
               onPlaceAnchor={placeAnchor}
               onCancelAnchor={() => setPlacingAnchor(false)}
+              // The panel is where a volume is read and changed, so opening it
+              // is what puts the handles on the volume. Nothing else has to be
+              // switched on, and closing it gives them back to the pieces.
+              editCollision={aside === "collision"}
+              onCollisionChange={(collisionVolume) =>
+                edit((project) => ({ ...project, collisionVolume }))
+              }
             />
           </div>
 
@@ -918,9 +928,31 @@ function Builder({ id }: { id: string | undefined }) {
             >
               Animation
             </Button>
+            <Button
+              size="sm"
+              variant={aside === "collision" ? "default" : "outline"}
+              onClick={() => setAside("collision")}
+              aria-pressed={aside === "collision"}
+            >
+              Collision
+            </Button>
           </ButtonGroup>
 
-          {aside === "animation" ? (
+          {aside === "collision" ? (
+            <CollisionPanel
+              project={draft}
+              pack={pack}
+              onChange={(collisionVolume) =>
+                edit((project) => {
+                  if (collisionVolume) return { ...project, collisionVolume };
+                  // Back on the derived volume, which is the absence of the key
+                  // rather than a stored copy of what was derived.
+                  const { collisionVolume: _dropped, ...rest } = project;
+                  return rest;
+                })
+              }
+            />
+          ) : aside === "animation" ? (
             <AnimationPanel
               project={draft}
               playing={playing}

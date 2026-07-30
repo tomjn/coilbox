@@ -1,7 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { newProject } from "./model";
+import { type LegoProject, newProject } from "./model";
+import type { UnitBounds } from "./s3oBuild";
 import { buildUnitDef } from "./unitDef";
+
+/** A measured model. Most of these only care about the two ground axes, so y
+ *  and the middle carry stand-in values unless a test says otherwise. */
+function bounds(size: {
+  x: number;
+  z: number;
+  y?: number;
+  mid?: [number, number, number];
+}): UnitBounds {
+  return {
+    mid: size.mid ?? [0, 0, 0],
+    sizeX: size.x,
+    sizeY: size.y ?? 10,
+    sizeZ: size.z,
+  };
+}
 
 function project(name: string, unitName?: string) {
   return newProject({
@@ -17,7 +34,10 @@ function project(name: string, unitName?: string) {
 
 describe("buildUnitDef", () => {
   it("keys the table by the unit name and points objectname and script at it", () => {
-    const lua = buildUnitDef(project("Cake Bot", "cakebot"), { x: 32, z: 32 });
+    const lua = buildUnitDef(
+      project("Cake Bot", "cakebot"),
+      bounds({ x: 32, z: 32 }),
+    );
 
     expect(lua).toContain('["cakebot"] = {');
     expect(lua).toContain('objectname = "cakebot"');
@@ -25,7 +45,10 @@ describe("buildUnitDef", () => {
   });
 
   it("carries the project's display name into name and description", () => {
-    const lua = buildUnitDef(project("Cake Bot", "cakebot"), { x: 32, z: 32 });
+    const lua = buildUnitDef(
+      project("Cake Bot", "cakebot"),
+      bounds({ x: 32, z: 32 }),
+    );
 
     expect(lua).toContain('name = "Cake Bot"');
     expect(lua).toContain("description =");
@@ -33,26 +56,41 @@ describe("buildUnitDef", () => {
   });
 
   it("escapes a quote in the name so the generated file still parses", () => {
-    const lua = buildUnitDef(project('6" Walker', "walker"), { x: 32, z: 32 });
+    const lua = buildUnitDef(
+      project('6" Walker', "walker"),
+      bounds({ x: 32, z: 32 }),
+    );
 
     expect(lua).toContain('name = "6\\" Walker"');
   });
 
   it("does not claim it can move, since no movement class is known here", () => {
-    const lua = buildUnitDef(project("Cake Bot", "cakebot"), { x: 32, z: 32 });
+    const lua = buildUnitDef(
+      project("Cake Bot", "cakebot"),
+      bounds({ x: 32, z: 32 }),
+    );
 
     expect(lua).toContain("canmove = false");
   });
 
   it("writes a maxdamage value", () => {
-    const lua = buildUnitDef(project("Cake Bot", "cakebot"), { x: 32, z: 32 });
+    const lua = buildUnitDef(
+      project("Cake Bot", "cakebot"),
+      bounds({ x: 32, z: 32 }),
+    );
 
     expect(lua).toMatch(/maxdamage = \d+/);
   });
 
   it("scales each footprint axis with the model's own extent on that axis", () => {
-    const small = buildUnitDef(project("Small", "small"), { x: 8, z: 8 });
-    const large = buildUnitDef(project("Large", "large"), { x: 80, z: 80 });
+    const small = buildUnitDef(
+      project("Small", "small"),
+      bounds({ x: 8, z: 8 }),
+    );
+    const large = buildUnitDef(
+      project("Large", "large"),
+      bounds({ x: 80, z: 80 }),
+    );
 
     const footprintOf = (lua: string) =>
       Number(/footprintx = (\d+)/.exec(lua)?.[1]);
@@ -64,7 +102,10 @@ describe("buildUnitDef", () => {
   it("writes a different footprint per axis for a unit longer than it is wide", () => {
     // 40.25 by 87.63, the probe from #679: a square footprint derived from a
     // radius would claim 112 by 112. Measuring each axis gives 48 by 96.
-    const lua = buildUnitDef(project("Probe", "probe"), { x: 40.25, z: 87.63 });
+    const lua = buildUnitDef(
+      project("Probe", "probe"),
+      bounds({ x: 40.25, z: 87.63 }),
+    );
 
     expect(lua).toContain("footprintx = 3");
     expect(lua).toContain("footprintz = 6");
@@ -73,7 +114,7 @@ describe("buildUnitDef", () => {
   it("rounds a size up to the next step rather than to the nearest one", () => {
     // 17 elmos is just past one 16-elmo step: rounding to nearest would give
     // 1 and leave part of the unit outside its own footprint.
-    const lua = buildUnitDef(project("Wide", "wide"), { x: 17, z: 8 });
+    const lua = buildUnitDef(project("Wide", "wide"), bounds({ x: 17, z: 8 }));
 
     expect(lua).toContain("footprintx = 2");
     expect(lua).toContain("footprintz = 1");
@@ -82,32 +123,85 @@ describe("buildUnitDef", () => {
   it("does not round a size on a step boundary up to the next step", () => {
     // Exactly two steps. Ceiling a value already on the boundary should not
     // push it to 3.
-    const lua = buildUnitDef(project("Boundary", "boundary"), {
-      x: 32,
-      z: 32,
-    });
+    const lua = buildUnitDef(
+      project("Boundary", "boundary"),
+      bounds({ x: 32, z: 32 }),
+    );
 
     expect(lua).toContain("footprintx = 2");
     expect(lua).toContain("footprintz = 2");
   });
 
   it("never writes a footprint below 1, even for a size of 0", () => {
-    const lua = buildUnitDef(project("Tiny", "tiny"), { x: 0, z: 0 });
+    const lua = buildUnitDef(project("Tiny", "tiny"), bounds({ x: 0, z: 0 }));
 
     expect(lua).toContain("footprintx = 1");
     expect(lua).toContain("footprintz = 1");
   });
 
+  it("writes a collision volume off the bounding box when the unit has none", () => {
+    const lua = buildUnitDef(
+      project("Probe", "probe"),
+      bounds({ x: 40, y: 12, z: 88 }),
+    );
+
+    expect(lua).toContain('collisionvolumetype = "box"');
+    expect(lua).toContain('collisionvolumescales = "40 12 88"');
+    // The engine measures offsets from the model's middle, and the derived box
+    // is centred on exactly that.
+    expect(lua).toContain('collisionvolumeoffsets = "0 0 0"');
+  });
+
+  it("writes the unit's own volume rather than the derived one", () => {
+    const doc: LegoProject = {
+      ...project("Probe", "probe"),
+      collisionVolume: {
+        type: "cyly",
+        scales: [20, 30, 20],
+        offsets: [0, -4, 2],
+      },
+    };
+
+    const lua = buildUnitDef(doc, bounds({ x: 40, y: 12, z: 88 }));
+
+    expect(lua).toContain('collisionvolumetype = "cyly"');
+    expect(lua).toContain('collisionvolumescales = "20 30 20"');
+    expect(lua).toContain('collisionvolumeoffsets = "0 -4 2"');
+  });
+
+  it("rounds a measured volume rather than writing its full float", () => {
+    const lua = buildUnitDef(
+      project("Probe", "probe"),
+      bounds({ x: 40.123456, y: 12, z: 88 }),
+    );
+
+    expect(lua).toContain('collisionvolumescales = "40.123 12 88"');
+  });
+
+  it("writes zeros for a unit with no geometry, deferring to the engine", () => {
+    const lua = buildUnitDef(
+      project("Empty", "empty"),
+      bounds({ x: 0, y: 0, z: 0 }),
+    );
+
+    // The engine reads an all-zero volume as none at all and puts its own
+    // sphere round the model, which is the same deferral the s3o header makes.
+    expect(lua).toContain('collisionvolumescales = "0 0 0"');
+  });
+
   it("gives the same output for the same project, every time", () => {
     const doc = project("Cake Bot", "cakebot");
 
-    expect(buildUnitDef(doc, { x: 32, z: 32 })).toBe(
-      buildUnitDef(doc, { x: 32, z: 32 }),
+    expect(buildUnitDef(doc, bounds({ x: 32, z: 32 }))).toBe(
+      buildUnitDef(doc, bounds({ x: 32, z: 32 })),
     );
   });
 
   it("ends with exactly one newline", () => {
-    const lua = buildUnitDef(project("Cake Bot", "cakebot"), { x: 32, z: 32 });
+    const lua = buildUnitDef(
+      project("Cake Bot", "cakebot"),
+      bounds({ x: 32, z: 32 }),
+    );
 
     expect(lua.endsWith("\n")).toBe(true);
     expect(lua.endsWith("\n\n")).toBe(false);

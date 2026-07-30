@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
-import { buildS3o, type S3oPiece, sitOnGround } from "./s3oBuild";
+import { buildS3o, type S3oPiece, sitOnGround, unitBounds } from "./s3oBuild";
 
 /**
  * A pack holding one part: a single triangle on the x/z plane, one metre out
@@ -206,6 +206,18 @@ describe("buildS3o", () => {
     expect(build?.sizeZ).toBeCloseTo(2);
   });
 
+  it("measures sizeY the same way, for a collision volume to use", () => {
+    // The part is flat, so height comes from stacking two of them apart.
+    const doc = project([
+      { id: "floor", name: "floor", parentId: "root" },
+      { id: "roof", name: "roof", parentId: "root", position: [0, 5, 0] },
+    ]);
+
+    const build = buildS3o(doc, pack(), TEXTURES);
+
+    expect(build?.sizeY).toBeCloseTo(5);
+  });
+
   it("measures a wide flat unit the same way", () => {
     const doc = project([
       { id: "pad", name: "pad", parentId: "root", scale: [1, 1, 6] },
@@ -264,6 +276,7 @@ describe("buildS3o", () => {
     expect(build?.height).toBe(0);
     expect(build?.mid).toEqual([0, 0, 0]);
     expect(build?.sizeX).toBe(0);
+    expect(build?.sizeY).toBe(0);
     expect(build?.sizeZ).toBe(0);
   });
 
@@ -325,5 +338,31 @@ describe("buildS3o", () => {
 
     expect(build?.texture1).toBe("probe.png");
     expect(build?.texture2).toBe("probe_glow.png");
+  });
+});
+
+describe("unitBounds", () => {
+  it("gives the same box the header does, without building a model", () => {
+    const doc = project([
+      { id: "hull", name: "hull", parentId: "root", scale: [8, 1, 2] },
+      { id: "mast", name: "mast", parentId: "root", position: [0, 6, 0] },
+    ]);
+
+    const measured = unitBounds(doc, pack());
+    const build = buildS3o(doc, pack(), TEXTURES);
+
+    expect(measured.sizeX).toBeCloseTo(build?.sizeX ?? -1);
+    expect(measured.sizeY).toBeCloseTo(build?.sizeY ?? -1);
+    expect(measured.sizeZ).toBeCloseTo(build?.sizeZ ?? -1);
+    expect(round(measured.mid)).toEqual(round(build?.mid ?? []));
+  });
+
+  it("measures nothing on a unit with no geometry", () => {
+    expect(unitBounds(project([]), pack())).toEqual({
+      mid: [0, 0, 0],
+      sizeX: 0,
+      sizeY: 0,
+      sizeZ: 0,
+    });
   });
 });

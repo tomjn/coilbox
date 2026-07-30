@@ -19,6 +19,7 @@
 import { Button } from "@picoframe/frame";
 import {
   ArrowDownToLine,
+  Box,
   ClipboardPaste,
   Copy,
   FlipHorizontal2,
@@ -54,6 +55,7 @@ import {
   disposeGround,
   REFERENCE_PARK_X,
 } from "../../buildPlate";
+import { effectiveCollisionVolume, engineScales } from "../../collisionVolume";
 import {
   type BackdropId,
   backdropById,
@@ -73,6 +75,7 @@ import {
 import {
   descendantIds,
   isEffectivelyHidden,
+  type LegoCollisionVolume,
   type LegoPiece,
   type LegoProject,
   pieceById,
@@ -82,7 +85,7 @@ import {
   buildReferenceUnit,
   disposeReferenceUnit,
 } from "../../referenceObject";
-import { type BakedPiece, bakedPieces } from "../../s3oBuild";
+import { type BakedPiece, bakedPieces, unitBounds } from "../../s3oBuild";
 import { isShortcut } from "../../shortcuts";
 import {
   type Anchor,
@@ -148,6 +151,13 @@ const SEAT_COLOUR = 0x34d399;
 const SEAT_DOT = 11;
 /** A target anchor nothing is near. Warms towards `SEAT_COLOUR` on approach. */
 const TARGET_COLD = 0x64748b;
+/**
+ * The collision volume's wireframe. Orange because nothing else in the scene
+ * is: it is a reading about the unit rather than a part of it, so it has to be
+ * telling apart from the selection, the anchors and the front marker at a
+ * glance.
+ */
+const COLLISION_COLOUR = 0xf97316;
 
 /** Where the camera starts, and where Reset view puts it back. */
 const HOME_CAMERA: [number, number, number] = [9, 7, 11];
@@ -234,6 +244,14 @@ interface Props {
   onPlaceAnchor?: (pieceId: string, position: Vec3) => void;
   /** A click that missed the model, which is how you change your mind. */
   onCancelAnchor?: () => void;
+  /**
+   * Puts the gizmo on the collision volume rather than on the selected piece,
+   * so its size and where it sits are dragged rather than typed. The volume is
+   * shown while this is on whether or not its own toggle is.
+   */
+  editCollision?: boolean;
+  /** Where a dragged volume goes. Committed on release, like a piece's. */
+  onCollisionChange?: (volume: LegoCollisionVolume) => void;
 }
 
 export function ModelViewport({
@@ -261,6 +279,8 @@ export function ModelViewport({
   placingAnchor = false,
   onPlaceAnchor,
   onCancelAnchor,
+  editCollision = false,
+  onCollisionChange,
 }: Props) {
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
@@ -276,6 +296,7 @@ export function ModelViewport({
   const [snappedTo, setSnappedTo] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showReference, setShowReference] = useState(false);
+  const [showCollision, setShowCollision] = useState(false);
   // View settings, held for as long as the viewport is open and no longer,
   // exactly as the two above are. Both open on what the builder has always
   // shown, so nothing about opening a project changes.
@@ -322,6 +343,8 @@ export function ModelViewport({
   onPlaceAnchorRef.current = onPlaceAnchor;
   const onCancelAnchorRef = useRef(onCancelAnchor);
   onCancelAnchorRef.current = onCancelAnchor;
+  const onCollisionChangeRef = useRef(onCollisionChange);
+  onCollisionChangeRef.current = onCollisionChange;
 
   // Built once. Everything after this mutates the scene rather than remaking it.
   useCanvas3D(
@@ -356,6 +379,17 @@ export function ModelViewport({
       reference.position.set(REFERENCE_PARK_X, 0, 0);
       reference.visible = false;
       scene.add(reference);
+
+      // The collision volume's wireframe. Drawn over everything rather than
+      // depth-tested, because a volume set smaller than the unit sits inside
+      // the geometry and would otherwise be invisible exactly when its size is
+      // the thing being checked.
+      const collisionMaterial = new THREE.LineBasicMaterial({
+        color: COLLISION_COLOUR,
+        transparent: true,
+        opacity: 0.9,
+        depthTest: false,
+      });
 
       const root = new THREE.Group();
       scene.add(root);
@@ -456,6 +490,11 @@ export function ModelViewport({
         grid,
         axes,
         reference,
+        collision: null,
+        collisionMaterial,
+        editCollision: false,
+        collisionDragFrom: null,
+        onCollisionChangeRef,
         sky: null,
         terrain: null,
         groups: new Map(),
@@ -498,6 +537,15 @@ export function ModelViewport({
         controls.enabled = false;
         dragging = true;
         setHoveredAndNotify(state, null);
+        // Where the volume was before the drag, so the axis this drag does not
+        // own can be put back on every frame of it. See `holdCollisionAxis`.
+        state.collisionDragFrom =
+          gizmo.object === state.collision
+            ? {
+                position: state.collision.position.clone(),
+                scale: state.collision.scale.clone(),
+              }
+            : null;
         // Built once per drag: the other pieces do not move while one is dragged,
         // so their anchors are fixed for the length of it.
         const pieceId = gizmo.object ? pieceIdOf(gizmo.object) : null;
@@ -515,12 +563,15 @@ export function ModelViewport({
         dragging = false;
         showTargetAnchors(state, packRef.current, projectRef.current, null);
         showSeat(state, null);
-        if (gizmo.object === groupPivot) commitGroup(state);
+        if (gizmo.object === state.collision) commitCollision(state);
+        else if (gizmo.object === groupPivot) commitGroup(state);
         else commitGizmo(state);
+        state.collisionDragFrom = null;
         render();
       });
 
       gizmo.addEventListener("objectChange", () => {
+        if (gizmo.object === state.collision) holdCollisionAxis(state);
         if (gizmo.object === groupPivot) {
           dragGroup(state);
         } else {
@@ -667,6 +718,8 @@ export function ModelViewport({
           state.sky?.texture.dispose();
           if (state.terrain) disposeTerrain(state.terrain);
           disposeReferenceUnit(reference);
+          state.collision?.geometry.dispose();
+          collisionMaterial.dispose();
           sceneRef.current = null;
         },
       };
@@ -693,6 +746,26 @@ export function ModelViewport({
     if (playing && !reduceMotion) showBaked(state, pack, project);
     state.render();
   }, [pack, project, playing, reduceMotion]);
+
+  // Before the gizmo below, which may have to point at what this builds.
+  // Follows the document as well as the toggle: the derived volume is the
+  // unit's own bounding box, so it changes every time a piece does.
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.editCollision = editCollision;
+    const shown = showCollision || editCollision;
+    showCollisionVolume(state, shown ? project : null, pack);
+    // The handles move between the volume and the selected piece with this, so
+    // they are re-pointed here rather than left until the selection changes.
+    attachGizmo(
+      state,
+      project,
+      selectedIdsRef.current,
+      placingAnchorRef.current,
+    );
+    state.render();
+  }, [showCollision, editCollision, project, pack]);
 
   useEffect(() => {
     const state = sceneRef.current;
@@ -733,9 +806,12 @@ export function ModelViewport({
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    state.gizmo.setMode(mode);
+    // Rotate falls back to move on a volume, which has no rotation to drag.
+    state.gizmo.setMode(
+      editCollision && mode === "rotate" ? "translate" : mode,
+    );
     state.render();
-  }, [mode]);
+  }, [mode, editCollision]);
 
   useEffect(() => {
     const state = sceneRef.current;
@@ -873,24 +949,32 @@ export function ModelViewport({
         <div className="absolute inset-y-3 left-3 flex flex-col overflow-y-auto">
           <div className="m-auto flex flex-col gap-2">
             <ButtonGroup orientation="vertical">
-              {MODES.map(({ id, label, key, Icon }) => (
-                <Tooltip key={id}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant={mode === id ? "default" : "outline"}
-                      onClick={() => setMode(id)}
-                      aria-label={label}
-                      aria-pressed={mode === id}
-                    >
-                      <Icon className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {label} ({key})
-                  </TooltipContent>
-                </Tooltip>
-              ))}
+              {MODES.map(({ id, label, key, Icon }) => {
+                // A collision volume is measured along the model's own axes and
+                // has nothing to turn, so the handles for it are move and scale.
+                const off = editCollision && id === "rotate";
+                return (
+                  <Tooltip key={id}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant={mode === id && !off ? "default" : "outline"}
+                        onClick={() => setMode(id)}
+                        disabled={off}
+                        aria-label={label}
+                        aria-pressed={mode === id && !off}
+                      >
+                        <Icon className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      {off
+                        ? "A collision volume has no rotation"
+                        : `${label} (${key})`}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
             </ButtonGroup>
 
             {/* A group of its own. The three above are a mode you are in, this
@@ -1014,6 +1098,19 @@ export function ModelViewport({
           }
         >
           <Grid3x3 className="size-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={() => setShowCollision(!showCollision)}
+          aria-pressed={showCollision}
+          title={
+            showCollision
+              ? "Hide the collision volume"
+              : "Show the collision volume, the shape the engine hits and clicks"
+          }
+        >
+          <Box className="size-4" />
         </Button>
         <EnvironmentPicker
           backdrop={backdrop}
@@ -1230,6 +1327,19 @@ interface SceneState {
   /** A scale figure beside the build, switched off by default. A view aid
    *  like `grid` and `axes`: never part of the project, never exported. */
   reference: THREE.Group;
+  /** The collision volume's wireframe, while it is being shown. Rebuilt on
+   *  every change rather than rescaled, because the shape itself changes with
+   *  the volume's type, and null the rest of the time. */
+  collision: THREE.LineSegments | null;
+  collisionMaterial: THREE.LineBasicMaterial;
+  /** Whether the gizmo is on the volume rather than on the selected piece. */
+  editCollision: boolean;
+  /** Where the volume was when the drag in progress started, or null when
+   *  nothing is dragging it. What `holdCollisionAxis` puts back. */
+  collisionDragFrom: { position: THREE.Vector3; scale: THREE.Vector3 } | null;
+  onCollisionChangeRef: {
+    current: ((volume: LegoCollisionVolume) => void) | undefined;
+  };
   /** The sky now drawn, and which backdrop built it, so going back to one
    *  already seen does not draw its gradient again. Null while the plain
    *  backdrop shows, which is what the canvas does with no background at all. */
@@ -1308,6 +1418,94 @@ function applyBackdrop(state: SceneState, id: BackdropId) {
   const texture = skyTexture(backdropById(id));
   state.scene.background = texture;
   if (texture) state.sky = { id, texture };
+}
+
+/**
+ * Draw the collision volume the export would write, or take it away again.
+ *
+ * The volume is positioned from the model's middle, because that is where the
+ * engine measures its offsets from, so a volume with no offset sits on the
+ * middle of the unit's bounding box exactly as it will in a game.
+ *
+ * A null project means "not showing", which is also what leaves nothing behind
+ * to keep in step with the document.
+ *
+ * The shape is built one elmo across and the object carries its size, so the
+ * gizmo's scale handles are the volume's own numbers and a drag needs no
+ * conversion to read back.
+ */
+function showCollisionVolume(
+  state: SceneState,
+  project: LegoProject | null,
+  pack: LoadedPack,
+) {
+  if (state.collision) {
+    if (state.gizmo.object === state.collision) state.gizmo.detach();
+    state.collision.geometry.dispose();
+    state.collision.removeFromParent();
+    state.collision = null;
+  }
+  if (!project) return;
+
+  const bounds = unitBounds(project, pack);
+  const volume = effectiveCollisionVolume(project, bounds);
+  const lines = new THREE.LineSegments(
+    collisionWireframe(volume),
+    state.collisionMaterial,
+  );
+  lines.position.set(
+    bounds.mid[0] + volume.offsets[0],
+    bounds.mid[1] + volume.offsets[1],
+    bounds.mid[2] + volume.offsets[2],
+  );
+  lines.scale.set(...engineScales(volume));
+  // Over the model, to match the material's own `depthTest: false`.
+  lines.renderOrder = 4;
+  lines.raycast = () => {};
+  state.collision = lines;
+  state.scene.add(lines);
+}
+
+/**
+ * A volume as lines, one elmo across, in the shape the engine will actually
+ * build. A sphere written with three different sizes is drawn round, and a
+ * cylinder written with an oval cross-section is drawn circular, because that
+ * is what a game gets: see `engineScales`.
+ *
+ * A box and a cylinder are drawn as their edges, which is the outline you would
+ * draw by hand. A sphere has no edges to find, so that one is the full mesh
+ * wireframe.
+ */
+function collisionWireframe(volume: LegoCollisionVolume): THREE.BufferGeometry {
+  const solid = collisionSolid(volume);
+  const round = volume.type === "sphere" || volume.type === "ellipsoid";
+  const lines = round
+    ? new THREE.WireframeGeometry(solid)
+    : new THREE.EdgesGeometry(solid);
+  solid.dispose();
+  return lines;
+}
+
+/** The volume as a solid one elmo across, for the lines to come off. Its size
+ *  is on the object rather than in here, so the same shape serves any size. */
+function collisionSolid(volume: LegoCollisionVolume): THREE.BufferGeometry {
+  switch (volume.type) {
+    case "box":
+      return new THREE.BoxGeometry(1, 1, 1);
+    case "cylx":
+    case "cyly":
+    case "cylz": {
+      // Three.js builds a cylinder along y, so the other two axes turn onto it.
+      const solid = new THREE.CylinderGeometry(0.5, 0.5, 1, 16);
+      if (volume.type === "cylx") solid.rotateZ(Math.PI / 2);
+      if (volume.type === "cylz") solid.rotateX(Math.PI / 2);
+      return solid;
+    }
+    default:
+      // A sphere and an ellipsoid are the same shape. Which one it turns out
+      // to be is entirely in the scales the object carries.
+      return new THREE.SphereGeometry(0.5, 16, 10);
+  }
 }
 
 /** Put the solid ground under the markings, or take it away again. */
@@ -1695,6 +1893,16 @@ function attachGizmo(
   selectedIds: string[],
   placingAnchor: boolean,
 ) {
+  // Editing the volume takes the handles off the pieces entirely. One set of
+  // handles cannot mean two things, and the volume is a property of the whole
+  // unit rather than of whichever piece happens to be selected behind it.
+  if (state.editCollision && state.collision) {
+    state.groupIds = [];
+    state.groupChanges = new Map();
+    state.gizmo.attach(state.collision);
+    return;
+  }
+
   const roots = transformRoots(project, selectedIds).filter(
     (id) => !isEffectivelyHidden(project, id) && state.groups.has(id),
   );
@@ -2248,6 +2456,58 @@ function frameBounds(state: SceneState, box: THREE.Box3): boolean {
   state.camera.position.set(...position);
   state.controls.update();
   return true;
+}
+
+/**
+ * Hold the volume still on the axis the drag does not own.
+ *
+ * A scale handle sets a size and a move handle sets a position, and neither is
+ * allowed to do the other's job: a volume that slid off the unit while it was
+ * being sized would make the size impossible to judge, which is the whole
+ * point of dragging it rather than typing it. `TransformControls` writes both
+ * channels of the object it holds, so whichever one this drag is not about is
+ * put back to where it started on every frame.
+ */
+function holdCollisionAxis(state: SceneState) {
+  const lines = state.collision;
+  const from = state.collisionDragFrom;
+  if (!lines || !from) return;
+  if (state.gizmo.getMode() === "scale") lines.position.copy(from.position);
+  else lines.scale.copy(from.scale);
+}
+
+/**
+ * Write a dragged collision volume back to the document.
+ *
+ * The wireframe's own scale and position are the volume's numbers: the shape
+ * is built one elmo across, and the offsets run from the model's middle, which
+ * is where the wireframe was put. So a drag is read straight off the object.
+ *
+ * Sizes are held above zero. A handle dragged through the middle would
+ * otherwise turn the volume inside out, and a volume of no size is one the
+ * engine throws away.
+ */
+function commitCollision(state: SceneState) {
+  const lines = state.collision;
+  const change = state.onCollisionChangeRef.current;
+  if (!lines || !change) return;
+
+  const project = state.projectRef.current;
+  const bounds = unitBounds(project, state.packRef.current);
+  const volume = effectiveCollisionVolume(project, bounds);
+  change({
+    ...volume,
+    scales: [
+      Math.max(0.1, lines.scale.x),
+      Math.max(0.1, lines.scale.y),
+      Math.max(0.1, lines.scale.z),
+    ],
+    offsets: [
+      lines.position.x - bounds.mid[0],
+      lines.position.y - bounds.mid[1],
+      lines.position.z - bounds.mid[2],
+    ],
+  });
 }
 
 /** Write the dragged transform back to the document, once the drag is over. */

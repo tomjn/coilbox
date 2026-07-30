@@ -40,14 +40,23 @@ export interface S3oPiece {
   children: S3oPiece[];
 }
 
-export interface S3oBuild {
-  radius: number;
-  height: number;
+/**
+ * The model's world-space bounding box, as the header and everything derived
+ * from it measures it: the middle of the box and its extent along each axis.
+ */
+export interface UnitBounds {
   mid: [number, number, number];
   /** The model's world-space bounding-box extent along x, in elmos. */
   sizeX: number;
-  /** The model's world-space bounding-box extent along z, in elmos. */
+  /** The same along y. */
+  sizeY: number;
+  /** The same along z. */
   sizeZ: number;
+}
+
+export interface S3oBuild extends UnitBounds {
+  radius: number;
+  height: number;
   texture1: string;
   texture2: string;
   root: S3oPiece;
@@ -287,20 +296,17 @@ function bakeGeometry(
  * `radius` and `height` are only honoured above 0.01, so a unit with no
  * geometry writes zeros and lets the engine work them out.
  *
- * `sizeX` and `sizeZ` are the same box's extent along each ground axis, for
- * `buildUnitDef` to derive a footprint from. They come straight off `box`
- * rather than off `radius`, because a unit longer than it is wide has no
- * single sphere that describes both axes.
+ * `sizeX`, `sizeY` and `sizeZ` are the same box's extent along each axis, for
+ * `buildUnitDef` to derive a footprint and a collision volume from. They come
+ * straight off `box` rather than off `radius`, because a unit longer than it
+ * is wide has no single sphere that describes both axes.
  */
-function header(world: THREE.Vector3[]): {
+function header(world: THREE.Vector3[]): UnitBounds & {
   radius: number;
   height: number;
-  mid: [number, number, number];
-  sizeX: number;
-  sizeZ: number;
 } {
   if (world.length === 0) {
-    return { radius: 0, height: 0, mid: [0, 0, 0], sizeX: 0, sizeZ: 0 };
+    return { ...emptyBounds(), radius: 0, height: 0 };
   }
   const box = new THREE.Box3().setFromPoints(world);
   const centre = box.getCenter(new THREE.Vector3());
@@ -315,6 +321,25 @@ function header(world: THREE.Vector3[]): {
     height,
     mid: [centre.x, centre.y, centre.z],
     sizeX: box.max.x - box.min.x,
+    sizeY: box.max.y - box.min.y,
     sizeZ: box.max.z - box.min.z,
   };
+}
+
+function emptyBounds(): UnitBounds {
+  return { mid: [0, 0, 0], sizeX: 0, sizeY: 0, sizeZ: 0 };
+}
+
+/**
+ * The unit's bounding box on its own, without building the whole model.
+ *
+ * The viewport draws the collision volume from this and the exporter derives
+ * one from the same numbers, so the wireframe on screen and the volume in the
+ * exported definition are measured once rather than twice.
+ */
+export function unitBounds(project: LegoProject, pack: LoadedPack): UnitBounds {
+  const { world } = bakedPieces(project, pack);
+  if (world.length === 0) return emptyBounds();
+  const { mid, sizeX, sizeY, sizeZ } = header(world);
+  return { mid, sizeX, sizeY, sizeZ };
 }
