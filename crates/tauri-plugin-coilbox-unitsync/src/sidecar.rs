@@ -146,6 +146,26 @@ pub fn build_unit_dataset_args(
     args
 }
 
+/// Build args for `--unit-model` mode: the game whose archive holds the model,
+/// the unitdef `objectname` naming it, plus the directory extracted textures are
+/// cached in (and served from).
+pub fn build_unit_model_args(
+    lib: &str,
+    datadir: &str,
+    game: &str,
+    object: &str,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--unit-model".into());
+    args.push("--game".into());
+    args.push(game.into());
+    args.push("--object".into());
+    args.push(object.into());
+    push_cache_dir(&mut args, cache_dir);
+    args
+}
+
 /// Build args for heightmap mode: scan args plus the map name, the `--heightmap`
 /// flag, the longest-side pixel cap, and the optional on-disk PNG cache directory.
 pub fn build_heightmap_args(
@@ -557,6 +577,23 @@ mod tests {
         let without = build_unit_dataset_args("/eng/libunitsync.so", "/data", "BAR.sdd", None);
         assert!(without.contains(&"--unit-dataset".to_string()));
         assert!(!without.iter().any(|x| x == "--cache-dir"));
+    }
+
+    #[test]
+    fn build_unit_model_args_carry_game_object_and_cache_dir() {
+        let a = build_unit_model_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "BA.sdz",
+            "ARMCOM",
+            Some("/cache/models"),
+        );
+        assert!(a.contains(&"--unit-model".to_string()));
+        let g = a.iter().position(|x| x == "--game").unwrap();
+        assert_eq!(a[g + 1], "BA.sdz");
+        let o = a.iter().position(|x| x == "--object").unwrap();
+        assert_eq!(a[o + 1], "ARMCOM");
+        assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/models"]);
     }
 
     #[test]

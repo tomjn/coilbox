@@ -21,8 +21,9 @@ use std::path::Path;
 /// Bump when the cached `GameInfoOutput` / `MapInfoOutput` / `UnitDatasetOutput`
 /// shape *or* the way its contents are produced changes, so stale entries from an
 /// older build are ignored. v4: game info gained the Lua-shim unit fallback. v5:
-/// the unit dataset gained the per-unit `mobile` flag.
-const INFO_CACHE_VERSION: u32 = 5;
+/// the unit dataset gained the per-unit `mobile` flag. v6: the unit dataset
+/// gained the per-unit `objectName`.
+const INFO_CACHE_VERSION: u32 = 6;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.

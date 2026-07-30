@@ -89,6 +89,7 @@ fn resolve_path(
     legopack_base: impl FnOnce() -> Option<PathBuf>,
     extra_packs_base: impl FnOnce() -> Option<PathBuf>,
     lego_base: impl FnOnce() -> Option<PathBuf>,
+    unit_model_base: impl FnOnce() -> Option<PathBuf>,
 ) -> Option<PathBuf> {
     let (root, rest) = segments.split_first()?;
     match root.as_str() {
@@ -129,6 +130,16 @@ fn resolve_path(
                 return None;
             };
             Some(lego_base()?.join(file))
+        }
+        "unitmodel" => {
+            // unitmodel/<file>: textures copied out of a game archive for the
+            // unit-model viewer, one flat folder. Raw archive bytes rather than
+            // anything decoded, because the shared atlases are compressed DDS
+            // measured in tens of megabytes and the webview uploads them as-is.
+            let [file] = rest else {
+                return None;
+            };
+            Some(unit_model_base()?.join(file))
         }
         _ => None,
     }
@@ -255,6 +266,7 @@ pub fn handle<R: Runtime>(
                 .ok()
                 .map(|d| d.join("lego").join("thumbs"))
         },
+        || tauri_plugin_coilbox_unitsync::model_texture_dir(app),
     );
     let Some(full) = full else {
         return not_found();
@@ -302,6 +314,7 @@ mod tests {
             || None,
             || None,
             || None,
+            || None,
         );
         assert_eq!(got, Some(PathBuf::from("/pkg/.coilbox/images/x.jpg")));
     }
@@ -310,7 +323,7 @@ mod tests {
     fn resolve_portable_none_without_root() {
         let segs = vec!["portable".into(), "x.jpg".into()];
         assert_eq!(
-            resolve_path(&segs, None, || None, || None, || None, || None),
+            resolve_path(&segs, None, || None, || None, || None, || None, || None),
             None
         );
     }
@@ -320,19 +333,19 @@ mod tests {
         let base = || Some(PathBuf::from("/data/campaign/media"));
         let ok = vec!["campaign".into(), "camp-1".into(), "intro.mp4".into()];
         assert_eq!(
-            resolve_path(&ok, None, base, || None, || None, || None),
+            resolve_path(&ok, None, base, || None, || None, || None, || None),
             Some(PathBuf::from("/data/campaign/media/camp-1/intro.mp4"))
         );
         // missing file segment
         let no_file = vec!["campaign".into(), "camp-1".into()];
         assert_eq!(
-            resolve_path(&no_file, None, base, || None, || None, || None),
+            resolve_path(&no_file, None, base, || None, || None, || None, || None),
             None
         );
         // bad id
         let bad = vec!["campaign".into(), "../x".into(), "intro.mp4".into()];
         assert_eq!(
-            resolve_path(&bad, None, base, || None, || None, || None),
+            resolve_path(&bad, None, base, || None, || None, || None, || None),
             None
         );
     }
@@ -342,17 +355,17 @@ mod tests {
         let base = || Some(PathBuf::from("/res/legoparts"));
         let segs = vec!["legopack".into(), "parts.bin.gz".into()];
         assert_eq!(
-            resolve_path(&segs, None, || None, base, || None, || None),
+            resolve_path(&segs, None, || None, base, || None, || None, || None),
             Some(PathBuf::from("/res/legoparts/parts.bin.gz"))
         );
         // no file segment, and no pack installed
         let bare = vec!["legopack".into()];
         assert_eq!(
-            resolve_path(&bare, None, || None, base, || None, || None),
+            resolve_path(&bare, None, || None, base, || None, || None, || None),
             None
         );
         assert_eq!(
-            resolve_path(&segs, None, || None, || None, || None, || None),
+            resolve_path(&segs, None, || None, || None, || None, || None, || None),
             None
         );
     }
@@ -362,13 +375,13 @@ mod tests {
         let base = || Some(PathBuf::from("/data/lego/thumbs"));
         let segs = vec!["lego".into(), "abc.png".into()];
         assert_eq!(
-            resolve_path(&segs, None, || None, || None, || None, base),
+            resolve_path(&segs, None, || None, || None, || None, base, || None),
             Some(PathBuf::from("/data/lego/thumbs/abc.png"))
         );
         // Thumbnails are not nested, so a deeper path is not a thumbnail.
         let nested = vec!["lego".into(), "sub".into(), "abc.png".into()];
         assert_eq!(
-            resolve_path(&nested, None, || None, || None, || None, base),
+            resolve_path(&nested, None, || None, || None, || None, base, || None),
             None
         );
     }
@@ -383,8 +396,25 @@ mod tests {
                 || None,
                 || None,
                 || None,
+                || None,
                 || None
             ),
+            None
+        );
+    }
+
+    #[test]
+    fn resolve_unitmodel_serves_one_flat_folder() {
+        let base = || Some(PathBuf::from("/cache/model-textures"));
+        let segs = vec!["unitmodel".into(), "abc_atlas_dds.dds".into()];
+        assert_eq!(
+            resolve_path(&segs, None, || None, || None, || None, || None, base),
+            Some(PathBuf::from("/cache/model-textures/abc_atlas_dds.dds"))
+        );
+        // The cache is flat, so a nested path is not one of its files.
+        let nested = vec!["unitmodel".into(), "sub".into(), "abc.dds".into()];
+        assert_eq!(
+            resolve_path(&nested, None, || None, || None, || None, || None, base),
             None
         );
     }

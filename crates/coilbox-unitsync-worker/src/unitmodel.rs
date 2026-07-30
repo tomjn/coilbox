@@ -1,0 +1,682 @@
+//! `--unit-model` mode: read one unit's model out of a game archive and flatten
+//! it into something a webview can draw.
+//!
+//! The two reader crates deliberately do not share a model type, because a
+//! `.3do` names a texture per face and carries no UVs while an `.s3o` binds one
+//! texture for the whole model and stores UVs per vertex. The format branch is
+//! taken here rather than in the viewer: both end up as a tree of pieces whose
+//! geometry is a list of indexed triangle batches, one per texture. An `.s3o`
+//! piece is always one batch, a `.3do` piece is one per distinct texture its
+//! faces name, and the viewer then has a single code path.
+//!
+//! Textures are copied out of the archive as raw bytes into a cache dir the
+//! asset protocol serves, and are never decoded here. Splinter Faction's shared
+//! unit atlas is a DXT5 8192 by 8192 `.dds`: 64 MiB compressed and 256 MiB as
+//! RGBA, so decoding it the way `factionlogo.rs` decodes a 16px sidepic would
+//! cost a quarter of a gigabyte for one texture. The webview uploads it still
+//! compressed instead.
+
+use crate::ffi::Unitsync;
+use crate::model::{ModelGroup, ModelPiece, ModelTexture, UnitModelOutput};
+use std::collections::BTreeMap;
+use std::path::Path;
+
+/// Salts the texture cache file names. Bump when the naming scheme changes so
+/// stale files are never picked up under a new meaning.
+const CACHE_VERSION: u32 = 1;
+
+/// Models are a few megabytes at most: the largest in the games checked is a
+/// 3.2 MiB `.s3o`. Bound the read anyway.
+const MODEL_READ_CAP: usize = 64 * 1024 * 1024;
+
+/// Textures go up to Splinter Faction's 64 MiB shared atlas. Anything past this
+/// is not a unit texture.
+const TEXTURE_READ_CAP: usize = 128 * 1024 * 1024;
+
+/// Where the engine looks for a unitdef's `objectname`.
+const MODEL_DIR: &str = "objects3d";
+
+/// Where an `.s3o` header's texture name resolves against.
+const S3O_TEXTURE_DIR: &str = "unittextures";
+
+/// Where a `.3do` face's texture name resolves against, and where the list of
+/// names that skip the `00` suffix lives.
+const TATEX_DIR: &str = "unittextures/tatex";
+const TEAMTEX_LIST: &str = "unittextures/tatex/teamtex.txt";
+
+/// Extensions probed for a texture named without one. Ordered by how often the
+/// installed games use them for unit art.
+const TEXTURE_EXTS: &[&str] = &["dds", "tga", "png", "bmp", "jpg", "jpeg"];
+
+/// A `.3do` face is stretched over the whole of its texture, so its corners take
+/// the corners of the texture rather than a stored UV. Faces with more than four
+/// corners wrap, which is what the engine's own quad-oriented mapping does.
+const CORNER_UV: [[f32; 2]; 4] = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
+
+/// Print a `UnitModelOutput` carrying only an error (used on panic/setup fail).
+pub fn emit_error(msg: String) {
+    let out = UnitModelOutput {
+        errors: vec![msg],
+        ..Default::default()
+    };
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
+/// Read `object_name`'s model out of `game_archive` and flatten it.
+///
+/// `object_name` is the unitdef field verbatim, so it may be any case and
+/// usually has no extension. Textures are written into `cache_dir`, and are
+/// simply left unresolved when there is no cache dir to write them to.
+pub fn render(
+    lib: &str,
+    game_archive: &str,
+    object_name: &str,
+    cache_dir: Option<&Path>,
+) -> UnitModelOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(u) => u,
+        Err(e) => {
+            return UnitModelOutput {
+                errors: vec![e],
+                ..Default::default()
+            }
+        }
+    };
+    us.init(false, 0);
+    let mut errors = us.drain_errors();
+
+    if !us.add_all_archives(game_archive) {
+        errors.push("this engine's libunitsync can't load game archives".into());
+        us.uninit();
+        return UnitModelOutput {
+            errors,
+            ..Default::default()
+        };
+    }
+    errors.extend(us.drain_errors());
+
+    let handle = crate::archive::resolve_open_path(&us, game_archive)
+        .as_deref()
+        .and_then(|p| us.open_archive(p));
+    let Some(handle) = handle else {
+        errors.push(format!("could not open archive {game_archive}"));
+        us.remove_all_archives();
+        us.uninit();
+        return UnitModelOutput {
+            errors,
+            ..Default::default()
+        };
+    };
+
+    let list: Vec<(String, String)> = us
+        .list_archive_files(handle)
+        .into_iter()
+        .map(|(path, _)| (path.to_lowercase(), path))
+        .collect();
+
+    let mut out = match find_model(&list, object_name) {
+        Some(path) => match us.read_archive_member(handle, &path, MODEL_READ_CAP) {
+            Some((_, bytes)) => build(&path, &bytes),
+            None => UnitModelOutput {
+                errors: vec![format!("could not read {path} out of {game_archive}")],
+                ..Default::default()
+            },
+        },
+        None => UnitModelOutput {
+            errors: vec![format!(
+                "{game_archive} has no model for {object_name:?} under {MODEL_DIR}/"
+            )],
+            ..Default::default()
+        },
+    };
+
+    if !out.textures.is_empty() {
+        let teamtex = read_teamtex(&us, handle, &list);
+        let key_base = cache_key_base(&us, game_archive);
+        for tex in &mut out.textures {
+            resolve_texture(
+                &us,
+                handle,
+                &list,
+                &out.format,
+                &teamtex,
+                cache_dir.zip(key_base.as_deref()),
+                tex,
+            );
+        }
+    }
+
+    us.close_archive(handle);
+    errors.extend(us.drain_errors());
+    us.remove_all_archives();
+    us.uninit();
+
+    out.errors.splice(0..0, errors);
+    out
+}
+
+/// Parse `bytes` by the extension of `path` and flatten the result.
+fn build(path: &str, bytes: &[u8]) -> UnitModelOutput {
+    if path.to_lowercase().ends_with(".3do") {
+        match coilbox_3do::read(bytes) {
+            Ok(m) => from_3do(path, &m),
+            Err(e) => UnitModelOutput {
+                errors: vec![format!("could not read {path}: {e}")],
+                ..Default::default()
+            },
+        }
+    } else {
+        match coilbox_s3o::read(bytes) {
+            Ok(m) => from_s3o(path, &m),
+            Err(e) => UnitModelOutput {
+                errors: vec![format!("could not read {path}: {e}")],
+                ..Default::default()
+            },
+        }
+    }
+}
+
+// ---------------------------------------------------------------- s3o
+
+/// Flatten an `.s3o`. One texture for the whole model, so every piece with
+/// geometry gets a single batch naming it. `texture2` is the team-colour and
+/// glow mask rather than something to look at, so it is not requested.
+fn from_s3o(path: &str, model: &coilbox_s3o::Model) -> UnitModelOutput {
+    let texture = (!model.texture1.is_empty()).then(|| model.texture1.clone());
+    UnitModelOutput {
+        format: "s3o".into(),
+        path: path.to_string(),
+        radius: model.radius,
+        height: model.height,
+        mid: model.mid,
+        root: Some(s3o_piece(&model.root, texture.as_deref())),
+        textures: texture
+            .map(|name| {
+                vec![ModelTexture {
+                    name,
+                    ..Default::default()
+                }]
+            })
+            .unwrap_or_default(),
+        palette_faces: 0,
+        errors: Vec::new(),
+    }
+}
+
+fn s3o_piece(piece: &coilbox_s3o::Piece, texture: Option<&str>) -> ModelPiece {
+    let indices = s3o_triangles(piece);
+    let mut groups = Vec::new();
+    if !indices.is_empty() {
+        let mut positions = Vec::with_capacity(piece.vertices.len() * 3);
+        let mut normals = Vec::with_capacity(piece.vertices.len() * 3);
+        let mut uvs = Vec::with_capacity(piece.vertices.len() * 2);
+        for v in &piece.vertices {
+            positions.extend_from_slice(&v.pos);
+            normals.extend_from_slice(&v.normal);
+            uvs.extend_from_slice(&v.uv);
+        }
+        groups.push(ModelGroup {
+            texture: texture.map(str::to_string),
+            positions,
+            normals,
+            uvs,
+            indices,
+        });
+    }
+    ModelPiece {
+        name: piece.name.clone(),
+        offset: piece.offset,
+        groups,
+        children: piece
+            .children
+            .iter()
+            .map(|c| s3o_piece(c, texture))
+            .collect(),
+    }
+}
+
+/// Turn a piece's index list into triangles, whichever primitive type it uses.
+/// The engine does the same conversion on load, so a viewer that only handled
+/// `Triangles` would draw parts of a shipped model as noise.
+fn s3o_triangles(piece: &coilbox_s3o::Piece) -> Vec<u32> {
+    let idx = &piece.indices;
+    let valid = |i: &u32| (*i as usize) < piece.vertices.len();
+    match piece.primitive_type {
+        coilbox_s3o::PrimitiveType::Triangles => idx
+            .chunks_exact(3)
+            .filter(|t| t.iter().all(valid))
+            .flatten()
+            .copied()
+            .collect(),
+        coilbox_s3o::PrimitiveType::Quads => idx
+            .chunks_exact(4)
+            .filter(|q| q.iter().all(valid))
+            .flat_map(|q| [q[0], q[1], q[2], q[0], q[2], q[3]])
+            .collect(),
+        coilbox_s3o::PrimitiveType::TriangleStrip => {
+            let mut out = Vec::new();
+            for (i, w) in idx.windows(3).enumerate() {
+                // A strip turns a corner by repeating a vertex, which makes a
+                // triangle with no area. Dropping those is what stops the turn
+                // showing up as a spike.
+                if w[0] == w[1] || w[1] == w[2] || w[0] == w[2] {
+                    continue;
+                }
+                if !w.iter().all(valid) {
+                    continue;
+                }
+                // Every other triangle in a strip is wound the other way.
+                if i % 2 == 0 {
+                    out.extend_from_slice(&[w[0], w[1], w[2]]);
+                } else {
+                    out.extend_from_slice(&[w[0], w[2], w[1]]);
+                }
+            }
+            out
+        }
+    }
+}
+
+// ---------------------------------------------------------------- 3do
+
+/// Flatten a `.3do`. A face names its own texture and has no UV, so a piece
+/// becomes one batch per distinct texture, and each face's corners are expanded
+/// rather than shared: two faces meeting at a corner have different normals for
+/// it, and under different textures they cannot share a vertex at all.
+fn from_3do(path: &str, model: &coilbox_3do::Model) -> UnitModelOutput {
+    let mut names: Vec<String> = Vec::new();
+    let mut palette_faces = 0u32;
+    let root = do3_piece(&model.root, &mut names, &mut palette_faces);
+    UnitModelOutput {
+        format: "3do".into(),
+        path: path.to_string(),
+        radius: model.radius,
+        height: model.height,
+        mid: model.mid,
+        root: Some(root),
+        textures: names
+            .into_iter()
+            .map(|name| ModelTexture {
+                name,
+                ..Default::default()
+            })
+            .collect(),
+        palette_faces,
+        errors: Vec::new(),
+    }
+}
+
+fn do3_piece(
+    piece: &coilbox_3do::Piece,
+    names: &mut Vec<String>,
+    palette_faces: &mut u32,
+) -> ModelPiece {
+    // Ordered so a piece's batches come out in a stable order, and so the
+    // untextured batch (the `None` key) is always first.
+    let mut batches: BTreeMap<Option<String>, ModelGroup> = BTreeMap::new();
+
+    for prim in &piece.primitives {
+        let key = match &prim.texture {
+            // A name that is present but empty resolves to nothing, so it is
+            // the flat-colour case in everything but how the file stores it.
+            coilbox_3do::Texture::Name(n) if !n.is_empty() => {
+                if !names.iter().any(|k| k == n) {
+                    names.push(n.clone());
+                }
+                Some(n.clone())
+            }
+            _ => {
+                *palette_faces += 1;
+                None
+            }
+        };
+        let group = batches.entry(key.clone()).or_insert_with(|| ModelGroup {
+            texture: key,
+            ..Default::default()
+        });
+        let base = (group.positions.len() / 3) as u32;
+        for (corner, &vi) in prim.indices.iter().enumerate() {
+            let pos = piece.vertices[vi as usize];
+            let normal = prim
+                .vertex_normals
+                .get(corner)
+                .copied()
+                .unwrap_or(prim.normal);
+            group.positions.extend_from_slice(&pos);
+            group.normals.extend_from_slice(&normal);
+            group.uvs.extend_from_slice(&CORNER_UV[corner % 4]);
+        }
+        // A face of any corner count is a fan around its first corner. The
+        // reader has already dropped everything with fewer than three.
+        for i in 1..prim.indices.len().saturating_sub(1) {
+            group
+                .indices
+                .extend_from_slice(&[base, base + i as u32, base + i as u32 + 1]);
+        }
+    }
+
+    ModelPiece {
+        name: piece.name.clone(),
+        offset: piece.offset,
+        groups: batches.into_values().collect(),
+        children: piece
+            .children
+            .iter()
+            .map(|c| do3_piece(c, names, palette_faces))
+            .collect(),
+    }
+}
+
+// ---------------------------------------------------------------- lookup
+
+/// Find the archive member a unitdef's `objectname` refers to.
+///
+/// The field is written however the game's author felt like: `"ARMCOM"`,
+/// `"arm_commander.s3o"`, or a path with a subfolder and Windows separators. A
+/// name with no extension means the engine tries `.s3o` first and `.3do` after,
+/// which is the order tried here.
+fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
+    let want = object_name.trim().replace('\\', "/").to_lowercase();
+    if want.is_empty() {
+        return None;
+    }
+    let candidates: Vec<String> = if want.ends_with(".s3o") || want.ends_with(".3do") {
+        vec![want]
+    } else {
+        vec![format!("{want}.s3o"), format!("{want}.3do")]
+    };
+    // The declared folder first, then the same name anywhere, which catches the
+    // games that put models under their own subfolders.
+    for c in &candidates {
+        if let Some(hit) = find_member(list, &format!("{MODEL_DIR}/{c}")) {
+            return Some(hit);
+        }
+    }
+    for c in &candidates {
+        let base = c.rsplit('/').next().unwrap_or(c);
+        if let Some(hit) = list
+            .iter()
+            .find(|(lower, _)| lower.starts_with(MODEL_DIR) && lower.ends_with(&format!("/{base}")))
+        {
+            return Some(hit.1.clone());
+        }
+    }
+    None
+}
+
+/// Read `unittextures/tatex/teamtex.txt`: the names a `.3do` face can use
+/// without the `00` suffix the engine otherwise appends. Lower cased, because
+/// the file is written in the original mixed case and the models are not.
+fn read_teamtex(us: &Unitsync, handle: i32, list: &[(String, String)]) -> Vec<String> {
+    let Some(actual) = find_member(list, TEAMTEX_LIST) else {
+        return Vec::new();
+    };
+    let Some((_, bytes)) = us.read_archive_member(handle, &actual, 64 * 1024) else {
+        return Vec::new();
+    };
+    String::from_utf8_lossy(&bytes)
+        .lines()
+        .map(|l| l.trim().to_lowercase())
+        .filter(|l| !l.is_empty())
+        .collect()
+}
+
+/// Resolve one texture name to an archive member, and copy its bytes into the
+/// cache dir under a name the asset protocol can serve. Leaves `tex.file` empty
+/// when nothing matches, which the viewer reports rather than drawing a mesh
+/// with no texture and no explanation.
+fn resolve_texture(
+    us: &Unitsync,
+    handle: i32,
+    list: &[(String, String)],
+    format: &str,
+    teamtex: &[String],
+    cache: Option<(&Path, &str)>,
+    tex: &mut ModelTexture,
+) {
+    let Some(actual) = locate_texture(list, format, teamtex, &tex.name) else {
+        return;
+    };
+    tex.source = actual.clone();
+
+    let Some((dir, base)) = cache else { return };
+    let file = cache_file_name(base, &actual);
+    let dest = dir.join(&file);
+    // Written once per archive and texture: the same atlas is shared by
+    // hundreds of units, and it can be 64 MiB.
+    if dest.is_file() {
+        tex.file = file;
+        return;
+    }
+    let Some((_, bytes)) = us.read_archive_member(handle, &actual, TEXTURE_READ_CAP) else {
+        return;
+    };
+    let _ = std::fs::create_dir_all(dir);
+    if std::fs::write(&dest, &bytes).is_ok() {
+        tex.file = file;
+    }
+}
+
+/// The archive member a model's texture name means.
+///
+/// An `.s3o` names a file, extension included, under `unittextures/`. A `.3do`
+/// names an entry in the atlas the engine packs out of `unittextures/tatex/`,
+/// with no extension and with `00` appended unless the name is in `teamtex.txt`.
+fn locate_texture(
+    list: &[(String, String)],
+    format: &str,
+    teamtex: &[String],
+    name: &str,
+) -> Option<String> {
+    let want = name.trim().replace('\\', "/").to_lowercase();
+    if want.is_empty() {
+        return None;
+    }
+    if format == "3do" {
+        let stem = if teamtex.contains(&want) {
+            want
+        } else {
+            format!("{want}00")
+        };
+        return find_with_ext(list, TATEX_DIR, &stem);
+    }
+    // Named with its extension, which is the normal case.
+    if let Some(hit) = find_member(list, &format!("{S3O_TEXTURE_DIR}/{want}")) {
+        return Some(hit);
+    }
+    // Named with the wrong extension, which happens when a game reskins a model
+    // from `.tga` to `.dds` without rewriting its headers.
+    let stem = want.rsplit_once('.').map(|(s, _)| s).unwrap_or(&want);
+    find_with_ext(list, S3O_TEXTURE_DIR, stem)
+}
+
+/// Find `<dir>/<stem>.<ext>` for the first extension that exists.
+fn find_with_ext(list: &[(String, String)], dir: &str, stem: &str) -> Option<String> {
+    TEXTURE_EXTS
+        .iter()
+        .find_map(|ext| find_member(list, &format!("{dir}/{stem}.{ext}")))
+}
+
+/// Find an archive member whose path equals or ends with `/<target_lc>`
+/// (case-insensitive). Mirrors the build-pic and sidepic resolvers.
+fn find_member(list: &[(String, String)], target_lc: &str) -> Option<String> {
+    let suffix = format!("/{target_lc}");
+    list.iter()
+        .find(|(lower, _)| lower == target_lc || lower.ends_with(&suffix))
+        .map(|(_, real)| real.clone())
+}
+
+// ---------------------------------------------------------------- cache
+
+/// Cheap, stable per-game cache identity (path + size + mtime + version salt).
+/// Mirrors `factionlogo::cache_key_base`.
+fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String> {
+    use std::hash::{Hash, Hasher};
+    let dir = us.archive_path(archive_name)?;
+    let path = Path::new(&dir).join(archive_name);
+    let md = std::fs::metadata(&path).ok()?;
+    let mtime = md
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    CACHE_VERSION.hash(&mut h);
+    path.hash(&mut h);
+    md.len().hash(&mut h);
+    mtime.hash(&mut h);
+    Some(format!("{:016x}", h.finish()))
+}
+
+/// The cache file for one archive member: `<gamekey>_<sanitised path>.<ext>`.
+/// One flat segment, because the asset protocol's root for these serves a single
+/// folder. The extension survives so the webview can pick a loader from it.
+fn cache_file_name(base: &str, member: &str) -> String {
+    let lower = member.to_lowercase();
+    let ext = lower.rsplit_once('.').map(|(_, e)| e).unwrap_or("bin");
+    let safe: String = lower
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+    format!("{base}_{safe}.{ext}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn listing(paths: &[&str]) -> Vec<(String, String)> {
+        paths
+            .iter()
+            .map(|p| (p.to_lowercase(), p.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn objectname_without_extension_prefers_s3o() {
+        let list = listing(&["Objects3D/armcom.s3o", "Objects3D/armcom.3do"]);
+        assert_eq!(
+            find_model(&list, "ARMCOM").as_deref(),
+            Some("Objects3D/armcom.s3o")
+        );
+    }
+
+    #[test]
+    fn objectname_without_extension_falls_back_to_3do() {
+        let list = listing(&["Objects3D/ARMCOM.3do"]);
+        assert_eq!(
+            find_model(&list, "ARMCOM").as_deref(),
+            Some("Objects3D/ARMCOM.3do")
+        );
+    }
+
+    #[test]
+    fn objectname_is_found_in_a_subfolder() {
+        let list = listing(&["Objects3D/units/goldtree.s3o"]);
+        assert_eq!(
+            find_model(&list, "goldtree").as_deref(),
+            Some("Objects3D/units/goldtree.s3o")
+        );
+    }
+
+    #[test]
+    fn objectname_with_a_windows_path_resolves() {
+        let list = listing(&["Objects3D/units/goldtree.s3o"]);
+        assert_eq!(
+            find_model(&list, "units\\GoldTree.s3o").as_deref(),
+            Some("Objects3D/units/goldtree.s3o")
+        );
+    }
+
+    #[test]
+    fn a_model_outside_objects3d_is_not_a_model() {
+        let list = listing(&["scripts/armcom.s3o"]);
+        assert_eq!(find_model(&list, "armcom"), None);
+    }
+
+    /// A `.3do` face's name gets `00` appended, unless `teamtex.txt` claims it.
+    #[test]
+    fn tatex_names_take_the_suffix_unless_listed() {
+        let list = listing(&[
+            "unittextures/tatex/arm01a00.tga",
+            "unittextures/tatex/arm32lt.bmp",
+        ]);
+        let teamtex = vec!["arm32lt".to_string()];
+        assert_eq!(
+            locate_texture(&list, "3do", &teamtex, "ARM01A").as_deref(),
+            Some("unittextures/tatex/arm01a00.tga")
+        );
+        assert_eq!(
+            locate_texture(&list, "3do", &teamtex, "Arm32Lt").as_deref(),
+            Some("unittextures/tatex/arm32lt.bmp")
+        );
+    }
+
+    #[test]
+    fn an_s3o_texture_resolves_by_name_then_by_stem() {
+        let list = listing(&[
+            "unittextures/lego2skin_explorer.dds",
+            "UnitTextures/armcom.dds",
+        ]);
+        assert_eq!(
+            locate_texture(&list, "s3o", &[], "lego2skin_explorer.dds").as_deref(),
+            Some("unittextures/lego2skin_explorer.dds")
+        );
+        // Header says `.tga`, archive ships `.dds`.
+        assert_eq!(
+            locate_texture(&list, "s3o", &[], "armcom.tga").as_deref(),
+            Some("UnitTextures/armcom.dds")
+        );
+        assert_eq!(locate_texture(&list, "s3o", &[], "missing.dds"), None);
+    }
+
+    #[test]
+    fn cache_file_name_is_one_flat_segment_keeping_the_extension() {
+        let name = cache_file_name("abcd", "UnitTextures/Lego Skin.DDS");
+        assert_eq!(name, "abcd_unittextures_lego_skin_dds.dds");
+        assert!(!name.contains('/'));
+    }
+
+    /// Quads become two triangles, and a strip alternates its winding.
+    #[test]
+    fn s3o_primitives_all_become_triangles() {
+        let vertex = coilbox_s3o::Vertex {
+            pos: [0.0; 3],
+            normal: [0.0, 1.0, 0.0],
+            uv: [0.0; 2],
+        };
+        let piece = |primitive_type, indices: Vec<u32>| coilbox_s3o::Piece {
+            name: "p".into(),
+            primitive_type,
+            offset: [0.0; 3],
+            vertices: vec![vertex; 5],
+            indices,
+            children: Vec::new(),
+        };
+        assert_eq!(
+            s3o_triangles(&piece(coilbox_s3o::PrimitiveType::Quads, vec![0, 1, 2, 3])),
+            vec![0, 1, 2, 0, 2, 3]
+        );
+        assert_eq!(
+            s3o_triangles(&piece(
+                coilbox_s3o::PrimitiveType::TriangleStrip,
+                vec![0, 1, 2, 3]
+            )),
+            vec![0, 1, 2, 1, 3, 2]
+        );
+        // A repeated vertex is a strip turning a corner, and has no area.
+        assert_eq!(
+            s3o_triangles(&piece(
+                coilbox_s3o::PrimitiveType::TriangleStrip,
+                vec![0, 1, 1, 2]
+            )),
+            Vec::<u32>::new()
+        );
+        // An index the piece has no vertex for is dropped, not drawn as noise.
+        assert_eq!(
+            s3o_triangles(&piece(coilbox_s3o::PrimitiveType::Triangles, vec![0, 1, 9])),
+            Vec::<u32>::new()
+        );
+    }
+}

@@ -71,8 +71,13 @@ for _, k in ipairs(names) do
     end
   end
   local mobile = (speed_of(d) > 0) and '1' or '0'
+  -- The model file the engine draws the unit with. Often has no extension and
+  -- often a different case from the archive member, so it is passed through as
+  -- written and resolved against the archive listing later.
+  local obj = (type(d) == 'table' and type(d.objectname) == 'string') and d.objectname or ''
+  obj = tostring(obj):gsub('[\t\r\n]', ' ')
   lines[#lines + 1] = string.lower(tostring(k)) .. '\t' .. full .. '\t'
-    .. table.concat(opts, ',') .. '\t' .. mobile
+    .. table.concat(opts, ',') .. '\t' .. mobile .. '\t' .. obj
 end
 return { result = table.concat(lines, '\n') }
 "#;
@@ -187,6 +192,7 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
             let full = it.next().unwrap_or("");
             let opts = it.next().unwrap_or("");
             let mobile = it.next().unwrap_or("") == "1";
+            let object_name = it.next().unwrap_or("").trim();
             let build_options = opts
                 .split(',')
                 .map(str::trim)
@@ -198,6 +204,7 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
                 full_name: Some(full.to_string()).filter(|s| !s.is_empty() && s != name),
                 build_options,
                 mobile,
+                object_name: Some(object_name.to_string()).filter(|s| !s.is_empty()),
             })
         })
         .collect()
@@ -210,7 +217,7 @@ mod tests {
     #[test]
     fn parses_tab_separated_dataset_units() {
         let units = parse_dataset_units(
-            "armcom\tArmada Commander\tarmsolar,armwin\t1\ncore\tcore\t\t0\n\tskip\tx\t1\nlone\t\tarmcom\t0",
+            "armcom\tArmada Commander\tarmsolar,armwin\t1\tARMCOM\ncore\tcore\t\t0\n\tskip\tx\t1\nlone\t\tarmcom\t0",
         );
         // Three usable rows: the empty-name row is dropped.
         assert_eq!(units.len(), 3);
@@ -218,11 +225,13 @@ mod tests {
         assert_eq!(units[0].full_name.as_deref(), Some("Armada Commander"));
         assert_eq!(units[0].build_options, vec!["armsolar", "armwin"]);
         assert!(units[0].mobile);
+        assert_eq!(units[0].object_name.as_deref(), Some("ARMCOM"));
         // Full name equal to the internal name collapses to None; empty options.
         assert_eq!(units[1].name, "core");
         assert_eq!(units[1].full_name, None);
         assert!(units[1].build_options.is_empty());
         assert!(!units[1].mobile);
+        assert_eq!(units[1].object_name, None);
         // Missing full name is None; a single build option parses.
         assert_eq!(units[2].name, "lone");
         assert_eq!(units[2].full_name, None);
@@ -244,6 +253,7 @@ mod tests {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("buildoptions"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("Spring.TimeCheck"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("speed_of"));
+        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("objectname"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("result ="));
     }
 }
