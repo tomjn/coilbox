@@ -12,6 +12,7 @@ import {
   presetById,
   RECOIL,
   ROLES,
+  restAngleWarnings,
   TURRET_TRACK,
   unmetRequirements,
   WALK_BIPED,
@@ -367,5 +368,81 @@ describe("idle.sway", () => {
 
     expect(yaw(IDLE_SWAY, 1, "base", params)).toBeCloseTo(10, 4);
     expect(yaw(IDLE_SWAY, 3, "base", params)).toBeCloseTo(-10, 4);
+  });
+});
+
+/** Degrees to radians, for readable rest rotations in the tests below. */
+function rad(degrees: number): number {
+  return (degrees * Math.PI) / 180;
+}
+
+describe("restAngleWarnings", () => {
+  it("says nothing about a piece with no role", () => {
+    expect(restAngleWarnings({ rotation: [rad(37), 0, 0] })).toEqual([]);
+  });
+
+  it("says nothing about a role no preset ever turns", () => {
+    expect(
+      restAngleWarnings({ role: "flare", rotation: [rad(37), 0, 0] }),
+    ).toEqual([]);
+  });
+
+  it("says nothing when the rotation on the turned axis is a right angle", () => {
+    expect(
+      restAngleWarnings({ role: "wheel", rotation: [rad(90), 0, 0] }),
+    ).toEqual([]);
+  });
+
+  it("says nothing a fraction off a right angle", () => {
+    expect(
+      restAngleWarnings({ role: "wheel", rotation: [rad(91), 0, 0] }),
+    ).toEqual([]);
+  });
+
+  it("names the axis, the angle and a clean value nearby when off-axis", () => {
+    const warnings = restAngleWarnings({
+      role: "wheel",
+      rotation: [rad(37), 0, 0],
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("Wheel");
+    expect(warnings[0]).toContain("X");
+    expect(warnings[0]).toContain("37.0");
+    expect(warnings[0]).toContain("0°");
+  });
+
+  it("checks the axis the role actually turns about, not just x", () => {
+    // A turret turns about y, so a dirty x rotation is not its business.
+    expect(
+      restAngleWarnings({ role: "turret", rotation: [rad(37), 0, 0] }),
+    ).toEqual([]);
+    expect(
+      restAngleWarnings({ role: "turret", rotation: [0, rad(37), 0] }),
+    ).toHaveLength(1);
+  });
+
+  it("works for both sides of a mirrored leg role", () => {
+    expect(
+      restAngleWarnings({ role: "leg.l1.thigh", rotation: [rad(20), 0, 0] }),
+    ).toHaveLength(1);
+    expect(
+      restAngleWarnings({ role: "leg.r1.thigh", rotation: [rad(20), 0, 0] }),
+    ).toHaveLength(1);
+    expect(
+      restAngleWarnings({ role: "leg.r2.foot", rotation: [rad(180), 0, 0] }),
+    ).toEqual([]);
+  });
+
+  it("checks every axis a role turns about, for a role that turns about more than one", () => {
+    // aim turns about both x (pitch) and y (heading).
+    expect(
+      restAngleWarnings({ role: "aim", rotation: [rad(15), 0, 0] }),
+    ).toHaveLength(1);
+    expect(
+      restAngleWarnings({ role: "aim", rotation: [rad(15), rad(15), 0] }),
+    ).toHaveLength(2);
+    expect(
+      restAngleWarnings({ role: "aim", rotation: [0, 0, rad(15)] }),
+    ).toEqual([]);
   });
 });

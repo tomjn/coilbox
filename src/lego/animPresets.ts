@@ -1087,3 +1087,78 @@ export function countRoles(pieces: { role?: string }[]): Map<string, number> {
 export function roleLabel(id: string): string {
   return ROLES.find((role) => role.id === id)?.label ?? id;
 }
+
+/**
+ * Which local axes (0 = x, 1 = y, 2 = z) a role's rotation actually turns
+ * about, read off every preset's `track` above rather than assumed.
+ *
+ * Most roles turn about exactly one axis, but two do not. `base` turns about
+ * y under idle sway and z under hover-and-bob or a wreck pose, because those
+ * are different presets claiming the same role, and `aim` turns about both x
+ * and y at once, standing in for a turret's separate pitch and heading on a
+ * single piece. A role missing here, such as `flare`, is never itself turned.
+ */
+const ROLE_ROTATION_AXES: Record<string, readonly number[]> = {
+  turret: [1],
+  barrel: [0],
+  wheel: [0],
+  "buildarm.base": [1],
+  "buildarm.arm": [0],
+  "buildarm.nozzle": [0],
+  door: [1],
+  base: [1, 2],
+  aim: [0, 1],
+};
+
+const LEG_ROLE = /^leg\.[lr][12]\.(?:thigh|shin|foot)$/;
+
+/** The axes a role's rest rotation should sit on a right angle for. Empty for
+ *  a role no preset ever turns. Leg roles turn about x regardless of side or
+ *  pair, so they match by pattern rather than one table entry each. */
+function roleRotationAxes(role: string): readonly number[] {
+  if (LEG_ROLE.test(role)) return [0];
+  return ROLE_ROTATION_AXES[role] ?? [];
+}
+
+const AXIS_LETTERS = ["X", "Y", "Z"];
+
+/**
+ * How far off a right angle a rest rotation can sit before it is worth
+ * mentioning. A drag rarely lands on exactly 90 degrees, and the gizmo's own
+ * rotation snap steps in 15 degree increments, so this stays well inside half
+ * of that or a deliberate 15 degree piece would nag too.
+ */
+const REST_ANGLE_TOLERANCE_DEG = 2;
+
+/**
+ * Whether a piece's rest rotation is a clean right angle on every axis its
+ * role turns about, as sentences meant to be shown next to the role picker.
+ *
+ * A piece's rest rotation is baked into its vertices on export (see
+ * `s3oBuild.ts`'s `bakeGeometry`). The engine keeps no separate record of it,
+ * so a `Turn` call always measures its target from that baked pose. Someone
+ * reading the viewport and typing a target relative to what they see needs
+ * the baked value to be a clean, memorable number. 90 degrees is one, 37.284
+ * is not, and a hand-edited `Turn` on that axis will not land where it looks
+ * like it should.
+ *
+ * Advice, not validation. A piece is free to sit at any angle, this warns and
+ * nothing more, and export is unaffected either way.
+ */
+export function restAngleWarnings(piece: {
+  role?: string;
+  rotation: [number, number, number];
+}): string[] {
+  if (!piece.role) return [];
+  const warnings: string[] = [];
+  for (const axis of roleRotationAxes(piece.role)) {
+    const degrees = (piece.rotation[axis] * 180) / Math.PI;
+    const nearest = Math.round(degrees / 90) * 90;
+    if (Math.abs(degrees - nearest) <= REST_ANGLE_TOLERANCE_DEG) continue;
+    const clean = ((nearest % 360) + 360) % 360;
+    warnings.push(
+      `${roleLabel(piece.role)} turns about ${AXIS_LETTERS[axis]}, and this piece's rest rotation there is ${degrees.toFixed(1)}°, not a right angle. A hand-edited Turn call may not land where it looks like it should. The nearest clean angle is ${clean}°.`,
+    );
+  }
+  return warnings;
+}
