@@ -20,10 +20,11 @@ import type { LoadedPack } from "./pack";
 /**
  * An atlas a unit can sample.
  *
- * Identified by its texture's file name, because that is what the s3o names,
- * what lands in `unittextures/`, and therefore what a unit is really bound to.
- * A pack id would not do: two atlases with the same file name could not coexist
- * in one game folder whatever their packs are called.
+ * Identified by its texture's file name, because an export derives from that
+ * both what the s3o names and what lands in `unittextures/` (see
+ * `exportTextureName`), and therefore what a unit is really bound to. A pack id
+ * would not do: two atlases with the same file name could not coexist in one
+ * game folder whatever their packs are called.
  */
 export interface LegoAtlas {
   /** The texture file name, as the s3o names it. */
@@ -32,6 +33,27 @@ export interface LegoAtlas {
   packId: string;
   /** The atlas pack's folder, or null for the base pack's own atlas. */
   folder: string | null;
+}
+
+/**
+ * The prefix on every texture an export writes.
+ *
+ * A pack's file name is only unique among packs: the base pack calls its atlas
+ * `atlas.png`, which is a name a game could plausibly already have in
+ * `unittextures/`. The prefix is what keeps an export off a file the game owns,
+ * and it says who put the file there.
+ */
+const EXPORT_TEXTURE_PREFIX = "coilbox_";
+
+/**
+ * The file name an atlas is written as, which is also what the s3o names.
+ *
+ * Taken from the atlas's own name and nothing else, so units sharing an atlas
+ * still share the one copy, and a unit whose atlas is not installed still names
+ * the file that atlas would be written as.
+ */
+export function exportTextureName(texture: string): string {
+  return `${EXPORT_TEXTURE_PREFIX}${texture}`;
 }
 
 /** Where an atlas's texture is served from. */

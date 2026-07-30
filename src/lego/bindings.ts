@@ -3,13 +3,20 @@ import { defineCommand } from "@picoframe/plugin-sdk";
 import type { S3oBuild } from "./s3oBuild";
 
 /**
- * Which atlas to place, and where to read it from. The two travel together
- * because a texture's file name does not say which pack ships it: `pack` is an
- * atlas pack's folder, or null for the base pack's own atlas.
+ * Which atlas to place, where to read it from, and what to call it. The three
+ * travel together because a texture's file name does not say which pack ships
+ * it: `pack` is an atlas pack's folder, or null for the base pack's own atlas.
  */
 export interface AtlasRef {
+  /** The file name in the pack that ships it, which is what to read. */
   name: string;
   pack: string | null;
+  /**
+   * The file name to write it as, which is what the s3o names. Derived by
+   * `exportTextureName`, so a pack's generic name cannot land on a game's own
+   * file.
+   */
+  writeAs: string;
 }
 
 /** A stored document. The JSON is parsed here, not in Rust. */
@@ -54,7 +61,8 @@ export const legoThumbSave = defineCommand<
 /**
  * Write a built unit into a game folder: `objects3d/<unit>.s3o`, and the unit's
  * atlas into `unittextures/` when `atlas` is given. Units sharing an atlas share
- * the one copy, so exporting a second unit does not add a second PNG.
+ * the one copy, so exporting a second unit does not add a second PNG, and a
+ * texture already at that path is left alone rather than overwritten.
  */
 export const legoExport = defineCommand<
   {
@@ -77,6 +85,8 @@ export const legoExport = defineCommand<
     unitDef: string | null;
     /** True when a unit definition was already there and was left as it was. */
     unitDefKept: boolean;
+    /** True when a texture of that name was already there and was left alone. */
+    textureKept: boolean;
   }
 >("coilbox-lego", "lego_export");
 

@@ -339,14 +339,20 @@ fn valid_pack_folder(name: &str) -> bool {
         && name != ".."
 }
 
-/// Which atlas to place, and which installed pack ships it. The two travel
-/// together because a texture's file name does not say where to read it from.
+/// Which atlas to place, which installed pack ships it, and what to call it in
+/// the game folder. The three travel together because a texture's file name
+/// does not say where to read it from, and what a pack calls its atlas is not
+/// what an export writes.
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct AtlasRef {
-    /// The texture's file name, as the s3o names it.
+    /// The texture's file name in the pack that ships it.
     name: String,
     /// The atlas pack's folder, or `None` for the base pack's own atlas.
     pack: Option<String>,
+    /// The file name to write it as, which is what the s3o names. The frontend
+    /// derives it, since the same name has to go into the model header.
+    write_as: String,
 }
 
 /// Where an atlas file is read from: the base pack, or the atlas pack that
@@ -368,6 +374,29 @@ fn atlas_source<R: Runtime>(app: &AppHandle<R>, atlas: &AtlasRef) -> Result<Path
                 .ok_or_else(|| "could not resolve the parts pack folder".to_string())
         }
     }
+}
+
+/// Where an atlas is written: `dir` joined with the name the s3o gives it.
+///
+/// Checked apart from the source name because the caller derives this one
+/// rather than reading it off a pack, and it is still a file name from the
+/// frontend.
+fn atlas_target(dir: &Path, atlas: &AtlasRef) -> Result<PathBuf, String> {
+    if !valid_atlas_name(&atlas.write_as) {
+        return Err(format!("invalid texture name: {}", atlas.write_as));
+    }
+    Ok(dir.join(&atlas.write_as))
+}
+
+/// Whether a file the export owns has to be left exactly as it is.
+///
+/// Once a game folder holds one, it is the game author's: hand edits to a
+/// script, a unit definition or a texture have to survive a re-export, and a
+/// file the export never wrote must not be overwritten at all. The scratch game
+/// is the one exception (see [`is_scratch_dir`]): it has no hand edits worth
+/// keeping and has to show the unit as it stands now.
+fn keep_existing(target: &Path, scratch: bool) -> bool {
+    target.exists() && !scratch
 }
 
 #[derive(Deserialize)]
@@ -424,15 +453,15 @@ impl From<ExportPiece> for coilbox_s3o::Piece {
 ///
 /// The model goes to `objects3d/<unit>.s3o`. The atlas is shared by every unit
 /// that samples it, so one copy in `unittextures/` serves all of them and
-/// re-exporting a second unit does not add a second PNG. `atlas_pack` says
+/// re-exporting a second unit does not add a second PNG. `atlas.pack` says
 /// which installed pack ships it, since a unit may sample an atlas pack's
-/// texture rather than the base pack's.
-/// The unit script and the unit definition both land under their own folder
-/// and, like the script, the definition is written once and then left for
-/// hand edits: a re-export never overwrites one that is already there. The one
-/// exception is coilbox's own scratch game (see [`is_scratch_dir`]), which has
-/// no hand edits worth keeping and must always show the unit as it stands now,
-/// so both files are overwritten unconditionally there.
+/// texture rather than the base pack's, and `atlas.write_as` is what it is
+/// called once written.
+/// The unit script and the unit definition both land under their own folder,
+/// and all three of the texture, the script and the definition are written once
+/// and then left alone: a re-export never overwrites one that is already there
+/// (see [`keep_existing`]). Only the model is rewritten every time, because it
+/// is the one file the builder alone owns.
 #[tauri::command]
 async fn lego_export<R: Runtime>(
     app: AppHandle<R>,
@@ -475,7 +504,13 @@ async fn lego_export<R: Runtime>(
         return CliResult::err(format!("could not write {}: {e}", model_path.display()));
     }
 
+    // The texture is written once and then left alone, like the two files
+    // below. The name it is written under is the caller's and cannot collide
+    // with a game's own by accident, so a file already there is either a copy
+    // an earlier export made or one the author put there, and neither is ours
+    // to overwrite.
     let mut texture_path = None;
+    let mut texture_kept = false;
     if let Some(atlas) = atlas {
         let source = match atlas_source(&app, &atlas) {
             Ok(path) => path,
@@ -485,11 +520,17 @@ async fn lego_export<R: Runtime>(
         if let Err(e) = std::fs::create_dir_all(&textures) {
             return CliResult::err(format!("could not create {}: {e}", textures.display()));
         }
-        let target = textures.join(&atlas.name);
-        if let Err(e) = std::fs::copy(&source, &target) {
+        let target = match atlas_target(&textures, &atlas) {
+            Ok(path) => path,
+            Err(e) => return CliResult::err(e),
+        };
+        if keep_existing(&target, scratch) {
+            texture_kept = true;
+        } else if let Err(e) = std::fs::copy(&source, &target) {
             return CliResult::err(format!("could not copy the texture: {e}"));
+        } else {
+            texture_path = Some(target.to_string_lossy().to_string());
         }
-        texture_path = Some(target.to_string_lossy().to_string());
     }
 
     // The unit script is written once and then left alone. It is meant to be
@@ -504,7 +545,7 @@ async fn lego_export<R: Runtime>(
             return CliResult::err(format!("could not create {}: {e}", scripts.display()));
         }
         let target = scripts.join(format!("{unit_name}.lua"));
-        if target.exists() && !scratch {
+        if keep_existing(&target, scratch) {
             script_kept = true;
         } else if let Err(e) = std::fs::write(&target, script) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
@@ -524,7 +565,7 @@ async fn lego_export<R: Runtime>(
             return CliResult::err(format!("could not create {}: {e}", units.display()));
         }
         let target = units.join(format!("{unit_name}.lua"));
-        if target.exists() && !scratch {
+        if keep_existing(&target, scratch) {
             unit_def_kept = true;
         } else if let Err(e) = std::fs::write(&target, unit_def) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
@@ -536,6 +577,7 @@ async fn lego_export<R: Runtime>(
     CliResult::ok(json!({
         "model": model_path.to_string_lossy(),
         "texture": texture_path,
+        "textureKept": texture_kept,
         "script": script_path,
         "scriptKept": script_kept,
         "unitDef": unit_def_path,
@@ -605,6 +647,12 @@ async fn lego_export_obj<R: Runtime>(
     if let Err(e) = std::fs::create_dir_all(&blender) {
         return CliResult::err(format!("could not create {}: {e}", blender.display()));
     }
+    // Resolved before anything is written, so a texture name that will not do
+    // does not leave an `.mtl` pointing at a file that never arrives.
+    let texture_path = match atlas_target(&blender, &atlas) {
+        Ok(path) => path,
+        Err(e) => return CliResult::err(e),
+    };
 
     let obj_path = blender.join(format!("{unit_name}.obj"));
     if let Err(e) = std::fs::write(&obj_path, obj) {
@@ -615,7 +663,6 @@ async fn lego_export_obj<R: Runtime>(
         return CliResult::err(format!("could not write {}: {e}", mtl_path.display()));
     }
 
-    let texture_path = blender.join(&atlas.name);
     if let Err(e) = std::fs::copy(&source, &texture_path) {
         return CliResult::err(format!("could not copy the texture: {e}"));
     }
@@ -770,6 +817,39 @@ mod tests {
         assert!(!valid_atlas_name("sub/atlas.png"));
         assert!(!valid_atlas_name("atlas.exe"));
         assert!(!valid_atlas_name(".."));
+    }
+
+    #[test]
+    fn a_texture_target_is_the_name_it_is_written_as_and_never_a_path() {
+        let atlas = |write_as: &str| AtlasRef {
+            name: "atlas.png".to_string(),
+            pack: None,
+            write_as: write_as.to_string(),
+        };
+        assert_eq!(
+            atlas_target(Path::new("/game/unittextures"), &atlas("coilbox_atlas.png")),
+            Ok(PathBuf::from("/game/unittextures/coilbox_atlas.png"))
+        );
+        // It is joined onto a folder in the game, so it must not walk out of it
+        // any more than the name it was read from may.
+        assert!(atlas_target(Path::new("/game/unittextures"), &atlas("../modinfo.png")).is_err());
+        assert!(atlas_target(Path::new("/game/unittextures"), &atlas("sub/atlas.png")).is_err());
+        assert!(atlas_target(Path::new("/game/unittextures"), &atlas("")).is_err());
+    }
+
+    #[test]
+    fn a_file_the_game_already_has_is_kept_unless_the_target_is_scratch() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let existing = dir.path().join("atlas.png");
+        std::fs::write(&existing, "the game's own").expect("write");
+        let missing = dir.path().join("coilbox_atlas.png");
+
+        // A real game folder: what is there stays, what is not is written.
+        assert!(keep_existing(&existing, false));
+        assert!(!keep_existing(&missing, false));
+        // The scratch game has nothing worth keeping, so it is always rewritten.
+        assert!(!keep_existing(&existing, true));
+        assert!(!keep_existing(&missing, true));
     }
 
     #[test]

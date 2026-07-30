@@ -92,7 +92,7 @@ A unit samples one atlas, chosen when the unit is created and changeable at any 
 
 The unit records the atlas by texture file name, which is what the s3o names. A unit whose atlas is not installed still opens: it is drawn with the base atlas, says so above the viewport, and still names its own atlas when exported, so installing the pack later completes the unit without touching it. An export in that state cannot copy the texture or write the Blender files, and the export drawer says which.
 
-An export writes exactly one atlas, the unit's own.
+An export writes exactly one atlas, the unit's own. It lands in `unittextures/` under the pack's name for it with `coilbox_` in front, which is also the name the s3o gives it: a pack's own name is unique only among packs, and `atlas.png` is a name a game could already have. A file already at that name is left alone rather than overwritten, and the export drawer says when that happened.
 
 ## pack.json
 
