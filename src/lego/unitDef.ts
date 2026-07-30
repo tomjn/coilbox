@@ -9,7 +9,14 @@
  * classes yet, and a unit with `canMove` set but no matching `movementClass`
  * is rejected outright at load: UnitDefHandler logs an error and drops it, so
  * the whole point of this file (something to spawn) is lost. Leaving
- * movement off is what keeps every export loadable.
+ * movement off is what keeps every export loadable. Nothing has to build the
+ * unit either, because the scratch game makes it the side's start unit, so a
+ * static unit is still one you meet in a match.
+ *
+ * `objectname` has to resolve. The engine's own `gamedata/unitdefs.lua` drops
+ * any definition whose model is missing, before the unit ever reaches the
+ * game, so an export that writes a definition without its `.s3o` produces a
+ * unit that silently does not exist.
  */
 
 import type { LegoProject } from "./model";
