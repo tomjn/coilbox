@@ -4,6 +4,7 @@ members = [
   "src-tauri",
   "crates/coilbox-portable",
   "crates/coilbox-s3o",
+  "crates/coilbox-3do",
   "crates/coilbox-lobby-protocol",
   "crates/coilbox-springlua",
   "crates/coilbox-thumb-cache",
