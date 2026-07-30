@@ -80,6 +80,18 @@ const HOOK_FALLBACK: Partial<Record<LuaHook, string[]>> = {
   AimWeapon1: ["  return true"],
 };
 
+/**
+ * The script this unit is: its own once the user has taken it over, the one
+ * the presets generate until then.
+ *
+ * Everything that shows or writes a unit script goes through here, so taking
+ * ownership changes what the drawer shows, what a test run installs and what
+ * an export writes, all at once.
+ */
+export function unitScript(project: LegoProject): string {
+  return project.script ?? buildLuaScript(project);
+}
+
 export function buildLuaScript(project: LegoProject): string {
   const used = new Set<string>();
   const byRole = new Map<string, string[]>();

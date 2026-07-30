@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { declaredPieces } from "./luaPieces";
-import { buildLuaScript } from "./luaScript";
+import { declaredPieces, missingPieces } from "./luaPieces";
+import { buildLuaScript, unitScript } from "./luaScript";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 
 function project(
@@ -66,12 +66,10 @@ describe("buildLuaScript", () => {
     const lua = buildLuaScript(
       project(LEGS, [{ presetId: "walk.biped", params: {} }]),
     );
-    const names = new Set(project(LEGS).pieces.map((piece) => piece.name));
+    const names = project(LEGS).pieces.map((piece) => piece.name);
 
     expect(declaredPieces(lua).length).toBeGreaterThan(0);
-    for (const declared of declaredPieces(lua)) {
-      expect(names).toContain(declared);
-    }
+    expect(missingPieces(lua, names)).toEqual([]);
   });
 
   it("leaves out pieces nothing references", () => {
@@ -314,5 +312,27 @@ describe("buildLuaScript", () => {
     expect(lua.endsWith("\n")).toBe(true);
     expect(lua.endsWith("\n\n")).toBe(false);
     expect(lua).not.toMatch(/\n{3}/);
+  });
+});
+
+describe("unitScript", () => {
+  it("generates from the presets while the unit has no script of its own", () => {
+    const doc = project(LEGS, [{ presetId: "walk.biped", params: {} }]);
+
+    expect(unitScript(doc)).toBe(buildLuaScript(doc));
+  });
+
+  it("gives back the unit's own script, verbatim, once it has one", () => {
+    const own = "-- mine\nfunction script.Create()\nend\n";
+    const doc = project(LEGS, [{ presetId: "walk.biped", params: {} }]);
+
+    expect(unitScript({ ...doc, script: own })).toBe(own);
+  });
+
+  it("keeps the owned script when the presets would say something else", () => {
+    const doc = project(LEGS, [{ presetId: "walk.biped", params: {} }]);
+    const owned = { ...doc, script: "-- mine\n" };
+
+    expect(unitScript({ ...owned, animations: [] })).toBe("-- mine\n");
   });
 });

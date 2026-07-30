@@ -34,7 +34,7 @@ import {
 } from "../../bindings";
 import { exportGlb } from "../../exportGlb";
 import { buildObj } from "../../exportObj";
-import { buildLuaScript } from "../../luaScript";
+import { unitScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { buildS3o } from "../../s3oBuild";
@@ -130,7 +130,7 @@ export function ExportDrawer({
           withTexture && installed
             ? { name: atlas, pack: installed.folder, writeAs: atlasFile }
             : null,
-        script: withScript ? buildLuaScript(project) : null,
+        script: withScript ? unitScript(project) : null,
         // Unlike the atlas and the script, there is no scenario where a
         // built unit should export without one: with no unit definition the
         // engine has nothing to spawn.
@@ -251,9 +251,12 @@ export function ExportDrawer({
                 </Label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Puts <code>{project.unitName}.lua</code> in{" "}
-                  <code>scripts</code>, generated from the animations applied to
-                  this unit. An existing script is never overwritten, so hand
-                  edits survive a re-export.
+                  <code>scripts</code>,{" "}
+                  {project.script === undefined
+                    ? "generated from the animations applied to this unit"
+                    : "the script this unit owns, exactly as it stands"}
+                  . An existing script is never overwritten, so hand edits
+                  survive a re-export.
                 </p>
               </div>
             </div>

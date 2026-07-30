@@ -14,3 +14,15 @@ export function declaredPieces(lua: string): string[] {
   const re = /piece\s*\(?\s*(?:"([^"]+)"|'([^']+)'|\[\[([^\]]+)\]\])\s*\)?/g;
   return [...lua.matchAll(re)].map((match) => match[1] ?? match[2] ?? match[3]);
 }
+
+/**
+ * The piece names a script declares that the unit does not have.
+ *
+ * In the order the script names them, each one once. The engine fails at load
+ * on the first of these, so a script editor can say which name is wrong before
+ * the unit ever reaches a game.
+ */
+export function missingPieces(lua: string, pieces: Iterable<string>): string[] {
+  const present = new Set(pieces);
+  return [...new Set(declaredPieces(lua))].filter((name) => !present.has(name));
+}

@@ -4,6 +4,10 @@
  * A preset can only be applied once its roles are filled, and the reason it
  * cannot is named rather than left as a greyed-out button. Playback changes
  * nothing in the document: stopping restores the built pose exactly.
+ *
+ * A unit that has taken its script over is past all of this. The presets are
+ * gone for it, and so is playback, which plays the presets rather than the
+ * script: what is left is the way into the editor.
  */
 
 import { Button } from "@picoframe/frame";
@@ -28,6 +32,8 @@ interface Props {
   playing: boolean;
   onPlayingChange: (playing: boolean) => void;
   onChange: (applied: AppliedPreset[]) => void;
+  /** Stores the unit's own Lua. The first call is the unit taking it over. */
+  onScriptChange: (script: string) => void;
 }
 
 export function AnimationPanel({
@@ -35,11 +41,13 @@ export function AnimationPanel({
   playing,
   onPlayingChange,
   onChange,
+  onScriptChange,
 }: Props) {
   const reduceMotion = useReduceMotion();
   const [showScript, setShowScript] = useState(false);
   const applied = project.animations ?? [];
   const counts = countRoles(project.pieces);
+  const owned = project.script !== undefined;
 
   function apply(presetId: string) {
     onChange([...applied, { presetId, params: {} }]);
@@ -56,6 +64,47 @@ export function AnimationPanel({
           ? { ...entry, params: { ...entry.params, [param]: next } }
           : entry,
       ),
+    );
+  }
+
+  const scriptDrawer = (
+    <ScriptDrawer
+      open={showScript}
+      onOpenChange={setShowScript}
+      project={project}
+      onScriptChange={onScriptChange}
+    />
+  );
+
+  if (owned) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          <span className="text-xs text-muted-foreground">
+            This unit owns its script.
+          </span>
+          <Button
+            size="sm"
+            className="ml-auto"
+            onClick={() => setShowScript(true)}
+          >
+            <FileCode size={14} /> Edit
+          </Button>
+        </div>
+
+        {scriptDrawer}
+
+        <div className="flex flex-col gap-2 px-3 py-3 text-xs text-muted-foreground">
+          <p>
+            The presets wrote this unit's script once and are done with it. The
+            script is the animation now, and it is edited here.
+          </p>
+          <p>
+            Playback plays the presets rather than the script, so it is off for
+            this unit.
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -89,11 +138,7 @@ export function AnimationPanel({
         </Button>
       </div>
 
-      <ScriptDrawer
-        open={showScript}
-        onOpenChange={setShowScript}
-        project={project}
-      />
+      {scriptDrawer}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {PRESETS.map((preset) => {
