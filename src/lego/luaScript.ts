@@ -21,8 +21,11 @@ import type { LegoProject } from "./model";
 /**
  * Lua's reserved words. A piece called `end` is a legal piece name and an
  * illegal local, so those get a prefix while the piece keeps its real name.
+ *
+ * Exported so other Lua-emitting code, such as a future script editor, can
+ * apply the same rule.
  */
-const RESERVED = new Set([
+export const RESERVED = new Set([
   "and",
   "break",
   "do",
@@ -47,7 +50,7 @@ const RESERVED = new Set([
   "while",
 ]);
 
-function localName(piece: string): string {
+export function localName(piece: string): string {
   return RESERVED.has(piece) ? `p_${piece}` : piece;
 }
 
