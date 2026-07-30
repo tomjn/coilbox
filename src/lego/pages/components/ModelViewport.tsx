@@ -47,6 +47,14 @@ import { useReduceMotion } from "../../../general/display";
 import { type AnimPreset, presetById } from "../../animPresets";
 import { unitAtlas } from "../../atlas";
 import { buildGround, disposeGround, REFERENCE_PARK_X } from "../../buildPlate";
+import {
+  type BackdropId,
+  backdropById,
+  buildTerrain,
+  disposeTerrain,
+  type GroundId,
+  skyTexture,
+} from "../../environment";
 import { frameBox } from "../../framing";
 import { addStandardLights, partMaterial } from "../../geometry";
 import {
@@ -71,6 +79,7 @@ import {
   snapRotation,
   type Vec3,
 } from "../../snapping";
+import { EnvironmentPicker } from "./EnvironmentPicker";
 import { ShortcutSheet } from "./ShortcutSheet";
 
 export type GizmoMode = "translate" | "rotate" | "scale";
@@ -234,6 +243,11 @@ export function ModelViewport({
   const [snappedTo, setSnappedTo] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showReference, setShowReference] = useState(false);
+  // View settings, held for as long as the viewport is open and no longer,
+  // exactly as the two above are. Both open on what the builder has always
+  // shown, so nothing about opening a project changes.
+  const [backdrop, setBackdrop] = useState<BackdropId>("studio");
+  const [ground, setGround] = useState<GroundId>("grid");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   function resetView() {
@@ -399,6 +413,8 @@ export function ModelViewport({
         grid,
         axes,
         reference,
+        sky: null,
+        terrain: null,
         groups: new Map(),
         baked: [],
         rest: new Map(),
@@ -594,6 +610,8 @@ export function ModelViewport({
           state.originDot.dispose();
           disposeBaked(state);
           disposeGround(grid);
+          state.sky?.texture.dispose();
+          if (state.terrain) disposeTerrain(state.terrain);
           disposeReferenceUnit(reference);
           outline.dispose();
           sceneRef.current = null;
@@ -710,6 +728,20 @@ export function ModelViewport({
     state.reference.visible = showReference;
     state.render();
   }, [showReference]);
+
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    applyBackdrop(state, backdrop);
+    state.render();
+  }, [backdrop]);
+
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    applyGround(state, ground);
+    state.render();
+  }, [ground]);
 
   // Playback. The gizmo comes off first: it would be dragging a transform that
   // is overwritten on the next frame. Stopping puts the scene back from the
@@ -933,6 +965,12 @@ export function ModelViewport({
         >
           <Grid3x3 className="size-4" />
         </Button>
+        <EnvironmentPicker
+          backdrop={backdrop}
+          onBackdrop={setBackdrop}
+          ground={ground}
+          onGround={setGround}
+        />
         <Button
           size="icon"
           variant="outline"
@@ -1126,6 +1164,13 @@ interface SceneState {
   /** A scale figure beside the build, switched off by default. A view aid
    *  like `grid` and `axes`: never part of the project, never exported. */
   reference: THREE.Group;
+  /** The sky now drawn, and which backdrop built it, so going back to one
+   *  already seen does not draw its gradient again. Null while the plain
+   *  backdrop shows, which is what the canvas does with no background at all. */
+  sky: { id: BackdropId; texture: THREE.Texture } | null;
+  /** The solid ground, built the first time it is asked for and kept after
+   *  that. A view aid like the grid. */
+  terrain: THREE.Mesh | null;
   /** Piece id to the group holding it, so selection and edits can find it. */
   groups: Map<string, THREE.Group>;
   /** Geometry built for playback, which this owns and must free. The shared
@@ -1177,6 +1222,33 @@ interface SceneState {
    *  selected without waiting for a render to see the new prop. */
   selectedIdRef: { current: string | null };
   onHoverRef: { current: ((pieceId: string | null) => void) | undefined };
+}
+
+/**
+ * Put the chosen sky behind the scene, or take it away again.
+ *
+ * The plain backdrop leaves the scene with no background at all, so the canvas
+ * stays transparent and the panel's own tint shows through, which is what the
+ * builder has always looked like.
+ */
+function applyBackdrop(state: SceneState, id: BackdropId) {
+  if (state.sky?.id === id) return;
+  state.sky?.texture.dispose();
+  state.sky = null;
+
+  const texture = skyTexture(backdropById(id));
+  state.scene.background = texture;
+  if (texture) state.sky = { id, texture };
+}
+
+/** Put the solid ground under the markings, or take it away again. */
+function applyGround(state: SceneState, id: GroundId) {
+  if (id !== "terrain") {
+    state.terrain?.removeFromParent();
+    return;
+  }
+  if (!state.terrain) state.terrain = buildTerrain();
+  state.scene.add(state.terrain);
 }
 
 /**
