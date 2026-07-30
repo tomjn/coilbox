@@ -1,9 +1,15 @@
 /**
- * The one material every part in the app is drawn with.
+ * Materials for drawing parts, one per texture in use.
  *
- * Every part samples the same atlas, so a single shared material means the
- * picker and the editor can put hundreds of meshes on screen without a material
- * switch between any of them.
+ * Every part in a pack samples that pack's atlas, so views that share an atlas
+ * can share one material and put hundreds of meshes on screen without a
+ * material switch between any of them. The cache is keyed by the atlas's
+ * resolved URL rather than by the pack's id or version: the material's only
+ * real dependency is the texture it samples. An id/version bump that ships
+ * the same atlas file should reuse the material rather than reload the
+ * texture, and the id/version alone cannot tell two different atlases apart.
+ * The URL is the narrowest thing that is genuinely unique to what actually
+ * gets uploaded to the GPU.
  */
 
 import * as THREE from "three";
@@ -11,15 +17,26 @@ import * as THREE from "three";
 import { legoPackUrl } from "../lib/assetUrl";
 import type { LegoPackManifest } from "./pack";
 
-let material: THREE.MeshStandardMaterial | null = null;
-let atlas: THREE.Texture | null = null;
+interface CachedMaterial {
+  material: THREE.MeshStandardMaterial;
+  texture: THREE.Texture;
+}
+
+const materials = new Map<string, CachedMaterial>();
+
+/** The cache key for a manifest's material: the atlas texture it samples. */
+export function materialCacheKey(manifest: LegoPackManifest): string {
+  return legoPackUrl(manifest.textures.tex1);
+}
 
 export function partMaterial(
   manifest: LegoPackManifest,
 ): THREE.MeshStandardMaterial {
-  if (material) return material;
+  const textureUrl = materialCacheKey(manifest);
+  const cached = materials.get(textureUrl);
+  if (cached) return cached.material;
 
-  atlas = new THREE.TextureLoader().load(legoPackUrl(manifest.textures.tex1));
+  const atlas = new THREE.TextureLoader().load(textureUrl);
   atlas.colorSpace = THREE.SRGBColorSpace;
   // Some parts reach a neighbouring atlas column through negative u, so the
   // texture has to repeat. Clamping would smear those parts' edge pixels.
@@ -31,11 +48,12 @@ export function partMaterial(
   atlas.minFilter = THREE.LinearMipmapLinearFilter;
   atlas.anisotropy = 4;
 
-  material = new THREE.MeshStandardMaterial({
+  const material = new THREE.MeshStandardMaterial({
     map: atlas,
     roughness: 0.75,
     metalness: 0.05,
   });
+  materials.set(textureUrl, { material, texture: atlas });
   return material;
 }
 
@@ -48,9 +66,20 @@ export function addStandardLights(scene: THREE.Scene): void {
   scene.add(key, fill, new THREE.AmbientLight(0xffffff, 0.55));
 }
 
+/**
+ * Free every cached material and its texture.
+ *
+ * No view calls this on its own teardown: the builder viewport, the parts
+ * picker, the compound picker and a part's detail view can all be drawing at
+ * once, sharing a material by this cache key, and disposing it under one
+ * would blank the GPU resource the others are still using. The cache is
+ * session-scoped, the same lifetime the loaded pack already has, so this is
+ * for a full teardown of the session rather than per-view cleanup.
+ */
 export function disposeSharedMaterial(): void {
-  material?.dispose();
-  atlas?.dispose();
-  material = null;
-  atlas = null;
+  for (const { material, texture } of materials.values()) {
+    material.dispose();
+    texture.dispose();
+  }
+  materials.clear();
 }
