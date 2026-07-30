@@ -1,0 +1,8 @@
+[package]
+name = "coilbox-3do"
+version = "0.0.0"
+description = "Reader for the Total Annihilation .3do model format, as Spring/Recoil loads it. Dependency-free; read only, because a .3do that is edited is saved as .s3o."
+edition = "2021"
+license = "MIT"
+
+[dependencies]

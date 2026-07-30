@@ -594,6 +594,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-3do"
+version = "0.0.0"
+
+[[package]]
 name = "coilbox-lobby-protocol"
 version = "0.0.0"
 dependencies = [
