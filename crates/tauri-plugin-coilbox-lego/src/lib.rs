@@ -674,14 +674,49 @@ async fn lego_export_obj<R: Runtime>(
     }))
 }
 
+/// The scratch game's generated files, by the path each has to sit at for the
+/// engine to find it. Fixed here rather than passed in, so the frontend supplies
+/// contents only and never a path.
+const SCRATCH_MODINFO: &[&str] = &["modinfo.lua"];
+const SCRATCH_SIDEDATA: &[&str] = &["gamedata", "sidedata.lua"];
+const SCRATCH_GADGET: &[&str] = &["LuaRules", "Gadgets", "coilbox_start_unit.lua"];
+
+/// Write one generated file into the scratch game, creating its folder.
+///
+/// Removing before writing bumps the containing folder's modification time,
+/// which is what the engine's archive scanner keys its cache off. Rewriting a
+/// file in place leaves the folder looking untouched, and a change made since
+/// the last scan would never load.
+fn write_scratch_file(dir: &Path, relative: &[&str], contents: &str) -> Result<(), String> {
+    let target = relative
+        .iter()
+        .fold(dir.to_path_buf(), |path, part| path.join(part));
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("could not create {}: {e}", parent.display()))?;
+    }
+    let _ = std::fs::remove_file(&target);
+    std::fs::write(&target, contents)
+        .map_err(|e| format!("could not write {}: {e}", target.display()))
+}
+
 /// `lego_scratch_game` prepares the `.sdd` a unit is tested in.
 ///
-/// It writes one file, the `modinfo.lua` the frontend generated, into
-/// `<data_dir>/games/<folder>`. The unit itself follows through `lego_export`,
-/// which treats the result as any other game folder. Nothing else in the
-/// content root is touched, so removing that one folder undoes the lot.
+/// It writes the three files the frontend generated into
+/// `<data_dir>/games/<folder>`: the `modinfo.lua` naming the base game, the
+/// `gamedata/sidedata.lua` declaring the built unit as the side's start unit,
+/// and the gadget that spawns it. The unit itself follows through
+/// `lego_export`, which treats the result as any other game folder. Nothing
+/// else in the content root is touched, so removing that one folder undoes the
+/// lot.
 #[tauri::command]
-async fn lego_scratch_game(data_dir: String, folder: String, modinfo: String) -> CliResult {
+async fn lego_scratch_game(
+    data_dir: String,
+    folder: String,
+    modinfo: String,
+    sidedata: String,
+    gadget: String,
+) -> CliResult {
     if !valid_scratch_folder(&folder) {
         return CliResult::err(format!("not a scratch game folder: {folder}"));
     }
@@ -695,16 +730,16 @@ async fn lego_scratch_game(data_dir: String, folder: String, modinfo: String) ->
         return CliResult::err(format!("could not create {}: {e}", dir.display()));
     }
 
-    let target = dir.join("modinfo.lua");
-    // Removing before writing bumps the folder's own modification time, which
-    // is what the engine's archive scanner keys its cache off. Rewriting the
-    // file in place leaves the folder looking untouched, and a unit added since
-    // the last scan would never load.
-    let _ = std::fs::remove_file(&target);
-    match std::fs::write(&target, modinfo) {
-        Ok(()) => CliResult::ok(json!({ "dir": dir.to_string_lossy() })),
-        Err(e) => CliResult::err(format!("could not write {}: {e}", target.display())),
+    for (relative, contents) in [
+        (SCRATCH_MODINFO, &modinfo),
+        (SCRATCH_SIDEDATA, &sidedata),
+        (SCRATCH_GADGET, &gadget),
+    ] {
+        if let Err(e) = write_scratch_file(&dir, relative, contents) {
+            return CliResult::err(e);
+        }
     }
+    CliResult::ok(json!({ "dir": dir.to_string_lossy() }))
 }
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -850,6 +885,35 @@ mod tests {
         // The scratch game has nothing worth keeping, so it is always rewritten.
         assert!(!keep_existing(&existing, true));
         assert!(!keep_existing(&missing, true));
+    }
+
+    #[test]
+    fn scratch_files_land_where_the_engine_looks_for_them() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        for (relative, contents) in [
+            (SCRATCH_MODINFO, "modinfo"),
+            (SCRATCH_SIDEDATA, "sidedata"),
+            (SCRATCH_GADGET, "gadget"),
+        ] {
+            write_scratch_file(dir.path(), relative, contents).expect("write");
+        }
+
+        let read = |path: &str| std::fs::read_to_string(dir.path().join(path)).expect("read");
+        assert_eq!(read("modinfo.lua"), "modinfo");
+        assert_eq!(read("gamedata/sidedata.lua"), "sidedata");
+        assert_eq!(read("LuaRules/Gadgets/coilbox_start_unit.lua"), "gadget");
+    }
+
+    #[test]
+    fn writing_a_scratch_file_twice_replaces_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        write_scratch_file(dir.path(), SCRATCH_SIDEDATA, "first").expect("write");
+        write_scratch_file(dir.path(), SCRATCH_SIDEDATA, "second").expect("write");
+
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("gamedata/sidedata.lua")).expect("read"),
+            "second"
+        );
     }
 
     #[test]

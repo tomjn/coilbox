@@ -30,8 +30,11 @@ import type { LoadedPack } from "../../pack";
 import { buildS3o } from "../../s3oBuild";
 import {
   buildModInfo,
+  buildSideData,
+  buildStartUnitGadget,
   isScratchArchive,
   SCRATCH_FOLDER,
+  SCRATCH_SIDE,
 } from "../../scratchGame";
 import { buildUnitDef } from "../../unitDef";
 
@@ -135,6 +138,8 @@ export function TestDrawer({ open, onOpenChange, project, pack }: Props) {
         dataDir: target.dataDir,
         folder: SCRATCH_FOLDER,
         modinfo: buildModInfo(game.name),
+        sidedata: buildSideData(project.unitName),
+        gadget: buildStartUnitGadget(project.unitName),
       });
       setScratchDir(dir);
       await legoExport({
@@ -175,7 +180,9 @@ export function TestDrawer({ open, onOpenChange, project, pack }: Props) {
       setPhase({ state: "playing" });
       const result = await launch("skirmish", {
         config: toBattleConfig({
-          participants: [initialParticipants()[0]],
+          // On the scratch game's own side, so a base game that does read the
+          // side's start unit resolves it rather than seeing an empty side.
+          participants: [{ ...initialParticipants()[0], side: SCRATCH_SIDE }],
           mapName: map.name,
           gameType: scratch.name,
           startPosType: START_POS_RANDOM,
@@ -246,11 +253,14 @@ export function TestDrawer({ open, onOpenChange, project, pack }: Props) {
             </div>
 
             <div className="flex flex-col gap-2 rounded border border-border/60 px-3 py-2 text-xs text-muted-foreground">
-              <p>Once you are on the map, press Enter and type:</p>
-              <code>/cheat</code>
-              <code>/give {project.unitName}</code>
               <p>
-                Cheats have to be on before <code>/give</code> will do anything.
+                <code>{project.unitName}</code> is the scratch game's start
+                unit, so it is waiting at your start position a second into the
+                match. Nothing has to build it and no cheats are needed.
+              </p>
+              <p>
+                If it is not there, press Enter and type <code>/cheat</code>{" "}
+                then <code>/give {project.unitName}</code> to place one by hand.
               </p>
             </div>
 
