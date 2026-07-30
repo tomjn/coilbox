@@ -685,8 +685,8 @@ export function ModelViewport({
       if (state) state.snapping = on;
     };
     const down = (event: KeyboardEvent) => {
-      if (event.altKey) setSnapping(false);
       if (event.target instanceof HTMLInputElement) return;
+      if (event.altKey) setSnapping(false);
       if (event.key === "g") setMode("translate");
       if (event.key === "r") setMode("rotate");
       if (event.key === "s") setMode("scale");
