@@ -65,6 +65,15 @@ export default function BuilderPage() {
   const { id } = useParams<{ id: string }>();
   // The viewport wants the width, and the nav stays reachable from the top bar.
   useHideSidebar();
+  // Keyed by id: `lego/:id` has no key of its own, so switching units without a
+  // reload (a client-side route change) would otherwise leave React's state
+  // pointed at whichever unit was open first. Remounting on id change is what
+  // makes the document, its undo history, its selection and its clipboard
+  // start clean for the unit actually named in the URL.
+  return <Builder key={id} id={id} />;
+}
+
+function Builder({ id }: { id: string | undefined }) {
   const doc = useLegoDocument(id);
   const { edit, selectedId, select: setSelectedId } = doc;
   const draft = doc.project;
