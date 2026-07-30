@@ -30,12 +30,13 @@ export interface LegoDocument {
   /** When the last edit landed, so a gesture can fold into one undo step. */
   editedAt: number;
   /**
-   * The piece the builder is pointed at. Lives here, not in the page, because
-   * every transition that can remove a piece has to decide what becomes of a
+   * The pieces the builder is pointed at, oldest first, so the last entry is
+   * the one clicked most recently. Lives here, not in the page, because every
+   * transition that can remove a piece has to decide what becomes of a
    * selection that named it. Reseated to the nearest surviving ancestor,
    * because that is where the pieces it lost were hanging off.
    */
-  selectedId: string | null;
+  selectedIds: string[];
 }
 
 export const emptyDocument: LegoDocument = {
@@ -44,7 +45,7 @@ export const emptyDocument: LegoDocument = {
   future: [],
   dirty: false,
   editedAt: 0,
-  selectedId: null,
+  selectedIds: [],
 };
 
 export type LegoDocumentAction =
@@ -53,10 +54,18 @@ export type LegoDocumentAction =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "saved" }
-  | { type: "select"; id: string | null };
+  /** Replaces the whole selection, which is what a plain click does. */
+  | { type: "select"; ids: string[] }
+  /** Adds a piece to the selection, or takes it out if it is already in it. */
+  | { type: "toggle-select"; id: string };
+
+/** The last piece clicked, which is the one a single-piece panel is about. */
+export function primarySelection(state: LegoDocument): string | null {
+  return state.selectedIds.at(-1) ?? null;
+}
 
 /**
- * What a selection becomes when the piece it names is gone from `to`.
+ * What one selected piece becomes when it is gone from `to`.
  *
  * Walks up the vanished piece's ancestors as they stood in `from`, the project
  * it is leaving, and lands on the first one that still exists on the other
@@ -64,13 +73,12 @@ export type LegoDocumentAction =
  * gone. A parent is where the missing piece was hanging off, so it is the
  * nearest thing left to "where the builder was working".
  */
-function reseatSelection(
-  selectedId: string | null,
+function reseatOne(
+  selectedId: string,
   from: LegoProject,
   to: LegoProject,
+  survives: Set<string>,
 ): string | null {
-  if (selectedId === null) return null;
-  const survives = new Set(to.pieces.map((piece) => piece.id));
   if (survives.has(selectedId)) return selectedId;
 
   let piece = pieceById(from, selectedId);
@@ -79,6 +87,27 @@ function reseatSelection(
     piece = pieceById(from, piece.parentId);
   }
   return survives.has(to.rootPieceId) ? to.rootPieceId : null;
+}
+
+/**
+ * Reseat every selected piece, keeping the order they were selected in.
+ *
+ * Two pieces of the same branch can reseat onto the same surviving ancestor,
+ * so the result is deduplicated: a selection holding one piece twice would
+ * transform it twice.
+ */
+function reseatSelection(
+  selectedIds: string[],
+  from: LegoProject,
+  to: LegoProject,
+): string[] {
+  const survives = new Set(to.pieces.map((piece) => piece.id));
+  const out: string[] = [];
+  for (const id of selectedIds) {
+    const reseated = reseatOne(id, from, to, survives);
+    if (reseated !== null && !out.includes(reseated)) out.push(reseated);
+  }
+  return out;
 }
 
 export function reduceDocument(
@@ -94,7 +123,7 @@ export function reduceDocument(
         : {
             ...state,
             project: action.project,
-            selectedId: action.project.rootPieceId,
+            selectedIds: [action.project.rootPieceId],
           };
 
     case "edit": {
@@ -116,7 +145,7 @@ export function reduceDocument(
         future: [],
         dirty: true,
         editedAt: action.at,
-        selectedId: reseatSelection(state.selectedId, current, next),
+        selectedIds: reseatSelection(state.selectedIds, current, next),
       };
     }
 
@@ -133,7 +162,7 @@ export function reduceDocument(
         // The next edit starts a fresh step rather than folding into whatever
         // was being done before the undo.
         editedAt: 0,
-        selectedId: reseatSelection(state.selectedId, current, previous),
+        selectedIds: reseatSelection(state.selectedIds, current, previous),
       };
     }
 
@@ -148,7 +177,7 @@ export function reduceDocument(
         future: state.future.slice(0, -1),
         dirty: true,
         editedAt: 0,
-        selectedId: reseatSelection(state.selectedId, current, next),
+        selectedIds: reseatSelection(state.selectedIds, current, next),
       };
     }
 
@@ -156,6 +185,19 @@ export function reduceDocument(
       return { ...state, dirty: false };
 
     case "select":
-      return { ...state, selectedId: action.id };
+      return { ...state, selectedIds: action.ids };
+
+    case "toggle-select": {
+      // Added at the end rather than in tree order, so the piece just clicked
+      // is the one the panel is about.
+      const without = state.selectedIds.filter((id) => id !== action.id);
+      return {
+        ...state,
+        selectedIds:
+          without.length === state.selectedIds.length
+            ? [...state.selectedIds, action.id]
+            : without,
+      };
+    }
   }
 }
