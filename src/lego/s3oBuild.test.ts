@@ -35,7 +35,7 @@ function pack(): LoadedPack {
   ]);
   return {
     manifest: {} as LoadedPack["manifest"],
-    library: { packs: [], dir: "", problems: [] },
+    library: { packs: [], atlases: [], dir: "", problems: [] },
     parts: [part],
     byId: new Map([["tri", part]]),
     vertices,

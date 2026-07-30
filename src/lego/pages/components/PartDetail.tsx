@@ -14,6 +14,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
+import { baseAtlas } from "../../atlas";
 import { addStandardLights, partMaterial } from "../../geometry";
 import {
   getPartGeometry,
@@ -136,7 +137,7 @@ function PartViewport({
 
       const scene = new THREE.Scene();
       addStandardLights(scene);
-      scene.add(new THREE.Mesh(geometry, partMaterial(pack.manifest)));
+      scene.add(new THREE.Mesh(geometry, partMaterial(baseAtlas(pack))));
 
       // Frame the part rather than the scene, so a sliver fills the view as much
       // as a hull section does.

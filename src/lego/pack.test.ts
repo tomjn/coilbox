@@ -9,6 +9,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
 }));
 
+import type { LegoAtlas } from "./atlas";
 import { newProject } from "./model";
 import {
   extensionProblem,
@@ -18,7 +19,9 @@ import {
   mergePacks,
   type PackSource,
   projectPackProblems,
+  type RawAtlasManifest,
   type RawPackManifest,
+  readAtlasPack,
 } from "./pack";
 
 /** Eight floats per vertex, so a part of n vertices is 8n floats. */
@@ -137,6 +140,92 @@ describe("extensionProblem", () => {
       extends: "base",
     };
     expect(extensionProblem(base, raw, "aliens")).toMatch(/schema 99/);
+  });
+});
+
+describe("readAtlasPack", () => {
+  const base = manifest("base", []);
+  const installed: LegoAtlas[] = [
+    { tex1: "atlas.png", packId: "base", folder: null },
+  ];
+
+  function raw(overrides: Partial<RawAtlasManifest> = {}): RawAtlasManifest {
+    return {
+      schemaVersion: 1,
+      id: "desert",
+      version: "1",
+      reskins: "base",
+      atlas: { width: 2048, height: 2048 },
+      textures: { tex1: "desert.png" },
+      ...overrides,
+    };
+  }
+
+  it("accepts a pack that reskins the base pack with its own texture", () => {
+    expect(readAtlasPack(base, raw(), "desert", installed)).toEqual({
+      atlas: { tex1: "desert.png", packId: "desert", folder: "desert" },
+    });
+  });
+
+  it("rejects a pack that reskins something else", () => {
+    expect(
+      readAtlasPack(base, raw({ reskins: "other" }), "desert", installed),
+    ).toEqual({ problem: expect.stringMatching(/reskins "other"/) });
+  });
+
+  it("rejects a pack that brings parts as well as an atlas", () => {
+    // That would be a second parts library, and a unit cannot mix two.
+    expect(
+      readAtlasPack(base, raw({ parts: [] }), "desert", installed),
+    ).toEqual({
+      problem: expect.stringMatching(/brings parts as well as an atlas/),
+    });
+  });
+
+  it("rejects a pack that ships geometry", () => {
+    expect(
+      readAtlasPack(
+        base,
+        raw({ geometry: { file: "parts.bin.gz" } }),
+        "desert",
+        installed,
+      ),
+    ).toEqual({
+      problem: expect.stringMatching(/brings parts as well as an atlas/),
+    });
+  });
+
+  it("rejects a pack that names no texture, since there is no atlas to use", () => {
+    const { textures: _dropped, ...rest } = raw();
+    expect(readAtlasPack(base, rest, "desert", installed)).toEqual({
+      problem: expect.stringMatching(/names no texture/),
+    });
+  });
+
+  it("rejects a texture file name another atlas already uses", () => {
+    // Both would land on the same path in a game's unittextures folder.
+    expect(
+      readAtlasPack(
+        base,
+        raw({ textures: { tex1: "atlas.png" } }),
+        "desert",
+        installed,
+      ),
+    ).toEqual({
+      problem: expect.stringMatching(/"base" already calls its own/),
+    });
+  });
+
+  it("rejects a pack built for another schema", () => {
+    expect(
+      readAtlasPack(base, raw({ schemaVersion: 99 }), "desert", installed),
+    ).toEqual({ problem: expect.stringMatching(/schema 99/) });
+  });
+
+  it("rejects a pack with no id", () => {
+    expect(readAtlasPack(base, raw({ id: "" }), "desert", installed)).toEqual({
+      problem: expect.stringMatching(/no pack id/),
+    });
   });
 });
 
@@ -260,7 +349,12 @@ describe("mergePacks", () => {
 
 describe("projectPackProblems", () => {
   function library(packs: LegoPackManifest[]): LoadedPack["library"] {
-    return { packs, dir: "/data/lego/packs", problems: [] };
+    return {
+      packs,
+      atlases: [{ tex1: "atlas.png", packId: packs[0].id, folder: null }],
+      dir: "/data/lego/packs",
+      problems: [],
+    };
   }
 
   function loaded(parts: LegoPartInfo[], packs: string[]): LoadedPack {
@@ -334,5 +428,12 @@ describe("projectPackProblems", () => {
 
   it("ignores empty pieces, which never had a part", () => {
     expect(projectPackProblems(unit([null, null], "base"), pack)).toEqual([]);
+  });
+
+  it("says a unit's atlas is missing, and what it is drawn with instead", () => {
+    const project = { ...unit(["a"], "base"), atlas: "desert.png" };
+    expect(projectPackProblems(project, pack)[0]).toMatch(
+      /"desert\.png", is not installed, so it is drawn with "atlas\.png"/,
+    );
   });
 });

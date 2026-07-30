@@ -45,6 +45,7 @@ import {
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { type AnimPreset, presetById } from "../../animPresets";
+import { unitAtlas } from "../../atlas";
 import { buildGround, disposeGround, REFERENCE_PARK_X } from "../../buildPlate";
 import { frameBox } from "../../framing";
 import { addStandardLights, partMaterial } from "../../geometry";
@@ -1512,6 +1513,9 @@ function showBaked(state: SceneState, pack: LoadedPack, project: LegoProject) {
   // bake built belongs here rather than only at the end of playback.
   disposeBaked(state);
   const { pieces } = bakedPieces(project, pack);
+  const material = partMaterial(
+    unitAtlas(project, pack.library.atlases).drawWith,
+  );
 
   for (const [pieceId, baked] of pieces) {
     const group = state.groups.get(pieceId);
@@ -1534,11 +1538,14 @@ function showBaked(state: SceneState, pack: LoadedPack, project: LegoProject) {
     state.baked.push(geometry);
     if (mesh) {
       mesh.geometry = geometry;
+      // Reassigned rather than left as it was, because the unit's atlas can
+      // change under a mesh that already exists.
+      mesh.material = material;
       // Baked vertices already sit around the origin, so the offset the
       // editing scene puts on the mesh has to come back off.
       mesh.position.set(0, 0, 0);
     } else {
-      const added = new THREE.Mesh(geometry, partMaterial(pack.manifest));
+      const added = new THREE.Mesh(geometry, material);
       added.userData.pieceId = pieceId;
       group.add(added);
     }
@@ -1838,6 +1845,9 @@ function pieceIdOf(object: THREE.Object3D | null): string | null {
  */
 function syncScene(state: SceneState, pack: LoadedPack, project: LegoProject) {
   const wanted = new Set(project.pieces.map((piece) => piece.id));
+  const material = partMaterial(
+    unitAtlas(project, pack.library.atlases).drawWith,
+  );
 
   for (const [id, group] of state.groups) {
     if (wanted.has(id)) continue;
@@ -1894,9 +1904,12 @@ function syncScene(state: SceneState, pack: LoadedPack, project: LegoProject) {
     const pivot = piece.pivot ?? [0, 0, 0];
     if (mesh) {
       mesh.geometry = geometry;
+      // Reassigned rather than left as it was, because the unit's atlas can
+      // change under a mesh that already exists.
+      mesh.material = material;
       mesh.position.set(-pivot[0], -pivot[1], -pivot[2]);
     } else {
-      const added = new THREE.Mesh(geometry, partMaterial(pack.manifest));
+      const added = new THREE.Mesh(geometry, material);
       added.userData.pieceId = piece.id;
       added.position.set(-pivot[0], -pivot[1], -pivot[2]);
       group.add(added);

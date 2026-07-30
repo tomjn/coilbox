@@ -237,6 +237,23 @@ describe("newProject", () => {
     });
     expect(projectProblems(doc)).toEqual([]);
   });
+
+  it("records an atlas only when one was asked for", () => {
+    const options = {
+      id: "p1",
+      rootPieceId: "r1",
+      name: "My Tank",
+      packId: "pack",
+      packVersion: "1",
+      now: "2026-07-28T00:00:00.000Z",
+    };
+    // The base pack's atlas is the absence of the key, so a unit built with one
+    // atlas installed is stored exactly as it was before atlases were a choice.
+    expect(newProject(options)).not.toHaveProperty("atlas");
+    expect(newProject({ ...options, atlas: "desert.png" }).atlas).toBe(
+      "desert.png",
+    );
+  });
 });
 
 describe("parseLegoProjectJson", () => {
@@ -246,6 +263,18 @@ describe("parseLegoProjectJson", () => {
       { ...piece("a", "root"), partId: "abc", role: "turret" },
     ]);
     expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it("keeps the atlas a unit names, and leaves it off when there is none", () => {
+    const doc = { ...project([piece("root", null)]), atlas: "desert.png" };
+    expect(parseLegoProjectJson(JSON.stringify(doc))?.atlas).toBe("desert.png");
+    // An empty string is not an atlas, and would stop the base one resolving.
+    expect(
+      parseLegoProjectJson(JSON.stringify({ ...doc, atlas: "" })),
+    ).not.toHaveProperty("atlas");
+    expect(
+      parseLegoProjectJson(JSON.stringify(project([piece("root", null)]))),
+    ).not.toHaveProperty("atlas");
   });
 
   it("puts pieces parent-first, for a document saved before that was true", () => {
