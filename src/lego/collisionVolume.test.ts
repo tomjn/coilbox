@@ -5,6 +5,8 @@ import {
   effectiveCollisionVolume,
   engineScales,
   isIgnoredByEngine,
+  MIN_COLLISION_SIZE,
+  resizeCollisionFace,
 } from "./collisionVolume";
 import { type LegoProject, newProject } from "./model";
 import type { UnitBounds } from "./s3oBuild";
@@ -105,6 +107,70 @@ describe("engineScales", () => {
         offsets: [0, 0, 0],
       }),
     ).toEqual([4, 6, 8]);
+  });
+});
+
+describe("resizeCollisionFace", () => {
+  const box = {
+    type: "box" as const,
+    scales: [10, 10, 10] as [number, number, number],
+    offsets: [0, 0, 0] as [number, number, number],
+  };
+
+  it("puts the dragged face where it was dragged to and leaves the other one", () => {
+    const grown = resizeCollisionFace(box, 0, 1, 12);
+    expect(grown.scales).toEqual([17, 10, 10]);
+    expect(grown.offsets).toEqual([3.5, 0, 0]);
+    // The face that was not dragged has not moved: it was at -5 and still is.
+    expect(grown.offsets[0] - grown.scales[0] / 2).toBe(-5);
+  });
+
+  it("drags the low face the other way round", () => {
+    const grown = resizeCollisionFace(box, 2, -1, -8);
+    expect(grown.scales).toEqual([10, 10, 13]);
+    expect(grown.offsets[2] + grown.scales[2] / 2).toBe(5);
+  });
+
+  it("holds a minimum size rather than turning the volume inside out", () => {
+    const crushed = resizeCollisionFace(box, 1, 1, -30);
+    expect(crushed.scales).toEqual([10, MIN_COLLISION_SIZE, 10]);
+    // Still hanging off the same fixed face.
+    expect(crushed.offsets[1] - crushed.scales[1] / 2).toBe(-5);
+  });
+
+  it("keeps a cylinder round, sizing both cross-section axes together", () => {
+    const cylinder = {
+      type: "cyly" as const,
+      scales: [4, 20, 2] as [number, number, number],
+      offsets: [0, 0, 0] as [number, number, number],
+    };
+    // Drawn 4 across, so the z face being dragged starts at 2, not at 1.
+    const wider = resizeCollisionFace(cylinder, 2, 1, 6);
+    expect(wider.scales).toEqual([8, 20, 8]);
+    expect(wider.offsets).toEqual([0, 0, 2]);
+    // Along the cylinder, only its length changes.
+    expect(resizeCollisionFace(cylinder, 1, 1, 15).scales).toEqual([4, 25, 2]);
+  });
+
+  it("keeps a sphere round, whichever face is dragged", () => {
+    const sphere = {
+      type: "sphere" as const,
+      scales: [6, 6, 6] as [number, number, number],
+      offsets: [0, 0, 0] as [number, number, number],
+    };
+    expect(resizeCollisionFace(sphere, 0, -1, -5).scales).toEqual([8, 8, 8]);
+  });
+
+  it("lands the face on the pointer for every shape, not just the box", () => {
+    for (const type of ["box", "ellipsoid", "sphere", "cylz"] as const) {
+      const from = {
+        type,
+        scales: [6, 9, 3] as [number, number, number],
+        offsets: [1, 0, -2] as [number, number, number],
+      };
+      const dragged = resizeCollisionFace(from, 0, 1, 11);
+      expect(dragged.offsets[0] + engineScales(dragged)[0] / 2).toBeCloseTo(11);
+    }
   });
 });
 
