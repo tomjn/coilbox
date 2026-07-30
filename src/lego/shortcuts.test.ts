@@ -40,6 +40,12 @@ describe("isShortcut", () => {
     expect(isShortcut("snap-hold", key("g"))).toBe(false);
   });
 
+  it("toggles symmetry on M, clear of Cmd M and Shift M", () => {
+    expect(isShortcut("symmetry", key("m"))).toBe(true);
+    expect(isShortcut("symmetry", key("m", { metaKey: true }))).toBe(false);
+    expect(isShortcut("symmetry", key("M", { shiftKey: true }))).toBe(false);
+  });
+
   it("frames on F, but not with Cmd or Ctrl held", () => {
     expect(isShortcut("frame", key("f"))).toBe(true);
     expect(isShortcut("frame", key("f", { metaKey: true }))).toBe(false);

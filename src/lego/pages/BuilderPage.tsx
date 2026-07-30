@@ -35,7 +35,13 @@ import {
   type PieceTransform,
   transformRoots,
 } from "../groupTransform";
-import { canMirror, mirrorCopy, mirrorPiece } from "../mirror";
+import {
+  canMirror,
+  canMirrorTwin,
+  mirrorCopy,
+  mirrorPiece,
+  mirrorTwin,
+} from "../mirror";
 import {
   childrenOf,
   descendantIds,
@@ -112,11 +118,39 @@ function Builder({ id }: { id: string | undefined }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   /** Whether the next click in the viewport drops a snap anchor. */
   const [placingAnchor, setPlacingAnchor] = useState(false);
+  /**
+   * Symmetry mode: a piece added now gets a mirrored twin the first time it is
+   * put somewhere off the centre line. A preference for the session, like the
+   * scale lock above, rather than something the unit carries.
+   */
+  const [symmetry, setSymmetry] = useState(false);
+  /**
+   * The pieces added since symmetry came on that have not been placed off the
+   * centre line yet.
+   *
+   * Every piece arrives at its parent's origin and is dragged into place after,
+   * so the moment a piece is added is too early to know where its twin belongs.
+   * These wait here until they are somewhere, and are twinned then. A ref, not
+   * state: nothing on screen reads it, and it is written from the same handlers
+   * that edit the document.
+   */
+  const awaitingTwin = useRef(new Set<string>());
   const filter = usePartFilter(pack);
 
   useEffect(() => {
     loadPack().then(setPack, () => setPack(null));
   }, []);
+
+  // A piece that has left the document is not waiting for anything: deleting it
+  // or undoing the add that made it takes it off the list rather than leaving an
+  // id that could be twinned if a redo brought it back.
+  useEffect(() => {
+    if (!draft) return;
+    const present = new Set(draft.pieces.map((piece) => piece.id));
+    for (const pieceId of awaitingTwin.current) {
+      if (!present.has(pieceId)) awaitingTwin.current.delete(pieceId);
+    }
+  }, [draft]);
 
   // The document's own problems, plus anything wrong between it and the packs
   // installed. Both are things to say rather than reasons to refuse the unit.
@@ -156,6 +190,43 @@ function Builder({ id }: { id: string | undefined }) {
         ],
       };
     });
+    queueTwin(pieceId);
+  }
+
+  /**
+   * Remember a piece that arrived while symmetry was on, so its first placement
+   * mirrors it. Off, this is nothing: the piece is an ordinary piece.
+   */
+  function queueTwin(pieceId: string) {
+    if (symmetry) awaitingTwin.current.add(pieceId);
+  }
+
+  /**
+   * Apply a placement, then mirror whichever of the pieces it moved were still
+   * waiting for a twin.
+   *
+   * One `edit`, so the piece and its twin arrive together and one undo puts
+   * both back. A piece stays on the list until it is somewhere a mirror means
+   * something: dropped down the middle it is its own reflection, so it keeps
+   * its place in the queue until it is moved off the line.
+   */
+  function place(
+    pieceIds: string[],
+    change: (project: LegoProject) => LegoProject,
+  ) {
+    if (!draft) return;
+    const placed = change(draft);
+    const twinning = pieceIds.filter(
+      (pieceId) =>
+        awaitingTwin.current.has(pieceId) && canMirrorTwin(placed, pieceId),
+    );
+    for (const pieceId of twinning) awaitingTwin.current.delete(pieceId);
+    edit(() =>
+      twinning.reduce(
+        (next, pieceId) => mirrorTwin(next, pieceId, () => crypto.randomUUID()),
+        placed,
+      ),
+    );
   }
 
   function addEmpty() {
@@ -182,6 +253,7 @@ function Builder({ id }: { id: string | undefined }) {
         ],
       };
     });
+    queueTwin(pieceId);
   }
 
   function removeSelected() {
@@ -221,6 +293,7 @@ function Builder({ id }: { id: string | undefined }) {
     copy: () => {},
     paste: () => {},
     duplicate: () => {},
+    symmetry: () => {},
   });
 
   // Backspace deletes the selected piece, which is what it does in every other
@@ -263,6 +336,11 @@ function Builder({ id }: { id: string | undefined }) {
       if (isShortcut("duplicate", event)) {
         event.preventDefault();
         shortcuts.duplicate();
+        return;
+      }
+      if (isShortcut("symmetry", event)) {
+        event.preventDefault();
+        shortcuts.symmetry();
         return;
       }
       if (isShortcut("delete", event)) {
@@ -311,11 +389,16 @@ function Builder({ id }: { id: string | undefined }) {
   function addCompound(compound: LegoProject) {
     if (!draft) return;
     const inserted = doc.insert(compound, selectedId ?? draft.rootPieceId);
-    if (inserted) setSelectedId(inserted);
+    if (inserted) {
+      setSelectedId(inserted);
+      queueTwin(inserted);
+    }
   }
 
   function transformPiece(pieceId: string, change: Partial<LegoPiece>) {
-    edit((project) => ({
+    // Where a placement lands, whether it came from the gizmo or from typing a
+    // number into the panel, so symmetry only has to watch this one spot.
+    place([pieceId], (project) => ({
       ...project,
       pieces: project.pieces.map((piece) =>
         piece.id === pieceId ? { ...piece, ...change } : piece,
@@ -325,7 +408,9 @@ function Builder({ id }: { id: string | undefined }) {
 
   /** A whole set moved at once, so it is one edit and one undo step. */
   function transformPieces(changes: Map<string, PieceTransform>) {
-    edit((project) => applyGroupTransform(project, changes));
+    place([...changes.keys()], (project) =>
+      applyGroupTransform(project, changes),
+    );
   }
 
   function renameUnit(name: string) {
@@ -432,7 +517,10 @@ function Builder({ id }: { id: string | undefined }) {
       result.piece.project,
       selectedId ?? draft.rootPieceId,
     );
-    if (inserted) setSelectedId(inserted);
+    if (inserted) {
+      setSelectedId(inserted);
+      queueTwin(inserted);
+    }
   }
 
   function duplicateSelection() {
@@ -441,6 +529,16 @@ function Builder({ id }: { id: string | undefined }) {
     // is copied once, inside its parent's copy, rather than twice.
     const copies = doc.duplicate(transformRoots(draft, selectedIds));
     if (copies.length > 0) doc.selectMany(copies);
+  }
+
+  /**
+   * Turning symmetry off forgets what was waiting: those pieces are ordinary
+   * pieces now, and turning it back on hours later should not suddenly twin one
+   * of them.
+   */
+  function setSymmetryMode(on: boolean) {
+    setSymmetry(on);
+    if (!on) awaitingTwin.current.clear();
   }
 
   function mirrorSelection() {
@@ -467,6 +565,7 @@ function Builder({ id }: { id: string | undefined }) {
     copy: copySelection,
     paste: pasteClipboard,
     duplicate: duplicateSelection,
+    symmetry: () => setSymmetryMode(!symmetry),
   };
 
   function setRole(pieceId: string, role: string | undefined) {
@@ -664,6 +763,8 @@ function Builder({ id }: { id: string | undefined }) {
               canSaveAsCompound={selectedIds.length === 1}
               onDelete={removeSelected}
               canDelete={transformRoots(draft, selectedIds).length > 0}
+              symmetry={symmetry}
+              onSymmetryChange={setSymmetryMode}
               placingAnchor={placingAnchor}
               onPlaceAnchor={placeAnchor}
               onCancelAnchor={() => setPlacingAnchor(false)}

@@ -144,9 +144,15 @@ export function snapRotation(rotation: Vec3, stepRadians: number): Vec3 {
 
 /** A piece this close to the camera cannot shrink the threshold to zero. */
 const MIN_CAMERA_DISTANCE = 0.5;
-/** The threshold never drops below this many world units, however tight the
- *  zoom. */
-const MIN_SCREEN_THRESHOLD = 0.05;
+/**
+ * The threshold never drops below this many world units, however tight the
+ * zoom.
+ *
+ * Exported because it is also the tightest distance at which this builder ever
+ * calls two points the same point, which is the question `mirror.ts` asks of
+ * the centre line and of a piece's reflection.
+ */
+export const MIN_SCREEN_THRESHOLD = 0.05;
 /** The threshold never grows past this many world units, however far the
  *  zoom is pulled back, so a snap cannot reach across the whole scene. */
 const MAX_SCREEN_THRESHOLD = 3;
