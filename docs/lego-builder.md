@@ -9,7 +9,7 @@ The builder is a modding tool, so it is hidden until you turn on **Advanced mode
 Two things to know before you spend an evening on this:
 
 - A unit you export cannot be built or moved in a game yet. The only way to see it is `/cheat` then `/give`. See [what an exported unit cannot do](#what-an-exported-unit-cannot-do-yet).
-- Nobody has yet loaded an exported unit in the engine and confirmed it draws correctly. See [the engine load checklist](#the-engine-load-checklist).
+- An exported unit has been loaded in a headless engine, which proves its pieces, its size and its script are right. Nobody has yet seen one drawn, so nothing has confirmed it looks right. See [the engine load checklist](#the-engine-load-checklist).
 
 ## Build a unit
 
@@ -141,17 +141,26 @@ A unit coilbox exports cannot be played normally. Its unit definition sets `canm
 
 ## The engine load checklist
 
-**Result: not run.** No exported unit has been loaded in the engine and checked against this list. The development machine the builder was written on exits without an OpenGL context, so the run has to happen somewhere else. Until it does, treat everything the exporter produces as unverified, however green the tests are.
+**Result: three of five proved, two still outstanding.** The check is: export a unit into a `.sdd` working copy or use **Test in game**, get it onto a map with `/cheat` and `/give`, and confirm all five of:
 
-The check, when someone can run it, is: export a unit into a `.sdd` working copy or use **Test in game**, get it onto a map with `/cheat` and `/give`, and confirm all five of:
+1. The model renders at all. **Outstanding.**
+2. Its orientation and handedness are right, so it faces the way it did in the builder and is not mirrored. **Proved.**
+3. Textures land on the right geometry. **Outstanding.**
+4. The selection volume is sane, so clicking the unit selects it and the volume is neither a speck nor the size of the map. **Proved.**
+5. The infolog has no Lua error from the unit script. **Proved.**
 
-1. The model renders at all.
-2. Its orientation and handedness are right, so it faces the way it did in the builder and is not mirrored.
-3. Textures land on the right geometry.
-4. The selection volume is sane, so clicking the unit selects it and the volume is neither a speck nor the size of the map.
-5. The infolog has no Lua error from the unit script.
+Three of them no longer need a machine that can draw. `spring-headless` runs a full simulation with no OpenGL context, and the engine's Lua tells you where it thinks every piece is, how big the unit is, and whether the unit script bound. An L-shaped probe unit, exported through the normal path and spawned twice at different facings, settled them:
 
-Record the outcome here, and on [issue #565](https://github.com/tomjn/coilbox/issues/565), rather than remembering it.
+- **Handedness.** Spring derives a piece's emit position from its first two vertices, so `Spring.GetUnitPiecePosDir` returns a point predictable from the file alone. Every piece landed where the file says, to four decimal places, at both facings. The transform from model space to world space is a rotation, determinant +1, not a reflection. Nothing mirrors the model, including a piece scaled `-1, 1, 1`.
+- **Orientation.** Model `+z` is the unit's front, model `+y` is up, and model `+x` is the unit's left. The builder does not yet show that: [issue #680](https://github.com/tomjn/coilbox/issues/680).
+- **The selection volume.** `Spring.GetUnitRadius` and `GetUnitHeight` return the s3o header values exactly, and the engine's default collision volume is the smallest sphere containing the geometry. Sane, but a sphere is a generous click target for a long unit. Authoring a tighter one is [issue #605](https://github.com/tomjn/coilbox/issues/605).
+- **The infolog.** Nothing in it names the unit, its model or its script. `Spring.UnitScript.GetScriptEnv` returns an environment carrying exactly the call-ins the generated script declares, so the script loaded and bound rather than merely failing quietly.
+
+The two still outstanding both need pixels. Nobody has seen the unit drawn, and nothing has checked which part of the atlas each triangle samples. [Issue #563](https://github.com/tomjn/coilbox/issues/563) is the cheaper of the two to settle, because Blender needs no engine.
+
+The same run found the footprint is wrong: it is derived from the collision radius, so a unit longer than it is wide claims far more ground than it stands on. [Issue #679](https://github.com/tomjn/coilbox/issues/679).
+
+Record any further outcome here, and on [issue #565](https://github.com/tomjn/coilbox/issues/565), rather than remembering it.
 
 ## Parts packs
 
