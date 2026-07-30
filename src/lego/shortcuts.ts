@@ -99,7 +99,7 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "symmetry",
     group: "Transform",
-    description: "Mirror new pieces as they are placed",
+    description: "Mirror new pieces as you place them",
     combos: [{ key: "m", mod: false, shift: false }],
   },
   {

@@ -73,6 +73,32 @@ function asTransform(
 }
 
 /**
+ * Where `targetId` has to sit to be the mirror image of `sourceId`, written
+ * against its own parent.
+ *
+ * The two are the same piece when a piece is reflected in place, and different
+ * pieces when one of a pair is following the other. A document with a second
+ * parentless piece is already broken, and treating it as its own frame is
+ * enough to not crash.
+ */
+function mirroredTransform(
+  project: LegoProject,
+  sourceId: string,
+  targetId: string,
+): Pick<LegoPiece, "position" | "rotation" | "scale"> {
+  const target = pieceById(project, targetId);
+  const parent = target?.parentId
+    ? worldMatrix(project, target.parentId)
+    : new THREE.Matrix4();
+  return asTransform(
+    parent
+      .invert()
+      .multiply(reflection(project))
+      .multiply(worldMatrix(project, sourceId)),
+  );
+}
+
+/**
  * Whether a piece can be mirrored.
  *
  * Everything but the root. The root is the frame the centre line is measured
@@ -117,20 +143,7 @@ export function mirrorPiece(
   pieceId: string,
 ): LegoProject {
   if (!canMirror(project, pieceId)) return project;
-  const piece = pieceById(project, pieceId) as LegoPiece;
-
-  // Reflect where the piece sits in the unit, then write that back against its
-  // parent, which has not moved. A document with a second parentless piece is
-  // already broken, and treating it as its own frame is enough to not crash.
-  const parent = piece.parentId
-    ? worldMatrix(project, piece.parentId)
-    : new THREE.Matrix4();
-  const local = parent
-    .clone()
-    .invert()
-    .multiply(reflection(project))
-    .multiply(worldMatrix(project, pieceId));
-  const transform = asTransform(local);
+  const transform = mirroredTransform(project, pieceId, pieceId);
 
   const subtree = new Set(descendantIds(project, pieceId));
   return {
@@ -288,18 +301,46 @@ export function canMirrorTwin(project: LegoProject, pieceId: string): boolean {
  * stands where its parent's own reflection stands, so a piece added to the left
  * thigh is twinned onto the right thigh rather than onto the left one.
  *
- * Nothing links the two afterwards. They are two ordinary pieces, and moving,
- * turning or deleting one says nothing about the other.
- *
- * Returns the project untouched when the piece should not be twinned.
+ * Answers null when the piece should not be twinned, and otherwise the new
+ * document and the twin's own piece id, which is what the pair is then followed
+ * by.
  */
 export function mirrorTwin(
   project: LegoProject,
   pieceId: string,
   newId: () => string,
-): LegoProject {
-  if (!canMirrorTwin(project, pieceId)) return project;
+): { project: LegoProject; twinId: string } | null {
+  if (!canMirrorTwin(project, pieceId)) return null;
   const source = pieceById(project, pieceId) as LegoPiece;
   const parent = mirrorParent(project, source.parentId ?? project.rootPieceId);
-  return mirrorCopy(project, pieceId, newId, parent)?.project ?? project;
+  const copy = mirrorCopy(project, pieceId, newId, parent);
+  return copy ? { project: copy.project, twinId: copy.pieceId } : null;
+}
+
+/**
+ * Move a twin to wherever the mirror of its counterpart now is.
+ *
+ * What keeps a pair in step while symmetry mode holds them together: drag the
+ * left leg and the right one goes with it, turned and scaled to match rather
+ * than merely shifted. Everything hanging off the twin comes along, because it
+ * is positioned against the twin rather than against the unit.
+ *
+ * Returns the project untouched when either piece has since gone, so a deleted
+ * twin quietly stops following instead of resurrecting or throwing.
+ */
+export function followMirror(
+  project: LegoProject,
+  pieceId: string,
+  twinId: string,
+): LegoProject {
+  if (!pieceById(project, pieceId) || !pieceById(project, twinId))
+    return project;
+  if (!canMirror(project, twinId)) return project;
+  const transform = mirroredTransform(project, pieceId, twinId);
+  return {
+    ...project,
+    pieces: project.pieces.map((piece) =>
+      piece.id === twinId ? { ...piece, ...transform } : piece,
+    ),
+  };
 }
