@@ -37,7 +37,7 @@ import {
 } from "../groupTransform";
 import {
   canMirror,
-  canMirrorTwin,
+  followMirror,
   mirrorCopy,
   mirrorPiece,
   mirrorTwin,
@@ -120,8 +120,9 @@ function Builder({ id }: { id: string | undefined }) {
   const [placingAnchor, setPlacingAnchor] = useState(false);
   /**
    * Symmetry mode: a piece added now gets a mirrored twin the first time it is
-   * put somewhere off the centre line. A preference for the session, like the
-   * scale lock above, rather than something the unit carries.
+   * put somewhere off the centre line, and the twin then follows it for as long
+   * as it stays selected. A preference for the session, like the scale lock
+   * above, rather than something the unit carries.
    */
   const [symmetry, setSymmetry] = useState(false);
   /**
@@ -135,22 +136,49 @@ function Builder({ id }: { id: string | undefined }) {
    * that edit the document.
    */
   const awaitingTwin = useRef(new Set<string>());
+  /**
+   * The pairs symmetry mode is currently holding together: a piece and the twin
+   * that follows it.
+   *
+   * Kept only while the piece stays selected. Moving on to something else ends
+   * it, and the two are ordinary pieces from then on. That is the whole of the
+   * pairing: nothing is written to the document, so a unit reopened tomorrow
+   * has two pieces and no memory of which made which.
+   */
+  const twins = useRef(new Map<string, string>());
   const filter = usePartFilter(pack);
 
   useEffect(() => {
     loadPack().then(setPack, () => setPack(null));
   }, []);
 
-  // A piece that has left the document is not waiting for anything: deleting it
-  // or undoing the add that made it takes it off the list rather than leaving an
-  // id that could be twinned if a redo brought it back.
+  // A piece that has left the document is not waiting for anything and has
+  // nothing following it: deleting it, or undoing the add that made it, takes it
+  // off both rather than leaving an id that could be twinned or moved if a redo
+  // brought it back.
   useEffect(() => {
     if (!draft) return;
     const present = new Set(draft.pieces.map((piece) => piece.id));
     for (const pieceId of awaitingTwin.current) {
       if (!present.has(pieceId)) awaitingTwin.current.delete(pieceId);
     }
+    for (const [pieceId, twinId] of twins.current) {
+      if (!present.has(pieceId) || !present.has(twinId))
+        twins.current.delete(pieceId);
+    }
   }, [draft]);
+
+  // Selecting something else ends whatever symmetry was holding together. Read
+  // during the render that brings the new selection in, so the pair is already
+  // broken by the time anything can act on it, and compared by the contents of
+  // the selection rather than the array, which is rebuilt on every edit and
+  // would otherwise break the pair on the first drag.
+  const selectionKey = selectedIds.join(" ");
+  const pairedFor = useRef(selectionKey);
+  if (pairedFor.current !== selectionKey) {
+    pairedFor.current = selectionKey;
+    twins.current.clear();
+  }
 
   // The document's own problems, plus anything wrong between it and the packs
   // installed. Both are things to say rather than reasons to refuse the unit.
@@ -202,31 +230,36 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   /**
-   * Apply a placement, then mirror whichever of the pieces it moved were still
-   * waiting for a twin.
+   * Apply a placement, then let symmetry mode answer for each piece it moved:
+   * bring the piece's twin along, or give it one if it is still owed one.
    *
-   * One `edit`, so the piece and its twin arrive together and one undo puts
-   * both back. A piece stays on the list until it is somewhere a mirror means
-   * something: dropped down the middle it is its own reflection, so it keeps
-   * its place in the queue until it is moved off the line.
+   * One `edit` either way, so a piece and its twin arrive together, move
+   * together and take one undo step between them.
+   *
+   * A piece owed a twin keeps its place in the queue until it is somewhere a
+   * mirror means something. Dropped down the middle it is its own reflection,
+   * so it waits there rather than spending its turn.
    */
   function place(
     pieceIds: string[],
     change: (project: LegoProject) => LegoProject,
   ) {
     if (!draft) return;
-    const placed = change(draft);
-    const twinning = pieceIds.filter(
-      (pieceId) =>
-        awaitingTwin.current.has(pieceId) && canMirrorTwin(placed, pieceId),
-    );
-    for (const pieceId of twinning) awaitingTwin.current.delete(pieceId);
-    edit(() =>
-      twinning.reduce(
-        (next, pieceId) => mirrorTwin(next, pieceId, () => crypto.randomUUID()),
-        placed,
-      ),
-    );
+    let next = change(draft);
+    for (const pieceId of pieceIds) {
+      const twinId = twins.current.get(pieceId);
+      if (twinId) {
+        next = followMirror(next, pieceId, twinId);
+        continue;
+      }
+      if (!awaitingTwin.current.has(pieceId)) continue;
+      const twinned = mirrorTwin(next, pieceId, () => crypto.randomUUID());
+      if (!twinned) continue;
+      awaitingTwin.current.delete(pieceId);
+      twins.current.set(pieceId, twinned.twinId);
+      next = twinned.project;
+    }
+    edit(() => next);
   }
 
   function addEmpty() {
@@ -538,7 +571,10 @@ function Builder({ id }: { id: string | undefined }) {
    */
   function setSymmetryMode(on: boolean) {
     setSymmetry(on);
-    if (!on) awaitingTwin.current.clear();
+    if (!on) {
+      awaitingTwin.current.clear();
+      twins.current.clear();
+    }
   }
 
   function mirrorSelection() {
