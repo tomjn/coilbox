@@ -25,9 +25,9 @@ import {
   Keyboard,
   Move,
   PackagePlus,
-  PersonStanding,
   RotateCw,
   Scaling,
+  Sun,
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -45,6 +45,7 @@ import {
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { type AnimPreset, presetById } from "../../animPresets";
+import { buildGround, disposeGround, REFERENCE_PARK_X } from "../../buildPlate";
 import { frameBox } from "../../framing";
 import { addStandardLights, partMaterial } from "../../geometry";
 import {
@@ -56,9 +57,8 @@ import {
 } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import {
-  buildReferenceFigure,
-  disposeReferenceFigure,
-  REFERENCE_HEIGHT_ELMOS,
+  buildReferenceUnit,
+  disposeReferenceUnit,
 } from "../../referenceObject";
 import { type BakedPiece, bakedPieces } from "../../s3oBuild";
 import { isShortcut } from "../../shortcuts";
@@ -259,7 +259,8 @@ export function ModelViewport({
       addStandardLights(scene);
 
       // Units stand on y = 0, so the grid is the ground the engine will use.
-      const grid = new THREE.GridHelper(40, 40, 0x556070, 0x2c333f);
+      // Marked up in footprint steps and common plate sizes: see buildPlate.ts.
+      const grid = buildGround();
       scene.add(grid);
 
       // Which way is which, drawn at the origin. Short, because it is a compass
@@ -271,8 +272,8 @@ export function ModelViewport({
       // A view aid, not a piece: sits beside where a unit is built rather
       // than under it, and is off by default so it never surprises anyone
       // opening a project for the first time.
-      const reference = buildReferenceFigure();
-      reference.position.set(-REFERENCE_HEIGHT_ELMOS, 0, 0);
+      const reference = buildReferenceUnit();
+      reference.position.set(REFERENCE_PARK_X, 0, 0);
       reference.visible = false;
       scene.add(reference);
 
@@ -560,8 +561,8 @@ export function ModelViewport({
           state.dots.dispose();
           state.originDot.dispose();
           disposeBaked(state);
-          grid.dispose();
-          disposeReferenceFigure(reference);
+          disposeGround(grid);
+          disposeReferenceUnit(reference);
           outline.dispose();
           sceneRef.current = null;
         },
@@ -877,7 +878,11 @@ export function ModelViewport({
           variant="outline"
           onClick={() => setShowGrid(!showGrid)}
           aria-pressed={showGrid}
-          title={showGrid ? "Hide the ground grid" : "Show the ground grid"}
+          title={
+            showGrid
+              ? "Hide the ground grid"
+              : "Show the ground grid, marked in footprint steps and plate sizes"
+          }
         >
           <Grid3x3 className="size-4" />
         </Button>
@@ -888,11 +893,11 @@ export function ModelViewport({
           aria-pressed={showReference}
           title={
             showReference
-              ? "Hide the reference figure"
-              : "Show a reference figure for scale"
+              ? "Hide the reference unit"
+              : "Show a solar collector at its real size, for scale"
           }
         >
-          <PersonStanding className="size-4" />
+          <Sun className="size-4" />
         </Button>
         <Button
           size="icon"
@@ -1057,7 +1062,7 @@ interface SceneState {
    *  Never a hidden piece, and never the selected piece: see `applyHoverVisual`. */
   hoveredId: string | null;
   /** The ground and the compass, both of which can be switched off. */
-  grid: THREE.GridHelper;
+  grid: THREE.Group;
   axes: THREE.AxesHelper;
   /** A scale figure beside the build, switched off by default. A view aid
    *  like `grid` and `axes`: never part of the project, never exported. */

@@ -1,92 +1,110 @@
 /**
- * A reference figure for judging scale against, toggled from the viewport.
+ * A real unit to judge scale against, toggled from the viewport.
  *
- * Built from primitives rather than loaded from a game archive. Reading a
- * real unit's model out of an installed game turns out to be much bigger work
- * than it looks: `coilbox_s3o::read` exists but is called by nothing in the
- * app (issue #581's design doc), and most installed games ship `.3do`, a
- * format nothing in coilbox reads. A wrong-scale reference would be worse
- * than none, so this sticks to what can be sized with confidence.
+ * The unit is Beyond All Reason's Armada solar collector, by Cremuss, under
+ * CC BY-SA 4.0. Anyone who plays a Spring or Recoil game has built hundreds of
+ * these, so "my unit is half the height of a solar" means something, where a
+ * figure invented for the purpose means nothing.
  *
- * The builder's world units are elmos with nothing rescaled in between: the
- * exporter's `header()` in `s3oBuild.ts` bakes each vertex's world position
- * straight into the s3o header, and that has been checked against a shipped
- * model (`ammobox2.s3o`'s header radius matches its furthest vertex from its
- * own `mid` exactly). So a shape sized in Three.js world units here is sized
- * in elmos there too, with no conversion to get wrong.
+ * Its geometry is committed as `reference/armsolar.json`, converted from the
+ * game's `armsolar.s3o` once by `scripts/reference-model.mjs`. Nothing is read
+ * out of an installed game at runtime: coilbox cannot rely on any particular
+ * game being installed, and a reference that appears only for some users would
+ * be worse than none. See `reference/LICENCE.txt` for the attribution, the
+ * licence and what the conversion changed.
  *
- * There is no fixed elmo-to-metre conversion in the engine. It is
- * deliberately scale-free, and different Spring-derived games use different
- * real-world scales for the same elmo count, so a "human height in elmos"
- * would be a guess dressed up as a measurement. What this codebase already
- * treats as ground truth is `ELMOS_PER_FOOTPRINT` (`unitDef.ts`), sourced to
- * the engine's own `SQUARE_SIZE` and `SPRING_FOOTPRINT_SCALE`: the smallest
- * area a unit is allowed to occupy. This figure is pegged to that instead: it
- * stands exactly one footprint step tall, on a tile of the same footprint.
+ * Sizes are in elmos with nothing rescaled in between: the exporter's
+ * `header()` in `s3oBuild.ts` bakes each vertex's world position straight into
+ * the s3o header, so a shape sized in Three.js world units here is sized in
+ * elmos there too. That is what lets a model lifted out of a game sit in this
+ * scene at the size the engine draws it.
+ *
+ * Two measurements, because a building has two:
+ *
+ * - The model, 42.98 elmos across and 29.12 tall, measured from the vertices in
+ *   `armsolar.s3o` itself. Its header claims a height of 43 and a radius of 40,
+ *   which are authored numbers rather than measured ones, so they are ignored.
+ * - The footprint, 5 by 5 steps, read from `footprintx` and `footprintz` in the
+ *   unit's own `armsolar.lua`. That is the ground the engine reserves, and it is
+ *   nearly twice the model's width: real buildings do not fill their footprint.
+ *   `buildPlate.ts` draws it as the largest plate under the unit being built,
+ *   rather than drawing it twice.
  */
 
 import * as THREE from "three";
 
-import { ELMOS_PER_FOOTPRINT } from "./unitDef";
+import model from "./reference/armsolar.json";
 
-/** Amber, distinct from every colourway in the bundled parts pack. */
-const FIGURE_COLOUR = 0x0ea5e9;
-const TILE_COLOUR = 0x334155;
-const TILE_THICKNESS = 0.15;
+/** Sky blue, distinct from every colourway in the bundled parts pack. */
+const REFERENCE_COLOUR = 0x0ea5e9;
+/** Ghostly on purpose: it is a backdrop for judging size against, and nothing
+ *  in the scene that can be clicked looks like this. */
+const REFERENCE_OPACITY = 0.35;
 
-/** The figure's total height, and its tile's width and depth, in elmos: one
- *  footprint step, the same number `unitDef.ts` uses to size an exported
- *  unit's footprint. Exported so the test checks the built shape against the
- *  same source of truth rather than a copy of it. */
-export const REFERENCE_HEIGHT_ELMOS = ELMOS_PER_FOOTPRINT;
+/** The reference unit's footprint, in steps, as its unitdef states it.
+ *  `buildPlate.ts` draws a plate this size under the unit being built. */
+export const REFERENCE_FOOTPRINT_STEPS = model.footprintSteps;
+
+/** How wide the model itself is, in elmos, measured off the geometry rather
+ *  than declared, so nothing can drift out of step with the asset. */
+export const REFERENCE_WIDTH_ELMOS = widthElmos();
+
+function widthElmos(): number {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < model.positions.length; i += 3) {
+    min = Math.min(min, model.positions[i]);
+    max = Math.max(max, model.positions[i]);
+  }
+  return max - min;
+}
 
 /**
- * A blocky standing figure on a footprint-sized tile, sized in elmos.
+ * The reference unit, in its own local space with the unit standing on y = 0,
+ * as it does in game.
  *
- * Purely a visual aid, in its own local space with its base at y = 0. It
- * never carries a piece, and is never selected, hovered, baked or exported.
- * The viewport positions and toggles it. This only builds the shape.
+ * Purely a visual aid. It never carries a piece, and is never selected,
+ * hovered, baked or exported. The viewport positions and toggles it. This only
+ * builds the shape.
  */
-export function buildReferenceFigure(): THREE.Group {
+export function buildReferenceUnit(): THREE.Group {
   const group = new THREE.Group();
 
-  const tile = new THREE.Mesh(
-    new THREE.BoxGeometry(
-      REFERENCE_HEIGHT_ELMOS,
-      TILE_THICKNESS,
-      REFERENCE_HEIGHT_ELMOS,
-    ),
-    new THREE.MeshStandardMaterial({ color: TILE_COLOUR, roughness: 0.9 }),
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(model.positions, 3),
   );
-  tile.position.y = TILE_THICKNESS / 2;
-  tile.raycast = () => {};
-
-  // Legs and head sum to the full height: the tile is a thin footprint
-  // marker embedded at the base rather than added on top of it.
-  const bodyHeight = REFERENCE_HEIGHT_ELMOS * 0.82;
-  const headRadius = REFERENCE_HEIGHT_ELMOS * 0.09;
-  const bodyRadius = REFERENCE_HEIGHT_ELMOS * 0.09;
-
-  const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(bodyRadius, bodyRadius * 1.2, bodyHeight, 12),
-    new THREE.MeshStandardMaterial({ color: FIGURE_COLOUR, roughness: 0.6 }),
+  // The model's own vertex normals, not recomputed ones: they are what the
+  // engine shades it with.
+  geometry.setAttribute(
+    "normal",
+    new THREE.Float32BufferAttribute(model.normals, 3),
   );
-  body.position.y = bodyHeight / 2;
-  body.raycast = () => {};
+  geometry.setIndex(model.indices);
 
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(headRadius, 16, 12),
-    new THREE.MeshStandardMaterial({ color: FIGURE_COLOUR, roughness: 0.6 }),
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({
+      color: REFERENCE_COLOUR,
+      roughness: 0.6,
+      transparent: true,
+      opacity: REFERENCE_OPACITY,
+      // Without this the object sorts against itself and reads as a solid with
+      // holes in it rather than as a ghost. Thirteen of the model's 370
+      // triangles wind against their own normals, so both sides are drawn.
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
   );
-  head.position.y = bodyHeight + headRadius;
-  head.raycast = () => {};
+  mesh.raycast = () => {};
 
-  group.add(tile, body, head);
+  group.add(mesh);
   return group;
 }
 
-/** Frees the geometry and materials `buildReferenceFigure` allocated. */
-export function disposeReferenceFigure(group: THREE.Group): void {
+/** Frees the geometry and materials `buildReferenceUnit` allocated. */
+export function disposeReferenceUnit(group: THREE.Group): void {
   for (const child of group.children) {
     if (!(child instanceof THREE.Mesh)) continue;
     child.geometry.dispose();

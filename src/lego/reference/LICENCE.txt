@@ -1,0 +1,31 @@
+armsolar.json: geometry of Beyond All Reason's Armada solar collector.
+
+Model by Cremuss, credited as `model_author` in Beyond All Reason's own
+units/ArmBuildings/LandEconomy/armsolar.lua.
+
+Licensed under Creative Commons Attribution-ShareAlike 4.0 International
+(CC BY-SA 4.0), https://creativecommons.org/licenses/by-sa/4.0/
+
+Source: https://github.com/beyond-all-reason/Beyond-All-Reason
+        objects3d/Units/armsolar.s3o
+
+Changes made: converted from s3o to JSON, the piece tree flattened into one
+mesh in model space, and UVs and texture references dropped. Vertex positions
+are unchanged, in elmos, because the object exists to show the unit's real
+size. No vertex was moved, added or removed.
+
+armsolar.json is therefore an adaptation and is offered under the same licence,
+CC BY-SA 4.0. That covers this file and the geometry in it, not the rest of
+coilbox, which stays under the licence in LICENSE at the repository root.
+
+Reproduce it with, from a checkout of Beyond All Reason:
+
+  bun run lego:reference --s3o <BAR>/objects3d/Units/armsolar.s3o \
+    --footprint 5 \
+    --source "https://github.com/beyond-all-reason/Beyond-All-Reason, objects3d/Units/armsolar.s3o" \
+    --author "Cremuss" \
+    --licence "CC-BY-SA-4.0, https://creativecommons.org/licenses/by-sa/4.0/"
+
+footprintSteps is 5, read from footprintx and footprintz in
+units/ArmBuildings/LandEconomy/armsolar.lua, and confirmed by that unitdef's
+5 by 5 yardmap.
