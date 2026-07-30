@@ -110,6 +110,15 @@ export const legoScratchGame = defineCommand<
   { dir: string }
 >("coilbox-lego", "lego_scratch_game");
 
+/**
+ * The extension parts packs installed, by folder name and in load order, plus
+ * the folder they live in so the UI can say where to put one.
+ */
+export const legoPacks = defineCommand<
+  Record<string, never>,
+  { dir: string; names: string[] }
+>("coilbox-lego", "lego_packs");
+
 /** Reveal an exported unit in the file manager. */
 export const legoOpenPath = defineCommand<
   { path: string },

@@ -1299,10 +1299,10 @@
           "markdownDescription": "Denies the dl_versions command without any pre-configured scope."
         },
         {
-          "description": "Allows the unit builder's project storage, thumbnail, reveal and test-game commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`\n- `allow-lego-export`\n- `allow-lego-export-glb`\n- `allow-lego-export-obj`\n- `allow-lego-scratch-game`",
+          "description": "Allows the unit builder's project storage, thumbnail, reveal and test-game commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`\n- `allow-lego-packs`\n- `allow-lego-export`\n- `allow-lego-export-glb`\n- `allow-lego-export-obj`\n- `allow-lego-scratch-game`",
           "type": "string",
           "const": "coilbox-lego:default",
-          "markdownDescription": "Allows the unit builder's project storage, thumbnail, reveal and test-game commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`\n- `allow-lego-export`\n- `allow-lego-export-glb`\n- `allow-lego-export-obj`\n- `allow-lego-scratch-game`"
+          "markdownDescription": "Allows the unit builder's project storage, thumbnail, reveal and test-game commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`\n- `allow-lego-packs`\n- `allow-lego-export`\n- `allow-lego-export-glb`\n- `allow-lego-export-obj`\n- `allow-lego-scratch-game`"
         },
         {
           "description": "Enables the lego_delete command without any pre-configured scope.",
@@ -1339,6 +1339,12 @@
           "type": "string",
           "const": "coilbox-lego:allow-lego-open-path",
           "markdownDescription": "Enables the lego_open_path command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the lego_packs command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lego:allow-lego-packs",
+          "markdownDescription": "Enables the lego_packs command without any pre-configured scope."
         },
         {
           "description": "Enables the lego_save command without any pre-configured scope.",
@@ -1393,6 +1399,12 @@
           "type": "string",
           "const": "coilbox-lego:deny-lego-open-path",
           "markdownDescription": "Denies the lego_open_path command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the lego_packs command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lego:deny-lego-packs",
+          "markdownDescription": "Denies the lego_packs command without any pre-configured scope."
         },
         {
           "description": "Denies the lego_save command without any pre-configured scope.",
