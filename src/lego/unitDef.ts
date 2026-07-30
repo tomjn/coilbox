@@ -20,7 +20,7 @@ import type { LegoProject } from "./model";
  * See UnitDef.cpp (`xsize = footprintX * SPRING_FOOTPRINT_SCALE`) and
  * GlobalConstants.h (`SPRING_FOOTPRINT_SCALE = 2`, `SQUARE_SIZE = 8`).
  */
-const ELMOS_PER_FOOTPRINT = 16;
+export const ELMOS_PER_FOOTPRINT = 16;
 
 /** A conservative stand-in health value, easy to find and retune by hand. */
 const DEFAULT_MAX_DAMAGE = 1000;
