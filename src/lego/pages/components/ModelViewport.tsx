@@ -95,6 +95,7 @@ import {
   snapRotation,
   type Vec3,
 } from "../../snapping";
+import { captureThumbnail } from "../../thumbnail";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import { ShortcutSheet } from "./ShortcutSheet";
 
@@ -675,7 +676,18 @@ export function ModelViewport({
       renderer.domElement.addEventListener("pointermove", onPointerMove);
       renderer.domElement.addEventListener("pointerleave", onPointerLeave);
 
-      onReadyRef.current?.(canvas.capture);
+      // A thumbnail is the unit alone, drawn from a fixed camera: see
+      // thumbnail.ts. The live view is drawn again straight after, before the
+      // browser composites anything, so the capture is never seen.
+      onReadyRef.current?.(() => {
+        const thumb = captureThumbnail(renderer, scene, root, [
+          state.hoverOverlay,
+          state.anchors,
+          ...state.selectOverlays,
+        ]);
+        render();
+        return thumb;
+      });
 
       return {
         render,
