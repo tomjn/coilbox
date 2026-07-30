@@ -207,7 +207,7 @@ interface Props {
   /** Save the selected piece and everything under it, to reuse in another unit. */
   onSaveAsCompound: () => void;
   canSaveAsCompound: boolean;
-  /** Delete the selected piece (Backspace). */
+  /** Delete every selected piece (Backspace). */
   onDelete: () => void;
   canDelete: boolean;
   /**
@@ -943,7 +943,7 @@ export function ModelViewport({
                     variant="outline"
                     onClick={onDelete}
                     disabled={!canDelete}
-                    aria-label="Delete the selected piece"
+                    aria-label="Delete the selection"
                   >
                     <Trash2 className="size-4" />
                   </Button>
