@@ -528,7 +528,9 @@ function Builder({ id }: { id: string | undefined }) {
             </div>
 
             {problems.length > 0 ? (
-              <ul className="pointer-events-none absolute inset-x-0 top-20 z-10 mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
+              // Below the unit's chrome card, which is three rows tall when a
+              // unit has an atlas to choose.
+              <ul className="pointer-events-none absolute inset-x-0 top-24 z-10 mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
                 {problems.map((problem) => (
                   <li key={problem}>{problem}</li>
                 ))}

@@ -139,8 +139,9 @@ export function TestDrawer({ open, onOpenChange, project, pack }: Props) {
       await legoExport({
         dir,
         unitName: project.unitName,
-        atlas: atlas.installed ? atlas.texture : null,
-        atlasPack: atlas.installed?.folder ?? null,
+        atlas: atlas.installed
+          ? { name: atlas.texture, pack: atlas.installed.folder }
+          : null,
         script: buildLuaScript(project),
         unitDef: buildUnitDef(project, model.radius),
         model,

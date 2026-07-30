@@ -40,6 +40,8 @@ export function AtlasPicker({ project, pack, onChange }: Props) {
   const unit = unitAtlas(project, atlases);
   if (atlases.length < 2 && unit.installed) return null;
 
+  // Its own row rather than sharing the line above: at a narrow window the
+  // piece count, the export name and this together are wider than the card.
   return (
     <div className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
       <span>atlas</span>

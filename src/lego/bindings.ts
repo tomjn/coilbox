@@ -2,6 +2,16 @@ import { defineCommand } from "@picoframe/plugin-sdk";
 
 import type { S3oBuild } from "./s3oBuild";
 
+/**
+ * Which atlas to place, and where to read it from. The two travel together
+ * because a texture's file name does not say which pack ships it: `pack` is an
+ * atlas pack's folder, or null for the base pack's own atlas.
+ */
+export interface AtlasRef {
+  name: string;
+  pack: string | null;
+}
+
 /** A stored document. The JSON is parsed here, not in Rust. */
 export interface LegoStoredItem {
   id: string;
@@ -50,12 +60,8 @@ export const legoExport = defineCommand<
   {
     dir: string;
     unitName: string;
-    atlas: string | null;
-    /**
-     * Which pack ships that atlas, by folder under the extension packs
-     * directory. Null for the base pack's own atlas.
-     */
-    atlasPack: string | null;
+    /** Null to write no texture. Otherwise the file, and which pack ships it. */
+    atlas: AtlasRef | null;
     /** Written only when the game has no script for this unit yet. */
     script: string | null;
     /** Written only when the game has no unit definition for it yet. */
@@ -98,10 +104,8 @@ export const legoExportObj = defineCommand<
     unitName: string;
     obj: string;
     mtl: string;
-    /** The atlas file name to copy in beside the .obj and .mtl. */
-    atlas: string;
-    /** Which pack ships it, as `legoExport` takes it. */
-    atlasPack: string | null;
+    /** The atlas to copy in beside the .obj and .mtl. */
+    atlas: AtlasRef;
   },
   { obj: string; mtl: string; texture: string }
 >("coilbox-lego", "lego_export_obj");

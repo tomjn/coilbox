@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
-
+import type { LegoAtlas } from "./atlas";
 import {
   disposeSharedMaterial,
   materialCacheKey,
   partMaterial,
 } from "./geometry";
-import type { LegoAtlas } from "./atlas";
 
 // TextureLoader starts an image load through the DOM the moment a material is
 // built. Vitest's node test environment has no document, and the load itself

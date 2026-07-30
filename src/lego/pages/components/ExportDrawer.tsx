@@ -88,10 +88,9 @@ export function ExportDrawer({
   // unit having to change.
   const unit = unitAtlas(project, pack.library.atlases);
   const atlas = unit.texture;
-  const atlasPack = unit.installed?.folder ?? null;
   // Everything that needs the atlas file itself, rather than only its name,
   // needs it to actually be installed.
-  const haveAtlas = unit.installed !== null;
+  const installed = unit.installed;
 
   async function chooseFolder() {
     const picked = await open({
@@ -117,8 +116,10 @@ export function ExportDrawer({
       const written = await legoExport({
         dir,
         unitName: project.unitName,
-        atlas: withTexture && haveAtlas ? atlas : null,
-        atlasPack,
+        atlas:
+          withTexture && installed
+            ? { name: atlas, pack: installed.folder }
+            : null,
         script: withScript ? buildLuaScript(project) : null,
         // Unlike the atlas and the script, there is no scenario where a
         // built unit should export without one: with no unit definition the
@@ -128,8 +129,8 @@ export function ExportDrawer({
       });
 
       let glbPath: string | null = null;
-      if (withGlb && unit.installed) {
-        const bytes = await exportGlb(project, pack, unit.installed);
+      if (withGlb && installed) {
+        const bytes = await exportGlb(project, pack, installed);
         if (bytes) {
           const glbWritten = await legoExportGlb({
             dir,
@@ -142,7 +143,7 @@ export function ExportDrawer({
 
       let objPath: string | null = null;
       let mtlPath: string | null = null;
-      if (withObj && haveAtlas) {
+      if (withObj && installed) {
         const objBuild = buildObj(project, pack, {
           unitName: project.unitName,
           textureName: atlas,
@@ -153,8 +154,7 @@ export function ExportDrawer({
             unitName: project.unitName,
             obj: objBuild.obj,
             mtl: objBuild.mtl,
-            atlas,
-            atlasPack,
+            atlas: { name: atlas, pack: installed.folder },
           });
           objPath = objWritten.obj;
           mtlPath = objWritten.mtl;
@@ -240,8 +240,8 @@ export function ExportDrawer({
             <div className="flex items-start gap-2">
               <Checkbox
                 id="lego-export-texture"
-                checked={withTexture && haveAtlas}
-                disabled={!haveAtlas}
+                checked={withTexture && !!installed}
+                disabled={!installed}
                 onCheckedChange={(checked) => setWithTexture(checked === true)}
                 className="mt-0.5"
               />
@@ -257,7 +257,7 @@ export function ExportDrawer({
               </div>
             </div>
 
-            {haveAtlas ? null : (
+            {installed ? null : (
               <p className="text-xs text-muted-foreground">
                 <code>{atlas}</code> is not installed, so the texture cannot be
                 copied and the Blender files cannot be written. The{" "}
@@ -279,8 +279,8 @@ export function ExportDrawer({
             <div className="flex items-start gap-2">
               <Checkbox
                 id="lego-export-glb"
-                checked={withGlb && haveAtlas}
-                disabled={!haveAtlas}
+                checked={withGlb && !!installed}
+                disabled={!installed}
                 onCheckedChange={(checked) => setWithGlb(checked === true)}
                 className="mt-0.5"
               />
@@ -296,8 +296,8 @@ export function ExportDrawer({
             <div className="flex items-start gap-2">
               <Checkbox
                 id="lego-export-obj"
-                checked={withObj && haveAtlas}
-                disabled={!haveAtlas}
+                checked={withObj && !!installed}
+                disabled={!installed}
                 onCheckedChange={(checked) => setWithObj(checked === true)}
                 className="mt-0.5"
               />

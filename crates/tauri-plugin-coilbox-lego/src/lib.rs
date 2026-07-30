@@ -339,27 +339,32 @@ fn valid_pack_folder(name: &str) -> bool {
         && name != ".."
 }
 
+/// Which atlas to place, and which installed pack ships it. The two travel
+/// together because a texture's file name does not say where to read it from.
+#[derive(Deserialize)]
+struct AtlasRef {
+    /// The texture's file name, as the s3o names it.
+    name: String,
+    /// The atlas pack's folder, or `None` for the base pack's own atlas.
+    pack: Option<String>,
+}
+
 /// Where an atlas file is read from: the base pack, or the atlas pack that
-/// ships it. `pack` is a folder under the extension packs directory, and `None`
-/// means the base pack's own atlas.
-fn atlas_source<R: Runtime>(
-    app: &AppHandle<R>,
-    pack: Option<&str>,
-    atlas: &str,
-) -> Result<PathBuf, String> {
-    if !valid_atlas_name(atlas) {
-        return Err(format!("invalid texture name: {atlas}"));
+/// ships it. `pack` is a folder under the extension packs directory.
+fn atlas_source<R: Runtime>(app: &AppHandle<R>, atlas: &AtlasRef) -> Result<PathBuf, String> {
+    if !valid_atlas_name(&atlas.name) {
+        return Err(format!("invalid texture name: {}", atlas.name));
     }
-    match pack {
+    match &atlas.pack {
         None => legopack_dir(app)
-            .map(|dir| dir.join(atlas))
+            .map(|dir| dir.join(&atlas.name))
             .ok_or_else(|| "no parts pack is installed".to_string()),
         Some(folder) => {
             if !valid_pack_folder(folder) {
                 return Err(format!("invalid pack folder: {folder}"));
             }
             extra_packs_dir(app)
-                .map(|dir| dir.join(folder).join(atlas))
+                .map(|dir| dir.join(folder).join(&atlas.name))
                 .ok_or_else(|| "could not resolve the parts pack folder".to_string())
         }
     }
@@ -433,8 +438,7 @@ async fn lego_export<R: Runtime>(
     app: AppHandle<R>,
     dir: String,
     unit_name: String,
-    atlas: Option<String>,
-    atlas_pack: Option<String>,
+    atlas: Option<AtlasRef>,
     script: Option<String>,
     unit_def: Option<String>,
     model: ExportModel,
@@ -473,7 +477,7 @@ async fn lego_export<R: Runtime>(
 
     let mut texture_path = None;
     if let Some(atlas) = atlas {
-        let source = match atlas_source(&app, atlas_pack.as_deref(), &atlas) {
+        let source = match atlas_source(&app, &atlas) {
             Ok(path) => path,
             Err(e) => return CliResult::err(e),
         };
@@ -481,7 +485,7 @@ async fn lego_export<R: Runtime>(
         if let Err(e) = std::fs::create_dir_all(&textures) {
             return CliResult::err(format!("could not create {}: {e}", textures.display()));
         }
-        let target = textures.join(&atlas);
+        let target = textures.join(&atlas.name);
         if let Err(e) = std::fs::copy(&source, &target) {
             return CliResult::err(format!("could not copy the texture: {e}"));
         }
@@ -581,15 +585,14 @@ async fn lego_export_obj<R: Runtime>(
     unit_name: String,
     obj: String,
     mtl: String,
-    atlas: String,
-    atlas_pack: Option<String>,
+    atlas: AtlasRef,
 ) -> CliResult {
     if !valid_unit_name(&unit_name) {
         return CliResult::err(format!(
             "invalid unit name: {unit_name}. Lower case letters, digits and underscores only."
         ));
     }
-    let source = match atlas_source(&app, atlas_pack.as_deref(), &atlas) {
+    let source = match atlas_source(&app, &atlas) {
         Ok(path) => path,
         Err(e) => return CliResult::err(e),
     };
@@ -612,7 +615,7 @@ async fn lego_export_obj<R: Runtime>(
         return CliResult::err(format!("could not write {}: {e}", mtl_path.display()));
     }
 
-    let texture_path = blender.join(&atlas);
+    let texture_path = blender.join(&atlas.name);
     if let Err(e) = std::fs::copy(&source, &texture_path) {
         return CliResult::err(format!("could not copy the texture: {e}"));
     }
