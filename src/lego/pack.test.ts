@@ -209,19 +209,40 @@ describe("mergePacks", () => {
   });
 
   it("merges categories by id, first label winning", () => {
-    const base = source("base", [], {
+    const base = source("base", [part({ id: "a", category: "grey" })], {
       categories: [{ id: "grey", label: "Grey" }],
     });
-    const extra = source("aliens", [], {
-      categories: [
-        { id: "grey", label: "Alien grey" },
-        { id: "chitin", label: "Chitin" },
+    const extra = source(
+      "aliens",
+      [
+        part({ id: "x", category: "grey" }),
+        part({ id: "y", category: "chitin" }),
       ],
-    });
+      {
+        categories: [
+          { id: "grey", label: "Alien grey" },
+          { id: "chitin", label: "Chitin" },
+        ],
+      },
+    );
 
     expect(mergePacks([base, extra]).manifest.categories).toEqual([
       { id: "grey", label: "Grey" },
       { id: "chitin", label: "Chitin" },
+    ]);
+  });
+
+  it("drops a category no surviving part is in", () => {
+    const base = source("base", [part({ id: "a", category: "grey" })], {
+      categories: [{ id: "grey", label: "Grey" }],
+    });
+    // Every part collides, so the pack's own category filters down to nothing.
+    const extra = source("aliens", [part({ id: "a", category: "chitin" })], {
+      categories: [{ id: "chitin", label: "Chitin" }],
+    });
+
+    expect(mergePacks([base, extra]).manifest.categories).toEqual([
+      { id: "grey", label: "Grey" },
     ]);
   });
 

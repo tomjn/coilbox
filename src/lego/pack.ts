@@ -235,12 +235,15 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
 
   // Categories are the picker's own cut of the parts, so a category id an
   // extension pack shares with the base pack is the same shelf, not a second
-  // one. First label wins, in the same order the packs loaded.
-  const categories = [...base.manifest.categories];
-  const known = new Set(categories.map((category) => category.id));
-  for (const source of sources.slice(1)) {
+  // one. First label wins, in the same order the packs loaded. A category no
+  // surviving part is in does not appear at all, because a button that filters
+  // down to nothing is a dead end.
+  const used = new Set(parts.map((part) => part.category));
+  const categories: LegoPackManifest["categories"] = [];
+  const known = new Set<string>();
+  for (const source of sources) {
     for (const category of source.manifest.categories) {
-      if (known.has(category.id)) continue;
+      if (known.has(category.id) || !used.has(category.id)) continue;
       known.add(category.id);
       categories.push(category);
     }
