@@ -28,7 +28,7 @@ import {
 } from "../../pack";
 
 /** Cell size in pixels. Big enough to read a small part, small enough to scan. */
-const CELL = 108;
+const CELL = 72;
 const GAP = 8;
 const PITCH = CELL + GAP;
 /** Rows kept either side of the viewport, so scrolling never shows a gap. */

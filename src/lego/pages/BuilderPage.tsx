@@ -436,114 +436,207 @@ function Builder({ id }: { id: string | undefined }) {
       />
 
       <div className="flex min-h-0 flex-1">
-        {/* The unit's chrome floats over the view rather than taking a strip
-            off the top of it. The 3D is the point of this screen. */}
-        <div className="relative min-h-0 flex-1">
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 p-3">
-            <div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
-              <Blocks size={16} className="shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <Input
-                  value={draft.name}
-                  onChange={(event) => renameUnit(event.target.value)}
-                  aria-label="Unit name"
-                  className="h-6 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
-                />
-                <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
-                  {draft.pieces.length}{" "}
-                  {draft.pieces.length === 1 ? "piece" : "pieces"} · exports as
-                  <NameInput
-                    value={draft.unitName}
-                    onCommit={renameExport}
-                    aria-label="Export name"
-                    className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
+        <div className="flex min-h-0 flex-1 flex-col">
+          {/* The unit's chrome floats over the view rather than taking a strip
+              off the top of it. The 3D is the point of this screen. */}
+          <div className="relative min-h-0 flex-1">
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 p-3">
+              <div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
+                <Blocks size={16} className="shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <Input
+                    value={draft.name}
+                    onChange={(event) => renameUnit(event.target.value)}
+                    aria-label="Unit name"
+                    className="h-6 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
                   />
-                </p>
+                  <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
+                    {draft.pieces.length}{" "}
+                    {draft.pieces.length === 1 ? "piece" : "pieces"} · exports
+                    as
+                    <NameInput
+                      value={draft.unitName}
+                      onCommit={renameExport}
+                      aria-label="Export name"
+                      className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
+                    />
+                  </p>
+                </div>
+              </div>
+
+              <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
+                <ButtonGroup>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={doc.undo}
+                    disabled={!doc.canUndo}
+                    aria-label="Undo"
+                    title="Undo (Cmd Z)"
+                  >
+                    <Undo size={14} />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={doc.redo}
+                    disabled={!doc.canRedo}
+                    aria-label="Redo"
+                    title="Redo (Cmd Shift Z)"
+                  >
+                    <Redo size={14} />
+                  </Button>
+                </ButtonGroup>
+                <span className="text-xs text-muted-foreground">
+                  {doc.saving
+                    ? "Saving"
+                    : doc.dirty
+                      ? "Unsaved changes"
+                      : "Saved"}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => doc.save()}
+                  disabled={doc.saving}
+                >
+                  <Save size={14} /> Save
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setTesting(true)}
+                >
+                  <Rocket size={14} /> Test in game
+                </Button>
+                <Button size="sm" onClick={() => setExporting(true)}>
+                  <Upload size={14} /> Export
+                </Button>
               </div>
             </div>
 
-            <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
-              <ButtonGroup>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={doc.undo}
-                  disabled={!doc.canUndo}
-                  aria-label="Undo"
-                  title="Undo (Cmd Z)"
-                >
-                  <Undo size={14} />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={doc.redo}
-                  disabled={!doc.canRedo}
-                  aria-label="Redo"
-                  title="Redo (Cmd Shift Z)"
-                >
-                  <Redo size={14} />
-                </Button>
-              </ButtonGroup>
-              <span className="text-xs text-muted-foreground">
-                {doc.saving
-                  ? "Saving"
-                  : doc.dirty
-                    ? "Unsaved changes"
-                    : "Saved"}
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => doc.save()}
-                disabled={doc.saving}
-              >
-                <Save size={14} /> Save
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setTesting(true)}
-              >
-                <Rocket size={14} /> Test in game
-              </Button>
-              <Button size="sm" onClick={() => setExporting(true)}>
-                <Upload size={14} /> Export
-              </Button>
-            </div>
+            {problems.length > 0 ? (
+              <ul className="pointer-events-none absolute inset-x-0 top-20 z-10 mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
+                {problems.map((problem) => (
+                  <li key={problem}>{problem}</li>
+                ))}
+              </ul>
+            ) : null}
+
+            <ModelViewport
+              pack={pack}
+              project={draft}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onTransform={transformPiece}
+              hoveredId={hoveredId}
+              onHover={setHoveredId}
+              playing={playing}
+              uniformScale={uniformScale}
+              onGround={() => edit((project) => sitOnGround(project, pack))}
+              onReady={doc.onCapture}
+              onDuplicate={duplicateSelection}
+              canDuplicate={!!selectedId && selectedId !== draft.rootPieceId}
+              onPaste={() => void pasteClipboard()}
+              onSaveAsCompound={() => void saveSelectionAsCompound()}
+              canSaveAsCompound={!!selectedId}
+              onDelete={removeSelected}
+              canDelete={!!selectedId && selectedId !== draft.rootPieceId}
+            />
           </div>
 
-          {problems.length > 0 ? (
-            <ul className="pointer-events-none absolute inset-x-0 top-20 z-10 mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
-              {problems.map((problem) => (
-                <li key={problem}>{problem}</li>
-              ))}
-            </ul>
-          ) : null}
+          {/* Collapsible: most of a session is spent moving what is already there,
+              not reaching for another part. */}
+          <div
+            className={`flex shrink-0 flex-col border-t border-border ${
+              stripOpen ? "h-72" : ""
+            }`}
+          >
+            <div className="flex items-center gap-2 px-3 py-2">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setStripOpen(!stripOpen)}
+                aria-expanded={stripOpen}
+                aria-label={stripOpen ? "Hide the parts" : "Show the parts"}
+              >
+                {stripOpen ? (
+                  <ChevronDown size={16} />
+                ) : (
+                  <ChevronUp size={16} />
+                )}
+              </Button>
 
-          <ModelViewport
-            pack={pack}
-            project={draft}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onTransform={transformPiece}
-            hoveredId={hoveredId}
-            onHover={setHoveredId}
-            playing={playing}
-            uniformScale={uniformScale}
-            onGround={() => edit((project) => sitOnGround(project, pack))}
-            onReady={doc.onCapture}
-            onDuplicate={duplicateSelection}
-            canDuplicate={!!selectedId && selectedId !== draft.rootPieceId}
-            onPaste={() => void pasteClipboard()}
-            onSaveAsCompound={() => void saveSelectionAsCompound()}
-            canSaveAsCompound={!!selectedId}
-            onDelete={removeSelected}
-            canDelete={!!selectedId && selectedId !== draft.rootPieceId}
-          />
+              <ButtonGroup>
+                <Button
+                  size="sm"
+                  variant={strip === "parts" ? "default" : "outline"}
+                  onClick={() => {
+                    setStrip("parts");
+                    setStripOpen(true);
+                  }}
+                  aria-pressed={strip === "parts"}
+                >
+                  Parts
+                </Button>
+                <Button
+                  size="sm"
+                  variant={strip === "compounds" ? "default" : "outline"}
+                  onClick={() => {
+                    setStrip("compounds");
+                    setStripOpen(true);
+                  }}
+                  aria-pressed={strip === "compounds"}
+                >
+                  Compounds
+                </Button>
+              </ButtonGroup>
+
+              {stripOpen && strip === "parts" ? (
+                <PartFilters
+                  pack={pack}
+                  query={filter.query}
+                  onQuery={filter.setQuery}
+                  category={filter.category}
+                  onCategory={filter.setCategory}
+                  packId={filter.packId}
+                  onPackId={filter.setPackId}
+                  shown={filter.parts.length}
+                  className="flex-1"
+                />
+              ) : null}
+            </div>
+
+            {/* Flex, not block: the picker sizes itself with flex-1 and its contents
+                are absolutely positioned, so in a block parent it collapses to
+                nothing and the panel looks empty. */}
+            {stripOpen ? (
+              <div className="flex min-h-0 flex-1 border-t border-border">
+                {strip === "compounds" ? (
+                  <CompoundPicker
+                    pack={pack}
+                    compounds={compounds}
+                    onInsert={addCompound}
+                    onDelete={(compoundId) => void deleteCompound(compoundId)}
+                    onRename={(compound, name) =>
+                      void saveCompound({ ...compound, name })
+                    }
+                  />
+                ) : filter.parts.length === 0 ? (
+                  <NoMatches />
+                ) : (
+                  <PartPicker
+                    pack={pack}
+                    parts={filter.parts}
+                    onSelect={addPart}
+                  />
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        <aside className="flex w-72 shrink-0 flex-col overflow-hidden border-l border-border">
+        <aside className="flex w-72 shrink-0 flex-col border-l border-border">
           <ButtonGroup className="m-2">
             <Button
               size="sm"
@@ -758,88 +851,6 @@ function Builder({ id }: { id: string | undefined }) {
             </>
           )}
         </aside>
-      </div>
-
-      {/* Collapsible: most of a session is spent moving what is already there,
-          not reaching for another part. */}
-      <div
-        className={`flex shrink-0 flex-col border-t border-border ${
-          stripOpen ? "h-72" : ""
-        }`}
-      >
-        <div className="flex items-center gap-2 px-3 py-2">
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setStripOpen(!stripOpen)}
-            aria-expanded={stripOpen}
-            aria-label={stripOpen ? "Hide the parts" : "Show the parts"}
-          >
-            {stripOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-          </Button>
-
-          <ButtonGroup>
-            <Button
-              size="sm"
-              variant={strip === "parts" ? "default" : "outline"}
-              onClick={() => {
-                setStrip("parts");
-                setStripOpen(true);
-              }}
-              aria-pressed={strip === "parts"}
-            >
-              Parts
-            </Button>
-            <Button
-              size="sm"
-              variant={strip === "compounds" ? "default" : "outline"}
-              onClick={() => {
-                setStrip("compounds");
-                setStripOpen(true);
-              }}
-              aria-pressed={strip === "compounds"}
-            >
-              Compounds
-            </Button>
-          </ButtonGroup>
-
-          {stripOpen && strip === "parts" ? (
-            <PartFilters
-              pack={pack}
-              query={filter.query}
-              onQuery={filter.setQuery}
-              category={filter.category}
-              onCategory={filter.setCategory}
-              packId={filter.packId}
-              onPackId={filter.setPackId}
-              shown={filter.parts.length}
-              className="flex-1"
-            />
-          ) : null}
-        </div>
-
-        {/* Flex, not block: the picker sizes itself with flex-1 and its contents
-            are absolutely positioned, so in a block parent it collapses to
-            nothing and the panel looks empty. */}
-        {stripOpen ? (
-          <div className="flex min-h-0 flex-1 border-t border-border">
-            {strip === "compounds" ? (
-              <CompoundPicker
-                pack={pack}
-                compounds={compounds}
-                onInsert={addCompound}
-                onDelete={(compoundId) => void deleteCompound(compoundId)}
-                onRename={(compound, name) =>
-                  void saveCompound({ ...compound, name })
-                }
-              />
-            ) : filter.parts.length === 0 ? (
-              <NoMatches />
-            ) : (
-              <PartPicker pack={pack} parts={filter.parts} onSelect={addPart} />
-            )}
-          </div>
-        ) : null}
       </div>
     </div>
   );
