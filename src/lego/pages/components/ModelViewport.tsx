@@ -55,7 +55,11 @@ import {
   disposeGround,
   REFERENCE_PARK_X,
 } from "../../buildPlate";
-import { effectiveCollisionVolume, engineScales } from "../../collisionVolume";
+import {
+  effectiveCollisionVolume,
+  engineScales,
+  resizeCollisionFace,
+} from "../../collisionVolume";
 import {
   type BackdropId,
   backdropById,
@@ -392,6 +396,26 @@ export function ModelViewport({
         depthTest: false,
       });
 
+      // The volume's size controls. Drawn over everything for the same reason
+      // the wireframe is, and grabbable from either side because a face can be
+      // looked at from inside the volume.
+      const collisionHandleMaterial = new THREE.MeshBasicMaterial({
+        color: COLLISION_COLOUR,
+        transparent: true,
+        opacity: 0.35,
+        depthTest: false,
+        side: THREE.DoubleSide,
+      });
+      const collisionHandleHotMaterial = new THREE.MeshBasicMaterial({
+        color: COLLISION_COLOUR,
+        transparent: true,
+        opacity: 0.8,
+        depthTest: false,
+        side: THREE.DoubleSide,
+      });
+      const collisionHandles = buildCollisionHandles(collisionHandleMaterial);
+      scene.add(collisionHandles);
+
       const root = new THREE.Group();
       scene.add(root);
 
@@ -494,7 +518,10 @@ export function ModelViewport({
         collision: null,
         collisionMaterial,
         editCollision: false,
-        collisionDragFrom: null,
+        collisionHandles,
+        collisionHandleMaterial,
+        collisionHandleHotMaterial,
+        collisionDrag: null,
         onCollisionChangeRef,
         sky: null,
         terrain: null,
@@ -538,15 +565,6 @@ export function ModelViewport({
         controls.enabled = false;
         dragging = true;
         setHoveredAndNotify(state, null);
-        // Where the volume was before the drag, so the axis this drag does not
-        // own can be put back on every frame of it. See `holdCollisionAxis`.
-        state.collisionDragFrom =
-          gizmo.object === state.collision
-            ? {
-                position: state.collision.position.clone(),
-                scale: state.collision.scale.clone(),
-              }
-            : null;
         // Built once per drag: the other pieces do not move while one is dragged,
         // so their anchors are fixed for the length of it.
         const pieceId = gizmo.object ? pieceIdOf(gizmo.object) : null;
@@ -567,12 +585,10 @@ export function ModelViewport({
         if (gizmo.object === state.collision) commitCollision(state);
         else if (gizmo.object === groupPivot) commitGroup(state);
         else commitGizmo(state);
-        state.collisionDragFrom = null;
         render();
       });
 
       gizmo.addEventListener("objectChange", () => {
-        if (gizmo.object === state.collision) holdCollisionAxis(state);
         if (gizmo.object === groupPivot) {
           dragGroup(state);
         } else {
@@ -602,13 +618,52 @@ export function ModelViewport({
       let pressedAt: { x: number; y: number } | null = null;
       let pressedOnGizmo = false;
 
+      const aimAt = (event: PointerEvent) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+      };
+
+      // Sizing the volume by its faces. Registered before the selection
+      // handlers below, so a press that grabbed a plate is already known by the
+      // time they run. The orbit registered before all of them and has already
+      // taken this press, which is why the drag switches it off rather than
+      // asking it not to start: the same thing TransformControls does.
+      const onFaceDown = (event: PointerEvent) => {
+        if (event.button !== 0) return;
+        aimAt(event);
+        if (!beginFaceDrag(state, raycaster)) return;
+        dragging = true;
+        setHoveredAndNotify(state, null);
+        renderer.domElement.setPointerCapture(event.pointerId);
+        render();
+      };
+      const onFaceMove = (event: PointerEvent) => {
+        if (!state.collisionDrag) return;
+        aimAt(event);
+        moveFaceDrag(state, raycaster);
+      };
+      const onFaceUp = (event: PointerEvent) => {
+        if (!state.collisionDrag) return;
+        endFaceDrag(state);
+        dragging = false;
+        if (renderer.domElement.hasPointerCapture(event.pointerId))
+          renderer.domElement.releasePointerCapture(event.pointerId);
+      };
+      renderer.domElement.addEventListener("pointerdown", onFaceDown);
+      renderer.domElement.addEventListener("pointermove", onFaceMove);
+      renderer.domElement.addEventListener("pointerup", onFaceUp);
+      renderer.domElement.addEventListener("pointercancel", onFaceUp);
+
       const onPointerDown = (event: PointerEvent) => {
         pressedAt = { x: event.clientX, y: event.clientY };
         // Whether a handle was grabbed has to be read now rather than on release.
         // TransformControls registered its listeners on this canvas first, so its
         // pointerdown has already set these, and its pointerup clears them again
         // before this handler's pointerup would ever see them.
-        pressedOnGizmo = gizmo.dragging || gizmo.axis !== null;
+        pressedOnGizmo =
+          gizmo.dragging || gizmo.axis !== null || state.collisionDrag !== null;
       };
       const onPointerUp = (event: PointerEvent) => {
         const from = pressedAt;
@@ -650,6 +705,19 @@ export function ModelViewport({
         pointer.x = hoverAt.x;
         pointer.y = hoverAt.y;
         raycaster.setFromCamera(pointer, camera);
+        // The plates sit over the model, so they answer first: a face about to
+        // be grabbed is not a piece about to be picked.
+        const plate = state.collisionHandles.visible
+          ? raycaster.intersectObjects(
+              state.collisionHandles.children,
+              false,
+            )[0]
+          : undefined;
+        if (highlightHandle(state, plate?.object ?? null)) render();
+        if (plate) {
+          setHoveredAndNotify(state, null);
+          return;
+        }
         let found: string | null = null;
         for (const hit of raycaster.intersectObject(root, true)) {
           const id = pieceIdOf(hit.object);
@@ -732,6 +800,10 @@ export function ModelViewport({
           disposeReferenceUnit(reference);
           state.collision?.geometry.dispose();
           collisionMaterial.dispose();
+          // One square shared by all six plates, so it is freed once.
+          (collisionHandles.children[0] as THREE.Mesh).geometry.dispose();
+          collisionHandleMaterial.dispose();
+          collisionHandleHotMaterial.dispose();
           sceneRef.current = null;
         },
       };
@@ -776,6 +848,7 @@ export function ModelViewport({
       selectedIdsRef.current,
       placingAnchorRef.current,
     );
+    showCollisionHandles(state);
     state.render();
   }, [showCollision, editCollision, project, pack]);
 
@@ -822,6 +895,15 @@ export function ModelViewport({
     state.gizmo.setMode(
       editCollision && mode === "rotate" ? "translate" : mode,
     );
+    // Scale on a volume is the face plates rather than the gizmo, so the mode
+    // decides which of the two is on screen.
+    attachGizmo(
+      state,
+      state.projectRef.current,
+      state.selectedIdsRef.current,
+      state.placingAnchorRef.current,
+    );
+    showCollisionHandles(state);
     state.render();
   }, [mode, editCollision]);
 
@@ -1300,6 +1382,29 @@ function Dot({ colour, label }: { colour: string; label: string }) {
   );
 }
 
+/** Which face of the volume a grab plate is, carried on the plate itself so a
+ *  raycast hit says what it dragged. */
+interface CollisionFace {
+  axis: 0 | 1 | 2;
+  /** Which end of that axis: the high face or the low one. */
+  sign: 1 | -1;
+}
+
+/** A face of the volume being dragged. */
+interface CollisionFaceDrag extends CollisionFace {
+  /** The pointer is followed on this plane. It holds the axis and faces the
+   *  camera, so the face tracks the pointer from any angle. */
+  plane: THREE.Plane;
+  /** The model's middle, which the volume's offsets are measured from. Fixed
+   *  for the length of the drag: the unit cannot change while it runs. */
+  mid: [number, number, number];
+  /** The volume when the face was grabbed. Every frame sizes this rather than
+   *  the last frame's answer, so the opposite face cannot creep. */
+  from: LegoCollisionVolume;
+  /** What the wireframe is showing now, and what release writes. */
+  volume: LegoCollisionVolume;
+}
+
 interface SceneState {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -1346,9 +1451,14 @@ interface SceneState {
   collisionMaterial: THREE.LineBasicMaterial;
   /** Whether the gizmo is on the volume rather than on the selected piece. */
   editCollision: boolean;
-  /** Where the volume was when the drag in progress started, or null when
-   *  nothing is dragging it. What `holdCollisionAxis` puts back. */
-  collisionDragFrom: { position: THREE.Vector3; scale: THREE.Vector3 } | null;
+  /** A grab plate on each of the volume's six faces, which is how the volume
+   *  is sized. Built with the scene and moved onto the volume from there. */
+  collisionHandles: THREE.Group;
+  collisionHandleMaterial: THREE.MeshBasicMaterial;
+  /** The same plate under the pointer, or being dragged. */
+  collisionHandleHotMaterial: THREE.MeshBasicMaterial;
+  /** The face drag in progress, or null while nothing is being sized. */
+  collisionDrag: CollisionFaceDrag | null;
   onCollisionChangeRef: {
     current: ((volume: LegoCollisionVolume) => void) | undefined;
   };
@@ -1443,7 +1553,7 @@ function applyBackdrop(state: SceneState, id: BackdropId) {
  * to keep in step with the document.
  *
  * The shape is built one elmo across and the object carries its size, so the
- * gizmo's scale handles are the volume's own numbers and a drag needs no
+ * volume's own numbers are the object's transform and a drag needs no
  * conversion to read back.
  */
 function showCollisionVolume(
@@ -1476,6 +1586,165 @@ function showCollisionVolume(
   lines.raycast = () => {};
   state.collision = lines;
   state.scene.add(lines);
+}
+
+/**
+ * Put the grab plates on the volume's faces, or take them off screen.
+ *
+ * They are the volume's size control, and they replace the gizmo rather than
+ * joining it: a face plate and a scale handle would be two answers to the same
+ * question, and only one of them sizes the thing you are pointing at.
+ *
+ * Drag one and its own face follows the pointer while the opposite face stays,
+ * which is how a box is sized anywhere else. The gizmo's squares could not do
+ * that. They multiply the volume by the ratio of two distances from its middle,
+ * measured from wherever the handle happens to sit on screen, so the same drag
+ * means different sizes at different zooms and dragging through the middle
+ * turns the size negative.
+ */
+function showCollisionHandles(state: SceneState) {
+  const lines = state.collision;
+  const shown =
+    lines !== null && state.editCollision && state.gizmo.getMode() === "scale";
+  state.collisionHandles.visible = shown;
+  if (!lines || !shown) return;
+
+  const size = [lines.scale.x, lines.scale.y, lines.scale.z];
+  state.collisionHandles.position.copy(lines.position);
+  for (const plate of state.collisionHandles.children) {
+    const { axis, sign } = plate.userData as CollisionFace;
+    const across = [0, 1, 2].filter((other) => other !== axis);
+    plate.position.setComponent(axis, (sign * size[axis]) / 2);
+    const side = plateSize(size[across[0]], size[across[1]]);
+    plate.scale.set(side, side, 1);
+  }
+}
+
+/** How big a grab plate is, given the face it sits on. A quarter of the face's
+ *  shorter side, but never so small that a thin volume cannot be grabbed nor so
+ *  large that a volume is hidden under its own handles. */
+function plateSize(acrossA: number, acrossB: number): number {
+  return Math.min(1.5, Math.max(0.4, 0.25 * Math.min(acrossA, acrossB)));
+}
+
+/** The six plates, built once with the scene. Squares rather than the gizmo's
+ *  arrows: a face is a flat thing and the handle sits on it. */
+function buildCollisionHandles(material: THREE.MeshBasicMaterial): THREE.Group {
+  const group = new THREE.Group();
+  const square = new THREE.PlaneGeometry(1, 1);
+  for (const axis of [0, 1, 2] as const) {
+    for (const sign of [1, -1] as const) {
+      const plate = new THREE.Mesh(square, material);
+      // Turned to lie in the face it sits on, which is also what makes the
+      // plate's own z the axis it drags along.
+      if (axis === 0) plate.rotation.y = (sign * Math.PI) / 2;
+      if (axis === 1) plate.rotation.x = (-sign * Math.PI) / 2;
+      if (axis === 2 && sign === -1) plate.rotation.y = Math.PI;
+      plate.userData = { axis, sign } satisfies CollisionFace;
+      plate.renderOrder = 5;
+      group.add(plate);
+    }
+  }
+  group.visible = false;
+  return group;
+}
+
+/**
+ * Start sizing the volume, if the pointer landed on one of the plates.
+ *
+ * The face is tracked on a plane that holds its axis and faces the camera, so
+ * it follows the pointer from any angle. Looking straight down the axis there
+ * is no such plane and no drag to be had, which is the one case this refuses.
+ */
+function beginFaceDrag(state: SceneState, raycaster: THREE.Raycaster): boolean {
+  if (!state.collisionHandles.visible) return false;
+  const hit = raycaster.intersectObjects(
+    state.collisionHandles.children,
+    false,
+  )[0];
+  if (!hit) return false;
+
+  const { axis, sign } = hit.object.userData as CollisionFace;
+  const along = new THREE.Vector3().setComponent(axis, 1);
+  const eye = state.camera.position.clone().sub(hit.point);
+  const normal = eye.sub(along.clone().multiplyScalar(eye.dot(along)));
+  if (normal.lengthSq() < 1e-6) return false;
+
+  const project = state.projectRef.current;
+  const bounds = unitBounds(project, state.packRef.current);
+  const volume = effectiveCollisionVolume(project, bounds);
+  state.collisionDrag = {
+    axis,
+    sign,
+    plane: new THREE.Plane().setFromNormalAndCoplanarPoint(
+      normal.normalize(),
+      hit.point,
+    ),
+    mid: bounds.mid,
+    from: volume,
+    volume,
+  };
+  highlightHandle(state, hit.object);
+  state.controls.enabled = false;
+  return true;
+}
+
+/** Follow the pointer with the dragged face. Shown live rather than on release,
+ *  so the size being set is the size on screen the whole way through. */
+function moveFaceDrag(state: SceneState, raycaster: THREE.Raycaster) {
+  const drag = state.collisionDrag;
+  const lines = state.collision;
+  if (!drag || !lines) return;
+
+  const at = raycaster.ray.intersectPlane(drag.plane, new THREE.Vector3());
+  if (!at) return;
+
+  drag.volume = resizeCollisionFace(
+    drag.from,
+    drag.axis,
+    drag.sign,
+    at.getComponent(drag.axis) - drag.mid[drag.axis],
+  );
+  lines.scale.set(...engineScales(drag.volume));
+  lines.position.set(
+    drag.mid[0] + drag.volume.offsets[0],
+    drag.mid[1] + drag.volume.offsets[1],
+    drag.mid[2] + drag.volume.offsets[2],
+  );
+  showCollisionHandles(state);
+  state.render();
+}
+
+/** Write the sized volume back to the document, if the drag changed it. A press
+ *  that went nowhere is not an edit and does not belong in the undo history. */
+function endFaceDrag(state: SceneState) {
+  const drag = state.collisionDrag;
+  state.collisionDrag = null;
+  state.controls.enabled = true;
+  highlightHandle(state, null);
+  if (!drag) return;
+  const change = state.onCollisionChangeRef.current;
+  const moved =
+    drag.volume.scales.some((size, i) => size !== drag.from.scales[i]) ||
+    drag.volume.offsets.some((offset, i) => offset !== drag.from.offsets[i]);
+  if (moved && change) change(drag.volume);
+  else state.render();
+}
+
+/** Light up the plate under the pointer, so it reads as something to grab. */
+function highlightHandle(state: SceneState, plate: THREE.Object3D | null) {
+  let changed = false;
+  for (const other of state.collisionHandles.children) {
+    if (!(other instanceof THREE.Mesh)) continue;
+    const material =
+      other === plate
+        ? state.collisionHandleHotMaterial
+        : state.collisionHandleMaterial;
+    if (other.material === material) continue;
+    other.material = material;
+    changed = true;
+  }
+  return changed;
 }
 
 /**
@@ -1911,7 +2180,10 @@ function attachGizmo(
   if (state.editCollision && state.collision) {
     state.groupIds = [];
     state.groupChanges = new Map();
-    state.gizmo.attach(state.collision);
+    // The face plates are the volume's size control, so the gizmo stands down
+    // in scale mode rather than offering a second, worse one.
+    if (state.gizmo.getMode() === "scale") state.gizmo.detach();
+    else state.gizmo.attach(state.collision);
     return;
   }
 
@@ -2471,33 +2743,14 @@ function frameBounds(state: SceneState, box: THREE.Box3): boolean {
 }
 
 /**
- * Hold the volume still on the axis the drag does not own.
+ * Write a moved collision volume back to the document.
  *
- * A scale handle sets a size and a move handle sets a position, and neither is
- * allowed to do the other's job: a volume that slid off the unit while it was
- * being sized would make the size impossible to judge, which is the whole
- * point of dragging it rather than typing it. `TransformControls` writes both
- * channels of the object it holds, so whichever one this drag is not about is
- * put back to where it started on every frame.
- */
-function holdCollisionAxis(state: SceneState) {
-  const lines = state.collision;
-  const from = state.collisionDragFrom;
-  if (!lines || !from) return;
-  if (state.gizmo.getMode() === "scale") lines.position.copy(from.position);
-  else lines.scale.copy(from.scale);
-}
-
-/**
- * Write a dragged collision volume back to the document.
- *
- * The wireframe's own scale and position are the volume's numbers: the shape
- * is built one elmo across, and the offsets run from the model's middle, which
- * is where the wireframe was put. So a drag is read straight off the object.
- *
- * Sizes are held above zero. A handle dragged through the middle would
- * otherwise turn the volume inside out, and a volume of no size is one the
- * engine throws away.
+ * Only the offsets: the gizmo moves the volume, and the face handles are what
+ * size it. The wireframe's position is the volume's own numbers, since the
+ * offsets run from the model's middle, which is where the wireframe was put.
+ * Its scale is not, because a round shape is drawn at the size the engine will
+ * build rather than the size typed in, so reading it back would quietly round
+ * off a cylinder nobody asked to change.
  */
 function commitCollision(state: SceneState) {
   const lines = state.collision;
@@ -2509,11 +2762,6 @@ function commitCollision(state: SceneState) {
   const volume = effectiveCollisionVolume(project, bounds);
   change({
     ...volume,
-    scales: [
-      Math.max(0.1, lines.scale.x),
-      Math.max(0.1, lines.scale.y),
-      Math.max(0.1, lines.scale.z),
-    ],
     offsets: [
       lines.position.x - bounds.mid[0],
       lines.position.y - bounds.mid[1],
