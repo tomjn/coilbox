@@ -1,7 +1,16 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import { canMirror, mirrorCopy, mirrorPiece, mirrorRole } from "./mirror";
+import {
+  canMirror,
+  canMirrorTwin,
+  mirrorCopy,
+  mirrorParent,
+  mirrorPiece,
+  mirrorRole,
+  mirrorTwin,
+  onCentreLine,
+} from "./mirror";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import { worldMatrix } from "./reparent";
 
@@ -291,6 +300,191 @@ describe("mirrorCopy", () => {
   it("refuses a piece that cannot be mirrored", () => {
     expect(mirrorCopy(doc, "root", counter())).toBeNull();
     expect(mirrorCopy(doc, "ghost", counter())).toBeNull();
+  });
+});
+
+describe("onCentreLine", () => {
+  it("knows a piece sitting down the middle from one out to the side", () => {
+    const doc = project([
+      { id: "hull", position: [0, 3, 1] },
+      { id: "leg", position: [2, 0, 0] },
+    ]);
+
+    expect(onCentreLine(doc, "hull")).toBe(true);
+    expect(onCentreLine(doc, "leg")).toBe(false);
+  });
+
+  it("counts a piece within a snap of the middle as on it", () => {
+    const doc = project([
+      { id: "near", position: [0.01, 0, 0] },
+      { id: "clear", position: [0.5, 0, 0] },
+    ]);
+
+    expect(onCentreLine(doc, "near")).toBe(true);
+    expect(onCentreLine(doc, "clear")).toBe(false);
+  });
+
+  it("measures against the unit's own middle, not the world's", () => {
+    const doc = project([{ id: "hull", position: [0, 0, 0] }]);
+    // Sliding the whole unit sideways takes its centre line with it.
+    const moved = {
+      ...doc,
+      pieces: doc.pieces.map((piece) =>
+        piece.id === "root"
+          ? { ...piece, position: [10, 0, 0] as [number, number, number] }
+          : piece,
+      ),
+    };
+
+    expect(onCentreLine(moved, "hull")).toBe(true);
+  });
+});
+
+describe("mirrorParent", () => {
+  /** A left thigh and its mirror image, which is what building one leg and
+   *  mirroring it leaves behind. */
+  function legs(): LegoProject {
+    const doc = project([
+      { id: "left", name: "left", position: [2, 3, 0], rotation: [0, 0, 0.3] },
+    ]);
+    const copy = mirrorCopy(doc, "left", () => "right") as {
+      project: LegoProject;
+    };
+    return copy.project;
+  }
+
+  it("finds the piece standing where the parent's reflection stands", () => {
+    const doc = legs();
+    const right = doc.pieces.find((piece) => piece.name === "left2");
+
+    expect(mirrorParent(doc, "left")).toBe(right?.id);
+  });
+
+  it("keeps the parent when nothing stands there", () => {
+    const doc = project([{ id: "left", position: [2, 3, 0] }]);
+
+    expect(mirrorParent(doc, "left")).toBe("left");
+  });
+
+  it("keeps the parent when a piece merely sits opposite without mirroring", () => {
+    // The same place, but turned rather than reflected, so it is a different
+    // piece rather than the other side of this one.
+    const doc = project([
+      { id: "left", position: [2, 0, 0] },
+      { id: "opposite", position: [-2, 0, 0] },
+    ]);
+
+    expect(mirrorParent(doc, "left")).toBe("left");
+  });
+
+  it("keeps the parent when two pieces stand in the reflected place", () => {
+    const doc = legs();
+    const right = doc.pieces.find(
+      (piece) => piece.name === "left2",
+    ) as LegoPiece;
+    const crowded = {
+      ...doc,
+      pieces: [...doc.pieces, { ...right, id: "third", name: "third" }],
+    };
+
+    expect(mirrorParent(crowded, "left")).toBe("left");
+  });
+
+  it("answers the root for a piece down the middle, which is its own parent", () => {
+    // A centred piece is not its own reflection: a mirror turns its frame
+    // inside out. So nothing stands there, and the fallback is the answer.
+    const doc = project([{ id: "hull", position: [0, 2, 0] }]);
+
+    expect(mirrorParent(doc, "hull")).toBe("hull");
+  });
+});
+
+describe("mirrorTwin", () => {
+  function counter(): () => string {
+    let n = 0;
+    return () => `new${n++}`;
+  }
+
+  it("puts the twin across the centre line", () => {
+    const doc = project([{ id: "leg", name: "leg", position: [2, 1, 3] }]);
+
+    const twinned = mirrorTwin(doc, "leg", counter());
+    const twin = twinned.pieces.find((piece) => piece.name === "leg2");
+
+    expect(twinned.pieces).toHaveLength(doc.pieces.length + 1);
+    expect(worldOrigin(twinned, twin?.id as string)).toEqual([-2, 1, 3]);
+  });
+
+  it("reflects the twin rather than sliding a copy sideways", () => {
+    const doc = project([
+      {
+        id: "arm",
+        name: "arm",
+        position: [2, 0, 0],
+        rotation: [0, Math.PI / 4, 0],
+      },
+    ]);
+
+    const twinned = mirrorTwin(doc, "arm", counter());
+    const twin = twinned.pieces.find(
+      (piece) => piece.name === "arm2",
+    ) as LegoPiece;
+
+    // A point out along the arm's own +z lands at the mirror image of where the
+    // original's does, which a copy at -x with the same turn would not.
+    expect(worldPoint(twinned, twin.id, [0, 0, 1])).toEqual(
+      worldPoint(doc, "arm", [0, 0, 1]).map((n, axis) => (axis === 0 ? -n : n)),
+    );
+    expect(worldMatrix(twinned, twin.id).determinant()).toBeLessThan(0);
+  });
+
+  it("hangs the twin off the parent's own reflection", () => {
+    const doc = project([{ id: "left", name: "left", position: [3, 4, 0] }]);
+    const legs = (
+      mirrorCopy(doc, "left", () => "right") as { project: LegoProject }
+    ).project;
+    const rightThigh = legs.pieces.find(
+      (piece) => piece.name === "left2",
+    ) as LegoPiece;
+    // A shin added to the left thigh while symmetry is on, then placed.
+    const withShin = {
+      ...legs,
+      pieces: [
+        ...legs.pieces,
+        {
+          ...(legs.pieces.find((piece) => piece.id === "left") as LegoPiece),
+          id: "shin",
+          name: "shin",
+          parentId: "left",
+          position: [0.5, -2, 0] as [number, number, number],
+          rotation: [0, 0, 0] as [number, number, number],
+        },
+      ],
+    };
+
+    const twinned = mirrorTwin(withShin, "shin", counter());
+    const twin = twinned.pieces.find(
+      (piece) => piece.name === "shin2",
+    ) as LegoPiece;
+
+    expect(twin.parentId).toBe(rightThigh.id);
+    expect(worldOrigin(twinned, "shin")).toEqual([3.5, 2, 0]);
+    expect(worldOrigin(twinned, twin.id)).toEqual([-3.5, 2, 0]);
+  });
+
+  it("gives no twin to a piece on the centre line", () => {
+    const doc = project([{ id: "hull", position: [0, 2, 0] }]);
+
+    expect(mirrorTwin(doc, "hull", counter())).toBe(doc);
+    expect(canMirrorTwin(doc, "hull")).toBe(false);
+  });
+
+  it("gives no twin to the root or to a piece that is not there", () => {
+    const doc = project([{ id: "leg", position: [2, 0, 0] }]);
+
+    expect(mirrorTwin(doc, "root", counter())).toBe(doc);
+    expect(mirrorTwin(doc, "ghost", counter())).toBe(doc);
+    expect(canMirrorTwin(doc, "leg")).toBe(true);
   });
 });
 
