@@ -315,6 +315,12 @@ pub struct UnitDatasetEntry {
     /// Whether the unit can move (a mobile unit) vs a static building — derived
     /// from the unitdef's speed. Static buildings are `false`.
     pub mobile: bool,
+    /// The unitdef's `objectname`: the model file the engine draws this unit
+    /// with, resolved against `objects3d/`. Often carries no extension, in which
+    /// case the engine tries `.s3o` then `.3do`. Absent for a unit that names no
+    /// model at all.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object_name: Option<String>,
 }
 
 /// Output of the lazy `--unit-dataset` mode: the whole game's unit graph (units +
@@ -330,6 +336,77 @@ pub struct UnitDatasetOutput {
     /// dependencies, so it's computed lazily here, not during the scan.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checksum: Option<String>,
+    pub errors: Vec<String>,
+}
+
+/// One drawable batch inside a piece: an indexed triangle list whose corners all
+/// sample the same texture. An `.s3o` piece is always one batch, because the
+/// format binds one texture per model. A `.3do` piece is one batch per distinct
+/// texture its faces name, which is what makes both formats fit this shape.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelGroup {
+    /// Which entry of [`UnitModelOutput::textures`] this batch samples. `None`
+    /// for a `.3do` face the format gives a flat palette colour rather than a
+    /// texture.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub texture: Option<String>,
+    /// x, y, z per vertex.
+    pub positions: Vec<f32>,
+    /// x, y, z per vertex.
+    pub normals: Vec<f32>,
+    /// u, v per vertex.
+    pub uvs: Vec<f32>,
+    /// Three indices per triangle, into this batch's own vertices.
+    pub indices: Vec<u32>,
+}
+
+/// One piece of the model tree, with its geometry already triangulated. Mirrors
+/// the `Piece` both reader crates expose: a name, a translation from the parent,
+/// and children. A piece with no groups is hierarchy only (a flare or aim point).
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelPiece {
+    pub name: String,
+    pub offset: [f32; 3],
+    pub groups: Vec<ModelGroup>,
+    pub children: Vec<ModelPiece>,
+}
+
+/// One texture the model asks for, and what became of it. `file` empty means
+/// nothing in the archive matched, which the viewer says on screen rather than
+/// drawing an untextured mesh that looks like a bug.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelTexture {
+    /// The name as the model file gives it, and the key groups refer to.
+    pub name: String,
+    /// The archive member it resolved to. Empty when nothing matched.
+    pub source: String,
+    /// The file written into the texture cache dir, which the webview loads over
+    /// the asset protocol. Empty when nothing matched.
+    pub file: String,
+}
+
+/// Output of `--unit-model`: one unit's model, read out of a game archive and
+/// flattened so the viewer draws `.s3o` and `.3do` the same way.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitModelOutput {
+    /// `"s3o"` or `"3do"`. Empty when nothing was read.
+    pub format: String,
+    /// The archive member the model came from, as the archive stores it.
+    pub path: String,
+    pub radius: f32,
+    pub height: f32,
+    pub mid: [f32; 3],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub root: Option<ModelPiece>,
+    pub textures: Vec<ModelTexture>,
+    /// Faces a `.3do` draws in a flat colour from the Total Annihilation
+    /// palette, which is engine-embedded and not in the archive. They are drawn
+    /// plain grey, so the count is reported rather than hidden.
+    pub palette_faces: u32,
     pub errors: Vec<String>,
 }
 

@@ -38,6 +38,10 @@ regex = "1"
 # Shared dependency-free on-disk byte cache: persist rendered minimap PNGs so they
 # aren't re-rendered every launch.
 coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
+# Model readers for `--unit-model`, so a game's own units can be viewed. Both are
+# dependency-free and read-only here.
+coilbox-s3o = { path = "../coilbox-s3o" }
+coilbox-3do = { path = "../coilbox-3do" }
 
 [dev-dependencies]
 # Stock Lua 5.1 used ONLY to unit-test the injected serializer + wrapper against a

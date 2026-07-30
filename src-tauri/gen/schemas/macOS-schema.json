@@ -2607,10 +2607,10 @@
           "markdownDescription": "Denies the us_settings_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-metalmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-unit-buildpics`\n- `allow-unitsync-faction-logos`\n- `allow-unitsync-unit-dataset`\n- `allow-unitsync-map-info`\n- `allow-unitsync-map-skybox`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-engine-config-set`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-game-headers`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-lua-repl-exec`\n- `allow-unitsync-archive-extract`\n- `allow-unitsync-cancel`",
+          "description": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-metalmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-unit-buildpics`\n- `allow-unitsync-faction-logos`\n- `allow-unitsync-unit-dataset`\n- `allow-unitsync-unit-model`\n- `allow-unitsync-map-info`\n- `allow-unitsync-map-skybox`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-engine-config-set`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-game-headers`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-lua-repl-exec`\n- `allow-unitsync-archive-extract`\n- `allow-unitsync-cancel`",
           "type": "string",
           "const": "coilbox-unitsync:default",
-          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-metalmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-unit-buildpics`\n- `allow-unitsync-faction-logos`\n- `allow-unitsync-unit-dataset`\n- `allow-unitsync-map-info`\n- `allow-unitsync-map-skybox`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-engine-config-set`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-game-headers`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-lua-repl-exec`\n- `allow-unitsync-archive-extract`\n- `allow-unitsync-cancel`"
+          "markdownDescription": "Allows the unitsync plugin's content-scan, minimap, heightmap, thumbnail, game-info, engine-config, archive browse/extract and Lua-console commands.\n#### This default permission set includes:\n\n- `allow-unitsync-scan`\n- `allow-unitsync-minimap`\n- `allow-unitsync-heightmap`\n- `allow-unitsync-metalmap`\n- `allow-unitsync-thumbnails`\n- `allow-unitsync-game-info`\n- `allow-unitsync-unit-buildpics`\n- `allow-unitsync-faction-logos`\n- `allow-unitsync-unit-dataset`\n- `allow-unitsync-unit-model`\n- `allow-unitsync-map-info`\n- `allow-unitsync-map-skybox`\n- `allow-unitsync-skirmish-ais`\n- `allow-unitsync-engine-config`\n- `allow-unitsync-engine-config-set`\n- `allow-unitsync-archive-tree`\n- `allow-unitsync-archive-file`\n- `allow-unitsync-game-headers`\n- `allow-unitsync-lua-exec`\n- `allow-unitsync-lua-repl-exec`\n- `allow-unitsync-archive-extract`\n- `allow-unitsync-cancel`"
         },
         {
           "description": "Enables the unitsync_archive_extract command without any pre-configured scope.",
@@ -2739,6 +2739,12 @@
           "markdownDescription": "Enables the unitsync_unit_dataset command without any pre-configured scope."
         },
         {
+          "description": "Enables the unitsync_unit_model command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:allow-unitsync-unit-model",
+          "markdownDescription": "Enables the unitsync_unit_model command without any pre-configured scope."
+        },
+        {
           "description": "Denies the unitsync_archive_extract command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-unitsync:deny-unitsync-archive-extract",
@@ -2863,6 +2869,12 @@
           "type": "string",
           "const": "coilbox-unitsync:deny-unitsync-unit-dataset",
           "markdownDescription": "Denies the unitsync_unit_dataset command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the unitsync_unit_model command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-unitsync:deny-unitsync-unit-model",
+          "markdownDescription": "Denies the unitsync_unit_model command without any pre-configured scope."
         },
         {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",

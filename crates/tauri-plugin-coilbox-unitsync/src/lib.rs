@@ -17,7 +17,7 @@ use sidecar::{
     build_game_headers_args, build_heightmap_args, build_lua_args, build_lua_repl_args,
     build_map_info_args, build_map_skybox_args, build_metalmap_args, build_minimap_args,
     build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
-    build_unit_dataset_args, find_unitsync, resolve_sidecar,
+    build_unit_dataset_args, build_unit_model_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -80,6 +80,10 @@ const BUILDPIC_CACHE_SUBDIR: &str = "coilbox-unitsync-buildpics";
 const FACTION_LOGO_CACHE_SUBDIR: &str = "coilbox-unitsync-faction-logos";
 const INFO_CACHE_SUBDIR: &str = "coilbox-unitsync-info";
 
+/// Subdirectory of the app cache dir holding textures copied out of a game
+/// archive for the unit-model viewer, raw and undecoded.
+const MODEL_TEXTURE_SUBDIR: &str = "coilbox-unitsync-model-textures";
+
 /// The on-disk PNG cache directory for minimaps/thumbnails, under the app cache
 /// dir. `None` when the platform can't resolve a cache dir — caching is then
 /// simply skipped (same pattern as the mapconv plugin's thumbnail cache).
@@ -119,6 +123,18 @@ fn info_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(INFO_CACHE_SUBDIR))
+}
+
+/// Where the unit-model viewer's extracted textures live, under the app cache
+/// dir. Public because the asset protocol serves this folder as its `unitmodel`
+/// root: the textures are raw archive bytes, up to a 64 MiB compressed atlas,
+/// which the webview loads over the protocol rather than through the IPC.
+/// `None` when the platform can't resolve a cache dir, and the viewer then draws
+/// the model untextured and says why.
+pub fn model_texture_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    coilbox_portable::cache_dir(app)
+        .ok()
+        .map(|d| d.join(MODEL_TEXTURE_SUBDIR))
 }
 
 /// The platform's shared-library search variable.
@@ -534,6 +550,35 @@ async fn unitsync_unit_dataset<R: Runtime>(
 
 /// `unitsync_map_info` — load one map's archive set to read its options + any
 /// attributed diagnostics. Fetched on demand (mounts the map), not during scan.
+/// `unitsync_unit_model`: read one unit's model (`.s3o` or `.3do`) out of a
+/// game's archive, flattened into pieces the viewer can draw. `object` is the
+/// unitdef's `objectname` verbatim. The model's textures are copied into the
+/// model-texture cache dir, which the `unitmodel` asset-protocol root serves, so
+/// a 64 MiB compressed atlas never travels through the IPC as base64.
+#[tauri::command]
+async fn unitsync_unit_model<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    game_archive: String,
+    object: String,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let cache_dir = model_texture_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_unit_model_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &game_archive,
+        &object,
+        cache_dir.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit model", None).await)
+}
+
 #[tauri::command]
 async fn unitsync_map_info<R: Runtime>(
     app: AppHandle<R>,
@@ -803,6 +848,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_unit_buildpics,
             unitsync_faction_logos,
             unitsync_unit_dataset,
+            unitsync_unit_model,
             unitsync_map_info,
             unitsync_map_skybox,
             unitsync_skirmish_ais,

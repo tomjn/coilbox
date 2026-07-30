@@ -636,6 +636,8 @@ name = "coilbox-unitsync-worker"
 version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
+ "coilbox-3do",
+ "coilbox-s3o",
  "coilbox-thumb-cache",
  "ddsfile",
  "image 0.25.10",
