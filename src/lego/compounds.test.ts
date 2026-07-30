@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   insertCompound,
   insertCompoundAt,
+  selectionAsCompound,
   subtreeAsCompound,
   validateCompoundName,
 } from "./compounds";
@@ -127,6 +128,90 @@ describe("subtreeAsCompound", () => {
   });
 });
 
+const LEGS = project([
+  { id: "left", name: "left", parentId: "root", position: [-3, 0, 0] },
+  { id: "foot", name: "foot", parentId: "left", position: [0, -1, 0] },
+  { id: "right", name: "right", parentId: "root", position: [3, 0, 0] },
+]);
+
+function liftLegs(project: LegoProject = LEGS): LegoProject {
+  return selectionAsCompound(project, ["left", "right"], {
+    id: "c1",
+    now: "2026-07-28T00:00:00Z",
+    newId: counter("new"),
+  }) as LegoProject;
+}
+
+describe("selectionAsCompound", () => {
+  it("takes every selected piece, with nothing invented to hold them", () => {
+    const compound = liftLegs();
+
+    expect(compound.pieces.map((piece) => piece.name)).toEqual([
+      "left",
+      "foot",
+      "right",
+    ]);
+    expect(
+      compound.pieces.filter((piece) => piece.parentId === null),
+    ).toHaveLength(2);
+  });
+
+  it("keeps the distance between the pieces that were selected", () => {
+    const compound = liftLegs();
+    const right = compound.pieces.find((piece) => piece.name === "right");
+
+    // The first selected piece stands at the origin, as a single lifted piece
+    // does, and the second is the six elmos away it was in the unit.
+    expect(compound.pieces[0]?.position).toEqual([0, 0, 0]);
+    expect(right?.position).toEqual([6, 0, 0]);
+  });
+
+  it("places the set in the first piece's frame, so a turn comes with it", () => {
+    const turned = {
+      ...LEGS,
+      pieces: LEGS.pieces.map((piece) =>
+        piece.id === "left"
+          ? {
+              ...piece,
+              rotation: [0, Math.PI / 2, 0] as [number, number, number],
+            }
+          : piece,
+      ),
+    };
+    const right = liftLegs(turned).pieces.find(
+      (piece) => piece.name === "right",
+    );
+
+    expect(right?.position[0]).toBeCloseTo(0);
+    expect(right?.position[1]).toBeCloseTo(0);
+    expect(right?.position[2]).toBeCloseTo(6);
+  });
+
+  it("takes a piece selected with its own ancestor once, under the ancestor", () => {
+    const compound = selectionAsCompound(LEGS, ["left", "foot"], {
+      id: "c1",
+      now: "2026-07-28T00:00:00Z",
+      newId: counter("new"),
+    }) as LegoProject;
+
+    expect(compound.pieces.map((piece) => piece.name)).toEqual([
+      "left",
+      "foot",
+    ]);
+    expect(childrenOf(compound, compound.rootPieceId)).toHaveLength(1);
+  });
+
+  it("is null when nothing in the selection is in the document", () => {
+    expect(
+      selectionAsCompound(LEGS, ["ghost"], {
+        id: "c1",
+        now: "2026-07-28T00:00:00Z",
+        newId: counter("new"),
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("insertCompound", () => {
   const compound = subtreeAsCompound(TURRET, "turret", {
     id: "c1",
@@ -137,7 +222,7 @@ describe("insertCompound", () => {
   it("hangs the compound's root off the chosen piece", () => {
     const host = project([{ id: "hull", name: "hull", parentId: "root" }]);
 
-    const { project: after, rootPieceId } = insertCompound(
+    const { project: after, rootPieceIds } = insertCompound(
       host,
       compound,
       "hull",
@@ -146,14 +231,14 @@ describe("insertCompound", () => {
 
     expect(after.pieces).toHaveLength(host.pieces.length + 3);
     expect(
-      after.pieces.find((piece) => piece.id === rootPieceId)?.parentId,
+      after.pieces.find((piece) => piece.id === rootPieceIds[0])?.parentId,
     ).toBe("hull");
   });
 
   it("falls back to the unit's root when the parent has gone", () => {
     const host = project([]);
 
-    const { project: after, rootPieceId } = insertCompound(
+    const { project: after, rootPieceIds } = insertCompound(
       host,
       compound,
       "ghost",
@@ -161,7 +246,7 @@ describe("insertCompound", () => {
     );
 
     expect(
-      after.pieces.find((piece) => piece.id === rootPieceId)?.parentId,
+      after.pieces.find((piece) => piece.id === rootPieceIds[0])?.parentId,
     ).toBe("root");
   });
 
@@ -184,18 +269,41 @@ describe("insertCompound", () => {
   it("keeps the compound's own hierarchy", () => {
     const host = project([]);
 
-    const { project: after, rootPieceId } = insertCompound(
+    const { project: after, rootPieceIds } = insertCompound(
       host,
       compound,
       "root",
       counter("i"),
     );
-    const barrel = childrenOf(after, rootPieceId)[0];
+    const barrel = childrenOf(after, rootPieceIds[0])[0];
 
     expect(barrel.name).toBe("barrel");
     expect(childrenOf(after, barrel.id).map((piece) => piece.name)).toEqual([
       "flare",
     ]);
+  });
+
+  it("hangs every root of a compound made from a set off the same piece", () => {
+    const host = project([{ id: "hull", name: "hull", parentId: "root" }]);
+
+    const { project: after, rootPieceIds } = insertCompound(
+      host,
+      liftLegs(),
+      "hull",
+      counter("i"),
+    );
+    const roots = rootPieceIds.map((id) =>
+      after.pieces.find((piece) => piece.id === id),
+    );
+
+    expect(rootPieceIds).toHaveLength(2);
+    expect(roots.map((piece) => piece?.parentId)).toEqual(["hull", "hull"]);
+    // Still six elmos apart, which is the point of pasting a set.
+    expect(roots.map((piece) => piece?.position)).toEqual([
+      [0, 0, 0],
+      [6, 0, 0],
+    ]);
+    expect(after.pieces).toHaveLength(host.pieces.length + 3);
   });
 
   it("inserting twice gives two independent copies", () => {

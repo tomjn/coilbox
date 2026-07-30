@@ -5,7 +5,7 @@ import {
   parseClipboardPiece,
   serializeClipboardPiece,
 } from "./clipboard";
-import { subtreeAsCompound } from "./compounds";
+import { selectionAsCompound, subtreeAsCompound } from "./compounds";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 
 function project(pieces: Partial<LegoPiece>[]): LegoProject {
@@ -65,6 +65,54 @@ describe("serializeClipboardPiece and parseClipboardPiece", () => {
         "turret",
       ]);
       expect(result.piece.missingParts).toEqual([]);
+    }
+  });
+
+  it("round-trips a set of pieces, keeping the distance between them", () => {
+    const legs = project([
+      { id: "left", name: "left", parentId: "root", position: [-3, 0, 0] },
+      { id: "right", name: "right", parentId: "root", position: [3, 0, 0] },
+    ]);
+    const lifted = selectionAsCompound(legs, ["left", "right"], {
+      id: "c2",
+      now: "2026-07-29T00:00:00Z",
+      newId: counter("new"),
+    }) as LegoProject;
+
+    const result = parseClipboardPiece(
+      serializeClipboardPiece(lifted),
+      new Set(),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const pieces = result.piece.project.pieces;
+      expect(pieces.map((p) => p.name)).toEqual(["left", "right"]);
+      // Both roots survive the trip, and so does the gap between them.
+      expect(pieces.filter((p) => p.parentId === null)).toHaveLength(2);
+      expect(pieces.map((p) => p.position)).toEqual([
+        [0, 0, 0],
+        [6, 0, 0],
+      ]);
+    }
+  });
+
+  it("reads a single-piece payload written by an older build", () => {
+    // Written out by hand, exactly as the build that added the envelope wrote
+    // it, because a payload pasted from another window has to keep working.
+    const text = JSON.stringify({
+      marker: CLIPBOARD_MARKER,
+      schemaVersion: 1,
+      project: liftTurret(),
+    });
+
+    const result = parseClipboardPiece(text, new Set(["barrel_a"]));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.piece.project.pieces.map((p) => p.name)).toEqual([
+        "turret",
+      ]);
     }
   });
 
