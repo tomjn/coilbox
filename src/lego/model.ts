@@ -38,8 +38,12 @@ export interface LegoPiece {
   pivot?: [number, number, number];
   /** Radians, XYZ euler. Baked into vertices on export, see the plan's D3. */
   rotation: [number, number, number];
+  /**
+   * A negative scale on one axis is a mirror, and the only record of one:
+   * `mirror.ts` writes it and the exporter reverses winding on it. A separate
+   * flag would be a second answer to the same question, free to disagree.
+   */
   scale: [number, number, number];
-  mirror?: boolean;
   /** Drives which animation presets apply. Free-form until presets land. */
   role?: string;
   tags?: string[];
@@ -397,7 +401,6 @@ function parsePiece(raw: unknown): LegoPiece | null {
       const pivot = parseVec3(p.pivot);
       return pivot ? { pivot } : {};
     })(),
-    ...(p.mirror === true ? { mirror: true } : {}),
     ...(typeof p.role === "string" ? { role: p.role } : {}),
     ...(Array.isArray(p.tags)
       ? { tags: p.tags.filter((t): t is string => typeof t === "string") }
