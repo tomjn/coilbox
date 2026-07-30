@@ -28,6 +28,7 @@ mod minimap;
 mod model;
 mod skirmishai;
 mod texture;
+mod unitmodel;
 
 use ffi::Unitsync;
 use model::{Archive, ConfigOption, GameItem, MapItem, OptionListItem, ScanOutput};
@@ -71,6 +72,10 @@ struct Args {
     /// `--unit-dataset`: read `--game`'s reusable unit graph (units + their
     /// `buildoptions` edges), for the build-tree viewer and unit filters.
     unit_dataset: bool,
+    /// `--unit-model`: read one unit's model out of `--game`, named by the
+    /// unitdef `objectname` given in `--object`.
+    unit_model: bool,
+    object: Option<String>,
     units: Vec<String>,
     /// `--faction-logos`: resolve `Sidepics/<side>` emblems for `--game`, for the
     /// side names listed in `--sides` (comma-separated).
@@ -259,6 +264,25 @@ fn run() -> i32 {
             }
             Err(_) => {
                 dataset::emit_error("worker panicked while reading unit dataset".into());
+                1
+            }
+        };
+    }
+
+    // Unit model: read one unit's model out of a game's archive and flatten it
+    // for the viewer. Keys off --game, so checked before the --game modes.
+    if args.unit_model {
+        let game_archive = args.game.clone().unwrap_or_default();
+        let object = args.object.clone().unwrap_or_default();
+        return match std::panic::catch_unwind(|| {
+            unitmodel::render(&args.lib, &game_archive, &object, cache_dir)
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                unitmodel::emit_error("worker panicked while reading a unit model".into());
                 1
             }
         };
@@ -512,6 +536,8 @@ fn parse_args() -> Result<Args, String> {
     let mut game_headers = false;
     let mut unit_buildpics = false;
     let mut unit_dataset = false;
+    let mut unit_model = false;
+    let mut object = None;
     let mut units: Vec<String> = Vec::new();
     let mut faction_logos = false;
     let mut sides: Vec<String> = Vec::new();
@@ -551,6 +577,8 @@ fn parse_args() -> Result<Args, String> {
             "--game-headers" => game_headers = true,
             "--unit-buildpics" => unit_buildpics = true,
             "--unit-dataset" => unit_dataset = true,
+            "--unit-model" => unit_model = true,
+            "--object" => object = it.next(),
             "--units" => {
                 units = it
                     .next()
@@ -609,6 +637,8 @@ fn parse_args() -> Result<Args, String> {
         game_headers,
         unit_buildpics,
         unit_dataset,
+        unit_model,
+        object,
         units,
         faction_logos,
         sides,
