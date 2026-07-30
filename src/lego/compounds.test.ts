@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   insertCompound,
+  insertCompoundAt,
   subtreeAsCompound,
   validateCompoundName,
 } from "./compounds";
@@ -206,6 +207,46 @@ describe("insertCompound", () => {
 
     expect(new Set(ids).size).toBe(ids.length);
     expect(twice.project.pieces).toHaveLength(host.pieces.length + 6);
+  });
+});
+
+describe("insertCompoundAt", () => {
+  const compound = subtreeAsCompound(TURRET, "turret", {
+    id: "c1",
+    now: "2026-07-28T00:00:00Z",
+    newId: counter("c"),
+  }) as LegoProject;
+
+  it("puts the source transform on the inserted root rather than the origin", () => {
+    const host = project([{ id: "hull", name: "hull", parentId: "root" }]);
+
+    const { project: after, rootPieceId } = insertCompoundAt(
+      host,
+      compound,
+      "hull",
+      { position: [0, 4, 0], rotation: [0, 1, 0], scale: [2, 2, 2] },
+      counter("i"),
+    );
+    const root = after.pieces.find((piece) => piece.id === rootPieceId);
+
+    expect(root?.position).toEqual([0, 4, 0]);
+    expect(root?.rotation).toEqual([0, 1, 0]);
+    expect(root?.scale).toEqual([2, 2, 2]);
+  });
+
+  it("leaves the rest of the compound's arrangement as insertCompound left it", () => {
+    const host = project([{ id: "hull", name: "hull", parentId: "root" }]);
+
+    const { project: after, rootPieceId } = insertCompoundAt(
+      host,
+      compound,
+      "hull",
+      { position: [0, 4, 0], rotation: [0, 1, 0], scale: [2, 2, 2] },
+      counter("i"),
+    );
+    const barrel = childrenOf(after, rootPieceId)[0];
+
+    expect(barrel.position).toEqual([0, 0, 3]);
   });
 });
 

@@ -19,7 +19,7 @@
 
 import * as THREE from "three";
 
-import { insertCompound, subtreeAsCompound } from "./compounds";
+import { insertCompoundAt, subtreeAsCompound } from "./compounds";
 import {
   descendantIds,
   type LegoPiece,
@@ -156,33 +156,24 @@ export function mirrorCopy(
   });
   if (!cutting) return null;
 
-  const inserted = insertCompound(
-    project,
-    cutting,
-    source.parentId ?? project.rootPieceId,
-    newId,
-  );
-
   // Lifting drops the subtree root's transform, because a compound is defined
   // by how its pieces sit against each other rather than by where it came from.
   // A mirror has to start from where the original stands: reflecting a leg that
   // had been dropped back at the hull's origin would not be the other leg.
-  const placed: LegoProject = {
-    ...inserted.project,
-    pieces: inserted.project.pieces.map((piece) =>
-      piece.id === inserted.rootPieceId
-        ? {
-            ...piece,
-            position: source.position,
-            rotation: source.rotation,
-            scale: source.scale,
-          }
-        : piece,
-    ),
-  };
+  const inserted = insertCompoundAt(
+    project,
+    cutting,
+    source.parentId ?? project.rootPieceId,
+    {
+      position: source.position,
+      rotation: source.rotation,
+      scale: source.scale,
+    },
+    newId,
+  );
 
   return {
-    project: mirrorPiece(placed, inserted.rootPieceId),
+    project: mirrorPiece(inserted.project, inserted.rootPieceId),
     pieceId: inserted.rootPieceId,
   };
 }

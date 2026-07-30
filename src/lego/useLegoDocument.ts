@@ -12,9 +12,13 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
-import { insertCompound, subtreeAsCompound } from "./compounds";
+import {
+  insertCompound,
+  insertCompoundAt,
+  subtreeAsCompound,
+} from "./compounds";
 import { emptyDocument, reduceDocument } from "./document";
-import type { LegoProject } from "./model";
+import { type LegoProject, pieceById } from "./model";
 import { saveProject, saveThumbnail, useLegoProjects } from "./projects";
 
 export interface LegoDocumentSession {
@@ -148,14 +152,29 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
     lift,
     insert,
     duplicate: (pieceId) => {
+      if (!project) return null;
+      const source = pieceById(project, pieceId);
       const cutting = lift(pieceId);
-      if (!cutting || !project) return null;
+      if (!source || !cutting) return null;
       // Alongside the original rather than inside it, which is what duplicate
       // means everywhere else.
-      const parentId =
-        project.pieces.find((piece) => piece.id === pieceId)?.parentId ??
-        project.rootPieceId;
-      return insert(cutting, parentId);
+      const parentId = source.parentId ?? project.rootPieceId;
+      // Lifting drops the subtree root's transform, which is right for
+      // something bound for the library but not for a copy that is meant to
+      // sit exactly where the original does until it is dragged elsewhere.
+      const inserted = insertCompoundAt(
+        project,
+        cutting,
+        parentId,
+        {
+          position: source.position,
+          rotation: source.rotation,
+          scale: source.scale,
+        },
+        () => crypto.randomUUID(),
+      );
+      edit(() => inserted.project);
+      return inserted.rootPieceId;
     },
     onCapture: (capture) => {
       captureRef.current = capture;
