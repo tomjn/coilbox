@@ -4,8 +4,8 @@ import model from "./reference/armsolar.json";
 import {
   buildReferenceUnit,
   disposeReferenceUnit,
-  REFERENCE_FOOTPRINT_ELMOS,
-  REFERENCE_OFFSET_X,
+  REFERENCE_FOOTPRINT_STEPS,
+  REFERENCE_WIDTH_ELMOS,
 } from "./referenceObject";
 import { ELMOS_PER_FOOTPRINT } from "./unitDef";
 
@@ -67,16 +67,16 @@ describe("buildReferenceUnit", () => {
     expect(size.z).toBeCloseTo(MODEL_WIDTH_ELMOS, 2);
   });
 
-  it("draws the footprint the engine reserves, wider than the model", () => {
-    expect(REFERENCE_FOOTPRINT_ELMOS).toBe(
-      FOOTPRINT_STEPS * ELMOS_PER_FOOTPRINT,
+  it("knows the footprint the engine reserves, wider than the model", () => {
+    // Drawn by buildPlate.ts as the largest plate, not drawn twice here.
+    expect(REFERENCE_FOOTPRINT_STEPS).toBe(FOOTPRINT_STEPS);
+    expect(REFERENCE_FOOTPRINT_STEPS * ELMOS_PER_FOOTPRINT).toBeGreaterThan(
+      MODEL_WIDTH_ELMOS,
     );
-    expect(REFERENCE_FOOTPRINT_ELMOS).toBeGreaterThan(MODEL_WIDTH_ELMOS);
+  });
 
-    const box = new THREE.Box3().setFromObject(buildReferenceUnit());
-    const size = box.getSize(new THREE.Vector3());
-    expect(size.x).toBeCloseTo(REFERENCE_FOOTPRINT_ELMOS, 5);
-    expect(size.z).toBeCloseTo(REFERENCE_FOOTPRINT_ELMOS, 5);
+  it("measures its own width off the geometry", () => {
+    expect(REFERENCE_WIDTH_ELMOS).toBeCloseTo(MODEL_WIDTH_ELMOS, 2);
   });
 
   it("is centred on its own local origin in x and z", () => {
@@ -94,10 +94,6 @@ describe("buildReferenceUnit", () => {
       expect(material.transparent).toBe(true);
       expect(material.opacity).toBeLessThan(1);
     }
-  });
-
-  it("parks clear of the origin, footprint and all", () => {
-    expect(REFERENCE_OFFSET_X + REFERENCE_FOOTPRINT_ELMOS / 2).toBeLessThan(0);
   });
 });
 

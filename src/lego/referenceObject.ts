@@ -27,38 +27,41 @@
  * - The footprint, 5 by 5 steps, read from `footprintx` and `footprintz` in the
  *   unit's own `armsolar.lua`. That is the ground the engine reserves, and it is
  *   nearly twice the model's width: real buildings do not fill their footprint.
- *   Drawn as an outline on the ground so both readings are available.
+ *   `buildPlate.ts` draws it as the largest plate under the unit being built,
+ *   rather than drawing it twice.
  */
 
 import * as THREE from "three";
 
 import model from "./reference/armsolar.json";
-import { ELMOS_PER_FOOTPRINT } from "./unitDef";
 
 /** Sky blue, distinct from every colourway in the bundled parts pack. */
 const REFERENCE_COLOUR = 0x0ea5e9;
 /** Ghostly on purpose: it is a backdrop for judging size against, and nothing
  *  in the scene that can be clicked looks like this. */
 const REFERENCE_OPACITY = 0.35;
-const OUTLINE_OPACITY = 0.55;
 
-/** The reference unit's footprint, in elmos: its unitdef's footprint steps at
- *  the same elmos-per-step `unitDef.ts` uses to size an exported unit. */
-export const REFERENCE_FOOTPRINT_ELMOS =
-  model.footprintSteps * ELMOS_PER_FOOTPRINT;
+/** The reference unit's footprint, in steps, as its unitdef states it.
+ *  `buildPlate.ts` draws a plate this size under the unit being built. */
+export const REFERENCE_FOOTPRINT_STEPS = model.footprintSteps;
+
+/** How wide the model itself is, in elmos, measured off the geometry rather
+ *  than declared, so nothing can drift out of step with the asset. */
+export const REFERENCE_WIDTH_ELMOS = widthElmos();
+
+function widthElmos(): number {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < model.positions.length; i += 3) {
+    min = Math.min(min, model.positions[i]);
+    max = Math.max(max, model.positions[i]);
+  }
+  return max - min;
+}
 
 /**
- * Where the viewport parks it: to the left of the origin, its footprint clear
- * of it by one footprint step, so it never sits inside whatever is being built.
- */
-export const REFERENCE_OFFSET_X = -(
-  REFERENCE_FOOTPRINT_ELMOS / 2 +
-  ELMOS_PER_FOOTPRINT
-);
-
-/**
- * The reference unit and its footprint, in its own local space with the unit
- * standing on y = 0, as it does in game.
+ * The reference unit, in its own local space with the unit standing on y = 0,
+ * as it does in game.
  *
  * Purely a visual aid. It never carries a piece, and is never selected,
  * hovered, baked or exported. The viewport positions and toggles it. This only
@@ -96,32 +99,14 @@ export function buildReferenceUnit(): THREE.Group {
   );
   mesh.raycast = () => {};
 
-  const half = REFERENCE_FOOTPRINT_ELMOS / 2;
-  const outline = new THREE.LineLoop(
-    new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-half, 0, -half),
-      new THREE.Vector3(half, 0, -half),
-      new THREE.Vector3(half, 0, half),
-      new THREE.Vector3(-half, 0, half),
-    ]),
-    new THREE.LineBasicMaterial({
-      color: REFERENCE_COLOUR,
-      transparent: true,
-      opacity: OUTLINE_OPACITY,
-    }),
-  );
-  outline.raycast = () => {};
-
-  group.add(mesh, outline);
+  group.add(mesh);
   return group;
 }
 
 /** Frees the geometry and materials `buildReferenceUnit` allocated. */
 export function disposeReferenceUnit(group: THREE.Group): void {
   for (const child of group.children) {
-    if (!(child instanceof THREE.Mesh) && !(child instanceof THREE.LineLoop)) {
-      continue;
-    }
+    if (!(child instanceof THREE.Mesh)) continue;
     child.geometry.dispose();
     (child.material as THREE.Material).dispose();
   }

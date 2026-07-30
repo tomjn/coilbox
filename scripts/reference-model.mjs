@@ -70,7 +70,9 @@ function main() {
   spawnSync("bunx", ["biome", "format", "--write", out], { stdio: "inherit" });
 
   const box = bounds(mesh.positions);
-  log(`${mesh.positions.length / 3} vertices, ${mesh.indices.length / 3} triangles`);
+  log(
+    `${mesh.positions.length / 3} vertices, ${mesh.indices.length / 3} triangles`,
+  );
   log(
     `size in elmos: ${(box.max[0] - box.min[0]).toFixed(3)} wide, ` +
       `${box.max[1].toFixed(3)} tall, ${(box.max[2] - box.min[2]).toFixed(3)} deep`,
@@ -87,7 +89,8 @@ function main() {
 function readS3o(buf) {
   const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const magic = buf.subarray(0, 12).toString("latin1");
-  if (magic !== "Spring unit\0") fail(`not an s3o: magic ${JSON.stringify(magic)}`);
+  if (magic !== "Spring unit\0")
+    fail(`not an s3o: magic ${JSON.stringify(magic)}`);
   if (view.getInt32(12, true) !== 0) fail("unknown s3o version");
 
   function cstring(at) {
@@ -111,7 +114,9 @@ function readS3o(buf) {
     // Strips and quads are legal s3o and the engine trianglizes them on load.
     // Nothing here does, so refuse rather than write nonsense.
     if (vertCount > 0 && primitiveType !== 0) {
-      fail(`piece ${name}: primitive type ${primitiveType}, expected triangles`);
+      fail(
+        `piece ${name}: primitive type ${primitiveType}, expected triangles`,
+      );
     }
 
     const vertices = [];
@@ -126,7 +131,8 @@ function readS3o(buf) {
     const indices = [];
     for (let i = 0; i < indexCount; i++) {
       const index = view.getUint32(indexAt + i * 4, true);
-      if (index >= vertCount) fail(`piece ${name}: index ${index} addresses nothing`);
+      if (index >= vertCount)
+        fail(`piece ${name}: index ${index} addresses nothing`);
       indices.push(index);
     }
     if (indices.length % 3 !== 0) {
@@ -158,7 +164,9 @@ function bake(root) {
   const indices = [];
 
   function walk(piece, parentOrigin) {
-    const origin = piece.offset.map((value, axis) => value + parentOrigin[axis]);
+    const origin = piece.offset.map(
+      (value, axis) => value + parentOrigin[axis],
+    );
     const base = positions.length / 3;
 
     for (const vertex of piece.vertices) {
