@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { declaredPieces } from "./luaPieces";
 import { buildLuaScript } from "./luaScript";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 
@@ -40,11 +41,6 @@ const LEGS: Partial<LegoPiece>[] = [
   { id: "rt", name: "rightthigh", role: "leg.r1.thigh" },
   { id: "rs", name: "rightshin", role: "leg.r1.shin" },
 ];
-
-/** Every piece a `piece("...")` call names. */
-function declaredPieces(lua: string): string[] {
-  return [...lua.matchAll(/piece\("([^"]+)"\)/g)].map((match) => match[1]);
-}
 
 describe("buildLuaScript", () => {
   it("writes every callin even with nothing applied, so it loads as it is", () => {
