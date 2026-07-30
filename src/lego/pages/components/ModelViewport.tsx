@@ -22,6 +22,7 @@ import {
   ClipboardPaste,
   Copy,
   Grid3x3,
+  Keyboard,
   Move,
   PackagePlus,
   RotateCw,
@@ -54,6 +55,7 @@ import {
 } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { type BakedPiece, bakedPieces } from "../../s3oBuild";
+import { isShortcut } from "../../shortcuts";
 import {
   localAnchors,
   nearestSnap,
@@ -61,6 +63,7 @@ import {
   snapRotation,
   type Vec3,
 } from "../../snapping";
+import { ShortcutSheet } from "./ShortcutSheet";
 
 export type GizmoMode = "translate" | "rotate" | "scale";
 
@@ -205,6 +208,7 @@ export function ModelViewport({
   const [mode, setMode] = useState<GizmoMode>("translate");
   const [snapped, setSnapped] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   function resetView() {
     const state = sceneRef.current;
@@ -686,17 +690,18 @@ export function ModelViewport({
     };
     const down = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement) return;
-      if (event.altKey) setSnapping(false);
-      if (event.key === "g") setMode("translate");
-      if (event.key === "r") setMode("rotate");
-      if (event.key === "s") setMode("scale");
-      if (event.key === "f" && !event.metaKey && !event.ctrlKey) {
+      if (isShortcut("snap-hold", event)) setSnapping(false);
+      if (isShortcut("translate", event)) setMode("translate");
+      if (isShortcut("rotate", event)) setMode("rotate");
+      if (isShortcut("scale", event)) setMode("scale");
+      if (isShortcut("frame", event)) {
         const state = sceneRef.current;
         if (state) focusSelection(state, selectedIdRef.current);
       }
+      if (isShortcut("shortcuts", event)) setShortcutsOpen(true);
     };
     const up = (event: KeyboardEvent) => {
-      if (!event.altKey) setSnapping(true);
+      if (!isShortcut("snap-hold", event)) setSnapping(true);
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -843,8 +848,18 @@ export function ModelViewport({
         >
           <Grid3x3 className="size-4" />
         </Button>
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={() => setShortcutsOpen(true)}
+          title="Keyboard shortcuts (?)"
+        >
+          <Keyboard className="size-4" />
+        </Button>
         <AxisCompass svgRef={compassRef} onClick={resetView} />
       </ButtonGroup>
+
+      <ShortcutSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 
       {/* Notes and the key sit at the bottom, where they can be read when
           wanted and ignored when not. */}
