@@ -21,6 +21,7 @@ import {
   ArrowDownToLine,
   ClipboardPaste,
   Copy,
+  FlipHorizontal2,
   Grid3x3,
   Keyboard,
   Move,
@@ -217,6 +218,13 @@ interface Props {
   onDelete: () => void;
   canDelete: boolean;
   /**
+   * Whether a new piece gets a mirrored twin the first time it is placed off
+   * the centre line (M). A setting for the session, not part of the unit, so it
+   * lives with the page rather than the document.
+   */
+  symmetry: boolean;
+  onSymmetryChange: (on: boolean) => void;
+  /**
    * Arms the next click on the model to drop a snap anchor where it lands,
    * rather than selecting. The gizmo comes off while it is armed, since its
    * handles sit over the middle of the very piece being clicked.
@@ -248,6 +256,8 @@ export function ModelViewport({
   canSaveAsCompound,
   onDelete,
   canDelete,
+  symmetry,
+  onSymmetryChange,
   placingAnchor = false,
   onPlaceAnchor,
   onCancelAnchor,
@@ -908,6 +918,25 @@ export function ModelViewport({
             {/* A third group: what you do to the selected piece, rather than a
               mode or a one-off on the whole unit. */}
             <ButtonGroup orientation="vertical">
+              {/* Held on rather than pressed once, so it reads as a state the
+                  builder is in: everything placed while it is lit comes in
+                  pairs. */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant={symmetry ? "default" : "outline"}
+                    onClick={() => onSymmetryChange(!symmetry)}
+                    aria-pressed={symmetry}
+                    aria-label="Symmetry"
+                  >
+                    <FlipHorizontal2 className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  Symmetry: mirror new pieces as they are placed (M)
+                </TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
