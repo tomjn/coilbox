@@ -19,9 +19,10 @@ import * as THREE from "three";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { baseAtlas, type LegoAtlas } from "../../atlas";
+import { buildCompoundHolder } from "../../compoundPreview";
 import { validateCompoundName } from "../../compounds";
 import { addStandardLights, partMaterial } from "../../geometry";
-import { type LegoProject, orderedPieces } from "../../model";
+import type { LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 
 /** Cell size in pixels: a square of model, with the name under it. */
@@ -345,57 +346,18 @@ interface GridState {
   onColumns: (columns: number) => void;
 }
 
-/**
- * One compound, ready to be dropped into a cell.
- *
- * The holder carries the cell's placement and the resting pose, and its child
- * carries the compound itself, shifted so the assembly's middle sits on the
- * holder's origin. Two objects rather than one, because the shift has to happen
- * before the holder scales and turns it.
- */
+/** One compound in its resting pose, sized to a cell. */
 function buildHolder(
   pack: LoadedPack,
   compound: LegoProject,
   material: THREE.MeshStandardMaterial,
 ): THREE.Group {
-  const holder = new THREE.Group();
-  const centred = new THREE.Group();
-  holder.add(centred);
-
-  const groups = new Map<string, THREE.Group>();
-  const assembly = new THREE.Group();
-  centred.add(assembly);
-
-  // Depth first from the root, then any piece the walk did not reach, which is
-  // how a compound saved from a set carries its other roots. A piece's parent is
-  // always in place first either way.
-  for (const piece of orderedPieces(compound)) {
-    const group = new THREE.Group();
-    group.position.set(...piece.position);
-    group.rotation.set(...piece.rotation);
-    group.scale.set(...piece.scale);
-    const parent =
-      piece.id === compound.rootPieceId
-        ? assembly
-        : (groups.get(piece.parentId as string) ?? assembly);
-    parent.add(group);
-    groups.set(piece.id, group);
-
-    const geometry = piece.partId ? getPartGeometry(pack, piece.partId) : null;
-    if (geometry) group.add(new THREE.Mesh(geometry, material));
-  }
-
-  // A compound of nothing but empty pieces has no size to fit, and dividing by
-  // it would send the holder to infinity.
-  const box = new THREE.Box3().setFromObject(assembly);
-  if (!box.isEmpty()) {
-    const size = box.getSize(new THREE.Vector3());
-    const centre = box.getCenter(new THREE.Vector3());
-    holder.scale.setScalar(
-      (CELL * 0.58) / Math.max(size.x, size.y, size.z, 0.001),
-    );
-    centred.position.copy(centre).negate();
-  }
+  const holder = buildCompoundHolder(
+    compound,
+    (partId) => getPartGeometry(pack, partId),
+    material,
+    CELL * 0.58,
+  );
   holder.rotation.set(REST_PITCH, REST_YAW, 0);
   return holder;
 }
