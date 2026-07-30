@@ -127,3 +127,32 @@ export function insertCompound(
     rootPieceId: remap.get(compound.rootPieceId) as string,
   };
 }
+
+/**
+ * Insert a compound, then put back the transform lifting it dropped.
+ *
+ * `subtreeAsCompound` resets the root's position, rotation and scale so a
+ * compound can be placed anywhere, which is right for something pulled from the
+ * library but wrong for an operation that means "this piece, again": duplicate
+ * and mirror-as-copy both want the copy to land where the source already sits,
+ * not at its parent's origin. Shared so the two do not grow their own answers to
+ * the same question.
+ */
+export function insertCompoundAt(
+  project: LegoProject,
+  compound: LegoProject,
+  parentId: string,
+  transform: Pick<LegoPiece, "position" | "rotation" | "scale">,
+  newId: () => string,
+): { project: LegoProject; rootPieceId: string } {
+  const inserted = insertCompound(project, compound, parentId, newId);
+  return {
+    project: {
+      ...inserted.project,
+      pieces: inserted.project.pieces.map((piece) =>
+        piece.id === inserted.rootPieceId ? { ...piece, ...transform } : piece,
+      ),
+    },
+    rootPieceId: inserted.rootPieceId,
+  };
+}
