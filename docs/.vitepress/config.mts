@@ -45,6 +45,7 @@ export default defineConfig({
           { text: "Map packs", link: "/map-packs" },
           { text: "Routes", link: "/routes" },
           { text: "The s3o model format", link: "/s3o-format" },
+          { text: "The 3do model format", link: "/3do-format" },
           { text: "The unit builder", link: "/lego-builder" },
           { text: "Lego parts pack", link: "/lego-parts-pack" },
         ],
