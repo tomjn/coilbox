@@ -97,6 +97,12 @@ export const SHORTCUTS: Shortcut[] = [
     matches: (event) => event.altKey,
   },
   {
+    id: "symmetry",
+    group: "Transform",
+    description: "Mirror new pieces as they are placed",
+    combos: [{ key: "m", mod: false, shift: false }],
+  },
+  {
     id: "frame",
     group: "View",
     description: "Frame the selection",
