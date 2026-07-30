@@ -17,6 +17,7 @@
     "lego:pack": "bun scripts/legopack/build.mjs",
     "lego:reads3o": "bun scripts/reads3o.mjs",
     "clean": "bash scripts/clean.sh",
+    "check": "bash scripts/check.sh",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
