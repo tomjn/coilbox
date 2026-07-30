@@ -28,7 +28,7 @@ import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
-import { subtreeAsCompound } from "../compounds";
+import { selectionAsCompound } from "../compounds";
 import { usePartFilter } from "../filter";
 import {
   applyGroupTransform,
@@ -410,8 +410,8 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   async function saveSelectionAsCompound() {
-    if (!draft || !selectedId || selectedIds.length > 1) return;
-    const compound = subtreeAsCompound(draft, selectedId, {
+    if (!draft) return;
+    const compound = selectionAsCompound(draft, selectedIds, {
       id: crypto.randomUUID(),
       now: new Date().toISOString(),
       newId: () => crypto.randomUUID(),
@@ -425,10 +425,9 @@ function Builder({ id }: { id: string | undefined }) {
   function addCompound(compound: LegoProject) {
     if (!draft) return;
     const inserted = doc.insert(compound, selectedId ?? draft.rootPieceId);
-    if (inserted) {
-      setSelectedId(inserted);
-      queueTwin(inserted);
-    }
+    if (inserted.length === 0) return;
+    doc.selectMany(inserted);
+    for (const pieceId of inserted) queueTwin(pieceId);
   }
 
   function transformPiece(pieceId: string, change: Partial<LegoPiece>) {
@@ -505,14 +504,7 @@ function Builder({ id }: { id: string | undefined }) {
   }, [placingAnchor]);
 
   async function copySelection() {
-    if (!selectedId) return;
-    // A cutting has one root piece, so there is nowhere for a second branch to
-    // go. Saying so beats copying whichever piece happened to be clicked last.
-    if (selectedIds.length > 1) {
-      toast.info("Copy takes one piece at a time.");
-      return;
-    }
-    const lifted = doc.lift(selectedId);
+    const lifted = doc.lift(selectedIds);
     if (!lifted) return;
     try {
       await navigator.clipboard.writeText(serializeClipboardPiece(lifted));
@@ -553,10 +545,9 @@ function Builder({ id }: { id: string | undefined }) {
       result.piece.project,
       selectedId ?? draft.rootPieceId,
     );
-    if (inserted) {
-      setSelectedId(inserted);
-      queueTwin(inserted);
-    }
+    if (inserted.length === 0) return;
+    doc.selectMany(inserted);
+    for (const pieceId of inserted) queueTwin(pieceId);
   }
 
   function duplicateSelection() {
@@ -797,9 +788,7 @@ function Builder({ id }: { id: string | undefined }) {
               canDuplicate={transformRoots(draft, selectedIds).length > 0}
               onPaste={() => void pasteClipboard()}
               onSaveAsCompound={() => void saveSelectionAsCompound()}
-              // A compound has one root piece, so a set has nowhere to put its
-              // second branch.
-              canSaveAsCompound={selectedIds.length === 1}
+              canSaveAsCompound={selectedIds.length > 0}
               onDelete={removeSelected}
               canDelete={transformRoots(draft, selectedIds).length > 0}
               symmetry={symmetry}

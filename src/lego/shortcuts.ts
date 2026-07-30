@@ -132,7 +132,7 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "copy",
     group: "Edit",
-    description: "Copy the selected piece",
+    description: "Copy the selection",
     combos: [{ key: "c", mod: true }],
   },
   {

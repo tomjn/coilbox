@@ -21,7 +21,7 @@ import { useReduceMotion } from "../../../general/display";
 import { baseAtlas, type LegoAtlas } from "../../atlas";
 import { validateCompoundName } from "../../compounds";
 import { addStandardLights, partMaterial } from "../../geometry";
-import { type LegoProject, walkPieces } from "../../model";
+import { type LegoProject, orderedPieces } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 
 /** Cell size in pixels: a square of model, with the name under it. */
@@ -366,8 +366,10 @@ function buildHolder(
   const assembly = new THREE.Group();
   centred.add(assembly);
 
-  // Depth first from the root, so a piece's parent is always in place first.
-  for (const piece of walkPieces(compound)) {
+  // Depth first from the root, then any piece the walk did not reach, which is
+  // how a compound saved from a set carries its other roots. A piece's parent is
+  // always in place first either way.
+  for (const piece of orderedPieces(compound)) {
     const group = new THREE.Group();
     group.position.set(...piece.position);
     group.rotation.set(...piece.rotation);

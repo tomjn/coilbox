@@ -1,11 +1,17 @@
 /**
- * The clipboard payload for a lifted piece, and what paste does with it.
+ * The clipboard payload for a lifted piece or set, and what paste does with it.
  *
  * The payload is the same self-contained document a saved compound uses (see
  * compounds.ts), wrapped in a small envelope so paste can tell it apart from
  * anything else that might be sitting on the system clipboard: a random JSON
  * object, a snippet of text, someone else's file. Reusing the compound shape
  * means there is one wire format for a subtree, not two.
+ *
+ * Copying several pieces at once needed nothing here: a set is that same
+ * document with several parentless pieces in it, which the envelope and this
+ * parser already carry. The alternative, a list of documents in the envelope,
+ * would have made every payload unreadable to a build that predates it,
+ * including the single-piece ones that work between windows today.
  *
  * Pure and DOM-free, so the rejection cases can be tested directly: parsing
  * clipboard text is exactly the code that handles input this codebase does
