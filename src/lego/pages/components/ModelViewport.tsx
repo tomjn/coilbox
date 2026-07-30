@@ -493,6 +493,7 @@ export function ModelViewport({
         collision: null,
         collisionMaterial,
         editCollision: false,
+        collisionDragFrom: null,
         onCollisionChangeRef,
         sky: null,
         terrain: null,
@@ -536,6 +537,15 @@ export function ModelViewport({
         controls.enabled = false;
         dragging = true;
         setHoveredAndNotify(state, null);
+        // Where the volume was before the drag, so the axis this drag does not
+        // own can be put back on every frame of it. See `holdCollisionAxis`.
+        state.collisionDragFrom =
+          gizmo.object === state.collision
+            ? {
+                position: state.collision.position.clone(),
+                scale: state.collision.scale.clone(),
+              }
+            : null;
         // Built once per drag: the other pieces do not move while one is dragged,
         // so their anchors are fixed for the length of it.
         const pieceId = gizmo.object ? pieceIdOf(gizmo.object) : null;
@@ -556,10 +566,12 @@ export function ModelViewport({
         if (gizmo.object === state.collision) commitCollision(state);
         else if (gizmo.object === groupPivot) commitGroup(state);
         else commitGizmo(state);
+        state.collisionDragFrom = null;
         render();
       });
 
       gizmo.addEventListener("objectChange", () => {
+        if (gizmo.object === state.collision) holdCollisionAxis(state);
         if (gizmo.object === groupPivot) {
           dragGroup(state);
         } else {
@@ -1322,6 +1334,9 @@ interface SceneState {
   collisionMaterial: THREE.LineBasicMaterial;
   /** Whether the gizmo is on the volume rather than on the selected piece. */
   editCollision: boolean;
+  /** Where the volume was when the drag in progress started, or null when
+   *  nothing is dragging it. What `holdCollisionAxis` puts back. */
+  collisionDragFrom: { position: THREE.Vector3; scale: THREE.Vector3 } | null;
   onCollisionChangeRef: {
     current: ((volume: LegoCollisionVolume) => void) | undefined;
   };
@@ -2441,6 +2456,24 @@ function frameBounds(state: SceneState, box: THREE.Box3): boolean {
   state.camera.position.set(...position);
   state.controls.update();
   return true;
+}
+
+/**
+ * Hold the volume still on the axis the drag does not own.
+ *
+ * A scale handle sets a size and a move handle sets a position, and neither is
+ * allowed to do the other's job: a volume that slid off the unit while it was
+ * being sized would make the size impossible to judge, which is the whole
+ * point of dragging it rather than typing it. `TransformControls` writes both
+ * channels of the object it holds, so whichever one this drag is not about is
+ * put back to where it started on every frame.
+ */
+function holdCollisionAxis(state: SceneState) {
+  const lines = state.collision;
+  const from = state.collisionDragFrom;
+  if (!lines || !from) return;
+  if (state.gizmo.getMode() === "scale") lines.position.copy(from.position);
+  else lines.scale.copy(from.scale);
 }
 
 /**
