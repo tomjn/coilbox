@@ -3,17 +3,12 @@
  *
  * Every 3D view wants the same four things: a renderer sized to the element it
  * sits in, a redraw when that element resizes, a frame drawn only when
- * something changed, and everything freed on the way out. The two traps are
- * held here rather than found again by each view that comes along:
- *
- * - `setSize(w, h, false)` leaves the canvas element itself unsized, so it
- *   falls back to its intrinsic size, which is the drawing buffer including the
- *   pixel ratio. That is larger than its host, which grows the host, which
- *   grows the canvas. The CSS size has to be set explicitly.
- * - A WebGL canvas discards its drawing buffer once the frame is composited, so
- *   reading it at any later moment gives a blank image. `capture` draws and
- *   hands the canvas back in one task, which is the only way to read pixels off
- *   it without keeping the buffer alive for every frame.
+ * something changed, and everything freed on the way out. The trap is held here
+ * rather than found again by each view that comes along: `setSize(w, h, false)`
+ * leaves the canvas element itself unsized, so it falls back to its intrinsic
+ * size, which is the drawing buffer including the pixel ratio. That is larger
+ * than its host, which grows the host, which grows the canvas. The CSS size has
+ * to be set explicitly.
  *
  * What stays with the view: the scene, the camera, orbit controls, gizmos and
  * any animation loop. Those are interaction and content, not canvas lifetime.
@@ -31,13 +26,6 @@ export interface Canvas3D {
   render: () => void;
   /** Take the host's size again, resize the buffer to it, and draw. */
   resize: () => void;
-  /**
-   * Draw a frame and hand back the canvas in the same task.
-   *
-   * Anything that reads the pixels, such as a thumbnail, has to go through
-   * this, because a canvas read at any later moment is blank.
-   */
-  capture: () => HTMLCanvasElement;
 }
 
 /** What a view builds on the canvas, and how the canvas drives it. */
@@ -90,16 +78,7 @@ export function useCanvas3D(
       render();
     };
 
-    scene = build({
-      renderer,
-      host,
-      render,
-      resize,
-      capture: () => {
-        render();
-        return renderer.domElement;
-      },
-    });
+    scene = build({ renderer, host, render, resize });
 
     if (!scene) {
       renderer.dispose();
