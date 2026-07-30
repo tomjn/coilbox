@@ -64,8 +64,9 @@ import {
 import { type BakedPiece, bakedPieces } from "../../s3oBuild";
 import { isShortcut } from "../../shortcuts";
 import {
-  localAnchors,
+  type Anchor,
   nearestSnap,
+  pieceAnchors,
   screenPixelsToWorld,
   snapRotation,
   type Vec3,
@@ -96,6 +97,8 @@ const MODES: {
 const ORIGIN_COLOUR = 0x8b5cf6;
 const FACE_COLOUR = 0x38bdf8;
 const CORNER_COLOUR = 0xfbbf24;
+/** A seat the modeller marked, which is the only kind that piece then offers. */
+const CUSTOM_COLOUR = 0xf472b6;
 /**
  * Hover reuses the face anchors' sky blue rather than a new hex: it already
  * means "something to interact with", and it reads clearly apart from the
@@ -186,6 +189,16 @@ interface Props {
   /** Delete the selected piece (Backspace). */
   onDelete: () => void;
   canDelete: boolean;
+  /**
+   * Arms the next click on the model to drop a snap anchor where it lands,
+   * rather than selecting. The gizmo comes off while it is armed, since its
+   * handles sit over the middle of the very piece being clicked.
+   */
+  placingAnchor?: boolean;
+  /** Where the click landed, in the clicked piece's part space. */
+  onPlaceAnchor?: (pieceId: string, position: Vec3) => void;
+  /** A click that missed the model, which is how you change your mind. */
+  onCancelAnchor?: () => void;
 }
 
 export function ModelViewport({
@@ -207,6 +220,9 @@ export function ModelViewport({
   canSaveAsCompound,
   onDelete,
   canDelete,
+  placingAnchor = false,
+  onPlaceAnchor,
+  onCancelAnchor,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
@@ -214,6 +230,8 @@ export function ModelViewport({
   const reduceMotion = useReduceMotion();
   const [mode, setMode] = useState<GizmoMode>("translate");
   const [snapped, setSnapped] = useState(false);
+  /** The name of the anchor a drag seated against, when it had one. */
+  const [snappedTo, setSnappedTo] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showReference, setShowReference] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -249,6 +267,12 @@ export function ModelViewport({
   projectRef.current = project;
   const packRef = useRef(pack);
   packRef.current = pack;
+  const placingAnchorRef = useRef(placingAnchor);
+  placingAnchorRef.current = placingAnchor;
+  const onPlaceAnchorRef = useRef(onPlaceAnchor);
+  onPlaceAnchorRef.current = onPlaceAnchor;
+  const onCancelAnchorRef = useRef(onCancelAnchor);
+  onCancelAnchorRef.current = onCancelAnchor;
 
   // Built once. Everything after this mutates the scene rather than remaking it.
   useCanvas3D(
@@ -391,6 +415,9 @@ export function ModelViewport({
         onSnapChange: () => {},
         projectRef,
         packRef,
+        placingAnchorRef,
+        onPlaceAnchorRef,
+        onCancelAnchorRef,
         onTransformRef,
         selectedIdRef,
         onHoverRef,
@@ -481,6 +508,10 @@ export function ModelViewport({
         pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
         raycaster.setFromCamera(pointer, camera);
         const hit = raycaster.intersectObject(root, true)[0];
+        if (placingAnchorRef.current) {
+          placeAnchor(state, hit);
+          return;
+        }
         onSelectRef.current(pieceIdOf(hit?.object ?? null));
       };
       renderer.domElement.addEventListener("pointerdown", onPointerDown);
@@ -610,8 +641,10 @@ export function ModelViewport({
       state.outline.setFromObject(group);
       state.outline.visible = true;
       showOverlay(state.selectOverlay, group);
-      // The root has nothing to move relative to, so it gets no handles.
-      if (selectedId === project.rootPieceId) {
+      // The root has nothing to move relative to, so it gets no handles. Nor
+      // does anything while an anchor is being placed: the handles sit over
+      // the middle of the very piece the click has to reach.
+      if (selectedId === project.rootPieceId || placingAnchor) {
         state.gizmo.detach();
       } else {
         state.gizmo.attach(group);
@@ -625,7 +658,7 @@ export function ModelViewport({
     // which now has to stand down in favour of the (stronger) selected look.
     applyHoverVisual(state);
     state.render();
-  }, [selectedId, project]);
+  }, [selectedId, project, placingAnchor]);
 
   // Independent of the pointer: the hovered piece can arrive from the sidebar
   // tree instead of a raycast, and does not report back up when it does, so
@@ -713,7 +746,11 @@ export function ModelViewport({
 
   useEffect(() => {
     const state = sceneRef.current;
-    if (state) state.onSnapChange = setSnapped;
+    if (!state) return;
+    state.onSnapChange = (on, anchorName) => {
+      setSnapped(on);
+      setSnappedTo(anchorName ?? null);
+    };
   }, []);
 
   // Held rather than toggled: snapping is on, and letting go of it is a
@@ -746,12 +783,21 @@ export function ModelViewport({
     };
   }, []);
 
+  // Whether the selected piece carries anchors of its own, which decides what
+  // the key at the bottom of the view has to name.
+  const ownAnchors = selectedId
+    ? (pieceById(project, selectedId)?.customAnchors?.length ?? 0)
+    : 0;
+
   return (
     // Darker than the page behind it, so the unit reads as being in its own
     // space and pale parts have something to sit against. A translucent tint
     // rather than a fixed colour, so it deepens whatever the theme is.
     <div className="relative h-full w-full bg-black/30">
-      <div ref={containerRef} className="h-full w-full" />
+      <div
+        ref={containerRef}
+        className={`h-full w-full ${placingAnchor ? "cursor-crosshair" : ""}`}
+      />
 
       {/* Down the left edge and vertically centred, out of the way of the
           unit's own chrome at the top of the view. Bounded top and bottom and
@@ -919,14 +965,26 @@ export function ModelViewport({
         {selectedId && !playing ? (
           <div className="flex gap-3">
             <Dot colour="#8b5cf6" label="Turns here" />
-            <Dot colour="#38bdf8" label="Faces" />
-            <Dot colour="#fbbf24" label="Corners" />
+            {/* A piece with anchors of its own offers only those, so the box's
+                key would be naming dots that are not drawn. */}
+            {ownAnchors > 0 ? (
+              <Dot colour="#f472b6" label="Anchors" />
+            ) : (
+              <>
+                <Dot colour="#38bdf8" label="Faces" />
+                <Dot colour="#fbbf24" label="Corners" />
+              </>
+            )}
           </div>
         ) : null}
         <span>
-          {snapped
-            ? "Snapped. Hold Alt to place freely"
-            : "Hold Alt to place freely"}
+          {placingAnchor
+            ? "Click the model to put an anchor there. Escape to stop"
+            : snapped
+              ? snappedTo
+                ? `Snapped to "${snappedTo}". Hold Alt to place freely`
+                : "Snapped. Hold Alt to place freely"
+              : "Hold Alt to place freely"}
         </span>
       </div>
     </div>
@@ -1096,11 +1154,22 @@ interface SceneState {
    *  so each one gets its own opening frame. */
   framed: boolean;
   snapping: boolean;
-  onSnapChange: (snapped: boolean) => void;
+  /** Both plain values rather than one object: this fires on every frame of a
+   *  drag, and an object would be a fresh identity each time and a re-render
+   *  with it. */
+  onSnapChange: (snapped: boolean, anchorName?: string) => void;
   /** Read during a drag, so the helpers see the current document, not the one
    *  the scene was built with. */
   projectRef: { current: LegoProject };
   packRef: { current: LoadedPack };
+  /** Whether the next click on the model drops an anchor rather than selecting,
+   *  and what to do when it does. Read from the pointer handler, which is
+   *  registered once and would otherwise only ever see the first values. */
+  placingAnchorRef: { current: boolean };
+  onPlaceAnchorRef: {
+    current: ((pieceId: string, position: Vec3) => void) | undefined;
+  };
+  onCancelAnchorRef: { current: (() => void) | undefined };
   onTransformRef: {
     current: (pieceId: string, change: Partial<LegoPiece>) => void;
   };
@@ -1111,42 +1180,80 @@ interface SceneState {
 }
 
 /**
+ * Every anchor of a piece, in the piece's own space.
+ *
+ * Anchors are in the part's own space, so the pivot comes off them exactly as
+ * it comes off the geometry and they sit on the part however the origin moves.
+ */
+function localAnchorsOf(
+  pack: LoadedPack,
+  piece: LegoPiece,
+): { anchor: Anchor; position: Vec3 }[] {
+  const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
+  const pivot = piece.pivot ?? [0, 0, 0];
+  return pieceAnchors(part?.bbox ?? null, piece.customAnchors).map(
+    (anchor) => ({
+      anchor,
+      position: [
+        anchor.position[0] - pivot[0],
+        anchor.position[1] - pivot[1],
+        anchor.position[2] - pivot[2],
+      ],
+    }),
+  );
+}
+
+/**
  * Every anchor of a piece, in world space.
  *
- * A piece with no part has only its own origin, which is what makes an empty
- * piece something you can still seat against a corner.
+ * The piece's own transform carries them, so an anchor turns and scales with
+ * the piece it is on rather than staying where the piece used to be.
  */
 function worldAnchors(
   state: SceneState,
   pack: LoadedPack,
   piece: LegoPiece,
-): Vec3[] {
+): Anchor[] {
   const group = state.groups.get(piece.id);
   if (!group) return [];
   group.updateWorldMatrix(true, false);
 
-  const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
-  // Anchors come from the part's bounding box, which is in part space, so they
-  // shift with the pivot exactly as the geometry does.
-  const pivot = piece.pivot ?? [0, 0, 0];
-  const local = part
-    ? localAnchors(part.bbox).map(
-        (anchor) =>
-          [
-            anchor.position[0] - pivot[0],
-            anchor.position[1] - pivot[1],
-            anchor.position[2] - pivot[2],
-          ] as Vec3,
-      )
-    : [[0, 0, 0] as Vec3];
-
   const point = new THREE.Vector3();
-  return local.map((position) => {
-    point
-      .set(position[0], position[1], position[2])
-      .applyMatrix4(group.matrixWorld);
-    return [point.x, point.y, point.z] as Vec3;
+  return localAnchorsOf(pack, piece).map(({ anchor, position }) => {
+    point.set(...position).applyMatrix4(group.matrixWorld);
+    return { ...anchor, position: [point.x, point.y, point.z] as Vec3 };
   });
+}
+
+/**
+ * Turn a click on the model into an anchor on the piece it landed on.
+ *
+ * The point is handed back in that piece's part space, which is the frame an
+ * anchor is stored in, so it stays on the surface it was clicked on however the
+ * piece is later moved, turned or scaled. A click that hit nothing means the
+ * pointer was aimed at the background, which is how you change your mind.
+ */
+function placeAnchor(state: SceneState, hit: THREE.Intersection | undefined) {
+  const pieceId = hit ? pieceIdOf(hit.object) : null;
+  const group = pieceId ? state.groups.get(pieceId) : undefined;
+  const piece = pieceId
+    ? pieceById(state.projectRef.current, pieceId)
+    : undefined;
+  if (!hit || !pieceId || !group || !piece) {
+    state.onCancelAnchorRef.current?.();
+    return;
+  }
+
+  group.updateWorldMatrix(true, false);
+  const local = hit.point
+    .clone()
+    .applyMatrix4(new THREE.Matrix4().copy(group.matrixWorld).invert());
+  const pivot = piece.pivot ?? [0, 0, 0];
+  state.onPlaceAnchorRef.current?.(pieceId, [
+    local.x + pivot[0],
+    local.y + pivot[1],
+    local.z + pivot[2],
+  ]);
 }
 
 /**
@@ -1215,8 +1322,11 @@ function applySnap(state: SceneState) {
     return;
   }
 
-  const { points, owners } = snapTargets(state, pack, project, pieceId);
-  const mine = worldAnchors(state, pack, piece);
+  const targets = snapTargets(state, pack, project, pieceId);
+  const targetPoints = targets.map((target) => target.position);
+  const mine = worldAnchors(state, pack, piece).map(
+    (anchor) => anchor.position,
+  );
 
   // Screen-scaled, so the snap reaches the same number of pixels whether the
   // camera is zoomed in tight or pulled right back. Measured to the dragged
@@ -1233,14 +1343,12 @@ function applySnap(state: SceneState) {
     SNAP_PIXELS,
   );
 
-  paintProximity(state, mine, points, threshold);
+  paintProximity(state, mine, targetPoints, threshold);
 
-  const snap = nearestSnap(mine, points, threshold);
-  state.onSnapChange(snap !== null);
-  showSeat(
-    state,
-    snap ? { at: snap.at, owner: owners[snap.targetIndex] } : null,
-  );
+  const snap = nearestSnap(mine, targetPoints, threshold);
+  const seated = snap ? targets[snap.targetIndex] : undefined;
+  state.onSnapChange(snap !== null, seated?.name);
+  showSeat(state, snap ? { at: snap.at, owner: seated?.owner } : null);
   if (!snap) return;
 
   // The delta is in world space and the group's position is relative to its
@@ -1257,6 +1365,14 @@ function applySnap(state: SceneState) {
   group.position.add(delta);
 }
 
+interface SnapTarget {
+  position: Vec3;
+  /** The piece whose anchor this is, so the seat can point at it. */
+  owner: string;
+  /** A custom anchor's name, so the seat can say which one it took. */
+  name?: string;
+}
+
 /**
  * Every anchor a dragged piece could seat against, and whose each one is.
  *
@@ -1268,18 +1384,20 @@ function snapTargets(
   pack: LoadedPack,
   project: LegoProject,
   pieceId: string,
-): { points: Vec3[]; owners: string[] } {
+): SnapTarget[] {
   const own = new Set(descendantIds(project, pieceId));
-  const points: Vec3[] = [];
-  const owners: string[] = [];
+  const targets: SnapTarget[] = [];
   for (const other of project.pieces) {
     if (own.has(other.id)) continue;
     for (const anchor of worldAnchors(state, pack, other)) {
-      points.push(anchor);
-      owners.push(other.id);
+      targets.push({
+        position: anchor.position,
+        owner: other.id,
+        ...(anchor.name ? { name: anchor.name } : {}),
+      });
     }
   }
-  return { points, owners };
+  return targets;
 }
 
 /**
@@ -1441,7 +1559,9 @@ function showTargetAnchors(
   state.targetAnchors = null;
   if (!pieceId) return;
 
-  const { points: positions } = snapTargets(state, pack, project, pieceId);
+  const positions = snapTargets(state, pack, project, pieceId).map(
+    (target) => target.position,
+  );
   if (positions.length === 0) return;
 
   // Every point starts cold. `paintProximity` warms them as the drag closes in.
@@ -1644,38 +1764,34 @@ function showAnchors(
   const group = state.groups.get(pieceId);
   if (!piece || !group) return;
 
-  const pivot = piece.pivot ?? [0, 0, 0];
   const marks = new THREE.Group();
 
   // The origin is its own object, drawn larger. There is one of it, and it is
   // the one you go looking for.
   marks.add(points([0, 0, 0], null, state.originDot));
 
-  const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
-  if (part) {
-    const positions: number[] = [];
-    const colours: number[] = [];
-    for (const anchor of localAnchors(part.bbox)) {
-      if (anchor.kind === "centre" && pivot.every((value) => value === 0)) {
-        // The middle and the origin coincide, and two dots in one place read
-        // as one dot of the wrong colour.
-        continue;
-      }
-      positions.push(
-        anchor.position[0] - pivot[0],
-        anchor.position[1] - pivot[1],
-        anchor.position[2] - pivot[2],
-      );
-      const colour = new THREE.Color(
-        anchor.kind === "corner" ? CORNER_COLOUR : FACE_COLOUR,
-      );
-      colours.push(colour.r, colour.g, colour.b);
+  const positions: number[] = [];
+  const colours: number[] = [];
+  for (const { anchor, position } of localAnchorsOf(pack, piece)) {
+    if (anchor.kind !== "custom" && position.every((v) => Math.abs(v) < 1e-6)) {
+      // The middle and the origin coincide, and two dots in one place read
+      // as one dot of the wrong colour. A custom anchor still draws there: it
+      // is a point someone put down, and it has to be visible to be moved.
+      continue;
     }
-    marks.add(points(positions, colours, state.dots));
+    positions.push(...position);
+    const colour = new THREE.Color(anchorColour(anchor.kind));
+    colours.push(colour.r, colour.g, colour.b);
   }
+  if (positions.length > 0) marks.add(points(positions, colours, state.dots));
 
   group.add(marks);
   state.anchors = marks;
+}
+
+function anchorColour(kind: Anchor["kind"]): number {
+  if (kind === "custom") return CUSTOM_COLOUR;
+  return kind === "corner" ? CORNER_COLOUR : FACE_COLOUR;
 }
 
 function points(

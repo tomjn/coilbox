@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { ROLES } from "../animPresets";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { subtreeAsCompound } from "../compounds";
@@ -47,6 +48,7 @@ import { canReparent, reparentPiece } from "../reparent";
 import { sitOnGround } from "../s3oBuild";
 import { isShortcut } from "../shortcuts";
 import { useLegoDocument } from "../useLegoDocument";
+import { AnchorList } from "./components/AnchorList";
 import { AnimationPanel } from "./components/AnimationPanel";
 import { AtlasPicker } from "./components/AtlasPicker";
 import { CompoundPicker } from "./components/CompoundPicker";
@@ -98,6 +100,8 @@ function Builder({ id }: { id: string | undefined }) {
   /** Shared between the viewport and the tree, so hovering a piece in either
    *  highlights it in the other. */
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  /** Whether the next click in the viewport drops a snap anchor. */
+  const [placingAnchor, setPlacingAnchor] = useState(false);
   const filter = usePartFilter(pack);
 
   useEffect(() => {
@@ -308,6 +312,28 @@ function Builder({ id }: { id: string | undefined }) {
   function movePivot(pieceId: string, pivot: [number, number, number]) {
     edit((project) => setPivot(project, pieceId, pivot));
   }
+
+  // Placing is one anchor at a time: the click is aimed at a spot, and staying
+  // armed afterwards would put a second anchor wherever the next click landed.
+  function placeAnchor(pieceId: string, position: [number, number, number]) {
+    edit((project) =>
+      addAnchor(project, pieceId, position, crypto.randomUUID()),
+    );
+    setPlacingAnchor(false);
+    // The panel follows the piece the anchor landed on, which is not
+    // necessarily the one that was selected when the click was armed.
+    setSelectedId(pieceId);
+  }
+
+  // Only while armed, so Escape keeps whatever it means everywhere else.
+  useEffect(() => {
+    if (!placingAnchor) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPlacingAnchor(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [placingAnchor]);
 
   async function copySelection() {
     if (!selectedId) return;
@@ -560,6 +586,9 @@ function Builder({ id }: { id: string | undefined }) {
               canSaveAsCompound={!!selectedId}
               onDelete={removeSelected}
               canDelete={!!selectedId && selectedId !== draft.rootPieceId}
+              placingAnchor={placingAnchor}
+              onPlaceAnchor={placeAnchor}
+              onCancelAnchor={() => setPlacingAnchor(false)}
             />
           </div>
 
@@ -825,6 +854,32 @@ function Builder({ id }: { id: string | undefined }) {
                       </p>
                     </div>
                   ) : null}
+
+                  <AnchorList
+                    piece={selected}
+                    placing={placingAnchor}
+                    onPlacingChange={setPlacingAnchor}
+                    onAddAtOrigin={() =>
+                      edit((project) =>
+                        addAnchor(
+                          project,
+                          selected.id,
+                          selected.pivot ?? [0, 0, 0],
+                          crypto.randomUUID(),
+                        ),
+                      )
+                    }
+                    onChange={(anchorId, change) =>
+                      edit((project) =>
+                        updateAnchor(project, selected.id, anchorId, change),
+                      )
+                    }
+                    onRemove={(anchorId) =>
+                      edit((project) =>
+                        removeAnchor(project, selected.id, anchorId),
+                      )
+                    }
+                  />
 
                   <div className="mt-2">
                     <span className="text-xs text-muted-foreground">Role</span>

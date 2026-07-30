@@ -61,7 +61,9 @@ describe("pieceAnchors", () => {
   });
 
   it("lets a piece with no part carry anchors too", () => {
-    const anchors = pieceAnchors(null, [{ name: "muzzle", position: [0, 0, 3] }]);
+    const anchors = pieceAnchors(null, [
+      { name: "muzzle", position: [0, 0, 3] },
+    ]);
 
     expect(anchors).toEqual([
       { position: [0, 0, 3], kind: "custom", name: "muzzle" },
