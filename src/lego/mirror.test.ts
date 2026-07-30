@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import { canMirror, mirrorPiece, mirrorRole } from "./mirror";
+import { canMirror, mirrorCopy, mirrorPiece, mirrorRole } from "./mirror";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import { worldMatrix } from "./reparent";
 
@@ -215,6 +215,82 @@ describe("mirrorPiece", () => {
     expect(pieceOf(mirrored, "flare").role).toBe("flare");
     // Outside the subtree, so untouched.
     expect(pieceOf(mirrored, "other").role).toBe("leg.l2.thigh");
+  });
+});
+
+describe("mirrorCopy", () => {
+  /** Ids in order, so a test can name the pieces the copy created. */
+  function counter(): () => string {
+    let n = 0;
+    return () => `new${n++}`;
+  }
+
+  const doc = project([
+    {
+      id: "thigh",
+      name: "thigh",
+      parentId: "root",
+      position: [2, 3, 0],
+      rotation: [0, 0, 0.3],
+      role: "leg.l1.thigh",
+    },
+    {
+      id: "foot",
+      name: "foot",
+      parentId: "thigh",
+      position: [0.8, -1.5, 0.6],
+    },
+  ]);
+
+  it("puts the copy where a mirror would, not at the parent's origin", () => {
+    const copy = mirrorCopy(doc, "thigh", counter());
+
+    expect(copy).not.toBeNull();
+    const mirrored = copy?.project as LegoProject;
+    // Lifting a subtree drops its root's transform, so this is the part that
+    // has to be put back before the reflection means anything.
+    expect(worldOrigin(mirrored, copy?.pieceId as string)).toEqual([-2, 3, 0]);
+    expect(worldOrigin(mirrored, "thigh")).toEqual([2, 3, 0]);
+  });
+
+  it("brings the subtree with it, reflected", () => {
+    const copy = mirrorCopy(doc, "thigh", counter()) as {
+      project: LegoProject;
+      pieceId: string;
+    };
+    const foot = copy.project.pieces.find((piece) => piece.name === "foot2");
+
+    expect(worldOrigin(copy.project, foot?.id as string)).toEqual(
+      worldOrigin(doc, "foot").map((n, axis) => (axis === 0 ? -n : n)),
+    );
+  });
+
+  it("leaves the original alone", () => {
+    const copy = mirrorCopy(doc, "thigh", counter()) as {
+      project: LegoProject;
+      pieceId: string;
+    };
+
+    expect(pieceOf(copy.project, "thigh")).toEqual(pieceOf(doc, "thigh"));
+    expect(pieceOf(copy.project, "foot")).toEqual(pieceOf(doc, "foot"));
+  });
+
+  it("names and hangs the copy the way duplicate already does", () => {
+    const copy = mirrorCopy(doc, "thigh", counter()) as {
+      project: LegoProject;
+      pieceId: string;
+    };
+    const added = pieceOf(copy.project, copy.pieceId);
+
+    expect(added.name).toBe("thigh2");
+    expect(added.parentId).toBe("root");
+    expect(added.role).toBe("leg.r1.thigh");
+    expect(copy.project.pieces).toHaveLength(doc.pieces.length + 2);
+  });
+
+  it("refuses a piece that cannot be mirrored", () => {
+    expect(mirrorCopy(doc, "root", counter())).toBeNull();
+    expect(mirrorCopy(doc, "ghost", counter())).toBeNull();
   });
 });
 

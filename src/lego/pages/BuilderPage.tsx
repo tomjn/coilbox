@@ -28,7 +28,7 @@ import { ROLES } from "../animPresets";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { subtreeAsCompound } from "../compounds";
 import { usePartFilter } from "../filter";
-import { canMirror, mirrorPiece } from "../mirror";
+import { canMirror, mirrorCopy, mirrorPiece } from "../mirror";
 import {
   childrenOf,
   descendantIds,
@@ -370,16 +370,13 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   // A copy, because the case this is for is one leg becoming the other and the
-  // first leg is meant to stay. Duplicating first means the naming, the new ids
-  // and the missing-part reporting are the ones paste and duplicate already
-  // use, rather than a third set. The two edits land inside the coalescing
-  // window, so one undo takes the mirrored copy away whole.
+  // first leg is meant to stay.
   function mirrorCopyOfSelection() {
-    if (!draft || !selectedId || selectedId === draft.rootPieceId) return;
-    const inserted = doc.duplicate(selectedId);
-    if (!inserted) return;
-    edit((project) => mirrorPiece(project, inserted));
-    setSelectedId(inserted);
+    if (!draft || !selectedId) return;
+    const copy = mirrorCopy(draft, selectedId, () => crypto.randomUUID());
+    if (!copy) return;
+    edit(() => copy.project);
+    setSelectedId(copy.pieceId);
   }
 
   // Rebound every render, so a shortcut always runs against the current

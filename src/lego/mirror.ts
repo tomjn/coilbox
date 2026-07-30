@@ -19,6 +19,7 @@
 
 import * as THREE from "three";
 
+import { insertCompound, subtreeAsCompound } from "./compounds";
 import {
   descendantIds,
   type LegoPiece,
@@ -124,5 +125,64 @@ export function mirrorPiece(
           }
         : sided;
     }),
+  };
+}
+
+/**
+ * Add a mirrored copy of a piece and its subtree beside the original.
+ *
+ * This is the leg case: the first leg stays and the second one is its
+ * reflection. The copy is lifted and put back through the same machinery the
+ * clipboard and duplicate use, so its new ids and its names come from one place
+ * rather than a third scheme of this file's own.
+ *
+ * Answers null when the piece cannot be mirrored, and otherwise the new
+ * document with the copy's own piece id.
+ */
+export function mirrorCopy(
+  project: LegoProject,
+  pieceId: string,
+  newId: () => string,
+): { project: LegoProject; pieceId: string } | null {
+  const source = pieceById(project, pieceId);
+  if (!source || !canMirror(project, pieceId)) return null;
+
+  // The compound in the middle is never stored, so its id and its timestamp are
+  // only there to satisfy the shape a saved one has.
+  const cutting = subtreeAsCompound(project, pieceId, {
+    id: newId(),
+    now: project.updatedAt,
+    newId,
+  });
+  if (!cutting) return null;
+
+  const inserted = insertCompound(
+    project,
+    cutting,
+    source.parentId ?? project.rootPieceId,
+    newId,
+  );
+
+  // Lifting drops the subtree root's transform, because a compound is defined
+  // by how its pieces sit against each other rather than by where it came from.
+  // A mirror has to start from where the original stands: reflecting a leg that
+  // had been dropped back at the hull's origin would not be the other leg.
+  const placed: LegoProject = {
+    ...inserted.project,
+    pieces: inserted.project.pieces.map((piece) =>
+      piece.id === inserted.rootPieceId
+        ? {
+            ...piece,
+            position: source.position,
+            rotation: source.rotation,
+            scale: source.scale,
+          }
+        : piece,
+    ),
+  };
+
+  return {
+    project: mirrorPiece(placed, inserted.rootPieceId),
+    pieceId: inserted.rootPieceId,
   };
 }
