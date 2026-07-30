@@ -472,7 +472,11 @@ function Builder({ id }: { id: string | undefined }) {
                       className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
                     />
                   </p>
-                  <AtlasPicker project={draft} pack={pack} onChange={setAtlas} />
+                  <AtlasPicker
+                    project={draft}
+                    pack={pack}
+                    onChange={setAtlas}
+                  />
                 </div>
               </div>
 
