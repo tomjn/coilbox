@@ -15,6 +15,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
   insertCompound,
   insertCompoundAt,
+  selectionAsCompound,
   subtreeAsCompound,
 } from "./compounds";
 import { emptyDocument, primarySelection, reduceDocument } from "./document";
@@ -41,14 +42,14 @@ export interface LegoDocumentSession {
   undo: () => void;
   redo: () => void;
   save: () => void;
-  /** Copies a piece and everything under it into a self-contained document,
-   *  ready to serialize onto the system clipboard. Null off the edge of the
-   *  document, same as everything else keyed by piece id. */
-  lift: (pieceId: string) => LegoProject | null;
+  /** Copies the given pieces and everything under them into a self-contained
+   *  document, ready to serialize onto the system clipboard. Null when none of
+   *  them are in the document, same as everything else keyed by piece id. */
+  lift: (pieceIds: string[]) => LegoProject | null;
   /** Replaces the selection with a whole set at once. */
   selectMany: (ids: string[]) => void;
-  /** Puts a subtree under `parentId`, answering with its new root piece. */
-  insert: (cutting: LegoProject, parentId: string) => string | null;
+  /** Puts a cutting under `parentId`, answering with its new root pieces. */
+  insert: (cutting: LegoProject, parentId: string) => string[];
   /** Copies each piece and its subtree alongside itself, in one edit, and
    *  answers the copies so the selection can move onto them. */
   duplicate: (pieceIds: string[]) => string[];
@@ -134,22 +135,24 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
    * lifted out and put back is the same operation whether it goes via the
    * system clipboard or straight back into the unit.
    */
-  function lift(pieceId: string): LegoProject | null {
+  function lift(pieceIds: string[]): LegoProject | null {
     if (!project) return null;
-    return subtreeAsCompound(project, pieceId, {
+    return selectionAsCompound(project, pieceIds, {
       id: crypto.randomUUID(),
       now: new Date().toISOString(),
       newId: () => crypto.randomUUID(),
     });
   }
 
-  function insert(cutting: LegoProject, parentId: string): string | null {
-    if (!project) return null;
+  function insert(cutting: LegoProject, parentId: string): string[] {
+    if (!project) return [];
     const inserted = insertCompound(project, cutting, parentId, () =>
       crypto.randomUUID(),
     );
+    // One edit however many roots the cutting has, so a paste of several pieces
+    // takes one undo step.
     edit(() => inserted.project);
-    return inserted.rootPieceId;
+    return inserted.rootPieceIds;
   }
 
   return {
