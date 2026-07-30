@@ -64,6 +64,12 @@ The **ground** is marked in elmos: fine lines every elmo near the origin, heavie
 
 The **reference unit**, the sun button in the bottom right, stands a real unit beside yours at its real size: Beyond All Reason's Armada solar collector, 43 elmos across and 29 tall. Anyone who plays these games has built hundreds of them. Its geometry is baked into coilbox rather than read out of an installed game, so it is there whatever you have installed. Attribution and licence are in `src/lego/reference/LICENCE.txt`.
 
+## Which way it faces
+
+A blue arrow on the ground, labelled **front**, marks model `+z`: the direction `Spring.GetUnitVectors` calls `frontdir`, pinned by the headless engine run on [issue #565](https://github.com/tomjn/coilbox/issues/565). Model `+y` is up, and model `+x` is the unit's left, being the negative of `rightdir`, not its right.
+
+Unlike the grid and the axes helper, this one has no toggle. Get a unit's facing wrong and the only way to find out used to be in a game, so it stays on rather than risking a builder forgetting to turn it back on.
+
 ## Roles and animation presets
 
 An animation preset is a canned motion. It does not ask you to key anything: it asks which piece is the turret, which is the barrel, which is the front left thigh. That is what a **role** is, and it is why roles are a fixed list rather than free text.
@@ -152,7 +158,7 @@ A unit coilbox exports cannot be played normally. Its unit definition sets `canm
 Three of them no longer need a machine that can draw. `spring-headless` runs a full simulation with no OpenGL context, and the engine's Lua tells you where it thinks every piece is, how big the unit is, and whether the unit script bound. An L-shaped probe unit, exported through the normal path and spawned twice at different facings, settled them:
 
 - **Handedness.** Spring derives a piece's emit position from its first two vertices, so `Spring.GetUnitPiecePosDir` returns a point predictable from the file alone. Every piece landed where the file says, to four decimal places, at both facings. The transform from model space to world space is a rotation, determinant +1, not a reflection. Nothing mirrors the model, including a piece scaled `-1, 1, 1`.
-- **Orientation.** Model `+z` is the unit's front, model `+y` is up, and model `+x` is the unit's left. The builder does not yet show that: [issue #680](https://github.com/tomjn/coilbox/issues/680).
+- **Orientation.** Model `+z` is the unit's front, model `+y` is up, and model `+x` is the unit's left. The builder marks this on the ground: see [Which way it faces](#which-way-it-faces).
 - **The selection volume.** `Spring.GetUnitRadius` and `GetUnitHeight` return the s3o header values exactly, and the engine's default collision volume is the smallest sphere containing the geometry. Sane, but a sphere is a generous click target for a long unit. Authoring a tighter one is [issue #605](https://github.com/tomjn/coilbox/issues/605).
 - **The infolog.** Nothing in it names the unit, its model or its script. `Spring.UnitScript.GetScriptEnv` returns an environment carrying exactly the call-ins the generated script declares, so the script loaded and bound rather than merely failing quietly.
 
