@@ -16,6 +16,7 @@
     "stars:catalogue": "bun scripts/build-star-catalogue.mjs && biome check --write src/conquest/realstars/catalogue.json",
     "lego:pack": "bun scripts/legopack/build.mjs",
     "lego:reads3o": "bun scripts/reads3o.mjs",
+    "lego:reference": "bun scripts/reference-model.mjs",
     "clean": "bash scripts/clean.sh",
     "check": "bash scripts/check.sh",
     "docs:dev": "vitepress dev docs",

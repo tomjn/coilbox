@@ -189,3 +189,13 @@ Coilbox's own code is MIT. It bundles **`pr-downloader`**, which is licensed
 separate process (a sidecar), i.e. mere aggregation — but redistributing the
 binary carries the GPL obligation to make its corresponding source available. The
 source is at <https://github.com/beyond-all-reason/pr-downloader>.
+
+### Bundled third-party assets
+
+Art in the repository is not covered by the MIT licence on the code. Each asset
+keeps its own terms in a `LICENCE.txt` beside it:
+
+| Asset | By | Licence |
+| --- | --- | --- |
+| `src/lego/reference/armsolar.json`, the unit builder's reference model, converted from [Beyond All Reason](https://github.com/beyond-all-reason/Beyond-All-Reason)'s `objects3d/Units/armsolar.s3o` | Cremuss | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), and so is anything derived from it |
+| `src-tauri/legoparts/`, the bundled unit builder parts pack, from [Splinter Faction](https://github.com/SplinterFaction/SplinterFaction) | Scary le poo | Reused with the author's permission |

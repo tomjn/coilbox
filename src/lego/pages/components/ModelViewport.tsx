@@ -25,9 +25,9 @@ import {
   Keyboard,
   Move,
   PackagePlus,
-  PersonStanding,
   RotateCw,
   Scaling,
+  Sun,
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -56,9 +56,9 @@ import {
 } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import {
-  buildReferenceFigure,
-  disposeReferenceFigure,
-  REFERENCE_HEIGHT_ELMOS,
+  buildReferenceUnit,
+  disposeReferenceUnit,
+  REFERENCE_OFFSET_X,
 } from "../../referenceObject";
 import { type BakedPiece, bakedPieces } from "../../s3oBuild";
 import { isShortcut } from "../../shortcuts";
@@ -271,8 +271,8 @@ export function ModelViewport({
       // A view aid, not a piece: sits beside where a unit is built rather
       // than under it, and is off by default so it never surprises anyone
       // opening a project for the first time.
-      const reference = buildReferenceFigure();
-      reference.position.set(-REFERENCE_HEIGHT_ELMOS, 0, 0);
+      const reference = buildReferenceUnit();
+      reference.position.set(REFERENCE_OFFSET_X, 0, 0);
       reference.visible = false;
       scene.add(reference);
 
@@ -560,7 +560,7 @@ export function ModelViewport({
           state.originDot.dispose();
           disposeBaked(state);
           grid.dispose();
-          disposeReferenceFigure(reference);
+          disposeReferenceUnit(reference);
           outline.dispose();
           sceneRef.current = null;
         },
@@ -879,11 +879,11 @@ export function ModelViewport({
           aria-pressed={showReference}
           title={
             showReference
-              ? "Hide the reference figure"
-              : "Show a reference figure for scale"
+              ? "Hide the reference unit"
+              : "Show a solar collector at its real size, for scale"
           }
         >
-          <PersonStanding className="size-4" />
+          <Sun className="size-4" />
         </Button>
         <Button
           size="icon"
