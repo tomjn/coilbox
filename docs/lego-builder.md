@@ -120,6 +120,25 @@ The one exception is coilbox's own scratch game, below, which is a throwaway and
 
 **What it deliberately does not write:** anything about the game around the unit. No weapon definitions, no cost, no build picture, no side or category, no movement class, and no edit to any other unit's `buildoptions`. Export puts a unit in a game folder. Making the game use it is your decision to make, in files you already own.
 
+## The collision volume
+
+The collision volume is the shape the engine hits, clicks and shoots at. It is not the model: a unit is selected, shot and blocked by its volume, whatever its geometry looks like.
+
+A unit definition that names no volume gets the engine's own, a sphere around the whole model, which for anything longer than it is wide is a much bigger click target than the unit looks. So export always writes one. By default it is the unit's own bounding box, which is the tighter of the two and needs no decision from you.
+
+The **Collision** tab beside Pieces and Animation shows what will be written, and lets you replace it. Pick a shape, then set its size and where it sits:
+
+- **Size** is the volume's full width on each axis, not its radius. The engine halves it.
+- **Offset** is measured from the middle of the unit, so zero is centred on it.
+
+Changing anything takes the volume over, and it is then saved with the unit. **Use the bounding box** hands it back, and the derived volume follows the geometry again as you build.
+
+Two shapes cannot be stretched, and the engine says so rather than the panel: a sphere takes the largest of the three sizes for every axis, and a cylinder takes the larger of the two across it for both. The viewport draws what the engine will end up with rather than what was typed.
+
+The box button in the viewport's camera group draws the volume as an orange wireframe, over the model, so the numbers have a shape.
+
+Nothing here is per piece. The engine can also collide a model piece by piece, which is a different job with a different answer, and coilbox does not write it.
+
 ## Test in game
 
 **Test in game** is the shortest honest route from a unit in the builder to a unit on a map. Everything else is a guess until the engine draws it.
@@ -159,7 +178,7 @@ Three of them no longer need a machine that can draw. `spring-headless` runs a f
 
 - **Handedness.** Spring derives a piece's emit position from its first two vertices, so `Spring.GetUnitPiecePosDir` returns a point predictable from the file alone. Every piece landed where the file says, to four decimal places, at both facings. The transform from model space to world space is a rotation, determinant +1, not a reflection. Nothing mirrors the model, including a piece scaled `-1, 1, 1`.
 - **Orientation.** Model `+z` is the unit's front, model `+y` is up, and model `+x` is the unit's left. The builder marks this on the ground: see [Which way it faces](#which-way-it-faces).
-- **The selection volume.** `Spring.GetUnitRadius` and `GetUnitHeight` return the s3o header values exactly, and the engine's default collision volume is the smallest sphere containing the geometry. Sane, but a sphere is a generous click target for a long unit. Authoring a tighter one is [issue #605](https://github.com/tomjn/coilbox/issues/605).
+- **The selection volume.** `Spring.GetUnitRadius` and `GetUnitHeight` return the s3o header values exactly, and the engine's default collision volume is the smallest sphere containing the geometry. Sane, but a sphere is a generous click target for a long unit, so an export now writes a volume of its own: see [The collision volume](#the-collision-volume).
 - **The infolog.** Nothing in it names the unit, its model or its script. `Spring.UnitScript.GetScriptEnv` returns an environment carrying exactly the call-ins the generated script declares, so the script loaded and bound rather than merely failing quietly.
 
 The two still outstanding both need pixels. Nobody has seen the unit drawn, and nothing has checked which part of the atlas each triangle samples. [Issue #563](https://github.com/tomjn/coilbox/issues/563) is the cheaper of the two to settle, because Blender needs no engine.

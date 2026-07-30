@@ -21,6 +21,44 @@ export interface LegoAnchor {
   position: [number, number, number];
 }
 
+/**
+ * The shapes the engine will build a collision volume out of.
+ *
+ * These exact strings because of how the engine reads them: `CollisionVolume`
+ * looks at the first character to pick the shape and the last to pick a
+ * cylinder's axis, and anything it does not recognise falls through to a
+ * sphere. `"cylx"` therefore has to keep both ends, and a typo like `"cube"`
+ * would quietly become a sphere rather than fail.
+ */
+export type CollisionVolumeType =
+  | "box"
+  | "sphere"
+  | "ellipsoid"
+  | "cylx"
+  | "cyly"
+  | "cylz";
+
+/** Every value `type` may take, for validating one that came off disk. */
+const COLLISION_VOLUME_TYPES: CollisionVolumeType[] = [
+  "box",
+  "sphere",
+  "ellipsoid",
+  "cylx",
+  "cyly",
+  "cylz",
+];
+
+export interface LegoCollisionVolume {
+  type: CollisionVolumeType;
+  /**
+   * The volume's full extent along x, y and z in elmos, not its radii: the
+   * engine halves these itself.
+   */
+  scales: [number, number, number];
+  /** From the middle of the model, which is the centre of its bounding box. */
+  offsets: [number, number, number];
+}
+
 export interface LegoPiece {
   id: string;
   /** Lower case, unique, and safe as a Lua local, because scripts use it as one. */
@@ -78,6 +116,12 @@ export interface LegoProject {
   radius?: number;
   height?: number;
   mid?: [number, number, number];
+  /**
+   * What the engine collides, clicks and shoots at. Absent means one derived
+   * from the model's bounding box, so a unit saved before this existed still
+   * opens and still exports a volume that fits it.
+   */
+  collisionVolume?: LegoCollisionVolume;
   unitDef?: Record<string, string | number | boolean>;
   notes?: string;
   /** Canned animations applied to this unit, from `animPresets.ts`. */
@@ -342,6 +386,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
   if (pieces.length === 0) return null;
 
   const mid = parseVec3(d.mid);
+  const collisionVolume = parseCollisionVolume(d.collisionVolume);
   const project: LegoProject = {
     schemaVersion: LEGO_SCHEMA_VERSION,
     id: d.id,
@@ -360,6 +405,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(typeof d.radius === "number" ? { radius: d.radius } : {}),
     ...(typeof d.height === "number" ? { height: d.height } : {}),
     ...(mid ? { mid } : {}),
+    ...(collisionVolume ? { collisionVolume } : {}),
     ...(typeof d.unitDef === "object" && d.unitDef !== null
       ? { unitDef: d.unitDef as Record<string, string | number | boolean> }
       : {}),
@@ -436,6 +482,23 @@ function parseApplied(
     }
   }
   return { presetId: a.presetId, params };
+}
+
+/**
+ * A collision volume that was set by hand.
+ *
+ * All three fields have to be there. A half-written one would be half derived
+ * and half set, with nothing to say which half, so it is dropped and the unit
+ * goes back to a volume derived from its own geometry.
+ */
+function parseCollisionVolume(value: unknown): LegoCollisionVolume | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const type = COLLISION_VOLUME_TYPES.find((known) => known === v.type);
+  const scales = parseVec3(v.scales);
+  const offsets = parseVec3(v.offsets);
+  if (!type || !scales || !offsets) return null;
+  return { type, scales, offsets };
 }
 
 function parseAnchor(raw: unknown): LegoAnchor | null {

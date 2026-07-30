@@ -277,6 +277,43 @@ describe("parseLegoProjectJson", () => {
     ).not.toHaveProperty("atlas");
   });
 
+  it("keeps a collision volume the unit was saved with", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      collisionVolume: {
+        type: "cylz" as const,
+        scales: [10, 10, 40] as [number, number, number],
+        offsets: [0, 2, 0] as [number, number, number],
+      },
+    };
+    expect(parseLegoProjectJson(JSON.stringify(doc))?.collisionVolume).toEqual(
+      doc.collisionVolume,
+    );
+  });
+
+  it("leaves a unit saved before volumes existed without one", () => {
+    // Absent rather than filled in, so the volume stays derived from whatever
+    // the unit's geometry is now rather than frozen at what it was on load.
+    expect(
+      parseLegoProjectJson(JSON.stringify(project([piece("root", null)]))),
+    ).not.toHaveProperty("collisionVolume");
+  });
+
+  it("drops a collision volume that is not a whole one", () => {
+    const doc = project([piece("root", null)]);
+    for (const broken of [
+      { type: "cube", scales: [1, 2, 3], offsets: [0, 0, 0] },
+      { type: "box", scales: [1, 2], offsets: [0, 0, 0] },
+      { type: "box", scales: [1, 2, 3] },
+    ]) {
+      expect(
+        parseLegoProjectJson(
+          JSON.stringify({ ...doc, collisionVolume: broken }),
+        ),
+      ).not.toHaveProperty("collisionVolume");
+    }
+  });
+
   it("puts pieces parent-first, for a document saved before that was true", () => {
     const doc = project([
       piece("root", null),

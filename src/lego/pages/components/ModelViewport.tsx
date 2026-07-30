@@ -19,6 +19,7 @@
 import { Button } from "@picoframe/frame";
 import {
   ArrowDownToLine,
+  Box,
   ClipboardPaste,
   Copy,
   FlipHorizontal2,
@@ -54,6 +55,7 @@ import {
   disposeGround,
   REFERENCE_PARK_X,
 } from "../../buildPlate";
+import { effectiveCollisionVolume, engineScales } from "../../collisionVolume";
 import {
   type BackdropId,
   backdropById,
@@ -73,6 +75,7 @@ import {
 import {
   descendantIds,
   isEffectivelyHidden,
+  type LegoCollisionVolume,
   type LegoPiece,
   type LegoProject,
   pieceById,
@@ -82,7 +85,7 @@ import {
   buildReferenceUnit,
   disposeReferenceUnit,
 } from "../../referenceObject";
-import { type BakedPiece, bakedPieces } from "../../s3oBuild";
+import { type BakedPiece, bakedPieces, unitBounds } from "../../s3oBuild";
 import { isShortcut } from "../../shortcuts";
 import {
   type Anchor,
@@ -148,6 +151,13 @@ const SEAT_COLOUR = 0x34d399;
 const SEAT_DOT = 11;
 /** A target anchor nothing is near. Warms towards `SEAT_COLOUR` on approach. */
 const TARGET_COLD = 0x64748b;
+/**
+ * The collision volume's wireframe. Orange because nothing else in the scene
+ * is: it is a reading about the unit rather than a part of it, so it has to be
+ * telling apart from the selection, the anchors and the front marker at a
+ * glance.
+ */
+const COLLISION_COLOUR = 0xf97316;
 
 /** Where the camera starts, and where Reset view puts it back. */
 const HOME_CAMERA: [number, number, number] = [9, 7, 11];
@@ -276,6 +286,7 @@ export function ModelViewport({
   const [snappedTo, setSnappedTo] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showReference, setShowReference] = useState(false);
+  const [showCollision, setShowCollision] = useState(false);
   // View settings, held for as long as the viewport is open and no longer,
   // exactly as the two above are. Both open on what the builder has always
   // shown, so nothing about opening a project changes.
@@ -356,6 +367,17 @@ export function ModelViewport({
       reference.position.set(REFERENCE_PARK_X, 0, 0);
       reference.visible = false;
       scene.add(reference);
+
+      // The collision volume's wireframe. Drawn over everything rather than
+      // depth-tested, because a volume set smaller than the unit sits inside
+      // the geometry and would otherwise be invisible exactly when its size is
+      // the thing being checked.
+      const collisionMaterial = new THREE.LineBasicMaterial({
+        color: COLLISION_COLOUR,
+        transparent: true,
+        opacity: 0.9,
+        depthTest: false,
+      });
 
       const root = new THREE.Group();
       scene.add(root);
@@ -456,6 +478,8 @@ export function ModelViewport({
         grid,
         axes,
         reference,
+        collision: null,
+        collisionMaterial,
         sky: null,
         terrain: null,
         groups: new Map(),
@@ -667,6 +691,8 @@ export function ModelViewport({
           state.sky?.texture.dispose();
           if (state.terrain) disposeTerrain(state.terrain);
           disposeReferenceUnit(reference);
+          state.collision?.geometry.dispose();
+          collisionMaterial.dispose();
           sceneRef.current = null;
         },
       };
@@ -756,6 +782,15 @@ export function ModelViewport({
     state.reference.visible = showReference;
     state.render();
   }, [showReference]);
+
+  // Follows the document as well as the toggle: the derived volume is the
+  // unit's own bounding box, so it changes every time a piece does.
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    showCollisionVolume(state, showCollision ? project : null, pack);
+    state.render();
+  }, [showCollision, project, pack]);
 
   useEffect(() => {
     const state = sceneRef.current;
@@ -1015,6 +1050,19 @@ export function ModelViewport({
         >
           <Grid3x3 className="size-4" />
         </Button>
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={() => setShowCollision(!showCollision)}
+          aria-pressed={showCollision}
+          title={
+            showCollision
+              ? "Hide the collision volume"
+              : "Show the collision volume, the shape the engine hits and clicks"
+          }
+        >
+          <Box className="size-4" />
+        </Button>
         <EnvironmentPicker
           backdrop={backdrop}
           onBackdrop={setBackdrop}
@@ -1230,6 +1278,11 @@ interface SceneState {
   /** A scale figure beside the build, switched off by default. A view aid
    *  like `grid` and `axes`: never part of the project, never exported. */
   reference: THREE.Group;
+  /** The collision volume's wireframe, while it is being shown. Rebuilt on
+   *  every change rather than rescaled, because the shape itself changes with
+   *  the volume's type, and null the rest of the time. */
+  collision: THREE.LineSegments | null;
+  collisionMaterial: THREE.LineBasicMaterial;
   /** The sky now drawn, and which backdrop built it, so going back to one
    *  already seen does not draw its gradient again. Null while the plain
    *  backdrop shows, which is what the canvas does with no background at all. */
@@ -1308,6 +1361,99 @@ function applyBackdrop(state: SceneState, id: BackdropId) {
   const texture = skyTexture(backdropById(id));
   state.scene.background = texture;
   if (texture) state.sky = { id, texture };
+}
+
+/**
+ * Draw the collision volume the export would write, or take it away again.
+ *
+ * The volume is positioned from the model's middle, because that is where the
+ * engine measures its offsets from, so a volume with no offset sits on the
+ * middle of the unit's bounding box exactly as it will in a game.
+ *
+ * A null project means "not showing", which is also what leaves nothing behind
+ * to keep in step with the document.
+ */
+function showCollisionVolume(
+  state: SceneState,
+  project: LegoProject | null,
+  pack: LoadedPack,
+) {
+  if (state.collision) {
+    state.collision.geometry.dispose();
+    state.collision.removeFromParent();
+    state.collision = null;
+  }
+  if (!project) return;
+
+  const bounds = unitBounds(project, pack);
+  const volume = effectiveCollisionVolume(project, bounds);
+  const lines = new THREE.LineSegments(
+    collisionWireframe(volume),
+    state.collisionMaterial,
+  );
+  lines.position.set(
+    bounds.mid[0] + volume.offsets[0],
+    bounds.mid[1] + volume.offsets[1],
+    bounds.mid[2] + volume.offsets[2],
+  );
+  // Over the model, to match the material's own `depthTest: false`.
+  lines.renderOrder = 4;
+  lines.raycast = () => {};
+  state.collision = lines;
+  state.scene.add(lines);
+}
+
+/**
+ * A volume as lines, built from the scales the engine will actually use rather
+ * than the ones typed, so the wireframe is not a rounder or squarer shape than
+ * the one a game gets.
+ *
+ * A box and a cylinder are drawn as their edges, which is the outline you would
+ * draw by hand. A sphere has no edges to find, so that one is the full mesh
+ * wireframe.
+ */
+function collisionWireframe(volume: LegoCollisionVolume): THREE.BufferGeometry {
+  const solid = collisionSolid(volume);
+  const round = volume.type === "sphere" || volume.type === "ellipsoid";
+  const lines = round
+    ? new THREE.WireframeGeometry(solid)
+    : new THREE.EdgesGeometry(solid);
+  solid.dispose();
+  return lines;
+}
+
+/** The volume as a solid, centred on itself, for the lines to come off. */
+function collisionSolid(volume: LegoCollisionVolume): THREE.BufferGeometry {
+  const [x, y, z] = engineScales(volume);
+  switch (volume.type) {
+    case "box":
+      return new THREE.BoxGeometry(x, y, z);
+    case "cylx":
+    case "cyly":
+    case "cylz": {
+      // Three.js builds a cylinder along y, so the other two axes turn onto it.
+      // `engineScales` has already made the cross-section round, so either of
+      // the two axes across the volume gives its diameter.
+      const along = volume.type === "cylx" ? x : volume.type === "cyly" ? y : z;
+      const across = volume.type === "cylx" ? y : x;
+      const solid = new THREE.CylinderGeometry(
+        across / 2,
+        across / 2,
+        along,
+        16,
+      );
+      if (volume.type === "cylx") solid.rotateZ(Math.PI / 2);
+      if (volume.type === "cylz") solid.rotateX(Math.PI / 2);
+      return solid;
+    }
+    default: {
+      // One sphere scaled per axis, which is what an ellipsoid is. A sphere
+      // arrives here with all three already equal.
+      const solid = new THREE.SphereGeometry(0.5, 16, 10);
+      solid.scale(x, y, z);
+      return solid;
+    }
+  }
 }
 
 /** Put the solid ground under the markings, or take it away again. */

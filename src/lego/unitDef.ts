@@ -19,7 +19,9 @@
  * unit that silently does not exist.
  */
 
+import { effectiveCollisionVolume } from "./collisionVolume";
 import type { LegoProject } from "./model";
+import type { UnitBounds } from "./s3oBuild";
 
 /**
  * World units (elmos) per footprint step. The blocking map's square is two of
@@ -38,11 +40,12 @@ export function luaString(value: string): string {
 }
 
 /**
- * `sizeX` and `sizeZ` are the model's world-space bounding-box extent along
- * each ground axis, in elmos, as `buildS3o`'s header measures them. Each axis
- * gets its own footprint step rather than one step shared from a collision
- * radius, so a unit longer than it is wide claims a rectangle of ground
- * rather than the square that would fit its longest axis.
+ * `bounds` is the model's world-space bounding box, in elmos, as `buildS3o`'s
+ * header measures it. Both the footprint and the collision volume come off it.
+ *
+ * Each footprint axis gets its own step rather than one step shared from a
+ * collision radius, so a unit longer than it is wide claims a rectangle of
+ * ground rather than the square that would fit its longest axis.
  *
  * This measures the whole bounding box, including anything that sticks out
  * such as a gun barrel or an aerial. A real game would usually trim those
@@ -56,13 +59,17 @@ export function luaString(value: string): string {
  * footprint too small to contain it. Rounding up always wastes a little
  * space instead, which is the safer failure. A unit smaller than one step
  * still gets at least 1, matching the engine's own minimum.
+ *
+ * The three `collisionvolume` keys are the flat form the engine reads in
+ * `SolidObjectDef::ParseCollisionVolume`, not the `collisionVolume = { }`
+ * subtable beside it: that one reads `type` as a number, so a shape named
+ * there as a string quietly becomes a sphere. What goes in them is
+ * `collisionVolume.ts`.
  */
-export function buildUnitDef(
-  project: LegoProject,
-  size: { x: number; z: number },
-): string {
-  const footprintx = footprintSteps(size.x);
-  const footprintz = footprintSteps(size.z);
+export function buildUnitDef(project: LegoProject, bounds: UnitBounds): string {
+  const footprintx = footprintSteps(bounds.sizeX);
+  const footprintz = footprintSteps(bounds.sizeZ);
+  const volume = effectiveCollisionVolume(project, bounds);
 
   const fields: [string, string][] = [
     ["name", luaString(project.name)],
@@ -74,6 +81,9 @@ export function buildUnitDef(
     ["script", luaString(`${project.unitName}.lua`)],
     ["footprintx", String(footprintx)],
     ["footprintz", String(footprintz)],
+    ["collisionvolumetype", luaString(volume.type)],
+    ["collisionvolumescales", luaString(luaFloat3(volume.scales))],
+    ["collisionvolumeoffsets", luaString(luaFloat3(volume.offsets))],
     ["maxdamage", String(DEFAULT_MAX_DAMAGE)],
     ["canmove", "false"],
   ];
@@ -101,4 +111,15 @@ export function buildUnitDef(
  */
 function footprintSteps(size: number): number {
   return Math.max(1, Math.ceil(size / ELMOS_PER_FOOTPRINT - 1e-9));
+}
+
+/**
+ * Three numbers the way the engine's `GetFloat3` reads them: "x y z". It takes
+ * either this or a table of three, and this is the form shipped games write.
+ *
+ * Rounded to a thousandth of an elmo, which is far below anything a collision
+ * volume can express, so the file stays readable.
+ */
+function luaFloat3(values: [number, number, number]): string {
+  return values.map((value) => Number(value.toFixed(3))).join(" ");
 }
