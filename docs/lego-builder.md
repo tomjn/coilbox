@@ -133,9 +133,11 @@ The **Collision** tab beside Pieces and Animation shows what will be written, an
 
 Changing anything takes the volume over, and it is then saved with the unit. **Use the bounding box** hands it back, and the derived volume follows the geometry again as you build.
 
-Two shapes cannot be stretched, and the engine says so rather than the panel: a sphere takes the largest of the three sizes for every axis, and a cylinder takes the larger of the two across it for both. The viewport draws what the engine will end up with rather than what was typed.
+You do not have to type any of it. While the Collision tab is open the viewport's move and scale handles are on the volume rather than on a piece, so you can drag it to size and watch the numbers follow. There is no rotate handle, because a volume has no rotation: the engine measures it along the model's own axes.
 
-The box button in the viewport's camera group draws the volume as an orange wireframe, over the model, so the numbers have a shape.
+Two shapes cannot be stretched, and the engine says so rather than the panel: a sphere takes the largest of the three sizes for every axis, and a cylinder takes the larger of the two across it for both. The viewport draws what the engine will end up with rather than what was typed, so a sphere dragged out on one axis comes back round.
+
+The box button in the viewport's camera group draws the volume as an orange wireframe, over the model, so you can keep an eye on it while building rather than only while setting it.
 
 Nothing here is per piece. The engine can also collide a model piece by piece, which is a different job with a different answer, and coilbox does not write it.
 

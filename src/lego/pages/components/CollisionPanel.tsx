@@ -91,6 +91,12 @@ export function CollisionPanel({ project, pack, onChange }: Props) {
         is measured from the middle of the unit, so zero is centred on it.
       </p>
 
+      <p className="text-xs text-muted-foreground">
+        While this panel is open the viewport's handles are on the volume rather
+        than on a piece, so you can drag it to size instead of typing. Move and
+        scale only: a volume has no rotation.
+      </p>
+
       {volume.type === "sphere" ? (
         <p className="text-xs text-muted-foreground">
           A sphere cannot be stretched, so the engine takes the largest of the

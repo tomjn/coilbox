@@ -807,6 +807,13 @@ function Builder({ id }: { id: string | undefined }) {
               placingAnchor={placingAnchor}
               onPlaceAnchor={placeAnchor}
               onCancelAnchor={() => setPlacingAnchor(false)}
+              // The panel is where a volume is read and changed, so opening it
+              // is what puts the handles on the volume. Nothing else has to be
+              // switched on, and closing it gives them back to the pieces.
+              editCollision={aside === "collision"}
+              onCollisionChange={(collisionVolume) =>
+                edit((project) => ({ ...project, collisionVolume }))
+              }
             />
           </div>
 
