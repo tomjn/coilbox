@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   canMirror,
   canMirrorTwin,
+  followMirror,
   mirrorCopy,
   mirrorParent,
   mirrorPiece,
@@ -405,14 +406,23 @@ describe("mirrorTwin", () => {
     return () => `new${n++}`;
   }
 
+  /** The document and the twin's id, for a call that was meant to succeed. */
+  function twinOf(
+    doc: LegoProject,
+    pieceId: string,
+  ): { project: LegoProject; twinId: string } {
+    const twinned = mirrorTwin(doc, pieceId, counter());
+    if (!twinned) throw new Error(`${pieceId} was not twinned`);
+    return twinned;
+  }
+
   it("puts the twin across the centre line", () => {
     const doc = project([{ id: "leg", name: "leg", position: [2, 1, 3] }]);
 
-    const twinned = mirrorTwin(doc, "leg", counter());
-    const twin = twinned.pieces.find((piece) => piece.name === "leg2");
+    const { project: twinned, twinId } = twinOf(doc, "leg");
 
     expect(twinned.pieces).toHaveLength(doc.pieces.length + 1);
-    expect(worldOrigin(twinned, twin?.id as string)).toEqual([-2, 1, 3]);
+    expect(worldOrigin(twinned, twinId)).toEqual([-2, 1, 3]);
   });
 
   it("reflects the twin rather than sliding a copy sideways", () => {
@@ -425,29 +435,56 @@ describe("mirrorTwin", () => {
       },
     ]);
 
-    const twinned = mirrorTwin(doc, "arm", counter());
-    const twin = twinned.pieces.find(
-      (piece) => piece.name === "arm2",
-    ) as LegoPiece;
+    const { project: twinned, twinId } = twinOf(doc, "arm");
 
     // A point out along the arm's own +z lands at the mirror image of where the
     // original's does, which a copy at -x with the same turn would not.
-    expect(worldPoint(twinned, twin.id, [0, 0, 1])).toEqual(
+    expect(worldPoint(twinned, twinId, [0, 0, 1])).toEqual(
       worldPoint(doc, "arm", [0, 0, 1]).map((n, axis) => (axis === 0 ? -n : n)),
     );
-    expect(worldMatrix(twinned, twin.id).determinant()).toBeLessThan(0);
+    expect(worldMatrix(twinned, twinId).determinant()).toBeLessThan(0);
   });
 
   it("hangs the twin off the parent's own reflection", () => {
-    const doc = project([{ id: "left", name: "left", position: [3, 4, 0] }]);
-    const legs = (
-      mirrorCopy(doc, "left", () => "right") as { project: LegoProject }
-    ).project;
+    const { project: legs, shin } = leggedUnit();
     const rightThigh = legs.pieces.find(
       (piece) => piece.name === "left2",
     ) as LegoPiece;
-    // A shin added to the left thigh while symmetry is on, then placed.
-    const withShin = {
+
+    const { project: twinned, twinId } = twinOf(legs, shin);
+
+    expect(pieceOf(twinned, twinId).parentId).toBe(rightThigh.id);
+    expect(worldOrigin(twinned, "shin")).toEqual([3.5, 2, 0]);
+    expect(worldOrigin(twinned, twinId)).toEqual([-3.5, 2, 0]);
+  });
+
+  it("gives no twin to a piece on the centre line", () => {
+    const doc = project([{ id: "hull", position: [0, 2, 0] }]);
+
+    expect(mirrorTwin(doc, "hull", counter())).toBeNull();
+    expect(canMirrorTwin(doc, "hull")).toBe(false);
+  });
+
+  it("gives no twin to the root or to a piece that is not there", () => {
+    const doc = project([{ id: "leg", position: [2, 0, 0] }]);
+
+    expect(mirrorTwin(doc, "root", counter())).toBeNull();
+    expect(mirrorTwin(doc, "ghost", counter())).toBeNull();
+    expect(canMirrorTwin(doc, "leg")).toBe(true);
+  });
+});
+
+/**
+ * A left thigh, its mirror image, and a shin hanging off the left one: the
+ * shape symmetry mode is working in once a leg has been mirrored.
+ */
+function leggedUnit(): { project: LegoProject; shin: string } {
+  const doc = project([{ id: "left", name: "left", position: [3, 4, 0] }]);
+  const legs = (
+    mirrorCopy(doc, "left", () => "right") as { project: LegoProject }
+  ).project;
+  return {
+    project: {
       ...legs,
       pieces: [
         ...legs.pieces,
@@ -460,31 +497,109 @@ describe("mirrorTwin", () => {
           rotation: [0, 0, 0] as [number, number, number],
         },
       ],
+    },
+    shin: "shin",
+  };
+}
+
+describe("followMirror", () => {
+  /** A piece at [2, 0, 0] and the twin that was made from it. */
+  function pair(): { project: LegoProject; twinId: string } {
+    const doc = project([{ id: "leg", name: "leg", position: [2, 0, 0] }]);
+    const twinned = mirrorTwin(doc, "leg", () => "twin");
+    if (!twinned) throw new Error("leg was not twinned");
+    return twinned;
+  }
+
+  /** The same document with one piece moved, as a drag would leave it. */
+  function moveTo(
+    doc: LegoProject,
+    pieceId: string,
+    position: [number, number, number],
+  ): LegoProject {
+    return {
+      ...doc,
+      pieces: doc.pieces.map((piece) =>
+        piece.id === pieceId ? { ...piece, position } : piece,
+      ),
+    };
+  }
+
+  it("takes the twin to the mirror of where its counterpart went", () => {
+    const { project: doc, twinId } = pair();
+
+    const moved = followMirror(moveTo(doc, "leg", [5, 1, 2]), "leg", twinId);
+
+    expect(worldOrigin(moved, "leg")).toEqual([5, 1, 2]);
+    expect(worldOrigin(moved, twinId)).toEqual([-5, 1, 2]);
+  });
+
+  it("keeps the twin a reflection rather than a copy, as it follows", () => {
+    const { project: doc, twinId } = pair();
+    const turned = {
+      ...doc,
+      pieces: doc.pieces.map((piece) =>
+        piece.id === "leg"
+          ? {
+              ...piece,
+              rotation: [0, Math.PI / 3, 0] as [number, number, number],
+            }
+          : piece,
+      ),
     };
 
-    const twinned = mirrorTwin(withShin, "shin", counter());
-    const twin = twinned.pieces.find(
-      (piece) => piece.name === "shin2",
-    ) as LegoPiece;
+    const moved = followMirror(turned, "leg", twinId);
 
-    expect(twin.parentId).toBe(rightThigh.id);
-    expect(worldOrigin(twinned, "shin")).toEqual([3.5, 2, 0]);
-    expect(worldOrigin(twinned, twin.id)).toEqual([-3.5, 2, 0]);
+    expect(worldPoint(moved, twinId, [0, 0, 1])).toEqual(
+      worldPoint(moved, "leg", [0, 0, 1]).map((n, axis) =>
+        axis === 0 ? -n : n,
+      ),
+    );
+    expect(worldMatrix(moved, twinId).determinant()).toBeLessThan(0);
   });
 
-  it("gives no twin to a piece on the centre line", () => {
-    const doc = project([{ id: "hull", position: [0, 2, 0] }]);
+  it("carries the twin's own subtree with it", () => {
+    const { project: doc, twinId } = pair();
+    const withFoot = {
+      ...doc,
+      pieces: [
+        ...doc.pieces,
+        {
+          ...pieceOf(doc, twinId),
+          id: "foot",
+          name: "foot",
+          parentId: twinId,
+          position: [0, -1, 0] as [number, number, number],
+          scale: [1, 1, 1] as [number, number, number],
+        },
+      ],
+    };
 
-    expect(mirrorTwin(doc, "hull", counter())).toBe(doc);
-    expect(canMirrorTwin(doc, "hull")).toBe(false);
+    const moved = followMirror(
+      moveTo(withFoot, "leg", [6, 0, 0]),
+      "leg",
+      twinId,
+    );
+
+    // The foot is positioned against the twin, so following moves it too.
+    expect(worldOrigin(moved, "foot")).toEqual([-6, -1, 0]);
   });
 
-  it("gives no twin to the root or to a piece that is not there", () => {
-    const doc = project([{ id: "leg", position: [2, 0, 0] }]);
+  it("leaves a pair alone once either piece has gone", () => {
+    const { project: doc, twinId } = pair();
+    const deleted = {
+      ...doc,
+      pieces: doc.pieces.filter((piece) => piece.id !== twinId),
+    };
 
-    expect(mirrorTwin(doc, "root", counter())).toBe(doc);
-    expect(mirrorTwin(doc, "ghost", counter())).toBe(doc);
-    expect(canMirrorTwin(doc, "leg")).toBe(true);
+    expect(followMirror(deleted, "leg", twinId)).toBe(deleted);
+    expect(followMirror(doc, "ghost", twinId)).toBe(doc);
+  });
+
+  it("refuses to move the root, which is the frame the mirror is measured in", () => {
+    const { project: doc } = pair();
+
+    expect(followMirror(doc, "leg", "root")).toBe(doc);
   });
 });
 

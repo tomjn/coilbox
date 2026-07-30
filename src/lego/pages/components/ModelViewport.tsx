@@ -934,7 +934,8 @@ export function ModelViewport({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  Symmetry: mirror new pieces as they are placed (M)
+                  Symmetry: a new piece gets a twin, which follows it for as
+                  long as it stays selected (M)
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
