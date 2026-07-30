@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {
+  buildFrontMarker,
   buildGround,
+  disposeFrontMarker,
   disposeGround,
   GROUND_ELMOS,
   PLATE_FOOTPRINTS,
@@ -97,5 +99,53 @@ describe("buildGround", () => {
 describe("disposeGround", () => {
   it("does not throw on freshly built ground", () => {
     expect(() => disposeGround(buildGround())).not.toThrow();
+  });
+});
+
+describe("buildFrontMarker", () => {
+  it("points the arrow at model +z, not some other axis", () => {
+    const [arrow] = buildFrontMarker().children.filter(
+      (child) => child.name === "front-arrow",
+    );
+    const box = new THREE.Box3().setFromObject(arrow);
+    // Its whole length lies ahead of the origin, along +z, centred on x = 0.
+    expect(box.min.z).toBeGreaterThan(0);
+    expect(box.max.z).toBeGreaterThan(box.min.z);
+    expect(box.min.x + box.max.x).toBeCloseTo(0, 5);
+  });
+
+  it("writes the label past the arrow's tip, not on top of it", () => {
+    const group = buildFrontMarker();
+    const [arrow] = group.children.filter(
+      (child) => child.name === "front-arrow",
+    );
+    const [label] = group.children.filter(
+      (child) => child.name === "front-label",
+    );
+    const arrowTip = new THREE.Box3().setFromObject(arrow).max.z;
+    const labelBox = new THREE.Box3().setFromObject(label);
+    expect(labelBox.min.z).toBeGreaterThanOrEqual(arrowTip);
+  });
+
+  it("lies flat on the ground, like the plates", () => {
+    for (const child of buildFrontMarker().children) {
+      const box = new THREE.Box3().setFromObject(child);
+      expect(box.min.y).toBeGreaterThan(0);
+      expect(box.max.y).toBeLessThan(0.1);
+    }
+  });
+
+  it("draws see-through, like the rest of the ground", () => {
+    for (const child of buildFrontMarker().children) {
+      const material = (child as THREE.Mesh).material as THREE.Material;
+      expect(material.transparent).toBe(true);
+      expect(material.opacity).toBeLessThan(1);
+    }
+  });
+});
+
+describe("disposeFrontMarker", () => {
+  it("does not throw on a freshly built marker", () => {
+    expect(() => disposeFrontMarker(buildFrontMarker())).not.toThrow();
   });
 });

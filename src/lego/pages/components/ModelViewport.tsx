@@ -46,7 +46,13 @@ import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { type AnimPreset, presetById } from "../../animPresets";
 import { unitAtlas } from "../../atlas";
-import { buildGround, disposeGround, REFERENCE_PARK_X } from "../../buildPlate";
+import {
+  buildFrontMarker,
+  buildGround,
+  disposeFrontMarker,
+  disposeGround,
+  REFERENCE_PARK_X,
+} from "../../buildPlate";
 import {
   type BackdropId,
   backdropById,
@@ -326,6 +332,12 @@ export function ModelViewport({
       const axes = new THREE.AxesHelper(2);
       axes.position.y = 0.01;
       scene.add(axes);
+
+      // Which way the unit faces. Not part of the grid toggle below: a
+      // decluttered view still has to say which way is front, since that is
+      // the one thing here a builder cannot re-check once it is missed.
+      const frontMarker = buildFrontMarker();
+      scene.add(frontMarker);
 
       // A view aid, not a piece: sits beside where a unit is built rather
       // than under it, and is off by default so it never surprises anyone
@@ -641,6 +653,7 @@ export function ModelViewport({
           state.originDot.dispose();
           disposeBaked(state);
           disposeGround(grid);
+          disposeFrontMarker(frontMarker);
           state.sky?.texture.dispose();
           if (state.terrain) disposeTerrain(state.terrain);
           disposeReferenceUnit(reference);

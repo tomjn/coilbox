@@ -239,6 +239,144 @@ function flatten(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
   return geometry;
 }
 
+/**
+ * Which way the unit faces, and the colour it is drawn in: the same blue the
+ * viewport's axis compass draws `+z` in, so the two agree about which axis
+ * this is rather than introducing a colour of its own.
+ */
+const FRONT_COLOUR = 0x60a5fa;
+const FRONT_OPACITY = 0.85;
+
+/** Where the front marker starts, in elmos: exactly where the viewport's own
+ *  `THREE.AxesHelper(2)` arm ends, so the two do not draw over each other. */
+const FRONT_ARROW_START = 2;
+/** Where the shaft gives way to the arrowhead. */
+const FRONT_ARROW_HEAD_START = 5;
+/** The tip, landing on the `1x1` plate's edge: the smallest footprint marked,
+ *  so the arrow reads as pointing at something rather than trailing into
+ *  empty ground. */
+const FRONT_ARROW_TIP = ELMOS_PER_FOOTPRINT / 2;
+const FRONT_ARROW_SHAFT_WIDTH = 0.5;
+const FRONT_ARROW_HEAD_WIDTH = 1.2;
+
+/** The label past the tip: how far clear of it, and how tall. Sized against
+ *  the same scale the plate labels read at, rather than the plate's own
+ *  footprint, because this marker is not tied to any one footprint. */
+const FRONT_LABEL_GAP = 0.6;
+const FRONT_LABEL_HEIGHT = 1.4;
+
+/**
+ * Marks the unit's front on the ground: an arrow along model `+z`, with the
+ * word "front" written past its tip.
+ *
+ * Pinned by the headless engine run on issue #565: model `+z` is what
+ * `Spring.GetUnitVectors` calls `frontdir`, `+y` is up, and `+x` is the
+ * unit's left, being the negative of `rightdir`. None of that is obvious
+ * from the axes helper alone, and getting it wrong means a unit built
+ * entirely backwards, found out only once it is in a game.
+ *
+ * Always visible, unlike the grid and the axes helper it sits beside. Those
+ * are decluttering toggles for markings a builder can always re-derive by
+ * looking at the unit. This is the one fact in the scene that cannot be
+ * checked at all once it is missed, so it does not earn a toggle to forget.
+ */
+export function buildFrontMarker(): THREE.Group {
+  const group = new THREE.Group();
+
+  const arrowMaterial = new THREE.MeshBasicMaterial({
+    color: FRONT_COLOUR,
+    transparent: true,
+    opacity: FRONT_OPACITY,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const arrow = new THREE.Mesh(frontArrowGeometry(), arrowMaterial);
+  arrow.name = "front-arrow";
+  group.add(arrow);
+
+  group.add(frontLabel());
+
+  for (const child of group.children) child.raycast = () => {};
+  return group;
+}
+
+/**
+ * A flat chevron built straight in world `x`/`z`, rather than through
+ * `flatten`'s xy-plane-then-rotate route. That route exists to keep text
+ * drawn on a canvas the right way up, which does not apply to a shape with
+ * no "up" of its own, and an arrow's direction is exactly the kind of thing
+ * a sign-flip in a rotation would get backwards without anyone noticing.
+ */
+function frontArrowGeometry(): THREE.BufferGeometry {
+  const halfShaft = FRONT_ARROW_SHAFT_WIDTH / 2;
+  const halfHead = FRONT_ARROW_HEAD_WIDTH / 2;
+
+  // Two triangles for the shaft, one for the head, wound so the visible
+  // face looks up. `DoubleSide` makes the winding immaterial to rendering,
+  // but a consistent one matches every other flat mesh this file builds.
+  // biome-ignore format: laid out one vertex per line, in triangles, reads
+  // as the shape rather than as a wall of numbers.
+  const vertices = [
+    -halfShaft, PLATE_Y, FRONT_ARROW_START,
+     halfShaft, PLATE_Y, FRONT_ARROW_START,
+     halfShaft, PLATE_Y, FRONT_ARROW_HEAD_START,
+
+    -halfShaft, PLATE_Y, FRONT_ARROW_START,
+     halfShaft, PLATE_Y, FRONT_ARROW_HEAD_START,
+    -halfShaft, PLATE_Y, FRONT_ARROW_HEAD_START,
+
+    -halfHead, PLATE_Y, FRONT_ARROW_HEAD_START,
+     halfHead, PLATE_Y, FRONT_ARROW_HEAD_START,
+             0, PLATE_Y, FRONT_ARROW_TIP,
+  ];
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(vertices, 3),
+  );
+  return geometry;
+}
+
+/** The word "front", past the arrow's tip. Built the same way as a plate's
+ *  label: text drawn on a canvas so it is real typography at any size, laid
+ *  flat with `flatten`, which is exactly the xy-plane-then-rotate route the
+ *  arrow avoids, because text has an "up" that has to survive the rotation
+ *  and a plain quad has no direction of its own to get backwards. */
+function frontLabel(): THREE.Mesh {
+  const drawn = drawLabel("front");
+  const width = FRONT_LABEL_HEIGHT * drawn.aspect;
+
+  const geometry = flatten(new THREE.PlaneGeometry(width, FRONT_LABEL_HEIGHT));
+  geometry.translate(
+    0,
+    0,
+    FRONT_ARROW_TIP + FRONT_LABEL_GAP + FRONT_LABEL_HEIGHT / 2,
+  );
+
+  const material = new THREE.MeshBasicMaterial({
+    color: FRONT_COLOUR,
+    map: drawn.texture,
+    transparent: true,
+    opacity: FRONT_OPACITY,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "front-label";
+  return mesh;
+}
+
+/** Frees the geometry and materials `buildFrontMarker` allocated. */
+export function disposeFrontMarker(group: THREE.Group): void {
+  for (const child of group.children) {
+    if (!(child instanceof THREE.Mesh)) continue;
+    child.geometry.dispose();
+    const material = child.material as THREE.MeshBasicMaterial;
+    material.map?.dispose();
+    material.dispose();
+  }
+}
+
 /** Frees the geometry and materials `buildGround` allocated. */
 export function disposeGround(group: THREE.Group): void {
   for (const child of group.children) {
