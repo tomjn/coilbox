@@ -25,6 +25,7 @@ import {
   Keyboard,
   Move,
   PackagePlus,
+  PersonStanding,
   RotateCw,
   Scaling,
   Trash2,
@@ -54,6 +55,11 @@ import {
   pieceById,
 } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
+import {
+  buildReferenceFigure,
+  disposeReferenceFigure,
+  REFERENCE_HEIGHT_ELMOS,
+} from "../../referenceObject";
 import { type BakedPiece, bakedPieces } from "../../s3oBuild";
 import { isShortcut } from "../../shortcuts";
 import {
@@ -208,6 +214,7 @@ export function ModelViewport({
   const [mode, setMode] = useState<GizmoMode>("translate");
   const [snapped, setSnapped] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
+  const [showReference, setShowReference] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   function resetView() {
@@ -260,6 +267,14 @@ export function ModelViewport({
       const axes = new THREE.AxesHelper(2);
       axes.position.y = 0.01;
       scene.add(axes);
+
+      // A view aid, not a piece: sits beside where a unit is built rather
+      // than under it, and is off by default so it never surprises anyone
+      // opening a project for the first time.
+      const reference = buildReferenceFigure();
+      reference.position.set(-REFERENCE_HEIGHT_ELMOS, 0, 0);
+      reference.visible = false;
+      scene.add(reference);
 
       const root = new THREE.Group();
       scene.add(root);
@@ -357,6 +372,7 @@ export function ModelViewport({
         hoveredId: null,
         grid,
         axes,
+        reference,
         groups: new Map(),
         baked: [],
         rest: new Map(),
@@ -544,6 +560,7 @@ export function ModelViewport({
           state.originDot.dispose();
           disposeBaked(state);
           grid.dispose();
+          disposeReferenceFigure(reference);
           outline.dispose();
           sceneRef.current = null;
         },
@@ -642,6 +659,13 @@ export function ModelViewport({
     state.axes.visible = showGrid;
     state.render();
   }, [showGrid]);
+
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.reference.visible = showReference;
+    state.render();
+  }, [showReference]);
 
   // Playback. The gizmo comes off first: it would be dragging a transform that
   // is overwritten on the next frame. Stopping puts the scene back from the
@@ -851,6 +875,19 @@ export function ModelViewport({
         <Button
           size="icon"
           variant="outline"
+          onClick={() => setShowReference(!showReference)}
+          aria-pressed={showReference}
+          title={
+            showReference
+              ? "Hide the reference figure"
+              : "Show a reference figure for scale"
+          }
+        >
+          <PersonStanding className="size-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="outline"
           onClick={() => setShortcutsOpen(true)}
           title="Keyboard shortcuts (?)"
         >
@@ -1013,6 +1050,9 @@ interface SceneState {
   /** The ground and the compass, both of which can be switched off. */
   grid: THREE.GridHelper;
   axes: THREE.AxesHelper;
+  /** A scale figure beside the build, switched off by default. A view aid
+   *  like `grid` and `axes`: never part of the project, never exported. */
+  reference: THREE.Group;
   /** Piece id to the group holding it, so selection and edits can find it. */
   groups: Map<string, THREE.Group>;
   /** Geometry built for playback, which this owns and must free. The shared
