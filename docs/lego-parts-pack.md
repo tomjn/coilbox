@@ -50,11 +50,49 @@ An extension pack is a normal pack with three differences:
 
 A pack that extends nothing, extends a pack that is not installed, or names a texture other than the base pack's is skipped, and the Lego Parts screen says why. The atlas rule is not a policy choice: an s3o names one texture and every piece in the model samples it, so a unit is bound to exactly one atlas and there is no way to export a mix.
 
+A pack that brings its own atlas *instead of* parts is a different thing. See atlas packs below.
+
 **Part ids have to be unique across packs.** Ids are global, and the first pack to claim one keeps it: the base pack loads first, then extension packs by folder name. A later pack's part whose id is already taken is skipped and reported. Nothing silently changes what an id draws, which is what would otherwise break every saved unit that used it. Content-hash ids, as `scripts/legopack/` generates, give this for free.
 
 Parts from every loaded pack sit in one grid, filtered by pack alongside the existing search and category. A unit is free to mix them.
 
 A unit records the base pack it was built against. Opening one whose pack is not installed still works: the pieces keep their names, hierarchy and transforms, and any piece whose part is missing draws nothing and is counted in the warnings above the viewport.
+
+## Atlas packs
+
+An atlas pack redraws the base pack's atlas. It is how a faction gets its own look without redrawing a single part: the parts stay where they are on the sheet, the pixels change.
+
+An atlas pack is an extension pack's mirror image. It ships a texture and no parts, where an extension pack ships parts and no texture. It lives in the same folder, one directory each under `<data_dir>/lego/packs/`, and is found the same way.
+
+```
+<data_dir>/lego/packs/
+  desert/
+    pack.json
+    desert2048.png
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "coilbox-desert",
+  "reskins": "splinterfaction-legosv2",
+  "version": "1",
+  "licence": "...",
+  "atlas": { "width": 2048, "height": 2048 },
+  "textures": { "tex1": "desert2048.png" }
+}
+```
+
+- `reskins` names the parts pack whose atlas this one replaces, by id.
+- `textures.tex1` is the PNG the pack ships, and it must not be the name any other installed atlas uses. Two atlases with the same file name would land on top of each other in a game's `unittextures/`.
+- It has no `parts` and no `geometry`. A pack that brings both an atlas and parts is skipped: that would be a second parts library, and a unit cannot mix two.
+- **It has to keep the base atlas's UV layout.** Nothing can check this. Every part's UVs are the base pack's, so a redrawn sheet that moves anything leaves those parts sampling the wrong pixels. Resizing the sheet is fine, since UVs are normalised.
+
+A unit samples one atlas, chosen when the unit is created and changeable at any point while editing. Changing it does nothing to the pieces: every part is mapped into every atlas, so nothing is dropped and nothing is remapped. The change is an ordinary edit, and undo takes it back.
+
+The unit records the atlas by texture file name, which is what the s3o names. A unit whose atlas is not installed still opens: it is drawn with the base atlas, says so above the viewport, and still names its own atlas when exported, so installing the pack later completes the unit without touching it. An export in that state cannot copy the texture or write the Blender files, and the export drawer says which.
+
+An export writes exactly one atlas, the unit's own.
 
 ## pack.json
 
