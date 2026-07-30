@@ -2,16 +2,19 @@
  * Write a unit out as an s3o.
  *
  * The destination is a game folder, chosen once and remembered on the project,
- * so exporting again after a change is one click. The model lands in
- * `objects3d/` and the unit's atlas, if asked for, in `unittextures/`. A unit
- * definition always goes to `units/`, since without one the engine has
- * nothing to spawn.
+ * so exporting again after a change is one click. The model in `objects3d/` is
+ * rewritten every export, since the builder alone owns it. The atlas, the unit
+ * script and the unit definition are different. Each is written once and then
+ * left alone, so hand edits to any of them survive a re-export. The atlas and
+ * the script are checkboxes, since a game may already have either. The unit
+ * definition always goes to `units/`, since without one the engine has nothing
+ * to spawn.
  *
  * Exactly one atlas is written, the unit's own, because that is all an s3o can
  * name. Units sharing an atlas share the one PNG, so five units in one atlas
  * need one file installed, not five. It goes in under the name
- * `exportTextureName` gives it, and a file already at that name is left alone,
- * so an export can never retexture the game's own models.
+ * `exportTextureName` gives it, prefixed so it does not collide with a file the
+ * game already has, and left alone once written like the rest.
  */
 
 import { Button } from "@picoframe/frame";
@@ -222,6 +225,17 @@ export function ExportDrawer({
                   <FolderOpen className="size-4" /> Choose
                 </Button>
               </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium">Unit definition</span>
+              <p className="text-xs text-muted-foreground">
+                Export always writes <code>{project.unitName}.lua</code> to{" "}
+                <code>units</code>, the definition the engine spawns from. There
+                is no checkbox for it: without one, the engine has nothing to
+                give a model to. It is written once and then left alone, so hand
+                edits survive a re-export.
+              </p>
             </div>
 
             <div className="flex items-start gap-2">

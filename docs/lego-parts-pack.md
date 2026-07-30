@@ -20,7 +20,7 @@ Coilbox looks for `.coilbox/legoparts/` beside the executable first, then the bu
 
 A pack can add parts to another pack's atlas. That is an extension pack, and it is how a game adds its own pieces without reworking the texture or losing access to the ones already there.
 
-Extension packs live one folder each under `<data_dir>/lego/packs/`, alongside the projects and thumbnails. In portable mode that is inside `.coilbox`, so a distribution can ship extension packs the same way it ships everything else. The Lego Parts screen shows the exact path.
+Extension packs live one folder each under `<data_dir>/lego/packs/`, alongside the projects and thumbnails. In portable mode that is inside `.coilbox`, so a distribution can ship extension packs the same way it ships everything else. The Lego Parts screen shows the exact path, but only when a pack fails to load.
 
 ```
 <data_dir>/lego/packs/
