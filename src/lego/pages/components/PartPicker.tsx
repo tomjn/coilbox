@@ -19,7 +19,7 @@ import * as THREE from "three";
 
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
-import { baseAtlas } from "../../atlas";
+import { baseAtlas, type LegoAtlas } from "../../atlas";
 import { addStandardLights, partMaterial } from "../../geometry";
 import {
   getPartGeometry,
@@ -47,6 +47,10 @@ const SPIN_RATE = 1.05;
 interface Props {
   pack: LoadedPack;
   parts: LegoPartInfo[];
+  /** Drawn with the base pack's atlas when absent, which is what the Lego
+   *  Parts browser wants: it has no unit to draw the rest of, so there is
+   *  nothing else to match. */
+  atlas?: LegoAtlas;
   selectedId?: string;
   onSelect?: (part: LegoPartInfo) => void;
 }
@@ -57,7 +61,13 @@ interface Visible {
   lastRow: number;
 }
 
-export function PartPicker({ pack, parts, selectedId, onSelect }: Props) {
+export function PartPicker({
+  pack,
+  parts,
+  atlas,
+  selectedId,
+  onSelect,
+}: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<ViewportState | null>(null);
@@ -126,6 +136,17 @@ export function PartPicker({ pack, parts, selectedId, onSelect }: Props) {
     setFocusIndex(0);
     layout(state, 0, scroller.clientHeight);
   }, [pack, parts]);
+
+  // Separate from the effect above: switching a unit's atlas changes none of
+  // the parts on screen or the scroll position, only what they are drawn
+  // with, so this leaves both alone and just redraws in place.
+  useEffect(() => {
+    const state = stateRef.current;
+    const scroller = scrollRef.current;
+    if (!state || !scroller) return;
+    state.atlas = atlas;
+    layout(state, scroller.scrollTop, scroller.clientHeight);
+  }, [atlas]);
 
   // Arrow keys move the roving tab stop, so focus has to follow it onto a
   // button that may only exist after the next render.
@@ -274,6 +295,8 @@ interface ViewportState {
   columns: number;
   parts: LegoPartInfo[];
   pack?: LoadedPack;
+  /** Undefined draws the base pack's atlas, resolved in `layout`. */
+  atlas?: LegoAtlas;
   onView: (view: Visible) => void;
   /** Which pooled mesh is currently standing in for which part, so the spin
    *  can find the one under the pointer. Rebuilt on every layout. */
@@ -292,8 +315,9 @@ function layout(
   scrollTop: number,
   viewportHeight: number,
 ) {
-  const { renderer, scene, camera, pool, columns, parts, pack } = state;
+  const { renderer, scene, camera, pool, columns, parts, pack, atlas } = state;
   if (!pack || viewportHeight === 0) return;
+  const material = partMaterial(atlas ?? baseAtlas(pack));
 
   const firstRow = Math.max(0, Math.floor(scrollTop / PITCH) - OVERSCAN);
   const lastRow = Math.ceil((scrollTop + viewportHeight) / PITCH) + OVERSCAN;
@@ -317,11 +341,15 @@ function layout(
 
       let mesh = pool[used];
       if (!mesh) {
-        mesh = new THREE.Mesh(geometry, partMaterial(baseAtlas(pack)));
+        mesh = new THREE.Mesh(geometry, material);
         pool.push(mesh);
         scene.add(mesh);
       }
       mesh.geometry = geometry;
+      // Reassigned rather than left as it was, because the pool reuses this
+      // mesh for whichever part is here now, and the unit's atlas can also
+      // change under it.
+      mesh.material = material;
       mesh.visible = true;
       // A three quarter view reads better than face on for boxy parts. Reset
       // every time, because a pooled mesh may have been left mid spin by a

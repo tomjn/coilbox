@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { ROLES } from "../animPresets";
+import { unitAtlas } from "../atlas";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { subtreeAsCompound } from "../compounds";
 import { usePartFilter } from "../filter";
@@ -464,6 +465,10 @@ function Builder({ id }: { id: string | undefined }) {
     );
   }
 
+  // What the drawers below draw parts and compounds with, so picking one is
+  // not a guess about how it will actually look once it is on the unit.
+  const drawAtlas = unitAtlas(draft, pack.library.atlases).drawWith;
+
   const selected = draft.pieces.find((piece) => piece.id === selectedId);
   // Empty pieces have no part, so no bounding box to offer pivots from. They
   // are already a bare point, which is its own pivot.
@@ -681,6 +686,7 @@ function Builder({ id }: { id: string | undefined }) {
                   <CompoundPicker
                     pack={pack}
                     compounds={compounds}
+                    atlas={drawAtlas}
                     onInsert={addCompound}
                     onDelete={(compoundId) => void deleteCompound(compoundId)}
                     onRename={(compound, name) =>
@@ -693,6 +699,7 @@ function Builder({ id }: { id: string | undefined }) {
                   <PartPicker
                     pack={pack}
                     parts={filter.parts}
+                    atlas={drawAtlas}
                     onSelect={addPart}
                   />
                 )}

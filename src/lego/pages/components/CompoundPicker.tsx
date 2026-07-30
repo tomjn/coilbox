@@ -18,7 +18,7 @@ import * as THREE from "three";
 
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
-import { baseAtlas } from "../../atlas";
+import { baseAtlas, type LegoAtlas } from "../../atlas";
 import { validateCompoundName } from "../../compounds";
 import { addStandardLights, partMaterial } from "../../geometry";
 import { type LegoProject, walkPieces } from "../../model";
@@ -39,6 +39,14 @@ const SPIN_RATE = 1.05;
 interface Props {
   pack: LoadedPack;
   compounds: LegoProject[];
+  /**
+   * Drawn with the base pack's atlas when absent. A compound is geometry, not
+   * a texture, so once inserted it takes on whatever atlas the unit around it
+   * already uses: this is only about how it looks while still in the tray, and
+   * the builder passes the unit's own atlas so a compound previews the way it
+   * will actually look once dropped in.
+   */
+  atlas?: LegoAtlas;
   /** Absent on the parts browser, which has no unit to insert into. */
   onInsert?: (compound: LegoProject) => void;
   onDelete: (id: string) => void;
@@ -55,6 +63,7 @@ interface Renaming {
 export function CompoundPicker({
   pack,
   compounds,
+  atlas,
   onInsert,
   onDelete,
   onRename,
@@ -140,12 +149,15 @@ export function CompoundPicker({
   );
 
   // The geometry is shared and cached, so a compound that is still here keeps
-  // the object it already had and only new ones are built.
+  // the object it already had and only new ones are built. The material is
+  // reassigned on every holder regardless, not only a freshly built one,
+  // because the unit's atlas can change under a compound that already exists.
   useEffect(() => {
     const state = stateRef.current;
     const scroller = scrollRef.current;
     if (!state || !scroller) return;
 
+    const material = partMaterial(atlas ?? baseAtlas(pack));
     const wanted = new Set(compounds.map((compound) => compound.id));
     for (const [id, holder] of state.holders) {
       if (wanted.has(id)) continue;
@@ -154,13 +166,18 @@ export function CompoundPicker({
     }
     for (const compound of compounds) {
       if (state.holders.has(compound.id)) continue;
-      const holder = buildHolder(pack, compound);
+      const holder = buildHolder(pack, compound, material);
       state.scene.add(holder);
       state.holders.set(compound.id, holder);
     }
+    for (const holder of state.holders.values()) {
+      holder.traverse((child) => {
+        if (child instanceof THREE.Mesh) child.material = material;
+      });
+    }
     state.order = compounds.map((compound) => compound.id);
     layout(state, scroller.scrollTop, scroller.clientHeight);
-  }, [pack, compounds]);
+  }, [pack, compounds, atlas]);
 
   // Turn the compound under the pointer, so its far side can be seen without
   // inserting it. Runs only while one is hovered.
@@ -336,7 +353,11 @@ interface GridState {
  * holder's origin. Two objects rather than one, because the shift has to happen
  * before the holder scales and turns it.
  */
-function buildHolder(pack: LoadedPack, compound: LegoProject): THREE.Group {
+function buildHolder(
+  pack: LoadedPack,
+  compound: LegoProject,
+  material: THREE.MeshStandardMaterial,
+): THREE.Group {
   const holder = new THREE.Group();
   const centred = new THREE.Group();
   holder.add(centred);
@@ -359,8 +380,7 @@ function buildHolder(pack: LoadedPack, compound: LegoProject): THREE.Group {
     groups.set(piece.id, group);
 
     const geometry = piece.partId ? getPartGeometry(pack, piece.partId) : null;
-    if (geometry)
-      group.add(new THREE.Mesh(geometry, partMaterial(baseAtlas(pack))));
+    if (geometry) group.add(new THREE.Mesh(geometry, material));
   }
 
   // A compound of nothing but empty pieces has no size to fit, and dividing by
