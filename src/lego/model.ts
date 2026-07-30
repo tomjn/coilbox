@@ -62,7 +62,8 @@ export interface LegoProject {
    * The atlas this unit samples, by texture file name, which is what the s3o
    * names. Absent means the base pack's own atlas, so a unit built before atlas
    * packs existed needs no migration. Never the pack id: an atlas is bound to
-   * the file that lands in a game's `unittextures/`, not to whoever shipped it.
+   * the texture it ships, which is what a game folder ends up holding a copy
+   * of, not to whoever shipped it.
    */
   atlas?: string;
   createdAt: string;

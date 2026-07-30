@@ -9,7 +9,9 @@
  *
  * Exactly one atlas is written, the unit's own, because that is all an s3o can
  * name. Units sharing an atlas share the one PNG, so five units in one atlas
- * need one file installed, not five.
+ * need one file installed, not five. It goes in under the name
+ * `exportTextureName` gives it, and a file already at that name is left alone,
+ * so an export can never retexture the game's own models.
  */
 
 import { Button } from "@picoframe/frame";
@@ -20,7 +22,7 @@ import { useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { unitAtlas } from "../../atlas";
+import { exportTextureName, unitAtlas } from "../../atlas";
 import {
   legoExport,
   legoExportGlb,
@@ -57,6 +59,7 @@ type Result =
       state: "done";
       model: string;
       texture: string | null;
+      textureKept: boolean;
       script: string | null;
       scriptKept: boolean;
       unitDef: string | null;
@@ -88,6 +91,10 @@ export function ExportDrawer({
   // unit having to change.
   const unit = unitAtlas(project, pack.library.atlases);
   const atlas = unit.texture;
+  // What the atlas is called once written, which is what the s3o names and
+  // what a game folder ends up holding. Never the pack's own name for it: that
+  // is generic enough to land on a file the game already has.
+  const atlasFile = exportTextureName(atlas);
   // Everything that needs the atlas file itself, rather than only its name,
   // needs it to actually be installed.
   const installed = unit.installed;
@@ -106,7 +113,7 @@ export function ExportDrawer({
   async function runExport() {
     // The s3o header names the atlas whether or not this export copies it, so a
     // unit exported without the texture still finds one already installed.
-    const model = buildS3o(project, pack, { texture1: atlas });
+    const model = buildS3o(project, pack, { texture1: atlasFile });
     if (!model) {
       setResult({ state: "failed", message: "This unit has no root piece." });
       return;
@@ -118,7 +125,7 @@ export function ExportDrawer({
         unitName: project.unitName,
         atlas:
           withTexture && installed
-            ? { name: atlas, pack: installed.folder }
+            ? { name: atlas, pack: installed.folder, writeAs: atlasFile }
             : null,
         script: withScript ? buildLuaScript(project) : null,
         // Unlike the atlas and the script, there is no scenario where a
@@ -146,7 +153,7 @@ export function ExportDrawer({
       if (withObj && installed) {
         const objBuild = buildObj(project, pack, {
           unitName: project.unitName,
-          textureName: atlas,
+          textureName: atlasFile,
         });
         if (objBuild) {
           const objWritten = await legoExportObj({
@@ -154,7 +161,7 @@ export function ExportDrawer({
             unitName: project.unitName,
             obj: objBuild.obj,
             mtl: objBuild.mtl,
-            atlas: { name: atlas, pack: installed.folder },
+            atlas: { name: atlas, pack: installed.folder, writeAs: atlasFile },
           });
           objPath = objWritten.obj;
           mtlPath = objWritten.mtl;
@@ -250,9 +257,10 @@ export function ExportDrawer({
                   Also place the texture
                 </Label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Copies <code>{atlas}</code> into <code>unittextures</code>.
-                  Every unit sampling this atlas uses it, so this only needs
-                  doing once per game.
+                  Copies the atlas into <code>unittextures</code> as{" "}
+                  <code>{atlasFile}</code>. Every unit sampling this atlas uses
+                  it, so this only needs doing once per game, and a file already
+                  at that name is never overwritten.
                 </p>
               </div>
             </div>
@@ -308,7 +316,8 @@ export function ExportDrawer({
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   <code>{project.unitName}.obj</code> and{" "}
                   <code>{project.unitName}.mtl</code>, with a copy of{" "}
-                  <code>{atlas}</code> next to them so the material resolves.
+                  <code>{atlasFile}</code> next to them so the material
+                  resolves.
                 </p>
               </div>
             </div>
@@ -328,6 +337,13 @@ export function ExportDrawer({
                 <code className="break-all">{result.model}</code>
                 {result.texture ? (
                   <code className="break-all">{result.texture}</code>
+                ) : null}
+                {result.textureKept ? (
+                  <p className="text-muted-foreground">
+                    A texture called <code>{atlasFile}</code> was already there
+                    and has been left alone. Delete it and export again to
+                    replace it.
+                  </p>
                 ) : null}
                 {result.script ? (
                   <code className="break-all">{result.script}</code>

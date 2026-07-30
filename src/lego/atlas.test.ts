@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type LegoAtlas, unitAtlas } from "./atlas";
+import { exportTextureName, type LegoAtlas, unitAtlas } from "./atlas";
 import { newProject } from "./model";
 
 describe("unitAtlas", () => {
@@ -54,5 +54,41 @@ describe("unitAtlas", () => {
       installed: null,
       drawWith: atlases[0],
     });
+  });
+});
+
+describe("exportTextureName", () => {
+  it("writes an atlas under a name a game folder would not already hold", () => {
+    // The base pack calls its atlas "atlas.png", which is exactly the name a
+    // game plausibly has in unittextures/ already.
+    expect(exportTextureName("atlas.png")).toBe("coilbox_atlas.png");
+    expect(exportTextureName("atlas.png")).not.toBe("atlas.png");
+  });
+
+  it("keeps two atlases apart, as their own names already are", () => {
+    expect(exportTextureName("desert.png")).not.toBe(
+      exportTextureName("atlas.png"),
+    );
+  });
+
+  it("gives the same name whether or not the atlas is installed", () => {
+    // A unit naming an atlas it has not got still exports against the file that
+    // atlas would be written as, so installing the pack later completes it.
+    const missing = unitAtlas(
+      {
+        ...newProject({
+          id: "u",
+          rootPieceId: "root",
+          name: "unit",
+          packId: "base",
+          packVersion: "1",
+          now: "2026-01-01",
+        }),
+        atlas: "arctic.png",
+      },
+      [{ tex1: "atlas.png", packId: "base", folder: null }],
+    );
+    expect(missing.installed).toBeNull();
+    expect(exportTextureName(missing.texture)).toBe("coilbox_arctic.png");
   });
 });
