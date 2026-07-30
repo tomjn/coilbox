@@ -384,6 +384,7 @@ export function ModelViewport({
         dots: dotMaterial(ANCHOR_DOT, renderer.getPixelRatio(), true),
         originDot: dotMaterial(ORIGIN_DOT, renderer.getPixelRatio(), false),
         render,
+        framed: false,
         snapping: true,
         onSnapChange: () => {},
         projectRef,
@@ -577,6 +578,14 @@ export function ModelViewport({
     const state = sceneRef.current;
     if (!state) return;
     syncScene(state, pack, project);
+    // Framed once per scene, the moment the whole unit's geometry first has
+    // something in it. A brand new unit's root piece is empty, so this keeps
+    // retrying on every sync (each one is cheap: an empty box, nothing more)
+    // until a piece with geometry exists, rather than giving up after the
+    // first, geometry-less attempt. Once it succeeds, `framed` stops it ever
+    // running again for this scene, so it never fights a camera the user has
+    // since moved.
+    if (!state.framed && frameObject(state, state.root)) state.framed = true;
     if (playing && !reduceMotion) showBaked(state, pack, project);
     state.render();
   }, [pack, project, playing, reduceMotion]);
@@ -1074,6 +1083,12 @@ interface SceneState {
   /** Each piece's baked offset while playing, the pose deltas are added to. */
   rest: Map<string, [number, number, number]>;
   render: () => void;
+  /** Whether the whole unit has already been framed once for this scene, so
+   *  the builder opens with the unit in view but a later edit never fights a
+   *  camera the user has since moved. Fresh per scene build (a unit switch
+   *  remounts the page, and the reduce-motion toggle rebuilds this state too),
+   *  so each one gets its own opening frame. */
+  framed: boolean;
   snapping: boolean;
   onSnapChange: (snapped: boolean) => void;
   /** Read during a drag, so the helpers see the current document, not the one
@@ -1745,13 +1760,26 @@ function applyAnimation(state: SceneState, project: LegoProject, t: number) {
 function focusSelection(state: SceneState, pieceId: string | null) {
   const object = pieceId ? state.groups.get(pieceId) : state.root;
   if (!object) return;
+  if (frameObject(state, object)) state.render();
+}
 
+/**
+ * Move the orbit target to `object`'s world-space bounding box and pull the
+ * camera in along the direction it is already looking. Returns false, leaving
+ * the camera untouched, when the box is empty: an object with no geometry
+ * (an empty piece, or a unit that is only empty pieces) has nothing to frame.
+ *
+ * Shared by the F shortcut, which frames the selection or the whole unit on
+ * demand, and the opening frame, which frames the whole unit once as soon as
+ * its geometry exists.
+ */
+function frameObject(state: SceneState, object: THREE.Object3D): boolean {
   const box = new THREE.Box3().setFromObject(object);
-  if (box.isEmpty()) return;
+  if (box.isEmpty()) return false;
 
   // The direction from the target to the camera, not the camera to the
   // target: keeping this fixed and only moving the target and the distance
-  // along it is what stops F from spinning the view to a new angle.
+  // along it is what stops framing from spinning the view to a new angle.
   const offset = new THREE.Vector3().subVectors(
     state.camera.position,
     state.controls.target,
@@ -1769,7 +1797,7 @@ function focusSelection(state: SceneState, pieceId: string | null) {
   state.controls.target.set(...target);
   state.camera.position.set(...position);
   state.controls.update();
-  state.render();
+  return true;
 }
 
 /** Write the dragged transform back to the document, once the drag is over. */
