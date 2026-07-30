@@ -2,9 +2,15 @@
  * Snapping one piece to another.
  *
  * Every part gets a set of anchors derived from its bounding box: the eight
- * corners, the six face centres and the middle. Nothing is authored, because
- * the parts library has no anchor data and the pieces are boxy enough that the
- * box is a good description of where they join.
+ * corners, the six face centres and the middle. The parts library has no anchor
+ * data and most pieces are boxy enough that the box is a good description of
+ * where they join.
+ *
+ * A piece can carry anchors of its own instead, for the parts where that is not
+ * true: a curved intake or a rounded nose seats nowhere near its box. Those
+ * replace the fifteen rather than joining them, because the box's guess is
+ * wrong on exactly the parts this is for, and a wrong point left in the running
+ * is a wrong point free to win the snap.
  *
  * These anchors are an editor aid only. An anchor that has to survive into the
  * engine is an empty piece, which is a real s3o piece with a name.
@@ -20,11 +26,13 @@ export interface Bounds {
   max: Vec3;
 }
 
-export type AnchorKind = "corner" | "face" | "centre";
+export type AnchorKind = "corner" | "face" | "centre" | "custom";
 
 export interface Anchor {
   position: Vec3;
   kind: AnchorKind;
+  /** A custom anchor's name, so a snap can say which seat it took. */
+  name?: string;
 }
 
 /**
@@ -61,6 +69,29 @@ export function localAnchors(bounds: Bounds): Anchor[] {
   );
 
   return anchors;
+}
+
+/**
+ * Everything a piece offers to snap against, in its part's own space.
+ *
+ * One answer, so nothing downstream has to decide between two sets. A piece
+ * with anchors of its own uses those alone. A piece with a part uses its box.
+ * A piece with neither still has its origin, which is what makes an empty
+ * piece something you can seat a part against.
+ */
+export function pieceAnchors(
+  bounds: Bounds | null,
+  custom: readonly { name: string; position: Vec3 }[] | undefined,
+): Anchor[] {
+  if (custom && custom.length > 0) {
+    return custom.map((anchor) => ({
+      position: anchor.position,
+      kind: "custom",
+      name: anchor.name,
+    }));
+  }
+  if (bounds) return localAnchors(bounds);
+  return [{ position: [0, 0, 0], kind: "centre" }];
 }
 
 export interface Snap {

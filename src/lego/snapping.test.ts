@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   localAnchors,
   nearestSnap,
+  pieceAnchors,
   screenPixelsToWorld,
   snapRotation,
   type Vec3,
@@ -34,6 +35,39 @@ describe("localAnchors", () => {
     const centre = anchors.find((a) => a.kind === "centre");
 
     expect(centre?.position).toEqual([2, 1, 3]);
+  });
+});
+
+describe("pieceAnchors", () => {
+  it("gives the box's fifteen when the piece has none of its own", () => {
+    expect(pieceAnchors(UNIT, undefined)).toHaveLength(15);
+    expect(pieceAnchors(UNIT, [])).toHaveLength(15);
+  });
+
+  it("uses the piece's own anchors instead of the box, not as well as", () => {
+    const anchors = pieceAnchors(UNIT, [
+      { name: "mouth", position: [0, 0.5, 1] },
+    ]);
+
+    expect(anchors).toEqual([
+      { position: [0, 0.5, 1], kind: "custom", name: "mouth" },
+    ]);
+  });
+
+  it("leaves a piece with no part its own origin to seat against", () => {
+    expect(pieceAnchors(null, undefined)).toEqual([
+      { position: [0, 0, 0], kind: "centre" },
+    ]);
+  });
+
+  it("lets a piece with no part carry anchors too", () => {
+    const anchors = pieceAnchors(null, [
+      { name: "muzzle", position: [0, 0, 3] },
+    ]);
+
+    expect(anchors).toEqual([
+      { position: [0, 0, 3], kind: "custom", name: "muzzle" },
+    ]);
   });
 });
 

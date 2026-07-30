@@ -72,12 +72,12 @@ export function TransformFields({
 
   return (
     <div className="mt-2 flex flex-col gap-2">
-      <Row
+      <Vec3Row
         label="Position"
         values={piece.position}
         onCommit={(axis, value) => setAxis("position", axis, value)}
       />
-      <Row
+      <Vec3Row
         label="Rotation"
         unit="°"
         values={piece.rotation.map(toDegrees) as Vec3}
@@ -85,7 +85,7 @@ export function TransformFields({
           setAxis("rotation", axis, (value * Math.PI) / 180)
         }
       />
-      <Row
+      <Vec3Row
         label="Scale"
         values={piece.scale}
         onCommit={(axis, value) => setAxis("scale", axis, value)}
@@ -110,7 +110,9 @@ export function TransformFields({
   );
 }
 
-function Row({
+/** Three numbers on one row, labelled by axis. Also what an anchor's position
+ *  is typed into, so the two read as the same kind of field. */
+export function Vec3Row({
   label,
   values,
   unit,
