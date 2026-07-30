@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
-import { ROLES } from "../animPresets";
+import { ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { subtreeAsCompound } from "../compounds";
@@ -968,6 +968,11 @@ function Builder({ id }: { id: string | undefined }) {
                       What this piece is, so the animation presets know what to
                       move.
                     </p>
+                    {restAngleWarnings(selected).map((warning) => (
+                      <p key={warning} className="mt-1 text-xs text-amber-500">
+                        {warning}
+                      </p>
+                    ))}
                   </div>
 
                   <p className="mt-2 text-xs text-muted-foreground">
