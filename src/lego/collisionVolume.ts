@@ -104,6 +104,62 @@ export function engineScales(
   }
 }
 
+/** The smallest a volume may be on any axis. A face dragged past its opposite
+ *  stops here rather than turning the shape inside out. */
+export const MIN_COLLISION_SIZE = 0.1;
+
+/**
+ * Move one face of the volume, leaving the opposite face where it is.
+ *
+ * `face` is where that face has been dragged to, measured from the model's
+ * middle, which is what `offsets` are measured from. `axis` is which of x, y
+ * and z the face is on and `sign` is which end of it.
+ *
+ * The size that moves is the one the engine will build, not the one typed in,
+ * so a shape that cannot be stretched stays the shape it is: a sphere takes the
+ * new size on all three axes and a cylinder takes it on both of its
+ * cross-section axes (see `engineScales`). Those extra axes grow about their own
+ * middle, since the face that was asked to stay put is only on the dragged one.
+ */
+export function resizeCollisionFace(
+  volume: LegoCollisionVolume,
+  axis: 0 | 1 | 2,
+  sign: 1 | -1,
+  face: number,
+): LegoCollisionVolume {
+  const built = engineScales(volume);
+  const fixed = volume.offsets[axis] - (sign * built[axis]) / 2;
+  const size = Math.max(MIN_COLLISION_SIZE, sign * (face - fixed));
+  const offsets: [number, number, number] = [...volume.offsets];
+  offsets[axis] = fixed + (sign * size) / 2;
+  return { ...volume, scales: resizedScales(volume, axis, size), offsets };
+}
+
+/** Which typed sizes a dragged face writes. More than one of them whenever the
+ *  shape has to stay round across the axis that was dragged. */
+function resizedScales(
+  volume: LegoCollisionVolume,
+  axis: 0 | 1 | 2,
+  size: number,
+): [number, number, number] {
+  const [x, y, z] = volume.scales;
+  switch (volume.type) {
+    case "sphere":
+      return [size, size, size];
+    case "cylx":
+      return axis === 0 ? [size, y, z] : [x, size, size];
+    case "cyly":
+      return axis === 1 ? [x, size, z] : [size, y, size];
+    case "cylz":
+      return axis === 2 ? [x, y, size] : [size, size, z];
+    default: {
+      const scales: [number, number, number] = [x, y, z];
+      scales[axis] = size;
+      return scales;
+    }
+  }
+}
+
 /**
  * Whether the engine will throw this volume away and put its own sphere round
  * the whole model instead.
