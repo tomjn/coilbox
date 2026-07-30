@@ -193,6 +193,53 @@ describe("buildS3o", () => {
     expect(build?.radius).toBeCloseTo(Math.hypot(0.5, 0.5));
   });
 
+  it("measures sizeX and sizeZ off the bounding box, not off the radius", () => {
+    // A long thin unit: 8 along x, 2 along z. A radius-derived footprint
+    // would be square. Measuring the box instead keeps the axes apart.
+    const doc = project([
+      { id: "hull", name: "hull", parentId: "root", scale: [8, 1, 2] },
+    ]);
+
+    const build = buildS3o(doc, pack(), TEXTURES);
+
+    expect(build?.sizeX).toBeCloseTo(8);
+    expect(build?.sizeZ).toBeCloseTo(2);
+  });
+
+  it("measures a wide flat unit the same way", () => {
+    const doc = project([
+      { id: "pad", name: "pad", parentId: "root", scale: [1, 1, 6] },
+    ]);
+
+    const build = buildS3o(doc, pack(), TEXTURES);
+
+    expect(build?.sizeX).toBeCloseTo(1);
+    expect(build?.sizeZ).toBeCloseTo(6);
+  });
+
+  it("measures a tiny unit as a small extent rather than zero", () => {
+    const doc = project([
+      { id: "speck", name: "speck", parentId: "root", scale: [0.1, 0.1, 0.1] },
+    ]);
+
+    const build = buildS3o(doc, pack(), TEXTURES);
+
+    expect(build?.sizeX).toBeCloseTo(0.1);
+    expect(build?.sizeZ).toBeCloseTo(0.1);
+  });
+
+  it("measures a unit exactly on a step boundary at its true size", () => {
+    // 16 elmos is exactly one ELMOS_PER_FOOTPRINT step.
+    const doc = project([
+      { id: "block", name: "block", parentId: "root", scale: [16, 1, 16] },
+    ]);
+
+    const build = buildS3o(doc, pack(), TEXTURES);
+
+    expect(build?.sizeX).toBeCloseTo(16);
+    expect(build?.sizeZ).toBeCloseTo(16);
+  });
+
   it("does not inflate the radius of a unit built away from the origin", () => {
     const near = buildS3o(
       project([{ id: "a", name: "a", parentId: "root" }]),
@@ -216,6 +263,8 @@ describe("buildS3o", () => {
     expect(build?.radius).toBe(0);
     expect(build?.height).toBe(0);
     expect(build?.mid).toEqual([0, 0, 0]);
+    expect(build?.sizeX).toBe(0);
+    expect(build?.sizeZ).toBe(0);
   });
 
   it("sits a floating unit down on the ground", () => {

@@ -38,13 +38,31 @@ export function luaString(value: string): string {
 }
 
 /**
- * `radius` is the model's collision-sphere radius, in elmos, as `buildS3o`
- * computes it. The footprint is derived from it rather than left at the
- * engine's 1x1 default, so units built from bigger or smaller assemblies do
- * not all claim the same ground space.
+ * `sizeX` and `sizeZ` are the model's world-space bounding-box extent along
+ * each ground axis, in elmos, as `buildS3o`'s header measures them. Each axis
+ * gets its own footprint step rather than one step shared from a collision
+ * radius, so a unit longer than it is wide claims a rectangle of ground
+ * rather than the square that would fit its longest axis.
+ *
+ * This measures the whole bounding box, including anything that sticks out
+ * such as a gun barrel or an aerial. A real game would usually trim those
+ * from a building's footprint, but the builder has no notion yet of which
+ * pieces are structural rather than attached, so there is nothing narrower to
+ * measure from.
+ *
+ * Each axis rounds up to the next whole step rather than to the nearest one.
+ * A footprint is the ground the engine uses for placement and pathing, and
+ * rounding to nearest can round down, which would leave a unit's own
+ * footprint too small to contain it. Rounding up always wastes a little
+ * space instead, which is the safer failure. A unit smaller than one step
+ * still gets at least 1, matching the engine's own minimum.
  */
-export function buildUnitDef(project: LegoProject, radius: number): string {
-  const footprint = Math.max(1, Math.round((radius * 2) / ELMOS_PER_FOOTPRINT));
+export function buildUnitDef(
+  project: LegoProject,
+  size: { x: number; z: number },
+): string {
+  const footprintx = footprintSteps(size.x);
+  const footprintz = footprintSteps(size.z);
 
   const fields: [string, string][] = [
     ["name", luaString(project.name)],
@@ -54,8 +72,8 @@ export function buildUnitDef(project: LegoProject, radius: number): string {
     ],
     ["objectname", luaString(project.unitName)],
     ["script", luaString(`${project.unitName}.lua`)],
-    ["footprintx", String(footprint)],
-    ["footprintz", String(footprint)],
+    ["footprintx", String(footprintx)],
+    ["footprintz", String(footprintz)],
     ["maxdamage", String(DEFAULT_MAX_DAMAGE)],
     ["canmove", "false"],
   ];
@@ -72,4 +90,15 @@ export function buildUnitDef(project: LegoProject, radius: number): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * One axis's extent, in elmos, to a whole number of footprint steps. Rounds
+ * up so the step always contains the axis it was measured from. A tiny or
+ * empty extent still steps up to 1, the engine's own minimum footprint.
+ * The `1e-9` slack absorbs float error from the box measurement so a size
+ * that lands exactly on a step boundary is not pushed into the next one.
+ */
+function footprintSteps(size: number): number {
+  return Math.max(1, Math.ceil(size / ELMOS_PER_FOOTPRINT - 1e-9));
 }

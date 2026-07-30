@@ -158,7 +158,7 @@ Three of them no longer need a machine that can draw. `spring-headless` runs a f
 
 The two still outstanding both need pixels. Nobody has seen the unit drawn, and nothing has checked which part of the atlas each triangle samples. [Issue #563](https://github.com/tomjn/coilbox/issues/563) is the cheaper of the two to settle, because Blender needs no engine.
 
-The same run found the footprint is wrong: it is derived from the collision radius, so a unit longer than it is wide claims far more ground than it stands on. [Issue #679](https://github.com/tomjn/coilbox/issues/679).
+The same run found the footprint was wrong: it was derived from the collision radius, so a unit longer than it is wide claimed far more ground than it stood on. Fixed in [issue #679](https://github.com/tomjn/coilbox/issues/679): the footprint now measures x and z off the model's own bounding box, each axis rounded up to its own step. Reverified headless on an asymmetric probe (48 by 6 elmos): the exported definition wrote `footprintx=3 footprintz=1`, and `UnitDefs[id].xsize/zsize` in a running engine read back `6` and `2`, a rectangle rather than the square the old code would have claimed.
 
 Record any further outcome here, and on [issue #565](https://github.com/tomjn/coilbox/issues/565), rather than remembering it.
 

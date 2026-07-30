@@ -44,6 +44,10 @@ export interface S3oBuild {
   radius: number;
   height: number;
   mid: [number, number, number];
+  /** The model's world-space bounding-box extent along x, in elmos. */
+  sizeX: number;
+  /** The model's world-space bounding-box extent along z, in elmos. */
+  sizeZ: number;
   texture1: string;
   texture2: string;
   root: S3oPiece;
@@ -282,14 +286,21 @@ function bakeGeometry(
  *
  * `radius` and `height` are only honoured above 0.01, so a unit with no
  * geometry writes zeros and lets the engine work them out.
+ *
+ * `sizeX` and `sizeZ` are the same box's extent along each ground axis, for
+ * `buildUnitDef` to derive a footprint from. They come straight off `box`
+ * rather than off `radius`, because a unit longer than it is wide has no
+ * single sphere that describes both axes.
  */
 function header(world: THREE.Vector3[]): {
   radius: number;
   height: number;
   mid: [number, number, number];
+  sizeX: number;
+  sizeZ: number;
 } {
   if (world.length === 0) {
-    return { radius: 0, height: 0, mid: [0, 0, 0] };
+    return { radius: 0, height: 0, mid: [0, 0, 0], sizeX: 0, sizeZ: 0 };
   }
   const box = new THREE.Box3().setFromPoints(world);
   const centre = box.getCenter(new THREE.Vector3());
@@ -299,5 +310,11 @@ function header(world: THREE.Vector3[]): {
     radius = Math.max(radius, point.distanceTo(centre));
     height = Math.max(height, point.y);
   }
-  return { radius, height, mid: [centre.x, centre.y, centre.z] };
+  return {
+    radius,
+    height,
+    mid: [centre.x, centre.y, centre.z],
+    sizeX: box.max.x - box.min.x,
+    sizeZ: box.max.z - box.min.z,
+  };
 }
