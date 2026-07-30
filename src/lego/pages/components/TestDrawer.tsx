@@ -24,7 +24,7 @@ import { usePlay } from "../../../play/PlayProvider";
 import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
 import { exportTextureName, unitAtlas } from "../../atlas";
 import { legoExport, legoOpenPath, legoScratchGame } from "../../bindings";
-import { buildLuaScript } from "../../luaScript";
+import { unitScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { buildS3o } from "../../s3oBuild";
@@ -152,7 +152,7 @@ export function TestDrawer({ open, onOpenChange, project, pack }: Props) {
               writeAs: written,
             }
           : null,
-        script: buildLuaScript(project),
+        script: unitScript(project),
         unitDef: buildUnitDef(project, model),
         model,
       });

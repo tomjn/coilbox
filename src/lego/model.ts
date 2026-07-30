@@ -126,6 +126,15 @@ export interface LegoProject {
   notes?: string;
   /** Canned animations applied to this unit, from `animPresets.ts`. */
   animations?: { presetId: string; params: Record<string, number> }[];
+  /**
+   * The unit's own Lua, once the user has taken it over.
+   *
+   * Absent means the presets still generate the script, which is where every
+   * unit starts and where a unit saved before this existed stays. Present
+   * means the presets are done with this unit: this text is what the builder
+   * shows and what an export writes, exactly as it stands.
+   */
+  script?: string;
   /** Where this unit was last exported, so exporting again does not ask. */
   exportDir?: string;
   /** Whether that export also placed the shared atlas. Defaults to true. */
@@ -413,6 +422,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(Array.isArray(d.animations)
       ? { animations: d.animations.map(parseApplied).filter((a) => a !== null) }
       : {}),
+    ...(typeof d.script === "string" ? { script: d.script } : {}),
     ...(typeof d.exportDir === "string" ? { exportDir: d.exportDir } : {}),
     ...(typeof d.exportTexture === "boolean"
       ? { exportTexture: d.exportTexture }

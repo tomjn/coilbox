@@ -949,6 +949,12 @@ function Builder({ id }: { id: string | undefined }) {
               onChange={(animations) =>
                 edit((project) => ({ ...project, animations }))
               }
+              onScriptChange={(script) => {
+                // Playback plays the presets, and a unit that owns its script
+                // is no longer described by them.
+                setPlaying(false);
+                edit((project) => ({ ...project, script }));
+              }}
             />
           ) : (
             <>

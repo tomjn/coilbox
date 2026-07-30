@@ -324,6 +324,21 @@ describe("parseLegoProjectJson", () => {
     expect(parsed?.pieces.map((p) => p.id)).toEqual(["root", "a", "a1"]);
   });
 
+  it("carries the unit's own script through a save and a load", () => {
+    const own = "-- mine\nfunction script.Create()\nend\n";
+    const doc = { ...project([piece("root", null)]), script: own };
+
+    expect(parseLegoProjectJson(JSON.stringify(doc))?.script).toBe(own);
+  });
+
+  it("leaves a unit that owns no script without one", () => {
+    const doc = project([piece("root", null)]);
+
+    expect(parseLegoProjectJson(JSON.stringify(doc))).not.toHaveProperty(
+      "script",
+    );
+  });
+
   it("loads a project that has problems, rather than refusing to open it", () => {
     // Two pieces called the same thing. Refusing would leave no way to fix it.
     const doc = project([
