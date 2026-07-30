@@ -137,6 +137,31 @@ export function PackProblems({ pack }: { pack: LoadedPack }) {
   );
 }
 
+/**
+ * The atlases installed, so it is clear which a unit can be built against.
+ *
+ * Only when there is more than one: with the bundled atlas on its own there is
+ * nothing to tell apart. Separate from the pack filter above, because an atlas
+ * pack has no parts to filter by. Which atlas a unit uses is chosen on the unit,
+ * not here.
+ */
+export function PackAtlases({ pack }: { pack: LoadedPack }) {
+  const atlases = pack.library.atlases;
+  if (atlases.length < 2) return null;
+  return (
+    <p className="border-b border-border px-6 py-2 text-xs text-muted-foreground">
+      {atlases.length} atlases installed, and a unit samples one of them:{" "}
+      {atlases.map((atlas, index) => (
+        <span key={atlas.tex1}>
+          {index > 0 ? ", " : null}
+          {atlas.packId} (<code>{atlas.tex1}</code>)
+        </span>
+      ))}
+      .
+    </p>
+  );
+}
+
 /** Shown in place of the grid when nothing matches. */
 export function NoMatches() {
   return (

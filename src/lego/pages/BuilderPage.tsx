@@ -48,6 +48,7 @@ import { sitOnGround } from "../s3oBuild";
 import { isShortcut } from "../shortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { AnimationPanel } from "./components/AnimationPanel";
+import { AtlasPicker } from "./components/AtlasPicker";
 import { CompoundPicker } from "./components/CompoundPicker";
 import { ExportDrawer } from "./components/ExportDrawer";
 import { ModelViewport } from "./components/ModelViewport";
@@ -294,6 +295,16 @@ function Builder({ id }: { id: string | undefined }) {
     edit((project) => ({ ...project, unitName }));
   }
 
+  // The base pack's atlas is stored as no atlas at all, the same way `role` and
+  // `hidden` are dropped rather than written empty. Nothing else changes: every
+  // part is mapped into every atlas, so the pieces are untouched.
+  function setAtlas(atlas: string | undefined) {
+    edit((project) => {
+      const { atlas: _dropped, ...rest } = project;
+      return atlas ? { ...rest, atlas } : rest;
+    });
+  }
+
   function movePivot(pieceId: string, pivot: [number, number, number]) {
     edit((project) => setPivot(project, pieceId, pivot));
   }
@@ -461,6 +472,7 @@ function Builder({ id }: { id: string | undefined }) {
                       className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
                     />
                   </p>
+                  <AtlasPicker project={draft} pack={pack} onChange={setAtlas} />
                 </div>
               </div>
 

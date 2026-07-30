@@ -1,9 +1,17 @@
 import { Button, Input } from "@picoframe/frame";
 import { Blocks, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { legoThumbUrl } from "../../lib/assetUrl";
+import type { LegoAtlas } from "../atlas";
 import { newProject } from "../model";
 import { loadPack } from "../pack";
 import { validateProjectName } from "../projectNames";
@@ -22,13 +30,33 @@ interface Renaming {
  * Creating one needs the parts pack, because a project records which pack it
  * was built against. Without a pack there is nothing to build from, so the page
  * says so rather than making an empty unit that cannot be opened.
+ *
+ * A unit is bound to one atlas, since that is all an s3o can name, so the atlas
+ * is chosen here when there is more than one installed. It can still be changed
+ * while editing: the parts are the same in every atlas, so switching costs
+ * nothing.
  */
 export default function ProjectsPage() {
   const { projects, loading, error } = useLegoProjects();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<Renaming | null>(null);
+  const [atlases, setAtlases] = useState<LegoAtlas[]>([]);
+  const [atlas, setAtlas] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  // Only to know whether there is a choice to offer. Creating a unit loads the
+  // pack again, which is the same cached promise.
+  useEffect(() => {
+    let live = true;
+    loadPack().then(
+      (pack) => live && setAtlases(pack.library.atlases),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
 
   async function create() {
     setBusy(true);
@@ -41,6 +69,9 @@ export default function ProjectsPage() {
         name: `Unit ${projects.length + 1}`,
         packId: pack.manifest.id,
         packVersion: pack.manifest.version,
+        // Left off for the base pack's atlas, so a unit built with one atlas
+        // installed is stored exactly as it always was.
+        ...(atlas ? { atlas } : {}),
         now: new Date().toISOString(),
       });
       await saveProject(project);
@@ -98,9 +129,32 @@ export default function ProjectsPage() {
             unit built here needs no UV work.
           </p>
         </div>
-        <Button onClick={create} disabled={busy}>
-          <Plus size={16} /> New unit
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Only when there is something to choose between. With one atlas
+              installed a control with one option is noise. */}
+          {atlases.length > 1 ? (
+            <Select
+              value={atlas ?? atlases[0].tex1}
+              onValueChange={(value) =>
+                setAtlas(value === atlases[0].tex1 ? null : value)
+              }
+            >
+              <SelectTrigger size="sm" className="w-52" aria-label="Atlas">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {atlases.map((option) => (
+                  <SelectItem key={option.tex1} value={option.tex1}>
+                    {option.packId}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+          <Button onClick={create} disabled={busy}>
+            <Plus size={16} /> New unit
+          </Button>
+        </div>
       </header>
 
       {problem ? (
