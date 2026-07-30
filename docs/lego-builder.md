@@ -108,7 +108,7 @@ It writes, if you leave the boxes ticked:
 
 It can also write a `.glb`, or an `.obj` with its `.mtl` and a copy of the atlas beside them. Neither is read by the engine. Both go into a `blender` folder alongside the game's own, for taking the unit into Blender to check it against the `.s3o` or finish it by hand.
 
-**The script and the unit definition are written once and then left alone.** If either is already there, export keeps yours and says so. Both files are meant to be edited: the unit definition coilbox writes is the minimum the engine needs to accept the unit, and adding weapons, cost, a build picture or a movement class is a hand edit that has to survive re-exporting the model. The model and the texture are overwritten every time, because they are generated and there is nothing in them to lose.
+**The script, the unit definition and the texture are all written once and then left alone.** If any is already there, export keeps yours and says so. The script and the unit definition are meant to be edited: the unit definition coilbox writes is the minimum the engine needs to accept the unit, and adding weapons, cost, a build picture or a movement class is a hand edit that has to survive re-exporting the model. Only the model is overwritten every time, because it is the one file the builder alone owns.
 
 The one exception is coilbox's own scratch game, below, which is a throwaway and is always rewritten in full.
 

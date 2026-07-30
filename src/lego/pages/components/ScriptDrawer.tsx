@@ -1,9 +1,10 @@
 /**
  * The unit script a unit's animations generate.
  *
- * Shown rather than written. Export puts a model in a game folder and nothing
- * else, so where this file belongs is the reader's decision, not ours. Copy it
- * into the game's `scripts/` folder as `<unit>.lua`.
+ * Shown so it can be copied by hand, but export writes the same text to the
+ * game's `scripts/<unit>.lua` too, when the script checkbox is ticked (on by
+ * default). It is written once and then left alone, so hand edits survive a
+ * re-export.
  */
 
 import { Button } from "@picoframe/frame";
@@ -61,8 +62,9 @@ export function ScriptDrawer({ open, onOpenChange, project }: Props) {
           </div>
 
           <p className="border-b border-border/60 px-5 py-2 text-xs text-muted-foreground">
-            Put this in the game's <code>scripts</code> folder. Export writes
-            the model and its texture, not this, so editing it by hand is safe.
+            Export writes this to <code>scripts/{project.unitName}.lua</code>{" "}
+            too, if the script checkbox is ticked (on by default). An existing
+            script is never overwritten, so hand edits survive a re-export.
           </p>
 
           <pre className="min-h-0 flex-1 overflow-auto px-5 py-4 text-xs leading-relaxed">
