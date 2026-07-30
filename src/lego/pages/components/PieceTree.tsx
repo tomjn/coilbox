@@ -29,8 +29,10 @@ const DRAG_THRESHOLD = 4;
 
 interface Props {
   project: LegoProject;
-  selectedId: string | null;
-  onSelect: (pieceId: string) => void;
+  selectedIds: string[];
+  /** `additive` is a Shift or Cmd click: add this piece to the selection
+   *  rather than replacing it. */
+  onSelect: (pieceId: string, additive: boolean) => void;
   onReparent: (pieceId: string, parentId: string) => void;
   onToggleHidden: (pieceId: string) => void;
   /** The piece to highlight as hovered, e.g. because the pointer is over its
@@ -51,7 +53,7 @@ interface Drag {
 
 export function PieceTree({
   project,
-  selectedId,
+  selectedIds,
   onSelect,
   onReparent,
   onToggleHidden,
@@ -120,7 +122,7 @@ export function PieceTree({
       <Rows
         project={project}
         parentId={null}
-        selectedId={selectedId}
+        selectedIds={selectedIds}
         onSelect={onSelect}
         onToggleHidden={onToggleHidden}
         draggingId={drag?.pieceId ?? null}
@@ -150,7 +152,7 @@ function rowIdOf(element: Element | null): string | null {
 function Rows({
   project,
   parentId,
-  selectedId,
+  selectedIds,
   onSelect,
   onToggleHidden,
   draggingId,
@@ -161,8 +163,8 @@ function Rows({
 }: {
   project: LegoProject;
   parentId: string | null;
-  selectedId: string | null;
-  onSelect: (pieceId: string) => void;
+  selectedIds: string[];
+  onSelect: (pieceId: string, additive: boolean) => void;
   onToggleHidden: (pieceId: string) => void;
   draggingId: string | null;
   overId: string | null;
@@ -202,7 +204,7 @@ function Rows({
               className={`group flex items-center pr-1 text-sm ${
                 piece.id === overId
                   ? "bg-primary/25 ring-1 ring-inset ring-primary"
-                  : piece.id === selectedId
+                  : selectedIds.includes(piece.id)
                     ? "bg-primary/15 text-foreground"
                     : piece.id === hoveredId
                       ? "bg-accent text-accent-foreground"
@@ -211,7 +213,15 @@ function Rows({
             >
               <button
                 type="button"
-                onClick={() => onSelect(piece.id)}
+                aria-pressed={selectedIds.includes(piece.id)}
+                // Shift or Cmd adds to the selection, the way a file list
+                // does. Either, because the viewport takes either too.
+                onClick={(event) =>
+                  onSelect(
+                    piece.id,
+                    event.shiftKey || event.metaKey || event.ctrlKey,
+                  )
+                }
                 className={`flex min-w-0 flex-1 items-center gap-2 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   dimmed ? "text-muted-foreground" : ""
                 }`}
@@ -264,7 +274,7 @@ function Rows({
             <Rows
               project={project}
               parentId={piece.id}
-              selectedId={selectedId}
+              selectedIds={selectedIds}
               onSelect={onSelect}
               onToggleHidden={onToggleHidden}
               draggingId={draggingId}

@@ -30,6 +30,11 @@ import { unitAtlas } from "../atlas";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { subtreeAsCompound } from "../compounds";
 import { usePartFilter } from "../filter";
+import {
+  applyGroupTransform,
+  type PieceTransform,
+  transformRoots,
+} from "../groupTransform";
 import { canMirror, mirrorCopy, mirrorPiece } from "../mirror";
 import {
   childrenOf,
@@ -37,6 +42,7 @@ import {
   type LegoPiece,
   type LegoProject,
   normalisePieceName,
+  pieceById,
   projectProblems,
   uniquePieceName,
 } from "../model";
@@ -88,7 +94,7 @@ export default function BuilderPage() {
 
 function Builder({ id }: { id: string | undefined }) {
   const doc = useLegoDocument(id);
-  const { edit, selectedId, select: setSelectedId } = doc;
+  const { edit, selectedId, selectedIds, select: setSelectedId } = doc;
   const draft = doc.project;
   const { compounds } = useLegoCompounds();
 
@@ -179,14 +185,31 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   function removeSelected() {
-    if (!draft || !selectedId || selectedId === draft.rootPieceId) return;
-    const doomed = new Set(descendantIds(draft, selectedId));
+    if (!draft) return;
+    // Everything selected goes, and everything under it. The root stays: it is
+    // the unit rather than a piece in it.
+    const doomed = new Set(
+      selectedIds
+        .filter((pieceId) => pieceId !== draft.rootPieceId)
+        .flatMap((pieceId) => descendantIds(draft, pieceId)),
+    );
+    if (doomed.size === 0) return;
     edit((project) => ({
       ...project,
       pieces: project.pieces.filter((piece) => !doomed.has(piece.id)),
     }));
-    // The edit above already reseats the selection to the removed piece's
-    // parent, since it is no longer in the resulting project.
+    // The edit above already reseats the selection to the removed pieces'
+    // parents, since they are no longer in the resulting project.
+  }
+
+  /**
+   * A plain click replaces the selection, Shift or Cmd adds to it or takes it
+   * out again. A modified click that hit nothing leaves the set alone: it was
+   * aimed at a piece and missed, not at clearing what is already there.
+   */
+  function selectPiece(pieceId: string | null, additive = false) {
+    if (!additive) setSelectedId(pieceId);
+    else if (pieceId) doc.toggleSelect(pieceId);
   }
 
   // The key handler is registered once, so it reaches the current selection
@@ -251,13 +274,29 @@ function Builder({ id }: { id: string | undefined }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // The piece stays where it is on screen: only what carries it changes.
+  // The pieces stay where they are on screen: only what carries them changes.
+  function reparentAll(pieceIds: string[], parentId: string) {
+    edit((project) =>
+      pieceIds.reduce(
+        (next, moved) => reparentPiece(next, moved, parentId),
+        project,
+      ),
+    );
+  }
+
+  // Dragging a row that is itself selected carries the whole selection, which
+  // is what dragging one of several selected things means everywhere else.
   function reparent(pieceId: string, parentId: string) {
-    edit((project) => reparentPiece(project, pieceId, parentId));
+    reparentAll(
+      draft && selectedIds.includes(pieceId)
+        ? transformRoots(draft, selectedIds)
+        : [pieceId],
+      parentId,
+    );
   }
 
   async function saveSelectionAsCompound() {
-    if (!draft || !selectedId) return;
+    if (!draft || !selectedId || selectedIds.length > 1) return;
     const compound = subtreeAsCompound(draft, selectedId, {
       id: crypto.randomUUID(),
       now: new Date().toISOString(),
@@ -282,6 +321,11 @@ function Builder({ id }: { id: string | undefined }) {
         piece.id === pieceId ? { ...piece, ...change } : piece,
       ),
     }));
+  }
+
+  /** A whole set moved at once, so it is one edit and one undo step. */
+  function transformPieces(changes: Map<string, PieceTransform>) {
+    edit((project) => applyGroupTransform(project, changes));
   }
 
   function renameUnit(name: string) {
@@ -341,6 +385,12 @@ function Builder({ id }: { id: string | undefined }) {
 
   async function copySelection() {
     if (!selectedId) return;
+    // A cutting has one root piece, so there is nowhere for a second branch to
+    // go. Saying so beats copying whichever piece happened to be clicked last.
+    if (selectedIds.length > 1) {
+      toast.info("Copy takes one piece at a time.");
+      return;
+    }
     const lifted = doc.lift(selectedId);
     if (!lifted) return;
     try {
@@ -386,9 +436,11 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   function duplicateSelection() {
-    if (!draft || !selectedId || selectedId === draft.rootPieceId) return;
-    const inserted = doc.duplicate(selectedId);
-    if (inserted) setSelectedId(inserted);
+    if (!draft) return;
+    // The roots of the selection, so a piece selected alongside its own parent
+    // is copied once, inside its parent's copy, rather than twice.
+    const copies = doc.duplicate(transformRoots(draft, selectedIds));
+    if (copies.length > 0) doc.selectMany(copies);
   }
 
   function mirrorSelection() {
@@ -593,9 +645,10 @@ function Builder({ id }: { id: string | undefined }) {
             <ModelViewport
               pack={pack}
               project={draft}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
+              selectedIds={selectedIds}
+              onSelect={selectPiece}
               onTransform={transformPiece}
+              onTransformMany={transformPieces}
               hoveredId={hoveredId}
               onHover={setHoveredId}
               playing={playing}
@@ -603,12 +656,14 @@ function Builder({ id }: { id: string | undefined }) {
               onGround={() => edit((project) => sitOnGround(project, pack))}
               onReady={doc.onCapture}
               onDuplicate={duplicateSelection}
-              canDuplicate={!!selectedId && selectedId !== draft.rootPieceId}
+              canDuplicate={transformRoots(draft, selectedIds).length > 0}
               onPaste={() => void pasteClipboard()}
               onSaveAsCompound={() => void saveSelectionAsCompound()}
-              canSaveAsCompound={!!selectedId}
+              // A compound has one root piece, so a set has nowhere to put its
+              // second branch.
+              canSaveAsCompound={selectedIds.length === 1}
               onDelete={removeSelected}
-              canDelete={!!selectedId && selectedId !== draft.rootPieceId}
+              canDelete={transformRoots(draft, selectedIds).length > 0}
               placingAnchor={placingAnchor}
               onPlaceAnchor={placeAnchor}
               onCancelAnchor={() => setPlacingAnchor(false)}
@@ -758,8 +813,8 @@ function Builder({ id }: { id: string | undefined }) {
                 <div className="h-full overflow-y-auto py-1">
                   <PieceTree
                     project={draft}
-                    selectedId={selectedId}
-                    onSelect={setSelectedId}
+                    selectedIds={selectedIds}
+                    onSelect={selectPiece}
                     onReparent={reparent}
                     onToggleHidden={toggleHidden}
                     hoveredId={hoveredId}
@@ -775,7 +830,16 @@ function Builder({ id }: { id: string | undefined }) {
                 />
               </div>
 
-              {selected ? (
+              {selectedIds.length > 1 ? (
+                <SetPanel
+                  project={draft}
+                  selectedIds={selectedIds}
+                  onSelect={setSelectedId}
+                  onReparent={(parentId, pieceIds) =>
+                    reparentAll(pieceIds, parentId)
+                  }
+                />
+              ) : selected ? (
                 // Capped and scrollable, and free to shrink further still: the
                 // 55% cap is against the whole aside, so it can outgrow what
                 // is actually left once the tree has taken its own minimum.
@@ -854,7 +918,7 @@ function Builder({ id }: { id: string | undefined }) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {parentOptions(draft, selected.id).map(
+                          {parentOptions(draft, [selected.id]).map(
                             ({ piece, depth }) => (
                               <SelectItem
                                 key={piece.id}
@@ -991,19 +1055,22 @@ function Builder({ id }: { id: string | undefined }) {
 }
 
 /**
- * Every piece that could carry `pieceId`, in tree order and with its depth.
+ * Every piece that could carry all of `pieceIds`, in tree order and with its
+ * depth.
  *
  * The picker reads as the hierarchy it is choosing from, rather than a flat
- * list in which two pieces called `barrel` are indistinguishable.
+ * list in which two pieces called `barrel` are indistinguishable. A set only
+ * offers a parent every piece in it can move to, so the move never half
+ * happens.
  */
 function parentOptions(
   project: LegoProject,
-  pieceId: string,
+  pieceIds: string[],
 ): { piece: LegoPiece; depth: number }[] {
   const options: { piece: LegoPiece; depth: number }[] = [];
   const visit = (parentId: string | null, depth: number) => {
     for (const child of childrenOf(project, parentId)) {
-      if (canReparent(project, pieceId, child.id)) {
+      if (pieceIds.every((id) => canReparent(project, id, child.id))) {
         options.push({ piece: child, depth });
       }
       visit(child.id, depth + 1);
@@ -1011,4 +1078,102 @@ function parentOptions(
   };
   visit(null, 0);
   return options;
+}
+
+/** Radix needs a non-empty value, and "they do not agree" needs one of its own. */
+const MIXED_PARENT = "mixed";
+
+/**
+ * The panel for a set: what is in it, and the one thing that can be said about
+ * all of it at once.
+ *
+ * No name, transform, pivot, role or anchor list, because those are one
+ * piece's answers and three pieces do not have one between them. A field
+ * showing the last-clicked piece's name in a panel headed "3 pieces" would
+ * invite an edit that only landed on one of them. What is left is what a set
+ * genuinely shares: what carries it, and the gizmo in the viewport.
+ */
+function SetPanel({
+  project,
+  selectedIds,
+  onSelect,
+  onReparent,
+}: {
+  project: LegoProject;
+  selectedIds: string[];
+  onSelect: (pieceId: string) => void;
+  onReparent: (parentId: string, pieceIds: string[]) => void;
+}) {
+  const roots = transformRoots(project, selectedIds);
+  const parents = new Set(
+    roots.map((id) => pieceById(project, id)?.parentId ?? project.rootPieceId),
+  );
+  const shared = parents.size === 1 ? [...parents][0] : MIXED_PARENT;
+
+  return (
+    <div className="max-h-[55%] min-h-0 overflow-y-auto border-t border-border px-3 py-2">
+      <p className="text-xs text-muted-foreground">
+        {selectedIds.length} pieces selected
+      </p>
+      <ul className="mt-1 flex flex-wrap gap-1">
+        {selectedIds.map((pieceId) => {
+          const piece = pieceById(project, pieceId);
+          if (!piece) return null;
+          return (
+            <li key={pieceId}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                onClick={() => onSelect(pieceId)}
+                title={`Select ${piece.name} on its own`}
+              >
+                {piece.name}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+
+      {roots.length > 0 ? (
+        <div className="mt-2">
+          <span className="text-xs text-muted-foreground">Hangs off</span>
+          <Select
+            value={shared}
+            onValueChange={(parentId) => onReparent(parentId, roots)}
+          >
+            <SelectTrigger
+              size="sm"
+              className="mt-1 w-full"
+              aria-label="Parent piece"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {shared === MIXED_PARENT ? (
+                <SelectItem value={MIXED_PARENT} disabled>
+                  Several
+                </SelectItem>
+              ) : null}
+              {parentOptions(project, roots).map(({ piece, depth }) => (
+                <SelectItem
+                  key={piece.id}
+                  value={piece.id}
+                  style={{ paddingLeft: 8 + depth * 12 }}
+                >
+                  {piece.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
+      <p className="mt-2 text-xs text-muted-foreground">
+        Moving, turning or scaling this set works on each piece about the middle
+        of the set, so it keeps its shape. A piece already carried by another in
+        the set is left to its parent.
+      </p>
+    </div>
+  );
 }

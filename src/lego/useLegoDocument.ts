@@ -17,7 +17,7 @@ import {
   insertCompoundAt,
   subtreeAsCompound,
 } from "./compounds";
-import { emptyDocument, reduceDocument } from "./document";
+import { emptyDocument, primarySelection, reduceDocument } from "./document";
 import { type LegoProject, pieceById } from "./model";
 import { saveProject, saveThumbnail, useLegoProjects } from "./projects";
 
@@ -29,8 +29,14 @@ export interface LegoDocumentSession {
   saving: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  /** Every selected piece, oldest first. */
+  selectedIds: string[];
+  /** The last piece clicked, which is what the single-piece panel is about. */
   selectedId: string | null;
+  /** Replaces the selection, which is what a plain click does. */
   select: (id: string | null) => void;
+  /** Adds a piece to the selection, or takes it out again. */
+  toggleSelect: (id: string) => void;
   edit: (change: (project: LegoProject) => LegoProject) => void;
   undo: () => void;
   redo: () => void;
@@ -39,9 +45,13 @@ export interface LegoDocumentSession {
    *  ready to serialize onto the system clipboard. Null off the edge of the
    *  document, same as everything else keyed by piece id. */
   lift: (pieceId: string) => LegoProject | null;
+  /** Replaces the selection with a whole set at once. */
+  selectMany: (ids: string[]) => void;
   /** Puts a subtree under `parentId`, answering with its new root piece. */
   insert: (cutting: LegoProject, parentId: string) => string | null;
-  duplicate: (pieceId: string) => string | null;
+  /** Copies each piece and its subtree alongside itself, in one edit, and
+   *  answers the copies so the selection can move onto them. */
+  duplicate: (pieceIds: string[]) => string[];
   /** How the viewport hands over the means to grab a thumbnail. */
   onCapture: (capture: () => HTMLCanvasElement) => void;
 }
@@ -69,7 +79,15 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
   const undo = useCallback(() => dispatch({ type: "undo" }), []);
   const redo = useCallback(() => dispatch({ type: "redo" }), []);
   const select = useCallback(
-    (id: string | null) => dispatch({ type: "select", id }),
+    (id: string | null) => dispatch({ type: "select", ids: id ? [id] : [] }),
+    [],
+  );
+  const selectMany = useCallback(
+    (ids: string[]) => dispatch({ type: "select", ids }),
+    [],
+  );
+  const toggleSelect = useCallback(
+    (id: string) => dispatch({ type: "toggle-select", id }),
     [],
   );
 
@@ -141,8 +159,11 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
     saving,
     canUndo: state.past.length > 0,
     canRedo: state.future.length > 0,
-    selectedId: state.selectedId,
+    selectedIds: state.selectedIds,
+    selectedId: primarySelection(state),
     select,
+    selectMany,
+    toggleSelect,
     edit,
     undo,
     redo,
@@ -151,30 +172,43 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
     },
     lift,
     insert,
-    duplicate: (pieceId) => {
-      if (!project) return null;
-      const source = pieceById(project, pieceId);
-      const cutting = lift(pieceId);
-      if (!source || !cutting) return null;
-      // Alongside the original rather than inside it, which is what duplicate
-      // means everywhere else.
-      const parentId = source.parentId ?? project.rootPieceId;
-      // Lifting drops the subtree root's transform, which is right for
-      // something bound for the library but not for a copy that is meant to
-      // sit exactly where the original does until it is dragged elsewhere.
-      const inserted = insertCompoundAt(
-        project,
-        cutting,
-        parentId,
-        {
-          position: source.position,
-          rotation: source.rotation,
-          scale: source.scale,
-        },
-        () => crypto.randomUUID(),
-      );
-      edit(() => inserted.project);
-      return inserted.rootPieceId;
+    duplicate: (pieceIds) => {
+      if (!project) return [];
+      // Each copy is lifted out of the document the one before it produced,
+      // so a set duplicates in a single edit and undoes in a single step.
+      let next = project;
+      const copies: string[] = [];
+      for (const pieceId of pieceIds) {
+        const source = pieceById(next, pieceId);
+        const cutting = subtreeAsCompound(next, pieceId, {
+          id: crypto.randomUUID(),
+          now: new Date().toISOString(),
+          newId: () => crypto.randomUUID(),
+        });
+        if (!source || !cutting) continue;
+        // Alongside the original rather than inside it, which is what duplicate
+        // means everywhere else.
+        const parentId = source.parentId ?? next.rootPieceId;
+        // Lifting drops the subtree root's transform, which is right for
+        // something bound for the library but not for a copy that is meant to
+        // sit exactly where the original does until it is dragged elsewhere.
+        const inserted = insertCompoundAt(
+          next,
+          cutting,
+          parentId,
+          {
+            position: source.position,
+            rotation: source.rotation,
+            scale: source.scale,
+          },
+          () => crypto.randomUUID(),
+        );
+        next = inserted.project;
+        copies.push(inserted.rootPieceId);
+      }
+      if (copies.length === 0) return [];
+      edit(() => next);
+      return copies;
     },
     onCapture: (capture) => {
       captureRef.current = capture;

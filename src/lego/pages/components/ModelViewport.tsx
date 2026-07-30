@@ -58,6 +58,12 @@ import {
 import { frameBox } from "../../framing";
 import { addStandardLights, partMaterial } from "../../geometry";
 import {
+  groupPivot,
+  groupTransform,
+  type PieceTransform,
+  transformRoots,
+} from "../../groupTransform";
+import {
   descendantIds,
   isEffectivelyHidden,
   type LegoPiece,
@@ -156,10 +162,16 @@ const ROTATION_STEP = Math.PI / 12;
 interface Props {
   pack: LoadedPack;
   project: LegoProject;
-  selectedId: string | null;
-  onSelect: (pieceId: string | null) => void;
+  /** Every selected piece, oldest first. One is the ordinary case. */
+  selectedIds: string[];
+  /** `additive` is a Shift or Cmd click: add this piece to the selection
+   *  rather than replacing it. */
+  onSelect: (pieceId: string | null, additive: boolean) => void;
   /** Committed when a drag ends, not on every frame of it. */
   onTransform: (pieceId: string, change: Partial<LegoPiece>) => void;
+  /** The same, for a set: every piece's new transform in one edit, so a group
+   *  drag is one undo step rather than one per piece. */
+  onTransformMany: (changes: Map<string, PieceTransform>) => void;
   /**
    * The piece to highlight as hovered regardless of where the pointer is, e.g.
    * because the sidebar's tree row for it is hovered instead of the canvas.
@@ -195,7 +207,7 @@ interface Props {
   /** Save the selected piece and everything under it, to reuse in another unit. */
   onSaveAsCompound: () => void;
   canSaveAsCompound: boolean;
-  /** Delete the selected piece (Backspace). */
+  /** Delete every selected piece (Backspace). */
   onDelete: () => void;
   canDelete: boolean;
   /**
@@ -213,9 +225,10 @@ interface Props {
 export function ModelViewport({
   pack,
   project,
-  selectedId,
+  selectedIds,
   onSelect,
   onTransform,
+  onTransformMany,
   hoveredId,
   onHover,
   onReady,
@@ -233,6 +246,10 @@ export function ModelViewport({
   onPlaceAnchor,
   onCancelAnchor,
 }: Props) {
+  // The one selected piece, when there is exactly one. Anchors, the key at the
+  // bottom of the view and the pivot dot are all about a single piece: a set
+  // is dragged about its midpoint and seats against nothing.
+  const soleSelectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
   const compassRef = useRef<SVGSVGElement>(null);
@@ -268,13 +285,15 @@ export function ModelViewport({
   onReadyRef.current = onReady;
   const onTransformRef = useRef(onTransform);
   onTransformRef.current = onTransform;
+  const onTransformManyRef = useRef(onTransformMany);
+  onTransformManyRef.current = onTransformMany;
   const onHoverRef = useRef(onHover);
   onHoverRef.current = onHover;
   // F reads this from the keydown listener below, which is registered once
   // and would otherwise only ever see the selection at mount. The hover code
-  // reads it too, to skip drawing a hover treatment on the selected piece.
-  const selectedIdRef = useRef(selectedId);
-  selectedIdRef.current = selectedId;
+  // reads it too, to skip drawing a hover treatment on a selected piece.
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
   // The gizmo reads the document every frame of a drag to find what to snap
   // against, and a stale copy would snap to where pieces used to be.
   const projectRef = useRef(project);
@@ -319,9 +338,11 @@ export function ModelViewport({
       const root = new THREE.Group();
       scene.add(root);
 
-      const outline = new THREE.BoxHelper(root, 0x8b5cf6);
-      outline.visible = false;
-      scene.add(outline);
+      // What the gizmo drags when more than one piece is selected. An object
+      // of its own, sitting at the set's midpoint, because the pieces have
+      // different parents and there is no shared carrier to grab.
+      const groupPivot = new THREE.Object3D();
+      scene.add(groupPivot);
 
       // Sky blue, and thinner reading than the selection outline: the piece
       // under the pointer, not yet clicked.
@@ -347,12 +368,6 @@ export function ModelViewport({
         ORIGIN_COLOUR,
         SELECT_OVERLAY_OPACITY,
       );
-      const selectOverlay = new THREE.Mesh(
-        new THREE.BufferGeometry(),
-        selectOverlayMaterial,
-      );
-      selectOverlay.visible = false;
-      selectOverlay.raycast = () => {};
 
       // Green, and only ever seen mid-drag: the piece being seated against, and
       // the point the two anchors meet at.
@@ -405,10 +420,16 @@ export function ModelViewport({
         controls,
         gizmo,
         root,
-        outline,
+        groupPivot,
+        groupPivotAt: [0, 0, 0],
+        groupIds: [],
+        groupChanges: new Map(),
         hoverOutline,
         hoverOverlay,
-        selectOverlay,
+        selectOverlayMaterial,
+        selectOutlines: [],
+        selectOverlays: [],
+        selectedGroups: [],
         hoveredId: null,
         grid,
         axes,
@@ -435,7 +456,8 @@ export function ModelViewport({
         onPlaceAnchorRef,
         onCancelAnchorRef,
         onTransformRef,
-        selectedIdRef,
+        onTransformManyRef,
+        selectedIdsRef,
         onHoverRef,
       };
       sceneRef.current = state;
@@ -471,14 +493,19 @@ export function ModelViewport({
         dragging = false;
         showTargetAnchors(state, packRef.current, projectRef.current, null);
         showSeat(state, null);
-        commitGizmo(state);
+        if (gizmo.object === groupPivot) commitGroup(state);
+        else commitGizmo(state);
         render();
       });
 
       gizmo.addEventListener("objectChange", () => {
-        forceUniformScale(state);
-        applySnap(state);
-        state.outline.setFromObject(gizmo.object ?? root);
+        if (gizmo.object === groupPivot) {
+          dragGroup(state);
+        } else {
+          forceUniformScale(state);
+          applySnap(state);
+        }
+        refreshSelectionOutlines(state);
         render();
       });
 
@@ -528,7 +555,10 @@ export function ModelViewport({
           placeAnchor(state, hit);
           return;
         }
-        onSelectRef.current(pieceIdOf(hit?.object ?? null));
+        onSelectRef.current(
+          pieceIdOf(hit?.object ?? null),
+          event.shiftKey || event.metaKey || event.ctrlKey,
+        );
       };
       renderer.domElement.addEventListener("pointerdown", onPointerDown);
       renderer.domElement.addEventListener("pointerup", onPointerUp);
@@ -596,6 +626,7 @@ export function ModelViewport({
           gizmo.getHelper().removeFromParent();
           gizmo.dispose();
           clearAnchors(state);
+          for (const helper of state.selectOutlines) helper.dispose();
           state.targetAnchors?.geometry.dispose();
           state.seatMark.geometry.dispose();
           (state.seatMark.material as THREE.PointsMaterial).dispose();
@@ -613,7 +644,6 @@ export function ModelViewport({
           state.sky?.texture.dispose();
           if (state.terrain) disposeTerrain(state.terrain);
           disposeReferenceUnit(reference);
-          outline.dispose();
           sceneRef.current = null;
         },
       };
@@ -644,39 +674,13 @@ export function ModelViewport({
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    const piece = selectedId ? pieceById(project, selectedId) : undefined;
-    const group = piece ? state.groups.get(piece.id) : undefined;
-    // A hidden piece keeps its row selectable, so unhiding it stays reachable,
-    // but there is nothing on screen to outline or drag: attaching the gizmo
-    // to an invisible object would just fight the pointer over thin air. An
-    // ancestor being hidden counts too, since that hides this piece as well.
-    if (
-      group &&
-      piece &&
-      selectedId &&
-      !isEffectivelyHidden(project, selectedId)
-    ) {
-      state.outline.setFromObject(group);
-      state.outline.visible = true;
-      showOverlay(state.selectOverlay, group);
-      // The root has nothing to move relative to, so it gets no handles. Nor
-      // does anything while an anchor is being placed: the handles sit over
-      // the middle of the very piece the click has to reach.
-      if (selectedId === project.rootPieceId || placingAnchor) {
-        state.gizmo.detach();
-      } else {
-        state.gizmo.attach(group);
-      }
-    } else {
-      state.outline.visible = false;
-      hideOverlay(state.selectOverlay);
-      state.gizmo.detach();
-    }
-    // The new selection may be the piece already showing a hover treatment,
+    showSelection(state, project, selectedIds);
+    attachGizmo(state, project, selectedIds, placingAnchor);
+    // The new selection may be a piece already showing a hover treatment,
     // which now has to stand down in favour of the (stronger) selected look.
     applyHoverVisual(state);
     state.render();
-  }, [selectedId, project, placingAnchor]);
+  }, [selectedIds, project, placingAnchor]);
 
   // Independent of the pointer: the hovered piece can arrive from the sidebar
   // tree instead of a raycast, and does not report back up when it does, so
@@ -694,13 +698,14 @@ export function ModelViewport({
 
   // Declared after the scene sync, so the group a new piece needs already
   // exists by the time this looks for it. Playback clears them: the baked scene
-  // has no pivot left to point at.
+  // has no pivot left to point at. So does a set: a group drag seats against
+  // nothing, so fifteen dots per piece would be pointing at nothing.
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    showAnchors(state, pack, project, playing ? null : selectedId);
+    showAnchors(state, pack, project, playing ? null : soleSelectedId);
     state.render();
-  }, [pack, project, selectedId, playing]);
+  }, [pack, project, soleSelectedId, playing]);
 
   useEffect(() => {
     const state = sceneRef.current;
@@ -768,13 +773,15 @@ export function ModelViewport({
       if (!current) return;
       disposeBaked(current);
       syncScene(current, packRef.current, projectRef.current);
-      const group = selectedId ? current.groups.get(selectedId) : undefined;
-      if (group && selectedId !== projectRef.current.rootPieceId) {
-        current.gizmo.attach(group);
-      }
+      attachGizmo(
+        current,
+        projectRef.current,
+        selectedIds,
+        placingAnchorRef.current,
+      );
       current.render();
     };
-  }, [playing, reduceMotion, selectedId]);
+  }, [playing, reduceMotion, selectedIds]);
 
   useEffect(() => {
     const state = sceneRef.current;
@@ -800,7 +807,7 @@ export function ModelViewport({
       if (isShortcut("scale", event)) setMode("scale");
       if (isShortcut("frame", event)) {
         const state = sceneRef.current;
-        if (state) focusSelection(state, selectedIdRef.current);
+        if (state) focusSelection(state, selectedIdsRef.current);
       }
       if (isShortcut("shortcuts", event)) setShortcutsOpen(true);
     };
@@ -817,8 +824,8 @@ export function ModelViewport({
 
   // Whether the selected piece carries anchors of its own, which decides what
   // the key at the bottom of the view has to name.
-  const ownAnchors = selectedId
-    ? (pieceById(project, selectedId)?.customAnchors?.length ?? 0)
+  const ownAnchors = soleSelectedId
+    ? (pieceById(project, soleSelectedId)?.customAnchors?.length ?? 0)
     : 0;
 
   return (
@@ -936,7 +943,7 @@ export function ModelViewport({
                     variant="outline"
                     onClick={onDelete}
                     disabled={!canDelete}
-                    aria-label="Delete the selected piece"
+                    aria-label="Delete the selection"
                   >
                     <Trash2 className="size-4" />
                   </Button>
@@ -1000,7 +1007,7 @@ export function ModelViewport({
       {/* Notes and the key sit at the bottom, where they can be read when
           wanted and ignored when not. */}
       <div className="pointer-events-none absolute bottom-3 left-3 flex flex-col gap-1 text-xs text-muted-foreground">
-        {selectedId && !playing ? (
+        {soleSelectedId && !playing ? (
           <div className="flex gap-3">
             <Dot colour="#8b5cf6" label="Turns here" />
             {/* A piece with anchors of its own offers only those, so the box's
@@ -1148,13 +1155,29 @@ interface SceneState {
   controls: OrbitControls;
   gizmo: TransformControls;
   root: THREE.Group;
-  outline: THREE.BoxHelper;
-  /** The hovered piece's outline and face wash, drawn the same way as the
+  /** What the gizmo drags for a set: an empty object at the set's midpoint.
+   *  Never in the document, never exported. */
+  groupPivot: THREE.Object3D;
+  /** Where that pivot was put when the set was selected, which is the point a
+   *  group drag is measured from and turns about. */
+  groupPivotAt: Vec3;
+  /** The pieces a group drag writes to: the selection's own roots. */
+  groupIds: string[];
+  /** What the drag in progress has worked out for them, ready to commit. */
+  groupChanges: Map<string, PieceTransform>;
+  /** The hovered piece's outline and face wash, drawn the same way as a
    *  selected piece's but in a different colour and never both on one piece. */
   hoverOutline: THREE.BoxHelper;
   hoverOverlay: THREE.Mesh;
-  /** The selected piece's face wash. `outline` is the box around it. */
-  selectOverlay: THREE.Mesh;
+  /** A violet box and face wash per selected piece. Pooled rather than made
+   *  per selection: a set is selected and cleared constantly, and a fresh
+   *  BoxHelper each time would leak its geometry. */
+  selectOutlines: THREE.BoxHelper[];
+  selectOverlays: THREE.Mesh[];
+  selectOverlayMaterial: THREE.MeshBasicMaterial;
+  /** The groups those outlines are on, so a drag can refresh them without
+   *  looking the selection up again. */
+  selectedGroups: THREE.Group[];
   /** The piece currently under the pointer, in this view or the sidebar tree.
    *  Never a hidden piece, and never the selected piece: see `applyHoverVisual`. */
   hoveredId: string | null;
@@ -1218,9 +1241,12 @@ interface SceneState {
   onTransformRef: {
     current: (pieceId: string, change: Partial<LegoPiece>) => void;
   };
+  onTransformManyRef: {
+    current: (changes: Map<string, PieceTransform>) => void;
+  };
   /** The latest selection, so hover code can skip a piece that is already
    *  selected without waiting for a render to see the new prop. */
-  selectedIdRef: { current: string | null };
+  selectedIdsRef: { current: string[] };
   onHoverRef: { current: ((pieceId: string | null) => void) | undefined };
 }
 
@@ -1556,6 +1582,172 @@ function hideOverlay(overlay: THREE.Mesh) {
 }
 
 /**
+ * Draw a violet box and face wash on every selected piece.
+ *
+ * A hidden piece is left out: its row stays selectable so it can be unhidden,
+ * but there is nothing on screen to draw a box round. The pools are only ever
+ * grown, so selecting eight pieces and then one leaves seven idle helpers
+ * rather than seven disposed and rebuilt on the next click.
+ */
+function showSelection(
+  state: SceneState,
+  project: LegoProject,
+  selectedIds: string[],
+) {
+  const groups = selectedIds
+    .filter((id) => !isEffectivelyHidden(project, id))
+    .map((id) => state.groups.get(id))
+    .filter((group): group is THREE.Group => group !== undefined);
+  state.selectedGroups = groups;
+
+  while (state.selectOutlines.length < groups.length) {
+    const helper = new THREE.BoxHelper(state.root, ORIGIN_COLOUR);
+    helper.visible = false;
+    state.scene.add(helper);
+    state.selectOutlines.push(helper);
+  }
+  while (state.selectOverlays.length < groups.length) {
+    const overlay = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      state.selectOverlayMaterial,
+    );
+    overlay.visible = false;
+    overlay.raycast = () => {};
+    state.selectOverlays.push(overlay);
+  }
+
+  state.selectOutlines.forEach((helper, index) => {
+    const group = groups[index];
+    if (group) helper.setFromObject(group);
+    helper.visible = group !== undefined;
+  });
+  state.selectOverlays.forEach((overlay, index) => {
+    const group = groups[index];
+    // `showOverlay` adds the wash to the piece's own group, which takes it off
+    // whichever group had it before.
+    if (group) showOverlay(overlay, group);
+    else hideOverlay(overlay);
+  });
+}
+
+/** Keep the boxes on the pieces while a drag moves them. */
+function refreshSelectionOutlines(state: SceneState) {
+  state.selectedGroups.forEach((group, index) => {
+    state.selectOutlines[index]?.setFromObject(group);
+  });
+}
+
+/**
+ * Point the gizmo at whatever the selection means: one piece's own group, or
+ * an object at the midpoint of a set.
+ *
+ * Nothing gets handles while an anchor is being placed, because they would sit
+ * over the middle of the very piece the click has to reach, and nothing gets
+ * them for a selection with nothing movable in it: the root is the unit, and a
+ * hidden piece is not on screen to drag.
+ */
+function attachGizmo(
+  state: SceneState,
+  project: LegoProject,
+  selectedIds: string[],
+  placingAnchor: boolean,
+) {
+  const roots = transformRoots(project, selectedIds).filter(
+    (id) => !isEffectivelyHidden(project, id) && state.groups.has(id),
+  );
+  state.groupIds = roots;
+  state.groupChanges = new Map();
+
+  if (placingAnchor || roots.length === 0) {
+    state.gizmo.detach();
+    return;
+  }
+  if (roots.length === 1) {
+    const group = state.groups.get(roots[0]);
+    if (group) state.gizmo.attach(group);
+    else state.gizmo.detach();
+    return;
+  }
+
+  const pivot = groupPivot(project, roots);
+  state.groupPivotAt = pivot;
+  state.groupPivot.position.set(...pivot);
+  state.groupPivot.rotation.set(0, 0, 0);
+  state.groupPivot.scale.set(1, 1, 1);
+  state.gizmo.attach(state.groupPivot);
+}
+
+/**
+ * Turn a drag of the group pivot into a transform for each piece in the set.
+ *
+ * The gesture is read off the pivot once and handed to `groupTransform`, which
+ * works out where each piece lands. The answer is put straight onto the scene
+ * so the drag is visible, and kept for the commit, so what was drawn is
+ * exactly what gets saved.
+ */
+function dragGroup(state: SceneState) {
+  const pivot = state.groupPivot;
+  const at = state.groupPivotAt;
+  const rotating = state.gizmo.getMode() === "rotate";
+
+  // One number, not three. A non-uniform scale about a shared point shears
+  // any piece turned relative to it, and a shear is not something a piece's
+  // position, rotation and scale can hold.
+  const scale = draggedScale(pivot);
+  pivot.scale.setScalar(scale);
+
+  const euler = new THREE.Euler().setFromQuaternion(pivot.quaternion);
+  let rotation: Vec3 = [euler.x, euler.y, euler.z];
+  // The same 15 degree steps a single piece lands on, applied to the pivot
+  // itself so the handles show where the set has actually gone.
+  if (rotating && state.snapping) {
+    rotation = snapRotation(rotation, ROTATION_STEP);
+    pivot.rotation.set(...rotation);
+  }
+
+  const changes = groupTransform(state.projectRef.current, state.groupIds, at, {
+    position: [
+      pivot.position.x - at[0],
+      pivot.position.y - at[1],
+      pivot.position.z - at[2],
+    ],
+    rotation,
+    scale,
+  });
+  state.groupChanges = changes;
+
+  for (const [pieceId, transform] of changes) {
+    const group = state.groups.get(pieceId);
+    if (!group) continue;
+    group.position.set(...transform.position);
+    group.rotation.set(...transform.rotation);
+    group.scale.set(...transform.scale);
+  }
+
+  // A set seats against nothing: there is no one anchor on it to seat with.
+  // Its turn still lands on the same 15 degree steps a single piece's does.
+  state.onSnapChange(rotating && state.snapping);
+}
+
+/** The scale a drag has put on the pivot, read off the axis that moved. */
+function draggedScale(pivot: THREE.Object3D): number {
+  let ratio = 1;
+  for (let axis = 0; axis < 3; axis++) {
+    const candidate = pivot.scale.getComponent(axis);
+    if (Math.abs(candidate - 1) > Math.abs(ratio - 1)) ratio = candidate;
+  }
+  return ratio;
+}
+
+/** Write a finished group drag back to the document, as one edit. */
+function commitGroup(state: SceneState) {
+  const changes = state.groupChanges;
+  state.groupChanges = new Map();
+  state.onSnapChange(false);
+  if (changes.size > 0) state.onTransformManyRef.current(changes);
+}
+
+/**
  * Resolve what should count as hovered, apply the outline and wash for it,
  * and report the result back to whichever raycast or pointer event asked.
  *
@@ -1601,14 +1793,16 @@ function resolveHovered(
 
 /**
  * Draw (or clear) the hover outline and wash for whatever `state.hoveredId` is
- * now. The selected piece is skipped even if it is also the hovered one: its
- * own outline, wash and gizmo already say enough, and a second wash in a
- * different colour on the same faces would only look muddy.
+ * now. A selected piece is skipped even if it is also the hovered one: its own
+ * outline, wash and gizmo already say enough, and a second wash in a different
+ * colour on the same faces would only look muddy.
  */
 function applyHoverVisual(state: SceneState) {
   const id = state.hoveredId;
   const group =
-    id && id !== state.selectedIdRef.current ? state.groups.get(id) : undefined;
+    id && !state.selectedIdsRef.current.includes(id)
+      ? state.groups.get(id)
+      : undefined;
   if (group) {
     state.hoverOutline.setFromObject(group);
     state.hoverOutline.visible = true;
@@ -1950,17 +2144,25 @@ function applyAnimation(state: SceneState, project: LegoProject, t: number) {
 }
 
 /**
- * Frame a piece: move the orbit target to its world-space bounding box and
- * pull the camera in along the direction it is already looking.
+ * Frame the selection: move the orbit target to the box round everything in
+ * it, and pull the camera in along the direction it is already looking.
  *
- * With nothing selected, `pieceId` is null and the whole unit is framed
- * instead. That reads as more useful than F doing nothing, and matches other
- * 3D tools' "frame all" behaviour for an empty selection.
+ * With nothing selected the whole unit is framed instead. That reads as more
+ * useful than F doing nothing, and matches other 3D tools' "frame all"
+ * behaviour for an empty selection.
  */
-function focusSelection(state: SceneState, pieceId: string | null) {
-  const object = pieceId ? state.groups.get(pieceId) : state.root;
-  if (!object) return;
-  if (frameObject(state, object)) state.render();
+function focusSelection(state: SceneState, pieceIds: string[]) {
+  const groups = pieceIds
+    .map((id) => state.groups.get(id))
+    .filter((group): group is THREE.Group => group !== undefined);
+  if (groups.length === 0) {
+    if (frameObject(state, state.root)) state.render();
+    return;
+  }
+
+  const box = new THREE.Box3();
+  for (const group of groups) box.union(new THREE.Box3().setFromObject(group));
+  if (frameBounds(state, box)) state.render();
 }
 
 /**
@@ -1974,7 +2176,12 @@ function focusSelection(state: SceneState, pieceId: string | null) {
  * its geometry exists.
  */
 function frameObject(state: SceneState, object: THREE.Object3D): boolean {
-  const box = new THREE.Box3().setFromObject(object);
+  return frameBounds(state, new THREE.Box3().setFromObject(object));
+}
+
+/** The same, from a box that is already worked out: framing a set unions the
+ *  boxes of several pieces rather than taking one object's own. */
+function frameBounds(state: SceneState, box: THREE.Box3): boolean {
   if (box.isEmpty()) return false;
 
   // The direction from the target to the camera, not the camera to the

@@ -6,6 +6,7 @@ import {
   HISTORY_LIMIT,
   type LegoDocument,
   type LegoDocumentAction,
+  primarySelection,
   reduceDocument,
 } from "./document";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
@@ -56,8 +57,8 @@ function addPiece(
   };
 }
 
-function select(id: string | null): LegoDocumentAction {
-  return { type: "select", id };
+function select(...ids: string[]): LegoDocumentAction {
+  return { type: "select", ids };
 }
 
 function run(
@@ -203,20 +204,22 @@ describe("undo and redo", () => {
 
 describe("selection", () => {
   it("starts on the root once the document arrives", () => {
-    expect(opened.selectedId).toBe("root");
+    expect(opened.selectedIds).toEqual(["root"]);
   });
 
   it("moves where it is told", () => {
-    expect(reduceDocument(opened, select("root")).selectedId).toBe("root");
+    expect(reduceDocument(opened, select("root")).selectedIds).toEqual([
+      "root",
+    ]);
   });
 
   it("reseats to the parent when undo removes the selected piece", () => {
     const built = run(opened, addPiece("child", "root", 1000), select("child"));
-    expect(built.selectedId).toBe("child");
+    expect(built.selectedIds).toEqual(["child"]);
 
     const undone = reduceDocument(built, { type: "undo" });
     expect(undone.project?.pieces.map((p) => p.id)).toEqual(["root"]);
-    expect(undone.selectedId).toBe("root");
+    expect(undone.selectedIds).toEqual(["root"]);
   });
 
   it("reseats to the parent when a delete removes the selected piece", () => {
@@ -231,7 +234,7 @@ describe("selection", () => {
       }),
     });
 
-    expect(deleted.selectedId).toBe("root");
+    expect(deleted.selectedIds).toEqual(["root"]);
   });
 
   it("reseats to redo the same way, since it is the same kind of jump", () => {
@@ -240,7 +243,7 @@ describe("selection", () => {
     // The selection already settled on root during the undo. Going forward
     // again does not chase the child back down, because root is still there.
     const redone = reduceDocument(undone, { type: "redo" });
-    expect(redone.selectedId).toBe("root");
+    expect(redone.selectedIds).toEqual(["root"]);
   });
 
   it("walks up to the nearest surviving ancestor, not straight to the root", () => {
@@ -256,7 +259,7 @@ describe("selection", () => {
     // furthest thing away.
     const undone = reduceDocument(built, { type: "undo" });
     expect(undone.project?.pieces.map((p) => p.id)).toEqual(["root", "mid"]);
-    expect(undone.selectedId).toBe("mid");
+    expect(undone.selectedIds).toEqual(["mid"]);
   });
 
   it("walks up past a whole removed branch to whatever is left", () => {
@@ -276,7 +279,7 @@ describe("selection", () => {
 
     const undone = reduceDocument(built, { type: "undo" });
     expect(undone.project?.pieces.map((p) => p.id)).toEqual(["root"]);
-    expect(undone.selectedId).toBe("root");
+    expect(undone.selectedIds).toEqual(["root"]);
   });
 
   it("clears the selection rather than guess, if even the root has gone", () => {
@@ -291,13 +294,80 @@ describe("selection", () => {
       change: (doc) => ({ ...doc, pieces: [] }),
     });
 
-    expect(broken.selectedId).toBe(null);
+    expect(broken.selectedIds).toEqual([]);
   });
 
   it("leaves an untouched selection alone", () => {
     const built = run(opened, addPiece("child", "root", 1000), select("root"));
 
     const edited = reduceDocument(built, rename("gunship", 6000));
-    expect(edited.selectedId).toBe("root");
+    expect(edited.selectedIds).toEqual(["root"]);
+  });
+});
+
+describe("selecting more than one piece", () => {
+  const tree = run(
+    opened,
+    addPiece("mid", "root", 1000),
+    addPiece("leg", "root", 1000),
+    addPiece("foot", "mid", 1000),
+  );
+
+  it("adds and removes one piece at a time, newest last", () => {
+    const both = run(tree, select("mid"), { type: "toggle-select", id: "leg" });
+    expect(both.selectedIds).toEqual(["mid", "leg"]);
+    expect(primarySelection(both)).toBe("leg");
+
+    const back = reduceDocument(both, { type: "toggle-select", id: "leg" });
+    expect(back.selectedIds).toEqual(["mid"]);
+  });
+
+  it("takes a plain select as a replacement, not an addition", () => {
+    const both = run(tree, select("mid", "leg"), select("foot"));
+    expect(both.selectedIds).toEqual(["foot"]);
+  });
+
+  it("reseats every selected piece when a delete takes some of them", () => {
+    const built = run(tree, select("foot", "leg"));
+
+    const deleted = reduceDocument(built, {
+      type: "edit",
+      at: 9000,
+      change: (doc) => ({
+        ...doc,
+        pieces: doc.pieces.filter((piece) => piece.id !== "foot"),
+      }),
+    });
+
+    // "foot" reseats onto the parent it hung off. "leg" is untouched and
+    // keeps its place in the order.
+    expect(deleted.selectedIds).toEqual(["mid", "leg"]);
+  });
+
+  it("does not hold the same piece twice when two of them reseat together", () => {
+    const built = run(tree, select("mid", "foot"));
+
+    const deleted = reduceDocument(built, {
+      type: "edit",
+      at: 9000,
+      change: (doc) => ({
+        ...doc,
+        pieces: doc.pieces.filter((piece) => piece.id !== "foot"),
+      }),
+    });
+
+    expect(deleted.selectedIds).toEqual(["mid"]);
+  });
+
+  it("empties the selection when every selected piece goes", () => {
+    const built = run(tree, select("mid", "leg"));
+
+    const broken = reduceDocument(built, {
+      type: "edit",
+      at: 9000,
+      change: (doc) => ({ ...doc, pieces: [] }),
+    });
+
+    expect(broken.selectedIds).toEqual([]);
   });
 });

@@ -74,19 +74,19 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "translate",
     group: "Transform",
-    description: "Move the selected piece",
+    description: "Move the selection",
     combos: [{ key: "g", shift: false }],
   },
   {
     id: "rotate",
     group: "Transform",
-    description: "Turn the selected piece",
+    description: "Turn the selection",
     combos: [{ key: "r", shift: false }],
   },
   {
     id: "scale",
     group: "Transform",
-    description: "Scale the selected piece",
+    description: "Scale the selection",
     combos: [{ key: "s", shift: false }],
   },
   {
@@ -99,7 +99,7 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "frame",
     group: "View",
-    description: "Frame the selected piece",
+    description: "Frame the selection",
     combos: [{ key: "f", mod: false, shift: false }],
   },
   {
@@ -138,14 +138,27 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "duplicate",
     group: "Edit",
-    description: "Duplicate the selected piece",
+    description: "Duplicate the selection",
     combos: [{ key: "d", mod: true }],
   },
   {
     id: "delete",
     group: "Edit",
-    description: "Delete the selected piece",
+    description: "Delete the selection",
     combos: [{ key: "Backspace" }, { key: "Delete" }],
+  },
+  {
+    // The one entry here no handler looks up: it is a modified click, in the
+    // viewport and in the piece tree, rather than a key. It is listed all the
+    // same, because the sheet is where anyone looks for it and a shortcut
+    // nothing prints is a shortcut nobody finds.
+    id: "add-to-selection",
+    group: "Edit",
+    description: "Add a piece to the selection, or take it out",
+    combos: [
+      { key: "Click", shift: true },
+      { key: "Click", mod: true },
+    ],
   },
 ];
 

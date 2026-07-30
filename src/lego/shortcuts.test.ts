@@ -96,6 +96,15 @@ describe("comboLabel", () => {
     expect(comboLabel(translate.combos[0], true)).toBe("G");
   });
 
+  it("prints the modified click that adds to the selection", () => {
+    const add = SHORTCUTS.find((s) => s.id === "add-to-selection");
+    if (!add) throw new Error("add-to-selection shortcut missing");
+    expect(add.combos.map((combo) => comboLabel(combo, true))).toEqual([
+      "Shift Click",
+      "Cmd Click",
+    ]);
+  });
+
   it("leaves a named key as it is", () => {
     const del = SHORTCUTS.find((s) => s.id === "delete");
     if (!del) throw new Error("delete shortcut missing");
