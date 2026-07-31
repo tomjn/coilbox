@@ -1,0 +1,170 @@
+{
+  "id": "garrison",
+  "name": "Garrison",
+  "description": "The player builds up a garrison team, then unlocks and reinforces it.",
+  "runtimeVersion": 1,
+  "setup": {
+    "gameName": "Test Game",
+    "mapName": "Comet Catcher Redux",
+    "participants": [
+      {
+        "id": "player",
+        "kind": "you",
+        "name": "Commander",
+        "side": "arm",
+        "color": [0, 0.6, 1],
+        "allyTeam": 0,
+        "spectator": false
+      },
+      {
+        "id": "garrison",
+        "kind": "ai",
+        "name": "Garrison",
+        "side": "arm",
+        "color": [0, 1, 0.4],
+        "allyTeam": 0,
+        "spectator": false
+      }
+    ],
+    "startPosType": 0,
+    "modOptionValues": {}
+  },
+  "teams": {
+    "garrison": {
+      "startUnits": ["armck"],
+      "resources": { "metal": 1000, "energy": 1000 },
+      "income": { "metal": 5, "energy": 5 }
+    }
+  },
+  "zones": [
+    {
+      "id": "depot",
+      "name": "Supply Depot",
+      "shape": "circle",
+      "center": { "x": 0, "z": 0 },
+      "radius": 50
+    }
+  ],
+  "actors": [
+    {
+      "id": "outpost",
+      "unitDef": "armestor",
+      "team": "garrison",
+      "pos": { "x": 10, "z": 10 },
+      "facing": 0,
+      "state": { "name": "Outpost" }
+    }
+  ],
+  "groups": [
+    {
+      "id": "reinforcements",
+      "team": "player",
+      "units": [{ "def": "armpw", "count": 2 }],
+      "pos": { "x": 0, "z": 0 },
+      "orders": [],
+      "dormant": true
+    }
+  ],
+  "prefabs": [],
+  "restrictions": {},
+  "vars": { "garrisonBuilt": 0 },
+  "triggers": [
+    {
+      "id": "count-check",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "unit_count",
+            "params": { "team": "garrison", "unitDefs": ["armpw"], "min": 3 }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "set_var",
+          "params": { "name": "garrisonBuilt", "value": 1 }
+        },
+        { "type": "enable_trigger", "params": { "trigger": "unlock" } }
+      ]
+    },
+    {
+      "id": "built-outpost",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "unit_built",
+            "params": { "team": "garrison", "unitDef": "armestor", "count": 1 }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "add_var",
+          "params": { "name": "garrisonBuilt", "value": 1 }
+        },
+        { "type": "disable_trigger", "params": { "trigger": "count-check" } }
+      ]
+    },
+    {
+      "id": "outpost-captured",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "unit_captured",
+            "params": { "actor": "outpost", "team": "player" }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "gift_units",
+          "params": { "group": "reinforcements", "team": "garrison" }
+        },
+        {
+          "type": "reveal_area",
+          "params": { "zone": "depot", "team": "player", "seconds": 30 }
+        }
+      ]
+    },
+    {
+      "id": "unlock",
+      "enabled": false,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "var",
+            "params": { "name": "garrisonBuilt", "op": "gte", "value": 1 }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "unlock_unit",
+          "params": { "unitDef": "armestor", "team": "player" }
+        }
+      ]
+    }
+  ],
+  "objectives": [
+    {
+      "id": "defend-garrison",
+      "kind": "secondary",
+      "text": "Defend the garrison.",
+      "hidden": true
+    }
+  ],
+  "dialogue": [],
+  "createdAt": "2026-07-31T00:00:00.000Z",
+  "updatedAt": "2026-07-31T00:00:00.000Z"
+}
