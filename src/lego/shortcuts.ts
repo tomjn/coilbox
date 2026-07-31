@@ -191,3 +191,15 @@ export function comboLabel(combo: KeyCombo, mac: boolean): string {
   parts.push(keyLabel(combo.key));
   return parts.join(" ");
 }
+
+/**
+ * A shortcut's first combo, for a button's tooltip. The sheet prints every
+ * combo, a tooltip has room for one, and both read the same table so a
+ * tooltip cannot go on promising a key the handler stopped listening for.
+ */
+export function shortcutLabel(id: string): string {
+  const shortcut = SHORTCUTS.find((s) => s.id === id);
+  const combo = shortcut?.combos[0];
+  if (!combo) throw new Error(`Unknown shortcut id: ${id}`);
+  return comboLabel(combo, isMac());
+}

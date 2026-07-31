@@ -1,4 +1,4 @@
-import { Button, Input, useHideSidebar } from "@picoframe/frame";
+import { Button, cn, Input, useHideSidebar } from "@picoframe/frame";
 import {
   Blocks,
   ChevronDown,
@@ -31,6 +31,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
@@ -80,7 +86,7 @@ import { texturesInUse } from "../rawImport";
 import { canReparent, reparentPiece } from "../reparent";
 import { sitOnGround } from "../s3oBuild";
 import type { ScriptTimeline } from "../scriptPlayback";
-import { isShortcut } from "../shortcuts";
+import { isShortcut, shortcutLabel } from "../shortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { useRawGeometry } from "../useRawGeometry";
 import { AnchorList } from "./components/AnchorList";
@@ -820,77 +826,140 @@ function Builder({ id }: { id: string | undefined }) {
                   </div>
                 </div>
 
-                <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
-                  <ButtonGroup>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={doc.undo}
-                      disabled={!doc.canUndo}
-                      aria-label="Undo"
-                      title="Undo (Cmd Z)"
-                    >
-                      <Undo size={14} />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={doc.redo}
-                      disabled={!doc.canRedo}
-                      aria-label="Redo"
-                      title="Redo (Cmd Shift Z)"
-                    >
-                      <Redo size={14} />
-                    </Button>
-                  </ButtonGroup>
-                  <span className="text-xs text-muted-foreground">
-                    {doc.saving
-                      ? "Saving"
-                      : doc.dirty
-                        ? "Unsaved changes"
-                        : "Saved"}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => doc.save()}
-                    disabled={doc.saving}
-                  >
-                    <Save size={14} /> Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setTesting(true)}
-                  >
-                    <Rocket size={14} /> Test in game
-                  </Button>
-                  <Button size="sm" onClick={() => setExporting(true)}>
-                    <Upload size={14} /> Export
-                  </Button>
-                  <CollapsibleTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label={
-                        asideOpen
+                {/* Icons only, and no card behind them: the same viewport
+                  chrome as the toolbars in the other corners, rather than a
+                  panel of labelled buttons sitting on top of the model. */}
+                <TooltipProvider delayDuration={300}>
+                  <div className="pointer-events-auto flex items-center gap-2">
+                    <ButtonGroup>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={doc.undo}
+                            disabled={!doc.canUndo}
+                            aria-label="Undo"
+                          >
+                            <Undo size={14} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Undo ({shortcutLabel("undo")})
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={doc.redo}
+                            disabled={!doc.canRedo}
+                            aria-label="Redo"
+                          >
+                            <Redo size={14} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Redo ({shortcutLabel("redo")})
+                        </TooltipContent>
+                      </Tooltip>
+                    </ButtonGroup>
+                    <ButtonGroup>
+                      {/* The save status was a word beside this button and is
+                        now a dot on it: a mark while there is work not yet on
+                        disk, gone once there isn't. The word itself survives
+                        in the tooltip, which is where the difference between
+                        saving and saved belongs. */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => doc.save()}
+                            disabled={doc.saving}
+                            className="relative"
+                            aria-label="Save"
+                          >
+                            <Save size={14} />
+                            {doc.dirty || doc.saving ? (
+                              <span
+                                aria-hidden
+                                className={cn(
+                                  "absolute right-1 top-1 size-2 rounded-full bg-amber-500",
+                                  doc.saving && "motion-safe:animate-pulse",
+                                )}
+                              />
+                            ) : null}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          {doc.saving
+                            ? "Saving"
+                            : doc.dirty
+                              ? "Unsaved changes - save now"
+                              : "Saved"}
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => setTesting(true)}
+                            aria-label="Test in game"
+                          >
+                            <Rocket size={14} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Test in game
+                        </TooltipContent>
+                      </Tooltip>
+                      {/* The one filled button here, as it was the one filled
+                        button before: without its label, colour is what still
+                        says this is the thing you are working towards. */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            onClick={() => setExporting(true)}
+                            aria-label="Export"
+                          >
+                            <Upload size={14} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Export</TooltipContent>
+                      </Tooltip>
+                    </ButtonGroup>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <CollapsibleTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            aria-label={
+                              asideOpen
+                                ? "Hide the side panel"
+                                : "Show the side panel"
+                            }
+                          >
+                            {asideOpen ? (
+                              <PanelRightClose size={16} />
+                            ) : (
+                              <PanelRightOpen size={16} />
+                            )}
+                          </Button>
+                        </CollapsibleTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        {asideOpen
                           ? "Hide the side panel"
-                          : "Show the side panel"
-                      }
-                      title={
-                        asideOpen
-                          ? "Hide the side panel"
-                          : "Show the side panel"
-                      }
-                    >
-                      {asideOpen ? (
-                        <PanelRightClose size={16} />
-                      ) : (
-                        <PanelRightOpen size={16} />
-                      )}
-                    </Button>
-                  </CollapsibleTrigger>
-                </div>
+                          : "Show the side panel"}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
               </div>
 
               {problems.length > 0 ? (
