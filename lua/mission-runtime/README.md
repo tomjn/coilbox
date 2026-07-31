@@ -5,7 +5,7 @@ The Lua that plays a coilbox scenario inside the engine. It is coilbox-authored 
 ## Layout
 
 - `luarules/gadgets/coilbox_mission_runtime.lua`, the gadget. It gates on the modoption, loads the compiled mission, and hands it to the rest of the runtime.
-- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, and `coilbox_zones.lua` the conditions that read zones. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out.
+- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, and `coilbox_vars.lua` the mission's variables. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out.
 - `missions/runtime.lua`, the version marker and capability table. Coilbox reads it out of an installed game to decide what the editor may offer.
 - `tests/`, checks that run outside the engine with `luajit`. Not part of what a game vendors.
 
@@ -26,6 +26,7 @@ GG.CoilboxMission = {
   actors  = <actor records by scenario id>,
   units   = <scenario actor id -> unitID, for the actors currently alive>,
   triggers = <the trigger engine, synced half only>,
+  vars    = <the mission's variables, synced half only>,
 }
 ```
 
@@ -94,6 +95,24 @@ Only the zone and team pairs a mission's `zone_held_for` conditions actually nam
 
 A hold is presence, not control. A team standing in a zone holds it whether or not anyone else is standing there too ([#802](https://github.com/tomjn/coilbox/issues/802)).
 
+## Vars
+
+A var is a named number belonging to one mission: a kill counter, a phase number, a flag saying which branch the player took. Numbers and nothing else, by design, so `add_var` always has something to add to and the `var` condition is one comparison. A scenario's `vars` table is the name and the number each one starts at.
+
+- `set_var` writes a number, `add_var` moves one by a delta, and `var` compares one against a number with `eq`, `ne`, `lt`, `lte`, `gt` or `gte`.
+- `var` is polled rather than event-driven. A var changes only when an action changes it, so an event looks like the obvious fit, until a trigger reading a var nothing has changed yet, a mission's opening branch reading the number its author set, is never asked at all and the mission stalls.
+- A name the scenario never declared reads as nothing and is reported. Writing one creates it. The compile step resolves every var a trigger names, so a stray name means a mission built by a newer editor or edited by hand, and a mission that half runs is harder to diagnose than one that says what it did.
+
+Every write is mirrored into a game rules param named `coilbox_mission_var_<name>`, because a var nothing outside synced Lua can read is no use to an objectives panel, a debrief or a debug view. Reading the mirror needs no line of sight and no channel of our own: the engine keeps one table of game rules params for every Lua handle and answers `Spring.GetGameRulesParam` from all of them, LuaUI included. It stores each one as a float, so the mirror is a copy for readers and `GG.CoilboxMission.vars` stays the table the mission runs on.
+
+A game's own actions read and write a var through that table rather than around it, so the mirror follows:
+
+```lua
+GG.CoilboxMission.vars.get("alertLevel")
+GG.CoilboxMission.vars.set("alertLevel", 3)
+GG.CoilboxMission.vars.add("kills", 1)
+```
+
 ## Conventions
 
 - Everything vendored is named `coilbox_*` so a game maintainer can see at a glance which files came from here.
@@ -110,6 +129,7 @@ luajit lua/mission-runtime/tests/plan_test.lua
 luajit lua/mission-runtime/tests/start_test.lua
 luajit lua/mission-runtime/tests/trigger_test.lua
 luajit lua/mission-runtime/tests/zone_test.lua
+luajit lua/mission-runtime/tests/var_test.lua
 luajit lua/mission-runtime/tests/mission_trigger_test.lua
 ```
 
