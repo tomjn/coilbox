@@ -153,9 +153,18 @@ export function buildS3o(
 ): S3oBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
   const { pieces, world } = bakedPieces(project, pack, raw);
+  const measured = header(world);
 
   return {
-    ...header(world),
+    ...measured,
+    // The collision sphere and the height the document pins, when it pins them.
+    // A unit assembled here pins nothing and is measured, which is what every
+    // unit did before this. A unit imported from somebody else's model carries
+    // the header that model shipped, and re-exporting it must not quietly give
+    // the unit a different collision sphere from the one its author set.
+    radius: project.radius ?? measured.radius,
+    height: project.height ?? measured.height,
+    mid: project.mid ?? measured.mid,
     texture1: textures.texture1,
     texture2: textures.texture2 ?? "",
     root: assemble(project, pieces, project.rootPieceId),

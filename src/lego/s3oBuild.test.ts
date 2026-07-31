@@ -336,6 +336,29 @@ describe("buildS3o", () => {
     expect(sitOnGround(doc, pack(), null)).toBe(doc);
   });
 
+  it("uses the header the document pins, and measures one it does not", () => {
+    const doc = project([{ id: "a", name: "a", parentId: "root" }]);
+    const pinned = { ...doc, radius: 99, height: 42, mid: [1, 2, 3] as const };
+
+    const measured = buildS3o(doc, pack(), null, TEXTURES);
+    const kept = buildS3o(
+      { ...pinned, mid: [1, 2, 3] },
+      pack(),
+      null,
+      TEXTURES,
+    );
+
+    expect(measured?.radius).not.toBeCloseTo(99);
+    // A unit imported from somebody else's model carries that model's own
+    // collision sphere, and re-exporting it must not change it.
+    expect(kept?.radius).toBe(99);
+    expect(kept?.height).toBe(42);
+    expect(kept?.mid).toEqual([1, 2, 3]);
+    // The box the unit definition is derived from is still measured, because
+    // the header has no room for it.
+    expect(kept?.sizeX).toBeCloseTo(measured?.sizeX ?? -1);
+  });
+
   it("carries the texture names through", () => {
     const build = buildS3o(project([]), pack(), null, {
       texture1: "probe.png",
