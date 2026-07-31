@@ -1,0 +1,285 @@
+/**
+ * One unit's model as the game ships it, beside the build tree rather than over
+ * it, so the tree stays visible while comparing units.
+ *
+ * Read only, and deliberately not the unit builder's viewport: that one is
+ * eleven editing callbacks and a scene of gizmos, anchors and bake caches around
+ * a project the builder owns, and a game's model is neither a project nor
+ * editable. The shape copied here is the parts picker's detail viewport.
+ */
+
+import { Button } from "@picoframe/frame";
+import { X } from "lucide-react";
+import { useRef } from "react";
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+import { useCanvas3D } from "@/lib/useCanvas3D";
+import { useReduceMotion } from "../../../general/display";
+import type { UnitDatasetEntry, UnitModelResult } from "../../bindings";
+import { useUnitsyncUnitModel } from "../../config";
+import { buildModel, countPieces, countTriangles } from "../../unitModel";
+
+interface Props {
+  enginePath: string;
+  dataDir: string;
+  gameArchive: string;
+  /** The unit's internal (lowercased) name, as the build tree keys nodes by. */
+  unitId: string;
+  /** Its dataset entry, which is where the model's name comes from. */
+  unit?: UnitDatasetEntry;
+  onClose: () => void;
+}
+
+export function UnitModelPanel({
+  enginePath,
+  dataDir,
+  gameArchive,
+  unitId,
+  unit,
+  onClose,
+}: Props) {
+  const object = unit?.objectName?.trim();
+  const { model, loading, failed } = useUnitsyncUnitModel(
+    enginePath,
+    dataDir,
+    gameArchive,
+    object,
+  );
+
+  return (
+    <aside className="flex w-72 shrink-0 flex-col overflow-y-auto rounded-lg border border-border/50 bg-card">
+      <header className="flex items-start justify-between gap-2 border-b border-border/50 px-3 py-2">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-medium leading-tight">
+            {unit?.fullName ?? unitId}
+          </h3>
+          <p className="truncate font-mono text-xs text-muted-foreground">
+            {unitId}
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onClose}
+          aria-label="Close model view"
+        >
+          <X size={16} />
+        </Button>
+      </header>
+
+      <Body
+        object={object}
+        model={model}
+        loading={loading}
+        failed={failed}
+        gameArchive={gameArchive}
+      />
+    </aside>
+  );
+}
+
+/**
+ * Everything below the header. Split out so each way of having nothing to draw
+ * says which one it is: an empty viewport that looks like a bug is worse than a
+ * sentence explaining there is no model.
+ */
+function Body({
+  object,
+  model,
+  loading,
+  failed,
+  gameArchive,
+}: {
+  object?: string;
+  model: UnitModelResult | null;
+  loading: boolean;
+  failed: boolean;
+  gameArchive: string;
+}) {
+  if (!object) {
+    return (
+      <Note>
+        This unit's definition names no model, so the engine draws nothing for
+        it either.
+      </Note>
+    );
+  }
+  if (loading) {
+    return (
+      <Note>
+        Reading <span className="font-mono">{object}</span> out of {gameArchive}
+        .
+      </Note>
+    );
+  }
+  if (failed) {
+    return <Note>Could not reach unitsync to read this unit's model.</Note>;
+  }
+  if (!model) return null;
+
+  const triangles = model.root ? countTriangles(model.root) : 0;
+  if (!model.root || triangles === 0) {
+    return (
+      <Note>
+        {model.errors[0] ??
+          `Nothing drawable came out of ${object}: it has pieces but no faces.`}
+      </Note>
+    );
+  }
+
+  const missing = model.textures.filter((t) => !t.file && !t.teamColour);
+  const teamColour = model.textures.filter((t) => t.teamColour);
+
+  return (
+    <>
+      <ModelViewport model={model} />
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 px-3 py-2 text-xs">
+        <dt className="text-muted-foreground">Model</dt>
+        <dd className="break-all font-mono">{model.path}</dd>
+
+        <dt className="text-muted-foreground">Format</dt>
+        <dd>{model.format === "3do" ? "3do (Total Annihilation)" : "s3o"}</dd>
+
+        <dt className="text-muted-foreground">Size</dt>
+        <dd>
+          {triangles.toLocaleString()} triangles in{" "}
+          {countPieces(model.root).toLocaleString()} pieces
+        </dd>
+
+        <dt className="text-muted-foreground">Textures</dt>
+        <dd className="break-all font-mono">
+          {model.textures.length === 0
+            ? "none"
+            : model.textures
+                .filter((t) => !t.teamColour)
+                .map((t) => t.name)
+                .join(", ") || "none"}
+        </dd>
+      </dl>
+
+      {teamColour.length > 0 && (
+        <Note>
+          {teamColour.length} of this model's textures are team-colour regions,
+          which the engine paints in the owning player's colour. There is no
+          player here, so they are drawn in one blue.
+        </Note>
+      )}
+
+      {missing.length > 0 && (
+        <Note>
+          {missing.length} of this model's textures are not in {gameArchive}, so
+          those faces are drawn plain:{" "}
+          <span className="font-mono">
+            {missing.map((t) => t.name).join(", ")}
+          </span>
+          .
+        </Note>
+      )}
+      {model.paletteFaces > 0 && (
+        <Note>
+          {model.paletteFaces.toLocaleString()} faces are a flat colour from the
+          Total Annihilation palette, which the engine holds rather than the
+          archive. They are drawn plain grey.
+        </Note>
+      )}
+      {model.errors.length > 0 && <Note>{model.errors.join(". ")}</Note>}
+    </>
+  );
+}
+
+function Note({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="m-3 rounded border border-border/50 px-3 py-2 text-xs text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
+/** The model itself, framed on its own extent and orbitable. */
+function ModelViewport({ model }: { model: UnitModelResult }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const reduceMotion = useReduceMotion();
+
+  useCanvas3D(
+    containerRef,
+    ({ renderer }) => {
+      const built = buildModel(model);
+
+      const scene = new THREE.Scene();
+      const key = new THREE.DirectionalLight(0xffffff, 2.2);
+      key.position.set(4, 8, 6);
+      const fill = new THREE.DirectionalLight(0xbfd4ff, 0.7);
+      fill.position.set(-5, 2, -4);
+      scene.add(key, fill, new THREE.AmbientLight(0xffffff, 0.55));
+      scene.add(built.object);
+
+      // Framed on the model's own bounding box rather than the header's radius,
+      // which both formats let the engine work out and so is often absent. Not
+      // `frameBox` from the unit builder: its distance is capped at 60 for the
+      // builder's grid, and a game unit is engine units across, so a commander
+      // at 32 units of radius wants a camera about 105 out and would be clipped.
+      const centre = built.box.getCenter(new THREE.Vector3());
+      const radius = Math.max(
+        built.box.getBoundingSphere(new THREE.Sphere()).radius,
+        0.001,
+      );
+      const camera = new THREE.PerspectiveCamera(
+        35,
+        1,
+        radius / 100,
+        radius * 100,
+      );
+      camera.position.set(
+        centre.x + radius * 1.6,
+        centre.y + radius * 1.2,
+        centre.z + radius * 1.9,
+      );
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.target.copy(centre);
+      controls.enableDamping = !reduceMotion;
+      controls.enablePan = false;
+      controls.minDistance = radius * 0.4;
+      controls.maxDistance = radius * 8;
+      controls.update();
+
+      const render = () => renderer.render(scene, camera);
+      controls.addEventListener("change", render);
+
+      // Damping needs a frame loop to settle. Without it the view still moves,
+      // it just stops the moment the pointer does.
+      let frame = 0;
+      if (!reduceMotion) {
+        const tick = () => {
+          controls.update();
+          render();
+          frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+      }
+
+      return {
+        render,
+        resize: (width, height) => {
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
+        },
+        dispose: () => {
+          cancelAnimationFrame(frame);
+          controls.removeEventListener("change", render);
+          controls.dispose();
+          built.dispose();
+        },
+      };
+    },
+    [model, reduceMotion],
+  );
+
+  return (
+    <div
+      ref={containerRef}
+      className="aspect-square w-full border-b border-border/50"
+    />
+  );
+}

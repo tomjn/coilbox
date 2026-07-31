@@ -27,6 +27,7 @@ import {
 import { useUnitsyncUnitBuildpics } from "../../config";
 import { BuildTreeExportButton } from "./BuildTreeExportButton";
 import { layoutBuildTree, layoutFocusTree } from "./buildTreeLayout";
+import { UnitModelPanel } from "./UnitModelPanel";
 
 /** Data carried on each build-tree node: the unit's label + icon, and flags that
  * drive its ring — `isStart` (commander, blue) takes precedence over `isBuilder`
@@ -207,6 +208,13 @@ export function BuildTreeDrawer({
   }, [focusedUnit]);
 
   const edges = useMemo(() => buildEdgeMap(units), [units]);
+  // Internal name (lowercased) -> its dataset entry, so a focused unit can be
+  // looked up for the model its definition names.
+  const unitByName = useMemo(() => {
+    const m = new Map<string, UnitDatasetEntry>();
+    for (const u of units) m.set(u.name.toLowerCase(), u);
+    return m;
+  }, [units]);
   // Internal name (lowercased) -> friendly name, for node labels.
   const fullByName = useMemo(() => {
     const m = new Map<string, string>();
@@ -509,71 +517,83 @@ export function BuildTreeDrawer({
       ) : (
         <>
           <BuildTreeLegend />
-          <div
-            className="min-h-[60vh] w-full flex-1 overflow-hidden rounded-lg border border-border/50 bg-background"
-            style={CONTROLS_THEME}
-          >
-            <ReactFlow
-              nodes={nodes}
-              edges={styledEdges}
-              nodeTypes={nodeTypes}
-              onNodeMouseEnter={(_, node) => setHoveredId(node.id)}
-              onNodeMouseLeave={() => setHoveredId(null)}
-              // Click a unit to focus its neighbours (replace, never nest); click
-              // the empty pane to exit back to the full tree. React Flow fires
-              // these on separate targets, so a node click never also clears.
-              onNodeClick={(_, node) => setFocusedUnit(node.id)}
-              onPaneClick={() => setFocusedUnit(null)}
-              // Read-only view: no editing, connecting, or selecting.
-              nodesDraggable={false}
-              nodesConnectable={false}
-              elementsSelectable={false}
-              edgesFocusable={false}
-              nodesFocusable={false}
-              fitView
-              // Keep nodes legible: fitView won't zoom out past 0.35 (big graphs
-              // stay readable and pan), but the canvas can zoom out further for an
-              // overview and in to 1.5 to inspect a unit.
-              fitViewOptions={{ padding: 0.15, minZoom: 0.35, maxZoom: 1 }}
-              minZoom={0.08}
-              maxZoom={1.5}
-              proOptions={{ hideAttribution: true }}
+          <div className="flex min-h-[60vh] w-full min-w-0 flex-1 gap-3">
+            <div
+              className="min-w-0 flex-1 overflow-hidden rounded-lg border border-border/50 bg-background"
+              style={CONTROLS_THEME}
             >
-              <FocusRefit
-                dep={`${activeName}:${focusedUnit ?? ""}`}
-                focusIds={focusedUnit && focusSet ? [...focusSet] : null}
-                instant={reduceMotion}
+              <ReactFlow
+                nodes={nodes}
+                edges={styledEdges}
+                nodeTypes={nodeTypes}
+                onNodeMouseEnter={(_, node) => setHoveredId(node.id)}
+                onNodeMouseLeave={() => setHoveredId(null)}
+                // Click a unit to focus its neighbours (replace, never nest); click
+                // the empty pane to exit back to the full tree. React Flow fires
+                // these on separate targets, so a node click never also clears.
+                onNodeClick={(_, node) => setFocusedUnit(node.id)}
+                onPaneClick={() => setFocusedUnit(null)}
+                // Read-only view: no editing, connecting, or selecting.
+                nodesDraggable={false}
+                nodesConnectable={false}
+                elementsSelectable={false}
+                edgesFocusable={false}
+                nodesFocusable={false}
+                fitView
+                // Keep nodes legible: fitView won't zoom out past 0.35 (big graphs
+                // stay readable and pan), but the canvas can zoom out further for an
+                // overview and in to 1.5 to inspect a unit.
+                fitViewOptions={{ padding: 0.15, minZoom: 0.35, maxZoom: 1 }}
+                minZoom={0.08}
+                maxZoom={1.5}
+                proOptions={{ hideAttribution: true }}
+              >
+                <FocusRefit
+                  dep={`${activeName}:${focusedUnit ?? ""}`}
+                  focusIds={focusedUnit && focusSet ? [...focusSet] : null}
+                  instant={reduceMotion}
+                />
+                <Background />
+                <Controls showInteractive={false} />
+                <MiniMap
+                  pannable
+                  zoomable
+                  bgColor="#0a0a0a"
+                  // The un-masked hole over the current viewport is the "where am
+                  // I" indicator, so the mask needs contrast to show it; the dots
+                  // stay legible because they're bright, fully-opaque colours
+                  // (commanders blue, builders yellow, other units near-white).
+                  // (React Flow's minimap draws node dots only — it can't render edges.)
+                  maskColor="rgba(0,0,0,0.55)"
+                  maskStrokeColor="#93c5fd"
+                  maskStrokeWidth={3}
+                  nodeColor={(n) => {
+                    const d = n.data as UnitNodeData | undefined;
+                    return d?.isStart
+                      ? "#60a5fa" // commander (blue)
+                      : d?.isBuilder
+                        ? "#fde047" // builder (yellow)
+                        : d?.isMobile
+                          ? "#fb7185" // mobile unit (red)
+                          : "#e5e7eb"; // static building (near-white)
+                  }}
+                  nodeStrokeColor="#ffffff"
+                  nodeStrokeWidth={10}
+                  nodeBorderRadius={2}
+                  className="!rounded !border !border-border/50"
+                />
+              </ReactFlow>
+            </div>
+            {focusedUnit && (
+              <UnitModelPanel
+                enginePath={enginePath}
+                dataDir={dataDir}
+                gameArchive={gameArchive}
+                unitId={focusedUnit}
+                unit={unitByName.get(focusedUnit)}
+                onClose={() => setFocusedUnit(null)}
               />
-              <Background />
-              <Controls showInteractive={false} />
-              <MiniMap
-                pannable
-                zoomable
-                bgColor="#0a0a0a"
-                // The un-masked hole over the current viewport is the "where am
-                // I" indicator, so the mask needs contrast to show it; the dots
-                // stay legible because they're bright, fully-opaque colours
-                // (commanders blue, builders yellow, other units near-white).
-                // (React Flow's minimap draws node dots only — it can't render edges.)
-                maskColor="rgba(0,0,0,0.55)"
-                maskStrokeColor="#93c5fd"
-                maskStrokeWidth={3}
-                nodeColor={(n) => {
-                  const d = n.data as UnitNodeData | undefined;
-                  return d?.isStart
-                    ? "#60a5fa" // commander (blue)
-                    : d?.isBuilder
-                      ? "#fde047" // builder (yellow)
-                      : d?.isMobile
-                        ? "#fb7185" // mobile unit (red)
-                        : "#e5e7eb"; // static building (near-white)
-                }}
-                nodeStrokeColor="#ffffff"
-                nodeStrokeWidth={10}
-                nodeBorderRadius={2}
-                className="!rounded !border !border-border/50"
-              />
-            </ReactFlow>
+            )}
           </div>
         </>
       )}
