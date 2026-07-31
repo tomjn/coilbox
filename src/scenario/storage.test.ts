@@ -5,6 +5,8 @@ const saveMock = vi.fn();
 const deleteMock = vi.fn();
 const mediaImportMock = vi.fn();
 const mediaDeleteMock = vi.fn();
+const mediaReadMock = vi.fn();
+const mediaWriteMock = vi.fn();
 
 // storage.ts reaches the plugin through bindings.ts, whose plugin-sdk import
 // Vitest's node resolver cannot load from the published dist. Stubbing the
@@ -16,16 +18,21 @@ vi.mock("./bindings", () => ({
   scenarioDelete: (...args: unknown[]) => deleteMock(...args),
   scenarioMediaImport: (...args: unknown[]) => mediaImportMock(...args),
   scenarioMediaDelete: (...args: unknown[]) => mediaDeleteMock(...args),
+  scenarioMediaRead: (...args: unknown[]) => mediaReadMock(...args),
+  scenarioMediaWrite: (...args: unknown[]) => mediaWriteMock(...args),
 }));
 
 import { parseScenarioJson, type Scenario } from "./model";
 import {
   deleteScenario,
   deleteScenarioMedia,
+  exportScenario,
+  importScenario,
   importScenarioMedia,
   listScenarios,
   saveScenario,
 } from "./storage";
+import { encodeScenarioExport, readScenarioExport } from "./transfer";
 
 /** A stored document as the plugin hands it back. */
 function stored(id: string, updatedAt: string): { json: string } {
@@ -46,12 +53,25 @@ function scenario(overrides: Partial<Scenario> = {}): Scenario {
   return { ...base, ...overrides };
 }
 
+const PORTRAIT = "data:image/png;base64,aGk=";
+
+/** A scenario whose one dialogue line names a portrait. */
+function withPortrait(): Scenario {
+  return scenario({
+    dialogue: [
+      { id: "d1", speaker: "Vega", text: "Hold.", portrait: "abc.png" },
+    ],
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   saveMock.mockResolvedValue({});
   deleteMock.mockResolvedValue({});
   mediaImportMock.mockResolvedValue({ file: "abc.png" });
   mediaDeleteMock.mockResolvedValue({});
+  mediaReadMock.mockResolvedValue({ dataUrl: PORTRAIT });
+  mediaWriteMock.mockResolvedValue({});
 });
 
 describe("listScenarios", () => {
@@ -137,5 +157,81 @@ describe("deleteScenario and media", () => {
       scenarioId: "s1",
       file: "abc.png",
     });
+  });
+});
+
+describe("exportScenario", () => {
+  it("inlines every referenced clip into the container", async () => {
+    const read = readScenarioExport(await exportScenario(withPortrait()));
+
+    expect(mediaReadMock).toHaveBeenCalledWith({
+      scenarioId: "s1",
+      file: "abc.png",
+    });
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.payload.media).toEqual({ "abc.png": PORTRAIT });
+    expect(read.payload.scenario.dialogue[0].portrait).toBe("abc.png");
+  });
+
+  it("leaves out a clip that cannot be read", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mediaReadMock.mockRejectedValue(new Error("gone"));
+
+    const read = readScenarioExport(await exportScenario(withPortrait()));
+
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.payload.media).toEqual({});
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+describe("importScenario", () => {
+  it("stores the document under a fresh id and writes its clips", async () => {
+    const text = encodeScenarioExport({
+      scenario: withPortrait(),
+      media: { "abc.png": PORTRAIT },
+    });
+
+    const result = await importScenario(text);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.id).not.toBe("s1");
+    expect(result.payload.dialogue[0].portrait).toBe("abc.png");
+    expect(mediaWriteMock).toHaveBeenCalledWith({
+      scenarioId: result.payload.id,
+      file: "abc.png",
+      dataUri: PORTRAIT,
+    });
+    const [{ id, json }] = saveMock.mock.calls[0] as [
+      { id: string; json: string },
+    ];
+    expect(id).toBe(result.payload.id);
+    expect(parseScenarioJson(json)?.name).toBe("s1");
+  });
+
+  it("drops a dialogue reference whose clip did not arrive", async () => {
+    const text = encodeScenarioExport({
+      scenario: withPortrait(),
+      media: {},
+    });
+
+    const result = await importScenario(text);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.dialogue[0].portrait).toBeUndefined();
+    expect(mediaWriteMock).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when the file is not a scenario", async () => {
+    const result = await importScenario("not a scenario");
+
+    expect(result).toEqual({ ok: false, error: "unknown-format" });
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(mediaWriteMock).not.toHaveBeenCalled();
   });
 });
