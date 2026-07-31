@@ -386,6 +386,11 @@ pub struct ModelTexture {
     /// The file written into the texture cache dir, which the webview loads over
     /// the asset protocol. Empty when nothing matched.
     pub file: String,
+    /// A `.3do` name listed in the game's `unittextures/tatex/teamtex.txt`: a
+    /// region the engine paints in the player's colour. The file behind it is a
+    /// flat magenta placeholder, so it is not read and the viewer picks a colour
+    /// instead. Nobody has ever seen a magenta commander in a game.
+    pub team_colour: bool,
 }
 
 /// Output of `--unit-model`: one unit's model, read out of a game archive and
