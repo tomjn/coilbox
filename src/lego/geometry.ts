@@ -14,7 +14,14 @@
 
 import * as THREE from "three";
 
+import { legoTextureUrl } from "../lib/assetUrl";
+import {
+  paintTeamColour,
+  releaseSpringTexture,
+  springTexture,
+} from "../lib/springTexture";
 import { atlasUrl, type LegoAtlas } from "./atlas";
+import type { LegoImported } from "./model";
 
 interface CachedMaterial {
   material: THREE.MeshStandardMaterial;
@@ -53,6 +60,58 @@ export function partMaterial(atlas: LegoAtlas): THREE.MeshStandardMaterial {
   materials.set(textureUrl, { material, texture });
   return material;
 }
+
+/**
+ * The material an imported unit draws with, and the means to free it.
+ *
+ * Not cached, unlike a part's. A unit imported from somebody else's model has
+ * its own texture rather than a shared atlas, only the builder viewport ever
+ * draws it, and the store is content addressed so refreshing an edited texture
+ * mints a new URL each time. So the viewport owns it: it builds one, and
+ * disposes it when the textures change or the view goes away. A cache here
+ * would hold every version of an 8 MiB texture a session ever refreshed
+ * through.
+ *
+ * An untextured unit is not a failure to report here. The texture could not be
+ * found, which the builder says in words, and a plain grey model is more use
+ * than none.
+ */
+export function importedMaterial(imported: LegoImported): {
+  material: THREE.MeshStandardMaterial;
+  dispose: () => void;
+} {
+  const urls: string[] = [];
+  const load = (key: string | undefined, data: boolean) => {
+    if (!key) return null;
+    const url = legoTextureUrl(key);
+    urls.push(url);
+    return springTexture(url, data);
+  };
+
+  const map = load(imported.texture?.key, false);
+  const mask = load(imported.teamMask?.key, true);
+  const material = new THREE.MeshStandardMaterial({
+    map,
+    color: map ? 0xffffff : UNTEXTURED,
+    roughness: 0.75,
+    metalness: 0.05,
+    // A shipped model is inconsistent about winding, so a single-sided view of
+    // one has holes in it. Same call the game model viewer makes.
+    side: THREE.DoubleSide,
+  });
+  if (map && mask) paintTeamColour(material, mask);
+
+  return {
+    material,
+    dispose: () => {
+      material.dispose();
+      for (const url of urls) releaseSpringTexture(url);
+    },
+  };
+}
+
+/** What a unit whose texture could not be found is drawn in. */
+const UNTEXTURED = 0x9aa0a6;
 
 /** Lighting shared by the picker and the editor, so a part looks the same in both. */
 export function addStandardLights(scene: THREE.Scene): void {
