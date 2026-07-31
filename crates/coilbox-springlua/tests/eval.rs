@@ -174,6 +174,56 @@ fn infinite_loop_is_aborted() {
     assert!(res.is_err(), "runaway loop must hit the instruction cap");
 }
 
+/// The contract the scenario validator reads against: a compiled mission pulled
+/// through `VFS.Include` the way the runtime's gadget pulls it, with its keys as
+/// authored. The fixture is real emitter output (`compileScenario`), so this
+/// test is what pins the Lua-to-JSON shape the TypeScript walker expects.
+#[test]
+fn include_value_reads_a_compiled_mission_as_authored() {
+    let dir = fixture("mission");
+    let lua = SpringLua::new(&dir).unwrap();
+    let m = lua.include_value("missions/demo/mission.lua").unwrap();
+
+    // Mixed-case keys survive: lowercasing them would rename author data.
+    assert_eq!(m["schemaVersion"], serde_json::json!(1));
+    assert_eq!(m["actors"][0]["unitDef"], serde_json::json!("armcom"));
+    assert_eq!(m["teams"]["Enemy-1"]["noCommander"], serde_json::json!(true));
+    assert_eq!(m["vars"]["Alarm"], serde_json::json!(0));
+
+    // Registries are arrays, author-keyed tables are objects.
+    assert!(m["zones"].is_array());
+    assert_eq!(m["zones"][0]["id"], serde_json::json!("gate"));
+    assert!(m["teams"].is_object());
+    assert_eq!(m["teams"]["player"]["team"], serde_json::json!(0));
+
+    // A teams entry the launcher gives no slot keeps its key and carries no
+    // `team`, which is what the validator reports. An empty Lua table has no
+    // way to say whether it was a list or a record, so record what it becomes.
+    assert_eq!(m["teams"]["ghost"], serde_json::json!({}));
+    assert_eq!(m["restrictions"], serde_json::json!({}));
+
+    // `repeat` is a Lua keyword, so it is emitted bracketed and reads back plain.
+    assert_eq!(m["triggers"][0]["repeat"], serde_json::json!(false));
+    assert_eq!(
+        m["triggers"][0]["actions"][0]["params"]["group"],
+        serde_json::json!("wave1")
+    );
+}
+
+#[test]
+fn include_value_rejects_a_path_outside_the_root() {
+    let dir = fixture("mission").join("missions");
+    let lua = SpringLua::new(&dir).unwrap();
+    assert!(lua.include_value("../missions/demo/mission.lua").is_err());
+}
+
+#[test]
+fn include_value_errors_on_a_missing_file() {
+    let dir = fixture("mission");
+    let lua = SpringLua::new(&dir).unwrap();
+    assert!(lua.include_value("missions/nope/mission.lua").is_err());
+}
+
 #[test]
 fn non_returning_chunk_errors() {
     let dir = fixture("selfcontained");
