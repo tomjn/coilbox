@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { useAdvancedMode } from "@/general/advanced";
 import { isProfileHidden } from "@/profile/hidden";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
@@ -34,6 +35,7 @@ import {
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
+import { useMapEligibility } from "../mapEligibility";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, guessPrimaryPlayer, mapRecordFor } from "../stats";
 import { usePlayMap } from "../usePlayMap";
@@ -390,7 +392,7 @@ export default function MapDetailPage() {
         </div>
       </section>
 
-      <OptionsList options={mapInfo.info?.options ?? []} title="Map options" />
+      <MapEligibilitySection mapName={map.name} />
 
       {otherInfo.length > 0 && (
         <section className="flex flex-col gap-2">
@@ -405,6 +407,8 @@ export default function MapDetailPage() {
           </dl>
         </section>
       )}
+
+      <OptionsList options={mapInfo.info?.options ?? []} title="Map options" />
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium">
@@ -431,5 +435,46 @@ export default function MapDetailPage() {
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * Opt this map out of the two modes that pick maps for the player (issue #696).
+ * The switch is the player's own layer: when the branding catalog or the
+ * distribution profile has already excluded the map, it shows that state and
+ * why, and stays off. Exclusion is additive, so there is nothing to re-enable.
+ */
+function MapEligibilitySection({ mapName }: { mapName: string }) {
+  const { verdictFor, setPlayerExcluded } = useMapEligibility();
+  const verdict = verdictFor(mapName);
+  const curated = verdict !== null && verdict.source !== "player";
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-medium">Warpath and Galactic Conquest</h2>
+      <label
+        htmlFor="map-mode-eligibility"
+        className="flex items-center justify-between gap-4 rounded-lg border border-border/50 bg-card p-3"
+      >
+        <span className="flex flex-col">
+          <span className="text-sm font-medium">Hide this map</span>
+          <span className="text-xs text-muted-foreground">
+            {curated
+              ? `Hidden by the ${
+                  verdict.source === "catalog"
+                    ? "branding catalog"
+                    : "distribution profile"
+                }${verdict.reason ? `: ${verdict.reason}` : "."}`
+              : "Keep this map out of generated warpaths and conquests. It stays playable in skirmish and multiplayer."}
+          </span>
+        </span>
+        <Switch
+          id="map-mode-eligibility"
+          checked={verdict !== null}
+          disabled={curated}
+          onCheckedChange={(on) => setPlayerExcluded(mapName, on)}
+        />
+      </label>
+    </section>
   );
 }
