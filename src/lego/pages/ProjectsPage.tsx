@@ -1,5 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
-import { Blocks, Pencil, Plus, Trash2 } from "lucide-react";
+import { Blocks, FileUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
@@ -12,10 +12,11 @@ import {
 } from "@/components/ui/select";
 import { legoThumbUrl } from "../../lib/assetUrl";
 import type { LegoAtlas } from "../atlas";
-import { newProject } from "../model";
+import { type LegoProject, newProject } from "../model";
 import { loadPack } from "../pack";
 import { validateProjectName } from "../projectNames";
 import { deleteProject, saveProject, useLegoProjects } from "../projects";
+import { RecoverDrawer } from "./components/RecoverDrawer";
 
 /** The name field being edited, and why it cannot be saved yet, if at all. */
 interface Renaming {
@@ -43,6 +44,7 @@ export default function ProjectsPage() {
   const [renaming, setRenaming] = useState<Renaming | null>(null);
   const [atlases, setAtlases] = useState<LegoAtlas[]>([]);
   const [atlas, setAtlas] = useState<string | null>(null);
+  const [recovering, setRecovering] = useState(false);
   const navigate = useNavigate();
 
   // Only to know whether there is a choice to offer. Creating a unit loads the
@@ -82,6 +84,20 @@ export default function ProjectsPage() {
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** A project rebuilt from an exported model, saved and opened like a new one. */
+  async function recovered(project: LegoProject) {
+    setRecovering(false);
+    setProblem(null);
+    try {
+      await saveProject(project);
+      navigate(`/lego/${project.id}`);
+    } catch (e) {
+      setProblem(
+        `Could not save the recovered unit: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   }
 
@@ -151,11 +167,20 @@ export default function ProjectsPage() {
               </SelectContent>
             </Select>
           ) : null}
+          <Button variant="outline" onClick={() => setRecovering(true)}>
+            <FileUp size={16} /> Recover a unit
+          </Button>
           <Button onClick={create} disabled={busy}>
             <Plus size={16} /> New unit
           </Button>
         </div>
       </header>
+
+      <RecoverDrawer
+        open={recovering}
+        onOpenChange={setRecovering}
+        onRecovered={(project) => void recovered(project)}
+      />
 
       {problem ? (
         <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">

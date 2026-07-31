@@ -449,6 +449,112 @@ impl From<ExportPiece> for coilbox_s3o::Piece {
     }
 }
 
+/// A model read back off disk, shaped exactly like what `lego_export` takes.
+///
+/// The frontend already knows this shape, because it is what it builds a unit
+/// into, so recovering a project is a matter of undoing the bake rather than
+/// learning a second one.
+#[derive(Serialize)]
+struct ReadVertex {
+    pos: [f32; 3],
+    normal: [f32; 3],
+    uv: [f32; 2],
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReadPiece {
+    name: String,
+    /// 0 triangles, 1 strip, 2 quads. Passed through rather than converted: the
+    /// builder only ever writes triangles, so anything else says this file did
+    /// not come from here.
+    primitive_type: u32,
+    offset: [f32; 3],
+    vertices: Vec<ReadVertex>,
+    indices: Vec<u32>,
+    children: Vec<ReadPiece>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReadModel {
+    radius: f32,
+    height: f32,
+    mid: [f32; 3],
+    texture1: String,
+    texture2: String,
+    root: ReadPiece,
+}
+
+impl From<&coilbox_s3o::Piece> for ReadPiece {
+    fn from(piece: &coilbox_s3o::Piece) -> Self {
+        Self {
+            name: piece.name.clone(),
+            primitive_type: match piece.primitive_type {
+                coilbox_s3o::PrimitiveType::Triangles => 0,
+                coilbox_s3o::PrimitiveType::TriangleStrip => 1,
+                coilbox_s3o::PrimitiveType::Quads => 2,
+            },
+            offset: piece.offset,
+            vertices: piece
+                .vertices
+                .iter()
+                .map(|v| ReadVertex {
+                    pos: v.pos,
+                    normal: v.normal,
+                    uv: v.uv,
+                })
+                .collect(),
+            indices: piece.indices.clone(),
+            children: piece.children.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// The largest `.s3o` worth reading. The largest in the games checked is 3.2
+/// MiB, so this is generous and still bounds a mistaken pick.
+const MAX_MODEL_BYTES: u64 = 64 * 1024 * 1024;
+
+/// `lego_read_s3o` parses a `.s3o` the user picked, for the builder to try to
+/// recover a project from.
+///
+/// Any path, because the file being recovered lives wherever it was exported
+/// to. Reading is all this does: whether the model came out of coilbox is a
+/// question about the parts pack, and the pack lives in the frontend.
+#[tauri::command]
+async fn lego_read_s3o(path: String) -> CliResult {
+    let file = PathBuf::from(&path);
+    let size = match std::fs::metadata(&file) {
+        Ok(meta) => meta.len(),
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    if size > MAX_MODEL_BYTES {
+        return CliResult::err(format!(
+            "{path} is {size} bytes, which is far larger than any unit model"
+        ));
+    }
+    let bytes = match std::fs::read(&file) {
+        Ok(bytes) => bytes,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let model = match coilbox_s3o::read(&bytes) {
+        Ok(model) => model,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let out = ReadModel {
+        radius: model.radius,
+        height: model.height,
+        mid: model.mid,
+        texture1: model.texture1.clone(),
+        texture2: model.texture2.clone(),
+        root: ReadPiece::from(&model.root),
+    };
+    match serde_json::to_value(&out) {
+        Ok(value) => CliResult::ok(value),
+        Err(e) => CliResult::err(format!("could not describe {path}: {e}")),
+    }
+}
+
 /// `lego_export` writes a built unit into a game folder.
 ///
 /// The model goes to `objects3d/<unit>.s3o`. The atlas is shared by every unit
@@ -751,6 +857,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_thumb_save,
             lego_open_path,
             lego_packs,
+            lego_read_s3o,
             lego_export,
             lego_export_glb,
             lego_export_obj,

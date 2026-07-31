@@ -1,5 +1,6 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 
+import type { S3oModel } from "./importS3o";
 import type { S3oBuild } from "./s3oBuild";
 
 /**
@@ -147,6 +148,16 @@ export const legoPacks = defineCommand<
   Record<string, never>,
   { dir: string; names: string[] }
 >("coilbox-lego", "lego_packs");
+
+/**
+ * Parse an `.s3o` the user picked, so the builder can try to recover the
+ * project it was exported from. Reading only: whether coilbox wrote it is a
+ * question about the parts pack, which lives here rather than in Rust.
+ */
+export const legoReadS3o = defineCommand<{ path: string }, S3oModel>(
+  "coilbox-lego",
+  "lego_read_s3o",
+);
 
 /** Reveal an exported unit in the file manager. */
 export const legoOpenPath = defineCommand<
