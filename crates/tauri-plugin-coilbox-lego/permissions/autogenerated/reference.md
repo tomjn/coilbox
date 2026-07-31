@@ -10,6 +10,7 @@ Allows the unit builder's project storage, thumbnail, reveal and test-game comma
 - `allow-lego-thumb-save`
 - `allow-lego-open-path`
 - `allow-lego-packs`
+- `allow-lego-read-s3o`
 - `allow-lego-export`
 - `allow-lego-export-glb`
 - `allow-lego-export-obj`
@@ -202,6 +203,32 @@ Enables the lego_packs command without any pre-configured scope.
 <td>
 
 Denies the lego_packs command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:allow-lego-read-s3o`
+
+</td>
+<td>
+
+Enables the lego_read_s3o command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:deny-lego-read-s3o`
+
+</td>
+<td>
+
+Denies the lego_read_s3o command without any pre-configured scope.
 
 </td>
 </tr>

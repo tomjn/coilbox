@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-lego-read-s3o"
+description = "Enables the lego_read_s3o command without any pre-configured scope."
+commands.allow = ["lego_read_s3o"]
+
+[[permission]]
+identifier = "deny-lego-read-s3o"
+description = "Denies the lego_read_s3o command without any pre-configured scope."
+commands.deny = ["lego_read_s3o"]
