@@ -107,7 +107,7 @@ fn run_blocking(
     reg: SharedRegistry,
     on_log: Channel<LogLine>,
 ) -> Result<std::process::ExitStatus, String> {
-    let mut cmd = Command::new(&bin);
+    let mut cmd = coilbox_proc::command(&bin);
     cmd.args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -649,7 +649,11 @@ async fn mc_open_url(url: String) -> CliResult {
     #[cfg(target_os = "macos")]
     let spawned = Command::new("open").arg(&url).spawn();
     #[cfg(target_os = "windows")]
-    let spawned = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
+    // `cmd` is console-mode, so without CREATE_NO_WINDOW it flashes a prompt
+    // while handing the url to the default browser.
+    let spawned = coilbox_proc::command("cmd")
+        .args(["/C", "start", "", &url])
+        .spawn();
     #[cfg(all(unix, not(target_os = "macos")))]
     let spawned = Command::new("xdg-open").arg(&url).spawn();
 

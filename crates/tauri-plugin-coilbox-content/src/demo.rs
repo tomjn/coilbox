@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use flate2::read::GzDecoder;
@@ -946,16 +946,11 @@ fn demotool_winners(engine_dir: &Path, demo: &Path) -> Option<Vec<u32>> {
 /// Spawn demotool with `flag` and a bounded timeout (kills the child on overrun),
 /// modeled on `engine::read_version`. Returns captured stdout.
 fn run_demotool(bin: &Path, demo: &Path, flag: &str, timeout: Duration) -> Result<String, String> {
-    let mut cmd = Command::new(bin);
+    let mut cmd = coilbox_proc::command(bin);
     cmd.arg(flag)
         .arg(demo)
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-    }
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to run demotool: {e}"))?;

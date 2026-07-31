@@ -14,7 +14,7 @@ use progress::DownloadProgress;
 use serde_json::json;
 use std::collections::HashMap;
 use std::io::Read;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -124,21 +124,6 @@ async fn fetch_gz(url: String) -> Result<String, String> {
     Ok(body)
 }
 
-/// Suppress the console window Windows would otherwise pop for the console-mode
-/// pr-downloader child (CREATE_NO_WINDOW). No-op on other platforms.
-fn hide_console(cmd: &mut Command) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = cmd;
-    }
-}
-
 /// Run the sidecar with the given args on a blocking thread, returning its output.
 async fn run_sidecar(args: Vec<String>) -> Result<std::process::Output, String> {
     run_sidecar_env(args, Vec::new()).await
@@ -153,12 +138,11 @@ async fn run_sidecar_env(
 ) -> Result<std::process::Output, String> {
     let path = sidecar::resolve_sidecar().ok_or(SIDECAR_MISSING)?;
     tauri::async_runtime::spawn_blocking(move || {
-        let mut cmd = Command::new(&path);
+        let mut cmd = coilbox_proc::command(&path);
         cmd.args(&args);
         for (k, v) in &envs {
             cmd.env(k, v);
         }
-        hide_console(&mut cmd);
         cmd.output()
     })
     .await
@@ -195,14 +179,13 @@ async fn run_sidecar_streaming(
     use std::io::BufReader;
     let path = sidecar::resolve_sidecar().ok_or(SIDECAR_MISSING)?;
     tauri::async_runtime::spawn_blocking(move || {
-        let mut cmd = Command::new(&path);
+        let mut cmd = coilbox_proc::command(&path);
         cmd.args(&args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         for (k, v) in &envs {
             cmd.env(k, v);
         }
-        hide_console(&mut cmd);
         let mut child = cmd
             .spawn()
             .map_err(|e| format!("failed to run pr-downloader: {e}"))?;

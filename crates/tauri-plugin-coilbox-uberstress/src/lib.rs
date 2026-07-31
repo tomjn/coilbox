@@ -15,7 +15,7 @@ use settings::{load_settings, save_settings, Settings};
 use sidecar::{build_args, resolve_sidecar, LogLine, RunOpts};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use tauri::{
@@ -41,7 +41,7 @@ fn data_dirs<R: Runtime>(app: &AppHandle<R>) -> Result<(PathBuf, PathBuf), Strin
 /// `list-scenarios` / `gen-seed-sql`).
 async fn run_capture(args: Vec<String>) -> Result<std::process::Output, String> {
     let path = resolve_sidecar().ok_or(SIDECAR_MISSING)?;
-    tauri::async_runtime::spawn_blocking(move || Command::new(&path).args(&args).output())
+    tauri::async_runtime::spawn_blocking(move || coilbox_proc::command(&path).args(&args).output())
         .await
         .map_err(|e| format!("sidecar task failed: {e}"))?
         .map_err(|e| format!("failed to run uberstress: {e}"))
@@ -88,7 +88,7 @@ fn run_blocking(
     results_dir: PathBuf,
     started: SystemTime,
 ) -> Result<(String, Report), String> {
-    let mut child = Command::new(&bin)
+    let mut child = coilbox_proc::command(&bin)
         .args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

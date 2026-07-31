@@ -5,7 +5,7 @@
 
 use std::io::Read;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 const VERSION_FLAGS: &[&str] = &["--sync-version", "--version"];
@@ -25,14 +25,8 @@ pub fn read_version(executable: &Path, timeout: Duration) -> Result<String, Stri
 }
 
 fn run_one(executable: &Path, flag: &str, timeout: Duration) -> Result<String, String> {
-    let mut cmd = Command::new(executable);
+    let mut cmd = coilbox_proc::command(executable);
     cmd.arg(flag).stdout(Stdio::piped()).stderr(Stdio::piped());
-    // Don't pop a console window on Windows (CREATE_NO_WINDOW).
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000);
-    }
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to launch engine: {e}"))?;
