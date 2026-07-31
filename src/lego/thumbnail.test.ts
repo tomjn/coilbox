@@ -1,7 +1,12 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import { hideChrome, THUMBNAIL_VIEW, thumbnailCamera } from "./thumbnail";
+import {
+  hideChrome,
+  readyToCapture,
+  THUMBNAIL_VIEW,
+  thumbnailCamera,
+} from "./thumbnail";
 
 /** A unit, a light and a view aid, which is the shape of the builder's scene. */
 function scene() {
@@ -58,6 +63,45 @@ describe("hideChrome", () => {
     expect(grid.visible).toBe(true);
     // Off before the capture, so still off after it.
     expect(reference.visible).toBe(false);
+  });
+});
+
+describe("readyToCapture", () => {
+  /** A textured unit, with the texture's pixels either arrived or not. */
+  function textured(arrived: boolean) {
+    const unit = new THREE.Group();
+    const map = new THREE.Texture();
+    if (arrived) map.image = { width: 64, height: 64 };
+    unit.add(
+      new THREE.Mesh(
+        new THREE.BoxGeometry(),
+        new THREE.MeshStandardMaterial({ map }),
+      ),
+    );
+    return unit;
+  }
+
+  it("waits for a texture that has not arrived", () => {
+    expect(readyToCapture(textured(false))).toBe(false);
+  });
+
+  it("is ready once it has", () => {
+    expect(readyToCapture(textured(true))).toBe(true);
+  });
+
+  it("is ready for a unit that draws with no texture at all", () => {
+    const { unit } = scene();
+
+    expect(readyToCapture(unit)).toBe(true);
+  });
+
+  it("has nothing to photograph in a unit with no pieces", () => {
+    const empty = new THREE.Group();
+    // The pivot dot the builder puts in the unit's own group, which is not the
+    // unit and is hidden from the capture anyway.
+    empty.add(new THREE.Points(new THREE.BufferGeometry()));
+
+    expect(readyToCapture(empty)).toBe(false);
   });
 });
 
