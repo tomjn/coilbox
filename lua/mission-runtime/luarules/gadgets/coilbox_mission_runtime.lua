@@ -39,15 +39,17 @@ if not MISSION_ID then
 	return false
 end
 
--- Read a Lua table out of an archive. The environment is empty because these
--- files are data: a mission that reaches for a global fails here instead of
--- reaching into the gadget.
-local function includeTable(path)
+-- Read a Lua table out of an archive.
+--
+-- Data files under missions/ are given an empty environment: a mission that
+-- reaches for a global fails here instead of reaching into the gadget. Runtime
+-- modules are code and pass nil, which runs them in the gadget's environment.
+local function includeTable(path, env)
 	if not VFS.FileExists(path, VFS.ZIP) then
 		return nil, path .. " is missing"
 	end
 
-	local ok, value = pcall(VFS.Include, path, {}, VFS.ZIP)
+	local ok, value = pcall(VFS.Include, path, env, VFS.ZIP)
 	if not ok then
 		return nil, path .. " failed to load: " .. tostring(value)
 	end
@@ -57,15 +59,21 @@ local function includeTable(path)
 	return value
 end
 
-local RUNTIME, runtimeError = includeTable("missions/runtime.lua")
+local RUNTIME, runtimeError = includeTable("missions/runtime.lua", {})
 if not RUNTIME then
 	log("error", runtimeError)
 	return false
 end
 
-local MISSION, missionError = includeTable("missions/" .. MISSION_ID .. "/mission.lua")
+local MISSION, missionError = includeTable("missions/" .. MISSION_ID .. "/mission.lua", {})
 if not MISSION then
 	log("error", missionError)
+	return false
+end
+
+local START, startError = includeTable("luarules/mission_runtime/coilbox_start.lua")
+if not START then
+	log("error", startError)
 	return false
 end
 
@@ -103,25 +111,257 @@ function gadget:GetInfo()
 		author = "coilbox",
 		date = "2026",
 		license = "MIT",
-		-- Ahead of the game's own gadgets. The runtime suppresses the normal
-		-- start and wants first sight of the events it acts on.
-		layer = -1,
+		-- Behind the game's own gadgets. The runtime overrides the start the
+		-- game would otherwise give the player, so it needs the last word:
+		-- gadgetHandler runs low layers first, and whoever runs last is the one
+		-- whose starting resources and damage modifiers stick.
+		layer = 1000,
 		enabled = true,
 	}
 end
 
--- The rest of the runtime reads the mission through GG, in both halves. The
--- table is the compiled scenario exactly as coilbox emitted it, so a mission
+-- Names the message the synced half sends its unsynced half when an actor has
+-- become a unit.
+local ACTOR_MESSAGE = "coilbox_mission_actor"
+
+-- The rest of the runtime reads the mission through GG, in both halves. Both
+-- compute the team plan, because it is derived from the mission and deriving it
+-- twice is cheaper than a channel between the halves.
+--
+-- `mission` is the compiled scenario exactly as coilbox emitted it, so a mission
 -- that misbehaves can be diagnosed by reading missions/<id>/mission.lua.
-function gadget:Initialize()
+local function publish()
+	local teams, problems = START.teamPlan(MISSION)
+
+	local actors = {}
+	for _, actor in ipairs(MISSION.actors or {}) do
+		actors[actor.id] = actor
+	end
+
 	GG.CoilboxMission = {
 		id = MISSION_ID,
 		mission = MISSION,
 		runtime = RUNTIME,
+		-- Per-participant setup with the engine team number resolved.
+		teams = teams,
+		-- Actor records by id, and the unit each one currently is. An actor
+		-- with no entry in `units` is one that has died or never spawned.
+		actors = actors,
+		units = {},
 	}
+	return GG.CoilboxMission, problems
+end
 
-	if gadgetHandler:IsSyncedCode() then
+if gadgetHandler:IsSyncedCode() then
+	-- The frame the runtime takes the last word on the start. GamePreload,
+	-- GameStart and frame 0 have all run by now, so a game's own start pass has
+	-- happened and cannot clobber what the scenario asked for.
+	local START_FRAME = 1
+
+	local teams = {}
+	local units = {}
+	-- Engine teams whose scenario entry says the game must not spawn for them.
+	local suppressedTeams = {}
+	local suppressing = false
+	-- True only inside the runtime's own Spring.CreateUnit, so the suppression
+	-- does not eat what the runtime just placed.
+	local spawning = false
+	local invulnerable = {}
+	local actorOfUnit = {}
+
+	--- Put one planned unit on the map. The scenario carries no height because
+	-- everything sits on terrain, so the ground is read here.
+	--
+	-- Spring.CreateUnit raises on a unit def the game does not have. A scenario
+	-- built against a different version of the game is the likely cause, and one
+	-- missing unit should not take the whole mission down with it.
+	local function create(placement)
+		local y = Spring.GetGroundHeight(placement.x, placement.z)
+		spawning = true
+		local ok, unitID = pcall(Spring.CreateUnit,
+			placement.unitDef, placement.x, y, placement.z, placement.facing, placement.team)
+		spawning = false
+
+		if not ok then
+			log("error", string.format(
+				"could not spawn %s: %s", tostring(placement.unitDef), tostring(unitID)))
+			return nil
+		end
+		return unitID
+	end
+
+	--- The author's overrides on a placed unit.
+	--
+	-- Health is a fraction of the unit's own maximum, so a scenario can say "half
+	-- dead" without knowing the def's hit points. Invulnerability is held here
+	-- and applied in UnitPreDamaged rather than through the unit's armoured
+	-- state, which its own script owns and would flip back.
+	local function applyState(unitID, state)
+		if state.hp then
+			local _, maxHealth = Spring.GetUnitHealth(unitID)
+			if maxHealth then
+				Spring.SetUnitHealth(unitID, maxHealth * state.hp)
+			end
+		end
+		if state.invulnerable then
+			invulnerable[unitID] = true
+		end
+	end
+
+	local function spawn()
+		local startPositions = {}
+		for _, team in ipairs(teams) do
+			local x, _, z, valid = Spring.GetTeamStartPosition(team.team)
+			if valid then
+				startPositions[team.team] = { x = x, z = z }
+			end
+		end
+
+		local placements, problems = START.placements(MISSION, teams, startPositions)
+		for _, problem in ipairs(problems) do
+			log("warning", problem)
+		end
+
+		local spawned = 0
+		for _, placement in ipairs(placements) do
+			local unitID = create(placement)
+			if unitID then
+				spawned = spawned + 1
+				if placement.state then
+					applyState(unitID, placement.state)
+				end
+				if placement.actor then
+					units[placement.actor] = unitID
+					actorOfUnit[unitID] = placement.actor
+					-- The unsynced half handles what is local to this player's
+					-- screen. It cannot read a synced table, so it is told which
+					-- unit each actor became.
+					SendToUnsynced(ACTOR_MESSAGE, placement.actor, unitID)
+				end
+			end
+		end
+
+		log("notice", string.format(
+			"mission %s spawned %d of %d units", MISSION_ID, spawned, #placements))
+	end
+
+	--- Set every mission team's bank to what the scenario asked for. Teams the
+	-- scenario says nothing about land on nothing, which is how the normal
+	-- starting resources are suppressed.
+	local function applyResources()
+		for _, team in ipairs(teams) do
+			Spring.SetTeamResource(team.team, "m", team.metal)
+			Spring.SetTeamResource(team.team, "e", team.energy)
+		end
+	end
+
+	--- Free income, spread over the second it is quoted per.
+	local function addIncome()
+		for _, team in ipairs(teams) do
+			if team.metalIncome ~= 0 then
+				Spring.AddTeamResource(team.team, "m", team.metalIncome / Game.gameSpeed)
+			end
+			if team.energyIncome ~= 0 then
+				Spring.AddTeamResource(team.team, "e", team.energyIncome / Game.gameSpeed)
+			end
+		end
+	end
+
+	function gadget:Initialize()
+		local published, problems = publish()
+		teams = published.teams
+		units = published.units
+
+		for _, problem in ipairs(problems) do
+			log("warning", problem)
+		end
+		for _, team in ipairs(teams) do
+			if team.noCommander then
+				suppressedTeams[team.team] = true
+			end
+		end
+
+		-- Open from here rather than from GameStart, so a game that spawns in
+		-- GamePreload is covered too.
+		suppressing = true
+
 		log("notice", string.format(
 			"mission %s loaded, runtime version %s", MISSION_ID, tostring(RUNTIME.version)))
+	end
+
+	function gadget:GameStart()
+		spawn()
+	end
+
+	function gadget:GameFrame(frame)
+		if frame < START_FRAME then
+			return
+		end
+		if frame == START_FRAME then
+			applyResources()
+			suppressing = false
+		end
+		addIncome()
+	end
+
+	--- Undo the start the game would have given a team the scenario spawns for
+	-- itself.
+	--
+	-- Undone rather than prevented, because the engine offers no veto:
+	-- AllowUnitCreation is consulted for builders and factories only, never for
+	-- Spring.CreateUnit, which is what a game's start gadget uses. Killing a unit
+	-- inside UnitCreated is a case the engine handles.
+	--
+	-- Narrow on purpose. Only a team the scenario marked noCommander, only while
+	-- the start window is open, only a unit with no builder, so nothing anyone
+	-- has begun building is ever touched.
+	function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
+		if not suppressing or spawning or builderID then
+			return
+		end
+		if not suppressedTeams[unitTeam] then
+			return
+		end
+		Spring.DestroyUnit(unitID, false, true)
+	end
+
+	function gadget:UnitPreDamaged(unitID)
+		if invulnerable[unitID] then
+			return 0, 0
+		end
+	end
+
+	function gadget:UnitDestroyed(unitID)
+		invulnerable[unitID] = nil
+		local actor = actorOfUnit[unitID]
+		if actor then
+			actorOfUnit[unitID] = nil
+			units[actor] = nil
+		end
+	end
+else
+	local published
+
+	function gadget:Initialize()
+		published = publish()
+	end
+
+	--- Told which unit an actor became. Anything about an actor that is local to
+	-- this player's screen is applied here, because the engine has no synced call
+	-- for it.
+	--
+	-- Returns nothing: a true return would stop the message reaching the gadgets
+	-- behind this one, and their messages are not ours to swallow.
+	function gadget:RecvFromSynced(message, actorId, unitID)
+		if message ~= ACTOR_MESSAGE then
+			return
+		end
+
+		published.units[actorId] = unitID
+
+		local actor = published.actors[actorId]
+		if actor and actor.state and actor.state.unselectable then
+			Spring.SetUnitNoSelect(unitID, true)
+		end
 	end
 end
