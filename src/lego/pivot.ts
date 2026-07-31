@@ -62,6 +62,20 @@ export function currentPivot(
 }
 
 /**
+ * Seat a piece's mesh inside its group.
+ *
+ * The mesh sits back from the piece's origin by the pivot, so the origin is the
+ * point the piece turns about rather than the part's middle. Every surface that
+ * draws a piece has to do this, and the compound previews once did not, so they
+ * drew a pivoted part displaced by its own pivot. One function, so the viewport
+ * and the previews cannot disagree about it again.
+ */
+export function seatPieceMesh(mesh: THREE.Object3D, pivot: Vec3 | undefined) {
+  const at = pivot ?? [0, 0, 0];
+  mesh.position.set(-at[0], -at[1], -at[2]);
+}
+
+/**
  * Move a piece's origin without moving anything on screen.
  *
  * Shifting the origin by `d` would drag the geometry the other way, so the

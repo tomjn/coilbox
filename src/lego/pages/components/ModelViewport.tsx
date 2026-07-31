@@ -85,11 +85,17 @@ import {
   pieceById,
 } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
+import { seatPieceMesh } from "../../pivot";
 import {
   buildReferenceUnit,
   disposeReferenceUnit,
 } from "../../referenceObject";
-import { type BakedPiece, bakedPieces, unitBounds } from "../../s3oBuild";
+import {
+  type BakedPiece,
+  bakedPieces,
+  type UnitBounds,
+  unitBounds,
+} from "../../s3oBuild";
 import { isShortcut } from "../../shortcuts";
 import {
   type Anchor,
@@ -309,12 +315,29 @@ export function ModelViewport({
   const [ground, setGround] = useState<GroundId>("grid");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
+  // The compass is the button people press when they are lost, so it frames
+  // the whole unit rather than dropping the camera on a fixed point that a
+  // unit built away from the origin, or much bigger than the default, is not
+  // near. It frames from the home direction rather than the direction the
+  // camera is already facing, so it lands somewhere recognisable every time.
+  //
+  // The box comes from the document rather than the scene because the scene's
+  // root holds the pivot dot as well as the geometry, which would make an
+  // empty unit look like a unit the size of a point at the origin. A unit with
+  // no geometry has nothing to frame, and keeps the old behaviour: the home
+  // camera, looking at the origin.
   function resetView() {
     const state = sceneRef.current;
     if (!state) return;
-    state.camera.position.set(...HOME_CAMERA);
-    state.controls.target.set(0, 0, 0);
-    state.controls.update();
+    const bounds = unitBounds(project, pack);
+    const box = boundsBox(bounds);
+    if (box) {
+      frameBounds(state, box, HOME_CAMERA);
+    } else {
+      state.camera.position.set(...HOME_CAMERA);
+      state.controls.target.set(0, 0, 0);
+      state.controls.update();
+    }
     state.render();
   }
 
@@ -2714,9 +2737,23 @@ function frameObject(state: SceneState, object: THREE.Object3D): boolean {
   return frameBounds(state, new THREE.Box3().setFromObject(object));
 }
 
+/** The unit's own measured box, or null when it has no geometry to frame: a
+ *  unit with no vertices measures zero on every axis. */
+function boundsBox(bounds: UnitBounds): THREE.Box3 | null {
+  if (bounds.sizeX === 0 && bounds.sizeY === 0 && bounds.sizeZ === 0) {
+    return null;
+  }
+  return new THREE.Box3().setFromCenterAndSize(
+    new THREE.Vector3(...bounds.mid),
+    new THREE.Vector3(bounds.sizeX, bounds.sizeY, bounds.sizeZ),
+  );
+}
+
 /** The same, from a box that is already worked out: framing a set unions the
- *  boxes of several pieces rather than taking one object's own. */
-function frameBounds(state: SceneState, box: THREE.Box3): boolean {
+ *  boxes of several pieces rather than taking one object's own. `from` is the
+ *  direction to look from when the caller wants a set one, and defaults to the
+ *  direction the camera is already looking. */
+function frameBounds(state: SceneState, box: THREE.Box3, from?: Vec3): boolean {
   if (box.isEmpty()) return false;
 
   // The direction from the target to the camera, not the camera to the
@@ -2732,7 +2769,7 @@ function frameBounds(state: SceneState, box: THREE.Box3): boolean {
       min: [box.min.x, box.min.y, box.min.z],
       max: [box.max.x, box.max.y, box.max.z],
     },
-    [offset.x, offset.y, offset.z],
+    from ?? [offset.x, offset.y, offset.z],
     THREE.MathUtils.degToRad(state.camera.fov),
   );
 
@@ -2857,19 +2894,16 @@ function syncScene(state: SceneState, pack: LoadedPack, project: LegoProject) {
       mesh?.removeFromParent();
       continue;
     }
-    // The mesh sits back from the piece's origin by its pivot, so the origin
-    // is the point the piece turns about rather than the part's middle.
-    const pivot = piece.pivot ?? [0, 0, 0];
     if (mesh) {
       mesh.geometry = geometry;
       // Reassigned rather than left as it was, because the unit's atlas can
       // change under a mesh that already exists.
       mesh.material = material;
-      mesh.position.set(-pivot[0], -pivot[1], -pivot[2]);
+      seatPieceMesh(mesh, piece.pivot);
     } else {
       const added = new THREE.Mesh(geometry, material);
       added.userData.pieceId = piece.id;
-      added.position.set(-pivot[0], -pivot[1], -pivot[2]);
+      seatPieceMesh(added, piece.pivot);
       group.add(added);
     }
   }
