@@ -56,7 +56,6 @@ import {
   type LegoImported,
   type LegoPiece,
   type LegoProject,
-  type LegoTexture,
   normalisePieceName,
   pieceById,
   projectProblems,
@@ -230,6 +229,7 @@ function Builder({ id }: { id: string | undefined }) {
             ...(draft.imported
               ? [
                   ...(geometry.error ? [geometry.error] : []),
+                  ...geometry.missingTextures,
                   ...rawGeometryProblems(draft.pieces, geometry.raw),
                 ]
               : pack
@@ -237,7 +237,7 @@ function Builder({ id }: { id: string | undefined }) {
                 : []),
           ]
         : [],
-    [draft, pack, geometry.error, geometry.raw],
+    [draft, pack, geometry.error, geometry.raw, geometry.missingTextures],
   );
 
   function addPart(part: LegoPartInfo) {
@@ -531,21 +531,31 @@ function Builder({ id }: { id: string | undefined }) {
    * The prune afterwards is because the store is content addressed. A refreshed
    * texture is new bytes under a new key, so the version before it is left
    * behind, and a session of edits on an 8 MiB texture would otherwise be
-   * hundreds of megabytes of dead files. The keep-set is every saved unit's
-   * keys plus the one just set, since the document has not been written yet.
+   * hundreds of megabytes of dead files.
+   *
+   * The keep-set is worked out here rather than inside the edit. `edit`
+   * dispatches to a reducer, which runs on the next render, so anything read
+   * out of it would still be the old document when the prune goes out and the
+   * texture just chosen would be swept away the moment it arrived. It is every
+   * saved unit's keys plus the two this unit now has, since this unit's own
+   * document is not written until the autosave a moment later.
    */
   function changeTextures(change: Partial<LegoImported>) {
-    let next: LegoTexture[] = [];
-    edit((project) => {
-      if (!project.imported) return project;
-      const imported = { ...project.imported, ...change };
-      next = [imported.texture, imported.teamMask].filter(
-        (texture): texture is LegoTexture => texture !== undefined,
-      );
-      return { ...project, imported };
-    });
+    const current = draft?.imported;
+    if (!current) return;
+    const next = { ...current, ...change };
+    edit((project) =>
+      project.imported
+        ? { ...project, imported: { ...project.imported, ...change } }
+        : project,
+    );
     void legoTexturePrune({
-      keep: [...texturesInUse(projects), ...next.map((t) => t.key)],
+      keep: [
+        ...texturesInUse(projects),
+        ...[next.texture, next.teamMask].flatMap((texture) =>
+          texture?.key ? [texture.key] : [],
+        ),
+      ],
     }).catch(() => {
       // A store that could not be swept is a disk-space question rather than a
       // correctness one, and the unit is already pointing at the new texture.
