@@ -133,16 +133,10 @@ pub fn render(
     if !out.textures.is_empty() {
         let teamtex = read_teamtex(&us, handle, &list);
         let key_base = cache_key_base(&us, game_archive);
-        for tex in &mut out.textures {
-            resolve_texture(
-                &us,
-                handle,
-                &list,
-                &out.format,
-                &teamtex,
-                cache_dir.zip(key_base.as_deref()),
-                tex,
-            );
+        let cache = cache_dir.zip(key_base.as_deref());
+        let format = out.format.clone();
+        for tex in out.textures.iter_mut().chain(out.team_mask.iter_mut()) {
+            resolve_texture(&us, handle, &list, &format, &teamtex, cache, tex);
         }
     }
 
@@ -179,10 +173,15 @@ fn build(path: &str, bytes: &[u8]) -> UnitModelOutput {
 // ---------------------------------------------------------------- s3o
 
 /// Flatten an `.s3o`. One texture for the whole model, so every piece with
-/// geometry gets a single batch naming it. `texture2` is the team-colour and
-/// glow mask rather than something to look at, so it is not requested.
+/// geometry gets a single batch naming it. `texture2` is not drawn: its red
+/// channel is the team-colour mask, which the viewer needs because the regions
+/// it marks are black in `texture1`.
 fn from_s3o(path: &str, model: &coilbox_s3o::Model) -> UnitModelOutput {
     let texture = (!model.texture1.is_empty()).then(|| model.texture1.clone());
+    let mask = (!model.texture2.is_empty()).then(|| ModelTexture {
+        name: model.texture2.clone(),
+        ..Default::default()
+    });
     UnitModelOutput {
         format: "s3o".into(),
         path: path.to_string(),
@@ -198,6 +197,7 @@ fn from_s3o(path: &str, model: &coilbox_s3o::Model) -> UnitModelOutput {
                 }]
             })
             .unwrap_or_default(),
+        team_mask: mask,
         palette_faces: 0,
         errors: Vec::new(),
     }
@@ -301,6 +301,9 @@ fn from_3do(path: &str, model: &coilbox_3do::Model) -> UnitModelOutput {
                 ..Default::default()
             })
             .collect(),
+        // A `.3do` has no second texture: its team-colour regions are named
+        // face by face, and `resolve_texture` flags them instead.
+        team_mask: None,
         palette_faces,
         errors: Vec::new(),
     }
@@ -348,10 +351,15 @@ fn do3_piece(
         }
         // A face of any corner count is a fan around its first corner. The
         // reader has already dropped everything with fewer than three.
+        //
+        // Wound backwards, because the engine derives a `.3do` face normal as
+        // the negative of the usual right-handed cross product. Winding the fan
+        // forwards would make the side the normals point at the back face, and
+        // every lit face would come out dark.
         for i in 1..prim.indices.len().saturating_sub(1) {
             group
                 .indices
-                .extend_from_slice(&[base, base + i as u32, base + i as u32 + 1]);
+                .extend_from_slice(&[base, base + i as u32 + 1, base + i as u32]);
         }
     }
 
@@ -434,13 +442,18 @@ fn resolve_texture(
     cache: Option<(&Path, &str)>,
     tex: &mut ModelTexture,
 ) {
+    if format == "3do" && teamtex.contains(&tex.name.trim().to_lowercase()) {
+        tex.team_colour = true;
+        return;
+    }
     let Some(actual) = locate_texture(list, format, teamtex, &tex.name) else {
         return;
     };
     tex.source = actual.clone();
 
     let Some((dir, base)) = cache else { return };
-    let file = cache_file_name(base, &actual);
+    let ext = actual.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
+    let file = cache_file_name(base, &actual, ext);
     let dest = dir.join(&file);
     // Written once per archive and texture: the same atlas is shared by
     // hundreds of units, and it can be 64 MiB.
@@ -452,9 +465,36 @@ fn resolve_texture(
         return;
     };
     let _ = std::fs::create_dir_all(dir);
-    if std::fs::write(&dest, &bytes).is_ok() {
+    let payload = to_webview_format(ext, &bytes);
+    if std::fs::write(&dest, payload.as_deref().unwrap_or(&bytes)).is_ok() {
         tex.file = file;
     }
+}
+
+/// Re-encode a texture the webview cannot decode, or `None` to write the bytes
+/// through untouched.
+///
+/// `.bmp` and `.tga` are most of what the legacy games ship, 358 and 192 files
+/// respectively in Balanced Annihilation, and a webview will render neither.
+/// The archive preview already transcodes `.tga` to PNG for the same reason.
+/// Alpha is dropped along with it, on the same grounds preview states: Spring's
+/// unit textures use it as a team-colour or specular mask rather than as
+/// transparency, so honouring it renders half a unit invisible.
+///
+/// Everything else passes through. `.dds` above all, because decoding a shared
+/// 8192 square atlas would cost 256 MiB for one texture and the webview can
+/// upload it compressed.
+fn to_webview_format(ext: &str, bytes: &[u8]) -> Option<Vec<u8>> {
+    if !matches!(ext, "bmp" | "tga") {
+        return None;
+    }
+    let img = crate::texture::decode_texture(ext, bytes)?;
+    let rgb = image::DynamicImage::ImageRgba8(img).to_rgb8();
+    let mut png = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgb8(rgb)
+        .write_to(&mut png, image::ImageFormat::Png)
+        .ok()?;
+    Some(png.into_inner())
 }
 
 /// The archive member a model's texture name means.
@@ -473,12 +513,13 @@ fn locate_texture(
         return None;
     }
     if format == "3do" {
-        let stem = if teamtex.contains(&want) {
-            want
-        } else {
-            format!("{want}00")
-        };
-        return find_with_ext(list, TATEX_DIR, &stem);
+        // A name in `teamtex.txt` is a team-colour region, not artwork. The
+        // file behind it is a flat magenta placeholder the engine paints over
+        // with the player's colour, so there is nothing here worth reading.
+        if teamtex.contains(&want) {
+            return None;
+        }
+        return find_with_ext(list, TATEX_DIR, &format!("{want}00"));
     }
     // Named with its extension, which is the normal case.
     if let Some(hit) = find_member(list, &format!("{S3O_TEXTURE_DIR}/{want}")) {
@@ -531,10 +572,15 @@ fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String> {
 
 /// The cache file for one archive member: `<gamekey>_<sanitised path>.<ext>`.
 /// One flat segment, because the asset protocol's root for these serves a single
-/// folder. The extension survives so the webview can pick a loader from it.
-fn cache_file_name(base: &str, member: &str) -> String {
+/// folder. The extension is the one the file is written in, which is not the
+/// source's when it was transcoded, so the webview can pick a loader from it.
+fn cache_file_name(base: &str, member: &str, source_ext: &str) -> String {
     let lower = member.to_lowercase();
-    let ext = lower.rsplit_once('.').map(|(_, e)| e).unwrap_or("bin");
+    let ext = match source_ext {
+        "bmp" | "tga" => "png",
+        "" => "bin",
+        other => other,
+    };
     let safe: String = lower
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
@@ -595,9 +641,11 @@ mod tests {
         assert_eq!(find_model(&list, "armcom"), None);
     }
 
-    /// A `.3do` face's name gets `00` appended, unless `teamtex.txt` claims it.
+    /// A `.3do` face's name gets `00` appended. A name `teamtex.txt` claims is
+    /// a team-colour region, and its file is a magenta placeholder worth
+    /// nothing, so it resolves to no texture at all.
     #[test]
-    fn tatex_names_take_the_suffix_unless_listed() {
+    fn tatex_names_take_the_suffix_unless_teamtex_claims_them() {
         let list = listing(&[
             "unittextures/tatex/arm01a00.tga",
             "unittextures/tatex/arm32lt.bmp",
@@ -607,10 +655,7 @@ mod tests {
             locate_texture(&list, "3do", &teamtex, "ARM01A").as_deref(),
             Some("unittextures/tatex/arm01a00.tga")
         );
-        assert_eq!(
-            locate_texture(&list, "3do", &teamtex, "Arm32Lt").as_deref(),
-            Some("unittextures/tatex/arm32lt.bmp")
-        );
+        assert_eq!(locate_texture(&list, "3do", &teamtex, "Arm32Lt"), None);
     }
 
     #[test]
@@ -633,9 +678,35 @@ mod tests {
 
     #[test]
     fn cache_file_name_is_one_flat_segment_keeping_the_extension() {
-        let name = cache_file_name("abcd", "UnitTextures/Lego Skin.DDS");
-        assert_eq!(name, "abcd_unittextures_lego_skin_dds.dds");
+        let name = cache_file_name("abcd", "UnitTextures/Lego Skin.DDS", "DDS");
+        assert_eq!(name, "abcd_unittextures_lego_skin_dds.DDS");
         assert!(!name.contains('/'));
+    }
+
+    /// A transcoded texture is named for what it was written as, not what it
+    /// came from, so the webview picks a loader that can read it.
+    #[test]
+    fn a_transcoded_texture_is_named_png() {
+        assert_eq!(
+            cache_file_name("abcd", "unittextures/tatex/glow00.bmp", "bmp"),
+            "abcd_unittextures_tatex_glow00_bmp.png"
+        );
+        assert_eq!(
+            cache_file_name("abcd", "unittextures/tatex/arm01a00.tga", "tga"),
+            "abcd_unittextures_tatex_arm01a00_tga.png"
+        );
+    }
+
+    /// Only the formats a webview cannot read are re-encoded. A `.dds` above
+    /// all must reach the GPU still compressed.
+    #[test]
+    fn only_bmp_and_tga_are_transcoded() {
+        assert!(to_webview_format("dds", b"not really a dds").is_none());
+        assert!(to_webview_format("png", b"not really a png").is_none());
+        assert!(to_webview_format("jpg", b"not really a jpeg").is_none());
+        // Undecodable bytes fall through to being written as they are, rather
+        // than the texture going missing.
+        assert!(to_webview_format("bmp", b"not really a bmp").is_none());
     }
 
     /// Quads become two triangles, and a strip alternates its winding.

@@ -58,6 +58,16 @@ export function legoExtraPackUrl(pack: string, file: string): string {
   return schemeUrl("legopacks", `${pack}/${file}`);
 }
 
+/**
+ * URL for a texture the unit-model viewer copied out of a game archive, under
+ * `unitmodel/<file>`. Raw archive bytes rather than anything decoded: a game's
+ * shared unit atlas can be a 64 MiB compressed DDS, which the webview uploads
+ * still compressed.
+ */
+export function unitModelTextureUrl(file: string): string {
+  return schemeUrl("unitmodel", file);
+}
+
 /** URL for a saved unit's overview thumbnail. */
 export function legoThumbUrl(projectId: string): string {
   return schemeUrl("lego", `${projectId}.png`);

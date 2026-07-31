@@ -153,6 +153,9 @@ pub fn mime_for(path: &Path) -> &'static str {
         Some("png") => "image/png",
         Some("jpg" | "jpeg") => "image/jpeg",
         Some("gif") => "image/gif",
+        // Most of a legacy game's unit textures are `.bmp`, and a webview will
+        // not decode one served as an octet stream.
+        Some("bmp") => "image/bmp",
         Some("svg") => "image/svg+xml",
         Some("avif") => "image/avif",
         // Audio
@@ -204,6 +207,7 @@ mod tests {
         assert_eq!(mime_for(Path::new("a.OGG")), "audio/ogg");
         assert_eq!(mime_for(Path::new("a.woff2")), "font/woff2");
         assert_eq!(mime_for(Path::new("a.png")), "image/png");
+        assert_eq!(mime_for(Path::new("a.bmp")), "image/bmp");
         assert_eq!(mime_for(Path::new("a.xyz")), "application/octet-stream");
     }
 

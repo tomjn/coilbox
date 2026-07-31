@@ -386,6 +386,11 @@ pub struct ModelTexture {
     /// The file written into the texture cache dir, which the webview loads over
     /// the asset protocol. Empty when nothing matched.
     pub file: String,
+    /// A `.3do` name listed in the game's `unittextures/tatex/teamtex.txt`: a
+    /// region the engine paints in the player's colour. The file behind it is a
+    /// flat magenta placeholder, so it is not read and the viewer picks a colour
+    /// instead. Nobody has ever seen a magenta commander in a game.
+    pub team_colour: bool,
 }
 
 /// Output of `--unit-model`: one unit's model, read out of a game archive and
@@ -403,6 +408,12 @@ pub struct UnitModelOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub root: Option<ModelPiece>,
     pub textures: Vec<ModelTexture>,
+    /// An `.s3o`'s second texture, whose red channel marks the regions the
+    /// engine paints in the owning player's colour. Those regions are black in
+    /// the first texture, so a viewer that ignores this draws a unit with black
+    /// holes where its markings should be.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub team_mask: Option<ModelTexture>,
     /// Faces a `.3do` draws in a flat colour from the Total Annihilation
     /// palette, which is engine-embedded and not in the archive. They are drawn
     /// plain grey, so the count is reported rather than hidden.

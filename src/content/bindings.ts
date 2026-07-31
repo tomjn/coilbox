@@ -699,6 +699,12 @@ export interface UnitDatasetEntry {
   buildOptions?: string[];
   /** Whether the unit can move (mobile unit) vs a static building. */
   mobile?: boolean;
+  /**
+   * The unitdef's `objectname`: the model the engine draws this unit with,
+   * resolved against `objects3d/`. Written however the game's author felt like,
+   * so it may be any case and usually carries no extension.
+   */
+  objectName?: string;
 }
 
 export interface UnitDatasetResult {
@@ -717,6 +723,80 @@ export const unitsyncUnitDataset = defineCommand<
   { enginePath: string; dataDir: string; gameArchive: string },
   UnitDatasetResult
 >("coilbox-unitsync", "unitsync_unit_dataset");
+
+/** One drawable batch inside a piece: an indexed triangle list whose corners all
+ *  sample the same texture. */
+export interface UnitModelGroup {
+  /** Which {@link UnitModelResult.textures} entry this batch samples. Absent for
+   *  a `.3do` face the format gives a flat palette colour instead. */
+  texture?: string;
+  /** x, y, z per vertex. */
+  positions: number[];
+  /** x, y, z per vertex. */
+  normals: number[];
+  /** u, v per vertex. */
+  uvs: number[];
+  /** Three indices per triangle, into this batch's own vertices. */
+  indices: number[];
+}
+
+/** One piece of the model tree. A piece with no groups is hierarchy only. */
+export interface UnitModelPiece {
+  name: string;
+  /** Translation from the parent piece. The formats have no rotation or scale. */
+  offset: [number, number, number];
+  groups: UnitModelGroup[];
+  children: UnitModelPiece[];
+}
+
+/** One texture the model asks for, and what became of it. */
+export interface UnitModelTexture {
+  /** The name as the model file gives it, and the key groups refer to. */
+  name: string;
+  /** The archive member it resolved to. Empty when nothing matched. */
+  source: string;
+  /** The file in the model-texture cache, loaded via {@link unitModelTextureUrl}.
+   *  Empty when nothing matched. */
+  file: string;
+  /** A `.3do` region the engine paints in the player's colour. The file behind
+   *  it is a flat magenta placeholder, so the viewer picks a colour instead. */
+  teamColour: boolean;
+}
+
+export interface UnitModelResult {
+  /** `"s3o"` or `"3do"`. Empty when nothing was read. */
+  format: string;
+  /** The archive member the model came from. */
+  path: string;
+  radius: number;
+  height: number;
+  mid: [number, number, number];
+  root?: UnitModelPiece;
+  textures: UnitModelTexture[];
+  /** An `.s3o`'s second texture, whose red channel marks the regions the engine
+   *  paints in the owning player's colour. Those regions are black in the first
+   *  texture, so ignoring this draws a unit with black holes in its markings. */
+  teamMask?: UnitModelTexture;
+  /** Faces a `.3do` draws in a flat palette colour, which is engine-embedded and
+   *  not in the archive. Drawn plain grey, so the count is worth showing. */
+  paletteFaces: number;
+  errors: string[];
+}
+
+/**
+ * Read one unit's model out of a game's archive, flattened so `.s3o` and `.3do`
+ * draw the same way. `object` is the unitdef's `objectname` verbatim. Loads the
+ * game's archive set, so it is fetched on demand.
+ */
+export const unitsyncUnitModel = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    gameArchive: string;
+    object: string;
+  },
+  UnitModelResult
+>("coilbox-unitsync", "unitsync_unit_model");
 
 export interface MapInfoResult {
   options: ConfigOption[];

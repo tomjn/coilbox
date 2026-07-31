@@ -40,6 +40,7 @@ import {
   type UnitBuildpicsResult,
   type UnitDatasetResult,
   type UnitDisplay,
+  type UnitModelResult,
   unitsyncArchiveFile,
   unitsyncArchiveTree,
   unitsyncCancel,
@@ -56,6 +57,7 @@ import {
   unitsyncThumbnails,
   unitsyncUnitBuildpics,
   unitsyncUnitDataset,
+  unitsyncUnitModel,
 } from "./bindings";
 import { newestEngineId } from "./engineVersion";
 import { useRecordMapAppearance } from "./mapAppearanceCache";
@@ -603,6 +605,65 @@ export function useUnitsyncUnitDataset(
   }, [enginePath, dataDir, gameArchive, nonce]);
 
   return { dataset, status, reload, loading: status === "loading" };
+}
+
+/** Session cache of read models, keyed by `dataDir::engine::game::object`. */
+const unitModelCache = new Map<string, UnitModelResult>();
+
+/**
+ * Read one unit's model out of a game's archive. Mounts the game's archive set,
+ * so it is fetched on demand and cached for the session, including a result that
+ * only carries errors: a unit whose model is missing stays missing until the
+ * content is rescanned, and re-mounting the archive to be told so again is a
+ * second or more each time.
+ */
+export function useUnitsyncUnitModel(
+  enginePath?: string,
+  dataDir?: string,
+  gameArchive?: string,
+  object?: string,
+) {
+  const [model, setModel] = useState<UnitModelResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !gameArchive || !object) {
+      setModel(null);
+      setLoading(false);
+      setFailed(false);
+      return;
+    }
+    const key = `${dataDir}::${enginePath}::${gameArchive}::${object}`;
+    const cached = unitModelCache.get(key);
+    if (cached) {
+      setModel(cached);
+      setLoading(false);
+      setFailed(false);
+      return;
+    }
+    let cancelled = false;
+    setModel(null);
+    setFailed(false);
+    setLoading(true);
+    unitsyncUnitModel({ enginePath, dataDir, gameArchive, object })
+      .then((res) => {
+        if (cancelled) return;
+        unitModelCache.set(key, res);
+        setModel(res);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFailed(true);
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, gameArchive, object]);
+
+  return { model, loading, failed };
 }
 
 /** Session cache of unit build icons, keyed by dataDir::engine::game::units. */
