@@ -96,6 +96,12 @@ if not ZONES then
 	return false
 end
 
+local VARS, varsError = includeTable("luarules/mission_runtime/coilbox_vars.lua")
+if not VARS then
+	log("error", varsError)
+	return false
+end
+
 -- Refuse a mission built for a newer runtime than the game vendored. Running it
 -- anyway would quietly drop whatever this version cannot read, and a mission
 -- that half works is harder to diagnose than one that refuses to start.
@@ -167,9 +173,10 @@ local function publish()
 		-- with no entry in `units` is one that has died or never spawned.
 		actors = actors,
 		units = {},
-		-- The synced half adds `triggers`, the trigger engine, once it has one.
-		-- Registering a condition or action type on it is how the rest of the
-		-- runtime, and a game's own extensions, join in.
+		-- The synced half adds `triggers`, the trigger engine, and `vars`, the
+		-- mission's variables. Registering a condition or action type on the
+		-- engine is how the rest of the runtime, and a game's own extensions,
+		-- join in; going through `vars` is how they read and write a var.
 	}
 	return GG.CoilboxMission, problems
 end
@@ -335,6 +342,9 @@ if gadgetHandler:IsSyncedCode() then
 		})
 		unitHooks = UNIT_CONDITIONS.register(triggers, published)
 		ZONES.register(triggers, published)
+		-- Before the first frame, so a var is at the number its author gave it
+		-- from the first trigger that reads it.
+		published.vars = VARS.register(triggers, published)
 		published.triggers = triggers
 
 		log("notice", string.format(
