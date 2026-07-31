@@ -24,8 +24,10 @@ use std::path::Path;
 /// the unit dataset gained the per-unit `mobile` flag. v6: the unit dataset
 /// gained the per-unit `objectName`. v7: unit lists no longer come back through
 /// unitsync's 100,000 byte string buffer, so a big game's cached list of one
-/// bogus unit has to be re-read.
-const INFO_CACHE_VERSION: u32 = 7;
+/// bogus unit has to be re-read. v8: the def-script shim now supplies
+/// `Game.mapName`, so a game whose cached list is empty because its defs raised
+/// on the missing field has to be re-read.
+const INFO_CACHE_VERSION: u32 = 8;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.

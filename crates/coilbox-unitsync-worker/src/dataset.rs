@@ -41,7 +41,13 @@ if type(Spring) == 'table' then
     Spring.GetModOptions = function() return {} end
   end
 end
-if type(Game) ~= 'table' then Game = { gameSpeed = 30 } end
+-- Stand in for the engine's Game table, which unitsync leaves out of the def
+-- parser entirely. Its map fields have no answer here, and the engine omits them
+-- too when no map is loaded, so they stay nil. mapName is the exception: def
+-- scripts read it to pick per-map config and assume it is always there. An empty
+-- name is the honest "no map" and matches none, so a script falls through to its
+-- map-independent defaults instead of loading some other map's overrides.
+if type(Game) ~= 'table' then Game = { gameSpeed = 30, mapName = '' } end
 
 local ok, defs = pcall(VFS.Include, 'gamedata/defs.lua')
 if not ok then return { __error = tostring(defs) } end
@@ -263,6 +269,7 @@ mod tests {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("VFS.Include"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("buildoptions"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("Spring.TimeCheck"));
+        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("mapName = ''"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("speed_of"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("objectname"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("return __cb_chunk("));
