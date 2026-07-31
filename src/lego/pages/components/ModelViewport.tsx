@@ -52,6 +52,7 @@ import {
   buildGround,
   disposeFrontMarker,
   disposeGround,
+  groundSteps,
   REFERENCE_PARK_X,
   referenceParkX,
 } from "../../buildPlate";
@@ -174,6 +175,19 @@ const COLLISION_COLOUR = 0xf97316;
 
 /** Where the camera starts, and where Reset view puts it back. */
 const HOME_CAMERA: [number, number, number] = [9, 7, 11];
+
+/**
+ * How far the camera may pull back, and how far it can see, when the scene is
+ * no bigger than the builder's own defaults. Both grow with the scene: see
+ * `applySceneScale`. Neither ever shrinks below these, so a unit on its own
+ * behaves exactly as it always has.
+ */
+const MIN_MAX_DISTANCE = 120;
+const MIN_FAR = 500;
+/** Slack past a tight fit, so the whole scene is comfortably inside the view at
+ *  the furthest the camera can go rather than flush with its edges. The same
+ *  figure `framing.ts` pads a framed box by. */
+const ZOOM_OUT_PADDING = 1.3;
 
 /**
  * How close two anchors must be before a piece seats against another,
@@ -498,14 +512,14 @@ export function ModelViewport({
       seatMark.raycast = () => {};
       scene.add(seatMark);
 
-      const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 500);
+      const camera = new THREE.PerspectiveCamera(40, 1, 0.05, MIN_FAR);
       camera.position.set(...HOME_CAMERA);
 
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = !reduceMotion;
       controls.maxPolarAngle = Math.PI * 0.495;
       controls.minDistance = 1;
-      controls.maxDistance = 120;
+      controls.maxDistance = MIN_MAX_DISTANCE;
       // The point under the pointer stays under it as the wheel dollies,
       // rather than everything converging on the orbit target. OrbitControls
       // moves the target itself to keep looking the same way from the new
@@ -543,6 +557,7 @@ export function ModelViewport({
         selectedGroups: [],
         hoveredId: null,
         grid,
+        groundSteps: groundSteps(0),
         axes,
         reference,
         disposeReference: () => disposeReferenceUnit(reference),
@@ -824,7 +839,9 @@ export function ModelViewport({
           state.dots.dispose();
           state.originDot.dispose();
           disposeBaked(state);
-          disposeGround(grid);
+          // Not `grid`: the ground is laid again whenever it has to reach
+          // further, so the one in the scene may not be the one built here.
+          disposeGround(state.grid);
           disposeFrontMarker(frontMarker);
           state.sky?.texture.dispose();
           if (state.terrain) disposeTerrain(state.terrain);
@@ -861,6 +878,7 @@ export function ModelViewport({
     // since moved.
     if (!state.framed && frameObject(state, state.root)) state.framed = true;
     if (playing && !reduceMotion) showBaked(state, pack, project);
+    applySceneScale(state);
     state.render();
   }, [pack, project, playing, reduceMotion]);
 
@@ -957,6 +975,7 @@ export function ModelViewport({
     const state = sceneRef.current;
     if (!state) return;
     state.reference.visible = showReference;
+    applySceneScale(state);
     state.render();
   }, [showReference]);
 
@@ -989,6 +1008,7 @@ export function ModelViewport({
 
     state.reference.visible = showReferenceRef.current;
     state.scene.add(state.reference);
+    applySceneScale(state);
     state.render();
   }, [gameReference]);
 
@@ -1500,8 +1520,13 @@ interface SceneState {
   /** The piece currently under the pointer, in this view or the sidebar tree.
    *  Never a hidden piece, and never the selected piece: see `applyHoverVisual`. */
   hoveredId: string | null;
-  /** The ground and the compass, both of which can be switched off. */
+  /** The ground and the compass, both of which can be switched off. The ground
+   *  is replaced when it has to reach further, so it is held here rather than
+   *  captured. */
   grid: THREE.Group;
+  /** How many footprint steps that ground reaches each way, so it is only
+   *  rebuilt when the answer actually changes. */
+  groundSteps: number;
   axes: THREE.AxesHelper;
   /** A scale figure beside the build, switched off by default. A view aid
    *  like `grid` and `axes`: never part of the project, never exported.
@@ -2820,6 +2845,76 @@ function frameBounds(state: SceneState, box: THREE.Box3, from?: Vec3): boolean {
   state.camera.position.set(...position);
   state.controls.update();
   return true;
+}
+
+/**
+ * Size the camera's reach and the ground's to what is actually in the scene:
+ * the unit being built, and whatever reference figure is standing beside it.
+ *
+ * Both used to be constants picked when the only reference was a solar
+ * collector, 43 elmos across. A figure read out of an installed game is any
+ * size at all, and the big ones are far bigger than that: Balanced
+ * Annihilation's Krogoth gantry is 125 elmos wide, its Buzzsaw 190 tall. At
+ * the old limits neither could be got fully in shot, and the gantry stood off
+ * the end of the ground it is there to be measured against.
+ *
+ * Called whenever the unit or the figure changes, which is cheap: it measures
+ * two bounding boxes and only lays the ground again when the answer crosses a
+ * whole footprint step.
+ */
+function applySceneScale(state: SceneState) {
+  const box = new THREE.Box3().setFromObject(state.root);
+  // Only when it is standing. A figure that has been picked but switched off
+  // is not in the scene, and should not stretch the ground out under nothing.
+  if (state.reference.visible) {
+    box.union(new THREE.Box3().setFromObject(state.reference));
+  }
+  if (box.isEmpty()) return;
+
+  // Measured from the world origin rather than from the box's own middle,
+  // because the orbit target sits on the unit, which is built at the origin,
+  // not on the middle of a scene a reference has pulled off to one side.
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const radius = sphere.center.length() + sphere.radius;
+
+  const fit = radius / Math.sin(THREE.MathUtils.degToRad(state.camera.fov) / 2);
+  state.controls.maxDistance = Math.max(
+    MIN_MAX_DISTANCE,
+    fit * ZOOM_OUT_PADDING,
+  );
+  // The ground is flat, so only how far the scene spreads matters here, not
+  // how tall it stands.
+  layGround(state, Math.max(-box.min.x, box.max.x, -box.min.z, box.max.z, 0));
+
+  // Far enough to still draw the far side of the scene from the furthest back
+  // the camera can now get. Measured against the ground too, not just what
+  // stands on it: the ground is always the wider of the two, so its far corner
+  // is what the far plane cuts off first. It is centred on the origin, so its
+  // bounding sphere's radius is that corner's distance.
+  const ground = new THREE.Box3()
+    .setFromObject(state.grid)
+    .getBoundingSphere(new THREE.Sphere()).radius;
+  state.camera.far = Math.max(
+    MIN_FAR,
+    state.controls.maxDistance + Math.max(radius, ground),
+  );
+  state.camera.updateProjectionMatrix();
+}
+
+/** Lay the ground again when it has to reach further than it does. Skipped
+ *  whenever the step count is unchanged, which is nearly always: each plate
+ *  carries a label drawn on its own canvas. */
+function layGround(state: SceneState, reachElmos: number) {
+  const steps = groundSteps(reachElmos);
+  if (steps === state.groundSteps) return;
+  state.groundSteps = steps;
+
+  const { visible } = state.grid;
+  state.scene.remove(state.grid);
+  disposeGround(state.grid);
+  state.grid = buildGround(reachElmos);
+  state.grid.visible = visible;
+  state.scene.add(state.grid);
 }
 
 /**
