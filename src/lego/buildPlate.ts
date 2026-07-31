@@ -32,13 +32,34 @@ import {
 } from "./referenceObject";
 import { ELMOS_PER_FOOTPRINT } from "./unitDef";
 
-/** How far the ground reaches from the origin, in footprint steps each way.
- *  Wide enough to hold the reference unit with room to spare, because a unit
- *  that fits inside the old 40-elmo grid is easy to mistake for a big one. */
-const GROUND_STEPS = 10;
+/** How far the ground reaches from the origin, in footprint steps each way,
+ *  when nothing in the scene needs more. Wide enough to hold the built-in
+ *  reference unit with room to spare, because a unit that fits inside the old
+ *  40-elmo grid is easy to mistake for a big one. */
+const MIN_GROUND_STEPS = 10;
 
-/** The full width of the ground, in elmos. */
-export const GROUND_ELMOS = GROUND_STEPS * 2 * ELMOS_PER_FOOTPRINT;
+/** The full width of the ground, in elmos, at that smallest size. */
+export const GROUND_ELMOS = MIN_GROUND_STEPS * 2 * ELMOS_PER_FOOTPRINT;
+
+/**
+ * How many steps the ground reaches each way to cover `reachElmos` from the
+ * origin.
+ *
+ * Whole steps, rounded up: the ground is there to be counted, so a part square
+ * at its edge is not a reading. Never smaller than the default, so a unit with
+ * no reference standing beside it gets exactly the ground it always had.
+ *
+ * The caller measures the reach off the scene rather than declaring it, because
+ * the reference figure can be a unit read out of an installed game and those
+ * run to hundreds of elmos: Balanced Annihilation's Krogoth gantry is 125 wide,
+ * which parks its far edge past the default ground's edge.
+ */
+export function groundSteps(reachElmos: number): number {
+  return Math.max(
+    MIN_GROUND_STEPS,
+    Math.ceil(reachElmos / ELMOS_PER_FOOTPRINT),
+  );
+}
 
 /** How far the 1-elmo grid reaches. Short of the ground's edge on purpose:
  *  every elmo across the whole ground is a shimmering mess when zoomed out, and
@@ -105,13 +126,15 @@ const LABEL_PIXELS = 96;
 
 /**
  * The ground plane, in its own group: grids and plate markings only, nothing
- * that can be selected, hovered or exported. The viewport adds it once and
- * toggles the group's visibility.
+ * that can be selected, hovered or exported. The viewport toggles the group's
+ * visibility, and lays it again when `reachElmos` needs another step, which is
+ * only when a reference figure stands further out than the default ground goes.
  */
-export function buildGround(): THREE.Group {
+export function buildGround(reachElmos = 0): THREE.Group {
+  const steps = groundSteps(reachElmos);
   const group = new THREE.Group();
   group.add(grid(FINE_ELMOS, FINE_ELMOS, FINE_COLOUR));
-  group.add(grid(GROUND_ELMOS, GROUND_STEPS * 2, STEP_COLOUR));
+  group.add(grid(steps * 2 * ELMOS_PER_FOOTPRINT, steps * 2, STEP_COLOUR));
 
   const material = new THREE.MeshBasicMaterial({
     color: PLATE_COLOUR,

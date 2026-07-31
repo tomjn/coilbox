@@ -6,6 +6,7 @@ import {
   disposeFrontMarker,
   disposeGround,
   GROUND_ELMOS,
+  groundSteps,
   PLATE_FOOTPRINTS,
   REFERENCE_PARK_X,
   referenceParkX,
@@ -104,6 +105,39 @@ describe("buildGround", () => {
       .getSize(new THREE.Vector3());
     expect(size.x).toBeCloseTo(GROUND_ELMOS, 5);
     expect(GROUND_ELMOS % ELMOS_PER_FOOTPRINT).toBe(0);
+  });
+
+  it("reaches under a figure that stands past the default ground", () => {
+    // Balanced Annihilation's Krogoth gantry, measured through unitsync: 125
+    // elmos wide, which parks its far edge past the ground's default edge.
+    const width = 125;
+    const farEdge = referenceParkX(width) - width / 2;
+    expect(farEdge).toBeLessThan(-GROUND_ELMOS / 2);
+
+    const [, steps] = buildGround(-farEdge).children;
+    const size = new THREE.Box3()
+      .setFromObject(steps)
+      .getSize(new THREE.Vector3());
+    expect(size.x / 2).toBeGreaterThanOrEqual(-farEdge);
+  });
+});
+
+describe("groundSteps", () => {
+  it("never lays less ground than the builder has always shown", () => {
+    const smallest = GROUND_ELMOS / 2 / ELMOS_PER_FOOTPRINT;
+    for (const reach of [0, 1, GROUND_ELMOS / 2]) {
+      expect(groundSteps(reach)).toBe(smallest);
+    }
+  });
+
+  it("grows in whole steps, and always covers the reach asked for", () => {
+    for (const reach of [200, 201, 260, 1000]) {
+      const steps = groundSteps(reach);
+      expect(steps).toBe(Math.ceil(steps));
+      expect(steps * ELMOS_PER_FOOTPRINT).toBeGreaterThanOrEqual(reach);
+      // And no more than one step of slack, so it does not sprawl.
+      expect((steps - 1) * ELMOS_PER_FOOTPRINT).toBeLessThan(reach);
+    }
   });
 });
 
