@@ -87,7 +87,8 @@ pub fn copy_media(src: &Path, dest: &Path) -> Result<Vec<String>, String> {
     let Ok(entries) = std::fs::read_dir(src) else {
         return Ok(Vec::new());
     };
-    std::fs::create_dir_all(dest).map_err(|e| format!("could not create {}: {e}", dest.display()))?;
+    std::fs::create_dir_all(dest)
+        .map_err(|e| format!("could not create {}: {e}", dest.display()))?;
     let mut copied = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
