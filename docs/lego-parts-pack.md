@@ -2,7 +2,7 @@
 
 A parts pack is a library of pre-textured geometry the unit builder assembles units from. It is a documented format, not a coilbox internal, so anyone can build and ship one.
 
-Coilbox bundles one pack, derived from Splinter Faction's Lego Models and reused with the author's permission. Splinter Faction and Evolution RTS build units "lego style": a single fixed UV atlas carries hundreds of small pre-mapped pieces, and units are assembled from those pieces rather than modelled and unwrapped from scratch.
+Coilbox bundles one pack, derived from KaiserJ's original v2 lego parts, released on the [Spring forums](https://springrts.com/phpbb/viewtopic.php?t=22283) with "do whatever the heck you'd like with these". The "lego style" approach is how Splinter Faction and Evolution RTS build their units, each with its own separate part set: a single fixed UV atlas carries hundreds of small pre-mapped pieces, and units are assembled from those pieces rather than modelled and unwrapped from scratch.
 
 ## Layout
 
@@ -167,18 +167,18 @@ There is no directory in the blob. `pack.json` holds it.
 
 ## Building the bundled pack
 
-`scripts/legopack/` converts Splinter Faction's Wings3D source into a pack. It runs once and its output is committed, so coilbox itself never parses `.wings`.
+`scripts/legopack/` converts KaiserJ's v2 lego OBJ source into a pack. It runs once and its output is committed, so coilbox itself never parses OBJ.
 
 ```
-bun run lego:pack --wings <legosv2.wings> --atlas <atlas.bmp> --version 2026.07.28
+bun run lego:pack --obj <legosv2.obj> --atlas <lego2skin.png> --version 2026.07.28
 ```
 
-The sources are not checked in. They live in [the Splinter Faction repository](https://github.com/SplinterFaction/SplinterFaction/tree/master/Lego%20Models).
+The sources are not checked in. KaiserJ released them on [the Spring forums](https://springrts.com/phpbb/viewtopic.php?t=22283).
 
 Before trusting a full run, dump one part and look at it in Blender. A UV or winding mistake would otherwise be baked into every part in the pack.
 
 ```
-bun run lego:pack --wings <legosv2.wings> --verify Object731
+bun run lego:pack --obj <legosv2.obj> --verify Object731
 ```
 
 The build reports everything it changed or could not do: faces it could not ear clip, triangles it turned round, zero-area triangles it dropped, faces with no UVs, and a final audit of how many triangles disagree with their own normals. None of it is silent.

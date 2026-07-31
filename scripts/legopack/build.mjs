@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Builds the lego parts pack from Splinter Faction's parts library.
+ * Builds the lego parts pack from KaiserJ's original v2 lego parts library.
  *
  * Run once, output committed. The app never parses OBJ, so this is the only
  * place that knows the source format:
@@ -11,8 +11,8 @@
  * it in Blender before trusting a full run: a UV or winding mistake in the
  * conversion would otherwise be baked into every part in the pack.
  *
- * Sources are not checked in. They come from Splinter Faction and are reused
- * with the author's permission, recorded in the pack's LICENCE.txt.
+ * Sources are not checked in. They come from KaiserJ's v2 lego release,
+ * reused under the terms recorded in the pack's LICENCE.txt.
  */
 
 import { createHash } from "node:crypto";
@@ -33,10 +33,10 @@ const OVERRIDES = join(
 );
 
 const LICENCE = [
-  "Geometry and texture from Splinter Faction's lego parts library.",
-  "https://github.com/SplinterFaction/SplinterFaction",
+  "Geometry and texture from KaiserJ's original v2 lego parts library.",
+  "Release thread: https://springrts.com/phpbb/viewtopic.php?t=22283",
   "",
-  'Reused with the permission of the author, Scary le poo, who confirmed on 2026-07-28 that the assets are "free and clear".',
+  'KaiserJ released the parts in that thread with "do whatever the heck you\'d like with these".',
   "",
   "The pack format is documented in docs/lego-parts-pack.md. Any pack following it can replace this one.",
 ].join("\n");

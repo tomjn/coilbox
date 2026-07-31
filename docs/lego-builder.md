@@ -191,6 +191,6 @@ Record any further outcome here, and on [issue #565](https://github.com/tomjn/co
 
 ## Parts packs
 
-The bundled pack is derived from Splinter Faction's Lego Models, reused with the author's permission. Several packs can be installed at once and they share one atlas, so parts from all of them can sit in the same unit. A pack picker appears in the parts filters once there is more than one. The format, where extension packs go and how to build one are in [the parts pack guide](/lego-parts-pack).
+The bundled pack is derived from KaiserJ's original v2 lego parts, released on the [Spring forums](https://springrts.com/phpbb/viewtopic.php?t=22283) with "do whatever the heck you'd like with these". Several packs can be installed at once and they share one atlas, so parts from all of them can sit in the same unit. A pack picker appears in the parts filters once there is more than one. The format, where extension packs go and how to build one are in [the parts pack guide](/lego-parts-pack).
 
 A unit records the pack it was built against. Opening one whose pack is not installed still works: the pieces keep their names, hierarchy and transforms, and any piece whose part is missing draws nothing and is counted in the warnings above the viewport.
