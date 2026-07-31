@@ -6,14 +6,21 @@
  * nothing in the document: stopping restores the built pose exactly.
  *
  * A unit that has taken its script over is past all of this. The presets are
- * gone for it, and so is playback, which plays the presets rather than the
- * script: what is left is the way into the editor.
+ * gone for it, so playback runs the script itself: pick what happens to the
+ * unit, and the viewport plays what the script does about it.
  */
 
 import { Button } from "@picoframe/frame";
 import { FileCode, Pause, Play } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { useReduceMotion } from "../../../general/display";
 import {
@@ -24,7 +31,15 @@ import {
   roleLabel,
   unmetRequirements,
 } from "../../animPresets";
+import { legoRunScript } from "../../bindings";
 import type { LegoProject } from "../../model";
+import {
+  PREVIEW_FRAMES,
+  PREVIEW_SECONDS,
+  SCENARIOS,
+  type ScriptTimeline,
+  scenarioById,
+} from "../../scriptPlayback";
 import { ScriptDrawer } from "./ScriptDrawer";
 
 interface Props {
@@ -34,6 +49,11 @@ interface Props {
   onChange: (applied: AppliedPreset[]) => void;
   /** Stores the unit's own Lua. The first call is the unit taking it over. */
   onScriptChange: (script: string) => void;
+  /**
+   * The poses a run of the unit's own script produced, for the viewport to
+   * play. Null whenever the presets are what is playing, or nothing is.
+   */
+  onScriptTimeline: (timeline: ScriptTimeline | null) => void;
 }
 
 export function AnimationPanel({
@@ -42,12 +62,74 @@ export function AnimationPanel({
   onPlayingChange,
   onChange,
   onScriptChange,
+  onScriptTimeline,
 }: Props) {
   const reduceMotion = useReduceMotion();
   const [showScript, setShowScript] = useState(false);
+  const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
+  const [timeline, setTimeline] = useState<ScriptTimeline | null>(null);
+  const [running, setRunning] = useState(false);
+  /** A run that never reached the runtime, as opposed to one that failed in it. */
+  const [failure, setFailure] = useState<string | null>(null);
   const applied = project.animations ?? [];
   const counts = countRoles(project.pieces);
   const owned = project.script !== undefined;
+
+  const stop = useCallback(() => {
+    onPlayingChange(false);
+    onScriptTimeline(null);
+    setTimeline(null);
+    setFailure(null);
+  }, [onPlayingChange, onScriptTimeline]);
+
+  const start = useCallback(
+    async (scenario: string) => {
+      const script = project.script;
+      if (script === undefined) return;
+      setRunning(true);
+      setFailure(null);
+      try {
+        const result = await legoRunScript({
+          script,
+          unitName: project.unitName,
+          pieces: project.pieces.map((piece) => piece.name),
+          events: scenarioById(scenario)?.events ?? [],
+          frames: PREVIEW_FRAMES,
+        });
+        setTimeline(result);
+        // A run that produced nothing has only its reason to show. One that
+        // failed part way through is still worth watching up to that point.
+        onScriptTimeline(result.frames.length > 0 ? result : null);
+        onPlayingChange(result.frames.length > 0);
+      } catch (error) {
+        setTimeline(null);
+        onScriptTimeline(null);
+        onPlayingChange(false);
+        setFailure(error instanceof Error ? error.message : String(error));
+      } finally {
+        setRunning(false);
+      }
+    },
+    [
+      project.script,
+      project.unitName,
+      project.pieces,
+      onPlayingChange,
+      onScriptTimeline,
+    ],
+  );
+
+  // A script edited while it is playing leaves the poses on screen describing
+  // the script before the edit, so playback stops rather than lying about it.
+  // Held in a ref because the callbacks are rebuilt on every render.
+  const stopRef = useRef(stop);
+  stopRef.current = stop;
+  const lastScript = useRef(project.script);
+  useEffect(() => {
+    if (lastScript.current === project.script) return;
+    lastScript.current = project.script;
+    stopRef.current();
+  }, [project.script]);
 
   function apply(presetId: string) {
     onChange([...applied, { presetId, params: {} }]);
@@ -77,11 +159,25 @@ export function AnimationPanel({
   );
 
   if (owned) {
+    const scenario = scenarioById(scenarioId);
+    const stopped = timeline?.error ?? null;
+
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          <Button
+            size="sm"
+            variant={playing ? "default" : "outline"}
+            disabled={reduceMotion || running}
+            onClick={() => (playing ? stop() : void start(scenarioId))}
+          >
+            {playing ? <Pause size={14} /> : <Play size={14} />}
+            {playing ? "Stop" : running ? "Running" : "Play"}
+          </Button>
           <span className="text-xs text-muted-foreground">
-            This unit owns its script.
+            {reduceMotion
+              ? "Playback is off while your system asks for reduced motion."
+              : `${PREVIEW_SECONDS} seconds, looped`}
           </span>
           <Button
             size="sm"
@@ -94,14 +190,63 @@ export function AnimationPanel({
 
         {scriptDrawer}
 
-        <div className="flex flex-col gap-2 px-3 py-3 text-xs text-muted-foreground">
-          <p>
-            The presets wrote this unit's script once and are done with it. The
-            script is the animation now, and it is edited here.
-          </p>
-          <p>
-            Playback plays the presets rather than the script, so it is off for
-            this unit.
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium">
+              What happens to the unit
+            </span>
+            <Select
+              value={scenarioId}
+              onValueChange={(next) => {
+                setScenarioId(next);
+                if (playing || timeline) void start(next);
+              }}
+            >
+              <SelectTrigger size="sm" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SCENARIOS.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {scenario?.description}
+            </p>
+          </div>
+
+          {failure ? (
+            <p className="text-xs text-destructive">
+              The script could not be run: {failure}
+            </p>
+          ) : null}
+
+          {stopped ? (
+            <div className="flex flex-col gap-1 rounded-md border border-destructive/50 px-2 py-2">
+              <span className="text-xs font-medium text-destructive">
+                The script stopped
+              </span>
+              <p className="text-xs text-destructive">{stopped}</p>
+              <p className="text-xs text-muted-foreground">
+                {timeline && timeline.frames.length > 0
+                  ? `Playing the ${(timeline.frames.length / timeline.fps).toFixed(1)} seconds it managed first.`
+                  : "It got no further than that, so there is nothing to play."}
+              </p>
+            </div>
+          ) : null}
+
+          {timeline?.warnings.map((warning) => (
+            <p key={warning} className="text-xs text-muted-foreground">
+              {warning}
+            </p>
+          ))}
+
+          <p className="text-xs text-muted-foreground">
+            The presets wrote this unit's script once and are done with it. This
+            plays the script itself, so what you see is what the file says.
           </p>
         </div>
       </div>

@@ -24,6 +24,7 @@ mod import;
 mod texture;
 
 use coilbox_portable::valid_id;
+use coilbox_springlua::unitscript;
 use picoframe_core::CliResult;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -1101,6 +1102,37 @@ async fn lego_scratch_game(
     CliResult::ok(json!({ "dir": dir.to_string_lossy() }))
 }
 
+/// `lego_run_script` plays a unit's own Lua and reports where its pieces are on
+/// every frame of it.
+///
+/// Sampled rather than streamed: the runtime is here and the viewport is in the
+/// webview, so driving pieces live would be one call a frame. One call hands
+/// back the whole timeline, which is the shape the viewport already plays.
+///
+/// A script that throws, loops or names a piece the unit does not have is not
+/// an error here. It comes back as a timeline carrying the reason, because what
+/// the script managed before it broke is worth seeing.
+#[tauri::command]
+fn lego_run_script(
+    script: String,
+    unit_name: String,
+    pieces: Vec<String>,
+    events: Vec<unitscript::ScriptEvent>,
+    frames: u32,
+) -> CliResult {
+    let timeline = unitscript::run(
+        &script,
+        &format!("{unit_name}.lua"),
+        &pieces,
+        &events,
+        frames,
+    );
+    match serde_json::to_value(timeline) {
+        Ok(value) => CliResult::ok(value),
+        Err(e) => CliResult::err(format!("could not report what the script did: {e}")),
+    }
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-lego")
         .invoke_handler(tauri::generate_handler![
@@ -1117,7 +1149,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_export,
             lego_export_glb,
             lego_export_obj,
-            lego_scratch_game
+            lego_scratch_game,
+            lego_run_script
         ])
         .build()
 }

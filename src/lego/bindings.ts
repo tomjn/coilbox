@@ -2,6 +2,7 @@ import { defineCommand } from "@picoframe/plugin-sdk";
 
 import type { S3oModel } from "./importS3o";
 import type { S3oBuild } from "./s3oBuild";
+import type { ScriptEvent, ScriptTimeline } from "./scriptPlayback";
 
 /**
  * Which atlas to place, where to read it from, and what to call it. The three
@@ -254,6 +255,25 @@ export const legoTexturePrune = defineCommand<
   { keep: string[] },
   { removed: number }
 >("coilbox-lego", "lego_texture_prune");
+
+/**
+ * Play a unit's own script and report where its pieces are on every frame.
+ *
+ * `pieces` is the unit's piece names, which is what `piece("name")` resolves
+ * against and the order the timeline's numbers come back in. A script that
+ * throws, loops or names a piece the unit does not have is not an error: the
+ * timeline carries the reason along with whatever it managed first.
+ */
+export const legoRunScript = defineCommand<
+  {
+    script: string;
+    unitName: string;
+    pieces: string[];
+    events: ScriptEvent[];
+    frames: number;
+  },
+  ScriptTimeline
+>("coilbox-lego", "lego_run_script");
 
 /** Reveal an exported unit in the file manager. */
 export const legoOpenPath = defineCommand<

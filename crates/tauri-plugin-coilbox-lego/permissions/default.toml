@@ -17,4 +17,5 @@ permissions = [
   "allow-lego-export-glb",
   "allow-lego-export-obj",
   "allow-lego-scratch-game",
+  "allow-lego-run-script",
 ]

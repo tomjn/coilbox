@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-lego-run-script"
+description = "Enables the lego_run_script command without any pre-configured scope."
+commands.allow = ["lego_run_script"]
+
+[[permission]]
+identifier = "deny-lego-run-script"
+description = "Denies the lego_run_script command without any pre-configured scope."
+commands.deny = ["lego_run_script"]

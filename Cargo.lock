@@ -4888,6 +4888,7 @@ version = "0.0.0"
 dependencies = [
  "coilbox-portable",
  "coilbox-s3o",
+ "coilbox-springlua",
  "flate2",
  "image 0.25.10",
  "picoframe-core",
