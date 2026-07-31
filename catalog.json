@@ -6,6 +6,11 @@
       "id": "zwzsg-hexfarm",
       "match": { "regex": "^hex ?farm" },
       "reason": "Built for Kernel Panic. It ships its own LuaRules gadget and sets maxMetal to 0.1, so another game has no economy on it."
+    },
+    {
+      "id": "comet-catcher",
+      "match": { "regex": "^comet catcher" },
+      "reason": "Throws an engine error on load, so a warpath or conquest route drawn to it gets stuck."
     }
   ],
   "githubGameRepos": [
@@ -268,12 +273,6 @@
         "title": "Classics",
         "blurb": "Time-honoured battlefields that have decided games for two decades.",
         "maps": [
-          {
-            "id": "classic-comet-catcher",
-            "title": "Comet Catcher",
-            "filename": "cometcatcher.sd7",
-            "download": { "kind": "map", "springName": "CometCatcher" }
-          },
           {
             "id": "classic-delta-siege-dry",
             "title": "Delta Siege Dry",
