@@ -78,10 +78,10 @@ describe("demoInfoToSkirmishDraft", () => {
     expect(draft?.modOptionValues).toEqual({ zombies: "disabled" });
   });
 
-  it("defaults every converted slot to a sensible non-denylisted AI", () => {
+  it("defaults every converted slot to the game's standard AI", () => {
     const draft = demoInfoToSkirmishDraft({ info: demoInfo(), ais, sides });
     for (const p of draft?.participants.filter((p) => p.kind === "ai") ?? []) {
-      expect(p.ai?.shortName).toBe("BARb");
+      expect(p.ai?.shortName).toBe("E323AI");
     }
   });
 

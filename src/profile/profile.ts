@@ -2,6 +2,7 @@ import type { Accent, ThemeMode } from "@picoframe/frame";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { ConquestNames } from "../conquest/names";
 import type { SuggestedMapList } from "../content/branding";
+import type { GameAiConfig } from "../play/gameAi";
 import { describeJsonError } from "./jsonError";
 import { type OnboardingPlacement, onboardingPlacement } from "./onboarding";
 import { readProfileFile, resolveFileRef } from "./refs";
@@ -299,6 +300,13 @@ export interface Profile {
    * (see `../conquest/names`).
    */
   conquest?: ConquestNames;
+  /**
+   * This game's AI catalogue: which AIs are hardest, which is standard, which
+   * must never play, which are mini-games, and which garrison a neutral
+   * conquest world. Overrides the branding catalog's per-game entry field by
+   * field (see `../play/gameAi`).
+   */
+  ai?: GameAiConfig;
 }
 
 /** Where the profile came from. "seed" is reserved for a future bundled default. */

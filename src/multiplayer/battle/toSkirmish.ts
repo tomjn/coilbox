@@ -1,6 +1,6 @@
-import { fallbackFactionAi } from "@/conquest/ai";
 import type { Side, SkirmishAi } from "@/content/bindings";
 import type { BattleRestrictions, SkirmishDraft } from "@/play/drafts";
+import { standardAi } from "@/play/gameAi";
 import { hexToRgb, PALETTE, type Participant } from "@/play/participants";
 import type { Battle, User } from "../bindings";
 import { MODOPT_PREFIX } from "./battleOptions";
@@ -57,7 +57,7 @@ export function battleToSkirmishDraft(opts: {
   const { battle, me, sides, ais } = opts;
   const sideName = (i: number) => sides[i]?.name ?? "";
   const colorOf = (int: number) => hexToRgb(colorIntToHex(int));
-  const fallbackAi = fallbackFactionAi(ais);
+  const fallbackAi = standardAi(ais);
 
   // "You" is the logged-in member; if absent (e.g. an autohost battle we only
   // spectate), a spectator "you" keeps the draft valid without a phantom combatant.

@@ -15,8 +15,10 @@ import {
 import { BrandingLinks } from "../../../content/pages/components/BrandingLinks";
 import { BrandingScreenshots } from "../../../content/pages/components/BrandingScreenshots";
 import { usePreferredTarget, useSkirmishAis } from "../../../play/config";
+import { aiForDifficulty, mergeGameAi } from "../../../play/gameAi";
 import { GameSelectCard } from "../../../play/pages/components/GameSelectCard";
-import { getGameMatcher } from "../../../profile/profile";
+import { aiKey } from "../../../play/participants";
+import { getGameMatcher, getProfile } from "../../../profile/profile";
 import {
   type GenBuildGraph,
   type GenerateRunOpts,
@@ -160,7 +162,11 @@ export function RunSetupForm({
     [maps],
   );
 
-  const enemyAiKey = ais[0] ? `${ais[0].kind}:${ais[0].shortName}` : undefined;
+  // The opponent this run fields: the AI its difficulty calls for, from the
+  // game's ranking rather than whatever unitsync listed first.
+  const aiConfig = mergeGameAi(getProfile().ai, brandingEntry?.ai);
+  const enemyAi = aiForDifficulty(difficulty, ais, aiConfig);
+  const enemyAiKey = enemyAi ? aiKey(enemyAi) : undefined;
   const canGenerate = !!game && genMaps.length > 0 && !gameLoading;
 
   const startRun = async () => {
