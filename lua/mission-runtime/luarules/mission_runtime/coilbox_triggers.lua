@@ -52,6 +52,19 @@ function Engine:addCondition(kind, spec)
 	self.index = nil
 end
 
+--- Run `fn(ctx)` at the top of every polled tick, before the pass.
+--
+-- A condition answers a question at the moment it is asked. A condition about
+-- duration cannot: `test` runs once per armed trigger per pass, so it is neither
+-- a clock nor guaranteed to run at all. Anything that has to sample the world on
+-- a fixed beat registers here and leaves its `test` a lookup.
+--
+-- Ticks run on the polled tick only, never on an event and never again inside a
+-- cascade, so a sampler advances once per beat however many passes follow it.
+function Engine:addTick(fn)
+	self.ticks[#self.ticks + 1] = fn
+end
+
 --- Teach the engine an action type. `run(params, ctx)` performs it.
 function Engine:addAction(kind, run)
 	if self.actions[kind] then
@@ -135,6 +148,7 @@ function M.new(mission, ctx)
 		ctx = ctx or {},
 		conditions = {},
 		actions = {},
+		ticks = {},
 		-- Trigger records in the order the mission lists them. Evaluation order
 		-- is mission order, so a mission plays the same way twice.
 		triggers = {},
@@ -364,11 +378,24 @@ end
 
 --- Called every game frame. The engine owns the polled rate so that the tick is
 -- provable here rather than in whichever callin happens to drive it.
+--
+-- Samplers first, so a condition that reads what one of them recorded reads this
+-- tick's reading rather than the last one's.
 function Engine:frame(frame)
 	self.frameNumber = frame
-	if frame % M.POLL_FRAMES == 0 then
-		self:run(nil)
+	if frame % M.POLL_FRAMES ~= 0 then
+		return
 	end
+
+	self.ctx.frame = frame
+	for index, tick in ipairs(self.ticks) do
+		local ok, err = pcall(tick, self.ctx)
+		if not ok then
+			self:report("tick-error:" .. index, "error", "a polled sampler failed: " .. tostring(err))
+		end
+	end
+
+	self:run(nil)
 end
 
 return M
