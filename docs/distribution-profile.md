@@ -614,6 +614,24 @@ Controls the app-frame chrome — the sidebar mode, the breadcrumb, the top-bar 
 | `image` | string | Logo image. Same source rules as [`splash.image`](#splash-object). **Wins over `text`** when it resolves; falls back to `text` if it can't be loaded. |
 | `href`  | string | Makes the logo a link opened in the system browser (`http(s)`/`mailto`/`tel`; other schemes are ignored). |
 
+### `ai` (object)
+
+Overrides the [branding catalog](branding-catalog.md#ai-rankings)'s per-game AI block: which AIs are hardest, which is standard, which must never play, which are mini-games, and which garrison a neutral conquest world.
+
+```json
+"ai": {
+  "ranking": ["BARb", "CircuitAI", "AAI", "SimpleAI"],
+  "standard": "AAI",
+  "never": ["Sandbox", "NullAI"],
+  "minigame": ["ChickensAI", "ScavengersAI"],
+  "neutral": ["ChickensAI"]
+}
+```
+
+See the [catalog documentation](branding-catalog.md#ai-rankings) for what each field does. The merge is per field: a field set here wins, a field left out falls through to the catalog entry, and anything neither sets falls back to the built-in defaults. An empty array counts as absent, so an override cannot blank a field.
+
+Use this when you package a build and want your own difficulty curve, for example to hide a bot your players should never face, or to name the AI your tutorial expects.
+
 ### `conquest` (object)
 
 Supplies system/faction names — and whole lore factions — for **[Galactic Conquest](conquest.md)** galaxies generated in this distribution, so they read as your game rather than generic space. Every field is optional and overrides the branding catalog's per-game defaults.

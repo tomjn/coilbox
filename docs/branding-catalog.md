@@ -72,6 +72,33 @@ Two more things ride in the same catalog file:
 - **Suggested content and map packs.** Besides `entries[]`, the catalog carries a `suggested` block of curated games, maps and **map packs** offered to users who have none yet (and on the Maps download page). See the dedicated **[Map packs](map-packs.md)** guide for the shape and behaviour.
 - **Galactic-conquest naming.** A branding entry can carry a `conquest` field that supplies per-game star/faction name pools and lore factions, so a generated galaxy reads as *your* game rather than generic space. See **[Galactic conquest → Names and factions](conquest.md#names-and-factions)**.
 
+## AI rankings
+
+A branding entry can carry an `ai` block describing what a game's skirmish AIs are for. Coilbox otherwise picks AIs by list position, which is arbitrary: a game switch can drop a player from a strong AI to a trivial one, and a difficulty setting cannot pick a harder opponent if it does not know which opponent is harder.
+
+```json
+"ai": {
+  "ranking": ["BARb", "CircuitAI", "AAI", "SimpleAI"],
+  "standard": "AAI",
+  "never": ["Sandbox", "NullAI"],
+  "minigame": ["ChickensAI", "ScavengersAI"],
+  "neutral": ["ChickensAI"],
+  "neutralModOptions": { "chicken_difficulty": "easy" }
+}
+```
+
+Every field is optional and every name is a unitsync `shortName`, matched case-insensitively so one entry covers every version of your game.
+
+- `ranking` lists your playing AIs hardest first. It drives the difficulty pips in the AI picker, the opponent a warpath or conquest difficulty selects, and the replacement when a preset moves to a game that lacks its AI.
+- `standard` names the normal-difficulty AI. It is the default opponent wherever nothing more specific applies. Without it, Coilbox uses the middle of the ranking.
+- `never` lists bots that must not play, such as a do-nothing test AI. `Sandbox` and `NullAI` are excluded already.
+- `minigame` lists AIs that are a game mode rather than an opponent, such as chickens or scavengers. They stay pickable by hand but are never fielded as a normal enemy. Names containing `chicken` or `scav` are treated this way already.
+- `neutral` lists the AIs that garrison unclaimed worlds in galactic conquest, best first, and `neutralModOptions` sets the mod options those battles run with.
+
+An AI in none of these lists stays selectable in the skirmish AI picker, sorted last and with no difficulty reading. Warpath and conquest leave it alone unless the ranking matches nothing the player has installed.
+
+Games with no `ai` block fall back to a built-in ranking of the common Spring and Recoil AIs, so difficulty still means something out of the box. A [distribution profile](distribution-profile.md#ai-object) can override any field.
+
 ## Checklist
 
 1. Fork/branch the [coilbox repo](https://github.com/tomjn/coilbox) and edit `catalog.json`.
