@@ -17,6 +17,8 @@
 import { type DependencyList, type RefObject, useLayoutEffect } from "react";
 import * as THREE from "three";
 
+import { onTextureArrived } from "./textureArrival";
+
 /** The canvas the build is handed, and what it can ask of it afterwards. */
 export interface Canvas3D {
   renderer: THREE.WebGLRenderer;
@@ -88,9 +90,13 @@ export function useCanvas3D(
 
     const observer = new ResizeObserver(resize);
     observer.observe(host);
+    // A texture the view is already drawing with is a change like any other,
+    // and the only one three does not report to whoever is drawing.
+    const stopWatchingTextures = onTextureArrived(render);
     resize();
 
     return () => {
+      stopWatchingTextures();
       observer.disconnect();
       scene?.dispose();
       renderer.dispose();

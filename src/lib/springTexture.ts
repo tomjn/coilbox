@@ -12,6 +12,8 @@
 import * as THREE from "three";
 import { DDSLoader } from "three/addons/loaders/DDSLoader.js";
 
+import { textureArrived } from "./textureArrival";
+
 /**
  * What a team-colour region is drawn in.
  *
@@ -42,10 +44,11 @@ export function springTexture(url: string, data = false): THREE.Texture {
 
   const clean = url.split(/[?#]/)[0];
   const ext = clean.slice(clean.lastIndexOf(".") + 1).toLowerCase();
+  // The callback is the one a view drawn on demand needs: see textureArrival.ts.
   const texture =
     ext === "dds"
-      ? new DDSLoader().load(url)
-      : new THREE.TextureLoader().load(url);
+      ? new DDSLoader().load(url, textureArrived)
+      : new THREE.TextureLoader().load(url, textureArrived);
   texture.colorSpace = data ? THREE.NoColorSpace : THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   // The engine flips every texture to OpenGL's bottom-up order on load,
