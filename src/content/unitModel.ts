@@ -59,7 +59,7 @@ export interface BuiltModel {
  * than being decoded anywhere: a game's shared unit atlas can be a DXT5 8192
  * square, which is 64 MiB packed and 256 MiB as RGBA.
  */
-function modelTexture(file: string): THREE.Texture {
+function modelTexture(file: string, data = false): THREE.Texture {
   const url = unitModelTextureUrl(file);
   const cached = textures.get(url);
   if (cached) return cached;
@@ -69,7 +69,9 @@ function modelTexture(file: string): THREE.Texture {
     ext === "dds"
       ? new DDSLoader().load(url)
       : new THREE.TextureLoader().load(url);
-  texture.colorSpace = THREE.SRGBColorSpace;
+  // A mask is measurements rather than colour, so it must not be gamma-decoded
+  // on the way to the shader that reads it.
+  texture.colorSpace = data ? THREE.NoColorSpace : THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   // The engine flips every texture to OpenGL's bottom-up order on load,
   // including a DDS. three does that for anything it decodes itself, but a
@@ -83,6 +85,39 @@ function modelTexture(file: string): THREE.Texture {
   }
   textures.set(url, texture);
   return texture;
+}
+
+/**
+ * Paint the team-colour regions an `.s3o` marks in its second texture.
+ *
+ * The two formats hide this in different places. A `.3do` names a team-colour
+ * texture per face, which the worker flags. An `.s3o` leaves those regions
+ * black in the texture it draws and marks them in the red channel of a second
+ * one, so a viewer that loads only the first draws a commander with a black
+ * head. Mixing them needs a second sampler, which is a patch on the standard
+ * material rather than a material of our own: everything else about it, the
+ * lighting and the colour space, is what the rest of the app already uses.
+ */
+function paintTeamColour(
+  material: THREE.MeshStandardMaterial,
+  mask: THREE.Texture,
+): void {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.teamMask = { value: mask };
+    shader.uniforms.teamColour = { value: new THREE.Color(TEAM_COLOUR) };
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nuniform sampler2D teamMask;\nuniform vec3 teamColour;",
+      )
+      .replace(
+        "#include <map_fragment>",
+        "#include <map_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, teamColour, texture2D(teamMask, vMapUv).r);",
+      );
+  };
+  // Without this three reuses the unpatched program it compiled for another
+  // material with the same parameters.
+  material.customProgramCacheKey = () => "coilbox-team-colour";
 }
 
 /**
@@ -114,6 +149,9 @@ export function buildModel(model: UnitModelResult): BuiltModel {
       metalness: 0.05,
       side: THREE.DoubleSide,
     });
+    if (file && model.teamMask?.file) {
+      paintTeamColour(material, modelTexture(model.teamMask.file, true));
+    }
     materials.set(key, material);
     return material;
   };

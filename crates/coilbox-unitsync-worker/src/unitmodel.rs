@@ -133,16 +133,10 @@ pub fn render(
     if !out.textures.is_empty() {
         let teamtex = read_teamtex(&us, handle, &list);
         let key_base = cache_key_base(&us, game_archive);
-        for tex in &mut out.textures {
-            resolve_texture(
-                &us,
-                handle,
-                &list,
-                &out.format,
-                &teamtex,
-                cache_dir.zip(key_base.as_deref()),
-                tex,
-            );
+        let cache = cache_dir.zip(key_base.as_deref());
+        let format = out.format.clone();
+        for tex in out.textures.iter_mut().chain(out.team_mask.iter_mut()) {
+            resolve_texture(&us, handle, &list, &format, &teamtex, cache, tex);
         }
     }
 
@@ -179,10 +173,15 @@ fn build(path: &str, bytes: &[u8]) -> UnitModelOutput {
 // ---------------------------------------------------------------- s3o
 
 /// Flatten an `.s3o`. One texture for the whole model, so every piece with
-/// geometry gets a single batch naming it. `texture2` is the team-colour and
-/// glow mask rather than something to look at, so it is not requested.
+/// geometry gets a single batch naming it. `texture2` is not drawn: its red
+/// channel is the team-colour mask, which the viewer needs because the regions
+/// it marks are black in `texture1`.
 fn from_s3o(path: &str, model: &coilbox_s3o::Model) -> UnitModelOutput {
     let texture = (!model.texture1.is_empty()).then(|| model.texture1.clone());
+    let mask = (!model.texture2.is_empty()).then(|| ModelTexture {
+        name: model.texture2.clone(),
+        ..Default::default()
+    });
     UnitModelOutput {
         format: "s3o".into(),
         path: path.to_string(),
@@ -198,6 +197,7 @@ fn from_s3o(path: &str, model: &coilbox_s3o::Model) -> UnitModelOutput {
                 }]
             })
             .unwrap_or_default(),
+        team_mask: mask,
         palette_faces: 0,
         errors: Vec::new(),
     }
@@ -301,6 +301,9 @@ fn from_3do(path: &str, model: &coilbox_3do::Model) -> UnitModelOutput {
                 ..Default::default()
             })
             .collect(),
+        // A `.3do` has no second texture: its team-colour regions are named
+        // face by face, and `resolve_texture` flags them instead.
+        team_mask: None,
         palette_faces,
         errors: Vec::new(),
     }
