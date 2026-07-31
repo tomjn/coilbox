@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows the scenario plugin's storage, dialogue-media, compiled-mission read-back and mission-runtime install commands.
+Allows the scenario plugin's storage, dialogue-media, compiled-mission read-back, mission-runtime install and test-mutator commands.
 
 #### This default permission set includes the following:
 
@@ -14,6 +14,7 @@ Allows the scenario plugin's storage, dialogue-media, compiled-mission read-back
 - `allow-scenario-read-mission`
 - `allow-scenario-runtime-install`
 - `allow-scenario-runtime-status`
+- `allow-scenario-test-mutator`
 
 ## Permission Table
 
@@ -280,6 +281,32 @@ Enables the scenario_save command without any pre-configured scope.
 <td>
 
 Denies the scenario_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:allow-scenario-test-mutator`
+
+</td>
+<td>
+
+Enables the scenario_test_mutator command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:deny-scenario-test-mutator`
+
+</td>
+<td>
+
+Denies the scenario_test_mutator command without any pre-configured scope.
 
 </td>
 </tr>
