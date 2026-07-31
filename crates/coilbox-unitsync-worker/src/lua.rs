@@ -114,6 +114,34 @@ pub fn emit_repl_error(msg: String) {
     println!("{}", serde_json::to_string(&out).unwrap_or_default());
 }
 
+/// Every string unitsync hands back, including each `lpGetStrKeyStrVal` value,
+/// comes through one fixed 100,000 byte buffer. A longer value is replaced by
+/// unitsync's own "Increase STRBUF_SIZE (needs N bytes)" complaint, which reads
+/// back as perfectly ordinary data, so a game whose unit list outgrew the buffer
+/// silently became one unit with a nonsense name.
+///
+/// This is the writing half of the fix: `__cb_chunk(s)` splits a result of any
+/// size into buffer-sized pieces under `result1`..`resultN`, with the count in
+/// `chunks`, and [`crate::ffi::Unitsync::run_lua_source`] reads them back and
+/// joins them. Splitting is by byte offset, not by line, so the pieces
+/// concatenate with no separator.
+pub const CHUNKED_RESULT: &str = r#"
+local function __cb_chunk(s, extra)
+  local out = extra or {}
+  s = (type(s) == 'string') and s or ''
+  local size = 60000
+  local n = 0
+  local i = 1
+  while i <= #s do
+    n = n + 1
+    out['result' .. n] = string.sub(s, i, i + size - 1)
+    i = i + size
+  end
+  out.chunks = tostring(n)
+  return out
+end
+"#;
+
 /// A pure-Lua pretty-printer, prepended to every script. Uses only primitives the
 /// unitsync `LuaParser` env keeps (`pairs`/`type`/`tostring`/`string.format`/
 /// `table.concat`/`table.sort`). Handles nil/number/boolean/string/table, sorts
@@ -348,6 +376,58 @@ mod tests {
             r.result.is_none(),
             "final chunk never runs after divergence"
         );
+    }
+
+    /// Run `__cb_chunk(<expr>)` in stock Lua 5.1 and return the pieces it made,
+    /// in the order the FFI reader reads them.
+    fn chunked(expr: &str) -> Vec<String> {
+        let lua = Lua::new();
+        let t: mlua::Table = lua
+            .load(format!("{CHUNKED_RESULT}\nreturn __cb_chunk({expr})"))
+            .eval()
+            .unwrap();
+        let n: usize = t.get::<String>("chunks").unwrap().parse().unwrap();
+        (1..=n)
+            .map(|i| t.get::<String>(format!("result{i}")).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn a_short_result_is_one_chunk() {
+        let pieces = chunked("'armcom\\tArmada Commander'");
+        assert_eq!(pieces, vec!["armcom\tArmada Commander"]);
+    }
+
+    #[test]
+    fn an_empty_result_is_no_chunks() {
+        assert!(chunked("''").is_empty());
+    }
+
+    #[test]
+    fn a_result_past_the_string_buffer_survives_the_round_trip() {
+        // XTA's unit list needed 132,890 bytes and came back as unitsync's
+        // complaint about its own 100,000 byte buffer. Every piece has to stay
+        // under that, and joining them has to give the list back unchanged.
+        let line = "unit\tUnit Name\n";
+        let pieces = chunked("string.rep('unit\\tUnit Name\\n', 12000)");
+        assert!(pieces.len() > 1, "a 180,000 byte result must be split");
+        for (i, piece) in pieces.iter().enumerate() {
+            assert!(piece.len() < 100_000, "piece {i} is {} bytes", piece.len());
+        }
+        assert_eq!(pieces.concat(), line.repeat(12_000));
+    }
+
+    #[test]
+    fn extra_fields_ride_along_with_the_chunks() {
+        let lua = Lua::new();
+        let t: mlua::Table = lua
+            .load(format!(
+                "{CHUNKED_RESULT}\nreturn __cb_chunk('x', {{ __error = 'boom' }})"
+            ))
+            .eval()
+            .unwrap();
+        assert_eq!(t.get::<String>("__error").unwrap(), "boom");
+        assert_eq!(t.get::<String>("result1").unwrap(), "x");
     }
 
     #[test]

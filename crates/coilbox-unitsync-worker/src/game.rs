@@ -68,10 +68,13 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameIn
     if units.is_empty() {
         let shimmed = units_via_shim(&us);
         let _ = us.drain_errors();
-        if shimmed.is_empty() {
-            errors.extend(unit_errors);
-        } else {
-            units = shimmed;
+        match shimmed {
+            Ok(shimmed) if !shimmed.is_empty() => units = shimmed,
+            Ok(_) => errors.extend(unit_errors),
+            Err(e) => {
+                errors.extend(unit_errors);
+                errors.push(format!("could not read this game's units: {}", e.trim()));
+            }
         }
     } else {
         errors.extend(unit_errors);
@@ -158,7 +161,8 @@ pub fn emit_error(msg: String) {
 /// game's own files and the base `springcontent` def scripts.
 const VFS_ALL_MODES: &str = "rmMbe";
 
-/// The Lua that [`units_via_shim`] runs; the inline comments explain each shim.
+/// The Lua that [`units_via_shim`] runs, with [`crate::lua::CHUNKED_RESULT`]
+/// prepended. The inline comments explain each shim.
 const UNIT_DEFS_SHIM_SCRIPT: &str = r#"
 -- Load the game's unit defs through unitsync's Lua parser, supplying the slice
 -- of the game environment unitsync doesn't provide but the shipped def scripts
@@ -191,7 +195,9 @@ for _, k in ipairs(names) do
   full = tostring(full):gsub('[\t\r\n]', ' ')
   lines[#lines + 1] = tostring(k) .. '\t' .. full
 end
-return { result = table.concat(lines, '\n') }
+-- Sent back in pieces: a big game's list is longer than unitsync can return in
+-- one string.
+return __cb_chunk(table.concat(lines, '\n'))
 "#;
 
 /// Native unit enumeration: `ProcessUnits` must have populated the unitdef table
@@ -211,13 +217,12 @@ fn collect_units_native(us: &Unitsync) -> Vec<UnitEntry> {
 
 /// Fallback unit loader: run the game's `gamedata/defs.lua` through the Lua
 /// parser (archives already mounted by the caller) with the missing game
-/// environment shimmed in, and read back `name\tfullname` per unit. Empty on any
-/// failure, so the caller keeps the previous "no units" behaviour.
-fn units_via_shim(us: &Unitsync) -> Vec<UnitEntry> {
-    match us.run_lua_source(UNIT_DEFS_SHIM_SCRIPT, VFS_ALL_MODES) {
-        Ok(raw) => parse_shim_units(&raw),
-        Err(_) => Vec::new(),
-    }
+/// environment shimmed in, and read back `name\tfullname` per unit. The failure
+/// is returned so the caller can report why a game has no units.
+fn units_via_shim(us: &Unitsync) -> Result<Vec<UnitEntry>, String> {
+    let script = format!("{}{UNIT_DEFS_SHIM_SCRIPT}", crate::lua::CHUNKED_RESULT);
+    us.run_lua_source(&script, VFS_ALL_MODES)
+        .map(|raw| parse_shim_units(&raw))
 }
 
 /// Parse the `name\tfullname` lines [`UNIT_DEFS_SHIM_SCRIPT`] returns into

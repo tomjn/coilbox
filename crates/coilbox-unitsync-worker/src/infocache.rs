@@ -22,8 +22,10 @@ use std::path::Path;
 /// shape *or* the way its contents are produced changes, so stale entries from an
 /// older build are ignored. v4: game info gained the Lua-shim unit fallback. v5:
 /// the unit dataset gained the per-unit `mobile` flag. v6: the unit dataset
-/// gained the per-unit `objectName`.
-const INFO_CACHE_VERSION: u32 = 6;
+/// gained the per-unit `objectName`. v7: unit lists no longer come back through
+/// unitsync's 100,000 byte string buffer, so a big game's cached list of one
+/// bogus unit has to be re-read.
+const INFO_CACHE_VERSION: u32 = 7;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.
