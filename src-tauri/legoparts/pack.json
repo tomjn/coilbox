@@ -8,7 +8,7 @@
     "atlas": "lego2skin2048_2-2.png",
     "atlasSha256": "5935139edf0eb20b4b7cb9465b463edfc64b31cd6e81cf404db18353dd4ca20f"
   },
-  "licence": "Geometry and texture from Splinter Faction's lego parts library.\nhttps://github.com/SplinterFaction/SplinterFaction\n\nReused with the permission of the author, Scary le poo, who confirmed on 2026-07-28 that the assets are \"free and clear\".\n\nThe pack format is documented in docs/lego-parts-pack.md. Any pack following it can replace this one.",
+  "licence": "Geometry and texture from KaiserJ's original v2 lego parts library.\nRelease thread: https://springrts.com/phpbb/viewtopic.php?t=22283\n\nKaiserJ released the parts in that thread with \"do whatever the heck you'd like with these\".\n\nThe pack format is documented in docs/lego-parts-pack.md. Any pack following it can replace this one.",
   "atlas": {
     "width": 2048,
     "height": 2048
