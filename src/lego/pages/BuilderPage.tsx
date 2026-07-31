@@ -34,6 +34,7 @@ import {
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
+import { legoTexturePrune } from "../bindings";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
 import { selectionAsCompound } from "../compounds";
 import { usePartFilter } from "../filter";
@@ -52,8 +53,10 @@ import {
 import {
   childrenOf,
   descendantIds,
+  type LegoImported,
   type LegoPiece,
   type LegoProject,
+  type LegoTexture,
   normalisePieceName,
   pieceById,
   projectProblems,
@@ -67,11 +70,19 @@ import {
 } from "../pack";
 import { usePanelOpen } from "../panels";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
-import { deleteCompound, saveCompound, useLegoCompounds } from "../projects";
+import {
+  deleteCompound,
+  saveCompound,
+  useLegoCompounds,
+  useLegoProjects,
+} from "../projects";
+import { rawGeometryProblems } from "../rawGeometry";
+import { texturesInUse } from "../rawImport";
 import { canReparent, reparentPiece } from "../reparent";
 import { sitOnGround } from "../s3oBuild";
 import { isShortcut } from "../shortcuts";
 import { useLegoDocument } from "../useLegoDocument";
+import { useRawGeometry } from "../useRawGeometry";
 import { AnchorList } from "./components/AnchorList";
 import { AnimationPanel } from "./components/AnimationPanel";
 import { AtlasPicker } from "./components/AtlasPicker";
@@ -84,6 +95,7 @@ import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 import { PieceTree } from "./components/PieceTree";
 import { TestDrawer } from "./components/TestDrawer";
+import { TexturePicker } from "./components/TexturePicker";
 import { TransformFields } from "./components/TransformFields";
 
 /** Radix needs a non-empty value, so "no role" gets one of its own. */
@@ -112,8 +124,20 @@ function Builder({ id }: { id: string | undefined }) {
   const { edit, selectedId, selectedIds, select: setSelectedId } = doc;
   const draft = doc.project;
   const { compounds } = useLegoCompounds();
+  // Only for the keep-set when a texture changes: the store is shared, so
+  // nothing can decide a key is dead by looking at one unit.
+  const { projects } = useLegoProjects();
 
   const [pack, setPack] = useState<LoadedPack | null>(null);
+  // The meshes of a unit imported from somebody else's model. Read once
+  // alongside the document, and null for a unit built out of parts.
+  const geometry = useRawGeometry(draft);
+  const raw = geometry.raw;
+  // A unit imported whole has no parts and no atlas, so the parts library, the
+  // compound library and the atlas picker are all hidden for it. Its UVs point
+  // onto its own texture rather than onto the pack's sheet, so a part dropped
+  // into it would sample the wrong image and nothing could put that right.
+  const imported = draft?.imported ?? null;
   const [strip, setStrip] = useState<"parts" | "compounds">("parts");
   // Open or closed is remembered between runs. Which tab is showing is not, so
   // the side panel always comes back on Pieces. See `../panels`.
@@ -201,10 +225,19 @@ function Builder({ id }: { id: string | undefined }) {
       draft
         ? [
             ...projectProblems(draft),
-            ...(pack ? projectPackProblems(draft, pack) : []),
+            // A unit imported whole names no parts and no atlas, so the pack
+            // has nothing to say about it. Its own geometry does.
+            ...(draft.imported
+              ? [
+                  ...(geometry.error ? [geometry.error] : []),
+                  ...rawGeometryProblems(draft.pieces, geometry.raw),
+                ]
+              : pack
+                ? projectPackProblems(draft, pack)
+                : []),
           ]
         : [],
-    [draft, pack],
+    [draft, pack, geometry.error, geometry.raw],
   );
 
   function addPart(part: LegoPartInfo) {
@@ -488,6 +521,37 @@ function Builder({ id }: { id: string | undefined }) {
     });
   }
 
+  /**
+   * Point an imported unit at a different texture, or at a re-read of the same
+   * file after it was edited elsewhere.
+   *
+   * An ordinary edit, so undo takes it back, and nothing else moves: the
+   * geometry, its UVs, the camera and the selection are all untouched.
+   *
+   * The prune afterwards is because the store is content addressed. A refreshed
+   * texture is new bytes under a new key, so the version before it is left
+   * behind, and a session of edits on an 8 MiB texture would otherwise be
+   * hundreds of megabytes of dead files. The keep-set is every saved unit's
+   * keys plus the one just set, since the document has not been written yet.
+   */
+  function changeTextures(change: Partial<LegoImported>) {
+    let next: LegoTexture[] = [];
+    edit((project) => {
+      if (!project.imported) return project;
+      const imported = { ...project.imported, ...change };
+      next = [imported.texture, imported.teamMask].filter(
+        (texture): texture is LegoTexture => texture !== undefined,
+      );
+      return { ...project, imported };
+    });
+    void legoTexturePrune({
+      keep: [...texturesInUse(projects), ...next.map((t) => t.key)],
+    }).catch(() => {
+      // A store that could not be swept is a disk-space question rather than a
+      // correctness one, and the unit is already pointing at the new texture.
+    });
+  }
+
   function movePivot(pieceId: string, pivot: [number, number, number]) {
     edit((project) => setPivot(project, pieceId, pivot));
   }
@@ -680,6 +744,7 @@ function Builder({ id }: { id: string | undefined }) {
           onOpenChange={setExporting}
           project={draft}
           pack={pack}
+          raw={raw}
           onRemember={(settings) =>
             edit((project) => ({ ...project, ...settings }))
           }
@@ -690,6 +755,7 @@ function Builder({ id }: { id: string | undefined }) {
           onOpenChange={setTesting}
           project={draft}
           pack={pack}
+          raw={raw}
         />
 
         <div className="flex min-h-0 flex-1">
@@ -721,11 +787,18 @@ function Builder({ id }: { id: string | undefined }) {
                         className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
                       />
                     </p>
-                    <AtlasPicker
-                      project={draft}
-                      pack={pack}
-                      onChange={setAtlas}
-                    />
+                    {imported ? (
+                      <TexturePicker
+                        imported={imported}
+                        onChange={changeTextures}
+                      />
+                    ) : (
+                      <AtlasPicker
+                        project={draft}
+                        pack={pack}
+                        onChange={setAtlas}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -814,6 +887,7 @@ function Builder({ id }: { id: string | undefined }) {
 
               <ModelViewport
                 pack={pack}
+                raw={raw}
                 project={draft}
                 selectedIds={selectedIds}
                 onSelect={selectPiece}
@@ -823,13 +897,18 @@ function Builder({ id }: { id: string | undefined }) {
                 onHover={setHoveredId}
                 playing={playing}
                 uniformScale={uniformScale}
-                onGround={() => edit((project) => sitOnGround(project, pack))}
+                onGround={() =>
+                  edit((project) => sitOnGround(project, pack, raw))
+                }
                 onReady={doc.onCapture}
                 onDuplicate={duplicateSelection}
                 canDuplicate={transformRoots(draft, selectedIds).length > 0}
                 onPaste={() => void pasteClipboard()}
                 onSaveAsCompound={() => void saveSelectionAsCompound()}
-                canSaveAsCompound={selectedIds.length > 0}
+                // Not for an imported unit: a compound is pieces made of
+                // parts, and one saved out of raw geometry would name meshes
+                // that only mean anything inside the unit they came from.
+                canSaveAsCompound={selectedIds.length > 0 && !imported}
                 onDelete={removeSelected}
                 canDelete={transformRoots(draft, selectedIds).length > 0}
                 symmetry={symmetry}
@@ -849,97 +928,107 @@ function Builder({ id }: { id: string | undefined }) {
               />
             </div>
 
-            {/* Collapsible: most of a session is spent moving what is already there,
-              not reaching for another part. */}
-            <div
-              className={`flex shrink-0 flex-col border-t border-border ${
-                stripOpen ? "h-72" : ""
-              }`}
-            >
-              <div className="flex items-center gap-2 px-3 py-2">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => setStripOpen(!stripOpen)}
-                  aria-expanded={stripOpen}
-                  aria-label={stripOpen ? "Hide the parts" : "Show the parts"}
-                >
-                  {stripOpen ? (
-                    <ChevronDown size={16} />
-                  ) : (
-                    <ChevronUp size={16} />
-                  )}
-                </Button>
+            {/* Hidden for an imported unit, which has no parts to reach for: its
+              UVs point onto its own texture rather than onto the pack's sheet,
+              so a part dropped into it would sample the wrong image and nothing
+              here could put that right. Compounds go with it, being pieces made
+              of parts. See https://github.com/tomjn/coilbox/issues/712.
 
-                <ButtonGroup>
+              Collapsible otherwise: most of a session is spent moving what is
+              already there, not reaching for another part. */}
+            {imported ? null : (
+              <div
+                className={`flex shrink-0 flex-col border-t border-border ${
+                  stripOpen ? "h-72" : ""
+                }`}
+              >
+                <div className="flex items-center gap-2 px-3 py-2">
                   <Button
-                    size="sm"
-                    variant={strip === "parts" ? "default" : "outline"}
-                    onClick={() => {
-                      setStrip("parts");
-                      setStripOpen(true);
-                    }}
-                    aria-pressed={strip === "parts"}
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setStripOpen(!stripOpen)}
+                    aria-expanded={stripOpen}
+                    aria-label={stripOpen ? "Hide the parts" : "Show the parts"}
                   >
-                    Parts
+                    {stripOpen ? (
+                      <ChevronDown size={16} />
+                    ) : (
+                      <ChevronUp size={16} />
+                    )}
                   </Button>
-                  <Button
-                    size="sm"
-                    variant={strip === "compounds" ? "default" : "outline"}
-                    onClick={() => {
-                      setStrip("compounds");
-                      setStripOpen(true);
-                    }}
-                    aria-pressed={strip === "compounds"}
-                  >
-                    Compounds
-                  </Button>
-                </ButtonGroup>
 
-                {stripOpen && strip === "parts" ? (
-                  <PartFilters
-                    pack={pack}
-                    query={filter.query}
-                    onQuery={filter.setQuery}
-                    category={filter.category}
-                    onCategory={filter.setCategory}
-                    packId={filter.packId}
-                    onPackId={filter.setPackId}
-                    shown={filter.parts.length}
-                    className="flex-1"
-                  />
-                ) : null}
-              </div>
+                  <ButtonGroup>
+                    <Button
+                      size="sm"
+                      variant={strip === "parts" ? "default" : "outline"}
+                      onClick={() => {
+                        setStrip("parts");
+                        setStripOpen(true);
+                      }}
+                      aria-pressed={strip === "parts"}
+                    >
+                      Parts
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={strip === "compounds" ? "default" : "outline"}
+                      onClick={() => {
+                        setStrip("compounds");
+                        setStripOpen(true);
+                      }}
+                      aria-pressed={strip === "compounds"}
+                    >
+                      Compounds
+                    </Button>
+                  </ButtonGroup>
 
-              {/* Flex, not block: the picker sizes itself with flex-1 and its contents
+                  {stripOpen && strip === "parts" ? (
+                    <PartFilters
+                      pack={pack}
+                      query={filter.query}
+                      onQuery={filter.setQuery}
+                      category={filter.category}
+                      onCategory={filter.setCategory}
+                      packId={filter.packId}
+                      onPackId={filter.setPackId}
+                      shown={filter.parts.length}
+                      className="flex-1"
+                    />
+                  ) : null}
+                </div>
+
+                {/* Flex, not block: the picker sizes itself with flex-1 and its contents
                 are absolutely positioned, so in a block parent it collapses to
                 nothing and the panel looks empty. */}
-              {stripOpen ? (
-                <div className="flex min-h-0 flex-1 border-t border-border">
-                  {strip === "compounds" ? (
-                    <CompoundPicker
-                      pack={pack}
-                      compounds={compounds}
-                      atlas={drawAtlas}
-                      onInsert={addCompound}
-                      onDelete={(compoundId) => void deleteCompound(compoundId)}
-                      onRename={(compound, name) =>
-                        void saveCompound({ ...compound, name })
-                      }
-                    />
-                  ) : filter.parts.length === 0 ? (
-                    <NoMatches />
-                  ) : (
-                    <PartPicker
-                      pack={pack}
-                      parts={filter.parts}
-                      atlas={drawAtlas}
-                      onSelect={addPart}
-                    />
-                  )}
-                </div>
-              ) : null}
-            </div>
+                {stripOpen ? (
+                  <div className="flex min-h-0 flex-1 border-t border-border">
+                    {strip === "compounds" ? (
+                      <CompoundPicker
+                        pack={pack}
+                        compounds={compounds}
+                        atlas={drawAtlas}
+                        onInsert={addCompound}
+                        onDelete={(compoundId) =>
+                          void deleteCompound(compoundId)
+                        }
+                        onRename={(compound, name) =>
+                          void saveCompound({ ...compound, name })
+                        }
+                      />
+                    ) : filter.parts.length === 0 ? (
+                      <NoMatches />
+                    ) : (
+                      <PartPicker
+                        pack={pack}
+                        parts={filter.parts}
+                        atlas={drawAtlas}
+                        onSelect={addPart}
+                      />
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
 
           <CollapsibleContent asChild>
@@ -975,6 +1064,7 @@ function Builder({ id }: { id: string | undefined }) {
                 <CollisionPanel
                   project={draft}
                   pack={pack}
+                  raw={raw}
                   onChange={(collisionVolume) =>
                     edit((project) => {
                       if (collisionVolume)
