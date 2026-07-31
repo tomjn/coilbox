@@ -13,6 +13,8 @@ import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { cn } from "@/lib/utils";
 import { aiByline } from "@/play/config";
+import { aiPips, type GameAiConfig, orderedAis } from "@/play/gameAi";
+import { DifficultyPips } from "@/play/pages/components/DifficultyPips";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { useMultiplayer } from "../store";
 import { allyLetter, isAiUnavailable, type MemberRow as Row } from "./config";
@@ -37,6 +39,7 @@ export function BattleMembersTable({
   hostControls,
   addableAis,
   addableAisReady,
+  aiConfig,
   noteFor,
   onSetNote,
   statsSummaryFor,
@@ -84,6 +87,8 @@ export function BattleMembersTable({
    * flag below so a bot's AI never reads as unavailable before the list is
    * actually known. */
   addableAisReady: boolean;
+  /** The game's AI catalogue, for the difficulty pips and AI ordering. */
+  aiConfig?: GameAiConfig;
   /** Current private note for a human row ("" for none). Bots have no account
    * so aren't offered notes (see `MemberRow`'s `onSetNote` gating below). */
   noteFor?: (row: Row) => string;
@@ -178,11 +183,16 @@ export function BattleMembersTable({
   }));
   // The AI options, shared by the Add AI dropdown and each bot row's in-place AI
   // picker (issue #532), so both offer exactly the game's addable AIs.
-  const aiOptions = addableAis.map((a) => ({
-    value: a.shortName,
-    label: a.name ?? a.shortName,
-    description: aiByline(a),
-  }));
+  const aiOptions = orderedAis(addableAis, aiConfig).map((a) => {
+    const filled = aiPips(a, addableAis, aiConfig);
+    return {
+      value: a.shortName,
+      label: a.name ?? a.shortName,
+      description: aiByline(a),
+      icon:
+        filled === undefined ? undefined : <DifficultyPips filled={filled} />,
+    };
+  });
 
   return (
     <div className="rounded-lg border border-border/50 bg-card">

@@ -22,6 +22,7 @@ import type { Side, SkirmishAi } from "@/content/bindings";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { cn } from "@/lib/utils";
+import { aiPips, type GameAiConfig, orderedAis } from "@/play/gameAi";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   aiByline,
@@ -31,6 +32,7 @@ import {
   RANDOM_SIDE,
   rgbToHex,
 } from "../../config";
+import { DifficultyPips } from "./DifficultyPips";
 
 /** Ally-team letters (A, B, C…) mapped to indices, offered per row. */
 const allyLetter = (n: number) => String.fromCharCode(65 + n);
@@ -51,6 +53,7 @@ export function ParticipantsTable({
   sides,
   factionLogos,
   ais,
+  aiConfig,
   disabled,
   startPosType,
   startPosCount,
@@ -64,6 +67,8 @@ export function ParticipantsTable({
   /** Resolved faction emblems, keyed by lowercased side name (may be empty). */
   factionLogos?: Record<string, FactionLogoSrc>;
   ais: SkirmishAi[];
+  /** The game's AI catalogue, for the difficulty pips and AI ordering. */
+  aiConfig?: GameAiConfig;
   disabled?: boolean;
   /** Current start-position mode; 0 (fixed map positions) shows the hint that
    * the team number picks the spawn. */
@@ -148,8 +153,17 @@ export function ParticipantsTable({
       ),
     };
   });
-  const nativeAis = ais.filter((a) => a.kind === "native");
-  const luaAis = ais.filter((a) => a.kind === "lua");
+  // Hardest first within each group, with AIs no ranking places last, so the
+  // pips read as an ordered scale rather than scattered through the list.
+  const sorted = orderedAis(ais, aiConfig);
+  const nativeAis = sorted.filter((a) => a.kind === "native");
+  const luaAis = sorted.filter((a) => a.kind === "lua");
+  const pipsFor = (a: SkirmishAi) => {
+    const filled = aiPips(a, ais, aiConfig);
+    return filled === undefined ? undefined : (
+      <DifficultyPips filled={filled} />
+    );
+  };
 
   // Defensive flag (#501): a row whose selected AI isn't in this game's list at
   // all reads as invalid rather than being shown as a normal (blank) pick. Only
@@ -267,6 +281,7 @@ export function ParticipantsTable({
                                     key={aiValue(a)}
                                     value={aiValue(a)}
                                     description={aiByline(a)}
+                                    icon={pipsFor(a)}
                                   >
                                     {aiLabel(a)}
                                   </SelectItem>
@@ -281,6 +296,7 @@ export function ParticipantsTable({
                                     key={aiValue(a)}
                                     value={aiValue(a)}
                                     description={aiByline(a)}
+                                    icon={pipsFor(a)}
                                   >
                                     {aiLabel(a)}
                                   </SelectItem>

@@ -2,12 +2,15 @@ import { Button, NavGate } from "@picoframe/frame";
 import { Bookmark, Gamepad2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { useBrandingEntry } from "@/content/branding";
 import { useFactionLogos } from "@/factions/logos";
 import { notify } from "@/notify/notify";
 import { useSkirmishAis } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
+import { mergeGameAi } from "@/play/gameAi";
 import { SaveAsPresetButton } from "@/play/pages/components/SaveAsPresetButton";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
+import { getProfile } from "@/profile/profile";
 import { ApplySkirmishPresetPopover } from "../battle/ApplySkirmishPresetPopover";
 import { AutohostControls } from "../battle/AutohostControls";
 import { addHostSeedBots } from "../battle/applyHostSeed";
@@ -53,6 +56,9 @@ function BattleRoomPage() {
     gameArchive: room.localGame?.primaryArchive.name,
     sideNames: room.sides.map((s) => s.name),
   });
+  // The game's AI catalogue, for the AI picker's difficulty pips.
+  const brandingAi = useBrandingEntry(room.localGame)?.ai;
+  const aiConfig = mergeGameAi(getProfile().ai, brandingAi);
   const launch = useBattleLaunch(room.serverKey, room.target, room.selfHost);
   // Private, client-side per-player notes (issue #341), scoped to this server.
   const { get: getNote, set: setNote } = useNoteActions(room.serverKey);
@@ -344,6 +350,7 @@ function BattleRoomPage() {
             hostControls={room.hostControls}
             addableAis={room.addableAis}
             addableAisReady={room.addableAisReady}
+            aiConfig={aiConfig}
             noteFor={(row) => getNote(row.userId, row.name)}
             onSetNote={(row, text) => setNote(row.userId, row.name, text)}
             statsSummaryFor={(row) => relationSummary(relationFor(row.name))}
