@@ -355,9 +355,7 @@ export function ModelViewport({
     if (box) {
       frameBounds(state, box, HOME_CAMERA);
     } else {
-      state.camera.position.set(...HOME_CAMERA);
-      state.controls.target.set(0, 0, 0);
-      state.controls.update();
+      homeView(state);
     }
     state.render();
   }
@@ -2776,13 +2774,30 @@ function applyAnimation(state: SceneState, project: LegoProject, t: number) {
  * With nothing selected the whole unit is framed instead. That reads as more
  * useful than F doing nothing, and matches other 3D tools' "frame all"
  * behaviour for an empty selection.
+ *
+ * A unit with no geometry in it at all has nothing to frame, whatever is
+ * selected, so the camera goes home instead: the same place the compass puts
+ * it, and for the same reason. Measuring the scene made this case look like a
+ * unit the size of a point at the origin, because a selected piece's pivot dot
+ * is in the scene as well as its geometry, and F dived at the dot. The
+ * document's own box has no dots in it, and no reference figure either: the
+ * figure stands beside the unit for scale and is not the work being framed.
  */
 function focusSelection(state: SceneState, pieceIds: string[]) {
+  const unit = boundsBox(
+    unitBounds(state.projectRef.current, state.packRef.current),
+  );
+  if (!unit) {
+    homeView(state);
+    state.render();
+    return;
+  }
+
   const groups = pieceIds
     .map((id) => state.groups.get(id))
     .filter((group): group is THREE.Group => group !== undefined);
   if (groups.length === 0) {
-    if (frameObject(state, state.root)) state.render();
+    if (frameBounds(state, unit)) state.render();
     return;
   }
 
@@ -2797,12 +2812,19 @@ function focusSelection(state: SceneState, pieceIds: string[]) {
  * the camera untouched, when the box is empty: an object with no geometry
  * (an empty piece, or a unit that is only empty pieces) has nothing to frame.
  *
- * Shared by the F shortcut, which frames the selection or the whole unit on
- * demand, and the opening frame, which frames the whole unit once as soon as
- * its geometry exists.
+ * Used by the opening frame, which frames the whole unit once as soon as its
+ * geometry exists.
  */
 function frameObject(state: SceneState, object: THREE.Object3D): boolean {
   return frameBounds(state, new THREE.Box3().setFromObject(object));
+}
+
+/** The view the builder opens on: the home camera, looking at the origin.
+ *  Where the camera lands when there is nothing to frame. */
+function homeView(state: SceneState) {
+  state.camera.position.set(...HOME_CAMERA);
+  state.controls.target.set(0, 0, 0);
+  state.controls.update();
 }
 
 /** The unit's own measured box, or null when it has no geometry to frame: a
