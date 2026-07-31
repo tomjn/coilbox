@@ -42,6 +42,25 @@ export const scenarioMediaImport = defineCommand<
 >("coilbox-scenario", "scenario_media_import");
 
 /**
+ * Read a stored dialogue clip back as a `data:` URL, for the export path. The
+ * content type follows the stored extension.
+ */
+export const scenarioMediaRead = defineCommand<
+  { scenarioId: string; file: string },
+  { dataUrl: string }
+>("coilbox-scenario", "scenario_media_read");
+
+/**
+ * Write a clip carried by an imported scenario file, under the name the imported
+ * document already references. Rejects anything that is not a `data:` URI, or
+ * that holds more than 16 MB.
+ */
+export const scenarioMediaWrite = defineCommand<
+  { scenarioId: string; file: string; dataUri: string },
+  Record<string, never>
+>("coilbox-scenario", "scenario_media_write");
+
+/**
  * Evaluate a compiled `mission.lua` at `path` (VFS-relative) inside the game
  * archive directory `root`, and return the table it built. The read half of the
  * compile step's validator, run through the same `VFS.Include` the mission

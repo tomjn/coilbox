@@ -9,6 +9,8 @@ Allows the scenario plugin's storage, dialogue-media and compiled-mission read-b
 - `allow-scenario-delete`
 - `allow-scenario-media-import`
 - `allow-scenario-media-delete`
+- `allow-scenario-media-read`
+- `allow-scenario-media-write`
 - `allow-scenario-read-mission`
 
 ## Permission Table
@@ -120,6 +122,58 @@ Enables the scenario_media_import command without any pre-configured scope.
 <td>
 
 Denies the scenario_media_import command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:allow-scenario-media-read`
+
+</td>
+<td>
+
+Enables the scenario_media_read command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:deny-scenario-media-read`
+
+</td>
+<td>
+
+Denies the scenario_media_read command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:allow-scenario-media-write`
+
+</td>
+<td>
+
+Enables the scenario_media_write command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:deny-scenario-media-write`
+
+</td>
+<td>
+
+Denies the scenario_media_write command without any pre-configured scope.
 
 </td>
 </tr>

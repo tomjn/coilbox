@@ -8,6 +8,8 @@ const COMMANDS: &[&str] = &[
     "scenario_delete",
     "scenario_media_import",
     "scenario_media_delete",
+    "scenario_media_read",
+    "scenario_media_write",
     "scenario_read_mission",
 ];
 
