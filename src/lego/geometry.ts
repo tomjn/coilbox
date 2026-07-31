@@ -20,6 +20,7 @@ import {
   releaseSpringTexture,
   springTexture,
 } from "../lib/springTexture";
+import { textureArrived } from "../lib/textureArrival";
 import { atlasUrl, type LegoAtlas } from "./atlas";
 import type { LegoImported } from "./model";
 
@@ -40,7 +41,8 @@ export function partMaterial(atlas: LegoAtlas): THREE.MeshStandardMaterial {
   const cached = materials.get(textureUrl);
   if (cached) return cached.material;
 
-  const texture = new THREE.TextureLoader().load(textureUrl);
+  // The callback is the one a view drawn on demand needs: see textureArrival.ts.
+  const texture = new THREE.TextureLoader().load(textureUrl, textureArrived);
   texture.colorSpace = THREE.SRGBColorSpace;
   // Some parts reach a neighbouring atlas column through negative u, so the
   // texture has to repeat. Clamping would smear those parts' edge pixels.
