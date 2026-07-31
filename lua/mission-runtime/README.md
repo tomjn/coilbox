@@ -5,7 +5,7 @@ The Lua that plays a coilbox scenario inside the engine. It is coilbox-authored 
 ## Layout
 
 - `luarules/gadgets/coilbox_mission_runtime.lua`, the gadget. It gates on the modoption, loads the compiled mission, and hands it to the rest of the runtime.
-- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out.
+- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, and `coilbox_zones.lua` the conditions that read zones. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out.
 - `missions/runtime.lua`, the version marker and capability table. Coilbox reads it out of an installed game to decide what the editor may offer.
 - `tests/`, checks that run outside the engine with `luajit`. Not part of what a game vendors.
 
@@ -60,6 +60,14 @@ GG.CoilboxMission.triggers:addAction("set_var", function(params, ctx) end)
 
 `ctx` is shared by every condition and action. It carries `state` (the table above), `engine`, `gameSpeed`, the current `frame`, and `event` when this pass came from one. Register in the gadget's `Initialize`, before the first frame.
 
+A condition answers a question at the moment it is asked, which is no use to a condition about duration: `test` runs once per armed trigger per pass, so it is neither a clock nor guaranteed to run at all. Anything that has to sample the world on a fixed beat registers a sampler instead and leaves its `test` a lookup:
+
+```lua
+GG.CoilboxMission.triggers:addTick(function(ctx) end)
+```
+
+Samplers run at the top of every polled tick, before the pass, and never on an event or inside a cascade. So one runs once per beat however many passes follow it, and a condition reading what one wrote reads this tick's reading rather than the last one's.
+
 Evaluation splits two ways:
 
 - Events. The runtime raises `unit_created`, `unit_finished`, `unit_destroyed` and `unit_captured`, and anything may raise its own name with `engine:event(name, payload)`. A trigger is woken by an event only when *every* one of its conditions watches events, because a trigger that fired on a unit's death without rechecking its zone condition would be firing on a half-truth.
@@ -72,6 +80,19 @@ A trigger fires when its condition group holds. The group is flat, one `op` over
 - Nothing is raised while the start window is open, so a mission's own placed units are not counted as units its team built.
 - A condition type nothing has registered is false, and an action type nothing has registered does nothing. Both are reported once. This is what a mission built for a newer runtime does, and it is why the capability table in `missions/runtime.lua` exists.
 - Triggers that set each other off inside one frame are cut off after sixteen passes and reported. Synced Lua that does not return takes the game with it.
+
+## Zones
+
+A zone is a named area of the map: a box with a `min` and a `max` corner, or a circle with a `center` and a `radius`. Both are flat. A scenario carries no height anywhere, because everything in one sits on terrain, so a zone is a footprint and a unit is in it or is not whatever its altitude.
+
+Membership is the engine's own spatial queries, `Spring.GetUnitsInRectangle` and `Spring.GetUnitsInCylinder`. So a zone contains what everything else in the game would say it contains: a unit's mid position, and a boundary that counts as inside. A synced gadget reads every team, so nothing is hidden from the query by line of sight and every machine counts the same units. A box whose corners arrive the wrong way round is read as the box they describe, because one nothing can ever be inside is a silent mission.
+
+- `units_in_zone` counts what is in a zone now, optionally narrowed to one `team` and to a list of `unitDefs`, and holds when the count sits between `min` and `max`. A condition stating neither means at least one, because asking about units in a zone with no number is asking whether anything is there. Stating only a maximum keeps its own meaning, so `max = 0` is how a mission asks whether a zone is clear.
+- `zone_held_for` holds once a `team` has had a unit in a `zone` continuously for `seconds`. Occupancy is one reading per polled tick, taken by a sampler rather than by the condition, so the clock does not depend on which triggers happened to be armed and asked. Leaving the zone drops the reading, so coming back starts the count again. The clock belongs to the world, not to the trigger: a hold that began before the trigger watching it was armed still counts.
+
+Only the zone and team pairs a mission's `zone_held_for` conditions actually name are sampled, so a mission that asks for no holds costs nothing per tick.
+
+A hold is presence, not control. A team standing in a zone holds it whether or not anyone else is standing there too ([#802](https://github.com/tomjn/coilbox/issues/802)).
 
 ## Conventions
 
@@ -88,6 +109,7 @@ luajit lua/mission-runtime/tests/gate_test.lua
 luajit lua/mission-runtime/tests/plan_test.lua
 luajit lua/mission-runtime/tests/start_test.lua
 luajit lua/mission-runtime/tests/trigger_test.lua
+luajit lua/mission-runtime/tests/zone_test.lua
 luajit lua/mission-runtime/tests/mission_trigger_test.lua
 ```
 
