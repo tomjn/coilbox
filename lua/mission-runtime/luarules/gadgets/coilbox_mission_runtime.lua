@@ -102,6 +102,12 @@ if not VARS then
 	return false
 end
 
+local GROUPS, groupsError = includeTable("luarules/mission_runtime/coilbox_groups.lua")
+if not GROUPS then
+	log("error", groupsError)
+	return false
+end
+
 -- Refuse a mission built for a newer runtime than the game vendored. Running it
 -- anyway would quietly drop whatever this version cannot read, and a mission
 -- that half works is harder to diagnose than one that refuses to start.
@@ -173,10 +179,11 @@ local function publish()
 		-- with no entry in `units` is one that has died or never spawned.
 		actors = actors,
 		units = {},
-		-- The synced half adds `triggers`, the trigger engine, and `vars`, the
-		-- mission's variables. Registering a condition or action type on the
-		-- engine is how the rest of the runtime, and a game's own extensions,
-		-- join in; going through `vars` is how they read and write a var.
+		-- The synced half adds `triggers`, the trigger engine, `vars`, the
+		-- mission's variables, and `groups`, the scenario's groups. Registering
+		-- a condition or action type on the engine is how the rest of the
+		-- runtime, and a game's own extensions, join in; going through `vars`
+		-- and `groups` is how they read and drive those.
 	}
 	return GG.CoilboxMission, problems
 end
@@ -202,6 +209,8 @@ if gadgetHandler:IsSyncedCode() then
 	-- every machine runs them.
 	local triggers
 	local unitHooks
+	-- The scenario's groups, once registered.
+	local groups
 
 	--- Tell the triggers something happened.
 	--
@@ -215,17 +224,32 @@ if gadgetHandler:IsSyncedCode() then
 		triggers:event(name, payload)
 	end
 
-	--- Put one planned unit on the map. The scenario carries no height because
-	-- everything sits on terrain, so the ground is read here.
+	--- Where a placement actually lands.
+	--
+	-- A scenario carries no height, because everything in one sits on terrain, so
+	-- the ground is read here. A building is put through the engine's build grid
+	-- as well: Spring.CreateUnit does not snap, and a base a few elmos off the
+	-- grid cannot be rebuilt where it stood and sits at the wrong height on a
+	-- slope. Pos2BuildPos answers with the height a builder would have used, so
+	-- the ground read is its job for those.
+	local function groundAt(placement)
+		local def = UnitDefNames[placement.unitDef]
+		if def and def.isBuilding then
+			return Spring.Pos2BuildPos(def.id, placement.x, 0, placement.z, placement.facing)
+		end
+		return placement.x, Spring.GetGroundHeight(placement.x, placement.z), placement.z
+	end
+
+	--- Put one planned unit on the map.
 	--
 	-- Spring.CreateUnit raises on a unit def the game does not have. A scenario
 	-- built against a different version of the game is the likely cause, and one
 	-- missing unit should not take the whole mission down with it.
 	local function create(placement)
-		local y = Spring.GetGroundHeight(placement.x, placement.z)
+		local x, y, z = groundAt(placement)
 		spawning = true
 		local ok, unitID = pcall(Spring.CreateUnit,
-			placement.unitDef, placement.x, y, placement.z, placement.facing, placement.team)
+			placement.unitDef, x, y, z, placement.facing, placement.team)
 		spawning = false
 
 		if not ok then
@@ -254,6 +278,32 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
+	--- Fill a prefab factory's build queue.
+	--
+	-- A build order is the negative of the unit def id, and the engine reads the
+	-- shift and control keys on one as "five of these" and "twenty of these", so
+	-- each is given with no options at all and appends exactly one unit. Build
+	-- orders always append, so nothing here clears the queue either.
+	--
+	-- `repeat` goes last, and needs its 0-or-1 parameter: the engine refuses the
+	-- command without one, and refuses it outright for a factory whose def cannot
+	-- repeat, which is the game's decision rather than the mission's.
+	local function applyQueue(unitID, queue, repeatQueue)
+		for _, name in ipairs(queue) do
+			local def = UnitDefNames[name]
+			if def then
+				Spring.GiveOrderToUnit(unitID, -def.id, {}, 0)
+			else
+				log("warning", string.format(
+					"a prefab factory's queue names %s, which this game has no unit def for",
+					tostring(name)))
+			end
+		end
+		if repeatQueue then
+			Spring.GiveOrderToUnit(unitID, CMD.REPEAT, { 1 }, 0)
+		end
+	end
+
 	local function spawn()
 		local startPositions = {}
 		for _, team in ipairs(teams) do
@@ -264,6 +314,13 @@ if gadgetHandler:IsSyncedCode() then
 		end
 
 		local placements, problems = START.placements(MISSION, teams, startPositions)
+		local prefabs, prefabProblems = START.prefabPlacements(MISSION, teams)
+		for _, placement in ipairs(prefabs) do
+			placements[#placements + 1] = placement
+		end
+		for _, problem in ipairs(prefabProblems) do
+			problems[#problems + 1] = problem
+		end
 		for _, problem in ipairs(problems) do
 			log("warning", problem)
 		end
@@ -276,6 +333,9 @@ if gadgetHandler:IsSyncedCode() then
 				if placement.state then
 					applyState(unitID, placement.state)
 				end
+				if placement.queue then
+					applyQueue(unitID, placement.queue, placement.repeatQueue)
+				end
 				if placement.actor then
 					units[placement.actor] = unitID
 					actorOfUnit[unitID] = placement.actor
@@ -287,8 +347,13 @@ if gadgetHandler:IsSyncedCode() then
 			end
 		end
 
+		-- After the actors, so a standing group ordered to guard one of them has
+		-- something to guard.
+		local grouped = groups.start()
+
 		log("notice", string.format(
-			"mission %s spawned %d of %d units", MISSION_ID, spawned, #placements))
+			"mission %s spawned %d of %d units and %d in groups",
+			MISSION_ID, spawned, #placements, grouped))
 	end
 
 	--- Set every mission team's bank to what the scenario asked for. Teams the
@@ -345,6 +410,22 @@ if gadgetHandler:IsSyncedCode() then
 		-- Before the first frame, so a var is at the number its author gave it
 		-- from the first trigger that reads it.
 		published.vars = VARS.register(triggers, published)
+		-- Creating a unit has to happen inside the start suppression and at the
+		-- ground height, both of which are this file's, so the groups get the one
+		-- hook and keep the lifecycle.
+		groups = GROUPS.register(triggers, published, {
+			spawn = function(group, team)
+				local created = {}
+				for _, placement in ipairs(START.groupPlacements(group, team)) do
+					local unitID = create(placement)
+					if unitID then
+						created[#created + 1] = unitID
+					end
+				end
+				return created
+			end,
+		})
+		published.groups = groups
 		published.triggers = triggers
 
 		log("notice", string.format(
@@ -425,6 +506,7 @@ if gadgetHandler:IsSyncedCode() then
 
 	function gadget:UnitDestroyed(unitID, unitDefID, unitTeam)
 		invulnerable[unitID] = nil
+		groups.removed(unitID)
 		local actor = actorOfUnit[unitID]
 		if actor then
 			actorOfUnit[unitID] = nil
