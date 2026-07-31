@@ -55,6 +55,33 @@ export interface BrandingEntry {
    * bots, neutral-world garrisons (see `../play/gameAi`). */
   ai?: GameAiConfig;
 }
+/** What an exclusion rule tests against an installed map's spring name. */
+export interface MapMatch {
+  /** Case-insensitive regex. The usual choice, since a map family is versioned
+   * into its spring name (`Hex Farm 8`, `Hex Farm 9`) and exact names miss the rest. */
+  regex?: string;
+  /** Case-insensitive exact spring names. */
+  names?: string[];
+}
+
+/**
+ * A rule keeping maps out of warpath and galactic conquest. Aimed at maps that
+ * load fine but make a nonsense match. Kernel Panic maps such as zwzsg's Hex
+ * Farm carry their own LuaRules gadgets and near-zero metal, so a normal game
+ * played on one has no economy.
+ *
+ * Exclusion is additive across the three sources (catalog, distribution profile,
+ * player). Nothing re-enables a map another source excluded. It applies to
+ * warpath and conquest only: the map stays visible in Content and playable in
+ * skirmish and multiplayer, where the player chose it deliberately.
+ */
+export interface MapExclusion {
+  id: string;
+  match: MapMatch;
+  /** Why, shown on the map's detail page. */
+  reason?: string;
+}
+
 /**
  * How a suggested item is fetched. Mirrors the downloads-plugin commands:
  * `rapid` -> dlDownload (a rapid tag), `map` -> dlDownloadMap (a springname),
@@ -121,6 +148,10 @@ export interface BrandingCatalog {
   version: number;
   updated?: string;
   entries: BrandingEntry[];
+  /** Curated maps kept out of warpath/conquest (see {@link MapExclusion}). A
+   * distribution profile's `excludedMaps` and the player's own opt-outs add to
+   * this list. Neither can shorten it. */
+  excludedMaps?: MapExclusion[];
   /** Pre-curated content offered when the user has none yet. */
   suggested?: {
     games?: SuggestedGame[];
@@ -211,6 +242,7 @@ interface LoadedCatalog {
   maps: SuggestedMap[];
   mapLists: SuggestedMapList[];
   githubGameRepos: GameRepo[];
+  excludedMaps: MapExclusion[];
 }
 
 const EMPTY_CATALOG: LoadedCatalog = {
@@ -219,6 +251,7 @@ const EMPTY_CATALOG: LoadedCatalog = {
   maps: [],
   mapLists: [],
   githubGameRepos: [],
+  excludedMaps: [],
 };
 
 let catalogPromise: Promise<LoadedCatalog> | null = null;
@@ -238,6 +271,7 @@ function loadCatalog(): Promise<LoadedCatalog> {
             maps: l.maps.map(withMapSource),
           })),
           githubGameRepos: parsed.githubGameRepos ?? [],
+          excludedMaps: parsed.excludedMaps ?? [],
         };
       })
       .catch((e) => {
@@ -311,6 +345,23 @@ export function useSuggestedMapLists(): SuggestedMapList[] {
     };
   }, []);
   return lists;
+}
+
+/** The catalog's map-exclusion rules, loaded once. Merged with the profile's and
+ * the player's by `mapEligibility.ts` (empty on load failure, so a catalog that
+ * cannot be fetched never hides a map). */
+export function useCatalogMapExclusions(): MapExclusion[] {
+  const [rules, setRules] = useState<MapExclusion[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    loadCatalog().then((c) => {
+      if (!cancelled) setRules(c.excludedMaps);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return rules;
 }
 
 /** Load just the catalog's `githubGameRepos` registry once per session, for
