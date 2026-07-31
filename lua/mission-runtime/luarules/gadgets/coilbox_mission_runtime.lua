@@ -90,6 +90,12 @@ if not UNIT_CONDITIONS then
 	return false
 end
 
+local ZONES, zonesError = includeTable("luarules/mission_runtime/coilbox_zones.lua")
+if not ZONES then
+	log("error", zonesError)
+	return false
+end
+
 -- Refuse a mission built for a newer runtime than the game vendored. Running it
 -- anyway would quietly drop whatever this version cannot read, and a mission
 -- that half works is harder to diagnose than one that refuses to start.
@@ -328,6 +334,7 @@ if gadgetHandler:IsSyncedCode() then
 			log = log,
 		})
 		unitHooks = UNIT_CONDITIONS.register(triggers, published)
+		ZONES.register(triggers, published)
 		published.triggers = triggers
 
 		log("notice", string.format(
