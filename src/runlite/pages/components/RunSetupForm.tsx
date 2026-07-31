@@ -12,6 +12,7 @@ import {
   useUnitsyncScan,
   useUnitsyncUnitDataset,
 } from "../../../content/config";
+import { useMapEligibility } from "../../../content/mapEligibility";
 import { BrandingLinks } from "../../../content/pages/components/BrandingLinks";
 import { BrandingScreenshots } from "../../../content/pages/components/BrandingScreenshots";
 import { usePreferredTarget, useSkirmishAis } from "../../../play/config";
@@ -153,13 +154,16 @@ export function RunSetupForm({
     return { startUnit: side.startUnit.toLowerCase(), edges, names };
   }, [dataset, side?.startUnit]);
 
+  // Excluded maps never enter the pool, so a generated run cannot put the player
+  // on one (see `content/mapEligibility`).
+  const { eligible } = useMapEligibility();
   const genMaps: GenRunMap[] = useMemo(
     () =>
-      maps.map((m) => ({
+      eligible(maps).map((m) => ({
         name: m.name,
         size: (m.width ?? 8) * (m.height ?? 8),
       })),
-    [maps],
+    [maps, eligible],
   );
 
   // The opponent this run fields: the AI its difficulty calls for, from the

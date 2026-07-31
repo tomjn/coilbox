@@ -9,6 +9,7 @@ import {
   unitsyncUnitDataset,
 } from "../../../content/bindings";
 import { useUnitsyncScan } from "../../../content/config";
+import { useMapEligibility } from "../../../content/mapEligibility";
 import { ResolveContentGate } from "../../../content/pages/components/ResolveContentDrawer";
 import type { ContentRequirement } from "../../../content/resolveContent";
 import { usePreferredTarget } from "../../../play/config";
@@ -57,6 +58,7 @@ export function ImportChallengeForm({
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const { eligible } = useMapEligibility();
   const { saveRun } = useRuns();
   const [pending, setPending] = useState<WarpathChallengeSettings | null>(null);
 
@@ -77,7 +79,7 @@ export function ImportChallengeForm({
     }
 
     const archive = installedGame.primaryArchive.name;
-    const maps = (scan.data?.maps ?? []).map((m) => ({
+    const maps = eligible(scan.data?.maps ?? []).map((m) => ({
       name: m.name,
       size: (m.width ?? 8) * (m.height ?? 8),
     }));
