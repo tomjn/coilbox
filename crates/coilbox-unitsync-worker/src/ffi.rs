@@ -88,8 +88,8 @@ pub struct MapAppearance {
 }
 
 /// The raw four-field read-back from a REPL wrapper script (see
-/// [`Unitsync::run_lua_repl`] and [`crate::lua::wrap_chunks`]). Empty
-/// `lpGetStrKeyStrVal` results are normalized to `None`.
+/// [`Unitsync::run_lua_repl`] and [`crate::lua::wrap_chunks`]). Each field is
+/// rejoined from its chunks, and an empty one is normalized to `None`.
 pub struct LuaReplRaw {
     pub result: Option<String>,
     pub error: Option<String>,
@@ -125,25 +125,43 @@ fn check_strbuf(value: &str, field: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Join the `result1`..`resultN` pieces [`crate::lua::CHUNKED_RESULT`] produced,
-/// reading each through `get`. A missing or complaint-filled piece is an error:
-/// silently joining what did arrive would hand back a plausible-looking but
-/// incomplete list, which is the failure this whole path exists to end.
-fn read_chunked_result(n: usize, mut get: impl FnMut(String) -> String) -> Result<String, String> {
+/// Join the `<prefix>1`..`<prefix>N` pieces [`crate::lua::CHUNKED_RESULT`]
+/// produced, reading each through `get`. A missing or complaint-filled piece is
+/// an error: silently joining what did arrive would hand back a plausible-looking
+/// but incomplete value, which is the failure this whole path exists to end.
+fn read_chunked_result(
+    prefix: &str,
+    n: usize,
+    mut get: impl FnMut(String) -> String,
+) -> Result<String, String> {
     let mut out = String::new();
     for i in 1..=n {
-        let field = format!("result{i}");
+        let field = format!("{prefix}{i}");
         let part = get(field.clone());
         check_strbuf(&part, &field)?;
         if part.is_empty() {
             return Err(format!(
-                "the Lua parser returned {} of {n} result chunks",
+                "the Lua parser returned {} of {n} {prefix} chunks",
                 i - 1
             ));
         }
         out.push_str(&part);
     }
     Ok(out)
+}
+
+/// Read one whole chunked field: its `<prefix>Chunks` count, then the pieces.
+/// A script that reports no count is broken rather than empty, so say so instead
+/// of handing back nothing.
+fn read_chunked_field(
+    prefix: &str,
+    mut get: impl FnMut(String) -> String,
+) -> Result<String, String> {
+    let count = get(format!("{prefix}Chunks"));
+    let n: usize = count.trim().parse().map_err(|_| {
+        format!("the Lua parser did not say how many {prefix} pieces it wrote (got {count:?})")
+    })?;
+    read_chunked_result(prefix, n, &mut get)
 }
 
 /// A loaded unitsync library plus its resolved entry points. The `Library` is
@@ -1421,19 +1439,17 @@ impl Unitsync {
     }
 
     /// Execute a Lua source string through unitsync's `LuaParser` with `modes`
-    /// VFS access. The caller must wrap the user's code so the chunk returns a
-    /// table with a string `result` field (and an optional `__error` field),
-    /// see [`crate::lua::wrap_source`]. Returns the `result` string on success,
-    /// or `Err(message)` for a compile error (`lpOpenSource` failed), a chunk
+    /// VFS access. The caller must wrap the user's code so the chunk returns its
+    /// value through [`crate::lua::CHUNKED_RESULT`] (a `resultChunks` count plus
+    /// `result1`..`resultN`), with an optional `__error` field, see
+    /// [`crate::lua::wrap_source`]. Returns the rejoined result on success, or
+    /// `Err(message)` for a compile error (`lpOpenSource` failed), a chunk
     /// failure (`lpRootTable` empty), a captured runtime error (`__error` set),
     /// or a build that lacks the Lua-parser symbols.
     ///
-    /// A result too big for unitsync's 100,000 byte string buffer arrives in
-    /// pieces instead: a `chunks` count plus `result1`..`resultN`, produced by
-    /// [`crate::lua::CHUNKED_RESULT`] and rejoined here. A script that sets no
-    /// `chunks` is read from `result` as before, and either way a value that
-    /// came back as unitsync's own buffer complaint is an error rather than
-    /// data, because the real result is gone.
+    /// The pieces are what keep a result bigger than unitsync's 100,000 byte
+    /// string buffer intact, and a piece that came back as unitsync's own buffer
+    /// complaint is an error rather than data, because the real value is gone.
     pub fn run_lua_source(&self, source: &str, modes: &str) -> Result<String, String> {
         let (Some(open), Some(execute), Some(close), Some(root), Some(get_str)) = (
             self.lp_open_source_fn,
@@ -1446,12 +1462,10 @@ impl Unitsync {
                         (lpOpenSource/lpGetStrKeyStrVal)"
                 .into());
         };
-        let (Ok(csrc), Ok(cmodes), Ok(result_key), Ok(err_key), Ok(chunks_key), Ok(empty)) = (
+        let (Ok(csrc), Ok(cmodes), Ok(err_key), Ok(empty)) = (
             CString::new(source),
             CString::new(modes),
-            CString::new("result"),
             CString::new("__error"),
-            CString::new("chunks"),
             CString::new(""),
         ) else {
             return Err("Lua source or arguments contained a NUL byte".into());
@@ -1475,21 +1489,12 @@ impl Unitsync {
             }
             let runtime_err =
                 cstr(get_str(err_key.as_ptr(), empty.as_ptr())).filter(|s| !s.is_empty());
-            let chunks = cstr(get_str(chunks_key.as_ptr(), empty.as_ptr()))
-                .and_then(|s| s.trim().parse::<usize>().ok());
-            let result = match chunks {
-                Some(n) => read_chunked_result(n, |key| {
-                    CString::new(key)
-                        .ok()
-                        .and_then(|k| cstr(get_str(k.as_ptr(), empty.as_ptr())))
-                        .unwrap_or_default()
-                }),
-                None => {
-                    let raw =
-                        cstr(get_str(result_key.as_ptr(), empty.as_ptr())).unwrap_or_default();
-                    check_strbuf(&raw, "result").map(|()| raw)
-                }
-            };
+            let result = read_chunked_field("result", |key| {
+                CString::new(key)
+                    .ok()
+                    .and_then(|k| cstr(get_str(k.as_ptr(), empty.as_ptr())))
+                    .unwrap_or_default()
+            });
             close();
             match runtime_err {
                 Some(e) => Err(e),
@@ -1499,10 +1504,14 @@ impl Unitsync {
     }
 
     /// Execute a REPL wrapper script (see [`crate::lua::wrap_chunks`]) and read
-    /// back its four string fields. Unlike [`Self::run_lua_source`], a set
-    /// `__error` does *not* become `Err` — the caller needs `prints` even when
-    /// the final chunk raised. Only a compile failure or a missing root table
-    /// (or absent parser symbols) are `Err`.
+    /// back its four fields. Unlike [`Self::run_lua_source`], a captured runtime
+    /// error does *not* become `Err`, because the caller needs `prints` even when
+    /// the final chunk raised. Only a compile failure, a missing root table,
+    /// absent parser symbols, or a value that did not survive the read are `Err`.
+    ///
+    /// The result, the prints and the error message all arrive in
+    /// [`crate::lua::CHUNKED_RESULT`] pieces, because all three are as big as the
+    /// user's script makes them.
     pub fn run_lua_repl(&self, source: &str, modes: &str) -> Result<LuaReplRaw, String> {
         let (Some(open), Some(execute), Some(close), Some(root), Some(get_str)) = (
             self.lp_open_source_fn,
@@ -1515,24 +1524,12 @@ impl Unitsync {
                         (lpOpenSource/lpGetStrKeyStrVal)"
                 .into());
         };
-        let (
-            Ok(csrc),
-            Ok(cmodes),
-            Ok(result_key),
-            Ok(err_key),
-            Ok(diverged_key),
-            Ok(prints_key),
-            Ok(empty),
-        ) = (
+        let (Ok(csrc), Ok(cmodes), Ok(diverged_key), Ok(empty)) = (
             CString::new(source),
             CString::new(modes),
-            CString::new("result"),
-            CString::new("__error"),
             CString::new("__diverged"),
-            CString::new("prints"),
             CString::new(""),
-        )
-        else {
+        ) else {
             return Err("Lua source or arguments contained a NUL byte".into());
         };
 
@@ -1550,17 +1547,27 @@ impl Unitsync {
                     "script did not produce a result table (lpRootTable failed)".into()
                 }));
             }
-            let read = |key: &CString| {
-                cstr(get_str(key.as_ptr(), empty.as_ptr())).filter(|s| !s.is_empty())
+            let read = |key: String| {
+                CString::new(key)
+                    .ok()
+                    .and_then(|k| cstr(get_str(k.as_ptr(), empty.as_ptr())))
+                    .unwrap_or_default()
             };
-            let raw = LuaReplRaw {
-                result: read(&result_key),
-                error: read(&err_key),
-                diverged: read(&diverged_key),
-                prints: read(&prints_key),
-            };
+            // Read everything before closing the parser, then report the first
+            // field that did not survive.
+            let result = read_chunked_field("result", &read);
+            let prints = read_chunked_field("prints", &read);
+            let error = read_chunked_field("error", &read);
+            let diverged =
+                cstr(get_str(diverged_key.as_ptr(), empty.as_ptr())).filter(|s| !s.is_empty());
             close();
-            Ok(raw)
+            let some = |s: String| Some(s).filter(|s| !s.is_empty());
+            Ok(LuaReplRaw {
+                result: some(result?),
+                error: some(error?),
+                diverged,
+                prints: some(prints?),
+            })
         }
     }
 
@@ -1693,21 +1700,44 @@ mod tests {
                 "mander\n armsolar\tSolar".to_string(),
             ),
         ]);
-        let joined = read_chunked_result(2, reader(&fields)).expect("both chunks present");
+        let joined =
+            read_chunked_result("result", 2, reader(&fields)).expect("both chunks present");
         assert_eq!(joined, "armcom\tArmada Commander\n armsolar\tSolar");
     }
 
     #[test]
     fn no_chunks_is_an_empty_result() {
         let fields = HashMap::new();
-        assert_eq!(read_chunked_result(0, reader(&fields)).as_deref(), Ok(""));
+        assert_eq!(
+            read_chunked_result("result", 0, reader(&fields)).as_deref(),
+            Ok("")
+        );
     }
 
     #[test]
     fn a_missing_chunk_fails_rather_than_returning_a_short_list() {
         let fields = HashMap::from([("result1".to_string(), "armcom\tArmada".to_string())]);
-        let err = read_chunked_result(3, reader(&fields)).expect_err("chunk 2 is missing");
+        let err =
+            read_chunked_result("result", 3, reader(&fields)).expect_err("chunk 2 is missing");
         assert!(err.contains("1 of 3"), "got: {err}");
+    }
+
+    #[test]
+    fn each_field_reads_its_own_chunks() {
+        let fields = HashMap::from([
+            ("printsChunks".to_string(), "2".to_string()),
+            ("prints1".to_string(), "line one\n".to_string()),
+            ("prints2".to_string(), "line two".to_string()),
+        ]);
+        let joined = read_chunked_field("prints", reader(&fields)).expect("both pieces present");
+        assert_eq!(joined, "line one\nline two");
+    }
+
+    #[test]
+    fn a_field_with_no_count_is_a_broken_script_not_an_empty_value() {
+        let fields = HashMap::new();
+        let err = read_chunked_field("prints", reader(&fields)).expect_err("no count was written");
+        assert!(err.contains("how many prints pieces"), "got: {err}");
     }
 
     #[test]
@@ -1718,7 +1748,8 @@ mod tests {
             "result1".to_string(),
             "Increase STRBUF_SIZE (needs 132890 bytes)".to_string(),
         )]);
-        let err = read_chunked_result(1, reader(&fields)).expect_err("the value was lost");
+        let err =
+            read_chunked_result("result", 1, reader(&fields)).expect_err("the value was lost");
         assert!(err.contains("100,000 byte string buffer"), "got: {err}");
         assert!(err.contains("result1"), "got: {err}");
     }
