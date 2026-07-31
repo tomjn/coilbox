@@ -16,6 +16,10 @@
 //!
 //! Registered as `"coilbox-scenario"`, so the frontend invokes
 //! `plugin:coilbox-scenario|<cmd>`.
+//!
+//! The plugin also installs the mission runtime into a game (see [`runtime`]),
+//! which is storage of a different kind: coilbox's own Lua, written into
+//! someone else's archive.
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use coilbox_portable::{is_safe_rel, mime_for, valid_id};
@@ -23,6 +27,8 @@ use picoframe_core::CliResult;
 use serde::Serialize;
 use serde_json::json;
 use std::path::{Path, PathBuf};
+
+mod runtime;
 use tauri::{
     plugin::{Builder, TauriPlugin},
     AppHandle, Runtime,
@@ -292,6 +298,56 @@ async fn scenario_read_mission(root: String, path: String) -> CliResult {
     }
 }
 
+/// A game folder coilbox may write the runtime into: an absolute path to a
+/// directory that exists. A packaged `.sd7`/`.sdz` is a file, so it fails here,
+/// which is the read-only case the test mutator answers (issue #754).
+fn writable_game_dir(root: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(root);
+    if !path.is_absolute() || !path.is_dir() {
+        return Err(format!("not a loose game folder: {root}"));
+    }
+    Ok(path)
+}
+
+/// `scenario_runtime_install`, writing the mission runtime's `luarules/`,
+/// `luaui/` and `missions/` into the loose game at `root`, or updating an older
+/// install in place.
+///
+/// The marker is read back out of the game afterwards rather than reported from
+/// what was written, because the answer that matters is what the engine will
+/// load from that folder. A copy that half succeeded, or a game whose own VFS
+/// shadows the marker, shows up here.
+#[tauri::command]
+async fn scenario_runtime_install<R: Runtime>(app: AppHandle<R>, root: String) -> CliResult {
+    let dest = match writable_game_dir(&root) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let Some(src) = runtime::runtime_dir(&app) else {
+        return CliResult::err("could not find the bundled mission runtime".to_string());
+    };
+    let files = match runtime::install(&src, &dest) {
+        Ok(f) => f,
+        Err(e) => return CliResult::err(e),
+    };
+    match runtime::read_marker(&dest) {
+        Ok(installed) => CliResult::ok(json!({ "installed": installed, "files": files })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `scenario_runtime_status`, the runtime a game has installed and the one
+/// coilbox ships. Either is null when it cannot be read: an unadopted game has
+/// no marker, and a build with no bundled runtime has nothing to offer.
+#[tauri::command]
+async fn scenario_runtime_status<R: Runtime>(app: AppHandle<R>, root: String) -> CliResult {
+    let installed = writable_game_dir(&root)
+        .ok()
+        .and_then(|dir| runtime::read_marker(&dir).ok());
+    let available = runtime::runtime_dir(&app).and_then(|dir| runtime::read_marker(&dir).ok());
+    CliResult::ok(json!({ "installed": installed, "available": available }))
+}
+
 /// `scenario_media_delete`, a best-effort removal of a stored clip. Dropping a
 /// portrait from a dialogue line needn't fail if the file is already gone.
 #[tauri::command]
@@ -324,7 +380,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_media_delete,
             scenario_media_read,
             scenario_media_write,
-            scenario_read_mission
+            scenario_read_mission,
+            scenario_runtime_install,
+            scenario_runtime_status
         ])
         .build()
 }

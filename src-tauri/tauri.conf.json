@@ -31,7 +31,13 @@
       "binaries/uberstress",
       "binaries/coilbox-unitsync-worker"
     ],
-    "resources": ["mapconv", "prdownloader", "legoparts", "../catalog.json"],
+    "resources": [
+      "mapconv",
+      "prdownloader",
+      "legoparts",
+      "../catalog.json",
+      "../lua/mission-runtime"
+    ],
     "active": true,
     "createUpdaterArtifacts": true,
     "targets": ["appimage", "app", "dmg", "nsis"],
