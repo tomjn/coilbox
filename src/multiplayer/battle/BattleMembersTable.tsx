@@ -189,7 +189,7 @@ export function BattleMembersTable({
       value: a.shortName,
       label: a.name ?? a.shortName,
       description: aiByline(a),
-      icon:
+      trailing:
         filled === undefined ? undefined : <DifficultyPips filled={filled} />,
     };
   });

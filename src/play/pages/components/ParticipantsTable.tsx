@@ -281,7 +281,7 @@ export function ParticipantsTable({
                                     key={aiValue(a)}
                                     value={aiValue(a)}
                                     description={aiByline(a)}
-                                    icon={pipsFor(a)}
+                                    trailing={pipsFor(a)}
                                   >
                                     {aiLabel(a)}
                                   </SelectItem>
@@ -296,7 +296,7 @@ export function ParticipantsTable({
                                     key={aiValue(a)}
                                     value={aiValue(a)}
                                     description={aiByline(a)}
-                                    icon={pipsFor(a)}
+                                    trailing={pipsFor(a)}
                                   >
                                     {aiLabel(a)}
                                   </SelectItem>
