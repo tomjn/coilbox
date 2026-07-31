@@ -61,12 +61,17 @@ const LARGEST_PLATE_ELMOS = Math.max(...PLATE_FOOTPRINTS) * ELMOS_PER_FOOTPRINT;
  * step outside the largest plate. Clear of the markings, because a solar
  * collector standing on the plates hides the numbers, and no further out than
  * that, because a reference you have to go looking for is one nobody uses.
+ *
+ * Takes the figure's width because the figure can be a unit read out of an
+ * installed game, which is any size at all. A wide one parks further left so
+ * its near edge lands in the same place the solar collector's does.
  */
-export const REFERENCE_PARK_X = -(
-  LARGEST_PLATE_ELMOS / 2 +
-  ELMOS_PER_FOOTPRINT / 2 +
-  REFERENCE_WIDTH_ELMOS / 2
-);
+export function referenceParkX(widthElmos: number): number {
+  return -(LARGEST_PLATE_ELMOS / 2 + ELMOS_PER_FOOTPRINT / 2 + widthElmos / 2);
+}
+
+/** Where the built-in reference unit parks. */
+export const REFERENCE_PARK_X = referenceParkX(REFERENCE_WIDTH_ELMOS);
 
 const FINE_COLOUR = 0x2c333f;
 const STEP_COLOUR = 0x556070;
