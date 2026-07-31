@@ -1,11 +1,20 @@
+import type { OpenResult } from "../container/container";
 import {
   scenarioDelete,
   scenarioList,
   scenarioMediaDelete,
   scenarioMediaImport,
+  scenarioMediaRead,
+  scenarioMediaWrite,
   scenarioSave,
 } from "./bindings";
 import { parseScenarioJson, type Scenario } from "./model";
+import {
+  dropMissingDialogueMedia,
+  encodeScenarioExport,
+  readScenarioExport,
+  scenarioMediaFiles,
+} from "./transfer";
 
 /**
  * Reading and writing stored scenarios. The `coilbox-scenario` plugin keeps the
@@ -72,4 +81,63 @@ export async function deleteScenarioMedia(
   file: string,
 ): Promise<void> {
   await scenarioMediaDelete({ scenarioId, file });
+}
+
+/**
+ * Export a scenario as the text of one self-contained container file: the
+ * document plus every dialogue clip it references, read back off disk and
+ * inlined. A clip that cannot be read is left out rather than sinking the
+ * export, the way a campaign export drops a broken image.
+ */
+export async function exportScenario(scenario: Scenario): Promise<string> {
+  const media: Record<string, string> = {};
+  await Promise.all(
+    scenarioMediaFiles(scenario).map(async (file) => {
+      try {
+        const { dataUrl } = await scenarioMediaRead({
+          scenarioId: scenario.id,
+          file,
+        });
+        media[file] = dataUrl;
+      } catch {
+        console.warn("skipping unreadable dialogue clip", file);
+      }
+    }),
+  );
+  return encodeScenarioExport({ scenario, media });
+}
+
+/**
+ * Import an exported scenario file's text and store it. Mints a fresh id, so an
+ * import never overwrites the scenario it was exported from, then writes the
+ * clips into that new id's media folder under the names the document already
+ * uses. References to clips that did not make it are dropped, so what is saved
+ * is a scenario whose media all exist here.
+ *
+ * Returns the container's typed failure rather than a bare `null`, so the caller
+ * can say "that is a campaign, not a scenario" instead of "invalid file".
+ */
+export async function importScenario(
+  text: string,
+): Promise<OpenResult<Scenario>> {
+  const read = readScenarioExport(text);
+  if (!read.ok) return read;
+
+  const id = crypto.randomUUID();
+  const { scenario, media } = read.payload;
+  const written = new Set<string>();
+  for (const [file, dataUri] of Object.entries(media)) {
+    try {
+      await scenarioMediaWrite({ scenarioId: id, file, dataUri });
+      written.add(file);
+    } catch {
+      console.warn("skipping unwritable dialogue clip", file);
+    }
+  }
+
+  const saved = await saveScenario({
+    ...dropMissingDialogueMedia(scenario, written),
+    id,
+  });
+  return { ok: true, payload: saved };
 }

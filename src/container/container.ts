@@ -37,13 +37,19 @@ export const CONTAINER_FORMAT = "coilbox";
 export const CONTAINER_VERSION = 1;
 
 /** The unambiguous payload discriminator. */
-export type ContainerKind = "campaign" | "preset" | "challenge" | "setup-pack";
+export type ContainerKind =
+  | "campaign"
+  | "preset"
+  | "challenge"
+  | "setup-pack"
+  | "scenario";
 
 export const CONTAINER_KINDS: readonly ContainerKind[] = [
   "campaign",
   "preset",
   "challenge",
   "setup-pack",
+  "scenario",
 ];
 
 /**
@@ -56,6 +62,7 @@ export const SUPPORTED_KIND_VERSIONS: Record<ContainerKind, number> = {
   preset: 1,
   challenge: 1,
   "setup-pack": 1,
+  scenario: 1,
 };
 
 export interface Container<P = unknown> {
@@ -250,6 +257,12 @@ export function sniffPayloadKind(payload: unknown): ContainerKind | null {
   if (typeof payload !== "object" || payload === null) return null;
   const p = payload as Record<string, unknown>;
   if (p.type === "ta" && Array.isArray(p.missions)) return "campaign";
+  // A scenario export wraps the document beside its dialogue media, so the
+  // shape to recognise is the wrapper, not the document.
+  if (typeof p.scenario === "object" && p.scenario !== null) {
+    const s = p.scenario as Record<string, unknown>;
+    if (Array.isArray(s.triggers) && Array.isArray(s.zones)) return "scenario";
+  }
   if (
     typeof p.engineVersion === "string" &&
     Array.isArray(p.maps) &&

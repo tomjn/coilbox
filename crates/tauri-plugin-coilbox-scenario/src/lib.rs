@@ -17,7 +17,8 @@
 //! Registered as `"coilbox-scenario"`, so the frontend invokes
 //! `plugin:coilbox-scenario|<cmd>`.
 
-use coilbox_portable::{is_safe_rel, valid_id};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use coilbox_portable::{is_safe_rel, mime_for, valid_id};
 use picoframe_core::CliResult;
 use serde::Serialize;
 use serde_json::json;
@@ -163,6 +164,106 @@ async fn scenario_media_import<R: Runtime>(
     }
 }
 
+/// Largest dialogue clip coilbox will write out of an imported scenario file.
+/// Media is copied verbatim, so unlike campaign art there is no re-encode step to
+/// bound it, and an export file arrives from outside the app.
+const MAX_MEDIA_BYTES: usize = 16 * 1024 * 1024;
+
+/// Stored media names are minted here as `<uuid>.<ext>`, so an incoming one only
+/// ever has to be a plain file name. Stricter than [`is_safe_rel`], which allows
+/// sub-directories, because these two commands read and create real files.
+fn safe_media_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with('.')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+}
+
+/// Decode the base64 body of a `data:` URI, the only form an export file carries.
+/// `None` when the string is not one, or when it holds more than
+/// [`MAX_MEDIA_BYTES`]. The encoded length is checked first, so a hostile file
+/// cannot make coilbox allocate the decode buffer before it is rejected.
+fn data_uri_bytes(uri: &str) -> Option<Vec<u8>> {
+    let rest = uri.strip_prefix("data:")?;
+    let comma = rest.find(',')?;
+    let (meta, payload) = rest.split_at(comma);
+    if !meta.contains(";base64") {
+        return None;
+    }
+    let encoded = &payload[1..];
+    if encoded.len() / 4 * 3 > MAX_MEDIA_BYTES {
+        return None;
+    }
+    let bytes = STANDARD.decode(encoded).ok()?;
+    (bytes.len() <= MAX_MEDIA_BYTES).then_some(bytes)
+}
+
+/// `scenario_media_read`, reading a stored dialogue clip back as a `data:` URL.
+/// The export path inlines every clip a scenario references, so a shared scenario
+/// is one self-contained file. The content type follows the stored extension,
+/// which is the extension the author's own file had.
+#[tauri::command]
+async fn scenario_media_read<R: Runtime>(
+    app: AppHandle<R>,
+    scenario_id: String,
+    file: String,
+) -> CliResult {
+    if !valid_id(&scenario_id) {
+        return CliResult::err(format!("invalid scenario id: {scenario_id}"));
+    }
+    if !safe_media_name(&file) {
+        return CliResult::err(format!("unsafe media file name: {file}"));
+    }
+    let path = match media_dir(&app) {
+        Ok(d) => d.join(&scenario_id).join(&file),
+        Err(e) => return CliResult::err(e),
+    };
+    match std::fs::read(&path) {
+        Ok(bytes) => {
+            let encoded = STANDARD.encode(&bytes);
+            let url = format!("data:{};base64,{}", mime_for(&path), encoded);
+            CliResult::ok(json!({ "dataUrl": url }))
+        }
+        Err(e) => CliResult::err(format!("could not read media: {e}")),
+    }
+}
+
+/// `scenario_media_write`, materialising a clip carried by an imported scenario
+/// file under the name the document already references.
+///
+/// The name is kept rather than minted anew, because an import writes into a
+/// brand new scenario's own media folder, where nothing can collide. Keeping it
+/// means the imported document needs no rewriting to stay valid.
+#[tauri::command]
+async fn scenario_media_write<R: Runtime>(
+    app: AppHandle<R>,
+    scenario_id: String,
+    file: String,
+    data_uri: String,
+) -> CliResult {
+    if !valid_id(&scenario_id) {
+        return CliResult::err(format!("invalid scenario id: {scenario_id}"));
+    }
+    if !safe_media_name(&file) {
+        return CliResult::err(format!("unsafe media file name: {file}"));
+    }
+    let Some(bytes) = data_uri_bytes(&data_uri) else {
+        return CliResult::err(format!("invalid or oversized media for {file}"));
+    };
+    let dir = match media_dir(&app) {
+        Ok(d) => d.join(&scenario_id),
+        Err(e) => return CliResult::err(e),
+    };
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return CliResult::err(format!("could not create media dir: {e}"));
+    }
+    match std::fs::write(dir.join(&file), bytes) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(format!("could not write media: {e}")),
+    }
+}
+
 /// `scenario_read_mission`, evaluating a compiled `mission.lua` under `root` and
 /// handing back the table it built.
 ///
@@ -221,6 +322,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_delete,
             scenario_media_import,
             scenario_media_delete,
+            scenario_media_read,
+            scenario_media_write,
             scenario_read_mission
         ])
         .build()
@@ -260,6 +363,30 @@ mod tests {
         assert_eq!(safe_ext("../sh"), "sh");
         assert_eq!(safe_ext(""), "bin");
         assert_eq!(safe_ext("!!"), "bin");
+    }
+
+    #[test]
+    fn safe_media_name_allows_only_plain_file_names() {
+        assert!(safe_media_name("a1b2.png"));
+        assert!(safe_media_name("voice-01_take2.ogg"));
+        assert!(!safe_media_name(""));
+        assert!(!safe_media_name(".hidden"));
+        assert!(!safe_media_name("../escape.png"));
+        assert!(!safe_media_name("sub/dir.png"));
+        assert!(!safe_media_name("has space.png"));
+    }
+
+    #[test]
+    fn data_uri_bytes_decodes_and_bounds() {
+        assert_eq!(
+            data_uri_bytes("data:image/png;base64,aGk=").unwrap(),
+            b"hi".to_vec()
+        );
+        assert!(data_uri_bytes("data:image/png,hi").is_none());
+        assert!(data_uri_bytes("aGk=").is_none());
+        assert!(data_uri_bytes("data:image/png;base64,!!!!").is_none());
+        let huge = "A".repeat(MAX_MEDIA_BYTES * 2);
+        assert!(data_uri_bytes(&format!("data:audio/ogg;base64,{huge}")).is_none());
     }
 
     #[test]

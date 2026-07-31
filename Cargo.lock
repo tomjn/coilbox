@@ -5001,6 +5001,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-scenario"
 version = "0.0.0"
 dependencies = [
+ "base64 0.22.1",
  "coilbox-portable",
  "coilbox-springlua",
  "picoframe-core",
