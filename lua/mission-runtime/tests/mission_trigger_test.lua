@@ -106,7 +106,9 @@ check("that trigger's actions ran", ranAll(ran) == "unlock_unit,add_var,gift_uni
 
 engine, state = playing("ambush")
 
-local lines = record(state.triggers, { "dialogue", "play_sound", "camera_pan", "map_marker" })
+local lines = record(state.triggers, {
+	"dialogue", "play_sound", "camera_pan", "map_marker", "spawn_group", "wake_group", "give_orders",
+})
 local scout = state.units.scout
 
 engine.env:GameFrame(1)
@@ -125,9 +127,64 @@ engine.env.Spring.DestroyUnit(scout)
 check("a dead actor fires on the death itself", state.triggers:isEnabled("scout-down") == false)
 check("its dialogue ran", ranAll(lines) == "dialogue,dialogue", ranAll(lines))
 
-check("a condition this runtime has no implementation for is reported",
-	logged(engine, "no implementation for condition units_in_zone"))
-check("and the trigger asking for it never fires", state.triggers:isEnabled("spring-ambush") == true)
+--------------------------------------------------------------------------------
+-- The ambush itself: a box zone the player has to walk into.
+--
+-- The mission's own units are already on the map, and the enemy scout stood
+-- inside the pass from the first frame, so the zone is proved to be reading the
+-- team the trigger names rather than whatever is nearest.
+--------------------------------------------------------------------------------
+
+local patrol = engine.spawn("armpw", 0)
+engine.move(patrol, 800, 800)
+engine.env:GameFrame(45)
+check("the player's units outside the pass do not spring the ambush",
+	state.triggers:isEnabled("spring-ambush") == true)
+
+engine.move(patrol, 100, 100)
+engine.env:GameFrame(60)
+check("walking into the pass springs it", state.triggers:isEnabled("spring-ambush") == false)
+check("and the whole trigger ran",
+	ranAll(lines) == "dialogue,dialogue,spawn_group,wake_group,give_orders,dialogue,camera_pan,"
+	.. "map_marker,play_sound", ranAll(lines))
+
+--------------------------------------------------------------------------------
+-- Siege: holding a zone for a minute.
+--------------------------------------------------------------------------------
+
+local siege
+engine, siege = playing("siege")
+
+local ended = record(siege.triggers, { "complete_objective", "victory", "fail_objective", "defeat" })
+
+--- Run the game on to `frame`, ticking every frame the way the engine does.
+local function playTo(from, frame)
+	for at = from, frame do
+		engine.env:GameFrame(at)
+	end
+	return frame
+end
+
+local at = playTo(1, 60)
+check("the defenders sitting in their own keep do not complete the player's objective",
+	#ended == 0, ranAll(ended))
+
+local squad = engine.spawn("armpw", 0)
+engine.move(squad, 20, 20)
+at = playTo(at + 1, 1800)
+check("taking the keep does not complete a hold on its own", #ended == 0, ranAll(ended))
+
+engine.move(squad, 900, 900)
+at = playTo(at + 1, 1830)
+check("and leaving before the minute is up loses the hold", #ended == 0, ranAll(ended))
+
+engine.move(squad, 20, 20)
+at = playTo(at + 1, 3600)
+check("so the minute has to be served from the return", #ended == 0, ranAll(ended))
+
+playTo(at + 1, 3660)
+check("a minute held end to end completes the objective and wins",
+	ranAll(ended) == "complete_objective,victory", ranAll(ended))
 
 --------------------------------------------------------------------------------
 -- Triggers are synced only.

@@ -72,6 +72,7 @@ function M.missionFiles(mission)
 		["luarules/mission_runtime/coilbox_triggers.lua"] = module("luarules/mission_runtime/coilbox_triggers.lua"),
 		["luarules/mission_runtime/coilbox_unit_conditions.lua"] = module(
 			"luarules/mission_runtime/coilbox_unit_conditions.lua"),
+		["luarules/mission_runtime/coilbox_zones.lua"] = module("luarules/mission_runtime/coilbox_zones.lua"),
 		["missions/demo/mission.lua"] = function()
 			return mission
 		end,
@@ -183,6 +184,33 @@ function M.newEngine(modOptions, files, options)
 		fire("UnitGiven", unitID, unit.defID, newTeam, oldTeam)
 	end
 
+	--- Put a unit somewhere. A unit the stub spawned has no position until a test
+	-- gives it one, because a test that cares where a unit stands says so.
+	function engine.move(unitID, x, z)
+		local unit = engine.units[unitID]
+		unit.x, unit.z = x, z
+	end
+
+	--- What a spatial query returns: units that are alive, placed, on the team the
+	-- allegiance names, and inside the region.
+	--
+	-- Matches the engine on the three things a zone depends on. The boundary
+	-- counts as inside, the allegiance is a team number or nothing at all, and a
+	-- synced query sees every team however the map is lit. A unit no test has
+	-- placed is in no region, so an unplaced unit never lands in a zone by
+	-- accident.
+	function engine.query(allegiance, inside)
+		local found = {}
+		for _, unitID in ipairs(engine.order) do
+			local unit = engine.units[unitID]
+			local mine = allegiance == nil or allegiance < 0 or unit.team == allegiance
+			if unit.alive and unit.x and mine and inside(unit) then
+				found[#found + 1] = unitID
+			end
+		end
+		return found
+	end
+
 	--- Units still alive, in creation order.
 	function engine.alive()
 		local alive = {}
@@ -255,6 +283,20 @@ function M.newEngine(modOptions, files, options)
 					end
 				end
 				return count
+			end,
+			GetUnitsInRectangle = function(xmin, zmin, xmax, zmax, allegiance)
+				return engine.query(allegiance, function(unit)
+					return unit.x >= xmin and unit.x <= xmax and unit.z >= zmin and unit.z <= zmax
+				end)
+			end,
+			GetUnitsInCylinder = function(x, z, radius, allegiance)
+				return engine.query(allegiance, function(unit)
+					local dx, dz = unit.x - x, unit.z - z
+					return dx * dx + dz * dz <= radius * radius
+				end)
+			end,
+			GetUnitDefID = function(unitID)
+				return engine.units[unitID].defID
 			end,
 			GetUnitHealth = function(unitID)
 				local unit = engine.units[unitID]
