@@ -13,6 +13,7 @@
 
 import { childrenOf, type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
+import type { RawGeometry } from "./rawGeometry";
 import { bakedPieces } from "./s3oBuild";
 
 export interface ObjBuild {
@@ -33,10 +34,11 @@ const MATERIAL_NAME = "atlas";
 export function buildObj(
   project: LegoProject,
   pack: LoadedPack,
+  raw: RawGeometry | null,
   options: { unitName: string; textureName: string },
 ): ObjBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
-  const { pieces } = bakedPieces(project, pack);
+  const { pieces } = bakedPieces(project, pack, raw);
 
   const lines: string[] = [
     `# ${options.unitName}, exported from coilbox's lego unit builder`,

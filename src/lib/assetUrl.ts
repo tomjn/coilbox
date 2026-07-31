@@ -74,6 +74,26 @@ export function legoThumbUrl(projectId: string): string {
 }
 
 /**
+ * URL for the meshes of a unit imported from somebody else's `.s3o`, under
+ * `legogeom/<projectId>.bin.gz`. Gzipped, and inflated with fflate the same way
+ * the parts pack's blob is.
+ */
+export function legoGeometryUrl(projectId: string): string {
+  return schemeUrl("legogeom", `${projectId}.bin.gz`);
+}
+
+/**
+ * URL for a texture in the unit builder's shared store, under `legotex/<key>`.
+ *
+ * The key is the texture's content hash, which is what makes refreshing an
+ * edited file work: new bytes are a new key and therefore a new URL, so there
+ * is nothing stale behind the old one for the webview to serve.
+ */
+export function legoTextureUrl(key: string): string {
+  return schemeUrl("legotex", key);
+}
+
+/**
  * Whether a URL string is a local reference to be rewritten to the asset protocol
  * (as opposed to an absolute URL, data/blob URI, in-page anchor, or already-app-
  * absolute `/…` path). Used by the profile welcome HTML/CSS rewrite.

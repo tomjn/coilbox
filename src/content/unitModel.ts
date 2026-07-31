@@ -11,9 +11,13 @@
  */
 
 import * as THREE from "three";
-import { DDSLoader } from "three/addons/loaders/DDSLoader.js";
 
 import { unitModelTextureUrl } from "@/lib/assetUrl";
+import {
+  paintTeamColour,
+  springTexture,
+  TEAM_COLOUR,
+} from "@/lib/springTexture";
 import type { UnitModelPiece, UnitModelResult } from "./bindings";
 
 /**
@@ -26,21 +30,6 @@ import type { UnitModelPiece, UnitModelResult } from "./bindings";
  */
 const UNTEXTURED = 0x9aa0a6;
 
-/**
- * What a team-colour region is drawn in.
- *
- * A `.3do` face can name one of the textures the game lists in
- * `unittextures/tatex/teamtex.txt`, which is a region the engine paints in the
- * player's colour. On disk those files are a flat magenta placeholder, so
- * drawing them literally gives a magenta commander nobody has ever seen. A
- * viewer has no player to take a colour from, so it picks one.
- */
-const TEAM_COLOUR = 0x1028cc;
-
-/** Textures shared for the session, keyed by URL, as the parts pack's are.
- *  Hundreds of a game's units sample one atlas, and it can be 64 MiB. */
-const textures = new Map<string, THREE.Texture>();
-
 /** What a built model hands back: the object to add, its extent, and cleanup. */
 export interface BuiltModel {
   object: THREE.Group;
@@ -52,72 +41,16 @@ export interface BuiltModel {
 }
 
 /**
- * Load a texture out of the model-texture cache.
+ * A texture out of the model-texture cache.
  *
- * Only two cases, because the worker has already re-encoded the `.bmp` and
- * `.tga` a webview cannot read. `.dds` goes to the GPU still compressed rather
- * than being decoded anywhere: a game's shared unit atlas can be a DXT5 8192
- * square, which is 64 MiB packed and 256 MiB as RGBA.
+ * The cache holds raw archive bytes, so the file's own extension picks the
+ * loader. `springTexture` is what the unit builder's imported units use too:
+ * they find their bytes somewhere else entirely and agree on everything after
+ * that. A `.3do` face can also name a Total Annihilation palette entry rather
+ * than a texture, which is why `UNTEXTURED` exists above.
  */
 function modelTexture(file: string, data = false): THREE.Texture {
-  const url = unitModelTextureUrl(file);
-  const cached = textures.get(url);
-  if (cached) return cached;
-
-  const ext = file.slice(file.lastIndexOf(".") + 1).toLowerCase();
-  const texture =
-    ext === "dds"
-      ? new DDSLoader().load(url)
-      : new THREE.TextureLoader().load(url);
-  // A mask is measurements rather than colour, so it must not be gamma-decoded
-  // on the way to the shader that reads it.
-  texture.colorSpace = data ? THREE.NoColorSpace : THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  // The engine flips every texture to OpenGL's bottom-up order on load,
-  // including a DDS. three does that for anything it decodes itself, but a
-  // compressed texture is uploaded block by block and cannot be flipped, so the
-  // sampling is turned upside down instead.
-  if (ext === "dds") {
-    texture.flipY = false;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(1, -1);
-    texture.offset.set(0, 1);
-  }
-  textures.set(url, texture);
-  return texture;
-}
-
-/**
- * Paint the team-colour regions an `.s3o` marks in its second texture.
- *
- * The two formats hide this in different places. A `.3do` names a team-colour
- * texture per face, which the worker flags. An `.s3o` leaves those regions
- * black in the texture it draws and marks them in the red channel of a second
- * one, so a viewer that loads only the first draws a commander with a black
- * head. Mixing them needs a second sampler, which is a patch on the standard
- * material rather than a material of our own: everything else about it, the
- * lighting and the colour space, is what the rest of the app already uses.
- */
-function paintTeamColour(
-  material: THREE.MeshStandardMaterial,
-  mask: THREE.Texture,
-): void {
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.teamMask = { value: mask };
-    shader.uniforms.teamColour = { value: new THREE.Color(TEAM_COLOUR) };
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        "#include <common>",
-        "#include <common>\nuniform sampler2D teamMask;\nuniform vec3 teamColour;",
-      )
-      .replace(
-        "#include <map_fragment>",
-        "#include <map_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, teamColour, texture2D(teamMask, vMapUv).r);",
-      );
-  };
-  // Without this three reuses the unpatched program it compiled for another
-  // material with the same parameters.
-  material.customProgramCacheKey = () => "coilbox-team-colour";
+  return springTexture(unitModelTextureUrl(file), data);
 }
 
 /**

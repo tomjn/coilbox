@@ -1299,10 +1299,10 @@
           "markdownDescription": "Denies the dl_versions command without any pre-configured scope."
         },
         {
-          "description": "Allows the unit builder's project storage, thumbnail, reveal and test-game commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`\n- `allow-lego-packs`\n- `allow-lego-read-s3o`\n- `allow-lego-export`\n- `allow-lego-export-glb`\n- `allow-lego-export-obj`\n- `allow-lego-scratch-game`",
+          "description": "Allows the unit builder's project storage, thumbnail, reveal and test-game commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`\n- `allow-lego-packs`\n- `allow-lego-read-s3o`\n- `allow-lego-import-s3o`\n- `allow-lego-texture-import`\n- `allow-lego-texture-prune`\n- `allow-lego-export`\n- `allow-lego-export-glb`\n- `allow-lego-export-obj`\n- `allow-lego-scratch-game`",
           "type": "string",
           "const": "coilbox-lego:default",
-          "markdownDescription": "Allows the unit builder's project storage, thumbnail, reveal and test-game commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`\n- `allow-lego-packs`\n- `allow-lego-read-s3o`\n- `allow-lego-export`\n- `allow-lego-export-glb`\n- `allow-lego-export-obj`\n- `allow-lego-scratch-game`"
+          "markdownDescription": "Allows the unit builder's project storage, thumbnail, reveal and test-game commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`\n- `allow-lego-packs`\n- `allow-lego-read-s3o`\n- `allow-lego-import-s3o`\n- `allow-lego-texture-import`\n- `allow-lego-texture-prune`\n- `allow-lego-export`\n- `allow-lego-export-glb`\n- `allow-lego-export-obj`\n- `allow-lego-scratch-game`"
         },
         {
           "description": "Enables the lego_delete command without any pre-configured scope.",
@@ -1327,6 +1327,12 @@
           "type": "string",
           "const": "coilbox-lego:allow-lego-export-obj",
           "markdownDescription": "Enables the lego_export_obj command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the lego_import_s3o command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lego:allow-lego-import-s3o",
+          "markdownDescription": "Enables the lego_import_s3o command without any pre-configured scope."
         },
         {
           "description": "Enables the lego_list command without any pre-configured scope.",
@@ -1365,6 +1371,18 @@
           "markdownDescription": "Enables the lego_scratch_game command without any pre-configured scope."
         },
         {
+          "description": "Enables the lego_texture_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lego:allow-lego-texture-import",
+          "markdownDescription": "Enables the lego_texture_import command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the lego_texture_prune command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lego:allow-lego-texture-prune",
+          "markdownDescription": "Enables the lego_texture_prune command without any pre-configured scope."
+        },
+        {
           "description": "Enables the lego_thumb_save command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-lego:allow-lego-thumb-save",
@@ -1393,6 +1411,12 @@
           "type": "string",
           "const": "coilbox-lego:deny-lego-export-obj",
           "markdownDescription": "Denies the lego_export_obj command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the lego_import_s3o command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lego:deny-lego-import-s3o",
+          "markdownDescription": "Denies the lego_import_s3o command without any pre-configured scope."
         },
         {
           "description": "Denies the lego_list command without any pre-configured scope.",
@@ -1429,6 +1453,18 @@
           "type": "string",
           "const": "coilbox-lego:deny-lego-scratch-game",
           "markdownDescription": "Denies the lego_scratch_game command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the lego_texture_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lego:deny-lego-texture-import",
+          "markdownDescription": "Denies the lego_texture_import command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the lego_texture_prune command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-lego:deny-lego-texture-prune",
+          "markdownDescription": "Denies the lego_texture_prune command without any pre-configured scope."
         },
         {
           "description": "Denies the lego_thumb_save command without any pre-configured scope.",

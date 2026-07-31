@@ -204,7 +204,7 @@ fn from_s3o(path: &str, model: &coilbox_s3o::Model) -> UnitModelOutput {
 }
 
 fn s3o_piece(piece: &coilbox_s3o::Piece, texture: Option<&str>) -> ModelPiece {
-    let indices = s3o_triangles(piece);
+    let indices = piece.triangles();
     let mut groups = Vec::new();
     if !indices.is_empty() {
         let mut positions = Vec::with_capacity(piece.vertices.len() * 3);
@@ -232,48 +232,6 @@ fn s3o_piece(piece: &coilbox_s3o::Piece, texture: Option<&str>) -> ModelPiece {
             .iter()
             .map(|c| s3o_piece(c, texture))
             .collect(),
-    }
-}
-
-/// Turn a piece's index list into triangles, whichever primitive type it uses.
-/// The engine does the same conversion on load, so a viewer that only handled
-/// `Triangles` would draw parts of a shipped model as noise.
-fn s3o_triangles(piece: &coilbox_s3o::Piece) -> Vec<u32> {
-    let idx = &piece.indices;
-    let valid = |i: &u32| (*i as usize) < piece.vertices.len();
-    match piece.primitive_type {
-        coilbox_s3o::PrimitiveType::Triangles => idx
-            .chunks_exact(3)
-            .filter(|t| t.iter().all(valid))
-            .flatten()
-            .copied()
-            .collect(),
-        coilbox_s3o::PrimitiveType::Quads => idx
-            .chunks_exact(4)
-            .filter(|q| q.iter().all(valid))
-            .flat_map(|q| [q[0], q[1], q[2], q[0], q[2], q[3]])
-            .collect(),
-        coilbox_s3o::PrimitiveType::TriangleStrip => {
-            let mut out = Vec::new();
-            for (i, w) in idx.windows(3).enumerate() {
-                // A strip turns a corner by repeating a vertex, which makes a
-                // triangle with no area. Dropping those is what stops the turn
-                // showing up as a spike.
-                if w[0] == w[1] || w[1] == w[2] || w[0] == w[2] {
-                    continue;
-                }
-                if !w.iter().all(valid) {
-                    continue;
-                }
-                // Every other triangle in a strip is wound the other way.
-                if i % 2 == 0 {
-                    out.extend_from_slice(&[w[0], w[1], w[2]]);
-                } else {
-                    out.extend_from_slice(&[w[0], w[2], w[1]]);
-                }
-            }
-            out
-        }
     }
 }
 
@@ -707,47 +665,5 @@ mod tests {
         // Undecodable bytes fall through to being written as they are, rather
         // than the texture going missing.
         assert!(to_webview_format("bmp", b"not really a bmp").is_none());
-    }
-
-    /// Quads become two triangles, and a strip alternates its winding.
-    #[test]
-    fn s3o_primitives_all_become_triangles() {
-        let vertex = coilbox_s3o::Vertex {
-            pos: [0.0; 3],
-            normal: [0.0, 1.0, 0.0],
-            uv: [0.0; 2],
-        };
-        let piece = |primitive_type, indices: Vec<u32>| coilbox_s3o::Piece {
-            name: "p".into(),
-            primitive_type,
-            offset: [0.0; 3],
-            vertices: vec![vertex; 5],
-            indices,
-            children: Vec::new(),
-        };
-        assert_eq!(
-            s3o_triangles(&piece(coilbox_s3o::PrimitiveType::Quads, vec![0, 1, 2, 3])),
-            vec![0, 1, 2, 0, 2, 3]
-        );
-        assert_eq!(
-            s3o_triangles(&piece(
-                coilbox_s3o::PrimitiveType::TriangleStrip,
-                vec![0, 1, 2, 3]
-            )),
-            vec![0, 1, 2, 1, 3, 2]
-        );
-        // A repeated vertex is a strip turning a corner, and has no area.
-        assert_eq!(
-            s3o_triangles(&piece(
-                coilbox_s3o::PrimitiveType::TriangleStrip,
-                vec![0, 1, 1, 2]
-            )),
-            Vec::<u32>::new()
-        );
-        // An index the piece has no vertex for is dropped, not drawn as noise.
-        assert_eq!(
-            s3o_triangles(&piece(coilbox_s3o::PrimitiveType::Triangles, vec![0, 1, 9])),
-            Vec::<u32>::new()
-        );
     }
 }

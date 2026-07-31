@@ -8,11 +8,20 @@
 //!   - `compounds/<id>.json` reusable sub-assemblies, saved out of a unit
 //!   - `thumbs/<id>.png` overview thumbnails, served by the `lego` root of the
 //!     `coilbox://` scheme
+//!   - `geometry/<id>.bin.gz` the meshes of a unit imported from somebody
+//!     else's `.s3o`, served by the `legogeom` root. Too big for the document:
+//!     see [`import`]
+//!   - `textures/<sha256>.<ext>` the textures those units draw with, served by
+//!     the `legotex` root. Keyed by content because a texture is shared: see
+//!     [`texture`]
 //!   - `out/<id>/` where an export lands unless told otherwise
 //!   - `packs/<name>/` extension parts packs, served by the `legopacks` root
 //!
 //! Registered as `"coilbox-lego"`, so the frontend invokes
 //! `plugin:coilbox-lego|<cmd>`.
+
+mod import;
+mod texture;
 
 use coilbox_portable::valid_id;
 use picoframe_core::CliResult;
@@ -143,6 +152,10 @@ async fn lego_delete<R: Runtime>(app: AppHandle<R>, kind: String, id: String) ->
         if let Ok(base) = lego_dir(&app) {
             let _ = std::fs::remove_file(base.join("thumbs").join(format!("{id}.png")));
             let _ = std::fs::remove_dir_all(base.join("out").join(&id));
+            // Imported geometry belongs to one unit, so it goes with it. The
+            // textures do not: they are shared, and `lego_texture_prune` is
+            // what clears the ones nothing names any more.
+            let _ = std::fs::remove_file(base.join("geometry").join(format!("{id}.bin.gz")));
         }
     }
     CliResult::ok(json!({}))
@@ -555,6 +568,205 @@ async fn lego_read_s3o(path: String) -> CliResult {
     }
 }
 
+/// A texture the model header names, once the import has looked for it.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ImportedTexture {
+    /// The file in the store, or `None` when the texture could not be found.
+    key: Option<String>,
+    /// What the header names, which is what to say when it was not found.
+    name: String,
+    /// Where it was read from, so it can be refreshed after an edit elsewhere.
+    source: Option<String>,
+}
+
+/// One header texture: found beside the model, stored, and described.
+///
+/// Not finding it is not fatal. The unit draws untextured and says which file
+/// it wanted, which is more use than refusing an import over it.
+fn import_texture(store: &Path, model: &Path, name: &str) -> ImportedTexture {
+    let mut out = ImportedTexture {
+        key: None,
+        name: name.to_string(),
+        source: None,
+    };
+    if name.trim().is_empty() {
+        return out;
+    }
+    let Some(source) = texture::find_beside_model(model, name) else {
+        return out;
+    };
+    out.source = Some(source.to_string_lossy().to_string());
+    if let Ok(stored) = texture::store(store, &source) {
+        out.key = Some(stored.key);
+        out.name = stored.name;
+    }
+    out
+}
+
+/// `lego_import_s3o` imports somebody else's `.s3o` as raw geometry.
+///
+/// Separate from `lego_read_s3o`, which hands the whole model to the frontend
+/// so it can try to match it back to the parts pack. This one keeps the meshes:
+/// it packs them into `geometry/<id>.bin.gz` and answers with the tree, which
+/// is names, offsets and a mesh key per piece and nothing else. The vertices
+/// never cross the IPC, because the largest model measured is 15.0 MB as JSON
+/// against 3.1 MiB packed.
+///
+/// The two textures the header names are resolved beside the model and put in
+/// the shared store in the same call, since the model's own path is what finds
+/// them and the frontend does not have it afterwards.
+#[tauri::command]
+async fn lego_import_s3o<R: Runtime>(app: AppHandle<R>, path: String, id: String) -> CliResult {
+    if !valid_id(&id) {
+        return CliResult::err(format!("invalid id: {id}"));
+    }
+    let file = PathBuf::from(&path);
+    let size = match std::fs::metadata(&file) {
+        Ok(meta) => meta.len(),
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    if size > MAX_MODEL_BYTES {
+        return CliResult::err(format!(
+            "{path} is {size} bytes, which is far larger than any unit model"
+        ));
+    }
+    let bytes = match std::fs::read(&file) {
+        Ok(bytes) => bytes,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let model = match coilbox_s3o::read(&bytes) {
+        Ok(model) => model,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let imported = match import::import(&model) {
+        Ok(imported) => imported,
+        Err(e) => return CliResult::err(e),
+    };
+    if imported.meshes == 0 {
+        return CliResult::err(format!(
+            "{path} has no geometry in it, so there is nothing to import."
+        ));
+    }
+
+    let base = match lego_dir(&app) {
+        Ok(dir) => dir,
+        Err(e) => return CliResult::err(e),
+    };
+    let geometry = base.join("geometry");
+    if let Err(e) = std::fs::create_dir_all(&geometry) {
+        return CliResult::err(format!("could not create the geometry folder: {e}"));
+    }
+    if let Err(e) = std::fs::write(geometry.join(format!("{id}.bin.gz")), &imported.blob) {
+        return CliResult::err(format!("could not store the geometry: {e}"));
+    }
+
+    let store = base.join("textures");
+    let out = json!({
+        "radius": model.radius,
+        "height": model.height,
+        "mid": model.mid,
+        "root": imported.root,
+        "texture": import_texture(&store, &file, &model.texture1),
+        "teamMask": import_texture(&store, &file, &model.texture2),
+        "meshes": imported.meshes,
+        "vertices": imported.vertices,
+        "triangles": imported.triangles,
+        "converted": imported.converted,
+        "bytes": imported.blob.len(),
+    });
+    match serde_json::to_value(out) {
+        Ok(value) => CliResult::ok(value),
+        Err(e) => CliResult::err(format!("could not describe {path}: {e}")),
+    }
+}
+
+/// `lego_texture_import` puts a texture the user pointed at into the store.
+///
+/// Both changing a unit's texture and refreshing one edited outside coilbox go
+/// through here. Refreshing is the same call with the path it came from: the
+/// store is keyed by content, so edited bytes land on a new key and the webview
+/// has nothing stale to serve, and unchanged bytes cost no write at all.
+#[tauri::command]
+async fn lego_texture_import<R: Runtime>(app: AppHandle<R>, path: String) -> CliResult {
+    let dir = match lego_dir(&app) {
+        Ok(dir) => dir.join("textures"),
+        Err(e) => return CliResult::err(e),
+    };
+    match texture::store(&dir, Path::new(&path)) {
+        Ok(stored) => CliResult::ok(json!({
+            "key": stored.key,
+            "name": stored.name,
+            "bytes": stored.bytes,
+        })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `lego_texture_prune` deletes every stored texture that `keep` does not name.
+///
+/// The store is content addressed, so refreshing an edited texture leaves the
+/// version before it behind. `keep` comes from the frontend because the
+/// document schema is the frontend's, which is the same seam everything else
+/// here sits on.
+#[tauri::command]
+async fn lego_texture_prune<R: Runtime>(app: AppHandle<R>, keep: Vec<String>) -> CliResult {
+    let dir = match lego_dir(&app) {
+        Ok(dir) => dir.join("textures"),
+        Err(e) => return CliResult::err(e),
+    };
+    CliResult::ok(json!({ "removed": texture::prune(&dir, &keep) }))
+}
+
+/// A texture to place out of the shared store, for a unit imported from
+/// somebody else's model rather than built out of the parts pack.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredTextureRef {
+    /// The file in the store: `<sha256>.<ext>`.
+    key: String,
+    /// What to call it in the game folder, which is what the s3o names.
+    write_as: String,
+}
+
+/// What an export places in `unittextures`, which is one thing or the other.
+///
+/// A unit built out of parts places the atlas it samples, under a prefixed name
+/// so it cannot land on a file the game already has. A unit imported from
+/// somebody else's model places its own textures out of the shared store, under
+/// the names the model already gives them, which are the game's own.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportTextures {
+    atlas: Option<AtlasRef>,
+    #[serde(default)]
+    stored: Vec<StoredTextureRef>,
+}
+
+/// A stored texture's file in the store. The key is content addressed and comes
+/// from the frontend, so it is held to the same "a file name, never a path"
+/// rule as everything else that lands in a folder.
+fn stored_texture_source(dir: &Path, key: &str) -> Result<PathBuf, String> {
+    if key.is_empty() || key.len() > 128 || key.contains(['/', '\\']) || key == "." || key == ".." {
+        return Err(format!("invalid texture key: {key}"));
+    }
+    Ok(dir.join(key))
+}
+
+/// Where a stored texture is written: `dir` joined with the name the s3o gives
+/// it, which is the model's own texture name and therefore the game's.
+fn stored_texture_target(dir: &Path, write_as: &str) -> Result<PathBuf, String> {
+    if write_as.is_empty()
+        || write_as.len() > 128
+        || write_as.contains(['/', '\\'])
+        || write_as == "."
+        || write_as == ".."
+    {
+        return Err(format!("invalid texture name: {write_as}"));
+    }
+    Ok(dir.join(write_as))
+}
+
 /// `lego_export` writes a built unit into a game folder.
 ///
 /// The model goes to `objects3d/<unit>.s3o`. The atlas is shared by every unit
@@ -573,7 +785,7 @@ async fn lego_export<R: Runtime>(
     app: AppHandle<R>,
     dir: String,
     unit_name: String,
-    atlas: Option<AtlasRef>,
+    textures: Option<ExportTextures>,
     script: Option<String>,
     unit_def: Option<String>,
     model: ExportModel,
@@ -617,16 +829,16 @@ async fn lego_export<R: Runtime>(
     // to overwrite.
     let mut texture_path = None;
     let mut texture_kept = false;
-    if let Some(atlas) = atlas {
-        let source = match atlas_source(&app, &atlas) {
+    if let Some(atlas) = textures.as_ref().and_then(|t| t.atlas.as_ref()) {
+        let source = match atlas_source(&app, atlas) {
             Ok(path) => path,
             Err(e) => return CliResult::err(e),
         };
-        let textures = root.join("unittextures");
-        if let Err(e) = std::fs::create_dir_all(&textures) {
-            return CliResult::err(format!("could not create {}: {e}", textures.display()));
+        let into = root.join("unittextures");
+        if let Err(e) = std::fs::create_dir_all(&into) {
+            return CliResult::err(format!("could not create {}: {e}", into.display()));
         }
-        let target = match atlas_target(&textures, &atlas) {
+        let target = match atlas_target(&into, atlas) {
             Ok(path) => path,
             Err(e) => return CliResult::err(e),
         };
@@ -636,6 +848,45 @@ async fn lego_export<R: Runtime>(
             return CliResult::err(format!("could not copy the texture: {e}"));
         } else {
             texture_path = Some(target.to_string_lossy().to_string());
+        }
+    }
+
+    // An imported unit draws with its own textures rather than a pack's atlas,
+    // and an `.s3o` names two: the one it is painted with, and the mask marking
+    // the regions the engine paints in the player's colour. Both follow the
+    // same write-once rule as the atlas, and for the same reason: the name they
+    // land under is the game's own, so a file already there is the game's.
+    let mut stored_paths = Vec::new();
+    let mut stored_kept = Vec::new();
+    let stored = textures.map(|t| t.stored).unwrap_or_default();
+    if !stored.is_empty() {
+        let store = match lego_dir(&app) {
+            Ok(base) => base.join("textures"),
+            Err(e) => return CliResult::err(e),
+        };
+        let into = root.join("unittextures");
+        if let Err(e) = std::fs::create_dir_all(&into) {
+            return CliResult::err(format!("could not create {}: {e}", into.display()));
+        }
+        for stored in stored {
+            let source = match stored_texture_source(&store, &stored.key) {
+                Ok(path) => path,
+                Err(e) => return CliResult::err(e),
+            };
+            let target = match stored_texture_target(&into, &stored.write_as) {
+                Ok(path) => path,
+                Err(e) => return CliResult::err(e),
+            };
+            if keep_existing(&target, scratch) {
+                stored_kept.push(stored.write_as);
+            } else if let Err(e) = std::fs::copy(&source, &target) {
+                return CliResult::err(format!(
+                    "could not copy {}: {e}. The texture may have been deleted from the store.",
+                    stored.write_as
+                ));
+            } else {
+                stored_paths.push(target.to_string_lossy().to_string());
+            }
         }
     }
 
@@ -684,6 +935,8 @@ async fn lego_export<R: Runtime>(
         "model": model_path.to_string_lossy(),
         "texture": texture_path,
         "textureKept": texture_kept,
+        "textures": stored_paths,
+        "texturesKept": stored_kept,
         "script": script_path,
         "scriptKept": script_kept,
         "unitDef": unit_def_path,
@@ -858,6 +1111,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_open_path,
             lego_packs,
             lego_read_s3o,
+            lego_import_s3o,
+            lego_texture_import,
+            lego_texture_prune,
             lego_export,
             lego_export_glb,
             lego_export_obj,

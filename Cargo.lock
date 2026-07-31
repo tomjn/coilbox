@@ -4888,9 +4888,12 @@ version = "0.0.0"
 dependencies = [
  "coilbox-portable",
  "coilbox-s3o",
+ "flate2",
+ "image 0.25.10",
  "picoframe-core",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tauri",
  "tauri-plugin",
  "tempfile",

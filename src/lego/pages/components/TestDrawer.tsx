@@ -27,6 +27,8 @@ import { legoExport, legoOpenPath, legoScratchGame } from "../../bindings";
 import { unitScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
+import type { RawGeometry } from "../../rawGeometry";
+import { importedTextures } from "../../rawImport";
 import { buildS3o } from "../../s3oBuild";
 import {
   buildModInfo,
@@ -43,6 +45,8 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   project: LegoProject;
   pack: LoadedPack;
+  /** The meshes of a unit imported from somebody else's model, if it is one. */
+  raw: RawGeometry | null;
 }
 
 /** Random start position: a test needs a spawn, not a chosen one. */
@@ -75,7 +79,7 @@ function uniqueByName<T extends { name: string }>(items: T[]): T[] {
   });
 }
 
-export function TestDrawer({ open, onOpenChange, project, pack }: Props) {
+export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { running, launch } = usePlay();
@@ -122,12 +126,19 @@ export function TestDrawer({ open, onOpenChange, project, pack }: Props) {
 
   async function run() {
     if (!target || !game || !map) return;
-    // The unit's own atlas, and only its own: an s3o names one texture. A unit
-    // whose atlas is not installed still tests, untextured, rather than failing
-    // on a file that cannot be copied.
+    // An imported unit draws with its own two textures out of the store. A
+    // built one samples one atlas, and only its own: an s3o names one texture.
+    // A unit whose atlas is not installed still tests, untextured, rather than
+    // failing on a file that cannot be copied.
     const atlas = unitAtlas(project, pack.library.atlases);
     const written = exportTextureName(atlas.texture);
-    const model = buildS3o(project, pack, { texture1: written });
+    const imported = project.imported
+      ? importedTextures(project.imported)
+      : null;
+    const model = buildS3o(project, pack, raw, {
+      texture1: imported ? imported.texture1 : written,
+      texture2: imported?.texture2,
+    });
     if (!model) {
       setPhase({ state: "failed", message: "This unit has no root piece." });
       return;
@@ -145,13 +156,17 @@ export function TestDrawer({ open, onOpenChange, project, pack }: Props) {
       await legoExport({
         dir,
         unitName: project.unitName,
-        atlas: atlas.installed
-          ? {
-              name: atlas.texture,
-              pack: atlas.installed.folder,
-              writeAs: written,
-            }
-          : null,
+        textures: {
+          atlas:
+            !imported && atlas.installed
+              ? {
+                  name: atlas.texture,
+                  pack: atlas.installed.folder,
+                  writeAs: written,
+                }
+              : null,
+          stored: imported?.place ?? [],
+        },
         script: unitScript(project),
         unitDef: buildUnitDef(project, model),
         model,

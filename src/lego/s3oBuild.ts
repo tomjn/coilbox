@@ -19,6 +19,7 @@ import {
   pieceById,
 } from "./model";
 import type { LoadedPack } from "./pack";
+import { pieceMesh, type RawGeometry } from "./rawGeometry";
 
 /** x, y, z, nx, ny, nz, u, v, the s3o vertex record the pack also uses. */
 const FLOATS_PER_VERTEX = 8;
@@ -85,6 +86,7 @@ export interface BakedPiece {
 export function bakedPieces(
   project: LegoProject,
   pack: LoadedPack,
+  raw: RawGeometry | null,
 ): { pieces: Map<string, BakedPiece>; world: THREE.Vector3[] } {
   const pieces = new Map<string, BakedPiece>();
   const world: THREE.Vector3[] = [];
@@ -93,6 +95,7 @@ export function bakedPieces(
     bakePiece(
       project,
       pack,
+      raw,
       root,
       new THREE.Matrix4(),
       new THREE.Vector3(),
@@ -116,8 +119,9 @@ export function bakedPieces(
 export function sitOnGround(
   project: LegoProject,
   pack: LoadedPack,
+  raw: RawGeometry | null,
 ): LegoProject {
-  const { world } = bakedPieces(project, pack);
+  const { world } = bakedPieces(project, pack, raw);
   if (world.length === 0) return project;
 
   let lowest = Number.POSITIVE_INFINITY;
@@ -144,13 +148,23 @@ export function sitOnGround(
 export function buildS3o(
   project: LegoProject,
   pack: LoadedPack,
+  raw: RawGeometry | null,
   textures: { texture1: string; texture2?: string },
 ): S3oBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
-  const { pieces, world } = bakedPieces(project, pack);
+  const { pieces, world } = bakedPieces(project, pack, raw);
+  const measured = header(world);
 
   return {
-    ...header(world),
+    ...measured,
+    // The collision sphere and the height the document pins, when it pins them.
+    // A unit assembled here pins nothing and is measured, which is what every
+    // unit did before this. A unit imported from somebody else's model carries
+    // the header that model shipped, and re-exporting it must not quietly give
+    // the unit a different collision sphere from the one its author set.
+    radius: project.radius ?? measured.radius,
+    height: project.height ?? measured.height,
+    mid: project.mid ?? measured.mid,
     texture1: textures.texture1,
     texture2: textures.texture2 ?? "",
     root: assemble(project, pieces, project.rootPieceId),
@@ -178,6 +192,7 @@ function assemble(
 function bakePiece(
   project: LegoProject,
   pack: LoadedPack,
+  raw: RawGeometry | null,
   piece: LegoPiece,
   parentWorld: THREE.Matrix4,
   parentTranslation: THREE.Vector3,
@@ -197,6 +212,7 @@ function bakePiece(
   const linear = new THREE.Matrix3().setFromMatrix4(matrix);
   const { vertices, indices } = bakeGeometry(
     pack,
+    raw,
     piece,
     linear,
     translation,
@@ -215,7 +231,7 @@ function bakePiece(
   });
 
   for (const child of childrenOf(project, piece.id)) {
-    bakePiece(project, pack, child, matrix, translation, pieces, world);
+    bakePiece(project, pack, raw, child, matrix, translation, pieces, world);
   }
 }
 
@@ -227,18 +243,23 @@ function bakePiece(
  * them if it is applied directly. A mirroring transform turns every triangle
  * inside out, so the winding is reversed to match: without that the piece is
  * drawn back to front and lit from inside.
+ *
+ * A piece draws either a part out of the pack or a mesh out of an imported
+ * model, and both are the same 32-byte vertex record in an interleaved buffer
+ * with its own index run, so the bake is the same arithmetic either way.
  */
 function bakeGeometry(
   pack: LoadedPack,
+  raw: RawGeometry | null,
   piece: LegoPiece,
   linear: THREE.Matrix3,
   translation: THREE.Vector3,
   world: THREE.Vector3[],
 ): { vertices: S3oVertex[]; indices: number[] } {
-  const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
+  const source = geometrySource(pack, raw, piece);
   // An empty piece is not a mistake: it is how the format carries hierarchy,
   // flares and aim points.
-  if (!part) return { vertices: [], indices: [] };
+  if (!source) return { vertices: [], indices: [] };
 
   const normalMatrix = new THREE.Matrix3().copy(linear).invert().transpose();
   const point = new THREE.Vector3();
@@ -248,31 +269,35 @@ function bakeGeometry(
   const pivot = piece.pivot ?? [0, 0, 0];
 
   const vertices: S3oVertex[] = [];
-  for (let i = 0; i < part.vCount; i++) {
-    const at = (part.vFirst + i) * FLOATS_PER_VERTEX;
+  for (let i = 0; i < source.vCount; i++) {
+    const at = (source.vFirst + i) * FLOATS_PER_VERTEX;
     point
       .set(
-        pack.vertices[at] - pivot[0],
-        pack.vertices[at + 1] - pivot[1],
-        pack.vertices[at + 2] - pivot[2],
+        source.vertices[at] - pivot[0],
+        source.vertices[at + 1] - pivot[1],
+        source.vertices[at + 2] - pivot[2],
       )
       .applyMatrix3(linear);
     normal
-      .set(pack.vertices[at + 3], pack.vertices[at + 4], pack.vertices[at + 5])
+      .set(
+        source.vertices[at + 3],
+        source.vertices[at + 4],
+        source.vertices[at + 5],
+      )
       .applyMatrix3(normalMatrix)
       .normalize();
 
     vertices.push({
       pos: [point.x, point.y, point.z],
       normal: [normal.x, normal.y, normal.z],
-      uv: [pack.vertices[at + 6], pack.vertices[at + 7]],
+      uv: [source.vertices[at + 6], source.vertices[at + 7]],
     });
     world.push(point.clone().add(translation));
   }
 
   const indices: number[] = [];
-  for (let i = 0; i < part.iCount; i++) {
-    indices.push(pack.indices[part.iFirst + i]);
+  for (let i = 0; i < source.iCount; i++) {
+    indices.push(source.indices[source.iFirst + i]);
   }
   if (linear.determinant() < 0) {
     for (let i = 0; i + 2 < indices.length; i += 3) {
@@ -281,6 +306,28 @@ function bakeGeometry(
   }
 
   return { vertices, indices };
+}
+
+/** Where a piece's vertices are, whichever of the two kinds of unit it is in. */
+function geometrySource(
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+  piece: LegoPiece,
+): {
+  vertices: Float32Array;
+  indices: Uint16Array | Uint32Array;
+  vFirst: number;
+  vCount: number;
+  iFirst: number;
+  iCount: number;
+} | null {
+  const mesh = pieceMesh(raw, piece);
+  if (mesh && raw) {
+    return { ...mesh, vertices: raw.vertices, indices: raw.indices };
+  }
+  const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
+  if (!part) return null;
+  return { ...part, vertices: pack.vertices, indices: pack.indices };
 }
 
 /**
@@ -337,8 +384,12 @@ function emptyBounds(): UnitBounds {
  * one from the same numbers, so the wireframe on screen and the volume in the
  * exported definition are measured once rather than twice.
  */
-export function unitBounds(project: LegoProject, pack: LoadedPack): UnitBounds {
-  const { world } = bakedPieces(project, pack);
+export function unitBounds(
+  project: LegoProject,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+): UnitBounds {
+  const { world } = bakedPieces(project, pack, raw);
   if (world.length === 0) return emptyBounds();
   const { mid, sizeX, sizeY, sizeZ } = header(world);
   return { mid, sizeX, sizeY, sizeZ };

@@ -80,7 +80,7 @@ describe("buildGlbScene", () => {
       { id: "gun", name: "gun", parentId: "hull" },
     ]);
 
-    const scene = buildGlbScene(doc, pack());
+    const scene = buildGlbScene(doc, pack(), null);
 
     expect(scene?.name).toBe("base");
     const hull = find(scene as THREE.Group, "hull");
@@ -93,7 +93,7 @@ describe("buildGlbScene", () => {
       { id: "arm", name: "arm", parentId: "root", position: [5, 0, 0] },
     ]);
 
-    const scene = buildGlbScene(doc, pack());
+    const scene = buildGlbScene(doc, pack(), null);
     const arm = find(scene as THREE.Group, "arm");
 
     expect([arm.position.x, arm.position.y, arm.position.z]).toEqual([5, 0, 0]);
@@ -102,7 +102,7 @@ describe("buildGlbScene", () => {
   it("gives a piece with geometry a mesh sized to its part", () => {
     const doc = project([{ id: "hull", name: "hull", parentId: "root" }]);
 
-    const scene = buildGlbScene(doc, pack());
+    const scene = buildGlbScene(doc, pack(), null);
     const hull = find(scene as THREE.Group, "hull");
     const mesh = hull.children.find(
       (child): child is THREE.Mesh => child instanceof THREE.Mesh,
@@ -118,7 +118,7 @@ describe("buildGlbScene", () => {
       { id: "flare", name: "flare", parentId: "root", partId: null },
     ]);
 
-    const scene = buildGlbScene(doc, pack());
+    const scene = buildGlbScene(doc, pack(), null);
     const flare = find(scene as THREE.Group, "flare");
 
     expect(flare.children.some((child) => child instanceof THREE.Mesh)).toBe(
@@ -130,6 +130,6 @@ describe("buildGlbScene", () => {
     const doc = project([]);
     const broken = { ...doc, rootPieceId: "missing" };
 
-    expect(buildGlbScene(broken, pack())).toBeNull();
+    expect(buildGlbScene(broken, pack(), null)).toBeNull();
   });
 });

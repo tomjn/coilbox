@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-lego-texture-prune"
+description = "Enables the lego_texture_prune command without any pre-configured scope."
+commands.allow = ["lego_texture_prune"]
+
+[[permission]]
+identifier = "deny-lego-texture-prune"
+description = "Denies the lego_texture_prune command without any pre-configured scope."
+commands.deny = ["lego_texture_prune"]

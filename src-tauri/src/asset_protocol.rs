@@ -18,6 +18,11 @@
 //!     parts pack, portable-first so a distribution can ship its own)
 //!   - `coilbox://localhost/legopacks/<name>/<file>` → `<data_dir>/lego/packs/<name>/<file>`
 //!     (extension parts packs, which add parts to the base pack's atlas)
+//!   - `coilbox://localhost/lego/<file>`      → `<data_dir>/lego/thumbs/<file>`
+//!   - `coilbox://localhost/legogeom/<file>`  → `<data_dir>/lego/geometry/<file>`
+//!     (the meshes of a unit imported from somebody else's `.s3o`)
+//!   - `coilbox://localhost/legotex/<file>`   → `<data_dir>/lego/textures/<file>`
+//!     (the textures those units draw with, keyed by content)
 //!
 //! Every segment is percent-decoded and rejected if it contains path syntax, so a
 //! request can never escape its root. Any miss (no root, unsafe path, absent file)
@@ -124,12 +129,19 @@ fn resolve_path(
             let base = extra_packs_base()?.join(name);
             Some(file.iter().fold(base, |p, s| p.join(s)))
         }
-        "lego" => {
-            // lego/<file>: unit thumbnails, one flat folder.
+        // The unit builder's three flat folders under `<data_dir>/lego`, each
+        // its own root so a request for one can never reach another: thumbnails,
+        // an imported unit's geometry, and the textures those units draw with.
+        "lego" | "legogeom" | "legotex" => {
+            let folder = match root.as_str() {
+                "legogeom" => "geometry",
+                "legotex" => "textures",
+                _ => "thumbs",
+            };
             let [file] = rest else {
                 return None;
             };
-            Some(lego_base()?.join(file))
+            Some(lego_base()?.join(folder).join(file))
         }
         "unitmodel" => {
             // unitmodel/<file>: textures copied out of a game archive for the
@@ -261,11 +273,7 @@ pub fn handle<R: Runtime>(
         },
         || tauri_plugin_coilbox_lego::legopack_dir(app),
         || tauri_plugin_coilbox_lego::extra_packs_dir(app),
-        || {
-            coilbox_portable::data_dir(app)
-                .ok()
-                .map(|d| d.join("lego").join("thumbs"))
-        },
+        || coilbox_portable::data_dir(app).ok().map(|d| d.join("lego")),
         || tauri_plugin_coilbox_unitsync::model_texture_dir(app),
     );
     let Some(full) = full else {
@@ -371,14 +379,25 @@ mod tests {
     }
 
     #[test]
-    fn resolve_lego_serves_one_flat_folder() {
-        let base = || Some(PathBuf::from("/data/lego/thumbs"));
-        let segs = vec!["lego".into(), "abc.png".into()];
+    fn resolve_lego_serves_one_flat_folder_per_root() {
+        let base = || Some(PathBuf::from("/data/lego"));
+        let at = |root: &str, file: &str| {
+            let segs = vec![root.to_string(), file.to_string()];
+            resolve_path(&segs, None, || None, || None, || None, base, || None)
+        };
         assert_eq!(
-            resolve_path(&segs, None, || None, || None, || None, base, || None),
+            at("lego", "abc.png"),
             Some(PathBuf::from("/data/lego/thumbs/abc.png"))
         );
-        // Thumbnails are not nested, so a deeper path is not a thumbnail.
+        assert_eq!(
+            at("legogeom", "abc.bin.gz"),
+            Some(PathBuf::from("/data/lego/geometry/abc.bin.gz"))
+        );
+        assert_eq!(
+            at("legotex", "ff00.dds"),
+            Some(PathBuf::from("/data/lego/textures/ff00.dds"))
+        );
+        // None of the three is nested, so a deeper path is not one of its files.
         let nested = vec!["lego".into(), "sub".into(), "abc.png".into()];
         assert_eq!(
             resolve_path(&nested, None, || None, || None, || None, base, || None),

@@ -18,6 +18,19 @@ serde_json = "1"
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 coilbox-s3o = { path = "../coilbox-s3o" }
+# Imported geometry ships gzipped, the same as the parts pack's blob, which the
+# frontend already inflates with fflate.
+flate2 = "1"
+# The texture store is keyed by content, so a file edited outside coilbox hashes
+# to a new key and cannot be served from a stale cache.
+sha2 = "0.10"
+# A webview renders neither `.bmp` nor `.tga`, and they are most of what the
+# legacy games ship, so both are re-encoded to PNG on the way into the store.
+image = { version = "0.25", default-features = false, features = [
+  "png",
+  "bmp",
+  "tga",
+] }
 
 [dev-dependencies]
 tempfile = "3"

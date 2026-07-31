@@ -20,6 +20,29 @@ export interface AtlasRef {
   writeAs: string;
 }
 
+/**
+ * What an export places in `unittextures`, which is one thing or the other.
+ *
+ * A unit built out of parts places the atlas it samples. A unit imported from
+ * somebody else's model places its own textures out of the shared store.
+ */
+export interface ExportTextures {
+  atlas: AtlasRef | null;
+  stored: StoredTextureRef[];
+}
+
+/**
+ * A texture out of the shared store to place in a game folder. What an imported
+ * unit exports instead of an atlas: it draws with its own texture, and the name
+ * it is written under is the game's own rather than a coilbox-prefixed one.
+ */
+export interface StoredTextureRef {
+  /** The file in the store: `<sha256>.<ext>`. */
+  key: string;
+  /** What to call it in `unittextures`, which is what the s3o names. */
+  writeAs: string;
+}
+
 /** A stored document. The JSON is parsed here, not in Rust. */
 export interface LegoStoredItem {
   id: string;
@@ -69,8 +92,8 @@ export const legoExport = defineCommand<
   {
     dir: string;
     unitName: string;
-    /** Null to write no texture. Otherwise the file, and which pack ships it. */
-    atlas: AtlasRef | null;
+    /** What to place in `unittextures`. Null to write no texture at all. */
+    textures: ExportTextures | null;
     /** Written only when the game has no script for this unit yet. */
     script: string | null;
     /** Written only when the game has no unit definition for it yet. */
@@ -88,6 +111,10 @@ export const legoExport = defineCommand<
     unitDefKept: boolean;
     /** True when a texture of that name was already there and was left alone. */
     textureKept: boolean;
+    /** Stored textures written, for an imported unit. */
+    textures: string[];
+    /** Stored textures already there under that name, and left alone. */
+    texturesKept: string[];
   }
 >("coilbox-lego", "lego_export");
 
@@ -158,6 +185,75 @@ export const legoReadS3o = defineCommand<{ path: string }, S3oModel>(
   "coilbox-lego",
   "lego_read_s3o",
 );
+
+/** One piece of an imported model. The vertices are in the sidecar, not here. */
+export interface ImportedPiece {
+  name: string;
+  offset: [number, number, number];
+  /** Null for a piece with no geometry: a hierarchy node, flare or aim point. */
+  meshId: string | null;
+  children: ImportedPiece[];
+}
+
+/** One of the two textures the model header names, once it has been looked for. */
+export interface ImportedTexture {
+  /** The file in the shared store, or null when it could not be found. */
+  key: string | null;
+  /** What the header names, or what the file found was actually called. */
+  name: string;
+  /** Where it was read from, so it can be refreshed after an edit elsewhere. */
+  source: string | null;
+}
+
+/** What one import produced. */
+export interface S3oImport {
+  radius: number;
+  height: number;
+  mid: [number, number, number];
+  root: ImportedPiece;
+  texture: ImportedTexture;
+  teamMask: ImportedTexture;
+  meshes: number;
+  vertices: number;
+  triangles: number;
+  /** Pieces whose index list was quads or a strip and had to be converted. */
+  converted: number;
+  /** How large the packed geometry sidecar is. */
+  bytes: number;
+}
+
+/**
+ * Import somebody else's `.s3o` as raw geometry, writing the meshes into
+ * `lego/geometry/<id>.bin.gz` and putting its textures in the shared store.
+ *
+ * The vertices never come back over the IPC: the largest model measured is 15.0
+ * MB as JSON against 3.1 MiB packed, and the frontend reads the sidecar over
+ * the asset protocol instead. See `rawGeometry.ts`.
+ */
+export const legoImportS3o = defineCommand<
+  { path: string; id: string },
+  S3oImport
+>("coilbox-lego", "lego_import_s3o");
+
+/**
+ * Put a texture in the shared store, for changing which one a unit draws with
+ * or for picking up an edit made outside coilbox. The store is keyed by
+ * content, so unchanged bytes cost no write and changed bytes get a new key.
+ */
+export const legoTextureImport = defineCommand<
+  { path: string },
+  { key: string; name: string; bytes: number }
+>("coilbox-lego", "lego_texture_import");
+
+/**
+ * Delete every stored texture `keep` does not name. Called after a texture
+ * changes, because a content-addressed store leaves the version before it
+ * behind.
+ */
+export const legoTexturePrune = defineCommand<
+  { keep: string[] },
+  { removed: number }
+>("coilbox-lego", "lego_texture_prune");
 
 /** Reveal an exported unit in the file manager. */
 export const legoOpenPath = defineCommand<

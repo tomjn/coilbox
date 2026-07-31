@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
+import type { RawGeometry } from "./rawGeometry";
 import { buildS3o, type S3oPiece, sitOnGround, unitBounds } from "./s3oBuild";
 
 /**
@@ -89,7 +90,7 @@ describe("buildS3o", () => {
       { id: "gun", name: "gun", parentId: "hull" },
     ]);
 
-    const build = buildS3o(doc, pack(), TEXTURES);
+    const build = buildS3o(doc, pack(), null, TEXTURES);
 
     expect(build?.root.name).toBe("base");
     expect(
@@ -109,7 +110,10 @@ describe("buildS3o", () => {
       },
     ]);
 
-    const arm = child(buildS3o(doc, pack(), TEXTURES)?.root as S3oPiece, "arm");
+    const arm = child(
+      buildS3o(doc, pack(), null, TEXTURES)?.root as S3oPiece,
+      "arm",
+    );
 
     expect(round(arm.offset)).toEqual([5, 0, 0]);
     // The vertex that sat at (1, 0, 0) is now at (0, 0, -1).
@@ -128,7 +132,7 @@ describe("buildS3o", () => {
       { id: "barrel", name: "barrel", parentId: "turret", position: [2, 0, 0] },
     ]);
 
-    const root = buildS3o(doc, pack(), TEXTURES)?.root as S3oPiece;
+    const root = buildS3o(doc, pack(), null, TEXTURES)?.root as S3oPiece;
     const barrel = child(child(root, "turret"), "barrel");
 
     // The offset is in engine axes, so the parent's turn moves it off +x.
@@ -142,7 +146,7 @@ describe("buildS3o", () => {
     ]);
 
     const slab = child(
-      buildS3o(doc, pack(), TEXTURES)?.root as S3oPiece,
+      buildS3o(doc, pack(), null, TEXTURES)?.root as S3oPiece,
       "slab",
     );
 
@@ -156,7 +160,7 @@ describe("buildS3o", () => {
       { id: "right", name: "right", parentId: "root", scale: [-1, 1, 1] },
     ]);
 
-    const root = buildS3o(doc, pack(), TEXTURES)?.root as S3oPiece;
+    const root = buildS3o(doc, pack(), null, TEXTURES)?.root as S3oPiece;
 
     expect(child(root, "left").indices).toEqual([0, 1, 2]);
     expect(child(root, "right").indices).toEqual([0, 2, 1]);
@@ -168,7 +172,7 @@ describe("buildS3o", () => {
     ]);
 
     const flare = child(
-      buildS3o(doc, pack(), TEXTURES)?.root as S3oPiece,
+      buildS3o(doc, pack(), null, TEXTURES)?.root as S3oPiece,
       "flare",
     );
 
@@ -182,7 +186,7 @@ describe("buildS3o", () => {
       { id: "up", name: "up", parentId: "root", position: [0, 3, 0] },
     ]);
 
-    const build = buildS3o(doc, pack(), TEXTURES);
+    const build = buildS3o(doc, pack(), null, TEXTURES);
 
     // The corners land at (0,3,0), (1,3,0) and (0,3,1), so the top is 3 and
     // the middle is half a metre along x and z.
@@ -200,7 +204,7 @@ describe("buildS3o", () => {
       { id: "hull", name: "hull", parentId: "root", scale: [8, 1, 2] },
     ]);
 
-    const build = buildS3o(doc, pack(), TEXTURES);
+    const build = buildS3o(doc, pack(), null, TEXTURES);
 
     expect(build?.sizeX).toBeCloseTo(8);
     expect(build?.sizeZ).toBeCloseTo(2);
@@ -213,7 +217,7 @@ describe("buildS3o", () => {
       { id: "roof", name: "roof", parentId: "root", position: [0, 5, 0] },
     ]);
 
-    const build = buildS3o(doc, pack(), TEXTURES);
+    const build = buildS3o(doc, pack(), null, TEXTURES);
 
     expect(build?.sizeY).toBeCloseTo(5);
   });
@@ -223,7 +227,7 @@ describe("buildS3o", () => {
       { id: "pad", name: "pad", parentId: "root", scale: [1, 1, 6] },
     ]);
 
-    const build = buildS3o(doc, pack(), TEXTURES);
+    const build = buildS3o(doc, pack(), null, TEXTURES);
 
     expect(build?.sizeX).toBeCloseTo(1);
     expect(build?.sizeZ).toBeCloseTo(6);
@@ -234,7 +238,7 @@ describe("buildS3o", () => {
       { id: "speck", name: "speck", parentId: "root", scale: [0.1, 0.1, 0.1] },
     ]);
 
-    const build = buildS3o(doc, pack(), TEXTURES);
+    const build = buildS3o(doc, pack(), null, TEXTURES);
 
     expect(build?.sizeX).toBeCloseTo(0.1);
     expect(build?.sizeZ).toBeCloseTo(0.1);
@@ -246,7 +250,7 @@ describe("buildS3o", () => {
       { id: "block", name: "block", parentId: "root", scale: [16, 1, 16] },
     ]);
 
-    const build = buildS3o(doc, pack(), TEXTURES);
+    const build = buildS3o(doc, pack(), null, TEXTURES);
 
     expect(build?.sizeX).toBeCloseTo(16);
     expect(build?.sizeZ).toBeCloseTo(16);
@@ -256,11 +260,13 @@ describe("buildS3o", () => {
     const near = buildS3o(
       project([{ id: "a", name: "a", parentId: "root" }]),
       pack(),
+      null,
       TEXTURES,
     );
     const far = buildS3o(
       project([{ id: "a", name: "a", parentId: "root", position: [40, 0, 0] }]),
       pack(),
+      null,
       TEXTURES,
     );
 
@@ -270,7 +276,7 @@ describe("buildS3o", () => {
   });
 
   it("writes zeros for a unit with no geometry, deferring to the engine", () => {
-    const build = buildS3o(project([]), pack(), TEXTURES);
+    const build = buildS3o(project([]), pack(), null, TEXTURES);
 
     expect(build?.radius).toBe(0);
     expect(build?.height).toBe(0);
@@ -285,11 +291,11 @@ describe("buildS3o", () => {
       { id: "up", name: "up", parentId: "root", position: [0, 4, 0] },
     ]);
 
-    const grounded = sitOnGround(doc, pack());
+    const grounded = sitOnGround(doc, pack(), null);
 
-    expect(buildS3o(doc, pack(), TEXTURES)?.height).toBeCloseTo(4);
+    expect(buildS3o(doc, pack(), null, TEXTURES)?.height).toBeCloseTo(4);
     // The part is flat, so its lowest point is its only point: it lands on 0.
-    expect(buildS3o(grounded, pack(), TEXTURES)?.height).toBeCloseTo(0);
+    expect(buildS3o(grounded, pack(), null, TEXTURES)?.height).toBeCloseTo(0);
   });
 
   it("lifts a buried unit up out of the ground", () => {
@@ -297,7 +303,7 @@ describe("buildS3o", () => {
       { id: "down", name: "down", parentId: "root", position: [0, -3, 0] },
     ]);
 
-    const grounded = sitOnGround(doc, pack());
+    const grounded = sitOnGround(doc, pack(), null);
     const root = grounded.pieces.find((piece) => piece.id === "root");
 
     expect(root?.position).toEqual([0, 3, 0]);
@@ -309,7 +315,7 @@ describe("buildS3o", () => {
       { id: "b", name: "b", parentId: "a", position: [0, 2, 0] },
     ]);
 
-    const grounded = sitOnGround(doc, pack());
+    const grounded = sitOnGround(doc, pack(), null);
 
     for (const id of ["a", "b"]) {
       expect(
@@ -321,17 +327,40 @@ describe("buildS3o", () => {
   it("leaves a unit already on the ground alone", () => {
     const doc = project([{ id: "a", name: "a", parentId: "root" }]);
 
-    expect(sitOnGround(doc, pack())).toBe(doc);
+    expect(sitOnGround(doc, pack(), null)).toBe(doc);
   });
 
   it("has nothing to measure on a unit with no geometry", () => {
     const doc = project([]);
 
-    expect(sitOnGround(doc, pack())).toBe(doc);
+    expect(sitOnGround(doc, pack(), null)).toBe(doc);
+  });
+
+  it("uses the header the document pins, and measures one it does not", () => {
+    const doc = project([{ id: "a", name: "a", parentId: "root" }]);
+    const pinned = { ...doc, radius: 99, height: 42, mid: [1, 2, 3] as const };
+
+    const measured = buildS3o(doc, pack(), null, TEXTURES);
+    const kept = buildS3o(
+      { ...pinned, mid: [1, 2, 3] },
+      pack(),
+      null,
+      TEXTURES,
+    );
+
+    expect(measured?.radius).not.toBeCloseTo(99);
+    // A unit imported from somebody else's model carries that model's own
+    // collision sphere, and re-exporting it must not change it.
+    expect(kept?.radius).toBe(99);
+    expect(kept?.height).toBe(42);
+    expect(kept?.mid).toEqual([1, 2, 3]);
+    // The box the unit definition is derived from is still measured, because
+    // the header has no room for it.
+    expect(kept?.sizeX).toBeCloseTo(measured?.sizeX ?? -1);
   });
 
   it("carries the texture names through", () => {
-    const build = buildS3o(project([]), pack(), {
+    const build = buildS3o(project([]), pack(), null, {
       texture1: "probe.png",
       texture2: "probe_glow.png",
     });
@@ -348,8 +377,8 @@ describe("unitBounds", () => {
       { id: "mast", name: "mast", parentId: "root", position: [0, 6, 0] },
     ]);
 
-    const measured = unitBounds(doc, pack());
-    const build = buildS3o(doc, pack(), TEXTURES);
+    const measured = unitBounds(doc, pack(), null);
+    const build = buildS3o(doc, pack(), null, TEXTURES);
 
     expect(measured.sizeX).toBeCloseTo(build?.sizeX ?? -1);
     expect(measured.sizeY).toBeCloseTo(build?.sizeY ?? -1);
@@ -358,11 +387,98 @@ describe("unitBounds", () => {
   });
 
   it("measures nothing on a unit with no geometry", () => {
-    expect(unitBounds(project([]), pack())).toEqual({
+    expect(unitBounds(project([]), pack(), null)).toEqual({
       mid: [0, 0, 0],
       sizeX: 0,
       sizeY: 0,
       sizeZ: 0,
     });
+  });
+});
+
+/**
+ * The meshes of an imported unit, as `rawGeometry.ts` hands them over: one
+ * triangle standing on the y/z plane so it is unmistakably not the pack's.
+ */
+function raw(): RawGeometry {
+  return {
+    byId: new Map([
+      [
+        "m1",
+        {
+          id: "m1",
+          vFirst: 0,
+          vCount: 3,
+          iFirst: 0,
+          iCount: 3,
+          bbox: { min: [0, 0, 0], max: [0, 2, 2] },
+        },
+      ],
+    ]),
+    // x, y, z, nx, ny, nz, u, v
+    vertices: new Float32Array([
+      0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0.5, 0, 0, 0, 2, 1, 0, 0, 0.5,
+      0.5,
+    ]),
+    indices: new Uint32Array([0, 1, 2]),
+  };
+}
+
+describe("baking an imported unit", () => {
+  it("takes a piece's geometry from the sidecar rather than the pack", () => {
+    const doc = project([
+      {
+        id: "hull",
+        name: "hull",
+        parentId: "root",
+        partId: null,
+        meshId: "m1",
+      },
+    ]);
+
+    const build = buildS3o(doc, pack(), raw(), TEXTURES);
+
+    const hull = child(build?.root as S3oPiece, "hull");
+    expect(hull.vertices).toHaveLength(3);
+    expect(hull.vertices[1].pos).toEqual([0, 2, 0]);
+    // The UVs are the model's own, untouched. A texture swap is a pointer
+    // change and never a remap.
+    expect(hull.vertices[1].uv).toEqual([0.5, 0]);
+    expect(hull.indices).toEqual([0, 1, 2]);
+  });
+
+  it("bakes a mesh's rotation and scale into its vertices, as it does a part's", () => {
+    const doc = project([
+      {
+        id: "hull",
+        name: "hull",
+        parentId: "root",
+        partId: null,
+        meshId: "m1",
+        scale: [1, 3, 1],
+      },
+    ]);
+
+    const build = buildS3o(doc, pack(), raw(), TEXTURES);
+
+    expect(child(build?.root as S3oPiece, "hull").vertices[1].pos).toEqual([
+      0, 6, 0,
+    ]);
+  });
+
+  it("shows nothing for a mesh the sidecar does not hold", () => {
+    const doc = project([
+      {
+        id: "hull",
+        name: "hull",
+        parentId: "root",
+        partId: null,
+        meshId: "m9",
+      },
+    ]);
+
+    const build = buildS3o(doc, pack(), raw(), TEXTURES);
+
+    expect(child(build?.root as S3oPiece, "hull").vertices).toEqual([]);
   });
 });
