@@ -441,3 +441,26 @@ export function compileScenario(scenario: Scenario): string {
     "",
   ].join("\n");
 }
+
+/** Turn a Lua value tree into plain JSON-safe JS: a `Map` becomes an object, an
+ * array stays an array, everything else is already a scalar. */
+function toJson(value: LuaValue): unknown {
+  if (Array.isArray(value)) return value.map(toJson);
+  if (value instanceof Map) {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of value) out[key] = toJson(item);
+    return out;
+  }
+  return value;
+}
+
+/**
+ * The shape `validateMission` expects: what a real Lua evaluation of
+ * `compileScenario`'s output would hand back, without needing a Lua VM. Built
+ * from the exact same {@link mission} field mapping `compileScenario` renders
+ * to text, so it cannot structurally disagree with what gets written to disk.
+ * Only `render`'s text-encoding step is skipped.
+ */
+export function scenarioMissionValue(scenario: Scenario): unknown {
+  return toJson(mission(scenario));
+}
