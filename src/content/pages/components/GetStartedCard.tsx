@@ -22,12 +22,11 @@ import { SuggestionsList } from "./SuggestionsList";
 
 /**
  * Welcome-screen card offering curated game/map downloads once setup (content
- * folder + engine) is complete but the user still has no content. Maps use the
- * cheap `dlInstalledContent` directory listing (maps land as files). Games are
- * resolved against a unitsync scan, since rapid installs live in
- * `packages/`+`pool/` and never appear as an archive in `games/`, so a file
- * listing would re-suggest a game the user can already launch. Self-hides once
- * every suggestion has been downloaded (issue #530: no manual dismiss).
+ * folder + engine) is complete but the user still has no content. The verdict
+ * needs two inventories: a settled unitsync scan (the authority, since rapid
+ * installs never appear as an archive in `games/`) and the `dlInstalledContent`
+ * directory listing. Self-hides once every suggestion has been downloaded
+ * (issue #530: no manual dismiss).
  *
  * The offered list is snapshotted once per visit (issue #526). Downloading one
  * suggestion refreshes `installed`, but re-deriving the list from that would
@@ -35,6 +34,11 @@ import { SuggestionsList } from "./SuggestionsList";
  * unmounts (navigating away from the welcome screen), and the next visit
  * recomputes it fresh. A downloaded item stays in its slot, marked done, via
  * `SuggestionsList`'s own per-item tracking.
+ *
+ * Nothing is snapshotted until both inventories are genuinely known. Neither an
+ * unloaded content root nor a failed scan may stand in as an empty one, or a
+ * mature install intermittently reads as a first run, and the per-visit
+ * snapshot then holds that wrong verdict for the whole visit.
  */
 export function GetStartedCard() {
   const { complete } = useSetupStatus();
@@ -54,16 +58,17 @@ export function GetStartedCard() {
     maps: SuggestedMap[];
   } | null>(null);
 
+  // Only ever publishes a listing it actually read. Content roots load
+  // asynchronously, so writing empty sets while `rootPaths` is still empty (or
+  // after a failed listing) would let the snapshot below freeze a "user has
+  // nothing" verdict for a user who has everything.
   const refreshInstalled = useCallback(async () => {
-    if (rootPaths.length === 0) {
-      setInstalled({ games: new Set(), maps: new Set() });
-      return;
-    }
+    if (rootPaths.length === 0) return;
     try {
       const { games, maps } = await dlInstalledContent({ paths: rootPaths });
       setInstalled({ games: new Set(games), maps: new Set(maps) });
     } catch {
-      setInstalled({ games: new Set(), maps: new Set() });
+      // Leave the last known listing (or nothing) in place.
     }
   }, [rootPaths]);
 
@@ -71,10 +76,11 @@ export function GetStartedCard() {
     refreshInstalled();
   }, [refreshInstalled]);
 
-  // unitsync is the truth for games (it sees rapid content). The file listing
-  // only backs maps.
-  const scannedGames = scan.data?.games ?? [];
-  const scanSettled = scan.data != null || scan.error != null;
+  // unitsync is the truth for both kinds: it sees rapid content, which never
+  // lands as a file in `games/`. A scan that failed reports no games and no
+  // maps, which is not a report of an empty install, so only a scan that
+  // resolved counts (matching `usePlayReadiness`).
+  const scanned = !scan.loading && scan.data ? scan.data : null;
   // A distribution's gameFilter narrows the suggestions first, so a single-game
   // distribution (e.g. SplinterFaction) never advertises other games' downloads.
   const scopedGames = filterSuggestedGamesByFilter(
@@ -82,33 +88,21 @@ export function GetStartedCard() {
     entries,
     getGameMatcher(),
   );
-  const { games: candidateGames, maps: candidateMaps } = getStartedCandidates({
+  const candidates = getStartedCandidates({
     installed,
-    scanSettled,
-    scannedGames,
+    scanned,
     scopedGames,
     entries,
     suggestedMaps,
   });
 
-  // Captured once the readiness signals (root paths resolved, installed listing
-  // in, settled scan) are all in, then held for the rest of this mount (issue
-  // #526). `rootPaths` starts empty and loads asynchronously, independently of
-  // `complete`, so without this check the very first `installed` (still keyed
-  // off the not-yet-loaded empty root list) could freeze a snapshot with
-  // nothing marked installed.
+  // Captured the moment the verdict is first answerable (both inventories in),
+  // then held for the rest of this mount (issue #526). Navigating away unmounts
+  // the card, so the next visit asks again from scratch.
   useEffect(() => {
-    if (snapshot || rootPaths.length === 0 || !installed || !scanSettled)
-      return;
-    setSnapshot({ games: candidateGames, maps: candidateMaps });
-  }, [
-    snapshot,
-    rootPaths,
-    installed,
-    scanSettled,
-    candidateGames,
-    candidateMaps,
-  ]);
+    if (snapshot || !candidates) return;
+    setSnapshot(candidates);
+  }, [snapshot, candidates]);
 
   if (!complete || !installed || !snapshot) return null;
   if (snapshot.games.length === 0 && snapshot.maps.length === 0) return null;
