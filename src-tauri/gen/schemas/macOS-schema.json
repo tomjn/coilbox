@@ -2529,6 +2529,72 @@
           "markdownDescription": "Denies the runlite_state_save command without any pre-configured scope."
         },
         {
+          "description": "Allows the scenario plugin's storage and dialogue-media commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`",
+          "type": "string",
+          "const": "coilbox-scenario:default",
+          "markdownDescription": "Allows the scenario plugin's storage and dialogue-media commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`"
+        },
+        {
+          "description": "Enables the scenario_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:allow-scenario-delete",
+          "markdownDescription": "Enables the scenario_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the scenario_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:allow-scenario-list",
+          "markdownDescription": "Enables the scenario_list command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the scenario_media_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:allow-scenario-media-delete",
+          "markdownDescription": "Enables the scenario_media_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the scenario_media_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:allow-scenario-media-import",
+          "markdownDescription": "Enables the scenario_media_import command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the scenario_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:allow-scenario-save",
+          "markdownDescription": "Enables the scenario_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scenario_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:deny-scenario-delete",
+          "markdownDescription": "Denies the scenario_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scenario_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:deny-scenario-list",
+          "markdownDescription": "Denies the scenario_list command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scenario_media_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:deny-scenario-media-delete",
+          "markdownDescription": "Denies the scenario_media_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scenario_media_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:deny-scenario-media-import",
+          "markdownDescription": "Denies the scenario_media_import command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scenario_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:deny-scenario-save",
+          "markdownDescription": "Denies the scenario_save command without any pre-configured scope."
+        },
+        {
           "description": "Allows the uberstress plugin's commands (scenarios, run, cancel, history, report, config, seed SQL, results dir, import/export).\n#### This default permission set includes:\n\n- `allow-us-scenarios`\n- `allow-us-run`\n- `allow-us-cancel`\n- `allow-us-history`\n- `allow-us-report`\n- `allow-us-settings-load`\n- `allow-us-settings-save`\n- `allow-us-seed-sql`\n- `allow-us-results-dir`\n- `allow-us-export-report`\n- `allow-us-import-report`",
           "type": "string",
           "const": "coilbox-uberstress:default",

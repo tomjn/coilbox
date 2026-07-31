@@ -20,6 +20,7 @@ tauri-plugin-coilbox-content = { path = "../crates/tauri-plugin-coilbox-content"
 tauri-plugin-coilbox-unitsync = { path = "../crates/tauri-plugin-coilbox-unitsync" }
 tauri-plugin-coilbox-play = { path = "../crates/tauri-plugin-coilbox-play" }
 tauri-plugin-coilbox-campaign = { path = "../crates/tauri-plugin-coilbox-campaign" }
+tauri-plugin-coilbox-scenario = { path = "../crates/tauri-plugin-coilbox-scenario" }
 tauri-plugin-coilbox-lego = { path = "../crates/tauri-plugin-coilbox-lego" }
 tauri-plugin-coilbox-conquest = { path = "../crates/tauri-plugin-coilbox-conquest" }
 tauri-plugin-coilbox-runlite = { path = "../crates/tauri-plugin-coilbox-runlite" }
