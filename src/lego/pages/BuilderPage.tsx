@@ -5,6 +5,8 @@ import {
   ChevronUp,
   Copy,
   FlipHorizontal2,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   Redo,
   Rocket,
@@ -17,6 +19,11 @@ import { useParams } from "react-router";
 import { toast } from "sonner";
 
 import { ButtonGroup } from "@/components/ui/button-group";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -58,6 +65,7 @@ import {
   loadPack,
   projectPackProblems,
 } from "../pack";
+import { usePanelOpen } from "../panels";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
 import { deleteCompound, saveCompound, useLegoCompounds } from "../projects";
 import { canReparent, reparentPiece } from "../reparent";
@@ -107,7 +115,10 @@ function Builder({ id }: { id: string | undefined }) {
 
   const [pack, setPack] = useState<LoadedPack | null>(null);
   const [strip, setStrip] = useState<"parts" | "compounds">("parts");
-  const [stripOpen, setStripOpen] = useState(true);
+  // Open or closed is remembered between runs. Which tab is showing is not, so
+  // the side panel always comes back on Pieces. See `../panels`.
+  const [stripOpen, setStripOpen] = usePanelOpen("strip");
+  const [asideOpen, setAsideOpen] = usePanelOpen("aside");
   const [aside, setAside] = useState<"pieces" | "animation" | "collision">(
     "pieces",
   );
@@ -658,563 +669,614 @@ function Builder({ id }: { id: string | undefined }) {
     : null;
 
   return (
-    <div className="flex h-full flex-col">
-      <ExportDrawer
-        open={exporting}
-        onOpenChange={setExporting}
-        project={draft}
-        pack={pack}
-        onRemember={(settings) =>
-          edit((project) => ({ ...project, ...settings }))
-        }
-      />
+    // The side panel collapses for the same reason the parts drawer does: a
+    // large unit is hard to see with 288px of panel beside it. It leaves no
+    // rail behind, so the button that brings it back rides in the chrome
+    // already floating over the view.
+    <Collapsible asChild open={asideOpen} onOpenChange={setAsideOpen}>
+      <div className="flex h-full flex-col">
+        <ExportDrawer
+          open={exporting}
+          onOpenChange={setExporting}
+          project={draft}
+          pack={pack}
+          onRemember={(settings) =>
+            edit((project) => ({ ...project, ...settings }))
+          }
+        />
 
-      <TestDrawer
-        open={testing}
-        onOpenChange={setTesting}
-        project={draft}
-        pack={pack}
-      />
+        <TestDrawer
+          open={testing}
+          onOpenChange={setTesting}
+          project={draft}
+          pack={pack}
+        />
 
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-h-0 flex-1 flex-col">
-          {/* The unit's chrome floats over the view rather than taking a strip
+        <div className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 flex-1 flex-col">
+            {/* The unit's chrome floats over the view rather than taking a strip
               off the top of it. The 3D is the point of this screen. */}
-          <div className="relative min-h-0 flex-1">
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 p-3">
-              <div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
-                <Blocks size={16} className="shrink-0 text-muted-foreground" />
-                <div className="min-w-0">
-                  <Input
-                    value={draft.name}
-                    onChange={(event) => renameUnit(event.target.value)}
-                    aria-label="Unit name"
-                    className="h-6 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
+            <div className="relative min-h-0 flex-1">
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 p-3">
+                <div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
+                  <Blocks
+                    size={16}
+                    className="shrink-0 text-muted-foreground"
                   />
-                  <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
-                    {draft.pieces.length}{" "}
-                    {draft.pieces.length === 1 ? "piece" : "pieces"} · exports
-                    as
-                    <NameInput
-                      value={draft.unitName}
-                      onCommit={renameExport}
-                      aria-label="Export name"
-                      className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
+                  <div className="min-w-0">
+                    <Input
+                      value={draft.name}
+                      onChange={(event) => renameUnit(event.target.value)}
+                      aria-label="Unit name"
+                      className="h-6 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
                     />
-                  </p>
-                  <AtlasPicker
-                    project={draft}
-                    pack={pack}
-                    onChange={setAtlas}
-                  />
+                    <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
+                      {draft.pieces.length}{" "}
+                      {draft.pieces.length === 1 ? "piece" : "pieces"} · exports
+                      as
+                      <NameInput
+                        value={draft.unitName}
+                        onCommit={renameExport}
+                        aria-label="Export name"
+                        className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
+                      />
+                    </p>
+                    <AtlasPicker
+                      project={draft}
+                      pack={pack}
+                      onChange={setAtlas}
+                    />
+                  </div>
+                </div>
+
+                <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
+                  <ButtonGroup>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={doc.undo}
+                      disabled={!doc.canUndo}
+                      aria-label="Undo"
+                      title="Undo (Cmd Z)"
+                    >
+                      <Undo size={14} />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={doc.redo}
+                      disabled={!doc.canRedo}
+                      aria-label="Redo"
+                      title="Redo (Cmd Shift Z)"
+                    >
+                      <Redo size={14} />
+                    </Button>
+                  </ButtonGroup>
+                  <span className="text-xs text-muted-foreground">
+                    {doc.saving
+                      ? "Saving"
+                      : doc.dirty
+                        ? "Unsaved changes"
+                        : "Saved"}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => doc.save()}
+                    disabled={doc.saving}
+                  >
+                    <Save size={14} /> Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setTesting(true)}
+                  >
+                    <Rocket size={14} /> Test in game
+                  </Button>
+                  <Button size="sm" onClick={() => setExporting(true)}>
+                    <Upload size={14} /> Export
+                  </Button>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={
+                        asideOpen
+                          ? "Hide the side panel"
+                          : "Show the side panel"
+                      }
+                      title={
+                        asideOpen
+                          ? "Hide the side panel"
+                          : "Show the side panel"
+                      }
+                    >
+                      {asideOpen ? (
+                        <PanelRightClose size={16} />
+                      ) : (
+                        <PanelRightOpen size={16} />
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
                 </div>
               </div>
 
-              <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
-                <ButtonGroup>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={doc.undo}
-                    disabled={!doc.canUndo}
-                    aria-label="Undo"
-                    title="Undo (Cmd Z)"
-                  >
-                    <Undo size={14} />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={doc.redo}
-                    disabled={!doc.canRedo}
-                    aria-label="Redo"
-                    title="Redo (Cmd Shift Z)"
-                  >
-                    <Redo size={14} />
-                  </Button>
-                </ButtonGroup>
-                <span className="text-xs text-muted-foreground">
-                  {doc.saving
-                    ? "Saving"
-                    : doc.dirty
-                      ? "Unsaved changes"
-                      : "Saved"}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => doc.save()}
-                  disabled={doc.saving}
-                >
-                  <Save size={14} /> Save
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setTesting(true)}
-                >
-                  <Rocket size={14} /> Test in game
-                </Button>
-                <Button size="sm" onClick={() => setExporting(true)}>
-                  <Upload size={14} /> Export
-                </Button>
-              </div>
+              {problems.length > 0 ? (
+                // Below the unit's chrome card, which is three rows tall when a
+                // unit has an atlas to choose.
+                <ul className="pointer-events-none absolute inset-x-0 top-24 z-10 mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
+                  {problems.map((problem) => (
+                    <li key={problem}>{problem}</li>
+                  ))}
+                </ul>
+              ) : null}
+
+              <ModelViewport
+                pack={pack}
+                project={draft}
+                selectedIds={selectedIds}
+                onSelect={selectPiece}
+                onTransform={transformPiece}
+                onTransformMany={transformPieces}
+                hoveredId={hoveredId}
+                onHover={setHoveredId}
+                playing={playing}
+                uniformScale={uniformScale}
+                onGround={() => edit((project) => sitOnGround(project, pack))}
+                onReady={doc.onCapture}
+                onDuplicate={duplicateSelection}
+                canDuplicate={transformRoots(draft, selectedIds).length > 0}
+                onPaste={() => void pasteClipboard()}
+                onSaveAsCompound={() => void saveSelectionAsCompound()}
+                canSaveAsCompound={selectedIds.length > 0}
+                onDelete={removeSelected}
+                canDelete={transformRoots(draft, selectedIds).length > 0}
+                symmetry={symmetry}
+                onSymmetryChange={setSymmetryMode}
+                placingAnchor={placingAnchor}
+                onPlaceAnchor={placeAnchor}
+                onCancelAnchor={() => setPlacingAnchor(false)}
+                // The panel is where a volume is read and changed, so opening it
+                // is what puts the handles on the volume. Nothing else has to be
+                // switched on, and closing it gives them back to the pieces.
+                // Putting the whole side panel away closes it too, so the handles
+                // never outlive the thing that explains them.
+                editCollision={asideOpen && aside === "collision"}
+                onCollisionChange={(collisionVolume) =>
+                  edit((project) => ({ ...project, collisionVolume }))
+                }
+              />
             </div>
 
-            {problems.length > 0 ? (
-              // Below the unit's chrome card, which is three rows tall when a
-              // unit has an atlas to choose.
-              <ul className="pointer-events-none absolute inset-x-0 top-24 z-10 mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
-                {problems.map((problem) => (
-                  <li key={problem}>{problem}</li>
-                ))}
-              </ul>
-            ) : null}
+            {/* Collapsible: most of a session is spent moving what is already there,
+              not reaching for another part. */}
+            <div
+              className={`flex shrink-0 flex-col border-t border-border ${
+                stripOpen ? "h-72" : ""
+              }`}
+            >
+              <div className="flex items-center gap-2 px-3 py-2">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setStripOpen(!stripOpen)}
+                  aria-expanded={stripOpen}
+                  aria-label={stripOpen ? "Hide the parts" : "Show the parts"}
+                >
+                  {stripOpen ? (
+                    <ChevronDown size={16} />
+                  ) : (
+                    <ChevronUp size={16} />
+                  )}
+                </Button>
 
-            <ModelViewport
-              pack={pack}
-              project={draft}
-              selectedIds={selectedIds}
-              onSelect={selectPiece}
-              onTransform={transformPiece}
-              onTransformMany={transformPieces}
-              hoveredId={hoveredId}
-              onHover={setHoveredId}
-              playing={playing}
-              uniformScale={uniformScale}
-              onGround={() => edit((project) => sitOnGround(project, pack))}
-              onReady={doc.onCapture}
-              onDuplicate={duplicateSelection}
-              canDuplicate={transformRoots(draft, selectedIds).length > 0}
-              onPaste={() => void pasteClipboard()}
-              onSaveAsCompound={() => void saveSelectionAsCompound()}
-              canSaveAsCompound={selectedIds.length > 0}
-              onDelete={removeSelected}
-              canDelete={transformRoots(draft, selectedIds).length > 0}
-              symmetry={symmetry}
-              onSymmetryChange={setSymmetryMode}
-              placingAnchor={placingAnchor}
-              onPlaceAnchor={placeAnchor}
-              onCancelAnchor={() => setPlacingAnchor(false)}
-              // The panel is where a volume is read and changed, so opening it
-              // is what puts the handles on the volume. Nothing else has to be
-              // switched on, and closing it gives them back to the pieces.
-              editCollision={aside === "collision"}
-              onCollisionChange={(collisionVolume) =>
-                edit((project) => ({ ...project, collisionVolume }))
-              }
-            />
+                <ButtonGroup>
+                  <Button
+                    size="sm"
+                    variant={strip === "parts" ? "default" : "outline"}
+                    onClick={() => {
+                      setStrip("parts");
+                      setStripOpen(true);
+                    }}
+                    aria-pressed={strip === "parts"}
+                  >
+                    Parts
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={strip === "compounds" ? "default" : "outline"}
+                    onClick={() => {
+                      setStrip("compounds");
+                      setStripOpen(true);
+                    }}
+                    aria-pressed={strip === "compounds"}
+                  >
+                    Compounds
+                  </Button>
+                </ButtonGroup>
+
+                {stripOpen && strip === "parts" ? (
+                  <PartFilters
+                    pack={pack}
+                    query={filter.query}
+                    onQuery={filter.setQuery}
+                    category={filter.category}
+                    onCategory={filter.setCategory}
+                    packId={filter.packId}
+                    onPackId={filter.setPackId}
+                    shown={filter.parts.length}
+                    className="flex-1"
+                  />
+                ) : null}
+              </div>
+
+              {/* Flex, not block: the picker sizes itself with flex-1 and its contents
+                are absolutely positioned, so in a block parent it collapses to
+                nothing and the panel looks empty. */}
+              {stripOpen ? (
+                <div className="flex min-h-0 flex-1 border-t border-border">
+                  {strip === "compounds" ? (
+                    <CompoundPicker
+                      pack={pack}
+                      compounds={compounds}
+                      atlas={drawAtlas}
+                      onInsert={addCompound}
+                      onDelete={(compoundId) => void deleteCompound(compoundId)}
+                      onRename={(compound, name) =>
+                        void saveCompound({ ...compound, name })
+                      }
+                    />
+                  ) : filter.parts.length === 0 ? (
+                    <NoMatches />
+                  ) : (
+                    <PartPicker
+                      pack={pack}
+                      parts={filter.parts}
+                      atlas={drawAtlas}
+                      onSelect={addPart}
+                    />
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
 
-          {/* Collapsible: most of a session is spent moving what is already there,
-              not reaching for another part. */}
-          <div
-            className={`flex shrink-0 flex-col border-t border-border ${
-              stripOpen ? "h-72" : ""
-            }`}
-          >
-            <div className="flex items-center gap-2 px-3 py-2">
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setStripOpen(!stripOpen)}
-                aria-expanded={stripOpen}
-                aria-label={stripOpen ? "Hide the parts" : "Show the parts"}
-              >
-                {stripOpen ? (
-                  <ChevronDown size={16} />
-                ) : (
-                  <ChevronUp size={16} />
-                )}
-              </Button>
-
-              <ButtonGroup>
+          <CollapsibleContent asChild>
+            <aside className="flex w-72 shrink-0 flex-col border-l border-border">
+              <ButtonGroup className="m-2">
                 <Button
                   size="sm"
-                  variant={strip === "parts" ? "default" : "outline"}
-                  onClick={() => {
-                    setStrip("parts");
-                    setStripOpen(true);
-                  }}
-                  aria-pressed={strip === "parts"}
+                  variant={aside === "pieces" ? "default" : "outline"}
+                  onClick={() => setAside("pieces")}
+                  aria-pressed={aside === "pieces"}
                 >
-                  Parts
+                  Pieces
                 </Button>
                 <Button
                   size="sm"
-                  variant={strip === "compounds" ? "default" : "outline"}
-                  onClick={() => {
-                    setStrip("compounds");
-                    setStripOpen(true);
-                  }}
-                  aria-pressed={strip === "compounds"}
+                  variant={aside === "animation" ? "default" : "outline"}
+                  onClick={() => setAside("animation")}
+                  aria-pressed={aside === "animation"}
                 >
-                  Compounds
+                  Animation
+                </Button>
+                <Button
+                  size="sm"
+                  variant={aside === "collision" ? "default" : "outline"}
+                  onClick={() => setAside("collision")}
+                  aria-pressed={aside === "collision"}
+                >
+                  Collision
                 </Button>
               </ButtonGroup>
 
-              {stripOpen && strip === "parts" ? (
-                <PartFilters
-                  pack={pack}
-                  query={filter.query}
-                  onQuery={filter.setQuery}
-                  category={filter.category}
-                  onCategory={filter.setCategory}
-                  packId={filter.packId}
-                  onPackId={filter.setPackId}
-                  shown={filter.parts.length}
-                  className="flex-1"
-                />
-              ) : null}
-            </div>
-
-            {/* Flex, not block: the picker sizes itself with flex-1 and its contents
-                are absolutely positioned, so in a block parent it collapses to
-                nothing and the panel looks empty. */}
-            {stripOpen ? (
-              <div className="flex min-h-0 flex-1 border-t border-border">
-                {strip === "compounds" ? (
-                  <CompoundPicker
-                    pack={pack}
-                    compounds={compounds}
-                    atlas={drawAtlas}
-                    onInsert={addCompound}
-                    onDelete={(compoundId) => void deleteCompound(compoundId)}
-                    onRename={(compound, name) =>
-                      void saveCompound({ ...compound, name })
-                    }
-                  />
-                ) : filter.parts.length === 0 ? (
-                  <NoMatches />
-                ) : (
-                  <PartPicker
-                    pack={pack}
-                    parts={filter.parts}
-                    atlas={drawAtlas}
-                    onSelect={addPart}
-                  />
-                )}
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <aside className="flex w-72 shrink-0 flex-col border-l border-border">
-          <ButtonGroup className="m-2">
-            <Button
-              size="sm"
-              variant={aside === "pieces" ? "default" : "outline"}
-              onClick={() => setAside("pieces")}
-              aria-pressed={aside === "pieces"}
-            >
-              Pieces
-            </Button>
-            <Button
-              size="sm"
-              variant={aside === "animation" ? "default" : "outline"}
-              onClick={() => setAside("animation")}
-              aria-pressed={aside === "animation"}
-            >
-              Animation
-            </Button>
-            <Button
-              size="sm"
-              variant={aside === "collision" ? "default" : "outline"}
-              onClick={() => setAside("collision")}
-              aria-pressed={aside === "collision"}
-            >
-              Collision
-            </Button>
-          </ButtonGroup>
-
-          {aside === "collision" ? (
-            <CollisionPanel
-              project={draft}
-              pack={pack}
-              onChange={(collisionVolume) =>
-                edit((project) => {
-                  if (collisionVolume) return { ...project, collisionVolume };
-                  // Back on the derived volume, which is the absence of the key
-                  // rather than a stored copy of what was derived.
-                  const { collisionVolume: _dropped, ...rest } = project;
-                  return rest;
-                })
-              }
-            />
-          ) : aside === "animation" ? (
-            <AnimationPanel
-              project={draft}
-              playing={playing}
-              onPlayingChange={setPlaying}
-              onChange={(animations) =>
-                edit((project) => ({ ...project, animations }))
-              }
-              onScriptChange={(script) => {
-                // Playback plays the presets, and a unit that owns its script
-                // is no longer described by them.
-                setPlaying(false);
-                edit((project) => ({ ...project, script }));
-              }}
-            />
-          ) : (
-            <>
-              <div className="flex items-center gap-1 border-b border-border px-3 py-2">
-                <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Pieces
-                </h2>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="ml-auto"
-                  onClick={addEmpty}
-                  title="Add an empty piece, which is how flares and aim points are made"
-                >
-                  <Plus size={14} />
-                </Button>
-              </div>
-
-              <div className="relative min-h-32 flex-1">
-                <div className="h-full overflow-y-auto py-1">
-                  <PieceTree
-                    project={draft}
-                    selectedIds={selectedIds}
-                    onSelect={selectPiece}
-                    onReparent={reparent}
-                    onToggleHidden={toggleHidden}
-                    hoveredId={hoveredId}
-                    onHoverChange={setHoveredId}
-                  />
-                </div>
-                {/* Fades the last row rather than clipping it mid-line, so a
-                    partly visible row reads as "more below" rather than a
-                    rendering fault. */}
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-background to-transparent"
-                />
-              </div>
-
-              {selectedIds.length > 1 ? (
-                <SetPanel
+              {aside === "collision" ? (
+                <CollisionPanel
                   project={draft}
-                  selectedIds={selectedIds}
-                  onSelect={setSelectedId}
-                  onReparent={(parentId, pieceIds) =>
-                    reparentAll(pieceIds, parentId)
+                  pack={pack}
+                  onChange={(collisionVolume) =>
+                    edit((project) => {
+                      if (collisionVolume)
+                        return { ...project, collisionVolume };
+                      // Back on the derived volume, which is the absence of the key
+                      // rather than a stored copy of what was derived.
+                      const { collisionVolume: _dropped, ...rest } = project;
+                      return rest;
+                    })
                   }
                 />
-              ) : selected ? (
-                // Capped and scrollable, and free to shrink further still: the
-                // 55% cap is against the whole aside, so it can outgrow what
-                // is actually left once the tree has taken its own minimum.
-                // Without shrink enabled here, that excess pushed past the
-                // aside's own box and over whatever sat below it (the parts
-                // drawer) instead of scrolling.
-                <div className="max-h-[55%] min-h-0 overflow-y-auto border-t border-border px-3 py-2">
-                  <label
-                    className="text-xs text-muted-foreground"
-                    htmlFor="lego-piece-name"
-                  >
-                    Name
-                  </label>
-                  <NameInput
-                    id="lego-piece-name"
-                    value={selected.name}
-                    onCommit={renameSelected}
-                    className="mt-1"
-                  />
-
-                  <TransformFields
-                    piece={selected}
-                    onChange={(change) => transformPiece(selected.id, change)}
-                    uniformScale={uniformScale}
-                    onUniformScaleChange={setUniformScale}
-                  />
-                  {canMirror(draft, selected.id) ? (
-                    <div className="mt-2">
-                      <span className="text-xs text-muted-foreground">
-                        Mirror
-                      </span>
-                      <ButtonGroup className="mt-1 flex w-full">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={mirrorSelection}
-                        >
-                          <FlipHorizontal2 size={14} /> In place
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={mirrorCopyOfSelection}
-                        >
-                          <Copy size={14} /> As a copy
-                        </Button>
-                      </ButtonGroup>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Across the unit's centre line, taking everything under
-                        this piece with it. A copy is how one leg becomes the
-                        other.
-                      </p>
-                    </div>
-                  ) : null}
-
-                  {selected.id === draft.rootPieceId ? null : (
-                    // The same move as dragging a row onto another, for anyone not
-                    // using a pointer.
-                    <div className="mt-2">
-                      <span className="text-xs text-muted-foreground">
-                        Hangs off
-                      </span>
-                      <Select
-                        value={selected.parentId ?? draft.rootPieceId}
-                        onValueChange={(parentId) =>
-                          reparent(selected.id, parentId)
-                        }
-                      >
-                        <SelectTrigger
-                          size="sm"
-                          className="mt-1 w-full"
-                          aria-label="Parent piece"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {parentOptions(draft, [selected.id]).map(
-                            ({ piece, depth }) => (
-                              <SelectItem
-                                key={piece.id}
-                                value={piece.id}
-                                // Indent on the item, not inside its text: Radix
-                                // mirrors the text into the trigger, and the
-                                // padding would come with it.
-                                style={{ paddingLeft: 8 + depth * 12 }}
-                              >
-                                {piece.name}
-                              </SelectItem>
-                            ),
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {selectedPart ? (
-                    <div className="mt-2">
-                      <span className="text-xs text-muted-foreground">
-                        Turns about
-                      </span>
-                      <Select
-                        value={
-                          currentPivot(selectedPart, selected.pivot) ?? "middle"
-                        }
-                        onValueChange={(id) => {
-                          const choice = pivotChoices(selectedPart).find(
-                            (option) => option.id === id,
-                          );
-                          if (choice) movePivot(selected.id, choice.position);
-                        }}
-                      >
-                        <SelectTrigger
-                          size="sm"
-                          className="mt-1 w-full"
-                          aria-label="Pivot point"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {pivotChoices(selectedPart).map((choice) => (
-                            <SelectItem key={choice.id} value={choice.id}>
-                              {choice.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        The point this piece turns about, and that its children
-                        hang from. A leg wants its top, not its middle.
-                      </p>
-                    </div>
-                  ) : null}
-
-                  <AnchorList
-                    piece={selected}
-                    placing={placingAnchor}
-                    onPlacingChange={setPlacingAnchor}
-                    onAddAtOrigin={() =>
-                      edit((project) =>
-                        addAnchor(
-                          project,
-                          selected.id,
-                          selected.pivot ?? [0, 0, 0],
-                          crypto.randomUUID(),
-                        ),
-                      )
-                    }
-                    onChange={(anchorId, change) =>
-                      edit((project) =>
-                        updateAnchor(project, selected.id, anchorId, change),
-                      )
-                    }
-                    onRemove={(anchorId) =>
-                      edit((project) =>
-                        removeAnchor(project, selected.id, anchorId),
-                      )
-                    }
-                  />
-
-                  <div className="mt-2">
-                    <span className="text-xs text-muted-foreground">Role</span>
-                    <Select
-                      value={selected.role ?? NO_ROLE}
-                      onValueChange={(role) =>
-                        setRole(
-                          selected.id,
-                          role === NO_ROLE ? undefined : role,
-                        )
-                      }
+              ) : aside === "animation" ? (
+                <AnimationPanel
+                  project={draft}
+                  playing={playing}
+                  onPlayingChange={setPlaying}
+                  onChange={(animations) =>
+                    edit((project) => ({ ...project, animations }))
+                  }
+                  onScriptChange={(script) => {
+                    // Playback plays the presets, and a unit that owns its script
+                    // is no longer described by them.
+                    setPlaying(false);
+                    edit((project) => ({ ...project, script }));
+                  }}
+                />
+              ) : (
+                <>
+                  <div className="flex items-center gap-1 border-b border-border px-3 py-2">
+                    <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Pieces
+                    </h2>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="ml-auto"
+                      onClick={addEmpty}
+                      title="Add an empty piece, which is how flares and aim points are made"
                     >
-                      <SelectTrigger
-                        size="sm"
-                        className="mt-1 w-full"
-                        aria-label="Animation role"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NO_ROLE}>None</SelectItem>
-                        {ROLES.map((role) => (
-                          <SelectItem key={role.id} value={role.id}>
-                            {role.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      What this piece is, so the animation presets know what to
-                      move.
-                    </p>
-                    {restAngleWarnings(selected).map((warning) => (
-                      <p key={warning} className="mt-1 text-xs text-amber-500">
-                        {warning}
-                      </p>
-                    ))}
+                      <Plus size={14} />
+                    </Button>
                   </div>
 
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {selected.partId
-                      ? "Geometry."
-                      : "Empty, so it carries other pieces and can be an emit point."}
-                  </p>
-                </div>
-              ) : null}
-            </>
-          )}
-        </aside>
+                  <div className="relative min-h-32 flex-1">
+                    <div className="h-full overflow-y-auto py-1">
+                      <PieceTree
+                        project={draft}
+                        selectedIds={selectedIds}
+                        onSelect={selectPiece}
+                        onReparent={reparent}
+                        onToggleHidden={toggleHidden}
+                        hoveredId={hoveredId}
+                        onHoverChange={setHoveredId}
+                      />
+                    </div>
+                    {/* Fades the last row rather than clipping it mid-line, so a
+                    partly visible row reads as "more below" rather than a
+                    rendering fault. */}
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-background to-transparent"
+                    />
+                  </div>
+
+                  {selectedIds.length > 1 ? (
+                    <SetPanel
+                      project={draft}
+                      selectedIds={selectedIds}
+                      onSelect={setSelectedId}
+                      onReparent={(parentId, pieceIds) =>
+                        reparentAll(pieceIds, parentId)
+                      }
+                    />
+                  ) : selected ? (
+                    // Capped and scrollable, and free to shrink further still: the
+                    // 55% cap is against the whole aside, so it can outgrow what
+                    // is actually left once the tree has taken its own minimum.
+                    // Without shrink enabled here, that excess pushed past the
+                    // aside's own box and over whatever sat below it (the parts
+                    // drawer) instead of scrolling.
+                    <div className="max-h-[55%] min-h-0 overflow-y-auto border-t border-border px-3 py-2">
+                      <label
+                        className="text-xs text-muted-foreground"
+                        htmlFor="lego-piece-name"
+                      >
+                        Name
+                      </label>
+                      <NameInput
+                        id="lego-piece-name"
+                        value={selected.name}
+                        onCommit={renameSelected}
+                        className="mt-1"
+                      />
+
+                      <TransformFields
+                        piece={selected}
+                        onChange={(change) =>
+                          transformPiece(selected.id, change)
+                        }
+                        uniformScale={uniformScale}
+                        onUniformScaleChange={setUniformScale}
+                      />
+                      {canMirror(draft, selected.id) ? (
+                        <div className="mt-2">
+                          <span className="text-xs text-muted-foreground">
+                            Mirror
+                          </span>
+                          <ButtonGroup className="mt-1 flex w-full">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={mirrorSelection}
+                            >
+                              <FlipHorizontal2 size={14} /> In place
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={mirrorCopyOfSelection}
+                            >
+                              <Copy size={14} /> As a copy
+                            </Button>
+                          </ButtonGroup>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Across the unit's centre line, taking everything
+                            under this piece with it. A copy is how one leg
+                            becomes the other.
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {selected.id === draft.rootPieceId ? null : (
+                        // The same move as dragging a row onto another, for anyone not
+                        // using a pointer.
+                        <div className="mt-2">
+                          <span className="text-xs text-muted-foreground">
+                            Hangs off
+                          </span>
+                          <Select
+                            value={selected.parentId ?? draft.rootPieceId}
+                            onValueChange={(parentId) =>
+                              reparent(selected.id, parentId)
+                            }
+                          >
+                            <SelectTrigger
+                              size="sm"
+                              className="mt-1 w-full"
+                              aria-label="Parent piece"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {parentOptions(draft, [selected.id]).map(
+                                ({ piece, depth }) => (
+                                  <SelectItem
+                                    key={piece.id}
+                                    value={piece.id}
+                                    // Indent on the item, not inside its text: Radix
+                                    // mirrors the text into the trigger, and the
+                                    // padding would come with it.
+                                    style={{ paddingLeft: 8 + depth * 12 }}
+                                  >
+                                    {piece.name}
+                                  </SelectItem>
+                                ),
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {selectedPart ? (
+                        <div className="mt-2">
+                          <span className="text-xs text-muted-foreground">
+                            Turns about
+                          </span>
+                          <Select
+                            value={
+                              currentPivot(selectedPart, selected.pivot) ??
+                              "middle"
+                            }
+                            onValueChange={(id) => {
+                              const choice = pivotChoices(selectedPart).find(
+                                (option) => option.id === id,
+                              );
+                              if (choice)
+                                movePivot(selected.id, choice.position);
+                            }}
+                          >
+                            <SelectTrigger
+                              size="sm"
+                              className="mt-1 w-full"
+                              aria-label="Pivot point"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {pivotChoices(selectedPart).map((choice) => (
+                                <SelectItem key={choice.id} value={choice.id}>
+                                  {choice.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            The point this piece turns about, and that its
+                            children hang from. A leg wants its top, not its
+                            middle.
+                          </p>
+                        </div>
+                      ) : null}
+
+                      <AnchorList
+                        piece={selected}
+                        placing={placingAnchor}
+                        onPlacingChange={setPlacingAnchor}
+                        onAddAtOrigin={() =>
+                          edit((project) =>
+                            addAnchor(
+                              project,
+                              selected.id,
+                              selected.pivot ?? [0, 0, 0],
+                              crypto.randomUUID(),
+                            ),
+                          )
+                        }
+                        onChange={(anchorId, change) =>
+                          edit((project) =>
+                            updateAnchor(
+                              project,
+                              selected.id,
+                              anchorId,
+                              change,
+                            ),
+                          )
+                        }
+                        onRemove={(anchorId) =>
+                          edit((project) =>
+                            removeAnchor(project, selected.id, anchorId),
+                          )
+                        }
+                      />
+
+                      <div className="mt-2">
+                        <span className="text-xs text-muted-foreground">
+                          Role
+                        </span>
+                        <Select
+                          value={selected.role ?? NO_ROLE}
+                          onValueChange={(role) =>
+                            setRole(
+                              selected.id,
+                              role === NO_ROLE ? undefined : role,
+                            )
+                          }
+                        >
+                          <SelectTrigger
+                            size="sm"
+                            className="mt-1 w-full"
+                            aria-label="Animation role"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NO_ROLE}>None</SelectItem>
+                            {ROLES.map((role) => (
+                              <SelectItem key={role.id} value={role.id}>
+                                {role.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          What this piece is, so the animation presets know what
+                          to move.
+                        </p>
+                        {restAngleWarnings(selected).map((warning) => (
+                          <p
+                            key={warning}
+                            className="mt-1 text-xs text-amber-500"
+                          >
+                            {warning}
+                          </p>
+                        ))}
+                      </div>
+
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {selected.partId
+                          ? "Geometry."
+                          : "Empty, so it carries other pieces and can be an emit point."}
+                      </p>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </aside>
+          </CollapsibleContent>
+        </div>
       </div>
-    </div>
+    </Collapsible>
   );
 }
 
