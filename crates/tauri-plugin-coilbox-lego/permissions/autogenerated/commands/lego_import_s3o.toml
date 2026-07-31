@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-lego-import-s3o"
+description = "Enables the lego_import_s3o command without any pre-configured scope."
+commands.allow = ["lego_import_s3o"]
+
+[[permission]]
+identifier = "deny-lego-import-s3o"
+description = "Denies the lego_import_s3o command without any pre-configured scope."
+commands.deny = ["lego_import_s3o"]

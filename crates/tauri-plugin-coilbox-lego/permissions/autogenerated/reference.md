@@ -11,6 +11,9 @@ Allows the unit builder's project storage, thumbnail, reveal and test-game comma
 - `allow-lego-open-path`
 - `allow-lego-packs`
 - `allow-lego-read-s3o`
+- `allow-lego-import-s3o`
+- `allow-lego-texture-import`
+- `allow-lego-texture-prune`
 - `allow-lego-export`
 - `allow-lego-export-glb`
 - `allow-lego-export-obj`
@@ -125,6 +128,32 @@ Enables the lego_export_obj command without any pre-configured scope.
 <td>
 
 Denies the lego_export_obj command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:allow-lego-import-s3o`
+
+</td>
+<td>
+
+Enables the lego_import_s3o command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:deny-lego-import-s3o`
+
+</td>
+<td>
+
+Denies the lego_import_s3o command without any pre-configured scope.
 
 </td>
 </tr>
@@ -281,6 +310,58 @@ Enables the lego_scratch_game command without any pre-configured scope.
 <td>
 
 Denies the lego_scratch_game command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:allow-lego-texture-import`
+
+</td>
+<td>
+
+Enables the lego_texture_import command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:deny-lego-texture-import`
+
+</td>
+<td>
+
+Denies the lego_texture_import command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:allow-lego-texture-prune`
+
+</td>
+<td>
+
+Enables the lego_texture_prune command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:deny-lego-texture-prune`
+
+</td>
+<td>
+
+Denies the lego_texture_prune command without any pre-configured scope.
 
 </td>
 </tr>
