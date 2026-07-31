@@ -1,11 +1,12 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the scenario plugin's storage and dialogue-media commands."
+description = "Allows the scenario plugin's storage, dialogue-media and compiled-mission read-back commands."
 permissions = [
   "allow-scenario-list",
   "allow-scenario-save",
   "allow-scenario-delete",
   "allow-scenario-media-import",
   "allow-scenario-media-delete",
+  "allow-scenario-read-mission",
 ]

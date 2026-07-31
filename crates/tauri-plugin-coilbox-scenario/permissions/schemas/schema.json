@@ -343,6 +343,18 @@
           "markdownDescription": "Denies the scenario_media_import command without any pre-configured scope."
         },
         {
+          "description": "Enables the scenario_read_mission command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-scenario-read-mission",
+          "markdownDescription": "Enables the scenario_read_mission command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scenario_read_mission command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-scenario-read-mission",
+          "markdownDescription": "Denies the scenario_read_mission command without any pre-configured scope."
+        },
+        {
           "description": "Enables the scenario_save command without any pre-configured scope.",
           "type": "string",
           "const": "allow-scenario-save",
@@ -355,10 +367,10 @@
           "markdownDescription": "Denies the scenario_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the scenario plugin's storage and dialogue-media commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`",
+          "description": "Allows the scenario plugin's storage, dialogue-media and compiled-mission read-back commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`\n- `allow-scenario-read-mission`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the scenario plugin's storage and dialogue-media commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`"
+          "markdownDescription": "Allows the scenario plugin's storage, dialogue-media and compiled-mission read-back commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`\n- `allow-scenario-read-mission`"
         }
       ]
     }

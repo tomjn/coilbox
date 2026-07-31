@@ -84,6 +84,26 @@ impl SpringLua {
         self.lua.from_value(lowered)
     }
 
+    /// Pull a file through `VFS.Include`, exactly as a gadget loads a data file,
+    /// and return what it returned as [`serde_json::Value`].
+    ///
+    /// No `lowerkeys` here, deliberately. `VFS.Include` hands a gadget the table
+    /// the file built, untouched, and a file whose keys are author data (a
+    /// compiled mission's team ids and variable names) means something different
+    /// once its keys are lowercased. Reading it any other way would check a file
+    /// the engine will never see.
+    pub fn include_value(&self, name: &str) -> Result<serde_json::Value> {
+        let vfs: mlua::Table = self.lua.globals().get("VFS")?;
+        let include: mlua::Function = vfs.get("Include")?;
+        let value: Value = include.call(name)?;
+        if value.is_nil() {
+            return Err(Error::RuntimeError(format!(
+                "{name}: file did not return a value"
+            )));
+        }
+        self.lua.from_value(value)
+    }
+
     /// Load + evaluate the chunk, require it to return a value, and apply
     /// `lowerkeys`. Shared by both eval entry points.
     fn eval_lowered(&self, src: &str, name: &str) -> Result<Value> {

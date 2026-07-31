@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows the scenario plugin's storage and dialogue-media commands.
+Allows the scenario plugin's storage, dialogue-media and compiled-mission read-back commands.
 
 #### This default permission set includes the following:
 
@@ -9,6 +9,7 @@ Allows the scenario plugin's storage and dialogue-media commands.
 - `allow-scenario-delete`
 - `allow-scenario-media-import`
 - `allow-scenario-media-delete`
+- `allow-scenario-read-mission`
 
 ## Permission Table
 
@@ -119,6 +120,32 @@ Enables the scenario_media_import command without any pre-configured scope.
 <td>
 
 Denies the scenario_media_import command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:allow-scenario-read-mission`
+
+</td>
+<td>
+
+Enables the scenario_read_mission command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:deny-scenario-read-mission`
+
+</td>
+<td>
+
+Denies the scenario_read_mission command without any pre-configured scope.
 
 </td>
 </tr>

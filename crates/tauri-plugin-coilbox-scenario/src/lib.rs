@@ -163,6 +163,34 @@ async fn scenario_media_import<R: Runtime>(
     }
 }
 
+/// `scenario_read_mission`, evaluating a compiled `mission.lua` under `root` and
+/// handing back the table it built.
+///
+/// This is the read half of the compile step's validator. Rather than parse the
+/// file it just wrote, coilbox loads it the way the mission runtime's gadget
+/// will: a sandboxed Spring Lua VM rooted at the game archive, `VFS.Include`,
+/// and whatever comes back. A file the engine cannot load fails here, and the
+/// frontend resolves the ids in the result (`src/scenario/validate.ts`), where
+/// the trigger capability table already lives.
+///
+/// `root` is a directory coilbox chose (a loose `.sdd` game). `path` is
+/// VFS-relative and confined to it, both by `is_safe_rel` here and by the VFS
+/// itself.
+#[tauri::command]
+async fn scenario_read_mission(root: String, path: String) -> CliResult {
+    if !is_safe_rel(Path::new(&path)) {
+        return CliResult::err(format!("unsafe mission path: {path}"));
+    }
+    let lua = match coilbox_springlua::SpringLua::new(&root) {
+        Ok(l) => l,
+        Err(e) => return CliResult::err(format!("could not start the Lua sandbox: {e}")),
+    };
+    match lua.include_value(&path) {
+        Ok(mission) => CliResult::ok(json!({ "mission": mission })),
+        Err(e) => CliResult::err(format!("could not read {path}: {e}")),
+    }
+}
+
 /// `scenario_media_delete`, a best-effort removal of a stored clip. Dropping a
 /// portrait from a dialogue line needn't fail if the file is already gone.
 #[tauri::command]
@@ -192,7 +220,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_save,
             scenario_delete,
             scenario_media_import,
-            scenario_media_delete
+            scenario_media_delete,
+            scenario_read_mission
         ])
         .build()
 }

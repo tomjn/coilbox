@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "scenario_delete",
     "scenario_media_import",
     "scenario_media_delete",
+    "scenario_read_mission",
 ];
 
 fn main() {

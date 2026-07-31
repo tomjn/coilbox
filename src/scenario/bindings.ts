@@ -41,6 +41,17 @@ export const scenarioMediaImport = defineCommand<
   { file: string }
 >("coilbox-scenario", "scenario_media_import");
 
+/**
+ * Evaluate a compiled `mission.lua` at `path` (VFS-relative) inside the game
+ * archive directory `root`, and return the table it built. The read half of the
+ * compile step's validator, run through the same `VFS.Include` the mission
+ * runtime's gadget uses. See {@link validateCompiledMission}.
+ */
+export const scenarioReadMission = defineCommand<
+  { root: string; path: string },
+  { mission: unknown }
+>("coilbox-scenario", "scenario_read_mission");
+
 /** Best-effort removal of a stored dialogue clip. */
 export const scenarioMediaDelete = defineCommand<
   { scenarioId: string; file: string },

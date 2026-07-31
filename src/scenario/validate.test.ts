@@ -1,0 +1,252 @@
+import { describe, expect, it, vi } from "vitest";
+
+const readMissionMock = vi.fn();
+
+// validate.ts reaches the plugin through bindings.ts, whose plugin-sdk import
+// Vitest's node resolver cannot load from the published dist. Stubbed the way
+// storage.test.ts stubs it.
+vi.mock("./bindings", () => ({
+  scenarioReadMission: (...args: unknown[]) => readMissionMock(...args),
+}));
+
+import { validateCompiledMission, validateMission } from "./validate";
+
+/**
+ * These fixtures are *evaluated* missions, in the shape
+ * `scenario_read_mission` hands back: registries as arrays, `teams` and `vars`
+ * as maps keyed by author data. That shape is pinned against real emitter
+ * output by `crates/coilbox-springlua/tests/eval.rs`, which evaluates a
+ * `compileScenario` result and asserts these same names.
+ */
+function mission(overrides: Record<string, unknown> = {}) {
+  return {
+    schemaVersion: 1,
+    runtimeVersion: 1,
+    id: "demo",
+    name: "Demo",
+    teams: { player: { team: 0 }, "Enemy-1": { team: 1 } },
+    zones: [{ id: "gate", name: "Gate", shape: "box" }],
+    actors: [{ id: "boss", unitDef: "armcom", team: "Enemy-1" }],
+    groups: [
+      {
+        id: "wave1",
+        team: "Enemy-1",
+        orders: [{ kind: "guard", target: "boss" }],
+      },
+    ],
+    prefabs: [{ id: "base", team: "player" }],
+    vars: { Alarm: 0 },
+    objectives: [{ id: "kill-boss", kind: "primary" }],
+    dialogue: [{ id: "intro", speaker: "HQ" }],
+    triggers: [],
+    ...overrides,
+  };
+}
+
+/** A mission with one trigger, `open`. */
+function withTrigger(conditions: unknown[], actions: unknown[]) {
+  return mission({
+    triggers: [
+      {
+        id: "open",
+        enabled: true,
+        repeat: false,
+        conditions: { op: "all", conditions },
+        actions,
+      },
+    ],
+  });
+}
+
+/** That trigger carrying one step, as a condition or as an action. */
+const withStep = (step: unknown, kind: "conditions" | "actions" = "actions") =>
+  kind === "conditions" ? withTrigger([step], []) : withTrigger([], [step]);
+
+describe("validateMission", () => {
+  it("passes a mission whose references all resolve", () => {
+    const full = withTrigger(
+      [
+        { type: "units_in_zone", params: { zone: "gate", team: "player" } },
+        { type: "var", params: { name: "Alarm", op: "eq", value: 0 } },
+      ],
+      [
+        { type: "spawn_group", params: { group: "wave1" } },
+        { type: "dialogue", params: { line: "intro" } },
+        { type: "complete_objective", params: { objective: "kill-boss" } },
+        { type: "disable_trigger", params: { trigger: "open" } },
+        { type: "set_var", params: { name: "Alarm", value: 1 } },
+        {
+          type: "give_orders",
+          params: {
+            group: "wave1",
+            orders: [{ kind: "attack", target: "boss" }],
+          },
+        },
+        { type: "victory", params: {} },
+      ],
+    );
+
+    expect(validateMission(full)).toEqual([]);
+  });
+
+  it("reports a typo in every kind of reference", () => {
+    const cases: [string, unknown][] = [
+      ["zone", { type: "reveal_area", params: { zone: "gatee" } }],
+      ["actor", { type: "unit_dead", params: { actor: "bosss" } }],
+      ["group", { type: "spawn_group", params: { group: "wave2" } }],
+      ["trigger", { type: "enable_trigger", params: { trigger: "shut" } }],
+      [
+        "objective",
+        { type: "fail_objective", params: { objective: "kill-bos" } },
+      ],
+      ["dialogue line", { type: "dialogue", params: { line: "outro" } }],
+      ["team", { type: "gift_units", params: { group: "wave1", team: "p9" } }],
+      ["variable", { type: "add_var", params: { name: "alarm", value: 1 } }],
+    ];
+
+    for (const [noun, step] of cases) {
+      const kind = noun === "actor" ? "conditions" : "actions";
+      const issues = validateMission(withStep(step, kind));
+      expect(issues, noun).toHaveLength(1);
+      expect(issues[0].message).toMatch(new RegExp(`^no ${noun} called `));
+      expect(issues[0].path).toContain('triggers["open"]');
+    }
+  });
+
+  it("names the parameter that holds the unresolved id", () => {
+    const issues = validateMission(
+      withStep({ type: "spawn_group", params: { group: "wave2" } }),
+    );
+
+    expect(issues[0].path).toBe('triggers["open"].actions[0].params.group');
+    expect(issues[0].message).toBe('no group called "wave2"');
+  });
+
+  it("reports every unresolved reference, not just the first", () => {
+    const issues = validateMission(
+      mission({
+        actors: [{ id: "boss", team: "nobody" }],
+        triggers: [
+          {
+            id: "open",
+            conditions: {
+              op: "all",
+              conditions: [{ type: "unit_dead", params: { actor: "ghost" } }],
+            },
+            actions: [
+              { type: "spawn_group", params: { group: "wave2" } },
+              { type: "dialogue", params: { line: "outro" } },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(issues.map((i) => i.message)).toEqual([
+      'no team called "nobody"',
+      'no actor called "ghost"',
+      'no group called "wave2"',
+      'no dialogue line called "outro"',
+    ]);
+  });
+
+  it("flags a team the launcher gave no engine team number", () => {
+    const issues = validateMission(
+      mission({
+        teams: { player: { team: 0 }, "Enemy-1": { team: 1 }, ghost: {} },
+      }),
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].path).toBe('teams["ghost"]');
+    expect(issues[0].message).toContain("has no engine team");
+  });
+
+  it("flags a required reference the compiled file does not carry", () => {
+    const issues = validateMission(
+      withStep({ type: "complete_objective", params: {} }),
+    );
+
+    expect(issues).toEqual([
+      {
+        path: 'triggers["open"].actions[0].params.objective',
+        message: "no objective given",
+      },
+    ]);
+  });
+
+  it("leaves an absent optional reference alone", () => {
+    const issues = validateMission(
+      withStep({ type: "reveal_area", params: { zone: "gate" } }),
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it("resolves an order target against actors and groups alike", () => {
+    const issues = validateMission(
+      mission({
+        groups: [
+          {
+            id: "wave1",
+            team: "player",
+            orders: [
+              { kind: "guard", target: "wave1" },
+              { kind: "attack", target: "nobody" },
+              { kind: "move", waypoints: [] },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(issues).toEqual([
+      {
+        path: 'groups["wave1"].orders[1].target',
+        message: 'no actor or group called "nobody"',
+      },
+    ]);
+  });
+
+  it("leaves a game extension's parameters to the game", () => {
+    const issues = validateMission(
+      withStep({
+        type: "sf_weather",
+        params: { zone: "gatee", kind: "storm" },
+      }),
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it("says so when the file returned no table", () => {
+    expect(validateMission(undefined)).toEqual([
+      { path: "mission", message: "the compiled mission returned no table" },
+    ]);
+  });
+});
+
+describe("validateCompiledMission", () => {
+  it("reads the mission back from the archive it was written into", async () => {
+    readMissionMock.mockResolvedValue({ mission: mission() });
+
+    expect(await validateCompiledMission("/games/test.sdd", "demo")).toEqual(
+      [],
+    );
+    expect(readMissionMock).toHaveBeenCalledWith({
+      root: "/games/test.sdd",
+      path: "missions/demo/mission.lua",
+    });
+  });
+
+  it("turns a file that will not load into an issue like any other", async () => {
+    readMissionMock.mockRejectedValue(new Error("unexpected symbol near '}'"));
+
+    expect(await validateCompiledMission("/games/test.sdd", "demo")).toEqual([
+      {
+        path: "missions/demo/mission.lua",
+        message: "unexpected symbol near '}'",
+      },
+    ]);
+  });
+});
