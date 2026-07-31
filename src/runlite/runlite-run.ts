@@ -24,7 +24,9 @@ import {
   resultFromDemoInfo,
 } from "../play/detect";
 import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
+import { mergeGameAi } from "../play/gameAi";
 import { usePlay } from "../play/PlayProvider";
+import { getProfile } from "../profile/profile";
 import { disabledUnitsFor, perkTotals } from "./build";
 import type { RogueliteRun, RunNode } from "./model";
 import { resolveBattle } from "./progress";
@@ -144,7 +146,8 @@ export function useRunEncounter(
     target?.dataDir,
     installedGame?.primaryArchive.name,
   );
-  const aiConfig = useBrandingEntry(installedGame)?.conquestAi;
+  const brandingAi = useBrandingEntry(installedGame)?.ai;
+  const aiConfig = mergeGameAi(getProfile().ai, brandingAi);
 
   // The unit dataset backs the shared tech ceiling; without it nothing is
   // disabled (full arsenal), which is a safe fallback.

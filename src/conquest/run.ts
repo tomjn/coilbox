@@ -21,7 +21,9 @@ import {
   resultFromDemoInfo,
 } from "../play/detect";
 import type { SkirmishDraft } from "../play/drafts";
+import { mergeGameAi } from "../play/gameAi";
 import { usePlay } from "../play/PlayProvider";
+import { getProfile } from "../profile/profile";
 import { useConquestState } from "./conquests";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "./model";
 import { resolveGameByShortname } from "./model";
@@ -149,9 +151,10 @@ export function useConquestBattleRun(
     target?.dataDir,
     installedGame?.primaryArchive.name,
   );
-  // The game's branding entry carries its conquest AI rules (deny-list, faction
-  // pool, neutral/chicken AI). Called unconditionally — accepts undefined.
-  const aiConfig = useBrandingEntry(installedGame)?.conquestAi;
+  // The game's AI catalogue: the branding entry's, with any profile override on
+  // top. Called unconditionally, since useBrandingEntry accepts undefined.
+  const brandingAi = useBrandingEntry(installedGame)?.ai;
+  const aiConfig = mergeGameAi(getProfile().ai, brandingAi);
 
   const noEngine = !targetLoading && !target;
   const scanLoading = !!target && !scanReady && scan.loading;

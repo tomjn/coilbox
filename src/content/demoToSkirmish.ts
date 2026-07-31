@@ -1,5 +1,5 @@
-import { fallbackFactionAi } from "@/conquest/ai";
 import type { SkirmishDraft } from "@/play/drafts";
+import { standardAi } from "@/play/gameAi";
 import { PALETTE, type Participant, RANDOM_SIDE } from "@/play/participants";
 import type { DemoInfo, Side, SkirmishAi } from "./bindings";
 
@@ -36,7 +36,7 @@ export function demoInfoToSkirmishDraft(opts: {
   ai?: Participant["ai"];
 }): SkirmishDraft | null {
   const { info, ais, sides, ai } = opts;
-  const fallback = fallbackFactionAi(ais);
+  const fallback = standardAi(ais);
   const chosenAi: Participant["ai"] | undefined =
     ai ??
     (fallback

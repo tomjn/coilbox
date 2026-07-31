@@ -1,17 +1,18 @@
 import type { SkirmishAi } from "../content/bindings";
 import type { SkirmishDraft } from "../play/drafts";
 import {
+  aiForDifficulty,
+  type GameAiConfig,
+  isNeverAi,
+  neutralPick,
+} from "../play/gameAi";
+import {
   hexToRgb,
   PALETTE,
   type Participant,
   resolveAi,
 } from "../play/participants";
-import {
-  type ConquestAiConfig,
-  fallbackFactionAi,
-  isDeniedAi,
-  neutralAi,
-} from "./ai";
+
 import type { ConquestState, Faction, GalaxyDoc, GalaxyNode } from "./model";
 import { difficultyHandicap, difficultyTable } from "./rules";
 
@@ -44,24 +45,25 @@ const toRef = (a?: SkirmishAi): Participant["ai"] | undefined =>
 
 /**
  * Resolve the enemy AI for a node. Authored keys (node override, then the
- * faction's AI) win, but a key resolving to a denied do-nothing bot is ignored
- * — conquest never fields a test/null AI. The fallback depends on the enemy:
- * a neutral garrison (no faction) prefers a chicken/wildlife AI as a hazard;
- * a faction enemy gets the first real playing AI installed.
+ * faction's AI) win, but a key naming a banned bot is ignored, so conquest never
+ * fields a test/null AI. Without a key the fallback depends on the enemy: a
+ * neutral garrison (no faction) gets a mini-game AI as a wildlife hazard, and a
+ * faction enemy gets the AI its node's difficulty calls for, so a frontier world
+ * is a gentler fight than an enemy capital.
  */
 function enemyAi(
   node: GalaxyNode,
   faction: Faction | undefined,
   ais: SkirmishAi[],
-  config?: ConquestAiConfig,
+  config?: GameAiConfig,
 ): Participant["ai"] | undefined {
   const fromKey = (key?: string) => {
     const ref = key ? resolveAi(key, ais) : undefined;
-    return ref && !isDeniedAi(ref, config) ? ref : undefined;
+    return ref && !isNeverAi(ref, config) ? ref : undefined;
   };
   const fallback = faction
-    ? fallbackFactionAi(ais, config)
-    : neutralAi(ais, config);
+    ? aiForDifficulty(node.difficulty, ais, config)
+    : neutralPick(ais, config);
   return (
     fromKey(node.battle.enemyAiKey) ??
     fromKey(faction?.aiKey) ??
@@ -87,8 +89,8 @@ export function synthesizeBattle(
     /** Exact installed game archive name (resolved from `galaxy.game`). */
     gameName: string;
     ais: SkirmishAi[];
-    /** Per-game conquest AI config (deny-list, faction pool, neutral AI). */
-    aiConfig?: ConquestAiConfig;
+    /** The game's AI catalogue, from branding and the profile. */
+    aiConfig?: GameAiConfig;
   },
 ): SkirmishDraft | null {
   const node = galaxy.nodes.find((n) => n.id === nodeId);

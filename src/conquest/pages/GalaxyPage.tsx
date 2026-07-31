@@ -28,6 +28,7 @@ import {
 } from "../../general/display";
 import { assetUrl } from "../../lib/assetUrl";
 import { usePreferredTarget, useSkirmishAis } from "../../play/config";
+import { mergeGameAi } from "../../play/gameAi";
 import { getProfile } from "../../profile/profile";
 import { conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
@@ -763,16 +764,10 @@ function RunSetupPanel({
         galaxy,
         {
           maps,
-          ais: ais.map((a) => ({
-            kind: a.kind,
-            shortName: a.shortName,
-            name: a.name,
-          })),
           names: mergeConquestNames(
             getProfile().conquest,
             brandingEntry?.conquest,
           ),
-          aiConfig: brandingEntry?.conquestAi,
         },
         Math.floor(Math.random() * 100000),
       );

@@ -1,111 +1,32 @@
 /**
- * Conquest AI eligibility: which skirmish AIs may fight as opponents.
+ * Reconciling a wanted AI with what a game actually offers.
  *
- * Conquest never fields a "do-nothing" test bot (a game's `LuaAI.lua` often
- * declares one, e.g. `Sandbox`, and it can end up first in the list). These
- * pure helpers filter the AI list for the two places an enemy AI is chosen —
- * galaxy generation (`generate.ts`) and battle synthesis (`synthesize.ts`) —
- * from one tested rule. A game's branding catalog entry can extend the
- * built-in deny-list, restrict the faction pool, or name a neutral-node AI.
+ * A preset, draft or authored battle names the AI it was written against, but
+ * that AI may not exist in the game it is later applied to. These pure helpers
+ * decide what to use instead and report the swap, over the per-game rules in
+ * `play/gameAi.ts` (which ranks AIs and says which must never play).
  */
 
-/** Per-game conquest AI configuration, carried on a branding catalog entry. */
-export interface ConquestAiConfig {
-  /** Extra `shortName`s (case-insensitive) treated as non-playing bots. */
-  deny?: string[];
-  /** Restrict the faction opponent pool to these `shortName`s, in this order. */
-  enemyAis?: string[];
-  /**
-   * AI for neutral garrison nodes (`shortName`). Unset -> auto-pick an available
-   * chicken AI, else a normal faction AI.
-   */
-  neutralAi?: string;
-  /** Mod options applied to neutral garrison battles (e.g. chicken difficulty). */
-  neutralModOptions?: Record<string, string>;
-}
-
-/** Built-in `shortName`s never fielded as conquest opponents (do-nothing bots). */
-export const BUILTIN_AI_DENYLIST = ["sandbox", "nullai"];
+import {
+  aiForDifficulty,
+  type GameAiConfig,
+  referencePips,
+  standardAi,
+} from "@/play/gameAi";
 
 const norm = (s: string) => s.toLowerCase();
 
-/** A do-nothing/test bot: on the built-in deny-list or the catalog `deny` list. */
-export function isDeniedAi(
-  ai: { shortName: string },
-  config?: ConquestAiConfig,
-): boolean {
-  const deny = new Set([
-    ...BUILTIN_AI_DENYLIST,
-    ...(config?.deny ?? []).map(norm),
-  ]);
-  return deny.has(norm(ai.shortName));
-}
-
-/** A chicken-defence / wildlife AI (spawns waves), matched by name. */
-export function isChickenAi(ai: { shortName: string }): boolean {
-  return /chicken/i.test(ai.shortName);
-}
-
-/**
- * AIs usable as a normal faction opponent: neither denied nor a chicken AI.
- * With `enemyAis` set, the result is restricted to and ordered by that list.
- */
-export function factionAiPool<T extends { shortName: string }>(
-  ais: T[],
-  config?: ConquestAiConfig,
-): T[] {
-  const playable = ais.filter((a) => !isDeniedAi(a, config) && !isChickenAi(a));
-  const allow = config?.enemyAis;
-  if (allow && allow.length > 0) {
-    const byName = new Map(playable.map((a) => [norm(a.shortName), a]));
-    return allow
-      .map((n) => byName.get(norm(n)))
-      .filter((a): a is T => a !== undefined);
-  }
-  return playable;
-}
-
-/**
- * The AI a faction enemy falls back to when nothing is authored: the first of
- * the faction pool, else the first non-denied AI (a chicken AI as a last
- * resort), else undefined when only do-nothing bots are installed.
- */
-export function fallbackFactionAi<T extends { shortName: string }>(
-  ais: T[],
-  config?: ConquestAiConfig,
-): T | undefined {
-  return (
-    factionAiPool(ais, config)[0] ?? ais.find((a) => !isDeniedAi(a, config))
-  );
-}
-
-/**
- * The AI a neutral garrison uses: an explicit catalog `neutralAi`, else an
- * available chicken AI (the wildlife-hazard default), else a normal faction AI.
- */
-export function neutralAi<T extends { shortName: string }>(
-  ais: T[],
-  config?: ConquestAiConfig,
-): T | undefined {
-  if (config?.neutralAi) {
-    const named = ais.find(
-      (a) =>
-        norm(a.shortName) === norm(config.neutralAi ?? "") &&
-        !isDeniedAi(a, config),
-    );
-    return named ?? fallbackFactionAi(ais, config);
-  }
-  const chicken = ais.find((a) => isChickenAi(a) && !isDeniedAi(a, config));
-  return chicken ?? fallbackFactionAi(ais, config);
-}
-
 /**
  * Resolve a desired AI reference against a game's actual AI list: keep it if
- * still available there, otherwise remap to `fallbackFactionAi` (skipping
- * do-nothing bots like Sandbox/NullAI) so a bot never carries an AI the game
- * doesn't provide. Matched by `shortName` only, case-insensitively, since a
- * shortName is unique regardless of native/Lua kind on the wire. Returns
- * undefined only when the game has no usable AI at all.
+ * still available there, otherwise pick this game's nearest equivalent so a bot
+ * never carries an AI the game doesn't provide. Matched by `shortName` only,
+ * case-insensitively, since a shortName is unique regardless of native/Lua kind
+ * on the wire. Returns undefined only when the game has no usable AI at all.
+ *
+ * The replacement keeps difficulty where it can: an AI the built-in ranking
+ * knows is swapped for the target game's AI at the same level, so leaving a
+ * brutal opponent behind doesn't quietly hand the player a walkover. Anything
+ * else falls back to the game's standard AI.
  *
  * Shared so every "pick an AI for this game" surface agrees: the multiplayer
  * preset-to-battle bridge (`draftToHostSeed`), and, in time, the
@@ -114,15 +35,17 @@ export function neutralAi<T extends { shortName: string }>(
 export function resolveGameAi<T extends { shortName: string }>(
   desired: { shortName: string } | undefined,
   ais: T[],
-  config?: ConquestAiConfig,
+  config?: GameAiConfig,
 ): T | undefined {
   if (desired) {
     const found = ais.find(
       (a) => norm(a.shortName) === norm(desired.shortName),
     );
     if (found) return found;
+    const level = referencePips(desired.shortName);
+    if (level !== undefined) return aiForDifficulty(level, ais, config);
   }
-  return fallbackFactionAi(ais, config);
+  return standardAi(ais, config);
 }
 
 /** One desired AI the target game didn't offer, and what it became instead. */
@@ -162,7 +85,7 @@ export interface AiReconcileOutcome<T> {
 export function reconcileAi<T extends { shortName: string }>(
   desired: { shortName: string } | undefined,
   ais: T[],
-  config?: ConquestAiConfig,
+  config?: GameAiConfig,
 ): AiReconcileOutcome<T> {
   const resolved = resolveGameAi(desired, ais, config);
   if (!resolved) return { ai: undefined, status: "unresolved" };

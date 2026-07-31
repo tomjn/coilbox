@@ -103,6 +103,7 @@ function SelectItem({
   children,
   description,
   icon,
+  trailing,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Item> & {
   /** Optional muted second line, shown in the dropdown only (not the trigger:
@@ -111,6 +112,10 @@ function SelectItem({
   /** Optional leading glyph, shown in the dropdown only (outside `ItemText`,
    * like `description`, so it isn't mirrored into the trigger's value). */
   icon?: React.ReactNode;
+  /** Optional badge pinned to the item's right edge, before the tick gutter.
+   * Dropdown only, like `icon`. For a reading about the option (how hard an AI
+   * is) rather than a glyph identifying it. */
+  trailing?: React.ReactNode;
 }) {
   return (
     <SelectPrimitive.Item
@@ -142,6 +147,11 @@ function SelectItem({
       ) : (
         <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
       )}
+      {trailing ? (
+        // A `div` (not a span) for the same reason as the description wrapper:
+        // the `*:[span]:last` utilities above would restyle a trailing span.
+        <div className="ml-auto flex shrink-0 items-center">{trailing}</div>
+      ) : null}
     </SelectPrimitive.Item>
   );
 }

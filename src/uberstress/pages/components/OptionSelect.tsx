@@ -32,6 +32,9 @@ export function OptionSelect({
     /** Optional leading glyph (e.g. a faction emblem). Rendered inside the item's
      * `ItemText`, so Radix mirrors it into the trigger's selected value too. */
     icon?: ReactNode;
+    /** Optional badge pinned to the item's right edge (e.g. an AI's difficulty),
+     * dropdown only. */
+    trailing?: ReactNode;
   }[];
   placeholder?: string;
   disabled?: boolean;
@@ -45,7 +48,12 @@ export function OptionSelect({
       </SelectTrigger>
       <SelectContent>
         {options.map((o) => (
-          <SelectItem key={o.value} value={o.value} description={o.description}>
+          <SelectItem
+            key={o.value}
+            value={o.value}
+            description={o.description}
+            trailing={o.trailing}
+          >
             {o.icon ? (
               <span className="flex items-center gap-2">
                 {o.icon}

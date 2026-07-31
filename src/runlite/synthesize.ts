@@ -1,10 +1,6 @@
-import {
-  type ConquestAiConfig,
-  fallbackFactionAi,
-  isDeniedAi,
-} from "../conquest/ai";
 import type { SkirmishAi } from "../content/bindings";
 import type { SkirmishDraft } from "../play/drafts";
+import { aiForDifficulty, type GameAiConfig, isNeverAi } from "../play/gameAi";
 import { PALETTE, type Participant, resolveAi } from "../play/participants";
 import type { RogueliteRun, RunNode } from "./model";
 
@@ -23,16 +19,17 @@ const toRef = (a?: SkirmishAi): Participant["ai"] | undefined =>
   a ? { kind: a.kind, shortName: a.shortName, name: a.name } : undefined;
 
 /** Resolve the enemy AI: the encounter's authored key wins (unless it names a
- * denied do-nothing bot), else the first real playing AI installed. */
+ * banned bot), else the AI this run's difficulty calls for. */
 function enemyAi(
+  run: RogueliteRun,
   node: RunNode,
   ais: SkirmishAi[],
-  config?: ConquestAiConfig,
+  config?: GameAiConfig,
 ): Participant["ai"] | undefined {
   const key = node.battle?.enemyAiKey;
   const fromKey = key ? resolveAi(key, ais) : undefined;
-  if (fromKey && !isDeniedAi(fromKey, config)) return fromKey;
-  return toRef(fallbackFactionAi(ais, config));
+  if (fromKey && !isNeverAi(fromKey, config)) return fromKey;
+  return toRef(aiForDifficulty(run.settings.difficulty, ais, config));
 }
 
 export function synthesizeEncounter(
@@ -43,13 +40,13 @@ export function synthesizeEncounter(
     /** Exact installed game archive name (resolved from `run.settings.game`). */
     gameName: string;
     ais: SkirmishAi[];
-    /** Per-game AI config (deny-list, fallback pool), from branding. */
-    aiConfig?: ConquestAiConfig;
+    /** The game's AI catalogue, from branding and the profile. */
+    aiConfig?: GameAiConfig;
   },
 ): SkirmishDraft | null {
   const spec = node.battle;
   if (!spec) return null;
-  const ai = enemyAi(node, opts.ais, opts.aiConfig);
+  const ai = enemyAi(run, node, opts.ais, opts.aiConfig);
 
   const you: Participant = {
     id: nextId(),

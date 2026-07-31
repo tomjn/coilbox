@@ -39,10 +39,12 @@ import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import { useMultiplayer } from "@/multiplayer/store";
 import { notify } from "@/notify/notify";
 import { contentListReplays } from "../../content/bindings";
+import { useBrandingEntry } from "../../content/branding";
 import { useReplayUserState } from "../../content/replayUserState";
 import { buildImportCodeLink } from "../../deeplink/build";
 import { copyDeepLink } from "../../deeplink/copyLink";
 import { useImportParam } from "../../deeplink/useImportParam";
+import { getProfile } from "../../profile/profile";
 import type { BattleConfig } from "../bindings";
 import { playExportPreset, playImportPreset } from "../bindings";
 import {
@@ -69,6 +71,7 @@ import {
   type SkirmishDraft,
   useSkirmishDraft,
 } from "../drafts";
+import { mergeGameAi } from "../gameAi";
 import { effectiveOptions } from "../modOptions";
 import { usePlay } from "../PlayProvider";
 import {
@@ -198,6 +201,9 @@ export default function SkirmishPage() {
   // waiting for the auto-pick effect below to commit `mapName`.
   const selectedMap = maps.find((m) => m.name === mapName) ?? maps[0] ?? null;
   const gameArchive = selectedGame?.primaryArchive.name;
+  // The selected game's AI catalogue, for the AI picker's difficulty pips.
+  const brandingAi = useBrandingEntry(selectedGame ?? undefined)?.ai;
+  const aiConfig = mergeGameAi(getProfile().ai, brandingAi);
   // Still scanning and nothing to show yet — the map card shows a spinner.
   const mapsLoading = scan.loading && maps.length === 0;
   const gamesLoading = scan.loading && games.length === 0;
@@ -854,6 +860,7 @@ export default function SkirmishPage() {
             sides={sides}
             factionLogos={factionLogos}
             ais={ais}
+            aiConfig={aiConfig}
             disabled={running}
             startPosType={startPosType}
             startPosCount={minimap.startPositions?.length}
