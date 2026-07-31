@@ -171,6 +171,10 @@ describe("pieceKind", () => {
     expect(pieceKind({ ...piece("a", null), partId: "leg" })).toBe("geometry");
   });
 
+  it("is geometry when a piece references an imported mesh", () => {
+    expect(pieceKind({ ...piece("a", null), meshId: "m3" })).toBe("geometry");
+  });
+
   it("is empty for a hierarchy node, flare, aim point or emitter", () => {
     expect(pieceKind(piece("a", null))).toBe("empty");
   });
@@ -263,6 +267,48 @@ describe("parseLegoProjectJson", () => {
       { ...piece("a", "root"), partId: "abc", role: "turret" },
     ]);
     expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it("round-trips an imported unit's meshes and textures", () => {
+    const doc = {
+      ...project([
+        piece("root", null),
+        { ...piece("a", "root"), meshId: "m1" },
+      ]),
+      imported: {
+        source: "/game/objects3d/Beacon.s3o",
+        texture: {
+          key: "aa11.dds",
+          name: "Beacon_1.dds",
+          source: "/game/unittextures/Beacon_1.dds",
+        },
+        teamMask: { key: "bb22.dds", name: "Beacon_2.dds" },
+        missingTeamMask: undefined,
+      },
+    };
+
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+
+    expect(parsed?.imported?.texture?.key).toBe("aa11.dds");
+    expect(parsed?.imported?.teamMask?.name).toBe("Beacon_2.dds");
+    expect(parsed?.pieces[1].meshId).toBe("m1");
+  });
+
+  it("keeps an imported unit when one of its textures will not parse", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      imported: {
+        source: "/game/objects3d/Beacon.s3o",
+        // Half a texture is not one, and losing the whole unit over it would be
+        // worse than drawing it untextured.
+        texture: { name: "Beacon_1.dds" },
+      },
+    };
+
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+
+    expect(parsed?.imported?.source).toBe("/game/objects3d/Beacon.s3o");
+    expect(parsed?.imported?.texture).toBeUndefined();
   });
 
   it("keeps the atlas a unit names, and leaves it off when there is none", () => {

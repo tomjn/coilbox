@@ -5,11 +5,19 @@
  * seam campaigns use. Everything here is pure, so the rules can be tested
  * without a renderer or a filesystem.
  *
- * A piece is either geometry, when it has a `partId`, or empty. Empty pieces
- * are not a coilbox invention: an s3o piece with no vertices is how the format
- * carries hierarchy, and how flares, aim points and build emitters are
- * expressed. They survive export. Anchors derived from a part's bounding box
- * do not, and exist only to snap against.
+ * A piece is either geometry, when it has a `partId` or a `meshId`, or empty.
+ * Empty pieces are not a coilbox invention: an s3o piece with no vertices is
+ * how the format carries hierarchy, and how flares, aim points and build
+ * emitters are expressed. They survive export. Anchors derived from a part's
+ * bounding box do not, and exist only to snap against.
+ *
+ * The two ways to be geometry are not two halves of one unit. A unit is either
+ * built out of the parts pack, where every piece names a part and the whole
+ * unit samples one atlas, or imported whole from somebody else's `.s3o`, where
+ * every piece names a mesh and the unit draws with its own texture. The two
+ * cannot mix: an imported model's UVs point onto its own texture, so a lego
+ * part dropped into it would sample the wrong image and nothing could fix that.
+ * `project.imported` is what says which kind a unit is.
  */
 
 export const LEGO_SCHEMA_VERSION = 1;
@@ -59,6 +67,51 @@ export interface LegoCollisionVolume {
   offsets: [number, number, number];
 }
 
+/**
+ * A texture in the shared store, which is where an imported unit's textures
+ * live.
+ *
+ * `key` is content addressed, `<sha256>.<ext>`, so two units naming the same
+ * file hold one copy of it and a file edited outside coilbox gets a new key
+ * rather than being served from a stale cache. `name` is what the file was
+ * called where it came from, which is what the model header names and what an
+ * export writes it back out as. `source` is where it was read from, which is
+ * what refreshing it re-reads.
+ */
+export interface LegoTexture {
+  key: string;
+  name: string;
+  source?: string;
+}
+
+/**
+ * A unit imported whole from somebody else's `.s3o`, rather than built out of
+ * the parts pack.
+ *
+ * The meshes are not here. They live in `lego/geometry/<projectId>.bin.gz`,
+ * because the largest model measured is 15.0 MB as JSON against 3.1 MiB packed
+ * and undo keeps sixty whole documents. See `rawGeometry.ts`.
+ *
+ * The textures are a pointer to what to draw with and nothing more. Changing
+ * one swaps the texture and leaves the geometry and its UVs exactly as they
+ * are: whether the new image suits them is the user's call to make and to undo.
+ */
+export interface LegoImported {
+  /** The `.s3o` this came from, for saying where the unit came from. */
+  source: string;
+  /** What the unit is painted with. Absent when it could not be found. */
+  texture?: LegoTexture;
+  /**
+   * The second texture an `.s3o` names, whose red channel marks the regions the
+   * engine paints in the player's colour. Not decoration: those regions are
+   * black in the first texture, so a unit that loses this shows black patches.
+   */
+  teamMask?: LegoTexture;
+  /** The texture name the header gave when the file could not be found. */
+  missingTexture?: string;
+  missingTeamMask?: string;
+}
+
 export interface LegoPiece {
   id: string;
   /** Lower case, unique, and safe as a Lua local, because scripts use it as one. */
@@ -66,6 +119,12 @@ export interface LegoPiece {
   parentId: string | null;
   /** Null for an empty piece: a hierarchy node, flare, aim point or emitter. */
   partId: string | null;
+  /**
+   * Geometry taken verbatim from an imported model, by its key in the project's
+   * geometry sidecar. Only ever set on a piece of an imported unit, where
+   * `partId` is always null.
+   */
+  meshId?: string;
   /** Relative to the parent piece. */
   position: [number, number, number];
   /**
@@ -108,6 +167,14 @@ export interface LegoProject {
    * of, not to whoever shipped it.
    */
   atlas?: string;
+  /**
+   * Present when the unit was imported whole from somebody else's `.s3o`.
+   *
+   * Such a unit has no parts and no atlas, so the parts library and the atlas
+   * picker are hidden for it and this is what they read to know that. Its
+   * pieces name meshes in the geometry sidecar rather than parts in the pack.
+   */
+  imported?: LegoImported;
   createdAt: string;
   updatedAt: string;
   rootPieceId: string;
@@ -233,7 +300,7 @@ export function descendantIds(project: LegoProject, pieceId: string): string[] {
 export type PieceKind = "geometry" | "empty";
 
 export function pieceKind(piece: LegoPiece): PieceKind {
-  return piece.partId ? "geometry" : "empty";
+  return piece.partId || piece.meshId ? "geometry" : "empty";
 }
 
 /**
@@ -407,6 +474,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(typeof d.atlas === "string" && d.atlas !== ""
       ? { atlas: d.atlas }
       : {}),
+    ...(() => {
+      const imported = parseImported(d.imported);
+      return imported ? { imported } : {};
+    })(),
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
     rootPieceId: d.rootPieceId,
@@ -450,6 +521,9 @@ function parsePiece(raw: unknown): LegoPiece | null {
     name: p.name,
     parentId: typeof p.parentId === "string" ? p.parentId : null,
     partId: typeof p.partId === "string" ? p.partId : null,
+    ...(typeof p.meshId === "string" && p.meshId !== ""
+      ? { meshId: p.meshId }
+      : {}),
     position: parseVec3(p.position) ?? [0, 0, 0],
     rotation: parseVec3(p.rotation) ?? [0, 0, 0],
     scale: parseVec3(p.scale) ?? [1, 1, 1],
@@ -469,6 +543,46 @@ function parsePiece(raw: unknown): LegoPiece | null {
             .filter((a): a is LegoAnchor => a !== null),
         }
       : {}),
+  };
+}
+
+/**
+ * Where an imported unit came from and what it draws with.
+ *
+ * A texture that will not parse is dropped rather than failing the project.
+ * The unit then draws untextured and says which file it wanted, which is the
+ * same call the import itself makes when a texture cannot be found: losing the
+ * project over a missing image would be worse than drawing it plain.
+ */
+function parseImported(value: unknown): LegoImported | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.source !== "string") return null;
+
+  const texture = parseTexture(v.texture);
+  const teamMask = parseTexture(v.teamMask);
+  return {
+    source: v.source,
+    ...(texture ? { texture } : {}),
+    ...(teamMask ? { teamMask } : {}),
+    ...(typeof v.missingTexture === "string"
+      ? { missingTexture: v.missingTexture }
+      : {}),
+    ...(typeof v.missingTeamMask === "string"
+      ? { missingTeamMask: v.missingTeamMask }
+      : {}),
+  };
+}
+
+function parseTexture(value: unknown): LegoTexture | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.key !== "string" || v.key === "") return null;
+  if (typeof v.name !== "string") return null;
+  return {
+    key: v.key,
+    name: v.name,
+    ...(typeof v.source === "string" ? { source: v.source } : {}),
   };
 }
 
