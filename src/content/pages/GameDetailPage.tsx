@@ -26,6 +26,7 @@ import { BrandingLinks } from "./components/BrandingLinks";
 import { BrandingScreenshots } from "./components/BrandingScreenshots";
 import { FactionBuildList } from "./components/FactionBuildList";
 import { GameHeader } from "./components/GameHeader";
+import { MissionRuntimeSection } from "./components/MissionRuntimeSection";
 import { OptionsList } from "./components/OptionsList";
 import { StartModeActions } from "./components/StartModeActions";
 import { TallyBar } from "./components/StatWidgets";
@@ -272,6 +273,8 @@ export default function GameDetailPage() {
       )}
 
       <OptionsList options={gameInfo?.options ?? []} title="Game options" />
+
+      <MissionRuntimeSection archive={game.primaryArchive} />
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">

@@ -11,6 +11,8 @@ const COMMANDS: &[&str] = &[
     "scenario_media_read",
     "scenario_media_write",
     "scenario_read_mission",
+    "scenario_runtime_install",
+    "scenario_runtime_status",
 ];
 
 fn main() {
