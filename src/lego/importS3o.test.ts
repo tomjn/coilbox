@@ -153,7 +153,7 @@ function written(build: S3oPiece): S3oReadPiece {
 }
 
 function exported(doc: LegoProject): S3oModel {
-  const build = buildS3o(doc, pack(), { texture1: "coilbox_atlas.png" });
+  const build = buildS3o(doc, pack(), null, { texture1: "coilbox_atlas.png" });
   if (!build) throw new Error("nothing to export");
   return {
     radius: Math.fround(build.radius),
@@ -187,7 +187,7 @@ function named(doc: LegoProject, name: string): LegoPiece {
 
 /** Every vertex of a built model, in the order the pieces are written. */
 function points(doc: LegoProject): number[] {
-  const build = buildS3o(doc, pack(), { texture1: "x" });
+  const build = buildS3o(doc, pack(), null, { texture1: "x" });
   const out: number[] = [];
   const visit = (piece: S3oPiece, x: number, y: number, z: number) => {
     const at = [x + piece.offset[0], y + piece.offset[1], z + piece.offset[2]];

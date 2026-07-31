@@ -25,19 +25,25 @@ import type {
   LegoProject,
 } from "../../model";
 import type { LoadedPack } from "../../pack";
+import type { RawGeometry } from "../../rawGeometry";
 import { unitBounds } from "../../s3oBuild";
 import { Vec3Row } from "./TransformFields";
 
 interface Props {
   project: LegoProject;
   pack: LoadedPack;
+  /** The meshes of a unit imported from somebody else's model, if it is one. */
+  raw: RawGeometry | null;
   /** Null puts the unit back on the derived volume. */
   onChange: (volume: LegoCollisionVolume | null) => void;
 }
 
-export function CollisionPanel({ project, pack, onChange }: Props) {
+export function CollisionPanel({ project, pack, raw, onChange }: Props) {
   // Every vertex in the unit, so not on every keystroke elsewhere in the page.
-  const bounds = useMemo(() => unitBounds(project, pack), [project, pack]);
+  const bounds = useMemo(
+    () => unitBounds(project, pack, raw),
+    [project, pack, raw],
+  );
   const custom = project.collisionVolume;
   const volume = custom ?? derivedCollisionVolume(bounds);
 

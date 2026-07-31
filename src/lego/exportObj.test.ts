@@ -75,7 +75,7 @@ const OPTIONS = { unitName: "probe", textureName: "probe.png" };
 
 describe("buildObj", () => {
   it("names the mtl and points it at the given texture", () => {
-    const built = buildObj(project([]), pack(), OPTIONS);
+    const built = buildObj(project([]), pack(), null, OPTIONS);
 
     expect(built?.obj).toContain("mtllib probe.mtl");
     expect(built?.mtl).toContain("newmtl atlas");
@@ -85,7 +85,7 @@ describe("buildObj", () => {
   it("writes one o block per piece with geometry, with matching v/vt/vn/f counts", () => {
     const doc = project([{ id: "hull", name: "hull", parentId: "root" }]);
 
-    const built = buildObj(doc, pack(), OPTIONS);
+    const built = buildObj(doc, pack(), null, OPTIONS);
     const lines = built?.obj.split("\n") ?? [];
 
     expect(lines).toContain("o hull");
@@ -102,7 +102,7 @@ describe("buildObj", () => {
       { id: "arm", name: "arm", parentId: "root", position: [5, 0, 0] },
     ]);
 
-    const built = buildObj(doc, pack(), OPTIONS);
+    const built = buildObj(doc, pack(), null, OPTIONS);
     const lines = built?.obj.split("\n") ?? [];
 
     // The triangle's second vertex sits at (1, 0, 0) in part space, so at
@@ -121,7 +121,7 @@ describe("buildObj", () => {
       { id: "barrel", name: "barrel", parentId: "turret", position: [2, 0, 0] },
     ]);
 
-    const built = buildObj(doc, pack(), OPTIONS);
+    const built = buildObj(doc, pack(), null, OPTIONS);
     const lines = built?.obj.split("\n") ?? [];
     const barrelBlock = lines.slice(lines.indexOf("o barrel"));
 
@@ -141,7 +141,7 @@ describe("buildObj", () => {
       },
     ]);
 
-    const built = buildObj(doc, pack(), OPTIONS);
+    const built = buildObj(doc, pack(), null, OPTIONS);
     const lines = built?.obj.split("\n") ?? [];
 
     expect(lines).not.toContain("o flare");
@@ -156,7 +156,7 @@ describe("buildObj", () => {
       { id: "right", name: "right", parentId: "root", scale: [-1, 1, 1] },
     ]);
 
-    const built = buildObj(doc, pack(), OPTIONS);
+    const built = buildObj(doc, pack(), null, OPTIONS);
     const lines = built?.obj.split("\n") ?? [];
     // o, usemtl, 3 v, 3 vt, 3 vn, then the one face: the face line is 11 rows
     // after the o line.
@@ -171,6 +171,6 @@ describe("buildObj", () => {
     const doc = project([]);
     const broken = { ...doc, rootPieceId: "missing" };
 
-    expect(buildObj(broken, pack(), OPTIONS)).toBeNull();
+    expect(buildObj(broken, pack(), null, OPTIONS)).toBeNull();
   });
 });

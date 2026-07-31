@@ -70,7 +70,11 @@ import {
   skyTexture,
 } from "../../environment";
 import { frameBox } from "../../framing";
-import { addStandardLights, partMaterial } from "../../geometry";
+import {
+  addStandardLights,
+  importedMaterial,
+  partMaterial,
+} from "../../geometry";
 import {
   groupPivot,
   groupTransform,
@@ -87,6 +91,11 @@ import {
 } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
+import {
+  getMeshGeometry,
+  pieceMesh,
+  type RawGeometry,
+} from "../../rawGeometry";
 import {
   buildGameReferenceUnit,
   buildReferenceUnit,
@@ -205,6 +214,8 @@ const ROTATION_STEP = Math.PI / 12;
 
 interface Props {
   pack: LoadedPack;
+  /** The meshes of a unit imported from somebody else's model, if it is one. */
+  raw: RawGeometry | null;
   project: LegoProject;
   /** Every selected piece, oldest first. One is the ordinary case. */
   selectedIds: string[];
@@ -283,6 +294,7 @@ interface Props {
 
 export function ModelViewport({
   pack,
+  raw,
   project,
   selectedIds,
   onSelect,
@@ -350,7 +362,7 @@ export function ModelViewport({
   function resetView() {
     const state = sceneRef.current;
     if (!state) return;
-    const bounds = unitBounds(project, pack);
+    const bounds = unitBounds(project, pack, raw);
     const box = boundsBox(bounds);
     if (box) {
       frameBounds(state, box, HOME_CAMERA);
@@ -384,6 +396,8 @@ export function ModelViewport({
   projectRef.current = project;
   const packRef = useRef(pack);
   packRef.current = pack;
+  const rawRef = useRef(raw);
+  rawRef.current = raw;
   const placingAnchorRef = useRef(placingAnchor);
   placingAnchorRef.current = placingAnchor;
   const onPlaceAnchorRef = useRef(onPlaceAnchor);
@@ -571,6 +585,7 @@ export function ModelViewport({
         terrain: null,
         groups: new Map(),
         baked: [],
+        imported: null,
         rest: new Map(),
         uniformScale: false,
         anchors: null,
@@ -585,6 +600,7 @@ export function ModelViewport({
         onSnapChange: () => {},
         projectRef,
         packRef,
+        rawRef,
         placingAnchorRef,
         onPlaceAnchorRef,
         onCancelAnchorRef,
@@ -837,6 +853,7 @@ export function ModelViewport({
           state.dots.dispose();
           state.originDot.dispose();
           disposeBaked(state);
+          state.imported?.dispose();
           // Not `grid`: the ground is laid again whenever it has to reach
           // further, so the one in the scene may not be the one built here.
           disposeGround(state.grid);
@@ -866,7 +883,7 @@ export function ModelViewport({
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    syncScene(state, pack, project);
+    syncScene(state, pack, raw, project);
     // Framed once per scene, the moment the whole unit's geometry first has
     // something in it. A brand new unit's root piece is empty, so this keeps
     // retrying on every sync (each one is cheap: an empty box, nothing more)
@@ -875,10 +892,10 @@ export function ModelViewport({
     // running again for this scene, so it never fights a camera the user has
     // since moved.
     if (!state.framed && frameObject(state, state.root)) state.framed = true;
-    if (playing && !reduceMotion) showBaked(state, pack, project);
+    if (playing && !reduceMotion) showBaked(state, pack, raw, project);
     applySceneScale(state);
     state.render();
-  }, [pack, project, playing, reduceMotion]);
+  }, [pack, raw, project, playing, reduceMotion]);
 
   // Before the gizmo below, which may have to point at what this builds.
   // Follows the document as well as the toggle: the derived volume is the
@@ -888,7 +905,7 @@ export function ModelViewport({
     if (!state) return;
     state.editCollision = editCollision;
     const shown = showCollision || editCollision;
-    showCollisionVolume(state, shown ? project : null, pack);
+    showCollisionVolume(state, shown ? project : null, pack, raw);
     // The handles move between the volume and the selected piece with this, so
     // they are re-pointed here rather than left until the selection changes.
     attachGizmo(
@@ -899,7 +916,7 @@ export function ModelViewport({
     );
     showCollisionHandles(state);
     state.render();
-  }, [showCollision, editCollision, project, pack]);
+  }, [showCollision, editCollision, project, pack, raw]);
 
   useEffect(() => {
     const state = sceneRef.current;
@@ -1032,7 +1049,7 @@ export function ModelViewport({
     if (!state || !playing || reduceMotion) return;
 
     state.gizmo.detach();
-    showBaked(state, packRef.current, projectRef.current);
+    showBaked(state, packRef.current, rawRef.current, projectRef.current);
     const started = performance.now();
     let frame = 0;
 
@@ -1048,7 +1065,7 @@ export function ModelViewport({
       const current = sceneRef.current;
       if (!current) return;
       disposeBaked(current);
-      syncScene(current, packRef.current, projectRef.current);
+      syncScene(current, packRef.current, rawRef.current, projectRef.current);
       attachGizmo(
         current,
         projectRef.current,
@@ -1563,6 +1580,15 @@ interface SceneState {
   /** Geometry built for playback, which this owns and must free. The shared
    *  part cache is not ours to dispose. */
   baked: THREE.BufferGeometry[];
+  /** The material an imported unit draws with, and the key of the textures it
+   *  was built from, so a refreshed texture is noticed and the version before
+   *  it is freed. Owned here rather than cached globally: only this view draws
+   *  one, and a content-addressed store mints a new key on every refresh. */
+  imported: {
+    key: string;
+    material: THREE.MeshStandardMaterial;
+    dispose: () => void;
+  } | null;
   /** Read during a drag, so the lock can be toggled mid-session. */
   uniformScale: boolean;
   /** The selected piece's origin and anchors, or nothing when none is. */
@@ -1594,6 +1620,7 @@ interface SceneState {
    *  the scene was built with. */
   projectRef: { current: LegoProject };
   packRef: { current: LoadedPack };
+  rawRef: { current: RawGeometry | null };
   /** Whether the next click on the model drops an anchor rather than selecting,
    *  and what to do when it does. Read from the pointer handler, which is
    *  registered once and would otherwise only ever see the first values. */
@@ -1649,6 +1676,7 @@ function showCollisionVolume(
   state: SceneState,
   project: LegoProject | null,
   pack: LoadedPack,
+  raw: RawGeometry | null,
 ) {
   if (state.collision) {
     if (state.gizmo.object === state.collision) state.gizmo.detach();
@@ -1658,7 +1686,7 @@ function showCollisionVolume(
   }
   if (!project) return;
 
-  const bounds = unitBounds(project, pack);
+  const bounds = unitBounds(project, pack, raw);
   const volume = effectiveCollisionVolume(project, bounds);
   const lines = new THREE.LineSegments(
     collisionWireframe(volume),
@@ -1760,7 +1788,11 @@ function beginFaceDrag(state: SceneState, raycaster: THREE.Raycaster): boolean {
   if (normal.lengthSq() < 1e-6) return false;
 
   const project = state.projectRef.current;
-  const bounds = unitBounds(project, state.packRef.current);
+  const bounds = unitBounds(
+    project,
+    state.packRef.current,
+    state.rawRef.current,
+  );
   const volume = effectiveCollisionVolume(project, bounds);
   state.collisionDrag = {
     axis,
@@ -1896,20 +1928,23 @@ function applyGround(state: SceneState, id: GroundId) {
  */
 function localAnchorsOf(
   pack: LoadedPack,
+  raw: RawGeometry | null,
   piece: LegoPiece,
 ): { anchor: Anchor; position: Vec3 }[] {
-  const part = piece.partId ? pack.byId.get(piece.partId) : undefined;
+  // A part carries its box in the pack manifest and an imported mesh carries
+  // its own, computed once on import, so both answer this the same way.
+  const box =
+    pieceMesh(raw, piece)?.bbox ??
+    (piece.partId ? pack.byId.get(piece.partId)?.bbox : undefined);
   const pivot = piece.pivot ?? [0, 0, 0];
-  return pieceAnchors(part?.bbox ?? null, piece.customAnchors).map(
-    (anchor) => ({
-      anchor,
-      position: [
-        anchor.position[0] - pivot[0],
-        anchor.position[1] - pivot[1],
-        anchor.position[2] - pivot[2],
-      ],
-    }),
-  );
+  return pieceAnchors(box ?? null, piece.customAnchors).map((anchor) => ({
+    anchor,
+    position: [
+      anchor.position[0] - pivot[0],
+      anchor.position[1] - pivot[1],
+      anchor.position[2] - pivot[2],
+    ],
+  }));
 }
 
 /**
@@ -1928,10 +1963,12 @@ function worldAnchors(
   group.updateWorldMatrix(true, false);
 
   const point = new THREE.Vector3();
-  return localAnchorsOf(pack, piece).map(({ anchor, position }) => {
-    point.set(...position).applyMatrix4(group.matrixWorld);
-    return { ...anchor, position: [point.x, point.y, point.z] as Vec3 };
-  });
+  return localAnchorsOf(pack, state.rawRef.current, piece).map(
+    ({ anchor, position }) => {
+      point.set(...position).applyMatrix4(group.matrixWorld);
+      return { ...anchor, position: [point.x, point.y, point.z] as Vec3 };
+    },
+  );
 }
 
 /**
@@ -2518,14 +2555,17 @@ function paintProximity(
  * Only used for playback. Editing keeps the document's own transforms on the
  * groups, because that is what the gizmo writes back to.
  */
-function showBaked(state: SceneState, pack: LoadedPack, project: LegoProject) {
+function showBaked(
+  state: SceneState,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+  project: LegoProject,
+) {
   // Baking again on every change to the document, so freeing what the last
   // bake built belongs here rather than only at the end of playback.
   disposeBaked(state);
-  const { pieces } = bakedPieces(project, pack);
-  const material = partMaterial(
-    unitAtlas(project, pack.library.atlases).drawWith,
-  );
+  const { pieces } = bakedPieces(project, pack, raw);
+  const material = unitMaterial(state, pack, project);
 
   for (const [pieceId, baked] of pieces) {
     const group = state.groups.get(pieceId);
@@ -2560,6 +2600,42 @@ function showBaked(state: SceneState, pack: LoadedPack, project: LegoProject) {
       group.add(added);
     }
   }
+}
+
+/**
+ * The material the whole unit draws with.
+ *
+ * One material for every piece, either way. A unit built out of parts samples
+ * the atlas it names, shared with the pickers. A unit imported from somebody
+ * else's model samples its own texture, which only this view draws, so this
+ * owns it and frees the one before it when the textures change. That is what
+ * makes refreshing a texture edited outside coilbox show up: the key is the
+ * content, so new bytes are a new key and a new material.
+ */
+function unitMaterial(
+  state: SceneState,
+  pack: LoadedPack,
+  project: LegoProject,
+): THREE.MeshStandardMaterial {
+  const imported = project.imported;
+  if (!imported) {
+    return partMaterial(unitAtlas(project, pack.library.atlases).drawWith);
+  }
+  const key = `${imported.texture?.key ?? ""}|${imported.teamMask?.key ?? ""}`;
+  if (state.imported?.key === key) return state.imported.material;
+  state.imported?.dispose();
+  state.imported = { key, ...importedMaterial(imported) };
+  return state.imported.material;
+}
+
+/** The geometry a piece draws, out of the pack or out of an imported model. */
+function pieceGeometry(
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+  piece: LegoPiece,
+): THREE.BufferGeometry | null {
+  if (raw && piece.meshId) return getMeshGeometry(raw, piece.meshId);
+  return piece.partId ? getPartGeometry(pack, piece.partId) : null;
 }
 
 function bakedGeometry(baked: BakedPiece): THREE.BufferGeometry {
@@ -2662,7 +2738,11 @@ function showAnchors(
 
   const positions: number[] = [];
   const colours: number[] = [];
-  for (const { anchor, position } of localAnchorsOf(pack, piece)) {
+  for (const { anchor, position } of localAnchorsOf(
+    pack,
+    state.rawRef.current,
+    piece,
+  )) {
     if (anchor.kind !== "custom" && position.every((v) => Math.abs(v) < 1e-6)) {
       // The middle and the origin coincide, and two dots in one place read
       // as one dot of the wrong colour. A custom anchor still draws there: it
@@ -2785,7 +2865,11 @@ function applyAnimation(state: SceneState, project: LegoProject, t: number) {
  */
 function focusSelection(state: SceneState, pieceIds: string[]) {
   const unit = boundsBox(
-    unitBounds(state.projectRef.current, state.packRef.current),
+    unitBounds(
+      state.projectRef.current,
+      state.packRef.current,
+      state.rawRef.current,
+    ),
   );
   if (!unit) {
     homeView(state);
@@ -2955,7 +3039,11 @@ function commitCollision(state: SceneState) {
   if (!lines || !change) return;
 
   const project = state.projectRef.current;
-  const bounds = unitBounds(project, state.packRef.current);
+  const bounds = unitBounds(
+    project,
+    state.packRef.current,
+    state.rawRef.current,
+  );
   const volume = effectiveCollisionVolume(project, bounds);
   change({
     ...volume,
@@ -2998,11 +3086,14 @@ function pieceIdOf(object: THREE.Object3D | null): string | null {
  * Groups are reused across edits, so moving a piece does not rebuild its
  * geometry and the renderer keeps its uploaded buffers.
  */
-function syncScene(state: SceneState, pack: LoadedPack, project: LegoProject) {
+function syncScene(
+  state: SceneState,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+  project: LegoProject,
+) {
   const wanted = new Set(project.pieces.map((piece) => piece.id));
-  const material = partMaterial(
-    unitAtlas(project, pack.library.atlases).drawWith,
-  );
+  const material = unitMaterial(state, pack, project);
 
   for (const [id, group] of state.groups) {
     if (wanted.has(id)) continue;
@@ -3043,7 +3134,7 @@ function syncScene(state: SceneState, pack: LoadedPack, project: LegoProject) {
     group.scale.set(...piece.scale);
     group.visible = piece.hidden !== true;
 
-    const geometry = piece.partId ? getPartGeometry(pack, piece.partId) : null;
+    const geometry = pieceGeometry(pack, raw, piece);
     const mesh = group.children.find((child) => child instanceof THREE.Mesh) as
       | THREE.Mesh
       | undefined;

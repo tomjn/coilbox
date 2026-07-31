@@ -22,6 +22,7 @@ import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { atlasUrl, type LegoAtlas } from "./atlas";
 import { childrenOf, type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
+import type { RawGeometry } from "./rawGeometry";
 import { type BakedPiece, bakedPieces } from "./s3oBuild";
 
 /**
@@ -31,9 +32,10 @@ import { type BakedPiece, bakedPieces } from "./s3oBuild";
 export function buildGlbScene(
   project: LegoProject,
   pack: LoadedPack,
+  raw: RawGeometry | null,
 ): THREE.Group | null {
   if (!pieceById(project, project.rootPieceId)) return null;
-  const { pieces } = bakedPieces(project, pack);
+  const { pieces } = bakedPieces(project, pack, raw);
 
   const build = (pieceId: string): THREE.Group | null => {
     const baked = pieces.get(pieceId);
@@ -91,9 +93,10 @@ function bakedGeometry(baked: BakedPiece): THREE.BufferGeometry {
 export async function exportGlb(
   project: LegoProject,
   pack: LoadedPack,
+  raw: RawGeometry | null,
   atlas: LegoAtlas,
 ): Promise<ArrayBuffer | null> {
-  const scene = buildGlbScene(project, pack);
+  const scene = buildGlbScene(project, pack, raw);
   if (!scene) return null;
 
   const texture = await new THREE.TextureLoader().loadAsync(atlasUrl(atlas));
