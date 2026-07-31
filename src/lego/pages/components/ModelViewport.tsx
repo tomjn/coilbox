@@ -126,7 +126,7 @@ import {
   snapRotation,
   type Vec3,
 } from "../../snapping";
-import { captureThumbnail } from "../../thumbnail";
+import { captureThumbnail, readyToCapture } from "../../thumbnail";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import { type GameReferenceChoice, ReferencePicker } from "./ReferencePicker";
 import { ShortcutSheet } from "./ShortcutSheet";
@@ -250,8 +250,11 @@ interface Props {
    * the canvas itself. WebGL discards its drawing buffer once the frame is
    * composited, so reading the canvas at any later moment gives a blank image.
    * The caller has to copy the pixels in the same task as the draw.
+   *
+   * It answers null while there is no picture to take: an empty unit, or one
+   * still waiting on its textures. Ask again later rather than storing that.
    */
-  onReady?: (capture: () => HTMLCanvasElement) => void;
+  onReady?: (capture: () => HTMLCanvasElement | null) => void;
   /** Runs the applied presets. Nothing is written: stopping restores the rest
    *  pose exactly, because it comes back from the document. */
   playing?: boolean;
@@ -828,6 +831,9 @@ export function ModelViewport({
       // thumbnail.ts. The live view is drawn again straight after, before the
       // browser composites anything, so the capture is never seen.
       onReadyRef.current?.(() => {
+        // Nothing worth photographing yet: a unit with no pieces in it, or one
+        // whose textures have not arrived and would draw black.
+        if (!readyToCapture(root)) return null;
         const thumb = captureThumbnail(renderer, scene, root, [
           state.hoverOverlay,
           state.anchors,

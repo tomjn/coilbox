@@ -20,7 +20,22 @@ import {
 } from "./compounds";
 import { emptyDocument, primarySelection, reduceDocument } from "./document";
 import { type LegoProject, pieceById } from "./model";
-import { saveProject, saveThumbnail, useLegoProjects } from "./projects";
+import {
+  hasThumbnail,
+  saveProject,
+  saveThumbnail,
+  useLegoProjects,
+} from "./projects";
+
+/**
+ * How long the first look at a unit waits for it to become drawable. Long
+ * enough for a big model's texture to come off disk: an imported unit can be
+ * sampling a 64 MiB compressed sheet.
+ */
+const FIRST_THUMBNAIL_WAIT = 20_000;
+
+/** How often it asks, while it waits. */
+const FIRST_THUMBNAIL_POLL = 250;
 
 export interface LegoDocumentSession {
   /** Still reading the stored units, so nothing can be said about this one. */
@@ -53,8 +68,9 @@ export interface LegoDocumentSession {
   /** Copies each piece and its subtree alongside itself, in one edit, and
    *  answers the copies so the selection can move onto them. */
   duplicate: (pieceIds: string[]) => string[];
-  /** How the viewport hands over the means to grab a thumbnail. */
-  onCapture: (capture: () => HTMLCanvasElement) => void;
+  /** How the viewport hands over the means to grab a thumbnail. The capture
+   *  answers null while there is nothing to photograph. */
+  onCapture: (capture: () => HTMLCanvasElement | null) => void;
 }
 
 /**
@@ -67,7 +83,7 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
 
   const [state, dispatch] = useReducer(reduceDocument, emptyDocument);
   const [saving, setSaving] = useState(false);
-  const captureRef = useRef<(() => HTMLCanvasElement) | null>(null);
+  const captureRef = useRef<(() => HTMLCanvasElement | null) | null>(null);
   const project = state.project;
 
   useEffect(() => {
@@ -100,8 +116,8 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
       // Draw a fresh frame and copy it in the same breath. The viewport's
       // drawing buffer is gone the moment its frame is composited, so a
       // thumbnail taken from the canvas at any other time is blank.
-      const capture = captureRef.current;
-      if (capture) await saveThumbnail(written.id, capture());
+      const thumb = captureRef.current?.();
+      if (thumb) await saveThumbnail(written.id, thumb);
     } finally {
       setSaving(false);
     }
@@ -115,6 +131,40 @@ export function useLegoDocument(id: string | undefined): LegoDocumentSession {
     const timer = setTimeout(() => void persist(project), 800);
     return () => clearTimeout(timer);
   }, [state.dirty, project, persist]);
+
+  // A unit only ever got its picture from a save, so one that arrived from
+  // outside the builder had none at all: import writes a document without going
+  // anywhere near the viewport, and looking at a model is no reason to edit it.
+  // Opening it is reason enough, and the view is drawing the unit by then, so
+  // this takes the same picture a save would and writes it once.
+  //
+  // The capture answers null until there is something to photograph, so this
+  // asks again until there is. A unit with nothing in it, and one whose texture
+  // has gone missing, never become drawable and are left without a picture
+  // rather than given a black square.
+  const openedId = stored?.id;
+  useEffect(() => {
+    if (!openedId) return;
+    let live = true;
+    void (async () => {
+      if (await hasThumbnail(openedId)) return;
+      const deadline = Date.now() + FIRST_THUMBNAIL_WAIT;
+      while (live) {
+        const thumb = captureRef.current?.();
+        if (thumb) {
+          await saveThumbnail(openedId, thumb);
+          return;
+        }
+        if (Date.now() > deadline) return;
+        await new Promise((resolve) =>
+          setTimeout(resolve, FIRST_THUMBNAIL_POLL),
+        );
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [openedId]);
 
   const projectRef = useRef(project);
   projectRef.current = project;

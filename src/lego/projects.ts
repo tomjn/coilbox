@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 
+import { legoThumbUrl } from "../lib/assetUrl";
 import { legoDelete, legoList, legoSave, legoThumbSave } from "./bindings";
 import { type LegoProject, orderedPieces, parseLegoProjectJson } from "./model";
 
@@ -137,6 +138,24 @@ export async function saveThumbnail(
   if (!blob) return;
   const bytes = new Uint8Array(await blob.arrayBuffer());
   await legoThumbSave({ id, png: Array.from(bytes) });
+}
+
+/**
+ * Whether a unit already has a thumbnail on disk.
+ *
+ * One byte rather than the file: all this decides is whether a picture has to be
+ * taken. Anything that goes wrong reading it counts as having one, so a unit is
+ * never photographed over and over because the answer cannot be got at.
+ */
+export async function hasThumbnail(id: string): Promise<boolean> {
+  try {
+    const response = await fetch(legoThumbUrl(id), {
+      headers: { Range: "bytes=0-0" },
+    });
+    return response.ok;
+  } catch {
+    return true;
+  }
 }
 
 const EMPTY: LegoStore = { projects: [], compounds: [] };

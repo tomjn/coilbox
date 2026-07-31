@@ -70,6 +70,38 @@ export function captureThumbnail(
 }
 
 /**
+ * Whether there is a picture of `unit` to take yet: it has geometry in it, and
+ * every texture it draws with has its pixels.
+ *
+ * A texture the loader has not finished with samples as a single black pixel, so
+ * a capture taken before then is a black unit rather than the unit. three's
+ * loaders do not report back to whoever holds the texture, so what a texture has
+ * is read off the texture itself: an image with a width is one that arrived,
+ * whether it was decoded by the browser or uploaded still compressed.
+ */
+export function readyToCapture(unit: THREE.Object3D): boolean {
+  let meshes = 0;
+  let waiting = 0;
+  unit.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    meshes += 1;
+    const materials = Array.isArray(mesh.material)
+      ? mesh.material
+      : [mesh.material];
+    for (const material of materials) {
+      const map = (material as THREE.MeshStandardMaterial).map;
+      // `image` is whatever the loader put there: an `HTMLImageElement`, an
+      // `ImageBitmap`, or a compressed texture's dimensions. All three carry a
+      // width once they hold anything.
+      const image = map?.image as { width?: number } | undefined;
+      if (map && !image?.width) waiting += 1;
+    }
+  });
+  return meshes > 0 && waiting === 0;
+}
+
+/**
  * Where to look at a unit from, whatever the builder's own camera is doing.
  *
  * A unit with nothing in it yet has no bounds to frame, so the camera keeps the
