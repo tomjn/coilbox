@@ -16,7 +16,7 @@ import { type LegoProject, newProject } from "../model";
 import { loadPack } from "../pack";
 import { validateProjectName } from "../projectNames";
 import { deleteProject, saveProject, useLegoProjects } from "../projects";
-import { RecoverDrawer } from "./components/RecoverDrawer";
+import { ImportDrawer } from "./components/ImportDrawer";
 
 /** The name field being edited, and why it cannot be saved yet, if at all. */
 interface Renaming {
@@ -36,6 +36,10 @@ interface Renaming {
  * is chosen here when there is more than one installed. It can still be changed
  * while editing: the parts are the same in every atlas, so switching costs
  * nothing.
+ *
+ * A unit can also come from a model file rather than being started empty. See
+ * `ImportDrawer`, which covers both a project recovered from an export and a
+ * model imported whole as raw geometry.
  */
 export default function ProjectsPage() {
   const { projects, loading, error } = useLegoProjects();
@@ -44,7 +48,7 @@ export default function ProjectsPage() {
   const [renaming, setRenaming] = useState<Renaming | null>(null);
   const [atlases, setAtlases] = useState<LegoAtlas[]>([]);
   const [atlas, setAtlas] = useState<string | null>(null);
-  const [recovering, setRecovering] = useState(false);
+  const [opening, setOpening] = useState(false);
   const navigate = useNavigate();
 
   // Only to know whether there is a choice to offer. Creating a unit loads the
@@ -87,16 +91,22 @@ export default function ProjectsPage() {
     }
   }
 
-  /** A project rebuilt from an exported model, saved and opened like a new one. */
-  async function recovered(project: LegoProject) {
-    setRecovering(false);
+  /**
+   * A unit that came out of a model file, saved and opened like a new one.
+   *
+   * Either a project rebuilt from an export or a model imported whole. Both
+   * arrive as an ordinary document, and an imported one already has its
+   * geometry and its textures on disk.
+   */
+  async function opened(project: LegoProject) {
+    setOpening(false);
     setProblem(null);
     try {
       await saveProject(project);
       navigate(`/lego/${project.id}`);
     } catch (e) {
       setProblem(
-        `Could not save the recovered unit: ${e instanceof Error ? e.message : String(e)}`,
+        `Could not save the unit: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
   }
@@ -167,8 +177,8 @@ export default function ProjectsPage() {
               </SelectContent>
             </Select>
           ) : null}
-          <Button variant="outline" onClick={() => setRecovering(true)}>
-            <FileUp size={16} /> Recover a unit
+          <Button variant="outline" onClick={() => setOpening(true)}>
+            <FileUp size={16} /> Open a model
           </Button>
           <Button onClick={create} disabled={busy}>
             <Plus size={16} /> New unit
@@ -176,10 +186,10 @@ export default function ProjectsPage() {
         </div>
       </header>
 
-      <RecoverDrawer
-        open={recovering}
-        onOpenChange={setRecovering}
-        onRecovered={(project) => void recovered(project)}
+      <ImportDrawer
+        open={opening}
+        onOpenChange={setOpening}
+        onOpened={(project) => void opened(project)}
       />
 
       {problem ? (
