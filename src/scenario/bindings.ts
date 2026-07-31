@@ -71,6 +71,40 @@ export const scenarioReadMission = defineCommand<
   { mission: unknown }
 >("coilbox-scenario", "scenario_read_mission");
 
+/**
+ * A runtime's version marker and capability table, as `missions/runtime.lua`
+ * declares it. `conditions` and `actions` are the trigger types that runtime
+ * implements, which is what the editor's palette is gated on (issue #765).
+ */
+export interface RuntimeMarker {
+  version: number;
+  schemaVersion: number;
+  conditions: string[];
+  actions: string[];
+}
+
+/**
+ * Write the mission runtime's `luarules/`, `luaui/` and `missions/` into the
+ * loose game folder at `root`, or update an older install in place. `installed`
+ * is the marker read back out of the game afterwards, so it is what the engine
+ * will load rather than what coilbox meant to write. Fails on a packaged
+ * `.sd7`/`.sdz`, which is a file and cannot be written into.
+ */
+export const scenarioRuntimeInstall = defineCommand<
+  { root: string },
+  { installed: RuntimeMarker; files: string[] }
+>("coilbox-scenario", "scenario_runtime_install");
+
+/**
+ * The runtime the game at `root` has installed, and the one this build of
+ * coilbox ships. Either is null when it cannot be read: a game that has not
+ * adopted the runtime has no marker at all.
+ */
+export const scenarioRuntimeStatus = defineCommand<
+  { root: string },
+  { installed: RuntimeMarker | null; available: RuntimeMarker | null }
+>("coilbox-scenario", "scenario_runtime_status");
+
 /** Best-effort removal of a stored dialogue clip. */
 export const scenarioMediaDelete = defineCommand<
   { scenarioId: string; file: string },

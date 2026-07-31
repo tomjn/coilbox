@@ -255,8 +255,12 @@ mod tests {
     #[test]
     fn only_coilbox_files_and_the_runtime_folder_are_ours_to_remove() {
         assert!(runtime_owned(Path::new("luarules/gadgets/coilbox_x.lua")));
-        assert!(runtime_owned(Path::new("luarules/mission_runtime/helper.lua")));
-        assert!(!runtime_owned(Path::new("luarules/gadgets/their_gadget.lua")));
+        assert!(runtime_owned(Path::new(
+            "luarules/mission_runtime/helper.lua"
+        )));
+        assert!(!runtime_owned(Path::new(
+            "luarules/gadgets/their_gadget.lua"
+        )));
         assert!(!runtime_owned(Path::new("missions/runtime.lua")));
         assert!(!runtime_owned(Path::new("missions/demo/mission.lua")));
     }
