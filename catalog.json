@@ -1,6 +1,13 @@
 {
   "version": 1,
-  "updated": "2026-07-05",
+  "updated": "2026-07-31",
+  "excludedMaps": [
+    {
+      "id": "zwzsg-hexfarm",
+      "match": { "regex": "^hex ?farm" },
+      "reason": "Built for Kernel Panic. It ships its own LuaRules gadget and sets maxMetal to 0.1, so another game has no economy on it."
+    }
+  ],
   "githubGameRepos": [
     {
       "key": "metal-factions",

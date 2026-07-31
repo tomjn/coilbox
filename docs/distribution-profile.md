@@ -553,6 +553,27 @@ Curated **map packs** offered for bulk download on the Maps download page — a 
 
 Each map's `download` is `{ "kind": "map", "springName", "searchUrl"? }` (fetched by springname via pr-downloader) or `{ "kind": "url", "url", "filename", "subdir"? }` (a direct mirror file); `filename` enables "already downloaded" detection. This is the same shape and mechanism the branding catalog's `suggested.mapLists` uses — see [Branding catalog](../README.md#branding-catalog); catalog packs are listed first, then a profile's, deduped by `id`.
 
+### `excludedMaps` (object[])
+
+Keeps maps out of warpath and galactic conquest, the two modes that pick maps on the player's behalf. Adds to the branding catalog's own list rather than replacing it, so a distribution can exclude more maps than the catalog does and never fewer.
+
+```json
+{
+  "version": 1,
+  "excludedMaps": [
+    {
+      "id": "house-rules-banned",
+      "match": { "names": ["Duck", "Comet Catcher Redux"] },
+      "reason": "Not part of the league map pool."
+    }
+  ]
+}
+```
+
+`match` is tested against the installed map's spring name: `regex` is case-insensitive, `names` are case-insensitive exact matches and win over `regex` within a rule. Prefer `regex` when you mean a family of maps, since a map's version is part of its spring name. `reason` is shown to the player on the map's detail page.
+
+An excluded map stays visible in Content and stays playable in skirmish and multiplayer. A player can opt further maps out themselves on the map detail page, but cannot re-enable one your profile or the catalog excluded. Same shape as the branding catalog's `excludedMaps`, documented in [Branding catalog](branding-catalog.md#excluding-maps-from-warpath-and-conquest).
+
 ### `quit` (boolean)
 
 Adds a **Quit** button to the bottom of the sidebar that closes Coilbox. Off by default. It's an escape hatch for fullscreen or kiosk (`fullscreenLocked`) builds, where a player may otherwise have no obvious way out — so unlike the fullscreen toggle, this button is **not** removed by the kiosk lock.
