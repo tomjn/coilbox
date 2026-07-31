@@ -1,0 +1,8 @@
+[package]
+name = "coilbox-proc"
+version = "0.0.0"
+description = "Dependency-free child-process constructor that suppresses the console window Windows pops for console-mode sidecars. Shared by every plugin that shells out."
+edition = "2021"
+license = "MIT"
+
+[dependencies]

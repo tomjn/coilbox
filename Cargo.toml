@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "src-tauri",
   "crates/coilbox-portable",
+  "crates/coilbox-proc",
   "crates/coilbox-s3o",
   "crates/coilbox-3do",
   "crates/coilbox-lobby-protocol",

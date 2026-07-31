@@ -22,7 +22,7 @@ use sidecar::{
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -178,17 +178,12 @@ fn run_worker_blocking(
     what: String,
     cancel: Option<Arc<AtomicBool>>,
 ) -> Result<String, String> {
-    let mut cmd = Command::new(&bin);
+    let mut cmd = coilbox_proc::command(&bin);
     cmd.args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     for (k, v) in &envs {
         cmd.env(k, v);
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
 
     let mut child = cmd

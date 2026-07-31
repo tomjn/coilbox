@@ -18,7 +18,7 @@ use serde::Serialize;
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{
@@ -105,18 +105,13 @@ fn launch_blocking(
     reg: RunRegistry,
     on_event: Channel<LaunchEvent>,
 ) -> Result<Option<i32>, String> {
-    let mut cmd = Command::new(&bin);
+    let mut cmd = coilbox_proc::command(&bin);
     cmd.args(&args)
         .env("SPRING_DATADIR", &data_dir)
         // The engine writes its own infolog file; detach its stdio so we don't
         // hold pipes open or pop a console.
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-    }
 
     let child = cmd
         .spawn()

@@ -615,6 +615,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-proc"
+version = "0.0.0"
+
+[[package]]
 name = "coilbox-s3o"
 version = "0.0.0"
 
@@ -4856,6 +4860,7 @@ version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
  "coilbox-portable",
+ "coilbox-proc",
  "flate2",
  "image 0.25.10",
  "notify",
@@ -4872,6 +4877,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-downloads"
 version = "0.0.0"
 dependencies = [
+ "coilbox-proc",
  "flate2",
  "picoframe-core",
  "reqwest 0.12.28",
@@ -4917,6 +4923,7 @@ name = "tauri-plugin-coilbox-mapconv"
 version = "0.0.0"
 dependencies = [
  "coilbox-portable",
+ "coilbox-proc",
  "coilbox-springlua",
  "coilbox-thumb-cache",
  "image 0.25.10",
@@ -4953,6 +4960,7 @@ name = "tauri-plugin-coilbox-play"
 version = "0.0.0"
 dependencies = [
  "coilbox-portable",
+ "coilbox-proc",
  "objc2-app-kit",
  "picoframe-core",
  "serde",
@@ -4993,6 +5001,7 @@ name = "tauri-plugin-coilbox-uberstress"
 version = "0.0.0"
 dependencies = [
  "coilbox-portable",
+ "coilbox-proc",
  "picoframe-core",
  "serde",
  "serde_json",
@@ -5005,6 +5014,7 @@ name = "tauri-plugin-coilbox-unitsync"
 version = "0.0.0"
 dependencies = [
  "coilbox-portable",
+ "coilbox-proc",
  "picoframe-core",
  "serde",
  "serde_json",
