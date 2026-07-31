@@ -1,7 +1,13 @@
 import type { MapDownloadHint } from "../campaign/model";
 import type { GameRef } from "../conquest/model";
 import { sectorNameForSeed } from "../conquest/names";
-import { mulberry32, pick, type Rng, randInt } from "../conquest/rng";
+import {
+  hashString,
+  mulberry32,
+  pick,
+  type Rng,
+  randInt,
+} from "../conquest/rng";
 import { buildBuildGraph } from "../content/buildTree";
 import type {
   EncounterSpec,
@@ -419,6 +425,49 @@ function linkColumns(from: RunNode[], to: RunNode[]): RunEdge[] {
 /** Starting hull scales down with difficulty + ascension. */
 function maxHullFor(difficulty: number, ascension: number): number {
   return Math.max(40, 120 - difficulty * 10 - ascension * 10);
+}
+
+/**
+ * Swap out node maps that are no longer allowed in warpath. A run is generated
+ * once and saved, but the exclusion lists behind it move: a catalog update or a
+ * fresh opt-out mid-run can make a node's map ineligible. Rather than strand the
+ * player on it, re-pick with the same depth-biased draw a fresh node uses.
+ *
+ * The draw is seeded from the node id rather than the run's rng stream, so the
+ * same node lands on the same replacement on every load. Applied on read, not
+ * written back, matching conquest's `substituteExcludedMaps`.
+ *
+ * `maps` is everything installed. Returns the run unchanged when nothing needed
+ * swapping, so callers can memo on identity.
+ */
+export function substituteExcludedMaps(
+  run: RogueliteRun,
+  maps: GenRunMap[],
+  isExcluded: (mapName: string) => boolean,
+): RogueliteRun {
+  const pool = maps.filter((m) => !isExcluded(m.name));
+  if (pool.length === 0) return run;
+
+  const cols = Math.max(...run.nodes.map((n) => n.col)) + 1;
+  let changed = false;
+  const nodes = run.nodes.map((node): RunNode => {
+    const battle = node.battle;
+    if (!battle?.mapName || !isExcluded(battle.mapName)) return node;
+    const depthFrac = cols > 1 ? node.col / (cols - 1) : 0;
+    const replacement = pickMap(
+      mulberry32(hashString(node.id)),
+      pool,
+      depthFrac,
+    );
+    changed = true;
+    // The old map's download hint goes with it, or the encounter screen would
+    // still offer to fetch the map we just excluded.
+    return {
+      ...node,
+      battle: { ...battle, mapName: replacement.name, mapDownload: undefined },
+    };
+  });
+  return changed ? { ...run, nodes } : run;
 }
 
 export function generateRun(opts: GenerateRunOpts): RogueliteRun {

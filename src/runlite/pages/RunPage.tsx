@@ -7,6 +7,7 @@ import { resolveGameByShortname } from "../../conquest/model";
 import { BracketFrame } from "../../conquest/pages/components/hudChrome";
 import { buildEdgeMap, reachableFrom } from "../../content/buildTree";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../../content/config";
+import { useMapEligibility } from "../../content/mapEligibility";
 import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
 import {
   EmptyState,
@@ -14,6 +15,7 @@ import {
 } from "../../content/pages/components/states";
 import { TechTreePicker } from "../../content/pages/components/TechTreePicker";
 import { usePreferredTarget } from "../../play/config";
+import { substituteExcludedMaps } from "../generate";
 import { awardMeta } from "../meta";
 import {
   isBattleNode,
@@ -49,7 +51,7 @@ export default function RunPage() {
   // The node map wants the full width. The nav stays reachable from the top bar.
   useHideSidebar();
   const { runId } = useParams();
-  const { run, loading, save } = useRun(runId);
+  const { run: savedRun, loading, save } = useRun(runId);
   const { meta, save: saveMeta } = useRunMeta();
   // A replay's "back to node" link deep-links here as `?node=<id>`, honoured
   // once on mount so the inspect panel opens straight to it (mirrors conquest's
@@ -69,6 +71,22 @@ export default function RunPage() {
   // The arsenal ceiling size, for the HUD gauge (best-effort).
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  // A saved run can outlive the map rules it was generated under, so nodes
+  // sitting on a now-excluded map are re-pointed on the way in (issue #696).
+  const { isExcluded } = useMapEligibility();
+  const run = useMemo(
+    () =>
+      savedRun &&
+      substituteExcludedMaps(
+        savedRun,
+        (scan.data?.maps ?? []).map((m) => ({
+          name: m.name,
+          size: (m.width ?? 8) * (m.height ?? 8),
+        })),
+        isExcluded,
+      ),
+    [savedRun, scan.data, isExcluded],
+  );
   const game = run
     ? resolveGameByShortname(run.settings.game, scan.data?.games ?? [])
     : undefined;

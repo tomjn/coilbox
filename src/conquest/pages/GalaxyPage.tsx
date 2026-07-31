@@ -15,6 +15,7 @@ import { useFactionLogos } from "@/factions/logos";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncGameInfo, useUnitsyncScan } from "../../content/config";
 import { useKnownSpaceMaps } from "../../content/mapAppearanceCache";
+import { useMapEligibility } from "../../content/mapEligibility";
 import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
 import {
   EmptyState,
@@ -38,7 +39,7 @@ import { isVoidNode, type VoidBody, voidBodiesFor } from "../galaxy3d/bodies";
 import { factionSides } from "../galaxy3d/factionShape";
 import { GalaxyView, nodeBodyLabel } from "../galaxy3d/GalaxyView";
 import { galaxyPalette } from "../galaxy3d/palette";
-import { regenerateGalaxy } from "../generate";
+import { regenerateGalaxy, substituteExcludedMaps } from "../generate";
 import type { ConquestState, GalaxyDoc, GalaxyNode, TurnEvent } from "../model";
 import {
   NEUTRAL,
@@ -65,6 +66,17 @@ export default function GalaxyPage() {
   const { id } = useParams();
   const { galaxies, loading, error } = useGalaxies();
   const loaded = galaxies.find((g) => g.galaxy.id === id);
+  // A saved galaxy can outlive the map rules it was generated under, so nodes
+  // sitting on a now-excluded map are re-pointed on the way in (issue #696).
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const { isExcluded } = useMapEligibility();
+  const galaxy = useMemo(
+    () =>
+      loaded &&
+      substituteExcludedMaps(loaded.galaxy, scan.data?.maps ?? [], isExcluded),
+    [loaded, scan.data, isExcluded],
+  );
 
   if (loading) {
     return (
@@ -73,7 +85,7 @@ export default function GalaxyPage() {
       </div>
     );
   }
-  if (!loaded) {
+  if (!loaded || !galaxy) {
     return (
       <div className="flex flex-col gap-4 p-4">
         {error && <ErrorBanner message={error} />}
@@ -84,7 +96,7 @@ export default function GalaxyPage() {
       </div>
     );
   }
-  return <GalaxyScreen key={loaded.galaxy.id} galaxy={loaded.galaxy} />;
+  return <GalaxyScreen key={galaxy.id} galaxy={galaxy} />;
 }
 
 function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
@@ -748,6 +760,7 @@ function RunSetupPanel({
     installedGame?.primaryArchive.name,
   );
   const brandingEntries = useBrandingCatalog();
+  const { eligible } = useMapEligibility();
   const brandingEntry = installedGame
     ? resolveBranding(brandingEntries, installedGame)
     : null;
@@ -756,7 +769,7 @@ function RunSetupPanel({
     galaxy.generated?.factionCount !== undefined;
   const [regenBusy, setRegenBusy] = useState(false);
   const regenerate = async () => {
-    const maps = scan.data?.maps ?? [];
+    const maps = eligible(scan.data?.maps ?? []);
     if (maps.length === 0) return;
     setRegenBusy(true);
     try {

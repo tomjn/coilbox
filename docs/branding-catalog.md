@@ -72,6 +72,30 @@ Two more things ride in the same catalog file:
 - **Suggested content and map packs.** Besides `entries[]`, the catalog carries a `suggested` block of curated games, maps and **map packs** offered to users who have none yet (and on the Maps download page). See the dedicated **[Map packs](map-packs.md)** guide for the shape and behaviour.
 - **Galactic-conquest naming.** A branding entry can carry a `conquest` field that supplies per-game star/faction name pools and lore factions, so a generated galaxy reads as *your* game rather than generic space. See **[Galactic conquest → Names and factions](conquest.md#names-and-factions)**.
 
+## Excluding maps from warpath and conquest
+
+Warpath and galactic conquest pick maps on the player's behalf, so a map that loads fine but makes a nonsense match ruins a run the player did not choose. The catalog's top-level `excludedMaps` keeps those maps out of both modes:
+
+```json
+"excludedMaps": [
+  {
+    "id": "zwzsg-hexfarm",
+    "match": { "regex": "^hex ?farm" },
+    "reason": "Built for Kernel Panic. It ships its own LuaRules gadget and sets maxMetal to 0.1, so another game has no economy on it."
+  }
+]
+```
+
+`match` works like a branding entry's, tested against the installed map's spring name: `regex` is case-insensitive, `names` are case-insensitive exact matches and win over `regex`. Prefer `regex`. A map family carries its version in the spring name, so `Hex Farm 8` and `Hex Farm 9` are different names and exact matching misses the next release.
+
+`reason` is shown to the player on the map's detail page, so write it for them rather than for the catalog.
+
+What belongs here is a map that cannot make a sensible match in a normal game: one built around another game's mechanics, or a joke map. A map you personally dislike does not, and neither does a map that is merely small or unbalanced. This list is global and no player can override it.
+
+The scope is narrow on purpose. An excluded map stays visible in Content and stays playable in skirmish and multiplayer, where the player picked it deliberately. A [distribution profile](distribution-profile.md) can add more exclusions, and a player can opt individual maps out on the map detail page. All three are additive: nothing re-enables a map another layer excluded.
+
+An in-progress warpath or conquest that already sits on a newly excluded map is not stranded. The node is re-pointed at a map the same draw would have chosen for it, so an exclusion lands mid-run without breaking a save.
+
 ## AI rankings
 
 A branding entry can carry an `ai` block describing what a game's skirmish AIs are for. Coilbox otherwise picks AIs by list position, which is arbitrary: a game switch can drop a player from a strong AI to a trivial one, and a difficulty setting cannot pick a harder opponent if it does not know which opponent is harder.

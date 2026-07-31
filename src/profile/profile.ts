@@ -1,7 +1,7 @@
 import type { Accent, ThemeMode } from "@picoframe/frame";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { ConquestNames } from "../conquest/names";
-import type { SuggestedMapList } from "../content/branding";
+import type { MapExclusion, SuggestedMapList } from "../content/branding";
 import type { GameAiConfig } from "../play/gameAi";
 import { describeJsonError } from "./jsonError";
 import { type OnboardingPlacement, onboardingPlacement } from "./onboarding";
@@ -295,6 +295,12 @@ export interface Profile {
    */
   mapLists?: SuggestedMapList[];
   /**
+   * Extra maps kept out of warpath and galactic conquest, on top of the branding
+   * catalog's own list. Additive only: a distribution can exclude more maps than
+   * the catalog does, never fewer. Same shape as the catalog's `excludedMaps`.
+   */
+  excludedMaps?: MapExclusion[];
+  /**
    * Galactic-conquest naming: star/faction name pools and lore faction presets
    * for generated galaxies. Overrides the branding catalog's per-game defaults
    * (see `../conquest/names`).
@@ -578,6 +584,12 @@ export function isProfileAuthoringEnabled(): boolean {
 /** Curated map packs this profile ships (empty when it defines none). */
 export function getProfileMapLists(): SuggestedMapList[] {
   return loaded.mapLists ?? [];
+}
+
+/** Map-exclusion rules this profile adds on top of the catalog's (empty when it
+ * defines none). See `../content/mapEligibility`. */
+export function getProfileMapExclusions(): MapExclusion[] {
+  return loaded.excludedMaps ?? [];
 }
 
 /** The active onboarding placement for the branded home (see `onboarding`). */

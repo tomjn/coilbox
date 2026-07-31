@@ -24,6 +24,7 @@ import { challengeDecodeErrorMessage } from "../../challenge/code";
 import { unitsyncSkirmishAis } from "../../content/bindings";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
+import { useMapEligibility } from "../../content/mapEligibility";
 import { BrandingLinks } from "../../content/pages/components/BrandingLinks";
 import { BrandingScreenshots } from "../../content/pages/components/BrandingScreenshots";
 import { ResolveContentGate } from "../../content/pages/components/ResolveContentDrawer";
@@ -596,7 +597,13 @@ function GenerateGalaxyForm({
     if (!scanData && !scanLoading) runScan();
   }, [scanData, scanLoading, runScan]);
 
-  const maps = useMemo(() => scan.data?.maps ?? [], [scan.data]);
+  // Excluded maps never enter the pool, so a generated galaxy cannot put the
+  // player on one (see `content/mapEligibility`).
+  const { eligible } = useMapEligibility();
+  const maps = useMemo(
+    () => eligible(scan.data?.maps ?? []),
+    [scan.data, eligible],
+  );
 
   // One options builder shared by the live preview and the create action, so
   // the galaxy the user saw is exactly the galaxy that gets saved.
@@ -864,6 +871,7 @@ function ImportChallengeForm({
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const brandingEntries = useBrandingCatalog();
+  const { eligible } = useMapEligibility();
   const [pending, setPending] = useState<ConquestChallengeSettings | null>(
     null,
   );
@@ -886,7 +894,7 @@ function ImportChallengeForm({
       );
     }
 
-    const maps = (scanData?.maps ?? []).map((m) => ({
+    const maps = eligible(scanData?.maps ?? []).map((m) => ({
       name: m.name,
       width: m.width,
       height: m.height,

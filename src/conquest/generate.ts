@@ -3,7 +3,7 @@ import { MAX_DIFFICULTY, NEUTRAL } from "./model";
 import type { ConquestNames } from "./names";
 import { factionSpecs, makeStarNamer, resolveConquestNames } from "./names";
 import { DEFAULT_RADIUS_LY, systemsWithin } from "./realstars";
-import { mulberry32, pick, type Rng } from "./rng";
+import { hashString, mulberry32, pick, type Rng } from "./rng";
 
 /**
  * Procedural galaxy generation — the fallback when a game ships no authored
@@ -60,6 +60,23 @@ export const MAX_LANES_PER_SYSTEM = 4;
 /** Added to a bridge's cost when either end is already at the lane cap. Larger
  * than the galaxy so an unsaturated bridge always wins when one exists. */
 const SATURATED_BRIDGE_PENALTY = 1000;
+
+/** Smallest map first. The difficulty tiers are windows over this order. */
+function mapsByArea(maps: GenMap[]): GenMap[] {
+  return [...maps].sort(
+    (a, b) =>
+      (a.width ?? 0) * (a.height ?? 0) - (b.width ?? 0) * (b.height ?? 0),
+  );
+}
+
+/** The slice of the area-sorted pool a node of this difficulty draws from. */
+function mapTier(byArea: GenMap[], difficulty: number): GenMap[] {
+  if (byArea.length === 0) return [];
+  const per = byArea.length / MAX_DIFFICULTY;
+  const start = Math.floor((difficulty - 1) * per);
+  const end = Math.max(start + 1, Math.floor(difficulty * per));
+  return byArea.slice(start, end);
+}
 
 export interface GenerateOptions {
   seed: number;
@@ -532,17 +549,8 @@ export function generateGalaxy(
 
   // Maps by area, bucketed into difficulty tiers (bigger -> harder), cycling
   // within a tier so a small pool still varies.
-  const byArea = [...opts.maps].sort(
-    (a, b) =>
-      (a.width ?? 0) * (a.height ?? 0) - (b.width ?? 0) * (b.height ?? 0),
-  );
-  const tierFor = (d: number) => {
-    if (byArea.length === 0) return [];
-    const per = byArea.length / MAX_DIFFICULTY;
-    const start = Math.floor((d - 1) * per);
-    const end = Math.max(start + 1, Math.floor(d * per));
-    return byArea.slice(start, end);
-  };
+  const byArea = mapsByArea(opts.maps);
+  const tierFor = (d: number) => mapTier(byArea, d);
   const tierCursor = new Map<number, number>();
   const mapFor = (d: number): string => {
     const tier = tierFor(d);
@@ -597,6 +605,46 @@ export function generateGalaxy(
       fogOfWar: opts.fogOfWar ? true : undefined,
     },
   };
+}
+
+/**
+ * Swap out node maps that are no longer allowed in conquest. A galaxy is
+ * generated once and saved, but the exclusion lists behind it move: a catalog
+ * update or a fresh opt-out mid-conquest can make a node's map ineligible.
+ * Rather than strand the player on it, re-pick from the same difficulty tier a
+ * fresh node would have drawn from.
+ *
+ * The choice is keyed on the node id, not on generation order, so the same node
+ * lands on the same replacement on every load. Applied on read rather than
+ * written back, since authored galaxies a game ships are not ours to rewrite.
+ *
+ * `maps` is everything installed. Returns the doc unchanged when nothing needed
+ * swapping, so callers can memo on identity.
+ */
+export function substituteExcludedMaps(
+  galaxy: GalaxyDoc,
+  maps: GenMap[],
+  isExcluded: (mapName: string) => boolean,
+): GalaxyDoc {
+  const byArea = mapsByArea(maps.filter((m) => !isExcluded(m.name)));
+  if (byArea.length === 0) return galaxy;
+
+  let changed = false;
+  const nodes = galaxy.nodes.map((node) => {
+    const current = node.battle.mapName;
+    if (!current || !isExcluded(current)) return node;
+    const tier = mapTier(byArea, node.difficulty);
+    const pool = tier.length > 0 ? tier : byArea;
+    const replacement = pool[hashString(node.id) % pool.length].name;
+    changed = true;
+    // The old map's download hint goes with it, or the battle screen would still
+    // offer to fetch the map we just excluded.
+    return {
+      ...node,
+      battle: { ...node.battle, mapName: replacement, mapDownload: undefined },
+    };
+  });
+  return changed ? { ...galaxy, nodes } : galaxy;
 }
 
 /** The content environment a reroll resolves at call time (never persisted). */
