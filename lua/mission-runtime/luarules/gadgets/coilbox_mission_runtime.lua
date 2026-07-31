@@ -77,6 +77,19 @@ if not START then
 	return false
 end
 
+local TRIGGERS, triggersError = includeTable("luarules/mission_runtime/coilbox_triggers.lua")
+if not TRIGGERS then
+	log("error", triggersError)
+	return false
+end
+
+local UNIT_CONDITIONS, unitConditionsError =
+	includeTable("luarules/mission_runtime/coilbox_unit_conditions.lua")
+if not UNIT_CONDITIONS then
+	log("error", unitConditionsError)
+	return false
+end
+
 -- Refuse a mission built for a newer runtime than the game vendored. Running it
 -- anyway would quietly drop whatever this version cannot read, and a mission
 -- that half works is harder to diagnose than one that refuses to start.
@@ -148,6 +161,9 @@ local function publish()
 		-- with no entry in `units` is one that has died or never spawned.
 		actors = actors,
 		units = {},
+		-- The synced half adds `triggers`, the trigger engine, once it has one.
+		-- Registering a condition or action type on it is how the rest of the
+		-- runtime, and a game's own extensions, join in.
 	}
 	return GG.CoilboxMission, problems
 end
@@ -168,6 +184,23 @@ if gadgetHandler:IsSyncedCode() then
 	local spawning = false
 	local invulnerable = {}
 	local actorOfUnit = {}
+	-- The trigger engine, and the hooks its unit conditions want fed. Both are
+	-- synced only: triggers decide what happens in the game, so they run where
+	-- every machine runs them.
+	local triggers
+	local unitHooks
+
+	--- Tell the triggers something happened.
+	--
+	-- Nothing is raised while the start window is open. The mission's own spawns
+	-- and the game's suppressed ones all land in there, and a mission counting
+	-- what a team has built should not be counting the units it was handed.
+	local function raise(name, payload)
+		if suppressing or not triggers then
+			return
+		end
+		triggers:event(name, payload)
+	end
 
 	--- Put one planned unit on the map. The scenario carries no height because
 	-- everything sits on terrain, so the ground is read here.
@@ -285,6 +318,18 @@ if gadgetHandler:IsSyncedCode() then
 		-- GamePreload is covered too.
 		suppressing = true
 
+		-- The trigger engine knows nothing about any condition or action until
+		-- one is registered on it. Every module that implements some registers
+		-- here, before the first frame, so the engine's index of which trigger
+		-- watches which event is built once and stays right.
+		triggers = TRIGGERS.new(MISSION, {
+			state = published,
+			gameSpeed = Game.gameSpeed,
+			log = log,
+		})
+		unitHooks = UNIT_CONDITIONS.register(triggers, published)
+		published.triggers = triggers
+
 		log("notice", string.format(
 			"mission %s loaded, runtime version %s", MISSION_ID, tostring(RUNTIME.version)))
 	end
@@ -302,6 +347,9 @@ if gadgetHandler:IsSyncedCode() then
 			suppressing = false
 		end
 		addIncome()
+		-- Last, so the world a trigger reads on this frame is the finished one.
+		-- The engine owns how often it actually evaluates.
+		triggers:frame(frame)
 	end
 
 	--- Undo the start the game would have given a team the scenario spawns for
@@ -316,13 +364,40 @@ if gadgetHandler:IsSyncedCode() then
 	-- the start window is open, only a unit with no builder, so nothing anyone
 	-- has begun building is ever touched.
 	function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
-		if not suppressing or spawning or builderID then
+		if suppressing then
+			if not spawning and not builderID and suppressedTeams[unitTeam] then
+				Spring.DestroyUnit(unitID, false, true)
+			end
 			return
 		end
-		if not suppressedTeams[unitTeam] then
+		raise("unit_created", { unitID = unitID, unitDefID = unitDefID, team = unitTeam })
+	end
+
+	--- A unit finished building. The mission's own spawns finish inside
+	-- Spring.CreateUnit, while the start window is open, which is what keeps a
+	-- team's placed units out of what that team has built.
+	function gadget:UnitFinished(unitID, unitDefID, unitTeam)
+		if suppressing then
 			return
 		end
-		Spring.DestroyUnit(unitID, false, true)
+		unitHooks.finished(unitDefID, unitTeam)
+		raise("unit_finished", { unitID = unitID, unitDefID = unitDefID, team = unitTeam })
+	end
+
+	--- A unit changed hands. UnitGiven rather than UnitTaken, because only by
+	-- then is the unit on the team that took it.
+	function gadget:UnitGiven(unitID, unitDefID, newTeam, oldTeam)
+		local actor = actorOfUnit[unitID]
+		if actor then
+			unitHooks.captured(actor, newTeam)
+		end
+		raise("unit_captured", {
+			unitID = unitID,
+			unitDefID = unitDefID,
+			actor = actor,
+			team = newTeam,
+			oldTeam = oldTeam,
+		})
 	end
 
 	function gadget:UnitPreDamaged(unitID)
@@ -331,13 +406,21 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
-	function gadget:UnitDestroyed(unitID)
+	function gadget:UnitDestroyed(unitID, unitDefID, unitTeam)
 		invulnerable[unitID] = nil
 		local actor = actorOfUnit[unitID]
 		if actor then
 			actorOfUnit[unitID] = nil
 			units[actor] = nil
 		end
+		-- After the bookkeeping, so a trigger asking whether an actor is dead
+		-- reads the answer this death just wrote.
+		raise("unit_destroyed", {
+			unitID = unitID,
+			unitDefID = unitDefID,
+			actor = actor,
+			team = unitTeam,
+		})
 	end
 else
 	local published

@@ -47,16 +47,31 @@ function M.logged(engine, needle)
 	return false
 end
 
+--- Load a runtime module the way the gadget does, in the environment it hands
+-- VFS.Include. A module that reads the engine sees the stub, not the real _G.
+local function module(path)
+	return function(env)
+		local chunk = assert(loadfile(M.root() .. "/" .. path))
+		setfenv(chunk, env)
+		return chunk()
+	end
+end
+
+--- A compiled mission read out of the scenario fixtures, at the path the runtime
+-- expects. They are the same files coilbox emits, so a test that runs one is
+-- running the real emitted shape.
+function M.fixture(id)
+	return dofile(M.root() .. "/../../src/scenario/fixtures/missions/" .. id .. "/mission.lua")
+end
+
 --- The files a working mission needs in the archive.
 function M.missionFiles(mission)
-	local root = M.root()
 	return {
-		["missions/runtime.lua"] = function()
-			return dofile(root .. "/missions/runtime.lua")
-		end,
-		["luarules/mission_runtime/coilbox_start.lua"] = function()
-			return dofile(root .. "/luarules/mission_runtime/coilbox_start.lua")
-		end,
+		["missions/runtime.lua"] = module("missions/runtime.lua"),
+		["luarules/mission_runtime/coilbox_start.lua"] = module("luarules/mission_runtime/coilbox_start.lua"),
+		["luarules/mission_runtime/coilbox_triggers.lua"] = module("luarules/mission_runtime/coilbox_triggers.lua"),
+		["luarules/mission_runtime/coilbox_unit_conditions.lua"] = module(
+			"luarules/mission_runtime/coilbox_unit_conditions.lua"),
 		["missions/demo/mission.lua"] = function()
 			return mission
 		end,
@@ -90,10 +105,11 @@ function M.newEngine(modOptions, files, options)
 		logs = {},
 		reads = 0,
 		GG = {},
-		-- unitID -> { def, team, x, y, z, facing, health, maxHealth, alive }
+		-- unitID -> { def, defID, team, x, y, z, facing, health, maxHealth, alive }
 		units = {},
 		order = {},
 		nextUnitID = 1,
+		nextDefID = 1,
 		-- Engine team number -> { m = , e = }.
 		resources = {},
 		income = {},
@@ -102,15 +118,34 @@ function M.newEngine(modOptions, files, options)
 		sent = {},
 	}
 
-	local function fireUnitCreated(unitID, unit, builderID)
-		local created = engine.env.UnitCreated
-		if created then
-			created(engine.env, unitID, 1, unit.team, builderID)
+	--- The def id the engine would have given this name, invented on first use.
+	local function unitDef(name)
+		local def = engine.env.UnitDefNames[name]
+		if not def then
+			def = { id = engine.nextDefID, name = name }
+			engine.nextDefID = engine.nextDefID + 1
+			engine.env.UnitDefNames[name] = def
+			engine.env.UnitDefs[def.id] = def
+		end
+		return def
+	end
+
+	local function fire(callin, ...)
+		local handler = engine.env[callin]
+		if handler then
+			handler(engine.env, ...)
 		end
 	end
 
-	--- Create a unit the way the engine does, including the callin the runtime
-	-- watches. `builderID` stands for a unit that something is building.
+	--- Tell the runtime a unit has finished building.
+	function engine.finish(unitID)
+		local unit = engine.units[unitID]
+		fire("UnitFinished", unitID, unit.defID, unit.team)
+	end
+
+	--- Create a unit the way the engine does, including the callins the runtime
+	-- watches. `builderID` stands for a unit that something is building, which
+	-- is the case that does not finish here.
 	function engine.spawn(def, team, builderID)
 		if options.defs and not options.defs[def] then
 			error("bad unitDef name: " .. tostring(def), 0)
@@ -119,11 +154,33 @@ function M.newEngine(modOptions, files, options)
 		local unitID = engine.nextUnitID
 		engine.nextUnitID = unitID + 1
 
-		local unit = { def = def, team = team, health = 100, maxHealth = 100, alive = true }
+		local unit = {
+			def = def,
+			defID = unitDef(def).id,
+			team = team,
+			health = 100,
+			maxHealth = 100,
+			alive = true,
+		}
 		engine.units[unitID] = unit
 		engine.order[#engine.order + 1] = unitID
-		fireUnitCreated(unitID, unit, builderID)
+
+		fire("UnitCreated", unitID, unit.defID, unit.team, builderID)
+		-- A unit created outright is finished inside CreateUnit itself. One with
+		-- a builder finishes when its builder is done, so the test says when.
+		if not builderID then
+			engine.finish(unitID)
+		end
 		return unitID
+	end
+
+	--- Transfer a unit to another team, captured or gifted: the engine tells Lua
+	-- the same thing either way.
+	function engine.give(unitID, newTeam)
+		local unit = engine.units[unitID]
+		local oldTeam = unit.team
+		unit.team = newTeam
+		fire("UnitGiven", unitID, unit.defID, newTeam, oldTeam)
 	end
 
 	--- Units still alive, in creation order.
@@ -179,10 +236,25 @@ function M.newEngine(modOptions, files, options)
 					return
 				end
 				unit.alive = false
-				local destroyed = engine.env.UnitDestroyed
-				if destroyed then
-					destroyed(engine.env, unitID, 1, unit.team)
+				fire("UnitDestroyed", unitID, unit.defID, unit.team)
+			end,
+			GetTeamUnitCount = function(team)
+				local count = 0
+				for _, unit in ipairs(engine.alive()) do
+					if unit.team == team then
+						count = count + 1
+					end
 				end
+				return count
+			end,
+			GetTeamUnitDefCount = function(team, defID)
+				local count = 0
+				for _, unit in ipairs(engine.alive()) do
+					if unit.team == team and unit.defID == defID then
+						count = count + 1
+					end
+				end
+				return count
 			end,
 			GetUnitHealth = function(unitID)
 				local unit = engine.units[unitID]
@@ -202,15 +274,20 @@ function M.newEngine(modOptions, files, options)
 			end,
 		},
 		Game = { mapName = "Test Map", gameSpeed = 30 },
+		-- Filled in as defs are used, so a test names units and never ids.
+		UnitDefs = {},
+		UnitDefNames = {},
 		VFS = {
 			ZIP = 1,
 			FileExists = function(path)
 				engine.reads = engine.reads + 1
 				return files[path] ~= nil
 			end,
-			Include = function(path)
+			Include = function(path, env)
 				engine.reads = engine.reads + 1
-				return files[path]()
+				-- The gadget passes an empty environment for data and none for
+				-- code, so code lands in the gadget's own environment here too.
+				return files[path](env or engine.env)
 			end,
 		},
 		gadgetHandler = {
