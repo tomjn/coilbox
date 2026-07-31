@@ -57,9 +57,9 @@ function importRoute(base: string, code: string): string {
 /**
  * Gate an inline import code and resolve where it should go. Rejects an
  * unrecognised or unsupported payload, warns on a newer-version one, and maps a
- * recognised payload to its importer route. `campaign` is recognised but has no
- * code-import screen (campaigns import from a file), so it is rejected with a
- * clear message rather than routed nowhere.
+ * recognised payload to its importer route. `campaign` and `scenario` are
+ * recognised but have no code-import screen (both import from a file), so they
+ * are rejected with a clear message rather than routed nowhere.
  */
 export function prepareImport(code: string): PrepareImportResult {
   const id = identify(code);
@@ -128,6 +128,11 @@ export function prepareImport(code: string): PrepareImportResult {
         ok: false,
         reason:
           "Campaigns import from a file, not a link. Use Campaigns > Import.",
+      };
+    case "scenario":
+      return {
+        ok: false,
+        reason: "Scenarios import from a file, not a link.",
       };
   }
 }

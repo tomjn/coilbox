@@ -281,6 +281,9 @@ describe("sniffPayloadKind", () => {
     expect(
       sniffPayloadKind({ participants: [], gameName: "x", mapName: "y" }),
     ).toBe("preset");
+    expect(
+      sniffPayloadKind({ scenario: { triggers: [], zones: [] }, media: {} }),
+    ).toBe("scenario");
     expect(sniffPayloadKind({ random: true })).toBeNull();
   });
 });
