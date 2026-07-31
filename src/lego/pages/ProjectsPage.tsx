@@ -1,5 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
-import { Blocks, FileUp, Pencil, Plus, Trash2 } from "lucide-react";
+import { Blocks, FileUp, ImageOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
@@ -49,6 +49,8 @@ export default function ProjectsPage() {
   const [atlases, setAtlases] = useState<LegoAtlas[]>([]);
   const [atlas, setAtlas] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
+  /** The units whose thumbnail would not load, so the card says so instead. */
+  const [noPicture, setNoPicture] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
 
   // Only to know whether there is a choice to offer. Creating a unit loads the
@@ -229,15 +231,26 @@ export default function ProjectsPage() {
                 className="group relative rounded border border-border transition-colors hover:border-foreground/30"
               >
                 <Link to={`/lego/${project.id}`} className="block">
-                  <img
-                    src={legoThumbUrl(project.id)}
-                    alt=""
-                    className="aspect-square w-full rounded-t bg-muted object-cover"
-                    // A unit saved before its first render has no thumbnail yet.
-                    onError={(event) => {
-                      event.currentTarget.style.visibility = "hidden";
-                    }}
-                  />
+                  {noPicture.has(project.id) ? (
+                    // Said rather than left blank: a unit gets its picture the
+                    // first time it is drawn, so one with nothing to show has
+                    // either never been opened or has nothing in it yet.
+                    <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-t bg-muted px-3 text-center">
+                      <ImageOff className="text-muted-foreground" size={20} />
+                      <span className="text-xs text-muted-foreground">
+                        No picture yet. Open it to make one.
+                      </span>
+                    </div>
+                  ) : (
+                    <img
+                      src={legoThumbUrl(project.id)}
+                      alt=""
+                      className="aspect-square w-full rounded-t bg-muted object-cover"
+                      onError={() =>
+                        setNoPicture((known) => new Set(known).add(project.id))
+                      }
+                    />
+                  )}
                   <div className="px-3 py-2">
                     <p className="truncate text-sm font-medium">
                       {isRenaming ? "" : project.name}
