@@ -49,19 +49,7 @@ check("the trigger engine is published", state.triggers ~= nil)
 check("a trigger the scenario disabled starts disabled", state.triggers:isEnabled("unlock") == false)
 check("every other trigger starts armed", state.triggers:isEnabled("count-check") == true)
 
-local ran = record(state.triggers, { "add_var", "gift_units", "reveal_area", "unlock_unit" })
-
--- Vars are a later issue. A stand-in here shows what registering one looks like
--- and lets the fixture's own state machine run end to end.
-local vars = { garrisonBuilt = 0 }
-state.triggers:addCondition("var", {
-	test = function(params)
-		return vars[params.name] >= params.value
-	end,
-})
-state.triggers:addAction("set_var", function(params)
-	vars[params.name] = params.value
-end)
+local ran = record(state.triggers, { "gift_units", "reveal_area", "unlock_unit" })
 
 engine.env:GameFrame(0)
 check("nothing fires while the start window is open", state.triggers:isEnabled("count-check") == true)
@@ -79,7 +67,8 @@ check("a unit count reaching its minimum fires", state.triggers:isEnabled("count
 check("a fired trigger's enable_trigger arms another", state.triggers:isEnabled("unlock") == false,
 	"unlock should have been armed and then spent")
 check("the trigger it armed ran in the same pass", ranAll(ran) == "unlock_unit", ranAll(ran))
-check("a registered stand-in condition is what let it hold", vars.garrisonBuilt == 1)
+check("the var an earlier action set is what let it hold", state.vars.get("garrisonBuilt") == 1,
+	tostring(state.vars.get("garrisonBuilt")))
 
 check("the mission's own units are not counted as built",
 	state.triggers:isEnabled("built-outpost") == true)
@@ -92,13 +81,14 @@ check("a unit under construction has not been built yet",
 engine.finish(depot)
 check("a finished unit fires the trigger watching for it",
 	state.triggers:isEnabled("built-outpost") == false)
-check("its actions ran on the event, not on the next tick", ranAll(ran) == "unlock_unit,add_var", ranAll(ran))
+check("its add_var ran on the event, not on the next tick", state.vars.get("garrisonBuilt") == 2,
+	tostring(state.vars.get("garrisonBuilt")))
 check("and its disable_trigger took effect", state.triggers:isEnabled("count-check") == false)
 
 engine.give(state.units.outpost, 0)
 check("an actor changing hands fires the trigger watching for it",
 	state.triggers:isEnabled("outpost-captured") == false)
-check("that trigger's actions ran", ranAll(ran) == "unlock_unit,add_var,gift_units,reveal_area", ranAll(ran))
+check("that trigger's actions ran", ranAll(ran) == "unlock_unit,gift_units,reveal_area", ranAll(ran))
 
 --------------------------------------------------------------------------------
 -- Ambush: an actor's health and its death.
