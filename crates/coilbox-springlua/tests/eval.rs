@@ -187,7 +187,10 @@ fn include_value_reads_a_compiled_mission_as_authored() {
     // Mixed-case keys survive: lowercasing them would rename author data.
     assert_eq!(m["schemaVersion"], serde_json::json!(1));
     assert_eq!(m["actors"][0]["unitDef"], serde_json::json!("armcom"));
-    assert_eq!(m["teams"]["Enemy-1"]["noCommander"], serde_json::json!(true));
+    assert_eq!(
+        m["teams"]["Enemy-1"]["noCommander"],
+        serde_json::json!(true)
+    );
     assert_eq!(m["vars"]["Alarm"], serde_json::json!(0));
 
     // Registries are arrays, author-keyed tables are objects.
