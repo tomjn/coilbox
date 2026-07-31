@@ -84,6 +84,16 @@ fn walk(dir: &Path, rel: &Path, files: &mut Vec<PathBuf>) {
     }
 }
 
+/// One relative path as a comparable key: forward slashes, lower case.
+///
+/// Case is dropped because a game folder's casing is its own. Real games ship
+/// `LuaRules/Gadgets/`, and on Windows and macOS that is the same folder as the
+/// `luarules/gadgets/` written into it. The engine agrees: an archive's file
+/// index is keyed lower case, so both spellings load the same file.
+fn key(rel: &Path) -> String {
+    rel.to_string_lossy().replace('\\', "/").to_lowercase()
+}
+
 /// Whether an installed file is the runtime's to remove when a newer runtime no
 /// longer ships it.
 ///
@@ -92,11 +102,11 @@ fn walk(dir: &Path, rel: &Path, files: &mut Vec<PathBuf>) {
 /// the game (its own gadgets, and the compiled missions coilbox writes at launch
 /// time) and is never touched. Without this a gadget dropped between runtime
 /// versions would keep loading in every game that had installed it.
-fn runtime_owned(rel: &Path) -> bool {
-    rel.starts_with(Path::new("luarules").join("mission_runtime"))
-        || rel
-            .file_name()
-            .and_then(|name| name.to_str())
+fn runtime_owned(key: &str) -> bool {
+    key.starts_with("luarules/mission_runtime/")
+        || key
+            .rsplit('/')
+            .next()
             .is_some_and(|name| name.starts_with("coilbox_"))
 }
 
@@ -114,6 +124,7 @@ pub fn install(src: &Path, dest: &Path) -> Result<Vec<String>, String> {
             src.display()
         ));
     }
+    let mut written = Vec::new();
     for rel in &files {
         let to = dest.join(rel);
         if let Some(parent) = to.parent() {
@@ -122,18 +133,17 @@ pub fn install(src: &Path, dest: &Path) -> Result<Vec<String>, String> {
         }
         std::fs::copy(src.join(rel), &to)
             .map_err(|e| format!("could not write {}: {e}", to.display()))?;
+        written.push(key(rel));
     }
     for rel in vendored_files(dest) {
-        if runtime_owned(&rel) && !files.contains(&rel) {
+        let key = key(&rel);
+        if runtime_owned(&key) && !written.contains(&key) {
             let stale = dest.join(&rel);
             std::fs::remove_file(&stale)
                 .map_err(|e| format!("could not remove {}: {e}", stale.display()))?;
         }
     }
-    Ok(files
-        .iter()
-        .map(|rel| rel.to_string_lossy().replace('\\', "/"))
-        .collect())
+    Ok(written)
 }
 
 /// Read a game's installed version marker, through the gadget's own code path: a
@@ -254,14 +264,37 @@ mod tests {
 
     #[test]
     fn only_coilbox_files_and_the_runtime_folder_are_ours_to_remove() {
-        assert!(runtime_owned(Path::new("luarules/gadgets/coilbox_x.lua")));
-        assert!(runtime_owned(Path::new(
-            "luarules/mission_runtime/helper.lua"
-        )));
-        assert!(!runtime_owned(Path::new(
-            "luarules/gadgets/their_gadget.lua"
-        )));
-        assert!(!runtime_owned(Path::new("missions/runtime.lua")));
-        assert!(!runtime_owned(Path::new("missions/demo/mission.lua")));
+        assert!(runtime_owned("luarules/gadgets/coilbox_x.lua"));
+        assert!(runtime_owned("luarules/mission_runtime/helper.lua"));
+        assert!(!runtime_owned("luarules/gadgets/their_gadget.lua"));
+        assert!(!runtime_owned("missions/runtime.lua"));
+        assert!(!runtime_owned("missions/demo/mission.lua"));
+    }
+
+    #[test]
+    fn a_game_folder_keeps_its_own_casing() {
+        assert_eq!(
+            key(Path::new("LuaRules/Gadgets/Coilbox_X.lua")),
+            key(Path::new("luarules/gadgets/coilbox_x.lua"))
+        );
+    }
+
+    /// Games spell it `LuaRules/Gadgets/`. On Windows and macOS that is the same
+    /// folder the install writes into, so the file lands under the game's
+    /// spelling and the prune has to recognise it as the one just written.
+    #[test]
+    fn an_install_into_a_games_own_luarules_casing_survives_the_prune() {
+        let src = source_tree();
+        let game = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(game.path().join("LuaRules/Gadgets")).expect("mkdir");
+
+        install(src.path(), game.path()).expect("install");
+        install(src.path(), game.path()).expect("update");
+
+        let installed: Vec<String> = vendored_files(game.path())
+            .iter()
+            .map(|rel| key(rel))
+            .collect();
+        assert!(installed.contains(&"luarules/gadgets/coilbox_mission_runtime.lua".to_string()));
     }
 }
