@@ -584,6 +584,13 @@ export function useUnitsyncUnitDataset(
       .then((res) => {
         if (cancelled) return;
         setDataset(res);
+        // A game whose unit defs would not load comes back with no units and a
+        // reason, which reads exactly like a game that ships none. Anything
+        // asking for a unit list needs to be able to tell those apart.
+        if (res.units.length === 0 && res.errors.length > 0) {
+          setStatus("error");
+          return;
+        }
         // Only a syncable result is cached (mirrors the worker's disk cache), so
         // a zero-checksum result stays retryable rather than sticking forever.
         if (res.checksum) {
