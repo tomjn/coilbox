@@ -3,6 +3,7 @@ import {
   type GenerateOptions,
   generateGalaxy,
   regenerateGalaxy,
+  substituteExcludedMaps,
 } from "./generate";
 import { parseGalaxyJson } from "./model";
 
@@ -329,5 +330,59 @@ describe("regenerateGalaxy", () => {
     const doc = generateGalaxy(base, "t0");
     const legacy = { ...doc, generated: { seed: 1 } };
     expect(regenerateGalaxy(legacy, { maps }, 5, "t1")).toBeNull();
+  });
+});
+
+describe("substituteExcludedMaps", () => {
+  const doc = generateGalaxy(base, "t0");
+  const banned = (name: string) => name === "Map 0" || name === "Map 5";
+
+  it("returns the same doc when nothing is excluded", () => {
+    expect(substituteExcludedMaps(doc, maps, () => false)).toBe(doc);
+  });
+
+  it("re-points every node on an excluded map", () => {
+    const next = substituteExcludedMaps(doc, maps, banned);
+    expect(next.nodes.some((n) => banned(n.battle.mapName))).toBe(false);
+    expect(next).not.toBe(doc);
+  });
+
+  it("leaves nodes on allowed maps untouched", () => {
+    const next = substituteExcludedMaps(doc, maps, banned);
+    for (const [i, node] of doc.nodes.entries()) {
+      if (!banned(node.battle.mapName)) {
+        expect(next.nodes[i].battle.mapName).toBe(node.battle.mapName);
+      }
+    }
+  });
+
+  it("picks the same replacement every time, so a briefing is stable", () => {
+    const a = substituteExcludedMaps(doc, maps, banned);
+    const b = substituteExcludedMaps(doc, maps, banned);
+    expect(a.nodes.map((n) => n.battle.mapName)).toEqual(
+      b.nodes.map((n) => n.battle.mapName),
+    );
+  });
+
+  it("drops the old map's download hint along with the map", () => {
+    const withHint = {
+      ...doc,
+      nodes: doc.nodes.map((n) => ({
+        ...n,
+        battle: {
+          ...n.battle,
+          mapName: "Map 0",
+          mapDownload: { springName: "Map 0" },
+        },
+      })),
+    };
+    const next = substituteExcludedMaps(withHint, maps, banned);
+    expect(next.nodes.every((n) => n.battle.mapDownload === undefined)).toBe(
+      true,
+    );
+  });
+
+  it("leaves the galaxy alone when every installed map is excluded", () => {
+    expect(substituteExcludedMaps(doc, maps, () => true)).toBe(doc);
   });
 });

@@ -19,6 +19,17 @@ export function mulberry32(seed: number): Rng {
   };
 }
 
+/** FNV-1a: a string to a 32-bit seed, for seeding a PRNG off a stable id (e.g. a
+ * node id) rather than a counter, so a value re-derived later comes out the same. */
+export function hashString(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
 /** Integer in [min, max] inclusive. */
 export function randInt(rng: Rng, min: number, max: number): number {
   return min + Math.floor(rng() * (max - min + 1));

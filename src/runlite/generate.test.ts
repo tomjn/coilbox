@@ -4,6 +4,7 @@ import {
   type GenerateRunOpts,
   type GenRunMap,
   generateRun,
+  substituteExcludedMaps,
 } from "./generate";
 import { isBattleNode, parseRunJson, type RogueliteRun } from "./model";
 
@@ -205,5 +206,31 @@ describe("generateRun", () => {
         }
       }
     }
+  });
+});
+
+describe("substituteExcludedMaps", () => {
+  const run = generateRun(opts());
+  const banned = (name: string) => name === "Small A" || name === "Huge";
+  const battleMaps = (r: RogueliteRun) =>
+    r.nodes.filter((n) => isBattleNode(n.type)).map((n) => n.battle?.mapName);
+
+  it("returns the same run when nothing is excluded", () => {
+    expect(substituteExcludedMaps(run, MAPS, () => false)).toBe(run);
+  });
+
+  it("re-points every encounter on an excluded map", () => {
+    const next = substituteExcludedMaps(run, MAPS, banned);
+    expect(battleMaps(next).some((m) => m && banned(m))).toBe(false);
+  });
+
+  it("picks the same replacement every time, so a briefing is stable", () => {
+    const a = substituteExcludedMaps(run, MAPS, banned);
+    const b = substituteExcludedMaps(run, MAPS, banned);
+    expect(battleMaps(a)).toEqual(battleMaps(b));
+  });
+
+  it("leaves the run alone when every installed map is excluded", () => {
+    expect(substituteExcludedMaps(run, MAPS, () => true)).toBe(run);
   });
 });
