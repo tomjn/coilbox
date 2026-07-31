@@ -79,6 +79,7 @@ import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { canReparent, reparentPiece } from "../reparent";
 import { sitOnGround } from "../s3oBuild";
+import type { ScriptTimeline } from "../scriptPlayback";
 import { isShortcut } from "../shortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { useRawGeometry } from "../useRawGeometry";
@@ -148,6 +149,13 @@ function Builder({ id }: { id: string | undefined }) {
   const [exporting, setExporting] = useState(false);
   const [testing, setTesting] = useState(false);
   const [playing, setPlaying] = useState(false);
+  /**
+   * What playing means for a unit that owns its script: the poses a run of that
+   * script produced, rather than the presets it no longer has.
+   */
+  const [scriptTimeline, setScriptTimeline] = useState<ScriptTimeline | null>(
+    null,
+  );
   /** A preference, not part of the unit, so it lives with the session. */
   const [uniformScale, setUniformScale] = useState(true);
   /** Shared between the viewport and the tree, so hovering a piece in either
@@ -906,6 +914,7 @@ function Builder({ id }: { id: string | undefined }) {
                 hoveredId={hoveredId}
                 onHover={setHoveredId}
                 playing={playing}
+                scriptTimeline={scriptTimeline}
                 uniformScale={uniformScale}
                 onGround={() =>
                   edit((project) => sitOnGround(project, pack, raw))
@@ -1094,10 +1103,13 @@ function Builder({ id }: { id: string | undefined }) {
                   onChange={(animations) =>
                     edit((project) => ({ ...project, animations }))
                   }
+                  onScriptTimeline={setScriptTimeline}
                   onScriptChange={(script) => {
-                    // Playback plays the presets, and a unit that owns its script
-                    // is no longer described by them.
+                    // What is playing describes the unit before the change: the
+                    // presets it just stopped using, or the script it just
+                    // edited.
                     setPlaying(false);
+                    setScriptTimeline(null);
                     edit((project) => ({ ...project, script }));
                   }}
                 />

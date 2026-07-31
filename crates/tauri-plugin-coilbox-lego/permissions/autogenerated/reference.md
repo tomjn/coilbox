@@ -18,6 +18,7 @@ Allows the unit builder's project storage, thumbnail, reveal and test-game comma
 - `allow-lego-export-glb`
 - `allow-lego-export-obj`
 - `allow-lego-scratch-game`
+- `allow-lego-run-script`
 
 ## Permission Table
 
@@ -258,6 +259,32 @@ Enables the lego_read_s3o command without any pre-configured scope.
 <td>
 
 Denies the lego_read_s3o command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:allow-lego-run-script`
+
+</td>
+<td>
+
+Enables the lego_run_script command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-lego:deny-lego-run-script`
+
+</td>
+<td>
+
+Denies the lego_run_script command without any pre-configured scope.
 
 </td>
 </tr>

@@ -107,6 +107,12 @@ import {
   type UnitBounds,
   unitBounds,
 } from "../../s3oBuild";
+import {
+  frameAt,
+  hiddenAt,
+  poseAt,
+  type ScriptTimeline,
+} from "../../scriptPlayback";
 import { isShortcut } from "../../shortcuts";
 import {
   type Anchor,
@@ -245,6 +251,11 @@ interface Props {
   /** Runs the applied presets. Nothing is written: stopping restores the rest
    *  pose exactly, because it comes back from the document. */
   playing?: boolean;
+  /**
+   * Poses to play instead of the presets, for a unit whose script is its own.
+   * The presets are gone for such a unit, so this is what playing means for it.
+   */
+  scriptTimeline?: ScriptTimeline | null;
   /** Scale handles keep the piece's proportions. */
   uniformScale?: boolean;
   /** Drop the unit onto y = 0. Absent hides the button. */
@@ -304,6 +315,7 @@ export function ModelViewport({
   onHover,
   onReady,
   playing = false,
+  scriptTimeline = null,
   uniformScale = false,
   onGround,
   onDuplicate,
@@ -398,6 +410,10 @@ export function ModelViewport({
   packRef.current = pack;
   const rawRef = useRef(raw);
   rawRef.current = raw;
+  // Read inside the playback loop, so replaying a different scenario swaps what
+  // is playing without tearing the loop down and building the bake again.
+  const scriptTimelineRef = useRef(scriptTimeline);
+  scriptTimelineRef.current = scriptTimeline;
   const placingAnchorRef = useRef(placingAnchor);
   placingAnchorRef.current = placingAnchor;
   const onPlaceAnchorRef = useRef(onPlaceAnchor);
@@ -1054,7 +1070,13 @@ export function ModelViewport({
     let frame = 0;
 
     const tick = (now: number) => {
-      applyAnimation(state, projectRef.current, (now - started) / 1000);
+      const timeline = scriptTimelineRef.current;
+      const seconds = (now - started) / 1000;
+      if (timeline) {
+        applyTimeline(state, projectRef.current, timeline, seconds);
+      } else {
+        applyAnimation(state, projectRef.current, seconds);
+      }
       state.render();
       frame = requestAnimationFrame(tick);
     };
@@ -1064,6 +1086,7 @@ export function ModelViewport({
       cancelAnimationFrame(frame);
       const current = sceneRef.current;
       if (!current) return;
+      restoreFromPlayback(current);
       disposeBaked(current);
       syncScene(current, packRef.current, rawRef.current, projectRef.current);
       attachGizmo(
@@ -2844,6 +2867,65 @@ function applyAnimation(state: SceneState, project: LegoProject, t: number) {
     }
     group.position.set(...position);
     group.rotation.set(...rotation);
+  }
+}
+
+/**
+ * Pose every piece the way the unit's own script put it at one moment.
+ *
+ * The engine composes a piece's rotations y, then x, then z, so the groups are
+ * put in that order for as long as playback owns them. Three's own default is
+ * x, y, z, which agrees only while a piece turns about one axis at a time.
+ *
+ * A run that stopped early loops at the length it reached, so a script that
+ * threw two seconds in plays those two seconds rather than freezing on one.
+ */
+function applyTimeline(
+  state: SceneState,
+  project: LegoProject,
+  timeline: ScriptTimeline,
+  seconds: number,
+) {
+  const frame = frameAt(timeline, seconds);
+  if (frame < 0) return;
+
+  for (let index = 0; index < timeline.pieces.length; index++) {
+    const piece = project.pieces.find(
+      (candidate) => candidate.name === timeline.pieces[index],
+    );
+    const group = piece ? state.groups.get(piece.id) : undefined;
+    const offset = piece ? state.rest.get(piece.id) : undefined;
+    if (!group || !offset) continue;
+
+    const pose = poseAt(timeline, frame, index);
+    if (!pose) continue;
+    group.position.set(
+      offset[0] + pose[0],
+      offset[1] + pose[1],
+      offset[2] + pose[2],
+    );
+    group.rotation.order = "YXZ";
+    group.rotation.set(pose[3], pose[4], pose[5]);
+
+    // The piece's own mesh rather than its group: hiding a piece in the engine
+    // leaves its children where they were, and a group takes everything under
+    // it with it.
+    const mesh = group.children.find((child) => child instanceof THREE.Mesh);
+    if (mesh) mesh.visible = !hiddenAt(timeline, frame, index);
+  }
+}
+
+/**
+ * Undo what playing a script did to the groups themselves, as opposed to what
+ * it put in them: a piece it hid, and the rotation order it borrowed. Rebuilding
+ * the scene from the document sets positions and rotations but neither of these.
+ */
+function restoreFromPlayback(state: SceneState) {
+  for (const group of state.groups.values()) {
+    group.rotation.order = "XYZ";
+    for (const child of group.children) {
+      if (child instanceof THREE.Mesh) child.visible = true;
+    }
   }
 }
 
