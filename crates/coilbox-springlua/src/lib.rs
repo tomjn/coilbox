@@ -14,12 +14,17 @@
 //! API is what the engine exposes over packaged archives, so config stays
 //! portable between "editing loose" and "engine-loaded".
 //!
+//! The same VM serves a second job in [`unitscript`]: running a *unit* script,
+//! which is Spring Lua too but is driven a frame at a time rather than
+//! evaluated for a table. Separate sandbox, separate API, one vendored Lua.
+//!
 //! Scope: **read** loose files only. It is not unitsync — anything needing
 //! engine-faithful values (archive contents, unit/mod lists, map options,
 //! rendered minimaps, computed/required values resolved against a `.sd7`/`.sdz`)
 //! is unitsync's job. Lua *write-back* (serialization) is also out of scope.
 
 mod env;
+pub mod unitscript;
 mod vfs;
 
 use std::path::{Path, PathBuf};
