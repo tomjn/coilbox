@@ -4,9 +4,10 @@
 //! unitsync's Lua parser has no usable stdout/`print`; the only readable output
 //! is a table the chunk `return`s, queried via the `lpGet*` C API. Rather than
 //! walk an arbitrary nested table from Rust, we inject a tiny Lua serializer and
-//! wrap the user's code so the chunk returns `{ result = <string> }` (or
-//! `{ __error = <string> }` if the user code raised). Rust then reads that one
-//! string back with a single `lpGetStrKeyStrVal`.
+//! wrap the user's code so the chunk returns the serialized value (or the error
+//! message, if the user code raised) as a string. Rust reads that string back
+//! with `lpGetStrKeyStrVal`, in [`CHUNKED_RESULT`] pieces so no value is capped
+//! by unitsync's string buffer.
 
 use crate::ffi::Unitsync;
 use crate::model::{LuaExecOutput, LuaReplOutput};
@@ -120,24 +121,29 @@ pub fn emit_repl_error(msg: String) {
 /// back as perfectly ordinary data, so a game whose unit list outgrew the buffer
 /// silently became one unit with a nonsense name.
 ///
-/// This is the writing half of the fix: `__cb_chunk(s)` splits a result of any
+/// This is the writing half of the fix: `__cb_chunk(s)` splits a value of any
 /// size into buffer-sized pieces under `result1`..`resultN`, with the count in
-/// `chunks`, and [`crate::ffi::Unitsync::run_lua_source`] reads them back and
-/// joins them. Splitting is by byte offset, not by line, so the pieces
+/// `resultChunks`, and [`crate::ffi::Unitsync::run_lua_source`] reads them back
+/// and joins them. Splitting is by byte offset, not by line, so the pieces
 /// concatenate with no separator.
+///
+/// `prefix` names the field it writes, so one script can chunk several values.
+/// The REPL wrapper chunks its result, its `print` output and its error message
+/// into one shared table, passed as `extra`.
 pub const CHUNKED_RESULT: &str = r#"
-local function __cb_chunk(s, extra)
+local function __cb_chunk(s, extra, prefix)
   local out = extra or {}
+  prefix = prefix or 'result'
   s = (type(s) == 'string') and s or ''
   local size = 60000
   local n = 0
   local i = 1
   while i <= #s do
     n = n + 1
-    out['result' .. n] = string.sub(s, i, i + size - 1)
+    out[prefix .. n] = string.sub(s, i, i + size - 1)
     i = i + size
   end
-  out.chunks = tostring(n)
+  out[prefix .. 'Chunks'] = tostring(n)
   return out
 end
 "#;
@@ -189,12 +195,14 @@ end
 /// Wrap the user's source: prepend the serializer, run the user code inside a
 /// `pcall` (so a runtime error becomes data, not a chunk failure), and return a
 /// table carrying either the serialized result or the error message. A bare
-/// `return X` in the user source returns `X` from the inner function.
+/// `return X` in the user source returns `X` from the inner function. The result
+/// goes back in [`CHUNKED_RESULT`] pieces, so a value bigger than unitsync's
+/// string buffer survives.
 pub fn wrap_source(user: &str) -> String {
     format!(
-        "{SERIALIZER}\nlocal __cb_ok, __cb_val = pcall(function()\n{user}\nend)\n\
-         return {{ result = __cb_ok and __cb_dump(__cb_val) or nil, \
-         __error = (not __cb_ok) and tostring(__cb_val) or nil }}\n"
+        "{SERIALIZER}{CHUNKED_RESULT}\nlocal __cb_ok, __cb_val = pcall(function()\n{user}\nend)\n\
+         return __cb_chunk(__cb_ok and __cb_dump(__cb_val) or nil, \
+         {{ __error = (not __cb_ok) and tostring(__cb_val) or nil }})\n"
     )
 }
 
@@ -214,9 +222,14 @@ end
 "#;
 
 /// The driver loop appended after the per-chunk function definitions. Runs each
-/// chunk under `pcall`; resets `__cb_buf` right before the final chunk so only
-/// its prints survive; stops at the first error, tagging `__diverged` when that
-/// error came from a replayed (non-final) chunk.
+/// chunk under `pcall`, resets `__cb_buf` right before the final chunk so only
+/// its prints survive, and stops at the first error, tagging `__diverged` when
+/// that error came from a replayed (non-final) chunk.
+///
+/// The result, the prints and the error message each go back in
+/// [`CHUNKED_RESULT`] pieces. All three are user-sized: a console session can
+/// dump a whole unitdef table, print thousands of lines, or raise an error built
+/// from either, and any of them can outgrow unitsync's string buffer.
 const DRIVER: &str = r#"
 local __cb_result, __cb_err, __cb_diverged
 for __cb_i = 1, __cb_n do
@@ -229,7 +242,11 @@ for __cb_i = 1, __cb_n do
   end
   if __cb_i == __cb_n then __cb_result = __cb_dump(__cb_val) end
 end
-return { result = __cb_result, __error = __cb_err, __diverged = __cb_diverged, prints = table.concat(__cb_buf, "\n") }
+local __cb_out = __cb_chunk(__cb_result, nil, 'result')
+__cb_chunk(table.concat(__cb_buf, "\n"), __cb_out, 'prints')
+__cb_chunk(__cb_err, __cb_out, 'error')
+__cb_out.__diverged = __cb_diverged
+return __cb_out
 "#;
 
 /// Wrap a session's `chunks` into one script: serializer + `print` shim + each
@@ -239,6 +256,7 @@ return { result = __cb_result, __error = __cb_err, __diverged = __cb_diverged, p
 pub fn wrap_chunks(chunks: &[String]) -> String {
     let mut s = String::with_capacity(SERIALIZER.len() + PRINT_SHIM.len() + DRIVER.len() + 256);
     s.push_str(SERIALIZER);
+    s.push_str(CHUNKED_RESULT);
     s.push_str(PRINT_SHIM);
     s.push_str("local __cb_chunks = {}\n");
     for (i, chunk) in chunks.iter().enumerate() {
@@ -258,12 +276,27 @@ mod tests {
     use super::*;
     use mlua::Lua;
 
+    /// Rejoin one chunked field of a wrapped script's table, the way the FFI
+    /// reader does. `None` when the field is empty.
+    fn field(t: &mlua::Table, prefix: &str) -> Option<String> {
+        let n: usize = t
+            .get::<String>(format!("{prefix}Chunks"))
+            .unwrap_or_else(|_| panic!("{prefix} has no chunk count"))
+            .parse()
+            .unwrap();
+        let joined: String = (1..=n)
+            .map(|i| t.get::<String>(format!("{prefix}{i}")).unwrap())
+            .collect();
+        Some(joined).filter(|s| !s.is_empty())
+    }
+
     /// Evaluate a wrapped script in stock Lua 5.1 and return its `(result,
-    /// __error)` fields — exactly what the worker reads back from unitsync.
+    /// __error)` fields, exactly what the worker reads back from unitsync.
     fn eval(user: &str) -> (Option<String>, Option<String>) {
         let lua = Lua::new();
         let t: mlua::Table = lua.load(wrap_source(user)).eval().unwrap();
-        (t.get("result").ok(), t.get("__error").ok())
+        let result = field(&t, "result");
+        (result, t.get("__error").ok())
     }
 
     #[test]
@@ -304,23 +337,21 @@ mod tests {
     }
 
     /// Evaluate a wrapped multi-chunk session in stock Lua 5.1 and return its
-    /// four fields. Empty strings are normalized to `None` to match the FFI
-    /// reader, which drops empty `lpGetStrKeyStrVal` results.
+    /// four fields, rejoining the chunked ones. Empty strings are normalized to
+    /// `None` to match the FFI reader, which drops empty values.
     fn eval_chunks(chunks: &[&str]) -> Repl {
         let owned: Vec<String> = chunks.iter().map(|s| s.to_string()).collect();
         let lua = Lua::new();
         let t: mlua::Table = lua.load(wrap_chunks(&owned)).eval().unwrap();
-        let get = |k: &str| {
-            t.get::<Option<String>>(k)
+        Repl {
+            result: field(&t, "result"),
+            error: field(&t, "error"),
+            diverged: t
+                .get::<Option<String>>("__diverged")
                 .ok()
                 .flatten()
-                .filter(|s| !s.is_empty())
-        };
-        Repl {
-            result: get("result"),
-            error: get("__error"),
-            diverged: get("__diverged"),
-            prints: get("prints"),
+                .filter(|s| !s.is_empty()),
+            prints: field(&t, "prints"),
         }
     }
 
@@ -386,7 +417,7 @@ mod tests {
             .load(format!("{CHUNKED_RESULT}\nreturn __cb_chunk({expr})"))
             .eval()
             .unwrap();
-        let n: usize = t.get::<String>("chunks").unwrap().parse().unwrap();
+        let n: usize = t.get::<String>("resultChunks").unwrap().parse().unwrap();
         (1..=n)
             .map(|i| t.get::<String>(format!("result{i}")).unwrap())
             .collect()
@@ -428,6 +459,47 @@ mod tests {
             .unwrap();
         assert_eq!(t.get::<String>("__error").unwrap(), "boom");
         assert_eq!(t.get::<String>("result1").unwrap(), "x");
+    }
+
+    /// The console is the easiest way to outgrow the buffer: dump a unitdef
+    /// table and print a few thousand lines while you are at it. Both come back
+    /// through the same 100,000 byte buffer, so both have to be split.
+    #[test]
+    fn a_big_repl_result_and_its_prints_both_survive() {
+        let owned = vec![
+            "for i = 1, 3000 do print(string.rep('y', 50)) end\nreturn string.rep('x', 120000)"
+                .to_string(),
+        ];
+        let lua = Lua::new();
+        let t: mlua::Table = lua.load(wrap_chunks(&owned)).eval().unwrap();
+        for prefix in ["result", "prints"] {
+            let n: usize = t
+                .get::<String>(format!("{prefix}Chunks"))
+                .unwrap()
+                .parse()
+                .unwrap();
+            assert!(n > 1, "{prefix} was not split");
+            for i in 1..=n {
+                let piece = t.get::<String>(format!("{prefix}{i}")).unwrap();
+                assert!(
+                    piece.len() < 100_000,
+                    "{prefix}{i} is {} bytes",
+                    piece.len()
+                );
+            }
+        }
+        // The serializer quotes the string, so the result is the 120,000 x's
+        // plus a pair of quotes.
+        assert_eq!(field(&t, "result").unwrap().len(), 120_002);
+        assert_eq!(field(&t, "prints").unwrap().len(), 3000 * 51 - 1);
+    }
+
+    #[test]
+    fn a_big_repl_error_survives() {
+        let r = eval_chunks(&["error(string.rep('z', 120000))"]);
+        assert!(r.result.is_none());
+        let err = r.error.expect("the chunk raised");
+        assert!(err.len() >= 120_000, "error is {} bytes", err.len());
     }
 
     #[test]
