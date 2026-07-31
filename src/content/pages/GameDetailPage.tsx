@@ -80,7 +80,7 @@ export default function GameDetailPage() {
   // The reusable unit graph (units + buildoptions edges) backs the per-side build
   // buttons + drawer (see FactionBuildList). Fetched on demand when this page opens —
   // never during the scan.
-  const { dataset } = useUnitsyncUnitDataset(
+  const { dataset, status: datasetStatus } = useUnitsyncUnitDataset(
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
@@ -210,6 +210,13 @@ export default function GameDetailPage() {
               ? ` · ${gameInfo.unitCount} units`
               : ""}
           </h2>
+          {/* An unreadable unit list leaves every faction button on nothing,
+              which otherwise reads as a game with no build tree. */}
+          {datasetStatus === "error" && (
+            <p className="text-xs text-muted-foreground">
+              Could not read this game's units, so its build trees are empty.
+            </p>
+          )}
           {gameInfoLoading || !gameInfo || !selected ? (
             <Skeleton className="h-12 rounded-lg border border-border/50 bg-card" />
           ) : (

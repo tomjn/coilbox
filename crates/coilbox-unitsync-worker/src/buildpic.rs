@@ -118,7 +118,9 @@ local parts = {}
 for name in pairs(want) do
   parts[#parts + 1] = name .. '\t' .. (found[name] or '\t')
 end
-return { result = table.concat(parts, '\n') }
+-- In pieces: an all-factions export asks for every unit in the game at once,
+-- which is more than unitsync can return in one string.
+return __cb_chunk(table.concat(parts, '\n'))
 "#;
 
 fn build_buildpic_script(units: &[String]) -> String {
@@ -127,7 +129,11 @@ fn build_buildpic_script(units: &[String]) -> String {
         .iter()
         .map(|u| format!("['{}']=true,", u.to_lowercase()))
         .collect();
-    BUILDPIC_SCRIPT.replace("__WANT__", &want)
+    format!(
+        "{}{}",
+        crate::lua::CHUNKED_RESULT,
+        BUILDPIC_SCRIPT.replace("__WANT__", &want)
+    )
 }
 
 /// Parse the `unit\tbuildpic\tname` lines the Lua script returns into a map keyed
@@ -521,6 +527,9 @@ mod tests {
         assert!(s.contains("VFS.SubDirs")); // recursive fallback
         assert!(s.contains("lowerkeys")); // gamedata helper shim
         assert!(s.contains(".buildpic") && s.contains(".name"));
-        assert!(s.contains("result ="));
+        // The result goes back in buffer-sized pieces, so the helper that makes
+        // them has to be part of the script the parser runs.
+        assert!(s.contains("local function __cb_chunk"));
+        assert!(s.contains("return __cb_chunk("));
     }
 }

@@ -107,6 +107,45 @@ pub(crate) unsafe fn cstr(p: *const c_char) -> Option<String> {
     }
 }
 
+/// What unitsync writes into its string buffer instead of a value that does not
+/// fit in it (`GetStr` in `unitsync.cpp`, buffer size 100,000 bytes). It reads
+/// back like any other string, so anything that sees it must treat it as a lost
+/// value rather than data.
+const STRBUF_COMPLAINT: &str = "Increase STRBUF_SIZE";
+
+/// `Err` if `value` is unitsync's buffer complaint rather than the value asked
+/// for. `field` names the key that was read, so the message says what was lost.
+fn check_strbuf(value: &str, field: &str) -> Result<(), String> {
+    if value.starts_with(STRBUF_COMPLAINT) {
+        return Err(format!(
+            "unitsync could not return `{field}` because it does not fit in its \
+             100,000 byte string buffer ({value})"
+        ));
+    }
+    Ok(())
+}
+
+/// Join the `result1`..`resultN` pieces [`crate::lua::CHUNKED_RESULT`] produced,
+/// reading each through `get`. A missing or complaint-filled piece is an error:
+/// silently joining what did arrive would hand back a plausible-looking but
+/// incomplete list, which is the failure this whole path exists to end.
+fn read_chunked_result(n: usize, mut get: impl FnMut(String) -> String) -> Result<String, String> {
+    let mut out = String::new();
+    for i in 1..=n {
+        let field = format!("result{i}");
+        let part = get(field.clone());
+        check_strbuf(&part, &field)?;
+        if part.is_empty() {
+            return Err(format!(
+                "the Lua parser returned {} of {n} result chunks",
+                i - 1
+            ));
+        }
+        out.push_str(&part);
+    }
+    Ok(out)
+}
+
 /// A loaded unitsync library plus its resolved entry points. The `Library` is
 /// kept alive in `_lib` so the copied function pointers stay valid.
 pub struct Unitsync {
@@ -1383,11 +1422,18 @@ impl Unitsync {
 
     /// Execute a Lua source string through unitsync's `LuaParser` with `modes`
     /// VFS access. The caller must wrap the user's code so the chunk returns a
-    /// table with a string `result` field (and an optional `__error` field) —
+    /// table with a string `result` field (and an optional `__error` field),
     /// see [`crate::lua::wrap_source`]. Returns the `result` string on success,
     /// or `Err(message)` for a compile error (`lpOpenSource` failed), a chunk
     /// failure (`lpRootTable` empty), a captured runtime error (`__error` set),
     /// or a build that lacks the Lua-parser symbols.
+    ///
+    /// A result too big for unitsync's 100,000 byte string buffer arrives in
+    /// pieces instead: a `chunks` count plus `result1`..`resultN`, produced by
+    /// [`crate::lua::CHUNKED_RESULT`] and rejoined here. A script that sets no
+    /// `chunks` is read from `result` as before, and either way a value that
+    /// came back as unitsync's own buffer complaint is an error rather than
+    /// data, because the real result is gone.
     pub fn run_lua_source(&self, source: &str, modes: &str) -> Result<String, String> {
         let (Some(open), Some(execute), Some(close), Some(root), Some(get_str)) = (
             self.lp_open_source_fn,
@@ -1400,11 +1446,12 @@ impl Unitsync {
                         (lpOpenSource/lpGetStrKeyStrVal)"
                 .into());
         };
-        let (Ok(csrc), Ok(cmodes), Ok(result_key), Ok(err_key), Ok(empty)) = (
+        let (Ok(csrc), Ok(cmodes), Ok(result_key), Ok(err_key), Ok(chunks_key), Ok(empty)) = (
             CString::new(source),
             CString::new(modes),
             CString::new("result"),
             CString::new("__error"),
+            CString::new("chunks"),
             CString::new(""),
         ) else {
             return Err("Lua source or arguments contained a NUL byte".into());
@@ -1428,11 +1475,25 @@ impl Unitsync {
             }
             let runtime_err =
                 cstr(get_str(err_key.as_ptr(), empty.as_ptr())).filter(|s| !s.is_empty());
-            let result = cstr(get_str(result_key.as_ptr(), empty.as_ptr())).unwrap_or_default();
+            let chunks = cstr(get_str(chunks_key.as_ptr(), empty.as_ptr()))
+                .and_then(|s| s.trim().parse::<usize>().ok());
+            let result = match chunks {
+                Some(n) => read_chunked_result(n, |key| {
+                    CString::new(key)
+                        .ok()
+                        .and_then(|k| cstr(get_str(k.as_ptr(), empty.as_ptr())))
+                        .unwrap_or_default()
+                }),
+                None => {
+                    let raw =
+                        cstr(get_str(result_key.as_ptr(), empty.as_ptr())).unwrap_or_default();
+                    check_strbuf(&raw, "result").map(|()| raw)
+                }
+            };
             close();
             match runtime_err {
                 Some(e) => Err(e),
-                None => Ok(result),
+                None => result,
             }
         }
     }
@@ -1609,5 +1670,61 @@ impl Unitsync {
     pub fn spring_config_file(&self) -> Option<String> {
         let f = self.spring_config_file_fn?;
         unsafe { cstr(f()) }.filter(|s| !s.is_empty())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    /// Stand-in for `lpGetStrKeyStrVal`: reads a prepared table, empty for a key
+    /// the script never set.
+    fn reader(fields: &HashMap<String, String>) -> impl FnMut(String) -> String + '_ {
+        move |key| fields.get(&key).cloned().unwrap_or_default()
+    }
+
+    #[test]
+    fn joins_chunks_in_order_with_no_separator() {
+        let fields = HashMap::from([
+            ("result1".to_string(), "armcom\tArmada Com".to_string()),
+            (
+                "result2".to_string(),
+                "mander\n armsolar\tSolar".to_string(),
+            ),
+        ]);
+        let joined = read_chunked_result(2, reader(&fields)).expect("both chunks present");
+        assert_eq!(joined, "armcom\tArmada Commander\n armsolar\tSolar");
+    }
+
+    #[test]
+    fn no_chunks_is_an_empty_result() {
+        let fields = HashMap::new();
+        assert_eq!(read_chunked_result(0, reader(&fields)).as_deref(), Ok(""));
+    }
+
+    #[test]
+    fn a_missing_chunk_fails_rather_than_returning_a_short_list() {
+        let fields = HashMap::from([("result1".to_string(), "armcom\tArmada".to_string())]);
+        let err = read_chunked_result(3, reader(&fields)).expect_err("chunk 2 is missing");
+        assert!(err.contains("1 of 3"), "got: {err}");
+    }
+
+    #[test]
+    fn a_chunk_that_overflowed_the_buffer_fails() {
+        // What unitsync writes when a value does not fit: it reads back as data,
+        // so the only way to tell is to recognise it.
+        let fields = HashMap::from([(
+            "result1".to_string(),
+            "Increase STRBUF_SIZE (needs 132890 bytes)".to_string(),
+        )]);
+        let err = read_chunked_result(1, reader(&fields)).expect_err("the value was lost");
+        assert!(err.contains("100,000 byte string buffer"), "got: {err}");
+        assert!(err.contains("result1"), "got: {err}");
+    }
+
+    #[test]
+    fn an_ordinary_result_passes_the_buffer_check() {
+        assert!(check_strbuf("armcom\tArmada Commander", "result").is_ok());
     }
 }

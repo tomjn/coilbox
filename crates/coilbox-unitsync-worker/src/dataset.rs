@@ -23,9 +23,10 @@ use std::path::Path;
 /// game's own files and the base `springcontent` def scripts.
 const VFS_ALL_MODES: &str = "rmMbe";
 
-/// The Lua that [`units_via_shim`] runs. It mirrors `game.rs`'s unit-list shim but
-/// also collects each unit's `buildoptions`. Keys and buildoptions are lowercased
-/// so the graph's edges match its node names.
+/// The Lua that [`units_via_shim`] runs, with [`crate::lua::CHUNKED_RESULT`]
+/// prepended. It mirrors `game.rs`'s unit-list shim but also collects each unit's
+/// `buildoptions`. Keys and buildoptions are lowercased so the graph's edges match
+/// its node names.
 const UNIT_DATASET_SHIM_SCRIPT: &str = r#"
 -- Supply the slice of the game environment unitsync doesn't provide but the
 -- shipped def scripts assume (same shims as game.rs's unit-list fallback).
@@ -79,7 +80,9 @@ for _, k in ipairs(names) do
   lines[#lines + 1] = string.lower(tostring(k)) .. '\t' .. full .. '\t'
     .. table.concat(opts, ',') .. '\t' .. mobile .. '\t' .. obj
 end
-return { result = table.concat(lines, '\n') }
+-- A big game's list runs to hundreds of kilobytes, far past what unitsync can
+-- hand back in one string, so it goes back in pieces.
+return __cb_chunk(table.concat(lines, '\n'))
 "#;
 
 /// Load `game_archive` and read its unit graph (units + `buildoptions` edges).
@@ -119,9 +122,16 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> UnitDa
     errors.extend(us.drain_errors());
 
     // Read the whole unitdef table (with buildoptions) through the Lua parser.
-    // An empty result is normal for legacy TDF (`.fbi`) games that ship no
-    // gamedata/defs.lua — not an error.
-    let mut units = units_via_shim(&us);
+    // A game that ships no gamedata/defs.lua (legacy TDF `.fbi` games) has no
+    // units to give, and says which of the two it is rather than reading as a
+    // game with nothing in it.
+    let mut units = match units_via_shim(&us) {
+        Ok(units) => units,
+        Err(e) => {
+            errors.push(format!("could not read this game's units: {}", e.trim()));
+            Vec::new()
+        }
+    };
     let _ = us.drain_errors();
     units.sort_by(|a, b| a.name.cmp(&b.name));
 
@@ -169,12 +179,13 @@ pub fn emit_error(msg: String) {
 
 /// Run the game's `gamedata/defs.lua` through the parser (archives already mounted
 /// by the caller) with the missing game environment shimmed in, and parse back the
-/// per-unit lines. Empty on any failure (matching the "no units" fallback).
-fn units_via_shim(us: &Unitsync) -> Vec<UnitDatasetEntry> {
-    match us.run_lua_source(UNIT_DATASET_SHIM_SCRIPT, VFS_ALL_MODES) {
-        Ok(raw) => parse_dataset_units(&raw),
-        Err(_) => Vec::new(),
-    }
+/// per-unit lines. The failure is returned rather than swallowed, because a game
+/// whose units cannot be read has to say so: an empty list is indistinguishable
+/// from a game that ships none.
+fn units_via_shim(us: &Unitsync) -> Result<Vec<UnitDatasetEntry>, String> {
+    let script = format!("{}{UNIT_DATASET_SHIM_SCRIPT}", crate::lua::CHUNKED_RESULT);
+    us.run_lua_source(&script, VFS_ALL_MODES)
+        .map(|raw| parse_dataset_units(&raw))
 }
 
 /// Parse the `name\tfullname\topt1,opt2,...` lines [`UNIT_DATASET_SHIM_SCRIPT`]
@@ -254,6 +265,6 @@ mod tests {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("Spring.TimeCheck"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("speed_of"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("objectname"));
-        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("result ="));
+        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("return __cb_chunk("));
     }
 }
