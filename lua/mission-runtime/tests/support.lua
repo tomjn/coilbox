@@ -74,6 +74,7 @@ function M.missionFiles(mission)
 			"luarules/mission_runtime/coilbox_unit_conditions.lua"),
 		["luarules/mission_runtime/coilbox_zones.lua"] = module("luarules/mission_runtime/coilbox_zones.lua"),
 		["luarules/mission_runtime/coilbox_vars.lua"] = module("luarules/mission_runtime/coilbox_vars.lua"),
+		["luarules/mission_runtime/coilbox_groups.lua"] = module("luarules/mission_runtime/coilbox_groups.lua"),
 		["missions/demo/mission.lua"] = function()
 			return mission
 		end,
@@ -121,18 +122,41 @@ function M.newEngine(modOptions, files, options)
 		rulesParams = {},
 		-- Every SendToUnsynced call, as its argument list.
 		sent = {},
+		-- Every GiveOrderToUnit call, as { unitID, cmd, params, opts }. Orders are
+		-- the whole of what the runtime does to a group, so they are recorded
+		-- rather than acted on.
+		orders = {},
+		-- Every unit def a Pos2BuildPos call named, so a test can say which
+		-- placements went through the build grid.
+		snapped = {},
 	}
 
 	--- The def id the engine would have given this name, invented on first use.
+	-- `options.buildings` is the set of def names that occupy the build grid.
 	local function unitDef(name)
 		local def = engine.env.UnitDefNames[name]
 		if not def then
-			def = { id = engine.nextDefID, name = name }
+			def = {
+				id = engine.nextDefID,
+				name = name,
+				isBuilding = (options.buildings or {})[name] == true,
+			}
 			engine.nextDefID = engine.nextDefID + 1
 			engine.env.UnitDefNames[name] = def
 			engine.env.UnitDefs[def.id] = def
 		end
 		return def
+	end
+
+	--- Every order a unit was given, in the order it was given them.
+	function engine.ordersFor(unitID)
+		local given = {}
+		for _, order in ipairs(engine.orders) do
+			if order[1] == unitID then
+				given[#given + 1] = order
+			end
+		end
+		return given
 	end
 
 	local function fire(callin, ...)
@@ -166,6 +190,8 @@ function M.newEngine(modOptions, files, options)
 			health = 100,
 			maxHealth = 100,
 			alive = true,
+			-- What the engine gives a unit whose def asks for nothing else.
+			movestate = 1,
 		}
 		engine.units[unitID] = unit
 		engine.order[#engine.order + 1] = unitID
@@ -312,6 +338,36 @@ function M.newEngine(modOptions, files, options)
 			SetUnitNoSelect = function(unitID, flag)
 				engine.noSelect[unitID] = flag
 			end,
+			GetUnitStates = function(unitID)
+				return { movestate = engine.units[unitID].movestate }
+			end,
+			-- Recorded rather than acted on: what the runtime asks a unit to do is
+			-- the whole of what a group does, and a stub that pretended to carry an
+			-- order out would be proving its own behaviour instead.
+			--
+			-- The one exception is the move state, which the runtime reads back
+			-- when it puts a group to sleep, so the stub has to keep it.
+			GiveOrderToUnit = function(unitID, cmd, params, opts)
+				table.insert(engine.orders, { unitID, cmd, params, opts })
+				if cmd == engine.env.CMD.MOVE_STATE then
+					engine.units[unitID].movestate = params[1]
+				end
+				return true
+			end,
+			TransferUnit = function(unitID, newTeam)
+				engine.give(unitID, newTeam)
+				return true
+			end,
+			-- The engine snaps to a 16-elmo grid with an offset that depends on the
+			-- footprint. This keeps only the part a test can assert: the placement
+			-- moved, and it moved for a building and not for anything else.
+			Pos2BuildPos = function(defID, x, _, z)
+				table.insert(engine.snapped, defID)
+				local function snap(value)
+					return math.floor(value / 16) * 16
+				end
+				return snap(x), 0, snap(z)
+			end,
 			SetTeamResource = function(team, kind, amount)
 				bank(team)[kind] = amount
 			end,
@@ -330,6 +386,21 @@ function M.newEngine(modOptions, files, options)
 			end,
 		},
 		Game = { mapName = "Test Map", gameSpeed = 30 },
+		-- The engine's own command constants, at the numbers it uses.
+		CMD = {
+			OPT_SHIFT = 32,
+			MOVE = 10,
+			PATROL = 15,
+			FIGHT = 16,
+			ATTACK = 20,
+			GUARD = 25,
+			FIRE_STATE = 45,
+			MOVE_STATE = 50,
+			REPEAT = 115,
+			MOVESTATE_HOLDPOS = 0,
+			MOVESTATE_MANEUVER = 1,
+			MOVESTATE_ROAM = 2,
+		},
 		-- Filled in as defs are used, so a test names units and never ids.
 		UnitDefs = {},
 		UnitDefNames = {},
@@ -362,6 +433,16 @@ function M.newEngine(modOptions, files, options)
 	setmetatable(env, { __index = _G })
 
 	engine.env = env
+
+	-- The engine has every unit def loaded before a gadget runs. The stub invents
+	-- them as they are used, which is enough until something reads a def before it
+	-- has spawned one, so the names a test declares are made up front.
+	for _, set in ipairs({ options.buildings or {}, options.defs or {} }) do
+		for name in pairs(set) do
+			unitDef(name)
+		end
+	end
+
 	return engine
 end
 

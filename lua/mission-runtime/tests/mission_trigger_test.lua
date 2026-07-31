@@ -49,7 +49,7 @@ check("the trigger engine is published", state.triggers ~= nil)
 check("a trigger the scenario disabled starts disabled", state.triggers:isEnabled("unlock") == false)
 check("every other trigger starts armed", state.triggers:isEnabled("count-check") == true)
 
-local ran = record(state.triggers, { "gift_units", "reveal_area", "unlock_unit" })
+local ran = record(state.triggers, { "reveal_area", "unlock_unit" })
 
 engine.env:GameFrame(0)
 check("nothing fires while the start window is open", state.triggers:isEnabled("count-check") == true)
@@ -88,7 +88,12 @@ check("and its disable_trigger took effect", state.triggers:isEnabled("count-che
 engine.give(state.units.outpost, 0)
 check("an actor changing hands fires the trigger watching for it",
 	state.triggers:isEnabled("outpost-captured") == false)
-check("that trigger's actions ran", ranAll(ran) == "unlock_unit,gift_units,reveal_area", ranAll(ran))
+check("that trigger's actions ran", ranAll(ran) == "unlock_unit,reveal_area", ranAll(ran))
+
+-- The mission gifts a dormant group it never spawned. Nothing to hand over, and
+-- an author who forgot the spawn_group is told so rather than left wondering.
+check("gifting a group that was never spawned says so",
+	logged(engine, "group reinforcements has no units on the map to gift"))
 
 --------------------------------------------------------------------------------
 -- Ambush: an actor's health and its death.
@@ -96,9 +101,7 @@ check("that trigger's actions ran", ranAll(ran) == "unlock_unit,gift_units,revea
 
 engine, state = playing("ambush")
 
-local lines = record(state.triggers, {
-	"dialogue", "play_sound", "camera_pan", "map_marker", "spawn_group", "wake_group", "give_orders",
-})
+local lines = record(state.triggers, { "dialogue", "play_sound", "camera_pan", "map_marker" })
 local scout = state.units.scout
 
 engine.env:GameFrame(1)
@@ -130,13 +133,33 @@ engine.move(patrol, 800, 800)
 engine.env:GameFrame(45)
 check("the player's units outside the pass do not spring the ambush",
 	state.triggers:isEnabled("spring-ambush") == true)
+check("a dormant group is not on the map before it is spawned",
+	#state.groups.units("raiders") == 0)
 
 engine.move(patrol, 100, 100)
 engine.env:GameFrame(60)
 check("walking into the pass springs it", state.triggers:isEnabled("spring-ambush") == false)
 check("and the whole trigger ran",
-	ranAll(lines) == "dialogue,dialogue,spawn_group,wake_group,give_orders,dialogue,camera_pan,"
-	.. "map_marker,play_sound", ranAll(lines))
+	ranAll(lines) == "dialogue,dialogue,dialogue,camera_pan,map_marker,play_sound", ranAll(lines))
+
+--------------------------------------------------------------------------------
+-- The raiders: spawn_group, wake_group and give_orders as the mission wrote
+-- them, against the real implementation.
+--------------------------------------------------------------------------------
+
+local raiders = state.groups.units("raiders")
+check("spawn_group put the whole group on the map", #raiders == 4, tostring(#raiders))
+check("its units are the def and team the scenario names",
+	engine.units[raiders[1]].def == "armpw" and engine.units[raiders[1]].team == 1)
+check("wake_group left it running its orders", state.groups.isAwake("raiders") == true)
+check("so it is not holding position",
+	engine.units[raiders[1]].movestate ~= engine.env.CMD.MOVESTATE_HOLDPOS)
+
+-- The scout the group was told to attack died earlier in this test. A declared
+-- actor that is dead is a target that is not there, not a name the mission got
+-- wrong, so nothing is reported.
+check("an order about an actor that has died is not reported as a bad name",
+	not logged(engine, "to give an order about"))
 
 --------------------------------------------------------------------------------
 -- Siege: holding a zone for a minute.
