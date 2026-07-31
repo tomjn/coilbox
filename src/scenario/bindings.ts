@@ -105,6 +105,28 @@ export const scenarioRuntimeStatus = defineCommand<
   { installed: RuntimeMarker | null; available: RuntimeMarker | null }
 >("coilbox-scenario", "scenario_runtime_status");
 
+/**
+ * Generate the test mutator under `dataDir`'s `games/`: coilbox's own `.sdd`
+ * carrying the mission runtime, the `modinfo.lua` the caller generated (which
+ * names the base game as its one dependency), and the one compiled mission with
+ * the scenario's dialogue clips beside it. Any previous scenario's mission is
+ * dropped, so the generated game holds exactly the one under test.
+ *
+ * `installed` is the runtime marker read back out of the generated game, so it
+ * is what the engine will load. See {@link writeTestMutator}, which is what
+ * callers use.
+ */
+export const scenarioTestMutator = defineCommand<
+  { dataDir: string; scenarioId: string; modinfo: string; mission: string },
+  {
+    dir: string;
+    folder: string;
+    installed: RuntimeMarker;
+    files: string[];
+    media: string[];
+  }
+>("coilbox-scenario", "scenario_test_mutator");
+
 /** Best-effort removal of a stored dialogue clip. */
 export const scenarioMediaDelete = defineCommand<
   { scenarioId: string; file: string },

@@ -28,6 +28,7 @@ use serde::Serialize;
 use serde_json::json;
 use std::path::{Path, PathBuf};
 
+mod mutator;
 mod runtime;
 use tauri::{
     plugin::{Builder, TauriPlugin},
@@ -348,6 +349,77 @@ async fn scenario_runtime_status<R: Runtime>(app: AppHandle<R>, root: String) ->
     CliResult::ok(json!({ "installed": installed, "available": available }))
 }
 
+/// `scenario_test_mutator`, generating the game a scenario is tested in.
+///
+/// A game that has not vendored the runtime, and a packaged one that cannot be
+/// written into at all, still has to be testable. So coilbox writes a game of
+/// its own under `<data_dir>/games/coilbox-mission-test.sdd`: the `modinfo.lua`
+/// the frontend generated, which names the base game as its one dependency, the
+/// mission runtime, and the one compiled mission with its dialogue clips beside
+/// it. Everything else comes from the base game.
+///
+/// A test route, never a distribution one. Nothing outside that one folder is
+/// touched, so deleting it undoes the lot, and re-running rewrites the same
+/// files: the previous scenario's mission is dropped, because the mutator
+/// carries exactly the one under test.
+///
+/// The marker is read back out of the generated game rather than reported from
+/// what was written, for the reason [`scenario_runtime_install`] does it.
+#[tauri::command]
+async fn scenario_test_mutator<R: Runtime>(
+    app: AppHandle<R>,
+    data_dir: String,
+    scenario_id: String,
+    modinfo: String,
+    mission: String,
+) -> CliResult {
+    if !valid_id(&scenario_id) {
+        return CliResult::err(format!("invalid scenario id: {scenario_id}"));
+    }
+    let dir = match mutator::mutator_dir(&data_dir) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let Some(src) = runtime::runtime_dir(&app) else {
+        return CliResult::err("could not find the bundled mission runtime".to_string());
+    };
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return CliResult::err(format!("could not create {}: {e}", dir.display()));
+    }
+    if let Err(e) = mutator::write_file(&dir.join("modinfo.lua"), &modinfo) {
+        return CliResult::err(e);
+    }
+    let files = match runtime::install(&src, &dir) {
+        Ok(f) => f,
+        Err(e) => return CliResult::err(e),
+    };
+    if let Err(e) = mutator::prune_missions(&dir, &scenario_id) {
+        return CliResult::err(e);
+    }
+    let missions = mutator::mission_dir(&dir, &scenario_id);
+    if let Err(e) = mutator::write_file(&missions.join("mission.lua"), &mission) {
+        return CliResult::err(e);
+    }
+    let media = match media_dir(&app) {
+        Ok(d) => d.join(&scenario_id),
+        Err(e) => return CliResult::err(e),
+    };
+    let clips = match mutator::copy_media(&media, &missions) {
+        Ok(c) => c,
+        Err(e) => return CliResult::err(e),
+    };
+    match runtime::read_marker(&dir) {
+        Ok(installed) => CliResult::ok(json!({
+            "dir": dir.to_string_lossy(),
+            "folder": mutator::FOLDER,
+            "installed": installed,
+            "files": files,
+            "media": clips,
+        })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `scenario_media_delete`, a best-effort removal of a stored clip. Dropping a
 /// portrait from a dialogue line needn't fail if the file is already gone.
 #[tauri::command]
@@ -382,7 +454,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_media_write,
             scenario_read_mission,
             scenario_runtime_install,
-            scenario_runtime_status
+            scenario_runtime_status,
+            scenario_test_mutator
         ])
         .build()
 }

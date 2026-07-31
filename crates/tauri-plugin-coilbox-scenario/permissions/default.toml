@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the scenario plugin's storage, dialogue-media, compiled-mission read-back and mission-runtime install commands."
+description = "Allows the scenario plugin's storage, dialogue-media, compiled-mission read-back, mission-runtime install and test-mutator commands."
 permissions = [
   "allow-scenario-list",
   "allow-scenario-save",
@@ -13,4 +13,5 @@ permissions = [
   "allow-scenario-read-mission",
   "allow-scenario-runtime-install",
   "allow-scenario-runtime-status",
+  "allow-scenario-test-mutator",
 ]

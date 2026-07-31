@@ -13,6 +13,7 @@ const COMMANDS: &[&str] = &[
     "scenario_read_mission",
     "scenario_runtime_install",
     "scenario_runtime_status",
+    "scenario_test_mutator",
 ];
 
 fn main() {
