@@ -1,0 +1,258 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const runtimeStatusMock = vi.fn();
+const writeMissionMock = vi.fn();
+const testMutatorMock = vi.fn();
+const readMissionMock = vi.fn();
+
+// launch.ts reaches the plugin through bindings.ts, whose plugin-sdk import
+// Vitest's node resolver cannot load from the published dist. Stubbed the way
+// mutator.test.ts stubs it.
+vi.mock("./bindings", () => ({
+  scenarioRuntimeStatus: (...args: unknown[]) => runtimeStatusMock(...args),
+  scenarioWriteMission: (...args: unknown[]) => writeMissionMock(...args),
+  scenarioTestMutator: (...args: unknown[]) => testMutatorMock(...args),
+  scenarioReadMission: (...args: unknown[]) => readMissionMock(...args),
+}));
+
+import type { GameItem } from "../content/bindings";
+import type { Participant } from "../play/participants";
+import {
+  launchScenario,
+  MISSION_MODOPTION,
+  missionIssueMessage,
+  scenarioRoute,
+} from "./launch";
+import { parseScenario, type Scenario } from "./model";
+import { MUTATOR_FOLDER } from "./mutator";
+
+const you: Participant = {
+  id: "you",
+  kind: "you",
+  name: "Player",
+  side: "",
+  color: [1, 0, 0],
+  allyTeam: 0,
+  spectator: false,
+};
+
+function build(overrides: Record<string, unknown> = {}): Scenario {
+  const scenario = parseScenario({
+    id: "s1",
+    name: "Scenario",
+    runtimeVersion: 1,
+    setup: {
+      gameName: "Splinter Faction test",
+      mapName: "Comet Catcher Redux",
+      startPosType: 0,
+      modOptionValues: { deathmode: "com" },
+      participants: [you],
+    },
+    teams: { you: {} },
+    ...overrides,
+  });
+  if (!scenario) throw new Error("fixture is not a valid scenario");
+  return scenario;
+}
+
+/** A game as the content scan reports it. */
+function game(name: string, archive: string, path?: string): GameItem {
+  return {
+    name,
+    primaryArchive: { name: archive, path },
+    dependencyArchives: [],
+    info: {},
+  };
+}
+
+const LOOSE = game("Splinter Faction test", "sf.sdd", "/games/sf.sdd");
+const PACKAGED = game("Splinter Faction test", "sf.sdz");
+const MUTATOR = game("Coilbox mission test test", MUTATOR_FOLDER, "/m");
+
+describe("scenarioRoute", () => {
+  it("lets a game that vendors a new enough runtime play the scenario itself", () => {
+    const choice = scenarioRoute({ game: LOOSE, installed: 2, required: 1 });
+
+    expect(choice.route).toBe("adopted");
+    expect(choice.reason).toContain("version 2");
+  });
+
+  it("sends a packaged game to the mutator, because it cannot be written into", () => {
+    const choice = scenarioRoute({ game: PACKAGED, installed: 2, required: 1 });
+
+    expect(choice.route).toBe("mutator");
+    expect(choice.reason).toContain("packaged archive");
+  });
+
+  it("sends a game with no runtime to the mutator", () => {
+    const choice = scenarioRoute({ game: LOOSE, installed: null, required: 1 });
+
+    expect(choice.route).toBe("mutator");
+    expect(choice.reason).toContain("has not adopted");
+  });
+
+  it("sends a game whose runtime is older than the scenario to the mutator", () => {
+    const choice = scenarioRoute({ game: LOOSE, installed: 1, required: 3 });
+
+    expect(choice.route).toBe("mutator");
+    expect(choice.reason).toContain("needs version 3");
+  });
+});
+
+describe("launchScenario", () => {
+  const launch = vi.fn();
+  const rescan = vi.fn();
+
+  function run(scenario: Scenario, games: GameItem[]) {
+    return launchScenario({
+      scenario,
+      dataDir: "/data",
+      games,
+      rescan,
+      launch,
+    });
+  }
+
+  beforeEach(() => {
+    runtimeStatusMock.mockReset();
+    writeMissionMock.mockReset();
+    testMutatorMock.mockReset();
+    readMissionMock.mockReset();
+    launch.mockReset();
+    rescan.mockReset();
+
+    runtimeStatusMock.mockResolvedValue({
+      installed: { version: 1, schemaVersion: 1, conditions: [], actions: [] },
+      available: { version: 1, schemaVersion: 1, conditions: [], actions: [] },
+    });
+    writeMissionMock.mockResolvedValue({
+      dir: "/games/sf.sdd/missions/s1",
+      media: [],
+    });
+    testMutatorMock.mockResolvedValue({
+      dir: "/data/games/coilbox-mission-test.sdd",
+      folder: MUTATOR_FOLDER,
+      installed: { version: 1, schemaVersion: 1, conditions: [], actions: [] },
+      files: [],
+      media: [],
+    });
+    readMissionMock.mockResolvedValue({ mission: { schemaVersion: 1 } });
+    rescan.mockResolvedValue([LOOSE, MUTATOR]);
+    launch.mockResolvedValue({ exitCode: 0 });
+  });
+
+  it("writes the mission into a game that vendors the runtime, and plays it as itself", async () => {
+    const result = await run(build(), [LOOSE]);
+
+    expect(writeMissionMock).toHaveBeenCalledWith({
+      root: "/games/sf.sdd",
+      scenarioId: "s1",
+      mission: expect.stringContaining("Compiled by coilbox"),
+    });
+    expect(testMutatorMock).not.toHaveBeenCalled();
+    expect(result.ok && result.route).toBe("adopted");
+    expect(result.ok && result.config.gameType).toBe("Splinter Faction test");
+    expect(result.ok && result.mission).toBe("missions/s1/mission.lua");
+  });
+
+  it("arms the runtime with the scenario id, keeping the setup's own modoptions", async () => {
+    const result = await run(build(), [LOOSE]);
+
+    expect(result.ok && result.config.modOptions).toEqual({
+      deathmode: "com",
+      [MISSION_MODOPTION]: "s1",
+    });
+  });
+
+  it("validates what was written into the game, not the document", async () => {
+    await run(build(), [LOOSE]);
+
+    expect(readMissionMock).toHaveBeenCalledWith({
+      root: "/games/sf.sdd",
+      path: "missions/s1/mission.lua",
+    });
+  });
+
+  it("plays a packaged game through the mutator, under the name the engine reports", async () => {
+    const result = await run(build(), [PACKAGED]);
+
+    expect(testMutatorMock).toHaveBeenCalled();
+    expect(writeMissionMock).not.toHaveBeenCalled();
+    expect(rescan).toHaveBeenCalled();
+    expect(result.ok && result.route).toBe("mutator");
+    expect(result.ok && result.config.gameType).toBe(
+      "Coilbox mission test test",
+    );
+  });
+
+  it("refuses to launch a mission that did not validate", async () => {
+    readMissionMock.mockResolvedValue({
+      mission: {
+        schemaVersion: 1,
+        teams: { you: { team: 0 } },
+        actors: [{ id: "boss", unitDef: "armcom", team: "nobody" }],
+      },
+    });
+
+    const result = await run(build(), [LOOSE]);
+
+    expect(launch).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.issues).toHaveLength(1);
+    expect(!result.ok && result.message).toContain('no team called "nobody"');
+  });
+
+  it("refuses a mission the engine could not load at all", async () => {
+    readMissionMock.mockRejectedValue(new Error("unexpected symbol near '}'"));
+
+    const result = await run(build(), [LOOSE]);
+
+    expect(launch).not.toHaveBeenCalled();
+    expect(!result.ok && result.message).toContain("unexpected symbol");
+  });
+
+  it("does not even rescan when the mutator's mission is broken", async () => {
+    readMissionMock.mockRejectedValue(new Error("no such file"));
+
+    await run(build(), [PACKAGED]);
+
+    expect(rescan).not.toHaveBeenCalled();
+    expect(launch).not.toHaveBeenCalled();
+  });
+
+  it("refuses a scenario whose game is not installed", async () => {
+    const result = await run(build(), []);
+
+    expect(launch).not.toHaveBeenCalled();
+    expect(!result.ok && result.message).toContain("Splinter Faction test");
+  });
+
+  it("refuses a scenario newer than the runtime coilbox itself ships", async () => {
+    const result = await run(build({ runtimeVersion: 9 }), [PACKAGED]);
+
+    expect(launch).not.toHaveBeenCalled();
+    expect(!result.ok && result.message).toContain("ships version 1");
+  });
+
+  it("refuses when the engine did not pick the mutator up", async () => {
+    rescan.mockResolvedValue([PACKAGED]);
+
+    const result = await run(build(), [PACKAGED]);
+
+    expect(launch).not.toHaveBeenCalled();
+    expect(!result.ok && result.message).toContain("did not pick up");
+  });
+});
+
+describe("missionIssueMessage", () => {
+  it("leads with the first problem and counts the rest", () => {
+    const message = missionIssueMessage([
+      { path: "actors[0].team", message: 'no team called "x"' },
+      { path: "actors[1].team", message: 'no team called "y"' },
+    ]);
+
+    expect(message).toContain("2 problems");
+    expect(message).toContain('actors[0].team: no team called "x"');
+    expect(message).toContain("(and 1 more)");
+  });
+});
