@@ -1,9 +1,11 @@
+import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
 import {
   AIM_TRACK,
   BUILDARM,
   countRoles,
+  ENGINE_ROTATION_ORDER,
   HOVER_BOB,
   IDLE_SWAY,
   isRole,
@@ -77,6 +79,59 @@ function depth(
   if (!delta?.position) throw new Error(`${role} is not moved at ${t}`);
   return delta.position[2];
 }
+
+/**
+ * `CQuaternion::FromEulerYPR`, transcribed from the engine, with pitch about
+ * x, yaw about y and roll about z. This is what the engine turns a piece's
+ * script rotation into, so it is what a delta has to agree with.
+ */
+function enginePieceRotation(
+  rotation: readonly number[],
+): [number, number, number, number] {
+  const [sp, sy, sr] = rotation.map((angle) => Math.sin(angle * 0.5));
+  const [cp, cy, cr] = rotation.map((angle) => Math.cos(angle * 0.5));
+  return [
+    cr * cy * sp + cp * sr * sy,
+    cp * cr * sy - cy * sp * sr,
+    cp * cy * sr - cr * sp * sy,
+    cp * cr * cy + sp * sr * sy,
+  ];
+}
+
+function composed(
+  rotation: readonly number[],
+  order: THREE.EulerOrder,
+): [number, number, number, number] {
+  const quaternion = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(rotation[0], rotation[1], rotation[2], order),
+  );
+  return [quaternion.x, quaternion.y, quaternion.z, quaternion.w];
+}
+
+describe("rotation order", () => {
+  // A moment where the aim piece has both a heading and a pitch, which is the
+  // only case the two orders disagree on and the reason this is pinned.
+  const twoAxis = AIM_TRACK.track(1.4, {}, "aim")?.rotation ?? [];
+
+  it("composes a delta the way the engine composes a script rotation", () => {
+    expect(twoAxis[0]).not.toBeCloseTo(0, 3);
+    expect(twoAxis[1]).not.toBeCloseTo(0, 3);
+
+    const engine = enginePieceRotation(twoAxis);
+    composed(twoAxis, ENGINE_ROTATION_ORDER).forEach((term, index) => {
+      expect(term).toBeCloseTo(engine[index], 12);
+    });
+  });
+
+  it("does not agree with three's default order", () => {
+    // Not a curiosity: XYZ is what playback used before, and this is the
+    // assertion that fails if it drifts back. Turning about x and y flips the
+    // sign of z, which is the term the two orders part company on.
+    const engine = enginePieceRotation(twoAxis);
+    expect(composed(twoAxis, "XYZ")[2]).toBeCloseTo(-engine[2], 12);
+    expect(composed(twoAxis, "XYZ")[2]).not.toBeCloseTo(engine[2], 6);
+  });
+});
 
 describe("roles", () => {
   it("has no duplicate ids", () => {

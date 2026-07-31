@@ -70,6 +70,21 @@ export interface TrackDelta {
   rotation?: [number, number, number];
 }
 
+/**
+ * The order the three angles in a `TrackDelta` compose in, as a three.js Euler
+ * order, because that is what the engine does with a piece's script rotation.
+ *
+ * `S3DModelPiece::ComposeTransform` builds `T(pos) * R(baked) * R(script)`
+ * with the script rotation as `CQuaternion::FromEulerYPR`, whose four terms
+ * are `sp*cy*cr + cp*sy*sr`, `cp*sy*cr - sp*cy*sr`, `cp*cy*sr - sp*sy*cr` and
+ * `cp*cy*cr + sp*sy*sr` for pitch about x, yaw about y and roll about z. Those
+ * are three.js's own `YXZ` terms exactly.
+ *
+ * Three's default is `XYZ`, which agrees only while a piece turns about one
+ * axis at a time.
+ */
+export const ENGINE_ROTATION_ORDER = "YXZ";
+
 /** Callins a preset can contribute to in a generated unit script. */
 export type LuaHook =
   | "Create"

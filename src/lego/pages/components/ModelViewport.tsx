@@ -45,7 +45,11 @@ import {
 } from "@/components/ui/tooltip";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
-import { type AnimPreset, presetById } from "../../animPresets";
+import {
+  type AnimPreset,
+  ENGINE_ROTATION_ORDER,
+  presetById,
+} from "../../animPresets";
 import { unitAtlas } from "../../atlas";
 import {
   buildFrontMarker,
@@ -2831,6 +2835,9 @@ function disposeBaked(state: SceneState) {
  * Each piece sits at its baked offset and takes the sum of every applied
  * preset's delta as a rotation about its own origin, so two presets touching
  * the same piece add up rather than one winning.
+ *
+ * The summed angles compose in the engine's order for as long as playback owns
+ * the group, and `restoreFromPlayback` puts it back.
  */
 function applyAnimation(state: SceneState, project: LegoProject, t: number) {
   const applied = (project.animations ?? [])
@@ -2866,6 +2873,7 @@ function applyAnimation(state: SceneState, project: LegoProject, t: number) {
       }
     }
     group.position.set(...position);
+    group.rotation.order = ENGINE_ROTATION_ORDER;
     group.rotation.set(...rotation);
   }
 }
