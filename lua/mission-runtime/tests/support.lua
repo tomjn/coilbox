@@ -73,6 +73,7 @@ function M.missionFiles(mission)
 		["luarules/mission_runtime/coilbox_unit_conditions.lua"] = module(
 			"luarules/mission_runtime/coilbox_unit_conditions.lua"),
 		["luarules/mission_runtime/coilbox_zones.lua"] = module("luarules/mission_runtime/coilbox_zones.lua"),
+		["luarules/mission_runtime/coilbox_vars.lua"] = module("luarules/mission_runtime/coilbox_vars.lua"),
 		["missions/demo/mission.lua"] = function()
 			return mission
 		end,
@@ -115,6 +116,9 @@ function M.newEngine(modOptions, files, options)
 		resources = {},
 		income = {},
 		noSelect = {},
+		-- Game rules params by name. The engine keeps one static table for every
+		-- Lua handle, which is what makes them readable outside synced code.
+		rulesParams = {},
 		-- Every SendToUnsynced call, as its argument list.
 		sent = {},
 	}
@@ -313,6 +317,16 @@ function M.newEngine(modOptions, files, options)
 			end,
 			AddTeamResource = function(team, kind, amount)
 				drip(team)[kind] = drip(team)[kind] + amount
+			end,
+			SetGameRulesParam = function(name, value)
+				-- A nil value erases the param, the way the engine's own does.
+				engine.rulesParams[name] = value
+			end,
+			-- Game rules params carry a line-of-sight flag that the engine then
+			-- ignores for them: it reads them with the mask that lets everything
+			-- through, so one is readable from every handle including LuaUI.
+			GetGameRulesParam = function(name)
+				return engine.rulesParams[name]
 			end,
 		},
 		Game = { mapName = "Test Map", gameSpeed = 30 },
