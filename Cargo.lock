@@ -580,6 +580,7 @@ dependencies = [
  "tauri-plugin-coilbox-play",
  "tauri-plugin-coilbox-profile",
  "tauri-plugin-coilbox-runlite",
+ "tauri-plugin-coilbox-scenario",
  "tauri-plugin-coilbox-uberstress",
  "tauri-plugin-coilbox-unitsync",
  "tauri-plugin-deep-link",
@@ -4994,6 +4995,20 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "tempfile",
+]
+
+[[package]]
+name = "tauri-plugin-coilbox-scenario"
+version = "0.0.0"
+dependencies = [
+ "coilbox-portable",
+ "picoframe-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tempfile",
+ "uuid",
 ]
 
 [[package]]

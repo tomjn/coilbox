@@ -1,0 +1,11 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows the scenario plugin's storage and dialogue-media commands."
+permissions = [
+  "allow-scenario-list",
+  "allow-scenario-save",
+  "allow-scenario-delete",
+  "allow-scenario-media-import",
+  "allow-scenario-media-delete",
+]
