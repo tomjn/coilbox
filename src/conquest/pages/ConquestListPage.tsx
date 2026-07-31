@@ -40,6 +40,7 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "../../play/config";
+import { mergeGameAi } from "../../play/gameAi";
 import { getGameMatcher, getProfile } from "../../profile/profile";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import { conquestDelete, conquestSave } from "../bindings";
@@ -604,12 +605,6 @@ function GenerateGalaxyForm({
       seed: Number(seed) || 1,
       game: { shortname: effectiveShort },
       maps,
-      ais: ais.map((a) => ({
-        kind: a.kind,
-        shortName: a.shortName,
-        name: a.name,
-      })),
-      aiConfig: brandingEntry?.conquestAi,
       nodeCount: Number(size),
       factionCount: Number(factions),
       layout: layout as GenerateOptions["layout"],
@@ -626,7 +621,6 @@ function GenerateGalaxyForm({
       seed,
       effectiveShort,
       maps,
-      ais,
       size,
       factions,
       layout,
@@ -636,7 +630,6 @@ function GenerateGalaxyForm({
       starting,
       fog,
       names,
-      brandingEntry,
     ],
   );
 
@@ -915,13 +908,7 @@ function ImportChallengeForm({
         settings,
         {
           maps,
-          ais: ais.map((a) => ({
-            kind: a.kind,
-            shortName: a.shortName,
-            name: a.name,
-          })),
           names,
-          aiConfig: brandingEntry?.conquestAi,
         },
         id,
       ),

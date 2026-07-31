@@ -21,7 +21,6 @@ const base: GenerateOptions = {
   seed: 4242,
   game: { shortname: "TG" },
   maps,
-  ais,
   nodeCount: 20,
   factionCount: 2,
   layout: "spiral",
@@ -57,7 +56,7 @@ describe("conquest challenge codec", () => {
     if (!result.ok) throw new Error("expected a successful decode");
     const options = optionsFromChallenge(
       result.settings,
-      { maps, ais, names: undefined, aiConfig: undefined },
+      { maps, names: undefined },
       "generated-4242",
     );
     const recreated = generateGalaxy(options, "t1");

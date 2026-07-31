@@ -138,7 +138,7 @@ export function decodeConquestChallenge(code: string) {
 
 /**
  * Resolve a decoded challenge's settings into full {@link GenerateOptions},
- * given the recipient's own installed content (maps/AIs/names/aiConfig — the
+ * given the recipient's own installed content (maps and naming pools, the
  * same shape `ConquestListPage`'s generator form already assembles).
  *
  * SEAM FOR #387 (resolve missing content on import): this is where a
@@ -152,16 +152,14 @@ export function decodeConquestChallenge(code: string) {
  */
 export function optionsFromChallenge(
   settings: ConquestChallengeSettings,
-  env: Pick<GenerateOptions, "maps" | "ais" | "names" | "aiConfig">,
+  env: Pick<GenerateOptions, "maps" | "names">,
   id: string,
 ): GenerateOptions {
   return {
     seed: settings.seed,
     game: settings.game,
     maps: env.maps,
-    ais: env.ais,
     names: env.names,
-    aiConfig: env.aiConfig,
     nodeCount: settings.nodeCount,
     factionCount: settings.factionCount,
     layout: settings.layout,

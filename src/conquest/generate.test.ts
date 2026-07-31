@@ -20,7 +20,6 @@ const base: GenerateOptions = {
   seed: 1234,
   game: { shortname: "TG" },
   maps,
-  ais,
   nodeCount: 16,
   factionCount: 2,
 };
@@ -42,19 +41,10 @@ describe("generateGalaxy", () => {
     expect(a).not.toEqual(b);
   });
 
-  it("never assigns a denied or chicken AI to a faction", () => {
-    const messyAis = [
-      { kind: "lua" as const, shortName: "Sandbox", name: "Sandbox" },
-      { kind: "lua" as const, shortName: "ChickensAI", name: "Chickens" },
-      { kind: "lua" as const, shortName: "SimpleAI", name: "Simple" },
-    ];
-    const doc = generateGalaxy(
-      { ...base, ais: messyAis, factionCount: 3 },
-      "t0",
-    );
-    // Player faction (index 0) never gets an AI; every enemy uses SimpleAI.
-    for (const f of doc.factions.slice(1)) {
-      expect(f.aiKey).toBe("lua:SimpleAI");
+  it("pins no AI to a faction, leaving the pick to node difficulty", () => {
+    const doc = generateGalaxy({ ...base, factionCount: 3 }, "t0");
+    for (const f of doc.factions) {
+      expect(f.aiKey).toBeUndefined();
     }
   });
 
@@ -322,7 +312,7 @@ describe("generateGalaxy", () => {
 describe("regenerateGalaxy", () => {
   it("rerolls in place: same id/title/createdAt/knobs, new positions", () => {
     const doc = generateGalaxy({ ...base, id: "keep-id", title: "Keep" }, "t0");
-    const re = regenerateGalaxy(doc, { maps, ais }, 999, "t1");
+    const re = regenerateGalaxy(doc, { maps }, 999, "t1");
     expect(re).not.toBeNull();
     expect(re?.id).toBe("keep-id");
     expect(re?.title).toBe("Keep");
@@ -338,6 +328,6 @@ describe("regenerateGalaxy", () => {
   it("returns null for docs without persisted knobs", () => {
     const doc = generateGalaxy(base, "t0");
     const legacy = { ...doc, generated: { seed: 1 } };
-    expect(regenerateGalaxy(legacy, { maps, ais }, 5, "t1")).toBeNull();
+    expect(regenerateGalaxy(legacy, { maps }, 5, "t1")).toBeNull();
   });
 });
