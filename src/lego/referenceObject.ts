@@ -7,11 +7,14 @@
  * figure invented for the purpose means nothing.
  *
  * Its geometry is committed as `reference/armsolar.json`, converted from the
- * game's `armsolar.s3o` once by `scripts/reference-model.mjs`. Nothing is read
- * out of an installed game at runtime: coilbox cannot rely on any particular
- * game being installed, and a reference that appears only for some users would
- * be worse than none. See `reference/LICENCE.txt` for the attribution, the
- * licence and what the conversion changed.
+ * game's `armsolar.s3o` once by `scripts/reference-model.mjs`. It is the
+ * default and the fallback because coilbox cannot rely on any particular game
+ * being installed, and a reference that appears only for some users would be
+ * worse than none. See `reference/LICENCE.txt` for the attribution, the licence
+ * and what the conversion changed.
+ *
+ * Anyone who does have a game installed can stand one of its units here
+ * instead, read at runtime by `buildGameReferenceUnit` below.
  *
  * Sizes are in elmos with nothing rescaled in between: the exporter's
  * `header()` in `s3oBuild.ts` bakes each vertex's world position straight into
@@ -33,6 +36,8 @@
 
 import * as THREE from "three";
 
+import type { UnitModelResult } from "../content/bindings";
+import { buildModel } from "../content/unitModel";
 import model from "./reference/armsolar.json";
 
 /** Sky blue, distinct from every colourway in the bundled parts pack. */
@@ -101,6 +106,47 @@ export function buildReferenceUnit(): THREE.Group {
 
   group.add(mesh);
   return group;
+}
+
+/** A reference figure read out of an installed game, and how to free it. */
+export interface GameReferenceUnit {
+  group: THREE.Group;
+  /** Measured off the model, in elmos, so the viewport can park it clear of the
+   *  build plates whatever size it turned out to be. */
+  widthElmos: number;
+  dispose: () => void;
+}
+
+/**
+ * A real unit out of an installed game, standing where the solar collector
+ * otherwise does.
+ *
+ * The model comes from the game unit viewer's own path, `buildModel`, so there
+ * is one reader, one texture cache and one flattening between the two views.
+ * Both formats store their vertices in elmos, and nothing here rescales them,
+ * which is the whole point: the unit is exactly as big beside your pieces as it
+ * is beside them in game.
+ *
+ * Drawn as the game draws it rather than ghosted like the built-in figure. The
+ * built-in is a shape without a texture, so the ghost is what stops it reading
+ * as a piece. A game's unit is textured, sits well to the left of the plates and
+ * is plainly somebody else's model, and ghosting it would mean overriding the
+ * materials the viewer just resolved.
+ */
+export function buildGameReferenceUnit(
+  unitModel: UnitModelResult,
+): GameReferenceUnit {
+  const built = buildModel(unitModel);
+  // A view aid, never a piece: nothing in the builder may select, hover or
+  // seat against it.
+  built.object.traverse((child) => {
+    child.raycast = () => {};
+  });
+  return {
+    group: built.object,
+    widthElmos: built.box.getSize(new THREE.Vector3()).x,
+    dispose: built.dispose,
+  };
 }
 
 /** Frees the geometry and materials `buildReferenceUnit` allocated. */

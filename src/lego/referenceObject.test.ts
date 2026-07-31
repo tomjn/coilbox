@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
+import type { UnitModelGroup, UnitModelResult } from "../content/bindings";
 import model from "./reference/armsolar.json";
 import {
+  buildGameReferenceUnit,
   buildReferenceUnit,
   disposeReferenceUnit,
   REFERENCE_FOOTPRINT_STEPS,
@@ -94,6 +96,70 @@ describe("buildReferenceUnit", () => {
       expect(material.transparent).toBe(true);
       expect(material.opacity).toBeLessThan(1);
     }
+  });
+});
+
+/**
+ * A model as the worker hands one over: two pieces, the second offset from the
+ * first, and no texture, so nothing here goes looking for an image file. Sized
+ * so the piece offset matters to the width: 10 elmos of quad at the root and
+ * another 10 parked 30 elmos out is 50 across, not 20.
+ */
+function gameModel(): UnitModelResult {
+  const quad = (): UnitModelGroup => ({
+    positions: [-5, 0, 0, 5, 0, 0, 5, 8, 0, -5, 8, 0],
+    normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+    uvs: [0, 0, 1, 0, 1, 1, 0, 1],
+    indices: [0, 1, 2, 0, 2, 3],
+  });
+  return {
+    format: "s3o",
+    path: "objects3d/test.s3o",
+    radius: 0,
+    height: 0,
+    mid: [0, 0, 0],
+    root: {
+      name: "base",
+      offset: [0, 0, 0],
+      groups: [quad()],
+      children: [
+        { name: "arm", offset: [30, 0, 0], groups: [quad()], children: [] },
+      ],
+    },
+    textures: [],
+    paletteFaces: 0,
+    errors: [],
+  };
+}
+
+describe("buildGameReferenceUnit", () => {
+  it("stands the model at the size the file states, in elmos", () => {
+    const built = buildGameReferenceUnit(gameModel());
+    const box = new THREE.Box3().setFromObject(built.group);
+    // Nothing is rescaled between the archive and this scene, so a piece 10
+    // elmos wide 30 elmos out is 40 elmos from the far edge of the first.
+    expect(box.min.x).toBeCloseTo(-5, 5);
+    expect(box.max.x).toBeCloseTo(35, 5);
+    expect(box.max.y).toBeCloseTo(8, 5);
+    expect(built.widthElmos).toBeCloseTo(40, 5);
+    built.dispose();
+  });
+
+  it("cannot be clicked, hovered or seated against", () => {
+    const built = buildGameReferenceUnit(gameModel());
+    const raycaster = new THREE.Raycaster(
+      new THREE.Vector3(0, 4, 50),
+      new THREE.Vector3(0, 0, -1),
+    );
+    expect(raycaster.intersectObject(built.group, true)).toHaveLength(0);
+    built.dispose();
+  });
+
+  it("has nothing to build from a model with no pieces", () => {
+    const built = buildGameReferenceUnit({ ...gameModel(), root: undefined });
+    expect(built.group.children).toHaveLength(0);
+    expect(built.widthElmos).toBe(0);
+    expect(() => built.dispose()).not.toThrow();
   });
 });
 

@@ -29,7 +29,6 @@ import {
   PackagePlus,
   RotateCw,
   Scaling,
-  Sun,
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -54,6 +53,7 @@ import {
   disposeFrontMarker,
   disposeGround,
   REFERENCE_PARK_X,
+  referenceParkX,
 } from "../../buildPlate";
 import {
   effectiveCollisionVolume,
@@ -87,6 +87,7 @@ import {
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
 import {
+  buildGameReferenceUnit,
   buildReferenceUnit,
   disposeReferenceUnit,
 } from "../../referenceObject";
@@ -107,6 +108,7 @@ import {
 } from "../../snapping";
 import { captureThumbnail } from "../../thumbnail";
 import { EnvironmentPicker } from "./EnvironmentPicker";
+import { type GameReferenceChoice, ReferencePicker } from "./ReferencePicker";
 import { ShortcutSheet } from "./ShortcutSheet";
 
 export type GizmoMode = "translate" | "rotate" | "scale";
@@ -307,6 +309,11 @@ export function ModelViewport({
   const [snappedTo, setSnappedTo] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showReference, setShowReference] = useState(false);
+  /** A unit read out of an installed game to stand instead of the built-in
+   *  solar collector. Null is the built-in one, which is also the fallback
+   *  whenever a game's model cannot be read. */
+  const [gameReference, setGameReference] =
+    useState<GameReferenceChoice | null>(null);
   const [showCollision, setShowCollision] = useState(false);
   // View settings, held for as long as the viewport is open and no longer,
   // exactly as the two above are. Both open on what the builder has always
@@ -538,6 +545,7 @@ export function ModelViewport({
         grid,
         axes,
         reference,
+        disposeReference: () => disposeReferenceUnit(reference),
         collision: null,
         collisionMaterial,
         editCollision: false,
@@ -820,7 +828,9 @@ export function ModelViewport({
           disposeFrontMarker(frontMarker);
           state.sky?.texture.dispose();
           if (state.terrain) disposeTerrain(state.terrain);
-          disposeReferenceUnit(reference);
+          // Not `reference`: the figure may have been swapped for a unit read
+          // out of an installed game since the scene was built.
+          state.disposeReference();
           state.collision?.geometry.dispose();
           collisionMaterial.dispose();
           // One square shared by all six plates, so it is freed once.
@@ -949,6 +959,38 @@ export function ModelViewport({
     state.reference.visible = showReference;
     state.render();
   }, [showReference]);
+
+  // Read by the swap below, which must not itself rerun on a toggle: rebuilding
+  // a game's model every time the figure is hidden and shown again would throw
+  // its geometry away and read it back.
+  const showReferenceRef = useRef(showReference);
+  showReferenceRef.current = showReference;
+
+  // Swapping the figure for a game's unit, and back. The old one is freed
+  // rather than kept: a real unit can be tens of thousands of triangles and
+  // several textures, and the built-in one is cheap to rebuild.
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.scene.remove(state.reference);
+    state.disposeReference();
+
+    if (gameReference) {
+      const built = buildGameReferenceUnit(gameReference.model);
+      built.group.position.set(referenceParkX(built.widthElmos), 0, 0);
+      state.reference = built.group;
+      state.disposeReference = built.dispose;
+    } else {
+      const group = buildReferenceUnit();
+      group.position.set(REFERENCE_PARK_X, 0, 0);
+      state.reference = group;
+      state.disposeReference = () => disposeReferenceUnit(group);
+    }
+
+    state.reference.visible = showReferenceRef.current;
+    state.scene.add(state.reference);
+    state.render();
+  }, [gameReference]);
 
   useEffect(() => {
     const state = sceneRef.current;
@@ -1235,19 +1277,16 @@ export function ModelViewport({
           ground={ground}
           onGround={setGround}
         />
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => setShowReference(!showReference)}
-          aria-pressed={showReference}
-          title={
-            showReference
-              ? "Hide the reference unit"
-              : "Show a solar collector at its real size, for scale"
-          }
-        >
-          <Sun className="size-4" />
-        </Button>
+        <ReferencePicker
+          show={showReference}
+          onShowChange={setShowReference}
+          onReference={(choice) => {
+            setGameReference(choice);
+            // Picking a unit and having nothing appear reads as a broken
+            // picker, so choosing one turns the figure on.
+            if (choice) setShowReference(true);
+          }}
+        />
         <Button
           size="icon"
           variant="outline"
@@ -1465,8 +1504,12 @@ interface SceneState {
   grid: THREE.Group;
   axes: THREE.AxesHelper;
   /** A scale figure beside the build, switched off by default. A view aid
-   *  like `grid` and `axes`: never part of the project, never exported. */
+   *  like `grid` and `axes`: never part of the project, never exported.
+   *  Replaced wholesale when the figure changes, since a unit read out of a
+   *  game is a different object with different materials. */
   reference: THREE.Group;
+  /** Frees whichever figure `reference` currently is. */
+  disposeReference: () => void;
   /** The collision volume's wireframe, while it is being shown. Rebuilt on
    *  every change rather than rescaled, because the shape itself changes with
    *  the volume's type, and null the rest of the time. */

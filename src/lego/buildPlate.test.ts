@@ -8,6 +8,7 @@ import {
   GROUND_ELMOS,
   PLATE_FOOTPRINTS,
   REFERENCE_PARK_X,
+  referenceParkX,
 } from "./buildPlate";
 import { REFERENCE_WIDTH_ELMOS } from "./referenceObject";
 import { ELMOS_PER_FOOTPRINT } from "./unitDef";
@@ -30,6 +31,16 @@ describe("buildGround", () => {
     expect(nearEdge).toBeLessThan(-largest / 2);
     // And no further out than half a step past it, so both fit in one view.
     expect(nearEdge).toBeGreaterThan(-largest / 2 - ELMOS_PER_FOOTPRINT);
+  });
+
+  it("parks a figure of any width the same distance clear", () => {
+    // A unit read out of an installed game can be any size, so the near edge
+    // is what stays put rather than the figure's own origin.
+    const largest = Math.max(...PLATE_FOOTPRINTS) * ELMOS_PER_FOOTPRINT;
+    for (const width of [4, REFERENCE_WIDTH_ELMOS, 120]) {
+      const nearEdge = referenceParkX(width) + width / 2;
+      expect(nearEdge).toBeCloseTo(-largest / 2 - ELMOS_PER_FOOTPRINT / 2, 5);
+    }
   });
 
   it("marks a plate per common footprint, at footprint size", () => {
