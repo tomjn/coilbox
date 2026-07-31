@@ -71,3 +71,27 @@ export function runtimeCapabilities(
 export function supportedCount(items: Capability[]): number {
   return items.filter((c) => c.status !== "added").length;
 }
+
+/**
+ * What to say beside a type the installed runtime does not simply support, or
+ * null for one it does.
+ *
+ * Only a game running behind coilbox is told which version would add the type,
+ * because that is the only case where installing gets it. A game running ahead
+ * of coilbox is missing types coilbox's older runtime has, and naming that
+ * older version would read as an instruction to downgrade. A game with no
+ * runtime at all gets no note, because then every type is one installing brings
+ * and the heading already says so.
+ */
+export function capabilityNote(
+  status: CapabilityStatus,
+  installed: RuntimeMarker | null,
+  available: RuntimeMarker | null,
+): string | null {
+  if (status === "supported") return null;
+  if (status === "extra") return "Not in coilbox's runtime";
+  if (!installed) return null;
+  if (available && installed.version < available.version)
+    return `Needs runtime ${available.version}`;
+  return "Not in this game's runtime";
+}

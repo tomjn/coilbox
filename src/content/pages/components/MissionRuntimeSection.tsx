@@ -15,6 +15,7 @@ import {
 } from "@/scenario/bindings";
 import {
   type Capability,
+  capabilityNote,
   runtimeCapabilities,
   supportedCount,
 } from "@/scenario/capabilities";
@@ -79,19 +80,8 @@ function capabilityHeadline(
   actions: Capability[],
 ): string {
   if (!installed)
-    return `Installing supports ${conditions.length} conditions and ${actions.length} actions`;
+    return `Installing adds ${conditions.length} conditions and ${actions.length} actions`;
   return `Supports ${supportedCount(conditions)} of ${conditions.length} conditions and ${supportedCount(actions)} of ${actions.length} actions`;
-}
-
-/** The note beside a type the installed runtime does not simply support. */
-function capabilityBadge(
-  status: Capability["status"],
-  installed: RuntimeMarker | null,
-  available: RuntimeMarker | null,
-): string | null {
-  if (status === "supported") return null;
-  if (status === "extra") return "Not in coilbox's runtime";
-  return installed ? `Needs runtime ${available?.version}` : "Added on install";
 }
 
 function CapabilityList({
@@ -112,7 +102,7 @@ function CapabilityList({
       </h3>
       <ul className="flex flex-col gap-1">
         {items.map((c) => {
-          const badge = capabilityBadge(c.status, installed, available);
+          const note = capabilityNote(c.status, installed, available);
           return (
             <li key={c.name} className="flex flex-wrap items-center gap-2">
               <span
@@ -123,12 +113,12 @@ function CapabilityList({
               >
                 {c.name}
               </span>
-              {badge && (
+              {note && (
                 <Badge
                   variant={c.status === "extra" ? "secondary" : "outline"}
                   className="text-[10px]"
                 >
-                  {badge}
+                  {note}
                 </Badge>
               )}
             </li>

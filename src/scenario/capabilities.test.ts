@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeMarker } from "./bindings";
-import { runtimeCapabilities, supportedCount } from "./capabilities";
+import {
+  capabilityNote,
+  runtimeCapabilities,
+  supportedCount,
+} from "./capabilities";
 
 const marker = (
   version: number,
@@ -78,6 +82,39 @@ describe("runtimeCapabilities", () => {
       marker(1, ["var"], []),
     );
     expect(caps.conditions).toEqual([{ name: "var", status: "supported" }]);
+  });
+});
+
+describe("capabilityNote", () => {
+  const one = marker(1, [], []);
+  const two = marker(2, [], []);
+
+  it("says nothing about a supported type", () => {
+    expect(capabilityNote("supported", one, two)).toBeNull();
+  });
+
+  it("names the version that would add a type the game is behind on", () => {
+    expect(capabilityNote("added", one, two)).toBe("Needs runtime 2");
+  });
+
+  it("does not name a version a game running ahead would go back to", () => {
+    expect(capabilityNote("added", two, one)).toBe(
+      "Not in this game's runtime",
+    );
+  });
+
+  it("does not name a version when the two are level", () => {
+    expect(capabilityNote("added", one, one)).toBe(
+      "Not in this game's runtime",
+    );
+  });
+
+  it("says nothing per type when the game has no runtime at all", () => {
+    expect(capabilityNote("added", null, one)).toBeNull();
+  });
+
+  it("says a type coilbox has never heard of is not its own", () => {
+    expect(capabilityNote("extra", two, one)).toBe("Not in coilbox's runtime");
   });
 });
 
