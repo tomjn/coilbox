@@ -510,7 +510,7 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
       const [a, b] = raw;
       if (typeof a !== "string" || typeof b !== "string") continue;
       if (a === b || !nodeIds.has(a) || !nodeIds.has(b)) continue;
-      const key = a < b ? `${a} ${b}` : `${b} ${a}`;
+      const key = a < b ? `${a}\0${b}` : `${b}\0${a}`;
       if (seenLinks.has(key)) continue;
       seenLinks.add(key);
       links.push([a, b]);

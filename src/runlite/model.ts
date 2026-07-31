@@ -565,7 +565,7 @@ export function parseRunJson(json: string): RogueliteRun | null {
       if (!nodeIds.has(a) || !nodeIds.has(b) || a === b) continue;
       // Forward-only: an edge must ascend columns.
       if ((colById.get(a) ?? 0) >= (colById.get(b) ?? 0)) continue;
-      const key = `${a} ${b}`;
+      const key = `${a}\0${b}`;
       if (seen.has(key)) continue;
       seen.add(key);
       edges.push([a, b]);
