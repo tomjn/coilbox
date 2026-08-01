@@ -238,12 +238,7 @@ function TriggerForm({
         <TriggerName
           id={trigger.id}
           onRename={(name) => {
-            const next = renameTrigger(
-              scenario,
-              trigger.id,
-              name,
-              extensions,
-            );
+            const next = renameTrigger(scenario, trigger.id, name, extensions);
             if (next === scenario) return false;
             onChange(next);
             onSelect(name.trim());

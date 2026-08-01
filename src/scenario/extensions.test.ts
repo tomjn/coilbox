@@ -142,14 +142,18 @@ describe("parseExtensions", () => {
 
   it("drops an enum with no values, which has nothing to pick from", () => {
     const types = parseExtensions(
-      declaring([{ type: "sf_weather", params: [{ name: "k", kind: "enum" }] }]),
+      declaring([
+        { type: "sf_weather", params: [{ name: "k", kind: "enum" }] },
+      ]),
     );
     expect(types.conditions).toEqual({});
     expect(types.problems[0]).toContain("is an enum with no values");
   });
 
   it("drops an entry that is not a table, or has no type name", () => {
-    const types = parseExtensions(declaring(["nonsense", { label: "no type" }]));
+    const types = parseExtensions(
+      declaring(["nonsense", { label: "no type" }]),
+    );
     expect(types.problems).toEqual([
       "an entry that is not a table",
       "an entry with no type name",
@@ -195,7 +199,10 @@ describe("extensionSpecs", () => {
   it("is the parameter tables, keyed by type", () => {
     const types = parseExtensions(declaring([RESEARCH]));
     expect(extensionSpecs(types.conditions)).toEqual({
-      sf_research_above: { team: { kind: "teamId" }, amount: { kind: "number" } },
+      sf_research_above: {
+        team: { kind: "teamId" },
+        amount: { kind: "number" },
+      },
     });
   });
 });

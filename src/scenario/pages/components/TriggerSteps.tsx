@@ -242,7 +242,8 @@ export function AddStep({
       value: type,
       label: stepLabel(type, extensions),
       description:
-        declared[type]?.description ?? (Object.keys(spec).join(", ") || undefined),
+        declared[type]?.description ??
+        (Object.keys(spec).join(", ") || undefined),
       trailing: reason,
       disabled: reason !== undefined,
     };

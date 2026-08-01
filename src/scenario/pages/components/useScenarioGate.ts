@@ -17,6 +17,11 @@ import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
 import { type RuntimeMarker, scenarioRuntimeStatus } from "../../bindings";
 import {
+  type ExtensionTypes,
+  NO_EXTENSIONS,
+  parseExtensions,
+} from "../../extensions";
+import {
   gatedCount,
   gateTarget,
   NO_GATE,
@@ -24,11 +29,6 @@ import {
   paletteGate,
   requiredRuntimeVersion,
 } from "../../gating";
-import {
-  type ExtensionTypes,
-  NO_EXTENSIONS,
-  parseExtensions,
-} from "../../extensions";
 import { type ScenarioRoute, scenarioRoute } from "../../launch";
 import type { Scenario } from "../../model";
 

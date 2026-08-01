@@ -19,6 +19,11 @@
  * arrives in the panel with no change to this file.
  */
 
+import {
+  type ExtensionTypes,
+  extensionSpecs,
+  NO_EXTENSIONS,
+} from "../../extensions";
 import type {
   Point,
   Scenario,
@@ -27,11 +32,6 @@ import type {
   ScenarioTrigger,
   TriggerStep,
 } from "../../model";
-import {
-  type ExtensionTypes,
-  extensionSpecs,
-  NO_EXTENSIONS,
-} from "../../extensions";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
@@ -249,7 +249,13 @@ export function renameTrigger(
   if (!wanted || wanted === from) return scenario;
   if (!scenario.triggers.some((t) => t.id === from)) return scenario;
   if (scenario.triggers.some((t) => t.id === wanted)) return scenario;
-  const rewritten = rewriteRefs(scenario, "triggerId", from, wanted, extensions);
+  const rewritten = rewriteRefs(
+    scenario,
+    "triggerId",
+    from,
+    wanted,
+    extensions,
+  );
   return {
     ...rewritten,
     triggers: rewritten.triggers.map((t) =>
