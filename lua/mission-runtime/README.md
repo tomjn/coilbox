@@ -8,7 +8,7 @@ The Lua that plays a coilbox scenario inside the engine. It is coilbox-authored 
 - `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, `coilbox_view.lua` where it points the player, `coilbox_reveal.lua` what it shows them, `coilbox_restrictions.lua` what its teams may build and do, and `coilbox_gameover.lua` how it ends. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` and `coilbox_view.lua` are pure as well, because saying a line, moving a camera and dropping a marker are all deciding that the mission asked and nothing more.
 - `luaui/widgets/coilbox_mission_ui.lua`, the widget: the objectives panel, the dialogue panel, the debrief and the name over a named actor. `luaui/mission_ui/coilbox_panel_model.lua` is everything it decides before it draws, pure and tested outside the engine.
 - `missions/runtime.lua`, the version marker and capability table. Coilbox reads it out of an installed game to decide what the editor may offer.
-- `tests/`, checks that run outside the engine with `luajit`. Not part of what a game vendors.
+- `tests/`, checks that run outside the engine with `luajit`, and `tests/headless/`, the probe and scratch game that run inside one. Not part of what a game vendors.
 
 A game vendoring the runtime takes `luarules/`, `luaui/` and `missions/`, and nothing else.
 
@@ -342,25 +342,42 @@ GG.CoilboxMission.gameOver.defeat("player")
 ## Tests
 
 ```sh
-luajit lua/mission-runtime/tests/gate_test.lua
-luajit lua/mission-runtime/tests/plan_test.lua
-luajit lua/mission-runtime/tests/start_test.lua
-luajit lua/mission-runtime/tests/trigger_test.lua
-luajit lua/mission-runtime/tests/zone_test.lua
-luajit lua/mission-runtime/tests/var_test.lua
-luajit lua/mission-runtime/tests/group_test.lua
-luajit lua/mission-runtime/tests/objective_test.lua
-luajit lua/mission-runtime/tests/gameover_test.lua
-luajit lua/mission-runtime/tests/dialogue_test.lua
-luajit lua/mission-runtime/tests/view_test.lua
-luajit lua/mission-runtime/tests/reveal_test.lua
-luajit lua/mission-runtime/tests/restriction_test.lua
-luajit lua/mission-runtime/tests/panel_test.lua
-luajit lua/mission-runtime/tests/mission_trigger_test.lua
+scripts/mission-tests.sh
 ```
+
+Every `tests/*_test.lua` file, each in its own `luajit`. Adding a suite is adding a file, and running one on its own is still `luajit lua/mission-runtime/tests/<name>_test.lua`. This is what the lint workflow runs.
 
 `tests/support.lua` holds the shared scaffolding: a stub of the slice of the engine the runtime touches, which records what the runtime asked for and plays back the callins it reacts to.
 
 `mission_trigger_test.lua` runs the scenario fixtures in `src/scenario/fixtures/missions/`, which are the files coilbox's own compiler emits. The runtime is proved against the emitted shape rather than against one written to suit it.
 
 Nothing here proves the widget. Everything a widget does is OpenGL, a font and a mouse, and none of the three exists outside a running engine. `panel_test.lua` proves what the widget decides before it draws: which objectives are visible and in what order, which name goes over which unit, how long a line holds the panel, where a line of text breaks, and whether the player won. That the drawing then lands where it should, that the panels do not sit on top of the game's own UI, and that a portrait loads, are claims only a real engine can settle.
+
+## In a real engine
+
+```sh
+scripts/mission-headless.sh
+```
+
+The suites above run against a stub, so every engine call in them is a claim read off the engine's source rather than something anyone has watched happen. This settles the ones that can be settled by watching. It builds a scratch game out of `luarules/`, `luaui/` and `missions/` on top of an installed game, and plays each fixture mission in `spring-headless`, which simulates with no OpenGL context. `tests/headless/probe.lua` is the player: a headless run has nobody at the keyboard, so the probe walks a unit into a zone, kills an actor, hands one over, and checks what the runtime did about it.
+
+It needs a `spring-headless` binary, a game carrying the fixture missions' unit defs (Balanced Annihilation by default) and any map. The script's own header lists the environment variables that point it at them. Nothing in CI runs it, because a runner has none of the three.
+
+What it has settled:
+
+- The modoption gate. A game with no `coilbox_mission` loads no runtime gadget at all, so nothing here is in a normal game's way.
+- The start, against a real game's own start gadget. A team the scenario marks `noCommander` ends the start owning only what the scenario placed, a team's `startUnits` are on its start position, and every mission team's bank is the scenario's number rather than the game's.
+- The start window. What the runtime placed is not counted as something the team built, and a unit finished after it is.
+- A prefab's factory queue is the three units the prefab wrote, one order each, with the factory repeating.
+- The rules params. Objectives, vars, the unit an actor became, the game over and the winning ally team all come back out of `Spring.GetGameRulesParam`.
+- Triggers firing on a zone entered, a unit count reached, a unit finished, a death and a capture, and one mission ending: `zone_held_for` completes its objective and hands the win to the player's ally team at the frame the clock says.
+- A reveal. A capture lights a zone with one spotter, no other ally team can see it, and it comes off the map when its 30 seconds are up.
+
+What it has caught:
+
+- `gift_units` moves nothing between teams that are not allied, and the runtime never notices. A game may refuse a share between enemies through `AllowUnitTransfer`, Balanced Annihilation does, and `Spring.TransferUnit`'s refusal is thrown away ([#857](https://github.com/tomjn/coilbox/issues/857)). The stub always agrees, so every suite passed on it.
+
+What it still cannot settle:
+
+- The widget, still. The engine loads LuaUI in a headless run, but the game the harness runs on has none that loads against a current engine, so `luaui/widgets/` has never been reached ([#850](https://github.com/tomjn/coilbox/issues/850)).
+- The restrictions. `AllowUnitCreation` returning `false, true` to clear a factory queue, and `AllowCommand` withholding a command, are the two callins with no fixture behind them: all three fixtures restrict nothing ([#849](https://github.com/tomjn/coilbox/issues/849)).
