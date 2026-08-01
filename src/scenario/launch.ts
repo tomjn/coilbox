@@ -24,7 +24,7 @@
 import type { GameItem } from "../content/bindings";
 import { isSdd } from "../content/format";
 import type { BattleConfig } from "../play/bindings";
-import { toBattleConfig } from "../play/participants";
+import { applyRestrictions, toBattleConfig } from "../play/participants";
 import { scenarioRuntimeStatus, scenarioWriteMission } from "./bindings";
 import { compileScenario, missionPath } from "./compile";
 import type { Scenario } from "./model";
@@ -161,10 +161,14 @@ export interface ScenarioLaunchInput {
   /** Start the engine. Called only once the mission has validated. */
   launch: (config: BattleConfig) => Promise<{ exitCode: number | null }>;
   /**
-   * Units to forbid outright, as the engine `[RESTRICT]` block. A campaign
-   * mission's own restriction list, which is authored around the scenario
-   * rather than inside it. Distinct from the scenario's `restrictions`, which
-   * the runtime enforces and can lift mid-mission.
+   * Extra units to forbid outright, added to the engine `[RESTRICT]` block. A
+   * campaign mission's own restriction list, which is authored around the
+   * scenario rather than inside it, so it is on top of whatever
+   * `scenario.setup.restrictions` already forbids.
+   *
+   * Neither of those is the scenario's own `restrictions` field, which is what
+   * the player may build and do, enforced by the runtime and liftable
+   * mid-mission.
    */
   disabledUnits?: string[];
 }
@@ -290,17 +294,31 @@ export async function launchScenario(
     gameType = found.name;
   }
 
-  const config = toBattleConfig({
-    participants: scenario.setup.participants,
-    mapName: scenario.setup.mapName,
-    gameType,
-    startPosType: scenario.setup.startPosType,
-    disabledUnits,
-    modOptions: {
-      ...scenario.setup.modOptionValues,
-      [MISSION_MODOPTION]: scenario.id,
-    },
-  });
+  // The setup is a skirmish draft, so it can carry the levers a conquest or
+  // warpath preset captured: a shared disabled-unit list, an advantage and an
+  // income multiplier. Built the same way `SkirmishPage` builds its own config,
+  // so a scenario plays the fight its preset described. This is
+  // `setup.restrictions`, the engine `[RESTRICT]` block and the team levers. It
+  // is not `scenario.restrictions`, which is the runtime's build and command
+  // rules.
+  const captured = scenario.setup.restrictions;
+  const config = applyRestrictions(
+    toBattleConfig({
+      participants: scenario.setup.participants,
+      mapName: scenario.setup.mapName,
+      gameType,
+      startPosType: scenario.setup.startPosType,
+      disabledUnits: [
+        ...(captured?.disabledUnits ?? []),
+        ...(disabledUnits ?? []),
+      ],
+      modOptions: {
+        ...scenario.setup.modOptionValues,
+        [MISSION_MODOPTION]: scenario.id,
+      },
+    }),
+    captured,
+  );
   const { exitCode } = await launch(config);
   return {
     ok: true,

@@ -165,6 +165,66 @@ describe("launchScenario", () => {
     });
   });
 
+  it("plays the fight the captured preset described: restrict list, advantage and income", async () => {
+    const scenario = build({
+      setup: {
+        gameName: "Splinter Faction test",
+        mapName: "Comet Catcher Redux",
+        startPosType: 0,
+        modOptionValues: { deathmode: "com" },
+        participants: [you],
+        restrictions: {
+          disabledUnits: ["armbrtha", "corbhmth"],
+          advantage: 0.25,
+          incomeMultiplier: 0.5,
+        },
+      },
+    });
+
+    const result = await run(scenario, [LOOSE]);
+
+    expect(result.ok && result.config.restrictedUnits).toEqual({
+      armbrtha: 0,
+      corbhmth: 0,
+    });
+    expect(result.ok && result.config.teams[0].advantage).toBe(0.25);
+    expect(result.ok && result.config.teams[0].incomeMultiplier).toBe(1.5);
+  });
+
+  it("adds a campaign mission's own disabled units to the setup's", async () => {
+    const scenario = build({
+      setup: {
+        gameName: "Splinter Faction test",
+        mapName: "Comet Catcher Redux",
+        startPosType: 0,
+        modOptionValues: {},
+        participants: [you],
+        restrictions: { disabledUnits: ["armbrtha"] },
+      },
+    });
+
+    const result = await launchScenario({
+      scenario,
+      dataDir: "/data",
+      games: [LOOSE],
+      rescan,
+      launch,
+      disabledUnits: ["corbhmth"],
+    });
+
+    expect(result.ok && result.config.restrictedUnits).toEqual({
+      armbrtha: 0,
+      corbhmth: 0,
+    });
+  });
+
+  it("restricts nothing when the setup captured nothing", async () => {
+    const result = await run(build(), [LOOSE]);
+
+    expect(result.ok && result.config.restrictedUnits).toBeUndefined();
+    expect(result.ok && result.config.teams[0].advantage).toBeUndefined();
+  });
+
   it("validates what was written into the game, not the document", async () => {
     await run(build(), [LOOSE]);
 
