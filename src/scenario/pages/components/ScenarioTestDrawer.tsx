@@ -60,6 +60,11 @@ export function ScenarioTestDrawer({ scenario }: { scenario: Scenario }) {
     phase.state === "scanning" ||
     phase.state === "playing";
 
+  // Launching on a scan that has not answered would hand `launchScenario` an
+  // empty game list, and it would refuse with "that game is not installed" over
+  // a game that is. So the read is waited for rather than blocked on.
+  const waiting = targetLoading || (!!target && !scan.data && !scan.error);
+
   const blocker = scan.error
     ? `The content scan failed: ${scan.error}`
     : scenarioLaunchBlocker({
@@ -138,9 +143,16 @@ export function ScenarioTestDrawer({ scenario }: { scenario: Scenario }) {
       ) : null}
 
       <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
-        <Button onClick={() => void run()} disabled={busy || !!blocker}>
+        <Button
+          onClick={() => void run()}
+          disabled={busy || waiting || !!blocker}
+        >
           <Rocket className="size-4" />
-          {busy ? BUSY_LABEL[phase.state] : "Test in game"}
+          {busy
+            ? BUSY_LABEL[phase.state]
+            : waiting
+              ? "Reading your installed games"
+              : "Test in game"}
         </Button>
       </div>
 
