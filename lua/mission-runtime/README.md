@@ -24,6 +24,7 @@ GG.CoilboxMission = {
   mission = <compiled scenario>,
   runtime = <runtime.lua>,
   teams   = <per-participant setup, with the engine team number resolved>,
+  suppressesStart = <function(teamID): does the mission place this team's start?>,
   actors  = <actor records by scenario id>,
   units   = <scenario actor id -> unitID, for the actors currently alive>,
   triggers = <the trigger engine, synced half only>,
@@ -49,9 +50,15 @@ The runtime takes over the start rather than sharing it, so a mission plays the 
 - Last of all, one anchor for each mission team a human is playing, so that team can never be empty. See [the anchor](#the-anchor).
 - A building is put through `Spring.Pos2BuildPos` on the way. `Spring.CreateUnit` does not snap, and a base a few elmos off the build grid cannot be rebuilt where it stood and sits at the wrong height on a slope. That call answers with the height a builder would have used, so it replaces the ground read for buildings.
 - Game frame 1: every mission team's bank is set to its `resources`, defaulting to nothing. This is how the normal starting resources are suppressed. `income` is then paid in every frame, spread over the second it is quoted per.
-- A team whose scenario entry sets `noCommander` has anything the game spawns for it removed, from load until the end of game frame 1. Only creations with no builder are touched, so nothing anyone has begun building is affected.
+- A team whose scenario entry sets `noCommander` gets no start from the game. The game is asked not to spawn one, and a game that has not been asked has anything it spawns removed instead, from load until the end of game frame 1. Only creations with no builder are touched, so nothing anyone has begun building is affected.
 
-Suppression removes rather than prevents because the engine offers no veto: `AllowUnitCreation` is consulted for builders and factories only, never for `Spring.CreateUnit`, which is what a game's start gadget uses.
+Asking is the third item in the [adoption contract](../../docs/mission-runtime.md). A game calls `GG.CoilboxMission.suppressesStart(teamID)` where its own start gadget would spawn, and spawns nothing when the answer is true. The answer is the scenario's, so it holds for the whole mission rather than for a window.
+
+Removing is the fallback, and it only reaches as far as game frame 1, which is late enough for a game that spawns at frame 0 and no use at all to one that does not. Splinter Faction runs a faction picker and a placement picker first and spawns at frame 1800 ([issue #884](https://github.com/tomjn/coilbox/issues/884)).
+
+Widening that window is not the fix. A game that counts commanders counts the one the runtime is about to destroy, and Splinter Faction's `game_team_com_ends.lua` answers an ally team's last commander dying with `Spring.KillTeam`: the player loses every unit they have and their seat in the game. Undoing a start at frame 1 is ahead of that bookkeeping and undoing one at frame 1800 is not, so the only reliable answer is for the game not to spawn.
+
+Removing rather than preventing is forced, because the engine offers no veto: `AllowUnitCreation` is consulted for builders and factories only, never for `Spring.CreateUnit`, which is what a game's start gadget uses.
 
 The gadget sits at `layer = 1000`, behind a game's own gadgets. `gadgetHandler` runs low layers first, and the runtime is overriding the game rather than pre-empting it, so it wants the last word on starting resources and on damage modifiers.
 
