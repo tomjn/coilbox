@@ -44,6 +44,25 @@ function referencedClips(campaign: Campaign): Map<string, Set<string>> {
 }
 
 /**
+ * True when a campaign mission's snapshot still names this exact clip.
+ *
+ * The narrow half of `scenarioIsAttached` in `missionScenario.ts`, which decides
+ * the same thing for a whole scenario. A snapshot names its clips by file name,
+ * and a stored
+ * name always holds the same bytes, so a name a snapshot still carries is a file
+ * that mission still plays.
+ */
+export function clipIsAttached(
+  campaigns: Campaign[],
+  scenarioId: string,
+  file: string,
+): boolean {
+  return campaigns.some((campaign) =>
+    referencedClips(campaign).get(scenarioId)?.has(file),
+  );
+}
+
+/**
  * Read every attached scenario's dialogue clips out of the media store, inlined
  * as `data:` URIs, ready to travel in an export. A clip that cannot be read is
  * left out rather than sinking the export, the way a broken campaign image is.

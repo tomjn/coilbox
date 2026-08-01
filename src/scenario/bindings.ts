@@ -123,6 +123,11 @@ export const scenarioRuntimeInstall = defineCommand<
  * not adopted the runtime has no marker at all, and most games declare no types
  * of their own.
  *
+ * `installedError` says why the game's marker would not load, and is set only
+ * when the marker file is there. A game that never adopted the runtime has a
+ * null `installed` and a null `installedError`; one whose marker is broken has a
+ * null `installed` and a message.
+ *
  * `extensions` is whatever that file evaluated to, unread. The editor's half of
  * it is `parseExtensions` in `extensions.ts`, which is where a hand-written
  * declaration is checked.
@@ -131,6 +136,7 @@ export const scenarioRuntimeStatus = defineCommand<
   { root: string },
   {
     installed: RuntimeMarker | null;
+    installedError: string | null;
     available: RuntimeMarker | null;
     extensions: unknown;
   }

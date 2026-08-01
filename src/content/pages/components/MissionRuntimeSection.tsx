@@ -34,6 +34,7 @@ const msg = (e: unknown): string =>
 const LABEL = {
   unavailable: "Mission runtime unavailable",
   missing: "Install the mission runtime",
+  broken: "Repair the mission runtime",
   outdated: "Update the mission runtime",
   current: "Reinstall the mission runtime",
   newer: "Replace with coilbox's mission runtime",
@@ -44,6 +45,7 @@ function summary(
   state: RuntimeInstallState,
   installed: RuntimeMarker | null,
   available: RuntimeMarker | null,
+  installedError: string | null,
 ): string {
   switch (state) {
     case "unavailable":
@@ -51,7 +53,9 @@ function summary(
         ? `This game vendors runtime version ${installed.version}. This build of coilbox has no runtime of its own to measure it against.`
         : "This build of coilbox has no mission runtime to install.";
     case "missing":
-      return "Coilbox found no readable runtime marker in this game, so it cannot play scenarios yet. Installing writes coilbox's luarules, luaui and missions folders into the game folder.";
+      return "Coilbox found no runtime marker in this game, so it cannot play scenarios yet. Installing writes coilbox's luarules, luaui and missions folders into the game folder.";
+    case "broken":
+      return `This game has a runtime marker at missions/runtime.lua, but it would not load: ${installedError}. Until that is fixed the engine will not read it either, so coilbox cannot tell what this runtime supports. Repairing overwrites it with the version ${available?.version} coilbox ships.`;
     case "newer":
       return `This game vendors runtime version ${installed?.version}, newer than the version ${available?.version} coilbox ships. Installing would take it backwards.`;
     default:
@@ -223,6 +227,7 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
   const root = archive.path;
   const loose = isSdd(archive) && !!root;
   const [installed, setInstalled] = useState<RuntimeMarker | null>(null);
+  const [installedError, setInstalledError] = useState<string | null>(null);
   const [available, setAvailable] = useState<RuntimeMarker | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -232,6 +237,7 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
     try {
       const status = await scenarioRuntimeStatus({ root });
       setInstalled(status.installed);
+      setInstalledError(status.installedError);
       setAvailable(status.available);
     } catch (e) {
       setError(msg(e));
@@ -246,7 +252,7 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
   if (!loose)
     return <PackagedOffer gameName={game.name} available={available} />;
 
-  const state = runtimeInstallState(installed, available);
+  const state = runtimeInstallState(installed, available, installedError);
 
   const install = async () => {
     setBusy(true);
@@ -254,6 +260,7 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
     try {
       const result = await scenarioRuntimeInstall({ root });
       setInstalled(result.installed);
+      setInstalledError(null);
       toast.success(
         `Mission runtime version ${result.installed.version} installed, ${result.files.length} files.`,
       );
@@ -273,7 +280,7 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
       <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-prose text-sm text-muted-foreground">
-            {summary(state, installed, available)}
+            {summary(state, installed, available, installedError)}
             {note && ` ${note}`}
           </p>
           {state !== "unavailable" && (

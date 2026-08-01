@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Settings2 } from "lucide-react";
+import { CloseDrawerOnNavigate } from "./drawer";
 import { FullscreenControls } from "./fullscreen";
 import GeneralSettings from "./pages/SettingsSection";
 import { QuitControl } from "./quit";
@@ -13,11 +14,15 @@ import { QuitControl } from "./quit";
  *
  * The settings Component is imported eagerly (not lazy): the frame settings page
  * renders it directly without a Suspense boundary, so React.lazy can't be used.
+ *
+ * Its `Provider` is app-wide behaviour with no settings of its own: closing the
+ * frame's drawer on a navigation, which every drawer in the app needs.
  */
 const generalPlugin: FramePlugin = {
   id: "general",
   version: "0.0.0",
   routes: [],
+  Provider: CloseDrawerOnNavigate,
   slots: [
     { slot: "topbar.right", Component: FullscreenControls },
     { slot: "sidebar.footer", Component: QuitControl },

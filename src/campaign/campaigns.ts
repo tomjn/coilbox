@@ -116,6 +116,16 @@ export function useCampaigns() {
 }
 
 /**
+ * Every stored campaign, from the session cache when it is warm and from disk
+ * when it is not. For callers outside React that must not answer "no campaigns"
+ * simply because nothing has read the list yet, chiefly the checks deciding
+ * whether deleting something would strip a campaign of what it plays.
+ */
+export async function loadedCampaigns(): Promise<LoadedCampaign[]> {
+  return cache ?? (await refreshCampaigns());
+}
+
+/**
  * Synchronous read of a loaded campaign from the session cache, or `undefined` if
  * the list hasn't loaded yet (or has no such id). For non-React callers that need a
  * best-effort title now — chiefly the breadcrumb `crumb` resolvers, which run

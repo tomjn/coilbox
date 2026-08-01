@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { loadedCampaigns } from "../../../campaign/campaigns";
+import { clipIsAttached } from "../../../campaign/scenarioMedia";
 import type { Scenario, ScenarioDialogue } from "../../model";
 import {
   deleteScenarioMedia,
@@ -47,6 +49,27 @@ const FILTERS = {
   portrait: { name: "Image", extensions: ["png", "jpg", "jpeg", "dds", "bmp"] },
   audio: { name: "Audio", extensions: ["ogg", "wav", "mp3"] },
 };
+
+/**
+ * Drop a clip the line no longer names, unless a campaign mission still names it
+ * (issue #871).
+ *
+ * The editor owns the scenario document, but not the missions that snapshotted
+ * it, and such a mission loads its portraits and voices by file name out of this
+ * same store. So a clip one of them still names is left orphaned rather than
+ * deleted, which is the trade issue #866 made for a whole deleted scenario. The
+ * campaign list is read at delete time rather than through `useCampaigns`,
+ * because a cold cache would read as "no campaigns" and delete the file.
+ */
+async function dropClip(scenarioId: string, file: string): Promise<void> {
+  const campaigns = await loadedCampaigns();
+  const attached = clipIsAttached(
+    campaigns.map((c) => c.campaign),
+    scenarioId,
+    file,
+  );
+  if (!attached) await deleteScenarioMedia(scenarioId, file);
+}
 
 export function DialoguePanel({
   scenario,
@@ -182,7 +205,9 @@ function DialogueForm({
     onChange(editDialogue(scenario, line.id, patch));
 
   /** Copy a file the author picked into the scenario's media folder, and drop
-   *  whatever the line held before, so a replaced clip is not left on disk. */
+   *  whatever the line held before, so a replaced clip is not left on disk. A
+   *  clip a campaign mission still names is kept, because that mission plays it
+   *  by name out of this same store (issue #871). */
   const importMedia = async (field: "portrait" | "audio") => {
     setError(null);
     try {
@@ -191,7 +216,7 @@ function DialogueForm({
       const file = await importScenarioMedia(scenario.id, src);
       const previous = line[field];
       edit({ [field]: file });
-      if (previous) await deleteScenarioMedia(scenario.id, previous);
+      if (previous) await dropClip(scenario.id, previous);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -202,7 +227,7 @@ function DialogueForm({
     edit({ [field]: undefined });
     if (file) {
       try {
-        await deleteScenarioMedia(scenario.id, file);
+        await dropClip(scenario.id, file);
       } catch {
         // The reference is gone either way, so a clip left on disk is not worth
         // stopping the author over.
@@ -240,7 +265,7 @@ function DialogueForm({
             onChange(removeDialogue(scenario, line.id));
             onSelect(null);
             for (const file of clips) {
-              void deleteScenarioMedia(scenario.id, file).catch(() => {});
+              void dropClip(scenario.id, file).catch(() => {});
             }
           }}
         >

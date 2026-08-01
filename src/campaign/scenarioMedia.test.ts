@@ -15,6 +15,7 @@ vi.mock("../scenario/bindings", () => ({
 import type { Scenario } from "../scenario/model";
 import type { Campaign, CampaignMission } from "./model";
 import {
+  clipIsAttached,
   collectCampaignScenarioMedia,
   dropUnavailableDialogueMedia,
   restoreCampaignScenarioMedia,
@@ -155,6 +156,30 @@ describe("restoreCampaignScenarioMedia", () => {
       s1: { "a.png": PORTRAIT, "a.ogg": VOICE },
     });
     expect(written.get("s1")).toEqual(new Set(["a.ogg"]));
+  });
+});
+
+describe("clipIsAttached", () => {
+  const attached = [campaign([mission("m1", scenario("s1"))])];
+
+  it("holds a clip a mission's snapshot still names", () => {
+    expect(clipIsAttached(attached, "s1", "a.png")).toBe(true);
+    expect(clipIsAttached(attached, "s1", "a.ogg")).toBe(true);
+  });
+
+  it("releases a clip no snapshot names", () => {
+    expect(clipIsAttached(attached, "s1", "b.png")).toBe(false);
+    expect(clipIsAttached([], "s1", "a.png")).toBe(false);
+  });
+
+  it("does not confuse one scenario's clips for another's", () => {
+    expect(clipIsAttached(attached, "s2", "a.png")).toBe(false);
+  });
+
+  it("ignores a mission with no scenario", () => {
+    expect(clipIsAttached([campaign([mission("m1")])], "s1", "a.png")).toBe(
+      false,
+    );
   });
 });
 
