@@ -23,7 +23,8 @@ import {
   type RuntimeInstallState,
   runtimeInstallState,
 } from "@/scenario/install";
-import type { Archive } from "../../bindings";
+import { mutatorOffer } from "@/scenario/offer";
+import type { GameItem } from "../../bindings";
 import { isSdd } from "../../format";
 
 const msg = (e: unknown): string =>
@@ -129,16 +130,96 @@ function CapabilityList({
   );
 }
 
+/** The two capability lists behind one collapsible line that counts them. */
+function CapabilityPanel({
+  headline,
+  conditions,
+  actions,
+  installed,
+  available,
+}: {
+  headline: string;
+  conditions: Capability[];
+  actions: Capability[];
+  installed: RuntimeMarker | null;
+  available: RuntimeMarker | null;
+}) {
+  if (conditions.length + actions.length === 0) return null;
+  return (
+    <Collapsible className="border-t border-border/50 pt-3">
+      <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-1 text-left text-sm text-muted-foreground hover:text-foreground">
+        <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+        {headline}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <CapabilityList
+            heading="Conditions"
+            items={conditions}
+            installed={installed}
+            available={available}
+          />
+          <CapabilityList
+            heading="Actions"
+            items={actions}
+            installed={installed}
+            available={available}
+          />
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/**
+ * What a packaged `.sd7`/`.sdz` gets in place of the install action: why the
+ * runtime cannot go into it, and the test mutator coilbox generates instead.
+ *
+ * The capabilities are listed against the runtime coilbox ships, because that is
+ * the one the mutator carries, so every type it declares is one a scenario
+ * tested here can use.
+ */
+function PackagedOffer({
+  gameName,
+  available,
+}: {
+  gameName: string;
+  available: RuntimeMarker | null;
+}) {
+  const { reason, offer, limit } = mutatorOffer(gameName, available);
+  const { conditions, actions } = runtimeCapabilities(available, available);
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-medium">Mission runtime</h2>
+      <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
+        <div className="flex max-w-prose flex-col gap-2 text-sm text-muted-foreground">
+          <p>{reason}</p>
+          <p>{offer}</p>
+          {limit && <p>{limit}</p>}
+        </div>
+        <CapabilityPanel
+          headline={`The test mutator brings ${conditions.length} conditions and ${actions.length} actions`}
+          conditions={conditions}
+          actions={actions}
+          installed={available}
+          available={available}
+        />
+      </div>
+    </section>
+  );
+}
+
 /**
  * Installing coilbox's mission runtime into a game, and what the installed one
  * supports, so a player knows before building a scenario which triggers this
  * game can actually run.
  *
- * Only a loose `.sdd` gets this: adoption means the game vendors `luarules/`,
- * `luaui/` and `missions/`, which coilbox cannot write into a packaged
- * `.sd7`/`.sdz`. Those games are offered the test mutator instead (issue #754).
+ * Only a loose `.sdd` can be installed into: adoption means the game vendors
+ * `luarules/`, `luaui/` and `missions/`, which coilbox cannot write into a
+ * packaged `.sd7`/`.sdz`. A packaged game gets {@link PackagedOffer} instead.
  */
-export function MissionRuntimeSection({ archive }: { archive: Archive }) {
+export function MissionRuntimeSection({ game }: { game: GameItem }) {
+  const archive = game.primaryArchive;
   const root = archive.path;
   const loose = isSdd(archive) && !!root;
   const [installed, setInstalled] = useState<RuntimeMarker | null>(null);
@@ -161,7 +242,9 @@ export function MissionRuntimeSection({ archive }: { archive: Archive }) {
     refresh();
   }, [refresh]);
 
-  if (!loose || !root) return null;
+  if (!root) return null;
+  if (!loose)
+    return <PackagedOffer gameName={game.name} available={available} />;
 
   const state = runtimeInstallState(installed, available);
 
@@ -210,30 +293,13 @@ export function MissionRuntimeSection({ archive }: { archive: Archive }) {
             </Button>
           )}
         </div>
-        {conditions.length + actions.length > 0 && (
-          <Collapsible className="border-t border-border/50 pt-3">
-            <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-1 text-left text-sm text-muted-foreground hover:text-foreground">
-              <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-              {capabilityHeadline(installed, conditions, actions)}
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                <CapabilityList
-                  heading="Conditions"
-                  items={conditions}
-                  installed={installed}
-                  available={available}
-                />
-                <CapabilityList
-                  heading="Actions"
-                  items={actions}
-                  installed={installed}
-                  available={available}
-                />
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+        <CapabilityPanel
+          headline={capabilityHeadline(installed, conditions, actions)}
+          conditions={conditions}
+          actions={actions}
+          installed={installed}
+          available={available}
+        />
       </div>
       {error && <p className="break-words text-sm text-destructive">{error}</p>}
     </section>
