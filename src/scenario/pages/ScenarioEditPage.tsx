@@ -14,6 +14,9 @@ import {
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { saveScenario } from "../storage";
+import { DialoguePanel } from "./components/DialoguePanel";
+import { ObjectivePanel } from "./components/ObjectivePanel";
+import { RestrictionPanel } from "./components/RestrictionPanel";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
 import { TriggerPanel } from "./components/TriggerPanel";
 import {
@@ -24,6 +27,7 @@ import {
   stepLabel,
 } from "./components/triggers";
 import { useGameUnits } from "./components/useGameUnits";
+import { VarPanel } from "./components/VarPanel";
 
 const BACK = "/scenario-builder";
 
@@ -178,8 +182,9 @@ export default function ScenarioEditPage() {
         picking={picking}
       />
 
-      {/* The panels: the parts of the document the map cannot show. Objectives,
-          dialogue, restrictions and vars join triggers here in #764. */}
+      {/* The panels: the parts of the document the map cannot show. Triggers
+          first, because everything under them is something a trigger points
+          at. */}
       <TriggerPanel
         scenario={scenario}
         onChange={(next) => void persist(next)}
@@ -188,6 +193,21 @@ export default function ScenarioEditPage() {
         picking={pick}
         onPick={setPick}
       />
+      <ObjectivePanel
+        scenario={scenario}
+        onChange={(next) => void persist(next)}
+      />
+      <DialoguePanel
+        scenario={scenario}
+        onChange={(next) => void persist(next)}
+      />
+      <RestrictionPanel
+        scenario={scenario}
+        onChange={(next) => void persist(next)}
+        units={gameUnits.units}
+        unitsLoading={gameUnits.loading}
+      />
+      <VarPanel scenario={scenario} onChange={(next) => void persist(next)} />
     </div>
   );
 }

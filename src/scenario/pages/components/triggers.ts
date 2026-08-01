@@ -160,27 +160,38 @@ function refParams(step: TriggerStep, list: StepList, kind: ParamKind) {
     .map(([name]) => name);
 }
 
-/** One trigger's own id and every trigger reference inside it rewritten. */
-function renamedIn(
-  trigger: ScenarioTrigger,
+/**
+ * Every parameter of one reference kind that names `from` pointed at `to`
+ * instead, across every trigger in the document.
+ *
+ * The reference kind is what makes this general: a zone, an objective, a
+ * dialogue line and a variable are all named by a parameter the type table
+ * declares, so renaming any of them is this one rewrite with a different kind,
+ * and a reference a game extension declares is carried over too.
+ */
+export function rewriteRefs(
+  scenario: Scenario,
+  kind: ParamKind,
   from: string,
   to: string,
-): ScenarioTrigger {
+): Scenario {
   const rewrite = (list: StepList) => (step: TriggerStep) => {
     let params = step.params;
-    for (const name of refParams(step, list, "triggerId")) {
+    for (const name of refParams(step, list, kind)) {
       if (params[name] === from) params = { ...params, [name]: to };
     }
     return params === step.params ? step : { ...step, params };
   };
   return {
-    ...trigger,
-    id: trigger.id === from ? to : trigger.id,
-    conditions: {
-      ...trigger.conditions,
-      conditions: trigger.conditions.conditions.map(rewrite("conditions")),
-    },
-    actions: trigger.actions.map(rewrite("actions")),
+    ...scenario,
+    triggers: scenario.triggers.map((trigger) => ({
+      ...trigger,
+      conditions: {
+        ...trigger.conditions,
+        conditions: trigger.conditions.conditions.map(rewrite("conditions")),
+      },
+      actions: trigger.actions.map(rewrite("actions")),
+    })),
   };
 }
 
@@ -206,9 +217,12 @@ export function renameTrigger(
   if (!wanted || wanted === from) return scenario;
   if (!scenario.triggers.some((t) => t.id === from)) return scenario;
   if (scenario.triggers.some((t) => t.id === wanted)) return scenario;
+  const rewritten = rewriteRefs(scenario, "triggerId", from, wanted);
   return {
-    ...scenario,
-    triggers: scenario.triggers.map((t) => renamedIn(t, from, wanted)),
+    ...rewritten,
+    triggers: rewritten.triggers.map((t) =>
+      t.id === from ? { ...t, id: wanted } : t,
+    ),
   };
 }
 
