@@ -25,6 +25,7 @@ GG.CoilboxMission = {
   runtime = <runtime.lua>,
   teams   = <per-participant setup, with the engine team number resolved>,
   suppressesStart = <function(teamID): does the mission place this team's start?>,
+  suppressesEveryStart = <function(): does it place every team's?>,
   actors  = <actor records by scenario id>,
   units   = <scenario actor id -> unitID, for the actors currently alive>,
   triggers = <the trigger engine, synced half only>,
@@ -54,7 +55,11 @@ The runtime takes over the start rather than sharing it, so a mission plays the 
 
 Asking is the third item in the [adoption contract](../../docs/mission-runtime.md). A game calls `GG.CoilboxMission.suppressesStart(teamID)` where its own start gadget would spawn, and spawns nothing when the answer is true. The answer is the scenario's, so it holds for the whole mission rather than for a window.
 
-Removing is the fallback, and it only reaches as far as game frame 1, which is late enough for a game that spawns at frame 0 and no use at all to one that does not. Splinter Faction runs a faction picker and a placement picker first and spawns at frame 1800 ([issue #884](https://github.com/tomjn/coilbox/issues/884)).
+A game whose start is a sequence of pre-game phases rather than a call asks `GG.CoilboxMission.suppressesEveryStart()` at the top of the sequence and skips it. That is the same question asked about the game rather than about one team, true when the mission owns the start of every non-Gaia team in the engine's team list. A phase is global, so the whole game decides whether one is worth running, and a team the mission says nothing about still has a start to pick a faction and a position for.
+
+Skipping is the game's, not the runtime's. A phase machine is the game's own gadget state and its own rules params, and the runtime can reach neither: all it can do is answer. Splinter Faction ran a faction picker and a spot picker to frame 1800 over a mission that was already playing ([issue #888](https://github.com/tomjn/coilbox/issues/888)).
+
+Removing is the fallback for a game that has not adopted that item, and it only reaches as far as game frame 1, which is late enough for a game that spawns at frame 0 and no use at all to one that does not. Splinter Faction spawns at frame 1800 ([issue #884](https://github.com/tomjn/coilbox/issues/884)).
 
 Widening that window is not the fix. A game that counts commanders counts the one the runtime is about to destroy, and Splinter Faction's `game_team_com_ends.lua` answers an ally team's last commander dying with `Spring.KillTeam`: the player loses every unit they have and their seat in the game. Undoing a start at frame 1 is ahead of that bookkeeping and undoing one at frame 1800 is not, so the only reliable answer is for the game not to spawn.
 
