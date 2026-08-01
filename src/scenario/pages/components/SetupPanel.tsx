@@ -8,6 +8,10 @@
  * draft, so an author with no saved preset can give a scenario a game and a map,
  * and one with a preset can still start from it.
  *
+ * One thing here is the scenario's own rather than the launcher's:
+ * {@link StartConditions}, the document's `teams` block. It sits with the
+ * participants because every field in it is keyed by a participant id.
+ *
  * What is different is that a scenario is not just a launch payload. The map is
  * the space every coordinate is measured in, the game is what every unit def
  * resolves against, and a participant id is what actors, groups, prefabs and
@@ -60,6 +64,7 @@ import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario } from "../../model";
 import { EditorPanel } from "./panels";
 import { placementDefs, scenarioPlacements } from "./placements";
+import { StartConditions } from "./StartConditions";
 import {
   applyPresetSetup,
   defsMissingFrom,
@@ -73,6 +78,7 @@ import {
   setScenarioGame,
   setScenarioMap,
 } from "./setup";
+import { startsSummary } from "./teams";
 import { useGameUnits } from "./useGameUnits";
 
 /**
@@ -291,9 +297,14 @@ export function SetupPanel({
     });
   }, [rows]);
 
-  const summary = `${setup.gameName || "No game"} · ${
-    setup.mapName || "No map"
-  } · ${count(setup.participants.length, "participant")}`;
+  // The starts are named only once something is set, so a shut panel says a
+  // scenario has them rather than always saying it has not.
+  const summary = [
+    setup.gameName || "No game",
+    setup.mapName || "No map",
+    count(setup.participants.length, "participant"),
+    ...(Object.keys(scenario.teams).length ? [startsSummary(scenario)] : []),
+  ].join(" · ");
 
   return (
     <EditorPanel
@@ -419,6 +430,13 @@ export function SetupPanel({
                   options,
                 )
               }
+            />
+            {/* Keyed by participant id, so it belongs beside the table that
+                mints those ids rather than in a panel of its own. */}
+            <StartConditions
+              scenario={scenario}
+              participants={rows}
+              onChange={onChange}
             />
             <GameOptionsPanel
               selectedGame={selectedGame}
