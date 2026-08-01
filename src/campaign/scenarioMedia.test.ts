@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mediaReadMock = vi.fn();
 const mediaWriteMock = vi.fn();
+const campaignListMock = vi.fn();
 
 // The media helpers reach the plugin through the scenario bindings, whose
 // plugin-sdk import Vitest's node resolver cannot load from the published dist.
@@ -12,14 +13,20 @@ vi.mock("../scenario/bindings", () => ({
   scenarioMediaWrite: (...args: unknown[]) => mediaWriteMock(...args),
 }));
 
+vi.mock("./bindings", () => ({
+  campaignList: (...args: unknown[]) => campaignListMock(...args),
+}));
+
 import type { Scenario } from "../scenario/model";
 import type { Campaign, CampaignMission } from "./model";
 import {
   clipIsAttached,
   collectCampaignScenarioMedia,
   dropUnavailableDialogueMedia,
+  ensureCampaignScenarioMedia,
   restoreCampaignScenarioMedia,
 } from "./scenarioMedia";
+import { wrapCampaignForExport } from "./transfer";
 
 const PORTRAIT = "data:image/png;base64,aGk=";
 const VOICE = "data:audio/ogg;base64,b2dn";
@@ -81,10 +88,10 @@ function mission(id: string, attached?: Scenario): CampaignMission {
   };
 }
 
-function campaign(missions: CampaignMission[]): Campaign {
+function campaign(missions: CampaignMission[], id = "c1"): Campaign {
   return {
     schemaVersion: 1,
-    id: "c1",
+    id,
     type: "ta",
     title: "Test",
     description: "",
@@ -100,6 +107,78 @@ beforeEach(() => {
     Promise.resolve({ dataUrl: file.endsWith(".png") ? PORTRAIT : VOICE }),
   );
   mediaWriteMock.mockResolvedValue({});
+  campaignListMock.mockResolvedValue({ items: [] });
+});
+
+/** A bundled campaign as it sits in `.coilbox/campaigns/`: the exported file. */
+function bundled(id: string) {
+  return {
+    source: "bundled" as const,
+    json: JSON.stringify(
+      wrapCampaignForExport(campaign([mission("m1", scenario("s1"))], id), {
+        s1: { "a.png": PORTRAIT, "a.ogg": VOICE },
+      }),
+    ),
+  };
+}
+
+describe("ensureCampaignScenarioMedia", () => {
+  it("writes a bundled campaign's clips into the media store", async () => {
+    campaignListMock.mockResolvedValue({ items: [bundled("b1")] });
+
+    await ensureCampaignScenarioMedia("b1");
+
+    expect(mediaWriteMock).toHaveBeenCalledWith({
+      scenarioId: "s1",
+      file: "a.png",
+      dataUri: PORTRAIT,
+    });
+    expect(mediaWriteMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("writes them once, however many missions are launched", async () => {
+    campaignListMock.mockResolvedValue({ items: [bundled("b2")] });
+
+    await ensureCampaignScenarioMedia("b2");
+    await ensureCampaignScenarioMedia("b2");
+
+    expect(campaignListMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves another bundled campaign's clips alone", async () => {
+    campaignListMock.mockResolvedValue({
+      items: [bundled("b3"), bundled("other")],
+    });
+
+    await ensureCampaignScenarioMedia("b3");
+
+    expect(mediaWriteMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does nothing for a local campaign, whose clips are already stored", async () => {
+    campaignListMock.mockResolvedValue({
+      items: [
+        {
+          source: "local" as const,
+          json: JSON.stringify(campaign([mission("m1", scenario("s1"))], "l1")),
+        },
+      ],
+    });
+
+    await ensureCampaignScenarioMedia("l1");
+
+    expect(mediaWriteMock).not.toHaveBeenCalled();
+  });
+
+  it("retries next launch when the list could not be read", async () => {
+    campaignListMock.mockRejectedValueOnce(new Error("no campaigns dir"));
+    await ensureCampaignScenarioMedia("b4");
+
+    campaignListMock.mockResolvedValue({ items: [bundled("b4")] });
+    await ensureCampaignScenarioMedia("b4");
+
+    expect(mediaWriteMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("collectCampaignScenarioMedia", () => {

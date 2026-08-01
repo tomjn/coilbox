@@ -20,6 +20,7 @@ import { launchScenario } from "../scenario/launch";
 import { useCampaignProgress } from "./campaigns";
 import type { Campaign, CampaignMission } from "./model";
 import { applyDefeat, applyVictory, nextAvailableMission } from "./results";
+import { ensureCampaignScenarioMedia } from "./scenarioMedia";
 
 /* -------------------------------------------------------------------------- *
  * The mission run hook — install check, launch, automatic result detection from
@@ -208,6 +209,10 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
       // scenario's own setup, not from the snapshot read here.
       let launched: BattleConfig;
       if (mission.scenario) {
+        // A bundled campaign's dialogue clips have never been written into the
+        // media store, and that store is where the compile step copies them
+        // from, so they are materialised here before anything is compiled.
+        await ensureCampaignScenarioMedia(campaign.id);
         // A mission that carries a scenario is launched the one way a scenario
         // is ever launched: compiled, written where the game will look for it,
         // and read back before the engine is started. A refusal means nothing
