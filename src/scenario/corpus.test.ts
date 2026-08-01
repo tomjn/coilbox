@@ -95,4 +95,79 @@ describe("scenario fixture corpus", () => {
 
     expect(missing).toEqual([]);
   });
+
+  /**
+   * Type-name coverage isn't enough: a fixture can name a type without
+   * exercising the shape of data it carries. Issue #811 found the corpus had
+   * no prefab at all, so no prefab building with a factory queue and no
+   * queue with `repeat` either, and every group was `dormant`, so none of
+   * them started on the map. Guard those shapes explicitly, the same way the
+   * type-name check above is guarded, so a fixture that stops exercising one
+   * fails here instead of silently leaving `mission.lua` untested.
+   */
+  it("covers every prefab and group-dormancy shape", () => {
+    const allPrefabs = fixtures.flatMap(({ scenario }) => scenario.prefabs);
+    const allBuildings = allPrefabs.flatMap((p) => p.buildings);
+    const allGroups = fixtures.flatMap(({ scenario }) => scenario.groups);
+
+    const shapes: Record<string, boolean> = {
+      "a prefab": allPrefabs.length > 0,
+      "a prefab building with a factory queue": allBuildings.some(
+        (b) => (b.queue?.length ?? 0) > 0,
+      ),
+      "a factory queue that repeats": allBuildings.some(
+        (b) => b.repeat === true,
+      ),
+      "a group that starts on the map (not dormant)": allGroups.some(
+        (g) => g.dormant === false,
+      ),
+    };
+
+    const missing = Object.entries(shapes)
+      .filter(([, present]) => !present)
+      .map(([label]) => label);
+
+    expect(missing).toEqual([]);
+  });
+
+  /**
+   * `ScenarioOrder` in model.ts allows five kinds: `move`, `patrol` and
+   * `fight` (a waypoint list) or `guard` and `attack` (a target). Before this
+   * fixture only ever used `guard` and `attack`, which is also the gap issue
+   * #811 named. An order appears either as a group's opening orders or as the
+   * payload of a `give_orders` action, so both are read.
+   */
+  const ORDER_KINDS = ["move", "patrol", "fight", "guard", "attack"] as const;
+
+  function orderKindsOf(orders: unknown): string[] {
+    if (!Array.isArray(orders)) return [];
+    return orders
+      .map((o) =>
+        typeof o === "object" && o !== null
+          ? (o as { kind?: unknown }).kind
+          : undefined,
+      )
+      .filter((k): k is string => typeof k === "string");
+  }
+
+  it("covers every order kind ScenarioOrder allows", () => {
+    const seenKinds = new Set<string>();
+    for (const { scenario } of fixtures) {
+      for (const group of scenario.groups) {
+        for (const order of group.orders) seenKinds.add(order.kind);
+      }
+      for (const trigger of scenario.triggers) {
+        for (const action of trigger.actions) {
+          if (action.type !== "give_orders") continue;
+          for (const kind of orderKindsOf(action.params.orders)) {
+            seenKinds.add(kind);
+          }
+        }
+      }
+    }
+
+    const missing = ORDER_KINDS.filter((k) => !seenKinds.has(k));
+
+    expect(missing).toEqual([]);
+  });
 });
