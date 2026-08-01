@@ -969,6 +969,11 @@ fn demotool_winners(engine_dir: &Path, demo: &Path) -> Option<Vec<u32>> {
 
 /// Spawn demotool with `flag` and a bounded timeout (kills the child on overrun),
 /// modeled on `engine::read_version`. Returns captured stdout.
+///
+/// The pipe is drained on its own thread while we wait. `--teamstats` on a long
+/// game prints more than the OS pipe buffer (64 KB on macOS), and demotool blocks
+/// on the write until someone reads it, so waiting for the exit first and reading
+/// afterwards would never let the child finish.
 fn run_demotool(bin: &Path, demo: &Path, flag: &str, timeout: Duration) -> Result<String, String> {
     let mut cmd = coilbox_proc::command(bin);
     cmd.arg(flag)
@@ -978,12 +983,23 @@ fn run_demotool(bin: &Path, demo: &Path, flag: &str, timeout: Duration) -> Resul
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to run demotool: {e}"))?;
+    let stdout = child.stdout.take();
+    let reader = std::thread::spawn(move || {
+        let mut out = String::new();
+        if let Some(mut s) = stdout {
+            let _ = s.read_to_string(&mut out);
+        }
+        out
+    });
     let start = Instant::now();
     loop {
         match child.try_wait() {
             Ok(Some(_)) => break,
             Ok(None) => {
                 if start.elapsed() > timeout {
+                    // Killing the child closes the pipe, so the reader thread ends
+                    // by itself. Its partial output is no use here, so leave it
+                    // rather than joining.
                     let _ = child.kill();
                     let _ = child.wait();
                     return Err("demotool timed out".into());
@@ -993,11 +1009,9 @@ fn run_demotool(bin: &Path, demo: &Path, flag: &str, timeout: Duration) -> Resul
             Err(e) => return Err(format!("error waiting for demotool: {e}")),
         }
     }
-    let mut out = String::new();
-    if let Some(mut s) = child.stdout.take() {
-        let _ = s.read_to_string(&mut out);
-    }
-    Ok(out)
+    reader
+        .join()
+        .map_err(|_| "demotool output could not be read".to_string())
 }
 
 /// Extract the winning ally-team numbers from demotool's `Winning Allyteams: N N`
@@ -1259,6 +1273,65 @@ mod tests {
         assert_eq!(list.len(), 2);
         assert!(list.iter().any(|r| r.filename == "a.sdfz"));
         assert!(list.iter().any(|r| r.filename == "b.sdf"));
+    }
+
+    /// Write an executable `/bin/sh` script standing in for demotool.
+    #[cfg(unix)]
+    fn fake_demotool(name: &str, body: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join("coilbox_demotool_test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(name);
+        std::fs::write(&path, format!("#!/bin/sh\n{body}")).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    }
+
+    /// A real `--teamstats` run on a 40 minute game prints past the 64 KB pipe
+    /// buffer, and the winners are on the last line. Reading only after the child
+    /// exits deadlocks, because the child cannot exit until someone reads.
+    #[test]
+    #[cfg(unix)]
+    fn run_demotool_reads_more_than_the_pipe_buffer() {
+        let bin = fake_demotool(
+            "chatty",
+            "i=0\n\
+             while [ $i -lt 4000 ]; do\n\
+             echo 'Team 0 stat line padded out to look like a teamstats block'\n\
+             i=$((i+1))\n\
+             done\n\
+             echo 'Winning Allyteams: 1'\n",
+        );
+        let out = run_demotool(
+            &bin,
+            Path::new("unused.sdfz"),
+            "--teamstats",
+            Duration::from_secs(10),
+        )
+        .expect("demotool should finish");
+        assert!(
+            out.len() > 200_000,
+            "expected a big dump, got {}",
+            out.len()
+        );
+        assert_eq!(parse_winners(&out), Some(vec![1]));
+    }
+
+    /// A demotool that never exits is still given up on.
+    #[test]
+    #[cfg(unix)]
+    fn run_demotool_times_out_on_a_hanging_child() {
+        let bin = fake_demotool("hangs", "sleep 30\n");
+        let start = Instant::now();
+        let err = run_demotool(
+            &bin,
+            Path::new("unused.sdfz"),
+            "--teamstats",
+            Duration::from_millis(200),
+        )
+        .expect_err("a hanging demotool should time out");
+        assert!(err.contains("timed out"), "unexpected error: {err}");
+        assert!(start.elapsed() < Duration::from_secs(5));
     }
 
     #[test]
