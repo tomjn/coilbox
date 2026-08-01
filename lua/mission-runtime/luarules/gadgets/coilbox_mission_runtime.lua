@@ -126,6 +126,12 @@ if not DIALOGUE then
 	return false
 end
 
+local VIEW, viewError = includeTable("luarules/mission_runtime/coilbox_view.lua")
+if not VIEW then
+	log("error", viewError)
+	return false
+end
+
 -- Refuse a mission built for a newer runtime than the game vendored. Running it
 -- anyway would quietly drop whatever this version cannot read, and a mission
 -- that half works is harder to diagnose than one that refuses to start.
@@ -174,10 +180,13 @@ end
 local ACTOR_MESSAGE = "coilbox_mission_actor"
 -- And the one that says a unit is an anchor, which the unsynced half hides.
 local ANCHOR_MESSAGE = "coilbox_mission_anchor"
--- And the two that reach the player rather than the game: a line of dialogue,
--- which the widget draws, and a sound, which the unsynced half plays outright.
+-- And the four that reach the player rather than the game: a line of dialogue,
+-- which the widget draws, and a sound, a camera move and a map marker, which the
+-- unsynced half does outright.
 local DIALOGUE_MESSAGE = "coilbox_mission_dialogue"
 local SOUND_MESSAGE = "coilbox_mission_sound"
+local CAMERA_MESSAGE = "coilbox_mission_camera"
+local MARKER_MESSAGE = "coilbox_mission_marker"
 
 -- The global the widget registers on the widget handler to hear a line. A
 -- missing one is a no-op in the engine, so a game with no LuaUI, or a player who
@@ -503,6 +512,16 @@ if gadgetHandler:IsSyncedCode() then
 				SendToUnsynced(SOUND_MESSAGE, name)
 			end,
 		})
+		-- Pointing the camera and putting a label on the map are the same kind of
+		-- thing: the player's screen rather than the game.
+		published.view = VIEW.register(triggers, published, {
+			pan = function(x, z, seconds)
+				SendToUnsynced(CAMERA_MESSAGE, x, z, seconds)
+			end,
+			mark = function(x, z, text)
+				SendToUnsynced(MARKER_MESSAGE, x, z, text)
+			end,
+		})
 		published.triggers = triggers
 
 		-- Before the first frame, so a panel reading which unit an actor is finds
@@ -651,13 +670,34 @@ else
 		end
 	end
 
+	--- Move the camera to a place on the map, over `seconds`.
+	--
+	-- A scenario carries no height, so the ground is read here, the way it is for
+	-- everything else the runtime puts somewhere.
+	local function panCamera(x, z, seconds)
+		Spring.SetCameraTarget(x, Spring.GetGroundHeight(x, z), z, seconds)
+	end
+
+	--- Put a labelled point on the map.
+	--
+	-- Local on purpose. Every client runs this half, so a marker sent the way a
+	-- player's own click sends one would be broadcast once per player and land on
+	-- the map that many times over.
+	local function addMarker(x, z, text)
+		Spring.MarkerAddPoint(x, Spring.GetGroundHeight(x, z), z, text, true)
+	end
+
 	--- Returns nothing: a true return would stop the message reaching the gadgets
 	-- behind this one, and their messages are not ours to swallow.
-	function gadget:RecvFromSynced(message, first, second)
+	function gadget:RecvFromSynced(message, first, second, third)
 		if message == ACTOR_MESSAGE then
 			actorBecame(first, second)
 		elseif message == ANCHOR_MESSAGE then
 			hideAnchor(first)
+		elseif message == CAMERA_MESSAGE then
+			panCamera(first, second, third)
+		elseif message == MARKER_MESSAGE then
+			addMarker(first, second, third)
 		elseif message == DIALOGUE_MESSAGE then
 			-- The panel is a widget, so the line goes on to LuaUI, which draws it
 			-- and plays its clip in step with the text. A game with no LuaUI, or a

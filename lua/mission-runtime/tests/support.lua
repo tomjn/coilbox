@@ -93,6 +93,7 @@ function M.missionFiles(mission)
 			"luarules/mission_runtime/coilbox_gameover.lua"),
 		["luarules/mission_runtime/coilbox_dialogue.lua"] = module(
 			"luarules/mission_runtime/coilbox_dialogue.lua"),
+		["luarules/mission_runtime/coilbox_view.lua"] = module("luarules/mission_runtime/coilbox_view.lua"),
 		["missions/demo/mission.lua"] = function()
 			return mission
 		end,
@@ -169,6 +170,9 @@ function M.newEngine(modOptions, files, options)
 		noMinimap = {},
 		-- Every Spring.PlaySoundFile call, as { name, volume }.
 		sounds = {},
+		-- Every Spring.SetCameraTarget call, and every Spring.MarkerAddPoint one.
+		camera = {},
+		markers = {},
 		-- Every call the unsynced half made into LuaUI, as { name, ... }.
 		luaUI = {},
 	}
@@ -514,6 +518,14 @@ function M.newEngine(modOptions, files, options)
 			PlaySoundFile = function(name, volume)
 				table.insert(engine.sounds, { name, volume })
 				return options.sounds == nil or options.sounds[name] == true
+			end,
+			-- Where the camera was sent, as { x, y, z, seconds }.
+			SetCameraTarget = function(x, y, z, seconds)
+				table.insert(engine.camera, { x, y, z, seconds })
+			end,
+			-- Every marker put on the map, as { x, y, z, text, localOnly }.
+			MarkerAddPoint = function(x, y, z, text, localOnly)
+				table.insert(engine.markers, { x, y, z, text, localOnly })
 			end,
 		},
 		Game = { mapName = "Test Map", gameSpeed = 30 },
