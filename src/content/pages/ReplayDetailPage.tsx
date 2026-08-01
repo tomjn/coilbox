@@ -88,8 +88,8 @@ function playedAt(ms: number): string {
 
 /** Human-readable result line from the winning ally-teams. */
 function resultLabel(info: DemoInfo): string {
-  if (!info.winnersKnown) return "Unknown (winner not recorded by demotool)";
-  if (info.winningAllyTeams.length === 0) return "No result recorded";
+  if (!info.winnersKnown) return "Unknown (the game never ended)";
+  if (info.winningAllyTeams.length === 0) return "Nobody won";
   const ids = info.winningAllyTeams.map((a) => `Ally ${a}`).join(", ");
   return `${ids} won`;
 }

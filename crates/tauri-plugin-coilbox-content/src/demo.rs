@@ -40,9 +40,12 @@ const OFF_UNIX_TIME: usize = 296;
 const OFF_SCRIPT_SIZE: usize = 304;
 const OFF_GAME_TIME: usize = 312;
 const OFF_WALLCLOCK: usize = 316;
-/// We only need the header up to (and including) the wallclock field; the v5
+/// `numTeams`, how many teams the end-of-game statistics block covers. Written
+/// only when the game actually ended, see [`RawDemo::game_over`].
+const OFF_NUM_TEAMS: usize = 332;
+/// We only need the header up to (and including) the team-count field. The v5
 /// header is 352 bytes but reading this prefix is enough to locate the script.
-const MIN_HEADER: usize = OFF_WALLCLOCK + 4;
+const MIN_HEADER: usize = OFF_NUM_TEAMS + 4;
 
 // ---- listing ---------------------------------------------------------------
 
@@ -164,7 +167,14 @@ pub fn demo_file_entries(root: &Path) -> Vec<DemoFileEntry> {
 pub fn demo_info(engine_dir: &Path, demo: &Path) -> Result<DemoInfo, String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
-    let winners = demotool_winners(engine_dir, demo);
+    // A replay of a game nobody ended has no winners to read, and demotool says
+    // the same thing for that as it does for a game over with nobody winning. So
+    // the header decides whether there is an answer, and demotool only says what
+    // it is.
+    let winners = raw
+        .game_over
+        .then(|| demotool_winners(engine_dir, demo))
+        .flatten();
     Ok(build_demo_info(raw, &game, winners))
 }
 
@@ -182,6 +192,19 @@ struct RawDemo {
     unix_time: u64,
     game_time: u32,
     wallclock: u32,
+    /// Whether the recorded game reached a game over.
+    ///
+    /// The engine writes the player and team statistics chunks, and the header
+    /// counts that describe them, from `CGame::GameEnd` and nowhere else, so a
+    /// non-zero `numTeams` means a game over was recorded. A game the player
+    /// quit part way through leaves every one of those fields at zero.
+    ///
+    /// This matters because `demotool` prints an empty `Winning Allyteams:` line
+    /// both for a game that never ended and for one that ended with
+    /// `Spring.GameOver({})`, which the mission runtime's `defeat` action
+    /// produces in a mission with one non-Gaia ally team. Without this flag the
+    /// first case reads as a loss for everyone.
+    game_over: bool,
     script: String,
 }
 
@@ -207,6 +230,7 @@ fn read_header_and_script(demo: &Path) -> Result<RawDemo, String> {
         unix_time: u64_at(&buf, OFF_UNIX_TIME)?,
         game_time: i32_at(&buf, OFF_GAME_TIME)?.max(0) as u32,
         wallclock: i32_at(&buf, OFF_WALLCLOCK)?.max(0) as u32,
+        game_over: i32_at(&buf, OFF_NUM_TEAMS)? > 0,
         script: String::from_utf8_lossy(&buf[header_size..need]).into_owned(),
     })
 }
@@ -977,7 +1001,9 @@ fn run_demotool(bin: &Path, demo: &Path, flag: &str, timeout: Duration) -> Resul
 }
 
 /// Extract the winning ally-team numbers from demotool's `Winning Allyteams: N N`
-/// line. An empty list (no game-over recorded) still returns `Some(vec![])`.
+/// line. An empty list still returns `Some(vec![])`, because a game over with
+/// nobody winning is a real outcome. Callers must already have established that
+/// the game ended, see [`RawDemo::game_over`].
 fn parse_winners(out: &str) -> Option<Vec<u32>> {
     let idx = out.find("Winning Allyteams:")?;
     let rest = &out[idx + "Winning Allyteams:".len()..];
@@ -1015,7 +1041,26 @@ mod tests {
     }
 
     /// Build a minimal v5 demo (352-byte header + script), optionally gzipped.
+    /// The header carries the end-of-game statistics counts, so it reads as a
+    /// game that ended. `build_unfinished_demo` is the one that did not.
     fn build_demo(script: &str, gzip: bool) -> Vec<u8> {
+        let mut h = build_demo_bytes(script, 2);
+        if !gzip {
+            return h;
+        }
+        let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        enc.write_all(&h).unwrap();
+        h = enc.finish().unwrap();
+        h
+    }
+
+    /// A demo of a game that never reached a game over: the engine leaves every
+    /// end-of-game statistics count at zero, `numTeams` among them.
+    fn build_unfinished_demo(script: &str) -> Vec<u8> {
+        build_demo_bytes(script, 0)
+    }
+
+    fn build_demo_bytes(script: &str, num_teams: i32) -> Vec<u8> {
         let mut h = vec![0u8; 352];
         h[..MAGIC.len()].copy_from_slice(MAGIC);
         put_i32(&mut h, 16, 5); // version
@@ -1029,13 +1074,9 @@ mod tests {
         put_i32(&mut h, OFF_SCRIPT_SIZE, script.len() as i32);
         put_i32(&mut h, OFF_GAME_TIME, 2356);
         put_i32(&mut h, OFF_WALLCLOCK, 2531);
+        put_i32(&mut h, OFF_NUM_TEAMS, num_teams);
         h.extend_from_slice(script.as_bytes());
-        if !gzip {
-            return h;
-        }
-        let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
-        enc.write_all(&h).unwrap();
-        enc.finish().unwrap()
+        h
     }
 
     fn write_tmp(name: &str, bytes: &[u8]) -> PathBuf {
@@ -1122,6 +1163,44 @@ mod tests {
         assert!(info.players.iter().all(|p| p.won.is_none()));
     }
 
+    /// The header tells a game that ended with nobody winning from one that
+    /// never ended, which demotool's output alone cannot: it prints an empty
+    /// `Winning Allyteams:` line for both.
+    ///
+    /// Measured on three replays recorded by spring-headless
+    /// (2026.07.01-18-g30201dc macos, map AcidicQuarry 5.17, one player on ally
+    /// team 0) from a gadget that ended the game three different ways:
+    ///
+    /// | ending                | numTeams | GAMEOVER packet | demotool  |
+    /// |-----------------------|----------|-----------------|-----------|
+    /// | never ended           | 0        | absent          | empty     |
+    /// | `GameOver({})`        | 2        | `1e 03 00`      | empty     |
+    /// | `GameOver({0})`       | 2        | `1e 04 00 00`   | `0`       |
+    #[test]
+    fn a_game_that_never_ended_has_no_winners() {
+        let p = write_tmp("unfinished.sdf", &build_unfinished_demo(SCRIPT));
+        let raw = read_header_and_script(&p).unwrap();
+        assert!(!raw.game_over);
+
+        // A finished game reads the other way, so the flag is about the ending
+        // and not about this synthetic header.
+        let q = write_tmp("finished.sdf", &build_demo(SCRIPT, false));
+        assert!(read_header_and_script(&q).unwrap().game_over);
+    }
+
+    #[test]
+    fn a_game_over_with_nobody_winning_is_still_a_result() {
+        // `Spring.GameOver({})`, which the mission runtime's `defeat` action
+        // produces in a mission with one non-Gaia ally team. Everyone lost, and
+        // that is an answer rather than a missing one.
+        let raw = read_header_and_script(&write_tmp("n.sdf", &build_demo(SCRIPT, false))).unwrap();
+        let game = find_game(&parse_tdf(&raw.script));
+        let info = build_demo_info(raw, &game, Some(vec![]));
+        assert!(info.winners_known);
+        let alice = info.players.iter().find(|p| p.name == "Alice").unwrap();
+        assert_eq!(alice.won, Some(false));
+    }
+
     #[test]
     fn parses_winner_line() {
         assert_eq!(
@@ -1201,6 +1280,7 @@ mod tests {
                 unix_time: 0,
                 game_time: 0,
                 wallclock: 0,
+                game_over: true,
                 script: SCRIPT.to_string(),
             },
             &game,
@@ -1223,6 +1303,7 @@ mod tests {
                 unix_time: 0,
                 game_time: 0,
                 wallclock: 0,
+                game_over: true,
                 script: SCRIPT.to_string(),
             },
             &game,

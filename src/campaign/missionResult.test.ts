@@ -13,17 +13,24 @@ import { applyDefeat, applyVictory } from "./results";
  * launch wrote, decode it, read the local player's result off it, and apply the
  * same progress transition. This file pins that contract from both ends.
  *
- * The three demos below are transcriptions of real replays. Each was written by
+ * The demos below are transcriptions of real replays. Each was written by
  * spring-headless running the mission runtime through
  * `scripts/mission-headless.sh` (engine 2026.06.06-90-gb54146d macos, map
  * AcidicQuarry 5.17, the harness's `probe` player on team 0 / ally team 0), and
  * decoded with the content plugin's demotool reader. The numbers are what that
  * reader returned, not what it ought to return.
+ *
+ * The last two are the same shape from a later run (engine
+ * 2026.07.01-18-g30201dc macos, same map and player) of a gadget calling
+ * `Spring.GameOver({})` and of one that quit without ending the game at all.
+ * Those two are why `winnersKnown` exists: demotool prints an empty
+ * `Winning Allyteams:` line for both, and only the demo header separates them.
  */
 
 /** A decoded mission replay: the harness run, with its winners and verdict. */
 function missionDemo(opts: {
   winningAllyTeams: number[];
+  winnersKnown?: boolean;
   won?: boolean;
   spectator?: boolean;
   durationSec: number;
@@ -36,7 +43,7 @@ function missionDemo(opts: {
     mapName: "AcidicQuarry 5.17",
     gameType: "Coilbox mission harness scratch",
     winningAllyTeams: opts.winningAllyTeams,
-    winnersKnown: true,
+    winnersKnown: opts.winnersKnown ?? true,
     numAllyTeams: 2,
     allyTeams: [],
     players: [
@@ -76,6 +83,32 @@ describe("a scenario mission's replay", () => {
 
   it("reads a runtime defeat as a defeat", () => {
     expect(resultFromDemoInfo(defeatDemo, "probe")).toBe("defeat");
+  });
+
+  it("reads a defeat with nobody left to win as a defeat", () => {
+    // The `defeat` action declares every ally team but the losing one, which in
+    // a mission with a single non-Gaia ally team is none at all. The replay
+    // records the game over with an empty winners list, so the player's ally
+    // team is not among the winners and the loss stands.
+    const nobody = missionDemo({
+      winningAllyTeams: [],
+      won: false,
+      durationSec: 5,
+    });
+    expect(resultFromDemoInfo(nobody, "probe")).toBe("defeat");
+  });
+
+  it("is ambiguous when the player quit before the mission ended", () => {
+    // Not the same replay as the one above, though demotool prints the same
+    // empty winners line for both. The reader tells them apart by the
+    // end-of-game statistics the engine only writes at a game over, so a
+    // mission nobody finished asks rather than declaring a defeat.
+    const quit = missionDemo({
+      winningAllyTeams: [],
+      winnersKnown: false,
+      durationSec: 0,
+    });
+    expect(resultFromDemoInfo(quit, "probe")).toBe("ambiguous");
   });
 
   it("is ambiguous when the player launched as a spectator", () => {
