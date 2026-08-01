@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { newScenario } from "../../create";
 import type { Scenario } from "../../model";
+import { initialParticipants } from "../../../play/participants";
 import {
+  applyPresetSetup,
   defsMissingFrom,
   holdsNothing,
   mapCost,
@@ -334,5 +336,72 @@ describe("removing a participant", () => {
     const ai = ids(scenario)[1];
     expect(removeScenarioParticipant(scenario, ai, ai)).toBe(scenario);
     expect(removeScenarioParticipant(scenario, ai, "nobody")).toBe(scenario);
+  });
+});
+
+describe("setting up from a preset", () => {
+  const preset = () => ({
+    participants: initialParticipants(),
+    gameName: "Preset Game",
+    mapName: "Preset Map",
+    startPosType: 2,
+    modOptionValues: { deathmode: "killall" },
+  });
+
+  it("takes the preset's whole setup", () => {
+    const next = applyPresetSetup(populated(), preset());
+    expect(next.setup.gameName).toBe("Preset Game");
+    expect(next.setup.mapName).toBe("Preset Map");
+    expect(next.setup.startPosType).toBe(2);
+    expect(next.setup.modOptionValues).toEqual({ deathmode: "killall" });
+  });
+
+  it("hands everything over in list order", () => {
+    const scenario = populated();
+    const incoming = preset();
+    const next = applyPresetSetup(scenario, incoming);
+    const [you, ai] = next.setup.participants.map((p) => p.id);
+    expect(next.actors.map((a) => a.team)).toEqual([you, ai]);
+    expect(next.groups[0].team).toBe(ai);
+    expect(next.prefabs[0].team).toBe(ai);
+    expect(next.triggers[0].conditions.conditions[0].params.team).toBe(ai);
+    expect(next.triggers[0].actions[2].params.team).toBe(you);
+    expect(Object.keys(next.teams)).toEqual([ai]);
+  });
+
+  it("hands a participant the preset has no room for to the player", () => {
+    const scenario = populated();
+    const third = {
+      ...scenario.setup.participants[1],
+      id: "extra",
+      name: "AI 2",
+    };
+    const crowded: Scenario = {
+      ...scenario,
+      setup: {
+        ...scenario.setup,
+        participants: [...scenario.setup.participants, third],
+      },
+      actors: [
+        ...scenario.actors,
+        {
+          id: "spare",
+          unitDef: "corak",
+          team: "extra",
+          pos: { x: 100, z: 100 },
+          facing: 0 as const,
+        },
+      ],
+    };
+    const next = applyPresetSetup(crowded, preset());
+    const you = next.setup.participants[0].id;
+    expect(next.actors.at(-1)?.team).toBe(you);
+  });
+
+  it("copies the preset rather than sharing it", () => {
+    const incoming = preset();
+    const next = applyPresetSetup(populated(), incoming);
+    expect(next.setup.participants).not.toBe(incoming.participants);
+    expect(next.setup.participants[0]).toEqual(incoming.participants[0]);
   });
 });

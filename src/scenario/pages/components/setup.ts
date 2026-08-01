@@ -12,11 +12,13 @@
  */
 
 import type { Participant } from "@/play/config";
+import type { SkirmishDraft } from "@/play/drafts";
 import type {
   Point,
   Scenario,
   ScenarioOrder,
   ScenarioParam,
+  ScenarioTeam,
   TriggerStep,
 } from "../../model";
 import { ACTION_TYPES, CONDITION_TYPES } from "../../triggerTypes";
@@ -340,18 +342,41 @@ export function participantHoldings(
   };
 }
 
-/** Rewrite every parameter of a step that names one participant. */
-function rewriteTeamParam(
+/** Rewrite every parameter of a step that names a participant the map renames. */
+function rewriteTeamParams(
   step: TriggerStep,
   table: Record<string, unknown>,
-  from: string,
-  to: string,
+  rename: (id: string) => string | undefined,
 ): TriggerStep {
   let params = step.params;
   for (const name of teamParams(step, table)) {
-    if (params[name] === from) params = { ...params, [name]: to };
+    const value = params[name];
+    const to = typeof value === "string" ? rename(value) : undefined;
+    if (to !== undefined) params = { ...params, [name]: to };
   }
   return params === step.params ? step : { ...step, params };
+}
+
+/** Every participant a trigger names put through one renaming. */
+function rewriteTriggerTeams(
+  scenario: Scenario,
+  rename: (id: string) => string | undefined,
+): Scenario {
+  return {
+    ...scenario,
+    triggers: scenario.triggers.map((trigger) => ({
+      ...trigger,
+      conditions: {
+        ...trigger.conditions,
+        conditions: trigger.conditions.conditions.map((c) =>
+          rewriteTeamParams(c, CONDITION_TYPES, rename),
+        ),
+      },
+      actions: trigger.actions.map((a) =>
+        rewriteTeamParams(a, ACTION_TYPES, rename),
+      ),
+    })),
+  };
 }
 
 /**
@@ -400,21 +425,63 @@ export function removeScenarioParticipant(
         : scenario.prefabs.map((p) => (p.team === id ? { ...p, team: to } : p)),
   };
   if (to === null) return next;
-  return {
-    ...next,
-    triggers: next.triggers.map((trigger) => ({
-      ...trigger,
-      conditions: {
-        ...trigger.conditions,
-        conditions: trigger.conditions.conditions.map((c) =>
-          rewriteTeamParam(c, CONDITION_TYPES, id, to),
-        ),
-      },
-      actions: trigger.actions.map((a) =>
-        rewriteTeamParam(a, ACTION_TYPES, id, to),
-      ),
+  return rewriteTriggerTeams(next, (named) =>
+    named === id ? to : undefined,
+  );
+}
+
+/**
+ * A saved skirmish preset copied in as the whole setup.
+ *
+ * A preset's participants are a different set of ids from the ones the document
+ * is keyed on, so copying one in used to leave every actor, group, prefab and
+ * `teams` entry pointing at somebody who no longer existed. They are handed over
+ * in list order instead: the first participant's things become the preset's
+ * first participant's, and so on. A participant the preset does not reach as far
+ * as hands its things to the preset's first, who is the player, because
+ * something has to own them.
+ *
+ * The setup is deep-copied the way a campaign mission snapshots one, so editing
+ * the preset afterwards cannot reach into the scenario.
+ */
+export function applyPresetSetup(
+  scenario: Scenario,
+  preset: SkirmishDraft,
+): Scenario {
+  const setup: SkirmishDraft = structuredClone({
+    participants: preset.participants,
+    gameName: preset.gameName,
+    mapName: preset.mapName,
+    startPosType: preset.startPosType,
+    modOptionValues: preset.modOptionValues,
+  });
+  const incoming = setup.participants;
+  if (incoming.length === 0) return { ...scenario, setup };
+
+  const rename = new Map<string, string>();
+  scenario.setup.participants.forEach((p, index) => {
+    rename.set(p.id, (incoming[index] ?? incoming[0]).id);
+  });
+  const to = (id: string) => rename.get(id);
+
+  const teams: Record<string, ScenarioTeam> = {};
+  for (const [id, team] of Object.entries(scenario.teams)) {
+    const renamed = to(id);
+    if (renamed !== undefined) teams[renamed] = team;
+  }
+
+  const next: Scenario = {
+    ...scenario,
+    setup,
+    teams,
+    actors: scenario.actors.map((a) => ({ ...a, team: to(a.team) ?? a.team })),
+    groups: scenario.groups.map((g) => ({ ...g, team: to(g.team) ?? g.team })),
+    prefabs: scenario.prefabs.map((p) => ({
+      ...p,
+      team: to(p.team) ?? p.team,
     })),
   };
+  return rewriteTriggerTeams(next, to);
 }
 
 /** The setup's participant list replaced, for every change that is not a
