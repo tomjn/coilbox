@@ -33,7 +33,12 @@ import {
   MissionMapSideGraphic,
 } from "./components/MissionMapPreview";
 import { MissionMediaPlayer } from "./components/MissionMediaFields";
+import {
+  MissionUnitBackground,
+  MissionUnitSideGraphic,
+} from "./components/MissionUnitPreview";
 import { PanoramaScroller } from "./components/PanoramaScroller";
+import { useMissionUnit } from "./components/useMissionUnit";
 
 /**
  * The mission briefing and play flow. A full-bleed panorama (or a dark gradient
@@ -98,6 +103,16 @@ function MissionStage({
   mission: CampaignMission;
 }) {
   const run = useMissionRun(campaign, mission);
+  // The panorama's unit, if it has one. A player whose install cannot draw it
+  // (an older version of the game, a unit renamed since) gets the slot's image
+  // or the gradient instead, rather than an empty backdrop.
+  const unit = useMissionUnit(mission.snapshot.gameName, mission.panoramaUnit);
+  // A live 3D backdrop, of either kind. Suppressed while the game or map is
+  // missing: the gate below is showing instead, and there is nothing to read a
+  // map or a unit out of.
+  const live3d =
+    !run.missing &&
+    !!(mission.panoramaMap || (mission.panoramaUnit && !unit.unavailable));
 
   return (
     <div
@@ -108,17 +123,25 @@ function MissionStage({
           : undefined
       }
     >
-      {/* Background: the mission map as a spinning backdrop, else a full-bleed
-          panorama, else a dark gradient. The map backdrop is suppressed while the
-          map is missing (the gate below shows instead — there's nothing to render).
-          The wrapper is NOT aria-hidden: a video panorama renders reachable
-          pause/mute controls, so each purely-decorative branch hides itself. */}
+      {/* Background: the mission map or its chosen unit as a spinning backdrop,
+          else a full-bleed panorama, else a dark gradient. The 3D backdrops are
+          suppressed while the game or map is missing (the gate below shows
+          instead, and there is nothing to render). The wrapper is NOT
+          aria-hidden: a video panorama renders reachable pause/mute controls, so
+          each purely-decorative branch hides itself. */}
       <div className="absolute inset-0">
-        {mission.panoramaMap && !run.missing ? (
+        {live3d && mission.panoramaMap ? (
           <div className="h-full w-full" aria-hidden>
             <MissionMapBackground
               mapName={mission.snapshot.mapName}
               config={mission.panoramaMap}
+            />
+          </div>
+        ) : live3d && mission.panoramaUnit ? (
+          <div className="h-full w-full" aria-hidden>
+            <MissionUnitBackground
+              model={unit.model}
+              config={mission.panoramaUnit}
             />
           </div>
         ) : mission.panorama ? (
@@ -136,7 +159,7 @@ function MissionStage({
           />
         )}
       </div>
-      {/* Scrim: darken for text contrast, heaviest at the bottom. A live map
+      {/* Scrim: darken for text contrast, heaviest at the bottom. A live 3D
           backdrop is the subject rather than a texture behind text, so it gets a
           much lighter scrim (the briefing card carries its own contrast) — the
           image-panorama design keeps the heavier one. `pointer-events-none` so it
@@ -144,7 +167,7 @@ function MissionStage({
       <div
         className={cn(
           "pointer-events-none absolute inset-0 bg-gradient-to-t",
-          mission.panoramaMap && !run.missing
+          live3d
             ? "from-background/70 via-background/10 to-transparent"
             : "from-background via-background/85 to-background/40",
         )}
@@ -196,6 +219,13 @@ function Briefing({
   run: ReturnType<typeof useMissionRun>;
 }) {
   const { target } = usePreferredTarget();
+  // As for the panorama: a unit the player's install cannot draw falls back to
+  // the slot's still image, or to no side graphic at all.
+  const unit = useMissionUnit(
+    mission.snapshot.gameName,
+    mission.sideGraphicUnit,
+  );
+  const unitGraphic = mission.sideGraphicUnit && !unit.unavailable;
   return (
     <div className="flex w-full items-end gap-4">
       <div className="flex w-full max-w-2xl flex-col gap-4 rounded-xl border border-border/50 bg-card/80 p-5 backdrop-blur-sm">
@@ -265,16 +295,23 @@ function Briefing({
         <StartArea run={run} />
       </div>
 
-      {/* Optional side graphic — a spinning 3D map preview, or a still image —
-          centered (both axes) in the space between the briefing card and the page's
-          right edge. `self-stretch` overrides the row's bottom alignment so the
-          region spans the card height and can centre vertically. Hidden on narrow
-          screens. */}
+      {/* Optional side graphic: a spinning 3D map preview, a spinning unit, or a
+          still image, centered (both axes) in the space between the briefing card
+          and the page's right edge. `self-stretch` overrides the row's bottom
+          alignment so the region spans the card height and can centre vertically.
+          Hidden on narrow screens. */}
       {mission.sideGraphicMap ? (
         <div className="hidden flex-1 items-stretch self-stretch lg:flex">
           <MissionMapSideGraphic
             mapName={mission.snapshot.mapName}
             config={mission.sideGraphicMap}
+          />
+        </div>
+      ) : unitGraphic && mission.sideGraphicUnit ? (
+        <div className="hidden flex-1 items-stretch self-stretch lg:flex">
+          <MissionUnitSideGraphic
+            model={unit.model}
+            config={mission.sideGraphicUnit}
           />
         </div>
       ) : mission.sideGraphic ? (

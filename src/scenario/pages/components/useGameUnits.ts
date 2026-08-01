@@ -24,6 +24,9 @@ export interface GameUnits {
   /** The game is not among the installed content, so there are no units to
    *  offer and there never will be until it is installed. */
   gameMissing: boolean;
+  /** The archive the units came out of, which is also what a model read of one
+   *  of them has to be made against. Undefined until the game is found. */
+  archive?: string;
 }
 
 export function useGameUnits(gameName: string): GameUnits {
@@ -40,5 +43,6 @@ export function useGameUnits(gameName: string): GameUnits {
     units: dataset?.units ?? [],
     loading: scan.loading || status === "loading",
     gameMissing: !!gameName && !!scan.data && !game,
+    archive: game?.primaryArchive.name,
   };
 }
