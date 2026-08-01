@@ -63,6 +63,11 @@ describe("zoneKey", () => {
     expect(parseZoneKey("zone:")).toBeNull();
     expect(parseZoneKey("zone:z1@middle")).toBeNull();
   });
+
+  it("names the handle that moves a whole zone", () => {
+    expect(zoneKey("z1", "move")).toBe("zone:z1@move");
+    expect(parseZoneKey("zone:z1@move")).toEqual({ id: "z1", handle: "move" });
+  });
 });
 
 describe("normaliseBox", () => {
@@ -176,9 +181,14 @@ describe("zone geometry", () => {
     expect(zoneExtent(circle)).toEqual({ halfX: 300, halfZ: 300 });
   });
 
-  it("offers four corners on a box and one radius on a circle", () => {
-    expect(zoneHandles(box)).toEqual(["nw", "ne", "sw", "se"]);
-    expect(zoneHandles(circle)).toEqual(["radius"]);
+  it("offers a move handle, four corners on a box and one radius on a circle", () => {
+    expect(zoneHandles(box)).toEqual(["move", "nw", "ne", "sw", "se"]);
+    expect(zoneHandles(circle)).toEqual(["move", "radius"]);
+  });
+
+  it("puts the move handle in the middle of either shape", () => {
+    expect(zoneHandleOffset(box, "move")).toEqual({ x: 0, z: 0 });
+    expect(zoneHandleOffset(circle, "move")).toEqual({ x: 0, z: 0 });
   });
 
   it("puts each handle on the corner it names, with north at the lower z", () => {
@@ -201,6 +211,18 @@ describe("dragZone", () => {
 
   it("moves a whole circle", () => {
     expect(dragZone(circle, null, { x: -100, z: 40 })).toMatchObject({
+      center: { x: 900, z: 1040 },
+      radius: 300,
+    });
+  });
+
+  it("moves a whole zone through the move handle", () => {
+    // The same as no handle at all: the sheet is not what a drag grabs any
+    // more, so the handle at the middle is what says "move all of this".
+    expect(dragZone(box, "move", { x: 50, z: -25 })).toEqual(
+      dragZone(box, null, { x: 50, z: -25 }),
+    );
+    expect(dragZone(circle, "move", { x: -100, z: 40 })).toMatchObject({
       center: { x: 900, z: 1040 },
       radius: 300,
     });
@@ -263,6 +285,14 @@ describe("moveZone", () => {
       max: { x: 510, z: 610 },
     });
     expect(next.zones[1]).toEqual(circle);
+  });
+
+  it("moves through the move handle's key", () => {
+    const next = moveZone(document(), zoneKey("z1", "move"), { x: 10, z: 10 });
+    expect(next.zones[0]).toMatchObject({
+      min: { x: 110, z: 210 },
+      max: { x: 510, z: 610 },
+    });
   });
 
   it("resizes through a handle key", () => {
