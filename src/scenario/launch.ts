@@ -96,12 +96,21 @@ export function scenarioRoute(opts: {
   };
 }
 
-/** What a refusal says when the compiled mission did not validate. */
+/** The lead-in to a refusal: how much is wrong, and that nothing was played. */
+export function missionIssueSummary(issues: MissionIssue[]): string {
+  return `The compiled mission has ${issues.length} problem${issues.length === 1 ? "" : "s"}, so it was not launched.`;
+}
+
+/**
+ * What a refusal says when the compiled mission did not validate, in one line.
+ * A caller with room for the whole list shows {@link missionIssueSummary} over
+ * every issue instead.
+ */
 export function missionIssueMessage(issues: MissionIssue[]): string {
   const [first] = issues;
   if (!first) return "";
   const more = issues.length - 1;
-  return `The compiled mission has ${issues.length} problem${issues.length === 1 ? "" : "s"}, so it was not launched. ${describeIssue(first)}${more > 0 ? ` (and ${more} more)` : ""}`;
+  return `${missionIssueSummary(issues)} ${describeIssue(first)}${more > 0 ? ` (and ${more} more)` : ""}`;
 }
 
 /**
