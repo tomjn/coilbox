@@ -9,7 +9,12 @@ vi.mock("./bindings", () => ({
   scenarioReadMission: (...args: unknown[]) => readMissionMock(...args),
 }));
 
-import { validateCompiledMission, validateMission } from "./validate";
+import {
+  describeIssue,
+  issueLocation,
+  validateCompiledMission,
+  validateMission,
+} from "./validate";
 
 /**
  * These fixtures are *evaluated* missions, in the shape
@@ -248,5 +253,67 @@ describe("validateCompiledMission", () => {
         message: "unexpected symbol near '}'",
       },
     ]);
+  });
+});
+
+describe("issueLocation", () => {
+  it("names a registry entry by the id the author gave it", () => {
+    expect(issueLocation('actors["boss"].team')).toBe('Actor "boss", team');
+  });
+
+  it("counts a step from one, the way the trigger panel lists them", () => {
+    expect(issueLocation('triggers["open"].actions[0].params.group')).toBe(
+      'Trigger "open", action 1, group',
+    );
+    expect(issueLocation('triggers["open"].conditions[2].params.zone')).toBe(
+      'Trigger "open", condition 3, zone',
+    );
+  });
+
+  it("counts an entry that has no id by position too", () => {
+    expect(issueLocation("actors[0].team")).toBe("Actor 1, team");
+  });
+
+  it("keeps an order's target under the step it was given on", () => {
+    expect(
+      issueLocation('triggers["t"].actions[1].params.orders[0].target'),
+    ).toBe('Trigger "t", action 2, order 1, target');
+    expect(issueLocation('groups["wave"].orders[0].target')).toBe(
+      'Group "wave", order 1, target',
+    );
+  });
+
+  it("says a team by its id, which is the participant's", () => {
+    expect(issueLocation('teams["you"]')).toBe('Team "you"');
+  });
+
+  it("reads an escaped id back out as the author typed it", () => {
+    expect(issueLocation('actors["a \\"b\\""].team')).toBe(
+      'Actor "a "b"", team',
+    );
+  });
+
+  it("has nothing to say about a file name", () => {
+    expect(issueLocation("missions/demo/mission.lua")).toBeNull();
+  });
+});
+
+describe("describeIssue", () => {
+  it("leads with where the problem is, then what is wrong", () => {
+    expect(
+      describeIssue({
+        path: 'triggers["open"].actions[0].params.group',
+        message: 'no group called "wave"',
+      }),
+    ).toBe('Trigger "open", action 1, group: no group called "wave"');
+  });
+
+  it("falls back to the path when it does not point into the mission", () => {
+    expect(
+      describeIssue({
+        path: "missions/demo/mission.lua",
+        message: "unexpected symbol near '}'",
+      }),
+    ).toBe("missions/demo/mission.lua: unexpected symbol near '}'");
   });
 });
