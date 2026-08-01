@@ -303,6 +303,12 @@ function Engine:fire(record)
 		record.enabled = false
 	end
 
+	local names = {}
+	for _, action in ipairs(record.def.actions or {}) do
+		names[#names + 1] = tostring(action.type) .. "(" .. tostring(action.params and action.params.group) .. ")"
+	end
+	self:log("notice", "FIRE " .. tostring(record.def.id) .. " -> " .. table.concat(names, ","))
+
 	for _, action in ipairs(record.def.actions or {}) do
 		self:act(action)
 	end
