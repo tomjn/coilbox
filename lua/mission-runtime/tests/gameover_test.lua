@@ -185,10 +185,20 @@ check("and is reported", logged(engine, "no team named nobody in this mission"))
 -- The anchor.
 --------------------------------------------------------------------------------
 
+-- Four defs in a known order, because which one the runtime anchors with is the
+-- claim under test. Only the wall does nothing at all, and it is not the first
+-- def the game has: an anchor that shot at things or wandered off would be worse
+-- than none.
+local DEFS = {
+	{ name = "turret", speed = 0 },
+	{ name = "runner", weapons = {} },
+	{ name = "wall", speed = 0, weapons = {} },
+	{ name = "grunt" },
+}
+
 local function anchored(overrides, options)
 	options = options or {}
-	options.inert = options.inert == nil and { wall = true } or options.inert
-	options.defs = options.defs == nil and { wall = true, grunt = true } or options.defs
+	options.defList = options.defList == nil and DEFS or options.defList
 	return playing(overrides, options)
 end
 
@@ -203,7 +213,8 @@ for unitID, unit in pairs(engine.units) do
 	end
 end
 
-check("a mission team a human is playing gets one anchor", #anchors == 1, #anchors)
+check("a mission team a human is playing gets one anchor, of the def that does nothing",
+	#anchors == 1, #anchors)
 check("and it is on that team", anchors[1] and anchors[1].team == 0)
 check("a team no human is playing gets none",
 	engine.env.Spring.GetTeamUnitCount(1) == 0, engine.env.Spring.GetTeamUnitCount(1))
@@ -212,7 +223,8 @@ local anchor = anchors[1].id
 local damage = { engine.env:UnitPreDamaged(anchor) }
 check("an anchor cannot be damaged", damage[1] == 0 and damage[2] == 0)
 check("it blocks nothing", engine.blocking[anchor] == false)
-check("it is stealthed", engine.stealth[anchor] == true)
+check("nothing can see it on radar", engine.stealth[anchor] == true)
+check("or on sonar", engine.sonarStealth[anchor] == true)
 check("it sees nothing", (engine.sensors[anchor] or {}).los == 0 and (engine.sensors[anchor] or {}).radar == 0)
 check("and it earns nothing", (engine.resourcing[anchor] or {}).umm == 0)
 
@@ -298,7 +310,7 @@ check("and an anchor standing in a zone is in no zone as far as the mission is c
 -- What happens when there is nothing to anchor with, or the anchor dies.
 --------------------------------------------------------------------------------
 
-engine = anchored({}, { inert = {}, defs = { grunt = true } })
+engine = anchored({}, { defList = { { name = "turret", speed = 0 }, { name = "grunt" } } })
 check("a game with no def that does nothing gets no anchor",
 	engine.env.Spring.GetTeamUnitCount(0) == 0, engine.env.Spring.GetTeamUnitCount(0))
 check("and is told what that costs", logged(engine, "no unit def in this game can be a mission anchor"))

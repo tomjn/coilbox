@@ -106,11 +106,14 @@ end
 -- limits which unit defs exist so a scenario naming a missing one can be tested,
 -- and `options.startPositions` is keyed by engine team number.
 --
--- `options.inert` names the defs that neither move nor shoot, which is what the
--- runtime looks for when it picks an anchor. `options.players` is keyed by
--- player id and says which team each one is on, `options.allyTeams` is keyed by
--- engine team number, and `options.allyTeamList` is every ally team the game
--- has.
+-- `options.defList` is an array of `{ name = , <def fields> }` created in that
+-- order before anything else, for a test that cares which def id came first or
+-- what a def does. Every other def moves and shoots, which is what nearly every
+-- def in a game does.
+--
+-- `options.players` is keyed by player id and says which team each one is on,
+-- `options.allyTeams` is keyed by engine team number, and `options.allyTeamList`
+-- is every ally team the game has.
 function M.newEngine(modOptions, files, options)
 	options = options or {}
 
@@ -145,6 +148,7 @@ function M.newEngine(modOptions, files, options)
 		-- the only thing the runtime does this to.
 		blocking = {},
 		stealth = {},
+		sonarStealth = {},
 		sensors = {},
 		resourcing = {},
 		noDraw = {},
@@ -159,20 +163,20 @@ function M.newEngine(modOptions, files, options)
 	end
 
 	--- The def id the engine would have given this name, invented on first use.
-	-- `options.buildings` is the set of def names that occupy the build grid.
-	local function unitDef(name)
+	-- `options.buildings` is the set of def names that occupy the build grid, and
+	-- `fields` overrides what the def does.
+	local function unitDef(name, fields)
 		local def = engine.env.UnitDefNames[name]
 		if not def then
-			-- A def is something that moves and shoots unless the test says it is
-			-- one of the inert ones, because that is what nearly every def in a
-			-- game is and what the anchor has to sift out.
-			local inert = (options.inert or {})[name] == true
+			-- A def moves and shoots unless the test says otherwise, because that
+			-- is what nearly every def in a game does and what the runtime has to
+			-- sift through to find something inert enough to anchor with.
 			def = {
 				id = engine.nextDefID,
 				name = name,
 				isBuilding = (options.buildings or {})[name] == true,
-				speed = inert and 0 or 30,
-				weapons = inert and {} or { { weaponDef = 1 } },
+				speed = 30,
+				weapons = { { weaponDef = 1 } },
 				buildSpeed = 0,
 				metalMake = 0,
 				energyMake = 0,
@@ -182,6 +186,11 @@ function M.newEngine(modOptions, files, options)
 				tidalGenerator = 0,
 				extractsMetal = 0,
 			}
+			for key, value in pairs(fields or {}) do
+				if key ~= "name" then
+					def[key] = value
+				end
+			end
 			engine.nextDefID = engine.nextDefID + 1
 			engine.env.UnitDefNames[name] = def
 			engine.env.UnitDefs[def.id] = def
@@ -464,7 +473,7 @@ function M.newEngine(modOptions, files, options)
 				engine.stealth[unitID] = stealth
 			end,
 			SetUnitSonarStealth = function(unitID, stealth)
-				engine.stealth[unitID] = stealth
+				engine.sonarStealth[unitID] = stealth
 			end,
 			SetUnitSensorRadius = function(unitID, sensor, radius)
 				engine.sensors[unitID] = engine.sensors[unitID] or {}
@@ -533,7 +542,12 @@ function M.newEngine(modOptions, files, options)
 	-- The engine has every unit def loaded before a gadget runs. The stub invents
 	-- them as they are used, which is enough until something reads a def before it
 	-- has spawned one, so the names a test declares are made up front.
-	for _, set in ipairs({ options.buildings or {}, options.defs or {}, options.inert or {} }) do
+	-- Listed defs first and in order, so a test that cares which def id came first
+	-- gets the ids it asked for rather than whatever pairs() walked into.
+	for _, entry in ipairs(options.defList or {}) do
+		unitDef(entry.name, entry)
+	end
+	for _, set in ipairs({ options.buildings or {}, options.defs or {} }) do
 		for name in pairs(set) do
 			unitDef(name)
 		end
