@@ -180,6 +180,14 @@ Which runtime it measures against depends on the route. A game that has adopted 
 
 A type can also be greyed because there is nothing for it to point at yet. `units_in_zone` needs a zone to exist first.
 
+### Types the game adds
+
+The lists are not only coilbox's. A game can declare condition and action types of its own, for systems coilbox has never heard of, and those appear in the same two dropdowns under the names the game gave them, with its own one-line description and a form for its parameters. Splinter Faction's research points are the worked example: a **Grant research** action and a **Research above** condition, neither of which coilbox understands a word of.
+
+They are never greyed out on a runtime version, because the game implements them rather than the runtime, so they work on either route.
+
+The game writes them in `missions/extensions.lua`, and [declare your own condition and action types](mission-runtime.md#4-optional-declare-your-own-condition-and-action-types) is the format. An extension can only add the game's own concepts: anything engine-level, spawning, orders, zones, sight, restrictions, the ending, the camera, is the runtime's and a game naming one of those is refused.
+
 ## Objectives
 
 An objective is a line of text the player is working towards, with a **Primary** or **Secondary** kind and an option to keep it **hidden until it is settled**. `complete_objective` and `fail_objective` settle one, and the first outcome sticks, so an author who wants a second chance at something writes a second objective.
