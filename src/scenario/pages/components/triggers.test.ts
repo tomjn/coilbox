@@ -368,7 +368,7 @@ describe("stepDefaults", () => {
     ] as const) {
       for (const [type, spec] of Object.entries(table)) {
         const defaults = stepDefaults(spec, context);
-        if (defaults.needs) continue;
+        if (!defaults.params) continue;
         const s = addStep(base, "open", list, {
           type,
           params: defaults.params,
