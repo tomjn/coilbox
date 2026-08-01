@@ -7,8 +7,10 @@ import {
   Maximize2,
   Minimize2,
   MountainSnow,
+  Redo2,
   RotateCw,
   Trash2,
+  Undo2,
   Unplug,
 } from "lucide-react";
 import {
@@ -50,6 +52,7 @@ import {
   removeWaypoint,
   targetOptions,
 } from "./groups";
+import { modKeyLabel } from "./history";
 import { EDITOR_MODES } from "./modes";
 import { PrefabControls } from "./PrefabControls";
 import { type Placement, placementKey } from "./placements";
@@ -108,9 +111,18 @@ export function ScenarioMapScene({
   scenario,
   onChange,
   picking,
+  history,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
+  /** The editor's undo history. Owned by the page, because it covers the panels
+   *  too, and shown here because this is where the author's hands are. */
+  history?: {
+    canUndo: boolean;
+    canRedo: boolean;
+    undo: () => void;
+    redo: () => void;
+  };
   /**
    * A point a panel under the map has asked the author to click, or null when
    * nothing is waiting. It joins the same queue a path being drawn and a base
@@ -426,7 +438,7 @@ export function ScenarioMapScene({
         onScene={onScene}
       />
 
-      <div className="absolute left-2 top-2 flex max-w-[calc(100%-16rem)] flex-col gap-1.5">
+      <div className="absolute left-2 top-2 flex max-w-[calc(100%-21rem)] flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <ToggleGroup
             type="single"
@@ -580,6 +592,32 @@ export function ScenarioMapScene({
       </div>
 
       <div className="absolute right-2 top-2 flex items-center gap-1.5">
+        {history && (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-card/80 px-2 backdrop-blur"
+              onClick={history.undo}
+              disabled={!history.canUndo}
+              aria-label="Undo"
+              title={`Undo (${modKeyLabel()} Z)`}
+            >
+              <Undo2 className="size-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-card/80 px-2 backdrop-blur"
+              onClick={history.redo}
+              disabled={!history.canRedo}
+              aria-label="Redo"
+              title={`Redo (${modKeyLabel()} Shift Z)`}
+            >
+              <Redo2 className="size-3.5" />
+            </Button>
+          </>
+        )}
         <Button
           size="sm"
           variant="outline"
