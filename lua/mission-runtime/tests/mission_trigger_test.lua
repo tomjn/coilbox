@@ -33,6 +33,8 @@ end
 
 local engine, state = playing("garrison")
 
+local trace = { "start=" .. #state.groups.units("reinforcements") }
+
 check("the trigger engine is published", state.triggers ~= nil)
 check("a trigger the scenario disabled starts disabled", state.triggers:isEnabled("unlock") == false)
 check("every other trigger starts armed", state.triggers:isEnabled("count-check") == true)
@@ -48,10 +50,12 @@ for _ = 1, 2 do
 	engine.spawn("armpw", 1)
 end
 engine.env:GameFrame(15)
+trace[#trace + 1] = "f15=" .. #state.groups.units("reinforcements")
 check("a unit count short of its minimum does not hold", state.triggers:isEnabled("count-check") == true)
 
 engine.spawn("armpw", 1)
 engine.env:GameFrame(30)
+trace[#trace + 1] = "f30=" .. #state.groups.units("reinforcements")
 check("a unit count reaching its minimum fires", state.triggers:isEnabled("count-check") == false)
 check("a fired trigger's enable_trigger arms another", state.triggers:isEnabled("unlock") == false,
 	"unlock should have been armed and then spent")
@@ -73,6 +77,7 @@ check("a unit under construction has not been built yet",
 	state.triggers:isEnabled("built-outpost") == true)
 
 engine.finish(depot)
+trace[#trace + 1] = "finish=" .. #state.groups.units("reinforcements")
 check("a finished unit fires the trigger watching for it",
 	state.triggers:isEnabled("built-outpost") == false)
 check("its add_var ran on the event, not on the next tick", state.vars.get("garrisonBuilt") == 2,
@@ -121,8 +126,8 @@ check("after which the fog comes back", state.reveal.spotterCount(0) == 0,
 check("gifting a group that was never spawned says so",
 	logged(engine, "group reinforcements has no units on the map to gift"),
 	table.concat(engine.logs, " / ")
-		.. " | members=" .. beforeGift .. "/" .. afterGift
-		.. "/" .. #state.groups.units("reinforcements")
+		.. " | " .. table.concat(trace, " ")
+		.. " before=" .. beforeGift .. " after=" .. afterGift
 		.. " | teams=" .. tostring(state.teams[1] and state.teams[1].id)
 		.. "," .. tostring(state.teams[2] and state.teams[2].id))
 
