@@ -158,6 +158,14 @@ local steps = {
 		check("and the scenario's actor for the enemy",
 			owns(ENEMY, "lozengineer") == 1, owns(ENEMY, "lozengineer"))
 
+		-- The adoption contract's third item, read from the game's side. Splinter
+		-- Faction's game_spawn.lua asks this where it would call Spring.CreateUnit
+		-- and spawns nothing when the answer is true.
+		check("the runtime tells the game the mission owns the player's start",
+			state and state.suppressesStart and state.suppressesStart(PLAYER) == true)
+		check("and the enemy's", state and state.suppressesStart
+			and state.suppressesStart(ENEMY) == true)
+
 		note("at frame 2, " .. armies())
 		check("inside the suppression window the player owns only what the scenario placed",
 			unplaced(PLAYER, "fedengineer") == 0, unplaced(PLAYER, "fedengineer"))
@@ -195,6 +203,16 @@ local steps = {
 			unplaced(PLAYER, "fedengineer") == 0, unplaced(PLAYER, "fedengineer"))
 		check("and for the enemy",
 			unplaced(ENEMY, "lozengineer") == 0, unplaced(ENEMY, "lozengineer"))
+		-- Suppressed and intact are two claims, and the gap between them is what
+		-- undoing a start costs where skipping it costs nothing. Splinter Faction's
+		-- game_team_com_ends.lua answers an ally team's last commander dying with
+		-- Spring.KillTeam, so a run that let the commander arrive and then destroyed
+		-- it read as perfectly suppressed with the player's own units gone too
+		-- (issue #884).
+		check("and the player still holds what the scenario placed",
+			owns(PLAYER, "fedengineer") == 1, owns(PLAYER, "fedengineer"))
+		check("and so does the enemy",
+			owns(ENEMY, "lozengineer") == 1, owns(ENEMY, "lozengineer"))
 	end },
 
 	-- The other half of the adoption contract. SplinterFaction's game_end.lua
@@ -230,6 +248,8 @@ local steps = {
 			unplaced(PLAYER, "fedengineer") == 0, unplaced(PLAYER, "fedengineer"))
 		check("the game's own start stayed suppressed for the whole mission, enemy",
 			unplaced(ENEMY, "lozengineer") == 0, unplaced(ENEMY, "lozengineer"))
+		check("and the player is still playing rather than a spectator with no units",
+			owns(PLAYER, "fedengineer") == 1, owns(PLAYER, "fedengineer"))
 
 		check("the timer completed the mission's objective",
 			rules("coilbox_mission_objective_hold-out") == COMPLETE,

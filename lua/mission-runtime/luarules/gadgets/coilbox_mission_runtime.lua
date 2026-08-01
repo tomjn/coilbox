@@ -227,12 +227,31 @@ local function publish()
 		actors[actor.id] = actor
 	end
 
+	local noCommander = {}
+	for _, team in ipairs(teams) do
+		if team.noCommander then
+			noCommander[team.team] = true
+		end
+	end
+
 	GG.CoilboxMission = {
 		id = MISSION_ID,
 		mission = MISSION,
 		runtime = RUNTIME,
 		-- Per-participant setup with the engine team number resolved.
 		teams = teams,
+		--- Whether the mission places this engine team's opening units itself, and
+		-- the game must not.
+		--
+		-- The adoption contract's question, asked by a game's own start gadget
+		-- where it would spawn. Answering it is the only reliable way to keep a
+		-- game's start out of a mission: the engine has no veto on
+		-- Spring.CreateUnit, so all the runtime can do on its own is destroy what
+		-- the game just made, and a game that ends a team when its commander dies
+		-- reads that as the team dying (issue #884).
+		suppressesStart = function(teamID)
+			return noCommander[teamID] == true
+		end,
 		-- Actor records by id, and the unit each one currently is. An actor
 		-- with no entry in `units` is one that has died or never spawned.
 		actors = actors,
@@ -248,15 +267,18 @@ local function publish()
 end
 
 if gadgetHandler:IsSyncedCode() then
-	-- The frame the runtime takes the last word on the start. GamePreload,
-	-- GameStart and frame 0 have all run by now, so a game's own start pass has
-	-- happened and cannot clobber what the scenario asked for.
+	-- The frame the runtime stops counting what arrives as part of the start.
+	-- Everything the mission itself places lands in GameStart, so by here the
+	-- scenario's own units are down and the bank can be set to the scenario's
+	-- number over whatever the game opened on.
 	local START_FRAME = 1
 
 	local teams = {}
 	local units = {}
-	-- Engine teams whose scenario entry says the game must not spawn for them.
-	local suppressedTeams = {}
+	-- Whether the scenario places a given engine team's opening units itself. The
+	-- published one, so a game asking the contract question and the undo below are
+	-- reading the same answer.
+	local suppressesStart
 	local suppressing = false
 	-- True only inside the runtime's own Spring.CreateUnit, so the suppression
 	-- does not eat what the runtime just placed.
@@ -462,14 +484,10 @@ if gadgetHandler:IsSyncedCode() then
 		local published, problems = publish()
 		teams = published.teams
 		units = published.units
+		suppressesStart = published.suppressesStart
 
 		for _, problem in ipairs(problems) do
 			log("warning", problem)
-		end
-		for _, team in ipairs(teams) do
-			if team.noCommander then
-				suppressedTeams[team.team] = true
-			end
 		end
 
 		-- Open from here rather than from GameStart, so a game that spawns in
@@ -652,17 +670,30 @@ if gadgetHandler:IsSyncedCode() then
 	--- Undo the start the game would have given a team the scenario spawns for
 	-- itself.
 	--
+	-- The fallback rather than the mechanism. What a game is asked to do is not
+	-- spawn in the first place, through suppressesStart. This catches a game that
+	-- has not been asked to, which is every game that has adopted the runtime and
+	-- not that part of the contract.
+	--
 	-- Undone rather than prevented, because the engine offers no veto:
 	-- AllowUnitCreation is consulted for builders and factories only, never for
 	-- Spring.CreateUnit, which is what a game's start gadget uses. Killing a unit
 	-- inside UnitCreated is a case the engine handles.
+	--
+	-- It reaches only as far as the start window, and it is not safe to widen. A
+	-- game that counts commanders counts this one, and Splinter Faction's
+	-- game_team_com_ends.lua answers an ally team's last commander dying with
+	-- Spring.KillTeam, which is the whole team's units and the player's seat in the
+	-- game. A start undone the frame it arrives is ahead of that bookkeeping. One
+	-- undone 1800 frames later is not, and the mission ends up worse off than the
+	-- unwanted commander it was undoing (issue #884).
 	--
 	-- Narrow on purpose. Only a team the scenario marked noCommander, only while
 	-- the start window is open, only a unit with no builder, so nothing anyone
 	-- has begun building is ever touched.
 	function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
 		if suppressing then
-			if not spawning and not builderID and suppressedTeams[unitTeam] then
+			if not spawning and not builderID and suppressesStart(unitTeam) then
 				Spring.DestroyUnit(unitID, false, true)
 			end
 			return
