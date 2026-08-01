@@ -17,8 +17,8 @@ return {
       id = "keep",
       name = "Keep",
       shape = "box",
-      min = { x = -50, z = -50 },
-      max = { x = 50, z = 50 },
+      min = { x = 1800, z = 1800 },
+      max = { x = 2200, z = 2200 },
     },
   },
   actors = {
@@ -26,7 +26,7 @@ return {
       id = "warlord",
       unitDef = "corcom",
       team = "defenders",
-      pos = { x = 0, z = 0 },
+      pos = { x = 2000, z = 2000 },
       facing = 2,
       state = { name = "Warlord" },
     },
@@ -38,7 +38,7 @@ return {
       units = {
         { def = "corak", count = 3 },
       },
-      pos = { x = -10, z = -10 },
+      pos = { x = 2000, z = 2120 },
       orders = {
         { kind = "guard", target = "warlord" },
       },
@@ -49,7 +49,7 @@ return {
     {
       id = "keep-base",
       team = "defenders",
-      origin = { x = -30, z = -30 },
+      origin = { x = 1900, z = 1900 },
       buildings = {
         {
           def = "corlab",
@@ -60,7 +60,7 @@ return {
         },
         {
           def = "cormex",
-          offset = { x = 15, z = 0 },
+          offset = { x = 128, z = 0 },
           facing = 0,
         },
       },

@@ -93,7 +93,7 @@ check("an actor changing hands fires the trigger watching for it",
 -- That trigger's own actions are a gift and a reveal, both proved below.
 --
 -- The mission reveals its supply depot to the player for thirty seconds. The
--- zone is a circle of 50 at the origin, so the spotter is one unit standing
+-- zone is a circle of 200 on (2000, 2000), so the spotter is one unit standing
 -- there with sight enough to cover it.
 local lit
 for _, unitID in ipairs(engine.order) do
@@ -102,7 +102,8 @@ for _, unitID in ipairs(engine.order) do
 	end
 end
 check("the trigger's reveal_area lit the zone it named", lit ~= nil)
-check("from the middle of it", lit and engine.units[lit].x == 0 and engine.units[lit].z == 0)
+check("from the middle of it",
+	lit and engine.units[lit].x == 2000 and engine.units[lit].z == 2000)
 check("for the team the mission named", lit and engine.units[lit].team == 0,
 	lit and engine.units[lit].team)
 check("and the mission's own counting does not see the unit doing it",
@@ -190,12 +191,12 @@ check("the player's units outside the pass do not spring the ambush",
 check("a dormant group is not on the map before it is spawned",
 	#state.groups.units("raiders") == 0)
 
-engine.move(patrol, 100, 100)
+engine.move(patrol, 1900, 1900)
 engine.env:GameFrame(60)
 check("walking into the pass springs it", state.triggers:isEnabled("spring-ambush") == false)
 check("and the whole trigger ran, in the order the mission wrote it",
 	said() == "warn,warn,warn"
-	and staged() == "pan 50/50 over 2, mark 50/50 Ambush!"
+	and staged() == "pan 2000/2000 over 2, mark 2000/2000 Ambush!"
 	and table.concat(sent(engine, "coilbox_mission_sound"), ",") == "alarm.wav",
 	said() .. " / " .. staged())
 
@@ -246,7 +247,7 @@ check("the defenders sitting in their own keep do not complete the player's obje
 	outcome() == "active/playing", outcome())
 
 local squad = engine.spawn("armpw", 0)
-engine.move(squad, 20, 20)
+engine.move(squad, 2100, 2100)
 at = playTo(at + 1, 1800)
 check("taking the keep does not complete a hold on its own", outcome() == "active/playing", outcome())
 
@@ -254,7 +255,7 @@ engine.move(squad, 900, 900)
 at = playTo(at + 1, 1830)
 check("and leaving before the minute is up loses the hold", outcome() == "active/playing", outcome())
 
-engine.move(squad, 20, 20)
+engine.move(squad, 2100, 2100)
 at = playTo(at + 1, 3600)
 check("so the minute has to be served from the return", outcome() == "active/playing", outcome())
 

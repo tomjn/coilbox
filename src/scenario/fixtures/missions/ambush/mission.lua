@@ -21,8 +21,8 @@ return {
       id = "pass",
       name = "Mountain Pass",
       shape = "box",
-      min = { x = 0, z = 0 },
-      max = { x = 200, z = 200 },
+      min = { x = 1800, z = 1800 },
+      max = { x = 2200, z = 2200 },
     },
   },
   actors = {
@@ -30,7 +30,7 @@ return {
       id = "scout",
       unitDef = "armpw",
       team = "enemy",
-      pos = { x = 50, z = 50 },
+      pos = { x = 2000, z = 2000 },
       facing = 0,
       state = { hp = 1 },
     },
@@ -42,7 +42,7 @@ return {
       units = {
         { def = "armpw", count = 4 },
       },
-      pos = { x = 60, z = 60 },
+      pos = { x = 2000, z = 2120 },
       orders = {
         { kind = "guard", target = "scout" },
       },
@@ -91,14 +91,14 @@ return {
         {
           type = "camera_pan",
           params = {
-            pos = { x = 50, z = 50 },
+            pos = { x = 2000, z = 2000 },
             seconds = 2,
           },
         },
         {
           type = "map_marker",
           params = {
-            pos = { x = 50, z = 50 },
+            pos = { x = 2000, z = 2000 },
             text = "Ambush!",
           },
         },

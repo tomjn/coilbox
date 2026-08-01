@@ -100,9 +100,10 @@ local function owns(team, defName)
 	return Spring.GetTeamUnitDefCount(team, def.id)
 end
 
---- The first unit a team owns of a def, or nil.
+--- The first unit a team owns of a def, or nil. A team of nil is a participant
+-- this mission has no engine team for, and owns nothing.
 local function find(team, defName)
-	for _, unitID in ipairs(Spring.GetTeamUnits(team) or {}) do
+	for _, unitID in ipairs(team and Spring.GetTeamUnits(team) or {}) do
 		if defOf(unitID) == defName then
 			return unitID
 		end
@@ -132,6 +133,192 @@ local function playerUnit(defName, x, z)
 end
 
 --------------------------------------------------------------------------------
+-- Where the mission put things.
+--
+-- The claim the harness went without, and issue #868 is what that cost. Spring
+-- measures a map from its north-west corner, so a negative coordinate is off the
+-- map, and the engine answers one by clamping the unit onto the edge rather than
+-- refusing it. Every check about placement here counted units, so a prefab base
+-- that arrived as a heap on (0, 0) read as placed.
+--
+-- What follows works out where the mission document asks for each unit and reads
+-- back where the engine has it. The block layout is derived here rather than
+-- borrowed from the runtime, so a change to it has to be a deliberate one.
+--------------------------------------------------------------------------------
+
+-- coilbox_start.lua's START_UNIT_SPACING: the gap between units placed as a block.
+local BLOCK_SPACING = 64
+
+--- Offsets for `count` units packed into a square grid centred on the origin.
+local function gridOffsets(count)
+	local width = 1
+	while width * width < count do
+		width = width + 1
+	end
+
+	local offsets = {}
+	for i = 0, count - 1 do
+		local column = i % width
+		local row = (i - column) / width
+		offsets[i + 1] = {
+			x = (column - (width - 1) / 2) * BLOCK_SPACING,
+			z = (row - (width - 1) / 2) * BLOCK_SPACING,
+		}
+	end
+	return offsets
+end
+
+--- Where a unit of `defName` asked for at (x, z) belongs. A building is snapped
+-- to the build grid, because the runtime puts one through Pos2BuildPos so a base
+-- can be rebuilt where it stood. Everything else lands where it was asked for.
+local function wantedPos(defName, x, z, facing)
+	local def = UnitDefNames[defName]
+	if def and def.isBuilding then
+		local bx, _, bz = Spring.Pos2BuildPos(def.id, x, 0, z, facing or 0)
+		return bx, bz
+	end
+	return x, z
+end
+
+--- Half a unit's footprint on each axis, in elmos. An odd facing stands a
+-- building a quarter turn round, which swaps the two.
+local function halfFootprint(unitID)
+	local def = UnitDefs[Spring.GetUnitDefID(unitID)]
+	local xsize, zsize = def.xsize, def.zsize
+	if (Spring.GetUnitBuildFacing(unitID) or 0) % 2 == 1 then
+		xsize, zsize = zsize, xsize
+	end
+	return xsize * 4, zsize * 4
+end
+
+--- The engine team behind a participant id.
+local function teamOf(id)
+	for _, entry in ipairs(state().teams or {}) do
+		if entry.id == id then
+			return entry.team
+		end
+	end
+end
+
+--- Every unit the mission places at the start, with the spot its document asks
+-- for. Actors and groups come back from the runtime by name. A prefab's
+-- buildings do not, because nothing records them, so they are found by def and
+-- team, which is enough while no prefab places two of a def.
+local function startPlacements()
+	local mission = state().mission
+	local wanted = {}
+
+	local function want(label, unitID, defName, x, z, facing)
+		local wx, wz = wantedPos(defName, x, z, facing)
+		wanted[#wanted + 1] = { label = label, unit = unitID, x = wx, z = wz }
+	end
+
+	for _, actor in ipairs(mission.actors or {}) do
+		want("actor " .. actor.id, state().units[actor.id], actor.unitDef,
+			actor.pos.x, actor.pos.z, actor.facing)
+	end
+
+	for _, group in ipairs(mission.groups or {}) do
+		if group.dormant ~= true then
+			local units = state().groups.units(group.id)
+			local defs = {}
+			for _, entry in ipairs(group.units or {}) do
+				for _ = 1, entry.count do
+					defs[#defs + 1] = entry.def
+				end
+			end
+			local offsets = gridOffsets(#defs)
+			for i, defName in ipairs(defs) do
+				want(string.format("group %s's %s %d", group.id, defName, i),
+					units[i], defName,
+					group.pos.x + offsets[i].x, group.pos.z + offsets[i].z, 0)
+			end
+		end
+	end
+
+	for _, prefab in ipairs(mission.prefabs or {}) do
+		for _, building in ipairs(prefab.buildings or {}) do
+			want(string.format("prefab %s's %s", prefab.id, building.def),
+				find(teamOf(prefab.team), building.def), building.def,
+				prefab.origin.x + building.offset.x,
+				prefab.origin.z + building.offset.z,
+				building.facing)
+		end
+	end
+
+	return wanted
+end
+
+--- Two claims about everything the mission places: each unit stands on the spot
+-- the document asks for, and no two of them are inside each other. Called on the
+-- frame the runtime places them, which is before the engine has moved anything,
+-- so the first is exact rather than approximate.
+local function checkPlacement()
+	local wanted = startPlacements()
+	local misplaced, stacked = {}, {}
+
+	for _, entry in ipairs(wanted) do
+		if not entry.unit then
+			misplaced[#misplaced + 1] = entry.label .. " is not on the map"
+		else
+			local x, _, z = Spring.GetUnitPosition(entry.unit)
+			entry.at = { x = x, z = z }
+			if math.abs(x - entry.x) > 0.5 or math.abs(z - entry.z) > 0.5 then
+				misplaced[#misplaced + 1] = string.format("%s at %d,%d wanted %d,%d",
+					entry.label, x, z, entry.x, entry.z)
+			end
+		end
+	end
+	check("every unit the mission places stands where the mission says",
+		#misplaced == 0, table.concat(misplaced, "; "))
+
+	for i = 1, #wanted do
+		for j = i + 1, #wanted do
+			local a, b = wanted[i], wanted[j]
+			if a.at and b.at then
+				local ax, az = halfFootprint(a.unit)
+				local bx, bz = halfFootprint(b.unit)
+				if math.abs(a.at.x - b.at.x) < ax + bx
+					and math.abs(a.at.z - b.at.z) < az + bz then
+					stacked[#stacked + 1] = a.label .. " and " .. b.label
+				end
+			end
+		end
+	end
+	check("and no two of them share ground", #stacked == 0, table.concat(stacked, "; "))
+end
+
+-- How far a group spawned into a running mission may be from where the scenario
+-- puts it. A block is 32 elmos out from its own centre, and a group is woken as
+-- it is spawned, so its units are already walking by the time anything can read
+-- them: 30 frames of a Peewee is another 84. What is left over is the margin, and
+-- it is still an order of magnitude short of the map corner a clamp would use.
+local SPAWNED_BLOCK_SLACK = 192
+
+--- A group the mission spawned mid-run is the block the scenario asks for,
+-- within that slack.
+local function checkSpawnedBlock(id)
+	local group
+	for _, entry in ipairs(state().mission.groups or {}) do
+		if entry.id == id then
+			group = entry
+		end
+	end
+
+	local strays = {}
+	for _, unitID in ipairs(state().groups.units(id)) do
+		local x, _, z = Spring.GetUnitPosition(unitID)
+		if math.abs(x - group.pos.x) > SPAWNED_BLOCK_SLACK
+			or math.abs(z - group.pos.z) > SPAWNED_BLOCK_SLACK then
+			strays[#strays + 1] = string.format("%d,%d", x, z)
+		end
+	end
+	check("and put them where the scenario says, not where the engine could fit them",
+		#strays == 0, string.format("%s from %d,%d",
+			table.concat(strays, "; "), group.pos.x, group.pos.z))
+end
+
+--------------------------------------------------------------------------------
 -- The plans. One per fixture mission: a deadline and a list of steps, each a
 -- frame and what to do or check on it.
 --------------------------------------------------------------------------------
@@ -142,6 +329,9 @@ local plans = {}
 plans.ambush = {
 	deadline = 150,
 	steps = {
+		-- The frame the runtime places what the scenario asks for, and the last
+		-- one on which nothing has moved yet.
+		{ frame = 1, run = checkPlacement },
 		{ frame = 5, run = function()
 			check("the mission is published", state() ~= nil and state().id == "ambush")
 			check("the actor the scenario placed is on the map",
@@ -155,8 +345,11 @@ plans.ambush = {
 			check("a dormant group is not on the map", #state().groups.units("raiders") == 0)
 			check("the trigger watching the zone is armed", armed("spring-ambush") == true)
 		end },
+		-- Inside the pass, and a long way from both the scout in the middle of it
+		-- and the raiders waiting behind him, so nothing the trigger spawns lands
+		-- on top of the unit that sprang it.
 		{ frame = 30, run = function()
-			playerUnit("armpw", 100, 100)
+			playerUnit("armpw", 1900, 1900)
 		end },
 		{ frame = 60, run = function()
 			check("walking a unit into the zone fires the trigger", armed("spring-ambush") == false)
@@ -164,6 +357,7 @@ plans.ambush = {
 			check("its spawn_group put the whole group on the map", #raiders == 4, #raiders)
 			check("the group's units are the def and team the scenario names",
 				defOf(raiders[1]) == "armpw" and Spring.GetUnitTeam(raiders[1]) == 1)
+			checkSpawnedBlock("raiders")
 			check("wake_group left it running its orders", state().groups.isAwake("raiders") == true)
 		end },
 		{ frame = 90, run = function()
@@ -185,6 +379,7 @@ plans.garrison = {
 	-- back before frame 1050 or so.
 	deadline = 1300,
 	steps = {
+		{ frame = 1, run = checkPlacement },
 		{ frame = 5, run = function()
 			check("a trigger the scenario disabled starts disabled", armed("unlock") == false)
 			check("a var starts at the number its author gave it",
@@ -197,9 +392,12 @@ plans.garrison = {
 			check("what the runtime placed does not count as something the team built",
 				armed("built-outpost") == true)
 		end },
+		-- Spread, because three units asked for on one spot is the pile-up the
+		-- placement check above exists to refuse.
 		{ frame = 30, run = function()
-			for _ = 1, 3 do
-				Spring.CreateUnit("armpw", 300, Spring.GetGroundHeight(300, 300), 300, 0, 1)
+			for i = 1, 3 do
+				local x = 300 + i * 64
+				Spring.CreateUnit("armpw", x, Spring.GetGroundHeight(x, 300), 300, 0, 1)
 			end
 		end },
 		{ frame = 60, run = function()
@@ -213,6 +411,7 @@ plans.garrison = {
 			check("the repeating trigger the var armed spawned the dormant group",
 				#state().groups.units("reinforcements") == 2,
 				#state().groups.units("reinforcements"))
+			checkSpawnedBlock("reinforcements")
 			check("and stayed armed, because it repeats",
 				armed("reinforcement-wave") == true)
 		end },
@@ -283,6 +482,7 @@ plans.siege = {
 	-- mission cannot end before frame 1830. The deadline is the slack on top.
 	deadline = 2100,
 	steps = {
+		{ frame = 1, run = checkPlacement },
 		{ frame = 5, run = function()
 			check("a group the scenario does not call dormant starts on the map",
 				#state().groups.units("keep-guard") == 3, #state().groups.units("keep-guard"))
@@ -297,17 +497,16 @@ plans.siege = {
 			check("the mission has not ended", rules("coilbox_mission_over") == 0)
 			check("nor has its objective", rules("coilbox_mission_objective_take-keep") == ACTIVE)
 		end },
-		-- An aircraft, and the one place in the probe where the def matters. The
-		-- keep holds the mission's factory, and the base game teleports any enemy
-		-- ground unit standing near a factory out to the edge of a box around it
-		-- (Balanced Annihilation's Prevent Lab Hax gadget). That box swallows the
-		-- whole zone, so a ground unit put anywhere in the keep is moved to within
-		-- a couple of elmos of the zone's edge and the first nudge takes it out.
-		-- The gadget skips anything that flies, a zone is a flat footprint that
-		-- counts a unit whatever its altitude, and this one is pinned, so it holds
-		-- the spot it was given.
+		-- The south-east of the keep, which is the far side of the zone from the
+		-- base. Balanced Annihilation's Prevent Lab Hax gadget teleports any enemy
+		-- ground unit standing within a factory's own footprint out to the edge of
+		-- it, every six frames, and the keep's factory is 96 elmos across: far
+		-- enough away and it never applies. An aircraft is belt and braces, since
+		-- the gadget skips anything that flies and a zone is a flat footprint that
+		-- counts a unit whatever its altitude. Pinned by playerUnit, so nothing in
+		-- the sim moves it either way.
 		{ frame = 30, run = function()
-			siegeUnit = playerUnit("armpeep", 20, 20)
+			siegeUnit = playerUnit("armpeep", 2100, 2100)
 			local x, _, z = Spring.GetUnitPosition(siegeUnit)
 			siegeX, siegeZ = x, z
 		end },

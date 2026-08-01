@@ -22,8 +22,8 @@ return {
       id = "depot",
       name = "Supply Depot",
       shape = "circle",
-      center = { x = 0, z = 0 },
-      radius = 50,
+      center = { x = 2000, z = 2000 },
+      radius = 200,
     },
   },
   actors = {
@@ -31,7 +31,7 @@ return {
       id = "outpost",
       unitDef = "armestor",
       team = "garrison",
-      pos = { x = 10, z = 10 },
+      pos = { x = 2000, z = 1900 },
       facing = 0,
       state = { name = "Outpost" },
     },
@@ -43,26 +43,26 @@ return {
       units = {
         { def = "armpw", count = 2 },
       },
-      pos = { x = 0, z = 0 },
+      pos = { x = 2000, z = 2100 },
       orders = {
         {
           kind = "move",
           waypoints = {
-            { x = 0, z = 0 },
+            { x = 2100, z = 2100 },
           },
         },
         {
           kind = "patrol",
           waypoints = {
-            { x = 0, z = 0 },
-            { x = 20, z = 20 },
+            { x = 2100, z = 2100 },
+            { x = 2100, z = 1900 },
           },
         },
         {
           kind = "fight",
           waypoints = {
-            { x = 20, z = 20 },
-            { x = 40, z = 40 },
+            { x = 2100, z = 1900 },
+            { x = 1900, z = 1900 },
           },
         },
       },
