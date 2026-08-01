@@ -1,0 +1,43 @@
+/**
+ * Which scenarios a player is offered, and what a row says about one.
+ *
+ * The Scenarios page and the Scenario Builder list the same documents for
+ * different reasons, so the two questions they share live here: what a scenario
+ * holds, and whether it is a document worth putting in front of the engine at
+ * all.
+ */
+
+import type { Scenario } from "./model";
+
+/** What a scenario holds, for a list row's second line. */
+export function scenarioContents(scenario: Scenario): string {
+  const counts = [
+    [scenario.actors.length + scenario.groups.length, "unit placement"],
+    [scenario.zones.length, "zone"],
+    [scenario.triggers.length, "trigger"],
+    [scenario.objectives.length, "objective"],
+  ] as const;
+  return counts
+    .map(([n, noun]) => `${n} ${noun}${n === 1 ? "" : "s"}`)
+    .join(" · ");
+}
+
+/**
+ * Whether a scenario names both a game and a map. One that does not is a draft
+ * the author has not set up yet, and nothing can be launched from it.
+ */
+export function isSetUp(scenario: Scenario): boolean {
+  return !!scenario.setup.gameName && !!scenario.setup.mapName;
+}
+
+/**
+ * The scenarios a player is offered, newest edit first, as
+ * {@link listScenarios} already orders them.
+ *
+ * Only setup is judged here. Whether the game is *installed* is a separate
+ * question, asked per row by `scenarioLaunchBlocker` so the answer can be a
+ * sentence rather than a disappearance.
+ */
+export function playableScenarios(scenarios: Scenario[]): Scenario[] {
+  return scenarios.filter(isSetUp);
+}
