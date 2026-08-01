@@ -8,6 +8,10 @@
  * draft, so an author with no saved preset can give a scenario a game and a map,
  * and one with a preset can still start from it.
  *
+ * One thing here is the scenario's own rather than the launcher's:
+ * {@link StartConditions}, the document's `teams` block. It sits with the
+ * participants because every field in it is keyed by a participant id.
+ *
  * What is different is that a scenario is not just a launch payload. The map is
  * the space every coordinate is measured in, the game is what every unit def
  * resolves against, and a participant id is what actors, groups, prefabs and
@@ -60,6 +64,7 @@ import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario } from "../../model";
 import { EditorPanel } from "./panels";
 import { placementDefs, scenarioPlacements } from "./placements";
+import { StartConditions } from "./StartConditions";
 import {
   applyPresetSetup,
   defsMissingFrom,
@@ -73,6 +78,7 @@ import {
   setScenarioGame,
   setScenarioMap,
 } from "./setup";
+import { startsSummary, startUnitDefs } from "./teams";
 import { useGameUnits } from "./useGameUnits";
 
 /**
@@ -231,8 +237,15 @@ export function SetupPanel({
 
   /* ---- The three changes that cost something. ---- */
 
+  // A team's start units have no position, so they are not placements, but they
+  // are still unit defs the new game has to have.
   const placedDefs = useMemo(
-    () => placementDefs(scenarioPlacements(scenario)),
+    () => [
+      ...new Set([
+        ...placementDefs(scenarioPlacements(scenario)),
+        ...startUnitDefs(scenario),
+      ]),
+    ],
     [scenario],
   );
   const carriesCoordinates =
@@ -291,9 +304,14 @@ export function SetupPanel({
     });
   }, [rows]);
 
-  const summary = `${setup.gameName || "No game"} · ${
-    setup.mapName || "No map"
-  } · ${count(setup.participants.length, "participant")}`;
+  // The starts are named only once something is set, so a shut panel says a
+  // scenario has them rather than always saying it has not.
+  const summary = [
+    setup.gameName || "No game",
+    setup.mapName || "No map",
+    count(setup.participants.length, "participant"),
+    ...(Object.keys(scenario.teams).length ? [startsSummary(scenario)] : []),
+  ].join(" · ");
 
   return (
     <EditorPanel
@@ -419,6 +437,13 @@ export function SetupPanel({
                   options,
                 )
               }
+            />
+            {/* Keyed by participant id, so it belongs beside the table that
+                mints those ids rather than in a panel of its own. */}
+            <StartConditions
+              scenario={scenario}
+              participants={rows}
+              onChange={onChange}
             />
             <GameOptionsPanel
               selectedGame={selectedGame}
@@ -600,7 +625,7 @@ function GameChangeNotice({
               ? `${gameName} is not installed, so coilbox cannot say which of the ${count(defs.length, "unit type")} this scenario places it has.`
               : missing.length === 0
                 ? `${gameName} has all ${count(defs.length, "unit type")} this scenario places.`
-                : `${count(missing.length, "unit type")} this scenario places ${missing.length === 1 ? "is" : "are"} not in ${gameName}: ${list(missing)}. They stay in the document and draw as boxes until you change them.`}
+                : `${count(missing.length, "unit type")} this scenario places ${missing.length === 1 ? "is" : "are"} not in ${gameName}: ${list(missing)}. They stay in the document until you change them, and the ones standing on the map draw as boxes.`}
         {optionCount > 0 &&
           ` The ${count(optionCount, "mod option")} set for ${oldGameName || "the old game"} ${optionCount === 1 ? "is" : "are"} dropped, because ${gameName} declares its own.`}
       </span>
@@ -636,6 +661,9 @@ function ParticipantRemovalNotice({
       held.actors > 0 && count(held.actors, "actor"),
       held.groups > 0 && count(held.groups, "group"),
       held.prefabs > 0 && count(held.prefabs, "base"),
+      // Listed rather than only explained below, because a participant whose
+      // only holding is a start used to read as owning nothing at all.
+      held.team && "a start",
     ].filter((part): part is string => !!part),
   );
 
