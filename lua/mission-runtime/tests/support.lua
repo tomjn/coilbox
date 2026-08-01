@@ -132,6 +132,10 @@ end
 -- `options.players` is keyed by player id and says which team each one is on,
 -- `options.allyTeams` is keyed by engine team number, and `options.allyTeamList`
 -- is every ally team the game has.
+--
+-- `options.allowTransfer(unitID, newTeam, given)` is the game's own
+-- `AllowUnitTransfer`, and a test that says nothing about it has a game that
+-- allows every transfer.
 function M.newEngine(modOptions, files, options)
 	options = options or {}
 
@@ -431,7 +435,15 @@ function M.newEngine(modOptions, files, options)
 				end
 				return true
 			end,
-			TransferUnit = function(unitID, newTeam)
+			-- A game gets the last word on a transfer, through `AllowUnitTransfer`,
+			-- and answers false when it takes it. `options.allowTransfer` is that
+			-- word. A stub that always agreed is why a gift a real engine refused
+			-- went unnoticed for as long as it did.
+			TransferUnit = function(unitID, newTeam, given)
+				local allow = options.allowTransfer
+				if allow and not allow(unitID, newTeam, given ~= false) then
+					return false
+				end
 				engine.give(unitID, newTeam)
 				return true
 			end,
