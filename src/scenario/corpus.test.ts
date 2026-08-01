@@ -137,6 +137,68 @@ describe("scenario fixture corpus", () => {
   });
 
   /**
+   * Issue #868. Spring measures a map from its north-west corner, so a negative
+   * coordinate is off the map, and the engine answers one by clamping the unit
+   * onto the edge rather than refusing it. Three fixtures were authored around a
+   * centre origin and the headless harness passed anyway, with the siege base
+   * arriving as a heap on (0, 0).
+   *
+   * Zero is barred as well as negative. It is the map edge, and it is where a
+   * clamp puts things, so a fixture standing on it cannot show it was not
+   * clamped.
+   */
+  type Point = { path: string; x: number; z: number };
+
+  function isPoint(value: unknown): value is { x: number; z: number } {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      typeof (value as { x?: unknown }).x === "number" &&
+      typeof (value as { z?: unknown }).z === "number"
+    );
+  }
+
+  /** Every `{ x, z }` anywhere in a scenario, with the path it sits at. */
+  function pointsIn(value: unknown, path = ""): Point[] {
+    if (isPoint(value)) return [{ path, x: value.x, z: value.z }];
+    if (Array.isArray(value))
+      return value.flatMap((entry, index) =>
+        pointsIn(entry, `${path}[${index}]`),
+      );
+    if (typeof value === "object" && value !== null)
+      return Object.entries(value).flatMap(([key, entry]) =>
+        pointsIn(entry, path ? `${path}.${key}` : key),
+      );
+    return [];
+  }
+
+  it("puts every fixture coordinate on the map", () => {
+    const offMap: string[] = [];
+    for (const { file, scenario } of fixtures) {
+      for (const point of pointsIn(scenario)) {
+        // A prefab building's offset is measured from its prefab's origin and is
+        // free to point north or west of it. The position it resolves to is
+        // checked below instead.
+        if (point.path.endsWith(".offset")) continue;
+        if (point.x <= 0 || point.z <= 0)
+          offMap.push(`${file} ${point.path} at ${point.x},${point.z}`);
+      }
+      for (const prefab of scenario.prefabs) {
+        for (const building of prefab.buildings) {
+          const x = prefab.origin.x + building.offset.x;
+          const z = prefab.origin.z + building.offset.z;
+          if (x <= 0 || z <= 0)
+            offMap.push(
+              `${file} prefab ${prefab.id}'s ${building.def} at ${x},${z}`,
+            );
+        }
+      }
+    }
+
+    expect(offMap).toEqual([]);
+  });
+
+  /**
    * `ScenarioOrder` in model.ts allows five kinds: `move`, `patrol` and
    * `fight` (a waypoint list) or `guard` and `attack` (a target). Before this
    * fixture only ever used `guard` and `attack`, which is also the gap issue
