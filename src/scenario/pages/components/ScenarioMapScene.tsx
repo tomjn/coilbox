@@ -3,6 +3,7 @@ import {
   Frame,
   Layers,
   Loader2,
+  MapPin,
   MountainSnow,
   RotateCw,
   Trash2,
@@ -18,7 +19,7 @@ import {
   type MapScene3D,
 } from "@/mapconv/pages/components/MapPreview3D";
 import { usePreferredTarget } from "@/play/config";
-import type { Scenario, ScenarioZone } from "../../model";
+import type { Point, Scenario, ScenarioZone } from "../../model";
 import { ActorControls } from "./ActorControls";
 import {
   canTurn,
@@ -28,10 +29,24 @@ import {
   setActorState,
   turnPlacement,
 } from "./editing";
+import { GroupControls } from "./GroupControls";
+import {
+  addWaypoint,
+  editGroup,
+  groupLabel,
+  moveWaypoint,
+  orderWaypoints,
+  parsePathKey,
+  removeGroup,
+  removeWaypoint,
+  targetOptions,
+} from "./groups";
 import { EDITOR_MODES } from "./modes";
-import type { Placement } from "./placements";
+import { type Placement, placementKey } from "./placements";
 import { authoringCamera, clampToPlane, mapSceneStatus } from "./scene";
+import { useGameUnits } from "./useGameUnits";
 import { useMapEditing } from "./useMapEditing";
+import { useScenarioPaths } from "./useScenarioPaths";
 import { type ScenarioUnitsState, useScenarioUnits } from "./useScenarioUnits";
 import { useScenarioZones } from "./useScenarioZones";
 import {
@@ -121,6 +136,49 @@ export function ScenarioMapScene({
     pickedZone?.id ?? null,
   );
 
+  const picked = units.placements.find((p) => p.key === selected) ?? null;
+  // A group is what is being worked on whether one of its units or one of its
+  // waypoints was clicked, so both answer the same question.
+  const pathRef = selected ? parsePathKey(selected) : null;
+  const pickedGroup =
+    scenario.groups.find(
+      (group) =>
+        group.id ===
+        (pathRef?.groupId ?? (picked?.kind === "group" ? picked.id : null)),
+    ) ?? null;
+  const pathsLayer = useScenarioPaths(
+    handle,
+    scenario.groups,
+    assets,
+    units.groundAt,
+    pickedGroup?.id ?? null,
+    pathRef ? selected : null,
+  );
+
+  // Which order the map is putting points into. Held loosely: it is only obeyed
+  // while its group is still the selection and its order is still one that has a
+  // path, so deleting either of them ends the drawing rather than stranding it.
+  const [drawing, setDrawing] = useState<{
+    groupId: string;
+    order: number;
+  } | null>(null);
+  const drawingOrder =
+    drawing && pickedGroup?.id === drawing.groupId
+      ? pickedGroup.orders[drawing.order]
+      : undefined;
+  const drawingPath =
+    drawing && drawingOrder && orderWaypoints(drawingOrder) ? drawing : null;
+
+  // Putting a point down is what a click means while a path is being drawn, in
+  // whatever mode: the author is answering a question they asked of a group, not
+  // placing something new.
+  const onPlace = drawingPath
+    ? (pos: Point) =>
+        onChange(
+          addWaypoint(scenario, drawingPath.groupId, drawingPath.order, pos),
+        )
+    : behaviour.place;
+
   useMapEditing({
     handle,
     layer: units.layer,
@@ -132,27 +190,27 @@ export function ScenarioMapScene({
     drawing: units.drawing,
     // A zone is a sheet lying over the ground, so it steps aside for a mode
     // that puts things on the ground: otherwise a zone covering a corner of the
-    // map would be a corner of the map nothing could be placed on.
-    overlay: behaviour.place ? null : zonesLayer,
+    // map would be a corner of the map nothing could be placed on. A waypoint
+    // is a knob rather than a sheet, so it covers nothing and stays pickable.
+    overlays: [onPlace ? null : zonesLayer, pathsLayer],
     onSelect: setSelected,
-    onPlace: behaviour.place,
+    onPlace,
     onDragGround: behaviour.draw ?? null,
-    onMove: (key, delta) =>
-      onChange(
-        parseZoneKey(key)
-          ? moveZone(scenario, key, delta)
-          : movePlacement(scenario, key, delta),
-      ),
+    onMove: (key, delta) => {
+      if (parseZoneKey(key)) return onChange(moveZone(scenario, key, delta));
+      if (parsePathKey(key))
+        return onChange(moveWaypoint(scenario, key, delta));
+      onChange(movePlacement(scenario, key, delta));
+    },
   });
 
-  const picked = units.placements.find((p) => p.key === selected) ?? null;
-  // Only an actor has fields of its own to edit: a group's units and a prefab's
-  // buildings are described by the entry they belong to, which #761 and #762
-  // give their own panels.
+  // A prefab's buildings are described by the entry they belong to, which #762
+  // gives its own panel. Actors and groups have theirs.
   const pickedActor =
     (picked?.kind === "actor" &&
       scenario.actors.find((a) => a.id === picked.id)) ||
     null;
+  const gameUnits = useGameUnits(scenario.setup.gameName);
 
   const status = mapSceneStatus({
     mapName,
@@ -345,7 +403,55 @@ export function ScenarioMapScene({
                 }
               />
             )}
+            {picked.kind === "group" && pickedGroup && (
+              <GroupControls
+                key={pickedGroup.id}
+                group={pickedGroup}
+                participants={scenario.setup.participants}
+                units={gameUnits.units}
+                unitsLoading={gameUnits.loading}
+                targets={targetOptions(scenario, pickedGroup.id)}
+                onEdit={(patch) => {
+                  onChange(editGroup(scenario, pickedGroup.id, patch));
+                  if (patch.units?.length === 0) setSelected(null);
+                }}
+                onDelete={() => {
+                  onChange(removeGroup(scenario, pickedGroup.id));
+                  setSelected(null);
+                }}
+                drawing={
+                  drawing?.groupId === pickedGroup.id ? drawing.order : null
+                }
+                onDraw={(order) =>
+                  setDrawing(
+                    order === null ? null : { groupId: pickedGroup.id, order },
+                  )
+                }
+              />
+            )}
           </SelectionBar>
+        )}
+        {drawingPath && pickedGroup && (
+          <DrawingBar
+            what={`${groupLabel(scenario.groups, pickedGroup.id)} · ${
+              pickedGroup.orders[drawingPath.order].kind
+            }`}
+            onDone={() => setDrawing(null)}
+          />
+        )}
+        {pathRef && selected && pickedGroup && (
+          <PathBar
+            what={`${groupLabel(scenario.groups, pickedGroup.id)} · point ${
+              pathRef.waypoint + 1
+            }`}
+            // Back to the group the point belonged to rather than to nothing,
+            // so its other points keep their knobs and a path being drawn is
+            // still being drawn.
+            onDelete={() => {
+              onChange(removeWaypoint(scenario, selected));
+              setSelected(placementKey("group", pathRef.groupId, 0));
+            }}
+          />
         )}
         {pickedZone && (
           <ZoneBar
@@ -498,6 +604,53 @@ function ZoneBar({
         onClick={onDelete}
       >
         <Trash2 className="size-3.5" /> Delete
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * A path being drawn, and the way to stop drawing it.
+ *
+ * Its own bar rather than a line in the group's controls, because while a path
+ * is being drawn the click that adds a point is also the click that would
+ * otherwise place something, and that is worth saying where it cannot be missed.
+ */
+function DrawingBar({ what, onDone }: { what: string; onDone: () => void }) {
+  return (
+    <div className="flex w-fit items-center gap-1.5 rounded-md border border-lime-400/60 bg-card/85 p-1 pl-2 backdrop-blur">
+      <MapPin className="size-3.5 text-lime-300" />
+      <span className="text-[11px]">
+        Click the map to add points to <span className="font-mono">{what}</span>
+      </span>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 px-2 text-xs"
+        onClick={onDone}
+      >
+        Done
+      </Button>
+    </div>
+  );
+}
+
+/** The selected waypoint: which order's path it belongs to, and the way to take
+ *  it out. Dragging it is what moves it, so there is nothing else here. */
+function PathBar({ what, onDelete }: { what: string; onDelete: () => void }) {
+  return (
+    <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card/85 p-1 pl-2 backdrop-blur">
+      <span className="font-mono text-[11px]">{what}</span>
+      <span className="text-[11px] text-muted-foreground">
+        drag it to move it
+      </span>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+        onClick={onDelete}
+      >
+        <Trash2 className="size-3.5" /> Delete point
       </Button>
     </div>
   );
