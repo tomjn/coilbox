@@ -35,6 +35,9 @@ export function OptionSelect({
     /** Optional badge pinned to the item's right edge (e.g. an AI's difficulty),
      * dropdown only. */
     trailing?: ReactNode;
+    /** Offered but not pickable, for an option the document cannot use yet.
+     * Shown greyed rather than left out, so the list says what exists. */
+    disabled?: boolean;
   }[];
   placeholder?: string;
   disabled?: boolean;
@@ -53,6 +56,7 @@ export function OptionSelect({
             value={o.value}
             description={o.description}
             trailing={o.trailing}
+            disabled={o.disabled}
           >
             {o.icon ? (
               <span className="flex items-center gap-2">

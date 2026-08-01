@@ -96,9 +96,21 @@ function SurfaceMessage({
 export function ScenarioMapScene({
   scenario,
   onChange,
+  picking,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
+  /**
+   * A point a panel under the map has asked the author to click, or null when
+   * nothing is waiting. It joins the same queue a path being drawn and a base
+   * being moved are in, so however the question was asked there is one bar
+   * saying the map is waiting and one click that answers it.
+   */
+  picking?: {
+    message: ReactNode;
+    onPick: (pos: Point) => void;
+    onDone: () => void;
+  } | null;
 }) {
   const mapName = scenario.setup.mapName;
   const assets = useMissionMapAssets(mapName);
@@ -191,7 +203,7 @@ export function ScenarioMapScene({
           onChange(setOrigin(scenario, moving, pos));
           setMovingBase(null);
         }
-      : behaviour.place;
+      : (picking?.onPick ?? behaviour.place);
 
   useMapEditing({
     handle,
@@ -498,6 +510,9 @@ export function ScenarioMapScene({
             message="Click the map to put this base's origin there, buildings and all"
             onDone={() => setMovingBase(null)}
           />
+        )}
+        {picking && !drawingPath && !moving && (
+          <ClickMapBar message={picking.message} onDone={picking.onDone} />
         )}
         {pathRef && selected && pickedGroup && (
           <PathBar

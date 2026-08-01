@@ -15,6 +15,15 @@ import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { saveScenario } from "../storage";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
+import { TriggerPanel } from "./components/TriggerPanel";
+import {
+  applyPoint,
+  type PointTarget,
+  pointRepeats,
+  stepAt,
+  stepLabel,
+} from "./components/triggers";
+import { useGameUnits } from "./components/useGameUnits";
 
 const BACK = "/scenario-builder";
 
@@ -37,6 +46,10 @@ export default function ScenarioEditPage() {
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  // A trigger parameter waiting for a point on the map. Held here rather than in
+  // the panel that asked, because the map that answers it is a sibling.
+  const [pick, setPick] = useState<PointTarget | null>(null);
+  const gameUnits = useGameUnits(scenario?.setup.gameName ?? "");
 
   // Seed the editable copy once this id's document is available, and re-seed if
   // the route id changes under the same component instance.
@@ -85,6 +98,24 @@ export default function ScenarioEditPage() {
     });
 
   const { participants } = scenario.setup;
+
+  // Held loosely, the way a base being moved is: a step that has been deleted
+  // stops the map waiting for a point nothing would receive.
+  const asked = pick && stepAt(scenario, pick.ref);
+  const picking =
+    pick && asked
+      ? {
+          message:
+            pick.order === undefined
+              ? `Click the map to put ${stepLabel(asked.type)}'s ${pick.param} there`
+              : `Click the map to add points to ${stepLabel(asked.type)}`,
+          onPick: (pos: { x: number; z: number }) => {
+            void persist(applyPoint(scenario, pick, pos));
+            if (!pointRepeats(pick)) setPick(null);
+          },
+          onDone: () => setPick(null),
+        }
+      : null;
 
   return (
     <div className="flex flex-col gap-5 p-4">
@@ -144,6 +175,18 @@ export default function ScenarioEditPage() {
       <ScenarioMapScene
         scenario={scenario}
         onChange={(next) => void persist(next)}
+        picking={picking}
+      />
+
+      {/* The panels: the parts of the document the map cannot show. Objectives,
+          dialogue, restrictions and vars join triggers here in #764. */}
+      <TriggerPanel
+        scenario={scenario}
+        onChange={(next) => void persist(next)}
+        units={gameUnits.units}
+        unitsLoading={gameUnits.loading}
+        picking={pick}
+        onPick={setPick}
       />
     </div>
   );
