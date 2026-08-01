@@ -55,7 +55,9 @@ function summary(
     case "missing":
       return "Coilbox found no runtime marker in this game, so it cannot play scenarios yet. Installing writes coilbox's luarules, luaui and missions folders into the game folder.";
     case "broken":
-      return `This game has a runtime marker at missions/runtime.lua, but it would not load: ${installedError}. Until that is fixed the engine will not read it either, so coilbox cannot tell what this runtime supports. Repairing overwrites it with the version ${available?.version} coilbox ships.`;
+      // The error names the file and the line itself, so this does not repeat
+      // the path it used to spell out (issue #915).
+      return `This game has a runtime marker, but it would not load: ${installedError}. Until that is fixed the engine will not read it either, so coilbox cannot tell what this runtime supports. Repairing overwrites it with the version ${available?.version} coilbox ships.`;
     case "newer":
       return `This game vendors runtime version ${installed?.version}, newer than the version ${available?.version} coilbox ships. Installing would take it backwards.`;
     default:
