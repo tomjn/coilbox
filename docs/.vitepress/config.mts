@@ -48,12 +48,14 @@ export default defineConfig({
           { text: "The 3do model format", link: "/3do-format" },
           { text: "The unit builder", link: "/lego-builder" },
           { text: "Lego parts pack", link: "/lego-parts-pack" },
+          { text: "The mission runtime", link: "/mission-runtime" },
         ],
       },
       {
         text: "Game modes",
         items: [
           { text: "Campaigns", link: "/campaigns" },
+          { text: "Scenarios", link: "/scenarios" },
           { text: "Galactic conquest", link: "/conquest" },
           { text: "Roguelite run", link: "/roguelite-run" },
         ],
