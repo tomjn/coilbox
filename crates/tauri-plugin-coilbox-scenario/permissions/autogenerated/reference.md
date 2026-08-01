@@ -9,6 +9,7 @@ Allows the scenario plugin's storage, dialogue-media, file export and import, co
 - `allow-scenario-delete`
 - `allow-scenario-media-import`
 - `allow-scenario-media-delete`
+- `allow-scenario-media-sweep`
 - `allow-scenario-media-read`
 - `allow-scenario-media-write`
 - `allow-scenario-export`
@@ -260,6 +261,32 @@ Enables the scenario_media_read command without any pre-configured scope.
 <td>
 
 Denies the scenario_media_read command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:allow-scenario-media-sweep`
+
+</td>
+<td>
+
+Enables the scenario_media_sweep command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:deny-scenario-media-sweep`
+
+</td>
+<td>
+
+Denies the scenario_media_sweep command without any pre-configured scope.
 
 </td>
 </tr>
