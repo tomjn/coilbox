@@ -231,6 +231,129 @@ describe("validateMission", () => {
   });
 });
 
+/**
+ * Issue #879. `CUnit::PreInit` clamps an off-map creation into bounds rather
+ * than refusing it, so a mission authored around a centre origin plays as a heap
+ * on the corner with nothing said. The near edge is checkable without knowing
+ * anything about the map. The far edge needs its size, which the caller supplies
+ * when it has an engine to read one with.
+ */
+describe("a coordinate that is not on the map", () => {
+  const at = (x: number, z: number) =>
+    mission({
+      actors: [
+        { id: "boss", unitDef: "armcom", team: "player", pos: { x, z } },
+      ],
+    });
+
+  it("reports a negative coordinate without needing the map's size", () => {
+    expect(validateMission(at(-512, 300))).toEqual([
+      {
+        path: 'actors["boss"].pos',
+        message:
+          "-512,300 is off the map. Spring measures a map from its north-west corner, so x and z start at 0.",
+      },
+    ]);
+  });
+
+  it("leaves the map edge alone", () => {
+    // The editor's own clampToMap puts an overshooting drag on exactly zero, so
+    // refusing it here would refuse an ordinary edit.
+    expect(validateMission(at(0, 0), { width: 8192, height: 8192 })).toEqual(
+      [],
+    );
+    expect(
+      validateMission(at(8192, 8192), { width: 8192, height: 8192 }),
+    ).toEqual([]);
+  });
+
+  it("reports a coordinate past the far edge only when the map's size is known", () => {
+    expect(validateMission(at(9000, 300))).toEqual([]);
+    expect(
+      validateMission(at(9000, 300), { width: 8192, height: 8192 }),
+    ).toEqual([
+      {
+        path: 'actors["boss"].pos',
+        message: "9000,300 is off the map, which is 8192 by 8192 elmos.",
+      },
+    ]);
+  });
+
+  it("finds a position wherever it sits in the file", () => {
+    const doc = mission({
+      groups: [
+        {
+          id: "wave1",
+          team: "player",
+          pos: { x: 100, z: 100 },
+          orders: [{ kind: "move", waypoints: [{ x: 100, z: -1 }] }],
+        },
+      ],
+      zones: [{ id: "gate", name: "Gate", shape: "box", min: { x: -8, z: 0 } }],
+      triggers: [
+        {
+          id: "open",
+          enabled: true,
+          repeat: false,
+          conditions: { op: "all", conditions: [] },
+          actions: [
+            {
+              type: "spawn_unit",
+              params: {
+                unitDef: "armpw",
+                team: "player",
+                pos: { x: 5, z: -5 },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    // The zone is left out on purpose: it is an area rather than a placement,
+    // and the editor's own atLeastMinimum puts a small one drawn against the
+    // edge a few elmos past it.
+    expect(validateMission(doc).map((i) => i.path)).toEqual([
+      'groups["wave1"].orders[0].waypoints[0]',
+      'triggers["open"].actions[0].params.pos',
+    ]);
+  });
+
+  it("measures a prefab building from its prefab's origin", () => {
+    // An offset is free to point north or west of the origin. Only where it
+    // lands is on or off the map.
+    const doc = (originX: number) =>
+      mission({
+        prefabs: [
+          {
+            id: "base",
+            team: "player",
+            origin: { x: originX, z: 500 },
+            buildings: [{ def: "armsolar", offset: { x: -200, z: 0 } }],
+          },
+        ],
+      });
+
+    expect(validateMission(doc(500))).toEqual([]);
+    expect(validateMission(doc(100))).toEqual([
+      {
+        path: 'prefabs["base"].buildings[0].offset',
+        message:
+          "-100,500 is off the map. Spring measures a map from its north-west corner, so x and z start at 0.",
+      },
+    ]);
+  });
+
+  it("says where an off-map position is in the author's words", () => {
+    expect(
+      describeIssue({
+        path: 'groups["wave1"].orders[0].waypoints[2]',
+        message: "-1,-1 is off the map.",
+      }),
+    ).toBe('Group "wave1", order 1, waypoint 3: -1,-1 is off the map.');
+  });
+});
+
 describe("validateCompiledMission", () => {
   it("reads the mission back from the archive it was written into", async () => {
     readMissionMock.mockResolvedValue({ mission: mission() });

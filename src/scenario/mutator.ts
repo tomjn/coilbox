@@ -17,7 +17,11 @@
 import { scenarioTestMutator } from "./bindings";
 import { compileScenario, luaString } from "./compile";
 import type { Scenario } from "./model";
-import { type MissionIssue, validateCompiledMission } from "./validate";
+import {
+  type MapExtent,
+  type MissionIssue,
+  validateCompiledMission,
+} from "./validate";
 
 /**
  * The mutator's folder name, matching the constant the plugin writes to. Held
@@ -99,6 +103,7 @@ export interface TestMutator {
 export async function writeTestMutator(
   dataDir: string,
   scenario: Scenario,
+  map?: MapExtent,
 ): Promise<TestMutator> {
   const result = await scenarioTestMutator({
     dataDir,
@@ -110,6 +115,6 @@ export async function writeTestMutator(
     dir: result.dir,
     version: result.installed.version,
     mission: `${MUTATOR_FOLDER}/missions/${scenario.id}/mission.lua`,
-    issues: await validateCompiledMission(result.dir, scenario.id),
+    issues: await validateCompiledMission(result.dir, scenario.id, map),
   };
 }

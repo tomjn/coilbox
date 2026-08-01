@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mediaReadMock = vi.fn();
 const mediaWriteMock = vi.fn();
 const campaignListMock = vi.fn();
+const scenarioListMock = vi.fn();
+const mediaSweepMock = vi.fn();
 
 // The media helpers reach the plugin through the scenario bindings, whose
 // plugin-sdk import Vitest's node resolver cannot load from the published dist.
@@ -11,6 +13,8 @@ const campaignListMock = vi.fn();
 vi.mock("../scenario/bindings", () => ({
   scenarioMediaRead: (...args: unknown[]) => mediaReadMock(...args),
   scenarioMediaWrite: (...args: unknown[]) => mediaWriteMock(...args),
+  scenarioList: (...args: unknown[]) => scenarioListMock(...args),
+  scenarioMediaSweep: (...args: unknown[]) => mediaSweepMock(...args),
 }));
 
 vi.mock("./bindings", () => ({
@@ -24,7 +28,9 @@ import {
   collectCampaignScenarioMedia,
   dropUnavailableDialogueMedia,
   ensureCampaignScenarioMedia,
+  namedScenarioIds,
   restoreCampaignScenarioMedia,
+  sweepOrphanedScenarioMedia,
 } from "./scenarioMedia";
 import { wrapCampaignForExport } from "./transfer";
 
@@ -108,6 +114,8 @@ beforeEach(() => {
   );
   mediaWriteMock.mockResolvedValue({});
   campaignListMock.mockResolvedValue({ items: [] });
+  scenarioListMock.mockResolvedValue({ items: [] });
+  mediaSweepMock.mockResolvedValue({ removed: [] });
 });
 
 /** A bundled campaign as it sits in `.coilbox/campaigns/`: the exported file. */
@@ -178,6 +186,47 @@ describe("ensureCampaignScenarioMedia", () => {
     await ensureCampaignScenarioMedia("b4");
 
     expect(mediaWriteMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * Issue #919. A bundled campaign's clips are written into the ordinary media
+ * store on the launch path, and the only thing holding them is the campaign
+ * still being bundled. Nothing acted on that until the sweep.
+ */
+describe("collecting the clips nothing names", () => {
+  it("holds a scenario's own clips and every campaign's attached ones", () => {
+    expect(
+      namedScenarioIds(
+        [{ id: "local" }],
+        [
+          campaign([mission("m1", scenario("attached"))], "c1"),
+          campaign([mission("m1"), mission("m2", scenario("bundled"))], "c2"),
+        ],
+      ),
+    ).toEqual(new Set(["local", "attached", "bundled"]));
+  });
+
+  it("holds nothing when there is nothing to hold", () => {
+    expect(namedScenarioIds([], [])).toEqual(new Set());
+  });
+
+  it("hands the sweep every named id and nothing else", async () => {
+    scenarioListMock.mockResolvedValue({
+      items: [JSON.stringify(scenario("kept"))].map((json) => ({ json })),
+    });
+    mediaSweepMock.mockResolvedValue({ removed: ["gone"] });
+
+    await sweepOrphanedScenarioMedia([
+      campaign([mission("m1", scenario("held"))], "c1"),
+    ]);
+
+    expect(mediaSweepMock).toHaveBeenCalledWith({ keep: ["kept", "held"] });
+  });
+
+  it("sweeps once a session", async () => {
+    await sweepOrphanedScenarioMedia([]);
+    expect(mediaSweepMock).not.toHaveBeenCalled();
   });
 });
 

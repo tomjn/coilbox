@@ -5,6 +5,7 @@ import {
   scenarioMediaDelete,
   scenarioMediaImport,
   scenarioMediaRead,
+  scenarioMediaSweep,
   scenarioMediaWrite,
   scenarioSave,
 } from "./bindings";
@@ -114,6 +115,20 @@ export async function deleteScenarioMedia(
   file: string,
 ): Promise<void> {
   await scenarioMediaDelete({ scenarioId, file });
+}
+
+/**
+ * Drop every stored media folder whose scenario id is not in `keep`, and say
+ * which ones went.
+ *
+ * `keep` has to be the whole of what is still named, so a caller that could not
+ * read part of it must not call this at all.
+ */
+export async function sweepScenarioMedia(
+  keep: Iterable<string>,
+): Promise<string[]> {
+  const { removed } = await scenarioMediaSweep({ keep: [...keep] });
+  return removed;
 }
 
 /**

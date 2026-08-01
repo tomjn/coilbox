@@ -8,6 +8,7 @@ permissions = [
   "allow-scenario-delete",
   "allow-scenario-media-import",
   "allow-scenario-media-delete",
+  "allow-scenario-media-sweep",
   "allow-scenario-media-read",
   "allow-scenario-media-write",
   "allow-scenario-export",
