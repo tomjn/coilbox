@@ -40,6 +40,8 @@ import {
   useUnitsyncUnitDataset,
   useUnitsyncUnitModel,
 } from "../../../content/config";
+import { UnitDefSelect } from "../../../content/pages/components/UnitDefSelect";
+import { unitLabel } from "../../../content/unitChoices";
 import { countTriangles } from "../../../content/unitModel";
 import { usePreferredTarget } from "../../../play/config";
 import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
@@ -92,9 +94,7 @@ export function ReferencePicker({
     target?.dataDir,
     archive,
   );
-  const units = [...(dataset.dataset?.units ?? [])].sort((a, b) =>
-    label(a).localeCompare(label(b)),
-  );
+  const units = dataset.dataset?.units ?? [];
   const unit = units.find((u) => u.name === unitName);
   const object = unit?.objectName?.trim();
 
@@ -114,7 +114,7 @@ export function ReferencePicker({
   useEffect(() => {
     onReferenceRef.current(
       model && drawable
-        ? { model, label: unit ? label(unit) : model.path }
+        ? { model, label: unit ? unitLabel(unit) : model.path }
         : null,
     );
   }, [model, drawable, unit]);
@@ -161,16 +161,11 @@ export function ReferencePicker({
 
         {game && (
           <Field label="Unit">
-            <OptionSelect
+            <UnitDefSelect
+              units={units}
               value={unitName}
               onValueChange={setUnitName}
-              options={units.map((u) => ({
-                value: u.name,
-                label: label(u),
-                description: u.name,
-              }))}
-              placeholder={dataset.loading ? "Reading units" : "Pick a unit"}
-              disabled={units.length === 0}
+              loading={dataset.loading}
             />
           </Field>
         )}
@@ -272,7 +267,7 @@ function Note({
   return (
     <>
       <Text>
-        {label(unit)} is standing to the left of the plates at the size the
+        {unitLabel(unit)} is standing to the left of the plates at the size the
         engine draws it.
       </Text>
       {missing.length > 0 && (
@@ -302,11 +297,6 @@ function Field({
 
 function Text({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-muted-foreground">{children}</p>;
-}
-
-/** What to call a unit: its readable name where it has one. */
-function label(unit: UnitDatasetEntry): string {
-  return unit.fullName?.trim() || unit.name;
 }
 
 /** Two installed archives can carry the same game name, which is the same

@@ -6,11 +6,15 @@ import {
   canTurn,
   clampToMap,
   dragKeys,
+  editActor,
   isClick,
+  MIN_ACTOR_HP,
   movePlacement,
+  normaliseActorState,
   parsePlacementKey,
   pointerNdc,
   removePlacement,
+  setActorState,
   turnFacing,
   turnPlacement,
 } from "./editing";
@@ -261,5 +265,75 @@ describe("addActor", () => {
       facing: 2,
     });
     expect(before.actors).toHaveLength(1);
+  });
+});
+
+describe("editActor", () => {
+  it("changes the fields it is given and leaves the rest", () => {
+    const before = document();
+    const next = editActor(before, "a1", { team: "p1", facing: 3 });
+    expect(next.actors[0]).toEqual({
+      ...before.actors[0],
+      team: "p1",
+      facing: 3,
+    });
+    expect(before.actors[0].team).toBe("p0");
+  });
+
+  it("hands back the same document for an id it does not have", () => {
+    const before = document();
+    expect(editActor(before, "nope", { team: "p1" })).toBe(before);
+  });
+});
+
+describe("normaliseActorState", () => {
+  it("drops everything the game would do anyway", () => {
+    expect(
+      normaliseActorState({
+        hp: 1,
+        invulnerable: false,
+        unselectable: false,
+        name: "   ",
+      }),
+    ).toBeUndefined();
+  });
+
+  it("keeps what was actually overridden", () => {
+    expect(
+      normaliseActorState({
+        hp: 0.5,
+        invulnerable: true,
+        unselectable: true,
+        name: "  Jarmen Kell  ",
+      }),
+    ).toEqual({
+      hp: 0.5,
+      invulnerable: true,
+      unselectable: true,
+      name: "Jarmen Kell",
+    });
+  });
+
+  it("holds health above nothing, so the unit lives to be nearly dead", () => {
+    expect(normaliseActorState({ hp: 0 })).toEqual({ hp: MIN_ACTOR_HP });
+    expect(normaliseActorState({ hp: -3 })).toEqual({ hp: MIN_ACTOR_HP });
+  });
+
+  it("ignores a health that is not a number or is above full", () => {
+    expect(normaliseActorState({ hp: Number.NaN })).toBeUndefined();
+    expect(normaliseActorState({ hp: 2 })).toBeUndefined();
+  });
+});
+
+describe("setActorState", () => {
+  it("writes the overrides that survive normalising", () => {
+    const next = setActorState(document(), "a1", { hp: 0.25, name: "Boss" });
+    expect(next.actors[0].state).toEqual({ hp: 0.25, name: "Boss" });
+  });
+
+  it("takes the state off an actor with nothing left to say", () => {
+    const withState = setActorState(document(), "a1", { invulnerable: true });
+    const cleared = setActorState(withState, "a1", { invulnerable: false });
+    expect(cleared.actors[0].state).toBeUndefined();
   });
 });

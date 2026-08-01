@@ -15,6 +15,7 @@
  */
 
 import type {
+  ActorState,
   Facing,
   Point,
   Scenario,
@@ -300,4 +301,65 @@ export function addActor(
     ...scenario,
     actors: [...scenario.actors, { ...actor, id, pos: round(actor.pos) }],
   };
+}
+
+/**
+ * The document with one actor's fields changed, or the same document when no
+ * actor has that id.
+ *
+ * The patch is applied as given, so the caller decides what a field means.
+ * Position and state have their own paths: {@link movePlacement} rounds, and
+ * {@link setActorState} drops what does not need saying.
+ */
+export function editActor(
+  scenario: Scenario,
+  id: string,
+  patch: Partial<Omit<ScenarioActor, "id">>,
+): Scenario {
+  const actors = edit<ScenarioActor>(scenario.actors, id, (actor) => ({
+    ...actor,
+    ...patch,
+  }));
+  return actors === scenario.actors ? scenario : { ...scenario, actors };
+}
+
+/**
+ * The least health an actor can be placed with, as a fraction of its maximum.
+ *
+ * The runtime sets health to `max * hp` at spawn, and a unit set to nothing dies
+ * the moment it is created, which is not what "nearly dead" means to whoever
+ * dragged the slider to the bottom.
+ */
+export const MIN_ACTOR_HP = 0.01;
+
+/**
+ * An actor's overrides as they are worth writing down, or `undefined` when it
+ * has none.
+ *
+ * Every field here overrides what the game would do on its own, so a field
+ * holding the game's own answer is dropped rather than stored: full health, not
+ * invulnerable, selectable, no display name. That keeps a document readable, and
+ * keeps an actor nobody has touched free of a `state` block that says nothing.
+ */
+export function normaliseActorState(state: ActorState): ActorState | undefined {
+  const out: ActorState = {};
+  const hp = state.hp;
+  if (hp !== undefined && Number.isFinite(hp) && hp < 1) {
+    out.hp = Math.max(MIN_ACTOR_HP, hp);
+  }
+  if (state.invulnerable) out.invulnerable = true;
+  if (state.unselectable) out.unselectable = true;
+  const name = state.name?.trim();
+  if (name) out.name = name;
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** The document with one actor's overrides replaced by {@link
+ *  normaliseActorState} of what was given. */
+export function setActorState(
+  scenario: Scenario,
+  id: string,
+  state: ActorState,
+): Scenario {
+  return editActor(scenario, id, { state: normaliseActorState(state) });
 }
