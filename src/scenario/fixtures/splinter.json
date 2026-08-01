@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "id": "splinter",
+  "name": "Splinter smoke",
+  "description": "The smallest scenario that proves the runtime on SplinterFaction: the game's own start is suppressed, the runtime places the player's squad, and a timer ends the mission.",
+  "runtimeVersion": 1,
+  "setup": {
+    "gameName": "SplinterFaction",
+    "mapName": "AcidicQuarry 5.17",
+    "participants": [
+      {
+        "id": "player",
+        "kind": "you",
+        "name": "Kala",
+        "side": "Federation of Kala",
+        "color": [0, 0.6, 1],
+        "allyTeam": 0,
+        "spectator": false
+      },
+      {
+        "id": "enemy",
+        "kind": "ai",
+        "name": "Loz",
+        "side": "Loz Alliance",
+        "color": [1, 0, 0],
+        "allyTeam": 1,
+        "spectator": false
+      }
+    ],
+    "startPosType": 0,
+    "modOptionValues": {}
+  },
+  "teams": {
+    "player": {
+      "noCommander": true,
+      "startUnits": ["fedengineer"],
+      "resources": { "metal": 750, "energy": 750 }
+    },
+    "enemy": {
+      "noCommander": true,
+      "resources": { "metal": 100, "energy": 100 }
+    }
+  },
+  "zones": [],
+  "actors": [
+    {
+      "id": "watchpost",
+      "unitDef": "lozengineer",
+      "team": "enemy",
+      "pos": { "x": 1400, "z": 1400 },
+      "facing": 0,
+      "state": {}
+    }
+  ],
+  "groups": [],
+  "prefabs": [],
+  "restrictions": {},
+  "vars": {},
+  "triggers": [
+    {
+      "id": "hold-out",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [{ "type": "time_elapsed", "params": { "seconds": 90 } }]
+      },
+      "actions": [
+        { "type": "complete_objective", "params": { "objective": "hold-out" } },
+        { "type": "victory", "params": { "team": "player" } }
+      ]
+    }
+  ],
+  "objectives": [
+    {
+      "id": "hold-out",
+      "kind": "primary",
+      "text": "Hold out for ninety seconds.",
+      "hidden": false
+    }
+  ],
+  "dialogue": [],
+  "createdAt": "2026-08-01T00:00:00.000Z",
+  "updatedAt": "2026-08-01T00:00:00.000Z"
+}
