@@ -138,9 +138,9 @@ export default function ScenarioEditPage() {
         </Button>
       </section>
 
-      {/* The editing surface. The mode strip that drives it, and the zones,
-          actors, groups and prefabs drawn into it, arrive in #757 onwards. */}
-      <ScenarioMapScene mapName={scenario.setup.mapName} />
+      {/* The editing surface, with the document's units drawn on it. The mode
+          strip that drives it, and the zones and paths, arrive in #758 onwards. */}
+      <ScenarioMapScene scenario={scenario} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Frame, Layers, Loader2, MountainSnow, Unplug } from "lucide-react";
-import { type ReactNode, useCallback, useRef } from "react";
+import { type ReactNode, useCallback, useRef, useState } from "react";
 import { Link } from "react-router";
 import * as THREE from "three";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
@@ -9,7 +9,9 @@ import {
   type MapScene3D,
 } from "@/mapconv/pages/components/MapPreview3D";
 import { usePreferredTarget } from "@/play/config";
+import type { Scenario } from "../../model";
 import { authoringCamera, clampToPlane, mapSceneStatus } from "./scene";
+import { type ScenarioUnitsState, useScenarioUnits } from "./useScenarioUnits";
 
 /** What the surface says when there is no scene to show. */
 function SurfaceMessage({
@@ -37,13 +39,19 @@ function SurfaceMessage({
  * zooms toward the cursor, and the point being looked at is held over the
  * terrain so a pan cannot strand the view in empty space.
  *
- * Everything a scenario contains is drawn into this same scene by the modes that
- * follow (issues #757 onwards), which take the scene through `onScene`.
+ * The units the document places are drawn on top of it by
+ * {@link useScenarioUnits}. The zones, paths and pickers that follow take the
+ * same scene the same way.
  */
-export function ScenarioMapScene({ mapName }: { mapName: string }) {
+export function ScenarioMapScene({ scenario }: { scenario: Scenario }) {
+  const mapName = scenario.setup.mapName;
   const assets = useMissionMapAssets(mapName);
   const { loading: enginesLoading } = usePreferredTarget();
   const sceneRef = useRef<MapScene3D | null>(null);
+  // Also held in state, because the units layer is built from it and a ref
+  // does not re-render the hook that owns that layer.
+  const [handle, setHandle] = useState<MapScene3D | null>(null);
+  const units = useScenarioUnits(handle, scenario, assets);
 
   const status = mapSceneStatus({
     mapName,
@@ -72,6 +80,7 @@ export function ScenarioMapScene({ mapName }: { mapName: string }) {
   const onScene = useCallback(
     (handle: MapScene3D | null) => {
       sceneRef.current = handle;
+      setHandle(handle);
       if (!handle) return;
       const { camera, controls, planeWidth, planeDepth, render } = handle;
 
@@ -199,10 +208,55 @@ export function ScenarioMapScene({ mapName }: { mapName: string }) {
       >
         <Frame className="size-3.5" /> Frame map
       </Button>
+      <UnitsNote
+        units={units}
+        gameName={scenario.setup.gameName}
+        drawing={units.drawing}
+      />
       <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
         {mapName} · drag to pan · right-drag to turn · scroll to zoom
       </p>
     </Surface>
+  );
+}
+
+/**
+ * What was drawn, and what could not be.
+ *
+ * A scenario can name a unit its game does not have, either because it was
+ * written for a different game or because the def was renamed. Those are drawn
+ * as marker boxes, which look deliberate enough to be mistaken for a feature, so
+ * the count says plainly that they are not units.
+ */
+function UnitsNote({
+  units,
+  gameName,
+  drawing,
+}: {
+  units: ScenarioUnitsState;
+  gameName: string;
+  drawing: boolean;
+}) {
+  if (units.placed === 0) return null;
+
+  const problem = units.gameMissing
+    ? `${gameName || "The scenario's game"} is not installed, so nothing can be drawn with its models.`
+    : units.missing.length > 0
+      ? `${units.missing.length} unit type${units.missing.length === 1 ? "" : "s"} not in ${gameName}, drawn as boxes: ${units.missing.join(", ")}`
+      : null;
+
+  return (
+    <div className="pointer-events-none absolute bottom-2 right-2 flex max-w-[60%] flex-col items-end gap-1 text-right">
+      {problem && (
+        <p className="rounded bg-amber-950/70 px-2 py-1 text-[11px] text-amber-200 backdrop-blur">
+          {problem}
+        </p>
+      )}
+      <p className="rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
+        {drawing ? "drawing " : ""}
+        {units.placed} unit{units.placed === 1 ? "" : "s"}
+      </p>
+    </div>
   );
 }
 
