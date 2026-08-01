@@ -1,5 +1,5 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { ArrowLeft, Layers } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { PresetPickerDrawer } from "@/campaign/pages/components/PresetPickerDrawer";
@@ -14,14 +14,14 @@ import {
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { saveScenario } from "../storage";
+import { ScenarioMapScene } from "./components/ScenarioMapScene";
 
 const BACK = "/scenario-builder";
 
 /**
- * Editor for one scenario. This is the shell: the document's name and
- * description, and the skirmish setup it is played on. The map scene and the
- * placement modes and panels that hang off it arrive in the issues after this
- * one (#756 onwards) and mount in the surface below.
+ * Editor for one scenario. The document's name and description, the skirmish
+ * setup it is played on, and the map it is authored on as a 3D scene. The
+ * placement modes and panels that hang off that scene arrive in #757 onwards.
  *
  * The working document is held in local state and written back with
  * {@link saveScenario} on every change, which stamps `updatedAt` and hands back
@@ -138,16 +138,9 @@ export default function ScenarioEditPage() {
         </Button>
       </section>
 
-      {/* Where the map scene and its mode strip mount (issue #756). Until then
-          the page still says which map the scenario is set on. */}
-      <section className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
-        <Layers className="size-6 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          {scenario.setup.mapName
-            ? `The editing surface for ${scenario.setup.mapName} lands here.`
-            : "Pick a setup to choose the map this scenario is authored on."}
-        </p>
-      </section>
+      {/* The editing surface. The mode strip that drives it, and the zones,
+          actors, groups and prefabs drawn into it, arrive in #757 onwards. */}
+      <ScenarioMapScene mapName={scenario.setup.mapName} />
     </div>
   );
 }
