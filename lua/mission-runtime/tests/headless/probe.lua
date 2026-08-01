@@ -192,6 +192,12 @@ plans.garrison = {
 				rules("coilbox_mission_var_garrisonBuilt"))
 			check("its enable_trigger armed another, which then fired and spent itself",
 				armed("unlock") == false)
+			-- The same var arms the wave, which is the mission's repeating trigger.
+			check("the repeating trigger the var armed spawned the dormant group",
+				#state().groups.units("reinforcements") == 2,
+				#state().groups.units("reinforcements"))
+			check("and stayed armed, because it repeats",
+				armed("reinforcement-wave") == true)
 		end },
 		{ frame = 90, run = function()
 			Spring.CreateUnit("armestor", 400, Spring.GetGroundHeight(400, 400), 400, 0, 1)
@@ -226,6 +232,13 @@ plans.garrison = {
 				tostring(seen.los) .. "/" .. tostring(seen.radar))
 			check("the spotter is not counted as a unit its team owns",
 				state().reveal.spotterCount(0, Spring.GetUnitDefID(spotter)) == 1)
+			-- The trigger's other action is a gift_units, and it moves nothing
+			-- here: this game refuses a share between enemies, and the runtime
+			-- throws the refusal away. See #857. What is checked is the runtime's
+			-- own bookkeeping, which is right either way.
+			check("gifting a group leaves it holding its units",
+				#state().groups.units("reinforcements") == 2,
+				#state().groups.units("reinforcements"))
 		end },
 		{ frame = 1250, run = function()
 			check("the reveal runs out and the spotter comes off the map",

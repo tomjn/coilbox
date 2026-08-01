@@ -373,6 +373,10 @@ What it has settled:
 - Triggers firing on a zone entered, a unit count reached, a unit finished, a death and a capture, and one mission ending: `zone_held_for` completes its objective and hands the win to the player's ally team at the frame the clock says.
 - A reveal. A capture lights a zone with one spotter, no other ally team can see it, and it comes off the map when its 30 seconds are up.
 
+What it has caught:
+
+- `gift_units` moves nothing between teams that are not allied, and the runtime never notices. A game may refuse a share between enemies through `AllowUnitTransfer`, Balanced Annihilation does, and `Spring.TransferUnit`'s refusal is thrown away ([#857](https://github.com/tomjn/coilbox/issues/857)). The stub always agrees, so every suite passed on it.
+
 What it still cannot settle:
 
 - The widget, still. The engine loads LuaUI in a headless run, but the game the harness runs on has none that loads against a current engine, so `luaui/widgets/` has never been reached ([#850](https://github.com/tomjn/coilbox/issues/850)).
