@@ -1,6 +1,6 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { ArrowLeft, Rocket } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { PresetPickerDrawer } from "@/campaign/pages/components/PresetPickerDrawer";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,16 @@ import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { saveScenario } from "../storage";
 import { DialoguePanel } from "./components/DialoguePanel";
+import {
+  type EditHistory,
+  emptyHistory,
+  isRedoKey,
+  isTypingTarget,
+  isUndoKey,
+  recordEdit,
+  redoEdit,
+  undoEdit,
+} from "./components/history";
 import { ObjectivePanel } from "./components/ObjectivePanel";
 import { RestrictionPanel } from "./components/RestrictionPanel";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
@@ -55,6 +65,14 @@ export default function ScenarioEditPage() {
   // the panel that asked, because the map that answers it is a sibling.
   const [pick, setPick] = useState<PointTarget | null>(null);
   const gameUnits = useGameUnits(scenario?.setup.gameName ?? "");
+  const [history, setHistory] = useState<EditHistory>(emptyHistory);
+  // Both are also held in refs, because an edit and a step through the history
+  // read them at the moment they happen rather than at the last render: two
+  // undos in quick succession are two presses before one re-render.
+  const scenarioRef = useRef<Scenario | null>(scenario);
+  scenarioRef.current = scenario;
+  const historyRef = useRef(history);
+  historyRef.current = history;
 
   // Seed the editable copy once this id's document is available, and re-seed if
   // the route id changes under the same component instance.
@@ -62,18 +80,72 @@ export default function ScenarioEditPage() {
     if (stored && loadedId !== stored.id) {
       setScenario(stored);
       setLoadedId(stored.id);
+      setHistory(emptyHistory);
+      historyRef.current = emptyHistory;
     }
   }, [stored, loadedId]);
 
+  /** Write a document to disk and show what was written. The whole editor's one
+   *  way out, including a step through the history: undoing is an edit like any
+   *  other, because there is no save button to defer it to. */
   const persist = useCallback(async (next: Scenario) => {
+    scenarioRef.current = next;
     setScenario(next);
     try {
-      setScenario(await saveScenario(next));
+      const written = await saveScenario(next);
+      scenarioRef.current = written;
+      setScenario(written);
       await refreshScenarios();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   }, []);
+
+  /** An edit the author made, which is the only kind that goes in the history.
+   *  Every panel and the map itself come through here. */
+  const apply = useCallback(
+    (next: Scenario) => {
+      const before = scenarioRef.current;
+      if (before) {
+        const recorded = recordEdit(historyRef.current, before, next);
+        historyRef.current = recorded;
+        setHistory(recorded);
+      }
+      void persist(next);
+    },
+    [persist],
+  );
+
+  const step = useCallback(
+    (take: typeof undoEdit) => {
+      const current = scenarioRef.current;
+      if (!current) return;
+      const taken = take(historyRef.current, current);
+      if (!taken) return;
+      historyRef.current = taken.history;
+      setHistory(taken.history);
+      void persist(taken.document);
+    },
+    [persist],
+  );
+
+  const undo = useCallback(() => step(undoEdit), [step]);
+  const redo = useCallback(() => step(redoEdit), [step]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target as HTMLElement | null)) return;
+      if (isUndoKey(event)) {
+        event.preventDefault();
+        undo();
+      } else if (isRedoKey(event)) {
+        event.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
 
   if (loading && !scenario) return <DetailLoading backTo={BACK} />;
   if (!scenario) return <NotFound backTo={BACK} label="scenario" />;
@@ -96,7 +168,7 @@ export default function ScenarioEditPage() {
               startPosType: preset.startPosType,
               modOptionValues: preset.modOptionValues,
             });
-            void persist({ ...scenario, setup, teams: {} });
+            apply({ ...scenario, setup, teams: {} });
           }}
         />
       ),
@@ -122,7 +194,7 @@ export default function ScenarioEditPage() {
               ? `Click the map to put ${stepLabel(asked.type)}'s ${pick.param} there`
               : `Click the map to add points to ${stepLabel(asked.type)}`,
           onPick: (pos: { x: number; z: number }) => {
-            void persist(applyPoint(scenario, pick, pos));
+            apply(applyPoint(scenario, pick, pos));
             if (!pointRepeats(pick)) setPick(null);
           },
           onDone: () => setPick(null),
@@ -147,7 +219,7 @@ export default function ScenarioEditPage() {
           onChange={(e) =>
             setScenario((s) => (s ? { ...s, name: e.target.value } : s))
           }
-          onBlur={() => void persist(scenario)}
+          onBlur={() => apply(scenario)}
           className="text-base font-semibold"
         />
         <Textarea
@@ -158,7 +230,7 @@ export default function ScenarioEditPage() {
           onChange={(e) =>
             setScenario((s) => (s ? { ...s, description: e.target.value } : s))
           }
-          onBlur={() => void persist(scenario)}
+          onBlur={() => apply(scenario)}
         />
       </header>
 
@@ -190,10 +262,19 @@ export default function ScenarioEditPage() {
       {/* The editing surface: the document's units drawn on the map, the mode
           strip that places more, and the picking and dragging that moves them.
           Zones and paths arrive in #759 onwards. */}
+      {/* The history is the whole document's, panels included, but its buttons
+          live on the map: it is the surface an author spends the time on, and
+          the one that covers the page when it is expanded. */}
       <ScenarioMapScene
         scenario={scenario}
-        onChange={(next) => void persist(next)}
+        onChange={(next) => apply(next)}
         picking={picking}
+        history={{
+          canUndo: history.past.length > 0,
+          canRedo: history.future.length > 0,
+          undo,
+          redo,
+        }}
       />
 
       {/* The panels: the parts of the document the map cannot show. Triggers
@@ -201,27 +282,21 @@ export default function ScenarioEditPage() {
           at. */}
       <TriggerPanel
         scenario={scenario}
-        onChange={(next) => void persist(next)}
+        onChange={(next) => apply(next)}
         units={gameUnits.units}
         unitsLoading={gameUnits.loading}
         picking={pick}
         onPick={setPick}
       />
-      <ObjectivePanel
-        scenario={scenario}
-        onChange={(next) => void persist(next)}
-      />
-      <DialoguePanel
-        scenario={scenario}
-        onChange={(next) => void persist(next)}
-      />
+      <ObjectivePanel scenario={scenario} onChange={(next) => apply(next)} />
+      <DialoguePanel scenario={scenario} onChange={(next) => apply(next)} />
       <RestrictionPanel
         scenario={scenario}
-        onChange={(next) => void persist(next)}
+        onChange={(next) => apply(next)}
         units={gameUnits.units}
         unitsLoading={gameUnits.loading}
       />
-      <VarPanel scenario={scenario} onChange={(next) => void persist(next)} />
+      <VarPanel scenario={scenario} onChange={(next) => apply(next)} />
     </div>
   );
 }
