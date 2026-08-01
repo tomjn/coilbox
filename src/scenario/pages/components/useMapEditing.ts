@@ -43,9 +43,9 @@ import { sceneToWorld, worldToScene } from "./scene";
 import type { UnitsLayer } from "./unitsLayer";
 
 /**
- * Pickable things on the map that are not units: zones today, patrol paths
- * later. Raycast alongside the units and sorted with them by distance, so a
- * unit standing inside a zone is still the nearer hit.
+ * Pickable things on the map that are not units: zones, and the waypoints of a
+ * group's orders. Raycast alongside the units and sorted with them by distance,
+ * so a unit standing inside a zone is still the nearer hit.
  *
  * An overlay owns how its objects are drawn, so a drag of one is handed back to
  * it rather than moved here: resizing a zone changes its shape, which is not
@@ -100,8 +100,15 @@ export interface MapEditingDeps {
   onDragGround:
     | ((from: Point, to: Point, phase: GroundDragPhase) => void)
     | null;
-  /** Anything pickable that is not a unit. */
-  overlay?: OverlayLayer | null;
+  /**
+   * Anything pickable that is not a unit, nearest layer first.
+   *
+   * A list rather than one, because zones and order paths are pickable at the
+   * same time and are drawn by layers of their own. A null entry is a layer that
+   * is not built yet, or one a mode has stood down: a mode that places on the
+   * ground hands the ground back by dropping the zones.
+   */
+  overlays?: (OverlayLayer | null)[];
   /** A drag that finished, in elmos moved. */
   onMove: (key: string, delta: Point) => void;
 }
@@ -192,7 +199,8 @@ interface Drag {
   /** The drawn units carried along, empty when an overlay owns the drag and
    *  redraws its own object. */
   members: { key: string; object: THREE.Object3D; pos: Point }[];
-  overlay: boolean;
+  /** The layer that owns this drag, or null when the units layer does. */
+  overlay: OverlayLayer | null;
   moved: boolean;
   delta: Point;
 }
@@ -260,14 +268,23 @@ export function useMapEditing(deps: MapEditingDeps): void {
       return clampToMap(relief ?? flat, worldWidth, worldHeight);
     };
 
+    /** The overlay layers in play, in the order they were handed over. */
+    const overlays = (): OverlayLayer[] =>
+      (latest.current.overlays ?? []).filter(
+        (one): one is OverlayLayer => !!one,
+      );
+
+    /** The overlay that owns a key, or null when no overlay drew it. */
+    const overlayFor = (key: string): OverlayLayer | null =>
+      overlays().find((one) => one.has(key)) ?? null;
+
     /** The placement key under the pointer, if any. Only the drawn layers are
      *  raycast: the terrain would answer flat, and nothing else is pickable. */
     const pick = (event: PointerEvent): string | null => {
       const rect = dom.getBoundingClientRect();
       const ndc = pointerNdc({ x: event.clientX, y: event.clientY }, rect);
       raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), handle.camera);
-      const overlay = latest.current.overlay;
-      const roots = overlay ? [layer.root, overlay.root] : [layer.root];
+      const roots = [layer.root, ...overlays().map((one) => one.root)];
       for (const hit of raycaster.intersectObjects(roots, true)) {
         const key = placementOf(hit.object);
         if (key) return key;
@@ -311,13 +328,14 @@ export function useMapEditing(deps: MapEditingDeps): void {
 
       // An overlay draws its own objects, so it is told about the drag rather
       // than having them moved out from under it.
-      if (latest.current.overlay?.has(key)) {
+      const owner = overlayFor(key);
+      if (owner) {
         drag = {
           key,
           from: pressed,
           origin,
           members: [],
-          overlay: true,
+          overlay: owner,
           moved: false,
           delta: { x: 0, z: 0 },
         };
@@ -341,7 +359,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
         from: pressed,
         origin,
         members,
-        overlay: false,
+        overlay: null,
         moved: false,
         delta: { x: 0, z: 0 },
       };
@@ -371,7 +389,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
       const at = groundPoint(event);
       if (!at) return;
       drag.delta = { x: at.x - drag.origin.x, z: at.z - drag.origin.z };
-      if (drag.overlay) latest.current.overlay?.drag(drag.key, drag.delta);
+      if (drag.overlay) drag.overlay.drag(drag.key, drag.delta);
       else carry(drag.delta);
     };
 
@@ -407,7 +425,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
       // Put back whatever the abandoned drag had moved. The next render of the
       // units layer would do it too, but only if the document changed.
       if (drag && !drag.overlay) carry({ x: 0, z: 0 });
-      if (drag?.overlay) latest.current.overlay?.drag(drag.key, { x: 0, z: 0 });
+      if (drag?.overlay) drag.overlay.drag(drag.key, { x: 0, z: 0 });
       if (band?.moved)
         latest.current.onDragGround?.(band.origin, band.to, "cancel");
       drag = null;
