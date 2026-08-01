@@ -138,9 +138,13 @@ export default function ScenarioEditPage() {
         </Button>
       </section>
 
-      {/* The editing surface, with the document's units drawn on it. The mode
-          strip that drives it, and the zones and paths, arrive in #758 onwards. */}
-      <ScenarioMapScene scenario={scenario} />
+      {/* The editing surface: the document's units drawn on the map, the mode
+          strip that places more, and the picking and dragging that moves them.
+          Zones and paths arrive in #759 onwards. */}
+      <ScenarioMapScene
+        scenario={scenario}
+        onChange={(next) => void persist(next)}
+      />
     </div>
   );
 }
