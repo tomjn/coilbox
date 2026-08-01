@@ -150,6 +150,31 @@ return {
       },
     },
     {
+      id = "reinforcement-wave",
+      enabled = true,
+      ["repeat"] = true,
+      cooldown = 60,
+      conditions = {
+        op = "all",
+        conditions = {
+          {
+            type = "var",
+            params = { name = "garrisonBuilt", op = "gte", value = 1 },
+          },
+        },
+      },
+      actions = {
+        {
+          type = "spawn_group",
+          params = { group = "reinforcements" },
+        },
+        {
+          type = "wake_group",
+          params = { group = "reinforcements" },
+        },
+      },
+    },
+    {
       id = "unlock",
       enabled = false,
       ["repeat"] = false,

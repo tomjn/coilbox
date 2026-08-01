@@ -109,8 +109,14 @@ describe("scenario fixture corpus", () => {
     const allPrefabs = fixtures.flatMap(({ scenario }) => scenario.prefabs);
     const allBuildings = allPrefabs.flatMap((p) => p.buildings);
     const allGroups = fixtures.flatMap(({ scenario }) => scenario.groups);
+    const allTriggers = fixtures.flatMap(({ scenario }) => scenario.triggers);
 
     const shapes: Record<string, boolean> = {
+      "a repeating trigger": allTriggers.some((t) => t.repeat),
+      "a trigger with a cooldown": allTriggers.some(
+        (t) => (t.cooldown ?? 0) > 0,
+      ),
+      "a trigger disarmed at start": allTriggers.some((t) => !t.enabled),
       "a prefab": allPrefabs.length > 0,
       "a prefab building with a factory queue": allBuildings.some(
         (b) => (b.queue?.length ?? 0) > 0,
