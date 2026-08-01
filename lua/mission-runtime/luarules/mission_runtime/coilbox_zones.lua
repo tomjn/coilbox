@@ -114,6 +114,9 @@ end
 --
 -- @param engine the trigger engine
 -- @param state the published mission state, GG.CoilboxMission
+-- @return the zones by id, with their corners the right way round, so anything
+--   else that has to work out where a zone is reads the same geometry these
+--   conditions do rather than parsing the shapes again
 function M.register(engine, state)
 	local function report(key, level, message)
 		engine:report(key, level, message)
@@ -128,11 +131,16 @@ function M.register(engine, state)
 		engineTeam[team.id] = team.team
 	end
 
-	--- Whether a unit is a mission anchor, which stands somewhere for the sake of
-	-- keeping its team's unit count above nothing and is in no zone as far as the
-	-- mission is concerned.
-	local function isAnchor(unitID)
-		return state.gameOver ~= nil and state.gameOver.isAnchor(unitID)
+	--- Whether a unit is one the runtime put on the map for its own reasons: an
+	-- anchor, which keeps its team's unit count above nothing, or a spotter, which
+	-- lights a revealed area. Neither is in any zone as far as the mission is
+	-- concerned, and a spotter stands in the middle of a zone by definition.
+	--
+	-- Read through `state` rather than taken once, because both are registered
+	-- after this module and the answer is only ever needed on a later frame.
+	local function placed(unitID)
+		return (state.gameOver ~= nil and state.gameOver.isAnchor(unitID))
+			or (state.reveal ~= nil and state.reveal.isSpotter(unitID))
 	end
 
 	--- The zone a condition names, or nil once it has said so.
@@ -173,7 +181,7 @@ function M.register(engine, state)
 			if not min and not max then
 				min = 1
 			end
-			return within(countIn(zone, allegiance, defSet(params.unitDefs), isAnchor), min, max)
+			return within(countIn(zone, allegiance, defSet(params.unitDefs), placed), min, max)
 		end,
 	})
 
@@ -221,7 +229,7 @@ function M.register(engine, state)
 	engine:addTick(function(ctx)
 		for _, entry in ipairs(watched) do
 			local held = heldSince[entry.zone.id]
-			if countIn(entry.zone, entry.allegiance, nil, isAnchor) > 0 then
+			if countIn(entry.zone, entry.allegiance, nil, placed) > 0 then
 				held[entry.team] = held[entry.team] or ctx.frame
 			else
 				held[entry.team] = false
@@ -238,6 +246,8 @@ function M.register(engine, state)
 			return ctx.frame - since >= (tonumber(params.seconds) or 0) * ctx.gameSpeed
 		end,
 	})
+
+	return zones
 end
 
 return M

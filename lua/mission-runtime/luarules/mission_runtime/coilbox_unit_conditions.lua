@@ -96,16 +96,21 @@ function M.register(engine, state)
 		end,
 	})
 
-	--- How many of a team's units are mission anchors rather than its own.
+	--- How many of a team's units the runtime put there rather than the mission:
+	-- anchors, which keep the engine from deciding a team with nothing left has
+	-- lost, and spotters, which light a revealed area.
 	--
-	-- An anchor is there to keep the engine from deciding a team with nothing
-	-- left has lost, and a mission asking "does the player have anything left"
-	-- has to get the answer it would have got without one.
-	local function anchors(team, defID)
-		if not state.gameOver then
-			return 0
+	-- A mission asking "does the player have anything left" has to get the answer
+	-- it would have got without either.
+	local function placed(team, defID)
+		local count = 0
+		if state.gameOver then
+			count = count + state.gameOver.anchorCount(team, defID)
 		end
-		return state.gameOver.anchorCount(team, defID)
+		if state.reveal then
+			count = count + state.reveal.spotterCount(team, defID)
+		end
+		return count
 	end
 
 	-- Polled: a team's holdings change with every death and every build, and an
@@ -123,11 +128,11 @@ function M.register(engine, state)
 				for _, name in ipairs(defs) do
 					local def = UnitDefNames[name]
 					if def then
-						count = count + Spring.GetTeamUnitDefCount(team, def.id) - anchors(team, def.id)
+						count = count + Spring.GetTeamUnitDefCount(team, def.id) - placed(team, def.id)
 					end
 				end
 			else
-				count = (Spring.GetTeamUnitCount(team) or 0) - anchors(team)
+				count = (Spring.GetTeamUnitCount(team) or 0) - placed(team)
 			end
 
 			return within(count, tonumber(params.min), tonumber(params.max))

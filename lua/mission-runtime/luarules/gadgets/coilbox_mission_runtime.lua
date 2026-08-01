@@ -126,6 +126,18 @@ if not DIALOGUE then
 	return false
 end
 
+local VIEW, viewError = includeTable("luarules/mission_runtime/coilbox_view.lua")
+if not VIEW then
+	log("error", viewError)
+	return false
+end
+
+local REVEAL, revealError = includeTable("luarules/mission_runtime/coilbox_reveal.lua")
+if not REVEAL then
+	log("error", revealError)
+	return false
+end
+
 -- Refuse a mission built for a newer runtime than the game vendored. Running it
 -- anyway would quietly drop whatever this version cannot read, and a mission
 -- that half works is harder to diagnose than one that refuses to start.
@@ -172,12 +184,16 @@ end
 -- Names the message the synced half sends its unsynced half when an actor has
 -- become a unit.
 local ACTOR_MESSAGE = "coilbox_mission_actor"
--- And the one that says a unit is an anchor, which the unsynced half hides.
-local ANCHOR_MESSAGE = "coilbox_mission_anchor"
--- And the two that reach the player rather than the game: a line of dialogue,
--- which the widget draws, and a sound, which the unsynced half plays outright.
+-- And the one that says a unit is the runtime's own -- an anchor or a spotter --
+-- which the unsynced half takes off this player's screen.
+local HIDDEN_MESSAGE = "coilbox_mission_hidden"
+-- And the four that reach the player rather than the game: a line of dialogue,
+-- which the widget draws, and a sound, a camera move and a map marker, which the
+-- unsynced half does outright.
 local DIALOGUE_MESSAGE = "coilbox_mission_dialogue"
 local SOUND_MESSAGE = "coilbox_mission_sound"
+local CAMERA_MESSAGE = "coilbox_mission_camera"
+local MARKER_MESSAGE = "coilbox_mission_marker"
 
 -- The global the widget registers on the widget handler to hear a line. A
 -- missing one is a no-op in the engine, so a game with no LuaUI, or a player who
@@ -238,6 +254,11 @@ if gadgetHandler:IsSyncedCode() then
 	-- True only inside the runtime's own Spring.CreateUnit, so the suppression
 	-- does not eat what the runtime just placed.
 	local spawning = false
+	-- True while the runtime is putting one of its own units on the map after the
+	-- start, or taking one off. A spotter is not something a team built and not
+	-- something it lost, so nothing about one reaches the triggers. The start
+	-- window is the same idea for everything the runtime places at game start.
+	local placing = false
 	local invulnerable = {}
 	local actorOfUnit = {}
 	-- The trigger engine, and the hooks its unit conditions want fed. Both are
@@ -249,6 +270,8 @@ if gadgetHandler:IsSyncedCode() then
 	local groups
 	-- What ends the mission, and what stops anything else ending it.
 	local gameOver
+	-- The reveals that are lit, and the spotters lighting them.
+	local reveal
 
 	--- Tell the triggers something happened.
 	--
@@ -260,7 +283,7 @@ if gadgetHandler:IsSyncedCode() then
 	-- in the replay, and a trigger that spawns a wave into a finished mission is
 	-- a mission that looks broken.
 	local function raise(name, payload)
-		if suppressing or not triggers or gameOver.isOver() then
+		if suppressing or placing or not triggers or gameOver.isOver() then
 			return
 		end
 		triggers:event(name, payload)
@@ -454,7 +477,9 @@ if gadgetHandler:IsSyncedCode() then
 			log = log,
 		})
 		unitHooks = UNIT_CONDITIONS.register(triggers, published)
-		ZONES.register(triggers, published)
+		-- The zone geometry is published as well as read, so anything else that has
+		-- to work out where a zone is reads the same corners the conditions do.
+		published.zones = ZONES.register(triggers, published)
 		-- Before the first frame, so a var is at the number its author gave it
 		-- from the first trigger that reads it.
 		published.vars = VARS.register(triggers, published)
@@ -486,12 +511,36 @@ if gadgetHandler:IsSyncedCode() then
 					-- Invulnerable through the same path an actor is, and hidden by
 					-- the unsynced half, which owns what this player's screen shows.
 					applyState(unitID, { invulnerable = true })
-					SendToUnsynced(ANCHOR_MESSAGE, unitID)
+					SendToUnsynced(HIDDEN_MESSAGE, unitID)
 				end
 				return unitID
 			end,
 		})
 		published.gameOver = gameOver
+		-- A revealed area is lit by a unit, because the engine has no call that
+		-- lights part of a map. It goes on and comes off mid-mission, so both ends
+		-- are wrapped in `placing`: a spotter is not a unit the team built and not
+		-- one it lost. After the game over, which is where the team it belongs to
+		-- and the def it is built from both come from.
+		reveal = REVEAL.register(triggers, published, {
+			spawn = function(placement)
+				placing = true
+				local unitID = create(placement)
+				if unitID then
+					applyState(unitID, { invulnerable = true })
+					SendToUnsynced(HIDDEN_MESSAGE, unitID)
+				end
+				placing = false
+				return unitID
+			end,
+			remove = function(unitID)
+				placing = true
+				Spring.DestroyUnit(unitID, false, true)
+				placing = false
+			end,
+			def = GAMEOVER.inertDef,
+		})
+		published.reveal = reveal
 		-- Saying a line and playing a sound are things the player sees and hears
 		-- rather than things that happen in the game, so synced Lua decides only
 		-- that they happened and the unsynced half takes it from there.
@@ -501,6 +550,16 @@ if gadgetHandler:IsSyncedCode() then
 			end,
 			sound = function(name)
 				SendToUnsynced(SOUND_MESSAGE, name)
+			end,
+		})
+		-- Pointing the camera and putting a label on the map are the same kind of
+		-- thing: the player's screen rather than the game.
+		published.view = VIEW.register(triggers, published, {
+			pan = function(x, z, seconds)
+				SendToUnsynced(CAMERA_MESSAGE, x, z, seconds)
+			end,
+			mark = function(x, z, text)
+				SendToUnsynced(MARKER_MESSAGE, x, z, text)
 			end,
 		})
 		published.triggers = triggers
@@ -561,7 +620,7 @@ if gadgetHandler:IsSyncedCode() then
 	-- Spring.CreateUnit, while the start window is open, which is what keeps a
 	-- team's placed units out of what that team has built.
 	function gadget:UnitFinished(unitID, unitDefID, unitTeam)
-		if suppressing then
+		if suppressing or placing then
 			return
 		end
 		unitHooks.finished(unitDefID, unitTeam)
@@ -594,6 +653,7 @@ if gadgetHandler:IsSyncedCode() then
 		invulnerable[unitID] = nil
 		groups.removed(unitID)
 		gameOver.removed(unitID)
+		reveal.removed(unitID)
 		local actor = actorOfUnit[unitID]
 		if actor then
 			actorOfUnit[unitID] = nil
@@ -628,10 +688,12 @@ else
 		end
 	end
 
-	--- Take an anchor off this player's screen. It exists to keep the team's unit
-	-- count above nothing and for no other reason, so it is drawn nowhere, on no
-	-- minimap, and cannot be selected -- not even by a select-all.
-	local function hideAnchor(unitID)
+	--- Take one of the runtime's own units off this player's screen. An anchor is
+	-- there to keep a team's unit count above nothing and a spotter to light a
+	-- revealed area, and neither is anything the player should see, so both are
+	-- drawn nowhere, on no minimap, and cannot be selected -- not even by a
+	-- select-all.
+	local function hide(unitID)
 		Spring.SetUnitNoDraw(unitID, true)
 		Spring.SetUnitNoMinimap(unitID, true)
 		Spring.SetUnitNoSelect(unitID, true)
@@ -651,13 +713,34 @@ else
 		end
 	end
 
+	--- Move the camera to a place on the map, over `seconds`.
+	--
+	-- A scenario carries no height, so the ground is read here, the way it is for
+	-- everything else the runtime puts somewhere.
+	local function panCamera(x, z, seconds)
+		Spring.SetCameraTarget(x, Spring.GetGroundHeight(x, z), z, seconds)
+	end
+
+	--- Put a labelled point on the map.
+	--
+	-- Local on purpose. Every client runs this half, so a marker sent the way a
+	-- player's own click sends one would be broadcast once per player and land on
+	-- the map that many times over.
+	local function addMarker(x, z, text)
+		Spring.MarkerAddPoint(x, Spring.GetGroundHeight(x, z), z, text, true)
+	end
+
 	--- Returns nothing: a true return would stop the message reaching the gadgets
 	-- behind this one, and their messages are not ours to swallow.
-	function gadget:RecvFromSynced(message, first, second)
+	function gadget:RecvFromSynced(message, first, second, third)
 		if message == ACTOR_MESSAGE then
 			actorBecame(first, second)
-		elseif message == ANCHOR_MESSAGE then
-			hideAnchor(first)
+		elseif message == HIDDEN_MESSAGE then
+			hide(first)
+		elseif message == CAMERA_MESSAGE then
+			panCamera(first, second, third)
+		elseif message == MARKER_MESSAGE then
+			addMarker(first, second, third)
 		elseif message == DIALOGUE_MESSAGE then
 			-- The panel is a widget, so the line goes on to LuaUI, which draws it
 			-- and plays its clip in step with the text. A game with no LuaUI, or a

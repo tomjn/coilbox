@@ -5,7 +5,7 @@ The Lua that plays a coilbox scenario inside the engine. It is coilbox-authored 
 ## Layout
 
 - `luarules/gadgets/coilbox_mission_runtime.lua`, the gadget. It gates on the modoption, loads the compiled mission, and hands it to the rest of the runtime.
-- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, and `coilbox_gameover.lua` how it ends. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` is pure as well, because saying a line is deciding that it was said and nothing more.
+- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, `coilbox_view.lua` where it points the player, `coilbox_reveal.lua` what it shows them, and `coilbox_gameover.lua` how it ends. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` and `coilbox_view.lua` are pure as well, because saying a line, moving a camera and dropping a marker are all deciding that the mission asked and nothing more.
 - `luaui/widgets/coilbox_mission_ui.lua`, the widget: the objectives panel, the dialogue panel, the debrief and the name over a named actor. `luaui/mission_ui/coilbox_panel_model.lua` is everything it decides before it draws, pure and tested outside the engine.
 - `missions/runtime.lua`, the version marker and capability table. Coilbox reads it out of an installed game to decide what the editor may offer.
 - `tests/`, checks that run outside the engine with `luajit`. Not part of what a game vendors.
@@ -27,10 +27,13 @@ GG.CoilboxMission = {
   actors  = <actor records by scenario id>,
   units   = <scenario actor id -> unitID, for the actors currently alive>,
   triggers = <the trigger engine, synced half only>,
+  zones   = <the scenario's zones, corners the right way round, synced half only>,
   vars    = <the mission's variables, synced half only>,
   groups  = <the scenario's groups, synced half only>,
   objectives = <the mission's objectives, synced half only>,
   dialogue = <what it says, synced half only>,
+  view    = <where it points the player, synced half only>,
+  reveal  = <what it shows them, synced half only>,
   gameOver = <what ends the mission, synced half only>,
 }
 ```
@@ -101,6 +104,48 @@ Membership is the engine's own spatial queries, `Spring.GetUnitsInRectangle` and
 Only the zone and team pairs a mission's `zone_held_for` conditions actually name are sampled, so a mission that asks for no holds costs nothing per tick.
 
 A hold is presence, not control. A team standing in a zone holds it whether or not anyone else is standing there too ([#802](https://github.com/tomjn/coilbox/issues/802)).
+
+The zones are published as well as read, so anything else that has to work out where a zone is, `reveal_area` for one, reads the same corners the conditions do rather than parsing the shapes again.
+
+## Revealing an area
+
+`reveal_area` lifts the fog over a zone for a participant, so a mission can show the player the base it is about to send them at. `seconds` is how long for, and no seconds is the rest of the mission. No team named means the team a human is playing, the same team a `victory` that names none is about.
+
+There is no engine call for it. Nothing in `LuaSyncedCtrl` grants sight over a region: `Spring.SetGlobalLos` is the whole map and per ally team, `Spring.SetUnitLosState` forces one unit's visibility and lifts no fog at all, and a feature emits no sight. The only thing in the engine that lights part of a map is a unit's own sight radius. So a reveal is a unit.
+
+That unit is a spotter, and it is [the anchor](#the-anchor)'s twin: the same def that does nothing at all, invulnerable, blocking nothing, earning nothing, drawn nowhere, and left out of the runtime's own counting. It differs in the two ways that matter for standing in someone else's base rather than in an empty corner. It has sight, ground and air, at the radius the zone needs. And every other ally team is pinned to never see it, with `Spring.SetUnitLosMask` and `Spring.SetUnitLosState`, so an enemy army does not spend the mission shooting at an invulnerable box.
+
+Two things follow from sight belonging to a unit, and neither is hidden:
+
+- It is a circle. A box zone is covered by the circle around its corners, so a reveal spills past them. Under-revealing would leave the thing the author drew the box around in the dark.
+- Terrain occludes it. Sight is a raycast from the spotter, so a ridge inside the zone shadows its far side, exactly as it would for a scout standing there. Air sight is granted at the same radius and is not occluded, so aircraft over the zone are seen wherever the ground is.
+
+- Revealing a zone that is already lit for that participant keeps the one spotter and takes the new deadline, so a repeating trigger lights a zone once rather than filling it with units, and the last reveal decides when the fog comes back.
+- A spotter goes on and comes off mid-mission, so neither is anything the triggers see: it is not a unit the team built and its going out is not a death. The start window does the same job for everything the runtime places at game start.
+- When it comes off, the fog closes over what it saw and the ground it explored stays explored, the same as when any other unit walks away.
+- A game with no def inert enough to be a spotter reveals nothing, and is told so.
+
+```lua
+GG.CoilboxMission.reveal.reveal("depot", "player", 30)
+GG.CoilboxMission.reveal.hide("depot", "player")
+```
+
+## Pointing the player
+
+`camera_pan` moves the camera to a place on the map, over `seconds`, defaulting to one second because a mission that teleports the camera has lost the player by the time they work out where it went. `map_marker` drops one of the map's own labelled points there, with the label the author wrote or none.
+
+Both are the player's screen rather than the game, so, like a line of dialogue, synced Lua decides only that the mission asked and the unsynced half does it. They are the unsynced half's rather than the widget's because neither needs a panel and neither queues behind anything: a player who had the widget switched off would otherwise get no markers.
+
+A marker is added locally. Every client runs that half, so a marker sent the way a player's own click sends one would be broadcast once per player and land on the map that many times over.
+
+A scenario carries no height, so the ground under the position is read by the unsynced half at the moment the camera moves or the marker lands.
+
+Neither action names a team. In a mission more than one person is playing, every player's camera moves and every player gets the marker ([#827](https://github.com/tomjn/coilbox/issues/827)).
+
+```lua
+GG.CoilboxMission.view.pan(500, 600, 2)
+GG.CoilboxMission.view.mark(500, 600, "Ambush!")
+```
 
 ## Vars
 
@@ -226,7 +271,9 @@ Anything that never changes, the widget reads out of the compiled mission itself
 
 Every one of those is written before the first frame, so a reader never finds one missing.
 
-The one exception is a line of dialogue, which is an event rather than a state: two lines in one frame would overwrite each other in a param, and the second half of an exchange is the half worth having. So the synced half sends it to its unsynced half, which passes it to LuaUI with `Script.LuaUI.CoilboxMissionDialogue(<line id>)`. A game with no LuaUI, or a player who has switched the widget off, gets no dialogue: the engine treats a call to a global nothing registered as doing nothing, and there is nowhere for a line to appear anyway. A sound is played by the unsynced half rather than passed on, because it has no conversation to queue behind.
+The exceptions are the things that happen rather than the things that are. A line of dialogue is one: two lines in one frame would overwrite each other in a param, and the second half of an exchange is the half worth having. So the synced half sends it to its unsynced half, which passes it to LuaUI with `Script.LuaUI.CoilboxMissionDialogue(<line id>)`. A game with no LuaUI, or a player who has switched the widget off, gets no dialogue: the engine treats a call to a global nothing registered as doing nothing, and there is nowhere for a line to appear anyway.
+
+A sound, a camera move and a map marker go to the unsynced half and stop there rather than going on to LuaUI. None of the three has a conversation to queue behind, none needs a panel, and a player with the widget switched off should still get their markers.
 
 The outcome is mirrored despite `Spring.GameOver` already carrying it, because LuaUI cannot read it back: the engine hands the winning ally teams to the `GameOver` callin and the stock widget handler calls a widget's `GameOver` with no arguments at all.
 
@@ -248,7 +295,7 @@ A game ends itself when an ally team has nothing left. The engine's own `game_en
 
 So each mission team a human is playing gets one anchor: a unit that is on the map for no other reason. The team is never empty, so nothing but the runtime decides the mission is over. This is the other half of the adoption contract, and it holds whether or not the vendoring game has added its guard to `Spring.GameOver`, because being spectated mid-mission is the damage even when nobody declares a winner.
 
-- The def is the first one the game has that does nothing at all: immobile, unarmed, builds nothing, and neither makes nor spends resources. Chosen by ascending def id, because a unit created on one machine and not another is a desync. A game with no such def gets no anchor, and is told what that costs.
+- The def is the first one the game has that does nothing at all: immobile, unarmed, builds nothing, and neither makes nor spends resources. Chosen by ascending def id, because a unit created on one machine and not another is a desync. A game with no such def gets no anchor, and is told what that costs. [A spotter](#revealing-an-area) is built from the same def, for the same reasons.
 - It is placed with everything else the runtime places, inside the start window, so no trigger sees it arrive and no team counts it as something it built. The engine clamps a creation into the map, so it stands in the corner.
 - It is invulnerable, blocks nothing, sees nothing, is stealthed, earns nothing, and the unsynced half draws it nowhere, puts it on no minimap and lets nothing select it.
 - The runtime's own counting skips it. `unit_count` takes it off a team's total and `units_in_zone` and `zone_held_for` leave it out, so a mission asking whether the player has anything left, or whether a zone is clear, gets the answer it would have got without an anchor. It still shows in that team's unit count in the game's own UI, which is the price.
@@ -266,6 +313,7 @@ GG.CoilboxMission.gameOver.defeat("player")
 - Files under `missions/` are data. They are read with an empty environment, so they may not call the engine or touch globals.
 - Files under `luarules/mission_runtime/` are code. They are read with the gadget's own environment, so they may call the engine, and a module that does not need to should not.
 - Adding a condition or action type means adding it to `missions/runtime.lua` and bumping `version` in the same change. A type that has shipped is never removed: a scenario asking for it would then silently do nothing.
+- Version 1 has not shipped to a game yet, so a type it declares and does not implement is a gap to close rather than a lie to version around. `unlock_unit` is the last one, and it waits on the runtime enforcing a scenario's restrictions ([#793](https://github.com/tomjn/coilbox/issues/793)).
 
 ## Tests
 
@@ -280,6 +328,8 @@ luajit lua/mission-runtime/tests/group_test.lua
 luajit lua/mission-runtime/tests/objective_test.lua
 luajit lua/mission-runtime/tests/gameover_test.lua
 luajit lua/mission-runtime/tests/dialogue_test.lua
+luajit lua/mission-runtime/tests/view_test.lua
+luajit lua/mission-runtime/tests/reveal_test.lua
 luajit lua/mission-runtime/tests/panel_test.lua
 luajit lua/mission-runtime/tests/mission_trigger_test.lua
 ```
