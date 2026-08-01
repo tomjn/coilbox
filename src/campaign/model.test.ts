@@ -83,6 +83,53 @@ describe("parseCampaignJson — map-preview fields", () => {
   });
 });
 
+describe("parseCampaignJson — unit-preview fields", () => {
+  it("leaves the unit fields undefined on legacy campaigns", () => {
+    const m = parseCampaignJson(campaignJson())!.missions[0];
+    expect(m.panoramaUnit).toBeUndefined();
+    expect(m.sideGraphicUnit).toBeUndefined();
+  });
+
+  it("parses a unit config with tuning", () => {
+    const m = parseCampaignJson(
+      campaignJson({
+        panoramaUnit: { unitDef: "armcom", spinSpeed: -2 },
+        sideGraphicUnit: { unitDef: "corcom" },
+      }),
+    )!.missions[0];
+    expect(m.panoramaUnit).toEqual({ unitDef: "armcom", spinSpeed: -2 });
+    expect(m.sideGraphicUnit).toEqual({
+      unitDef: "corcom",
+      spinSpeed: undefined,
+    });
+  });
+
+  it("drops a config naming no unit, and a non-numeric spinSpeed", () => {
+    const m = parseCampaignJson(
+      campaignJson({
+        panoramaUnit: { unitDef: "  " },
+        sideGraphicUnit: { unitDef: "corcom", spinSpeed: "fast" },
+      }),
+    )!.missions[0];
+    expect(m.panoramaUnit).toBeUndefined();
+    expect(m.sideGraphicUnit).toEqual({
+      unitDef: "corcom",
+      spinSpeed: undefined,
+    });
+  });
+
+  it("keeps the map preview when a document sets both sources", () => {
+    const m = parseCampaignJson(
+      campaignJson({
+        panoramaMap: { style: "textured" },
+        panoramaUnit: { unitDef: "armcom" },
+      }),
+    )!.missions[0];
+    expect(m.panoramaMap).toBeDefined();
+    expect(m.panoramaUnit).toBeUndefined();
+  });
+});
+
 describe("parseCampaignJson — media playback", () => {
   it("leaves playback undefined on legacy campaigns", () => {
     const m = parseCampaignJson(campaignJson())!.missions[0];

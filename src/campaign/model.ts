@@ -85,6 +85,21 @@ export interface MapPreviewConfig {
 }
 
 /**
+ * Per-slot spinning-unit configuration. When present on a mission's
+ * `panoramaUnit` / `sideGraphicUnit`, that slot renders one of the game's units
+ * as a slowly turning 3D model instead of its still image, so a briefing can
+ * show the unit the mission is about. The game is always the mission's
+ * `snapshot.gameName`, the way the map preview always uses `snapshot.mapName`.
+ */
+export interface UnitPreviewConfig {
+  /** The unit's internal def name, as the game's unit dataset lists it. */
+  unitDef: string;
+  /** Auto-orbit speed multiplier (1 = default, negative = reversed). Clamped to
+   *  0.25–4 on read. */
+  spinSpeed?: number;
+}
+
+/**
  * Optional author override for downloading a mission's map through the install
  * gate. Absent = best-effort by `snapshot.mapName` (works for most rapid /
  * springfiles / BAR maps); set these when the map's springname or search URL
@@ -123,6 +138,13 @@ export interface CampaignMission {
   panoramaMap?: MapPreviewConfig;
   /** When set, the side-graphic slot renders a live 3D map preview instead of `sideGraphic`. */
   sideGraphicMap?: MapPreviewConfig;
+  /**
+   * When set, the panorama slot renders a spinning 3D unit instead of `panorama`.
+   * Never set alongside `panoramaMap`: a slot has one source.
+   */
+  panoramaUnit?: UnitPreviewConfig;
+  /** When set, the side-graphic slot renders a spinning 3D unit instead of `sideGraphic`. */
+  sideGraphicUnit?: UnitPreviewConfig;
   /** Optional install-gate download override for the mission's map. */
   mapDownload?: MapDownloadHint;
   /**
@@ -232,6 +254,28 @@ function parseMapPreview(value: unknown): MapPreviewConfig | undefined {
   };
 }
 
+/**
+ * Narrow an unknown to a {@link UnitPreviewConfig}, or drop it (returns
+ * undefined). A config naming no unit is dropped: the editor holds that state
+ * while an author is still picking, but there is nothing to draw for it, so it
+ * is not worth storing.
+ *
+ * A campaign that carries one of these still exports at the plain container
+ * version (`transfer.ts`). An older build drops the field and renders the slot's
+ * image, or the gradient, which is what this campaign looked like before the
+ * author set a unit: a cosmetic loss, not a mission that plays differently.
+ */
+function parseUnitPreview(value: unknown): UnitPreviewConfig | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const p = value as Record<string, unknown>;
+  if (typeof p.unitDef !== "string" || p.unitDef.trim() === "")
+    return undefined;
+  return {
+    unitDef: p.unitDef,
+    spinSpeed: typeof p.spinSpeed === "number" ? p.spinSpeed : undefined,
+  };
+}
+
 /** Narrow an unknown to a {@link MapDownloadHint}, or drop it (returns undefined). */
 export function parseMapDownload(value: unknown): MapDownloadHint | undefined {
   if (typeof value !== "object" || value === null) return undefined;
@@ -323,6 +367,11 @@ export function parseCampaignJson(json: string): Campaign | null {
       scenario = parsed;
     }
     seen.add(m.id);
+    // A slot has one source, so a hand-edited document that sets both keeps the
+    // map preview and drops the unit. Everything downstream can then test the
+    // two in any order.
+    const panoramaMap = parseMapPreview(m.panoramaMap);
+    const sideGraphicMap = parseMapPreview(m.sideGraphicMap);
     missions.push({
       id: m.id,
       title: m.title,
@@ -337,8 +386,12 @@ export function parseCampaignJson(json: string): Campaign | null {
       voiceoverPlayback: parsePlayback(m.voiceoverPlayback),
       cutscene: parseImageRef(m.cutscene),
       cutscenePlayback: parsePlayback(m.cutscenePlayback),
-      panoramaMap: parseMapPreview(m.panoramaMap),
-      sideGraphicMap: parseMapPreview(m.sideGraphicMap),
+      panoramaMap,
+      sideGraphicMap,
+      panoramaUnit: panoramaMap ? undefined : parseUnitPreview(m.panoramaUnit),
+      sideGraphicUnit: sideGraphicMap
+        ? undefined
+        : parseUnitPreview(m.sideGraphicUnit),
       mapDownload: parseMapDownload(m.mapDownload),
       snapshot: m.snapshot as SkirmishDraft,
       scenario,
