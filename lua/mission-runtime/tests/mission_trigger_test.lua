@@ -64,6 +64,13 @@ check("the trigger it armed ran in the same pass",
 check("the var an earlier action set is what let it hold", state.vars.get("garrisonBuilt") == 1,
 	tostring(state.vars.get("garrisonBuilt")))
 
+-- The same var arms the wave, which is a repeating trigger with a cooldown, so
+-- the dormant group the mission gifts later is on the map from here.
+check("a repeating trigger the var armed spawned the dormant group",
+	#state.groups.units("reinforcements") == 2, #state.groups.units("reinforcements"))
+check("and woke it", state.groups.isAwake("reinforcements") == true)
+check("a repeating trigger stays armed", state.triggers:isEnabled("reinforcement-wave") == true)
+
 check("the mission's own units are not counted as built",
 	state.triggers:isEnabled("built-outpost") == true)
 
@@ -114,10 +121,15 @@ end
 check("after which the fog comes back", state.reveal.spotterCount(0) == 0,
 	state.reveal.spotterCount(0))
 
--- The mission gifts a dormant group it never spawned. Nothing to hand over, and
--- an author who forgot the spawn_group is told so rather than left wondering.
-check("gifting a group that was never spawned says so",
-	logged(engine, "group reinforcements has no units on the map to gift"))
+-- The capture's other action hands the wave's units to the garrison, and the
+-- group keeps them, so the mission can go on ordering the squad it gave away.
+--
+-- This is the ask, not the outcome. The stub always agrees; a real game may
+-- refuse a share between enemies, which is #857.
+local gifted = state.groups.units("reinforcements")
+check("gifting a group asks for its units on the team the trigger named",
+	#gifted == 2 and engine.units[gifted[1]].team == 1 and engine.units[gifted[2]].team == 1,
+	#gifted .. "/" .. tostring(gifted[1] and engine.units[gifted[1]].team))
 
 --------------------------------------------------------------------------------
 -- Ambush: an actor's health and its death.
