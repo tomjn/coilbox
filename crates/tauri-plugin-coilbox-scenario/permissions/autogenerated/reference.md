@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows the scenario plugin's storage, dialogue-media, compiled-mission read-back and write, mission-runtime install and test-mutator commands.
+Allows the scenario plugin's storage, dialogue-media, file export and import, compiled-mission read-back and write, mission-runtime install and test-mutator commands.
 
 #### This default permission set includes the following:
 
@@ -11,6 +11,8 @@ Allows the scenario plugin's storage, dialogue-media, compiled-mission read-back
 - `allow-scenario-media-delete`
 - `allow-scenario-media-read`
 - `allow-scenario-media-write`
+- `allow-scenario-export`
+- `allow-scenario-import`
 - `allow-scenario-read-mission`
 - `allow-scenario-runtime-install`
 - `allow-scenario-runtime-status`
@@ -48,6 +50,58 @@ Enables the scenario_delete command without any pre-configured scope.
 <td>
 
 Denies the scenario_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:allow-scenario-export`
+
+</td>
+<td>
+
+Enables the scenario_export command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:deny-scenario-export`
+
+</td>
+<td>
+
+Denies the scenario_export command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:allow-scenario-import`
+
+</td>
+<td>
+
+Enables the scenario_import command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:deny-scenario-import`
+
+</td>
+<td>
+
+Denies the scenario_import command without any pre-configured scope.
 
 </td>
 </tr>

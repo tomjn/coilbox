@@ -271,6 +271,28 @@ async fn scenario_media_write<R: Runtime>(
     }
 }
 
+/// `scenario_export`, writing a caller-serialized scenario export file to a
+/// caller-chosen path. Opaque: the frontend builds the container text
+/// (`src/scenario/transfer.ts`) and picks the destination with the save dialog,
+/// so this only writes bytes. Mirrors `campaign_export`.
+#[tauri::command]
+async fn scenario_export(text: String, dest: String) -> CliResult {
+    match std::fs::write(&dest, text) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(format!("could not write scenario export: {e}")),
+    }
+}
+
+/// `scenario_import`, reading a scenario file the user picked and handing its raw
+/// text back for the frontend to decode through the container reader.
+#[tauri::command]
+async fn scenario_import(src: String) -> CliResult {
+    match std::fs::read_to_string(&src) {
+        Ok(text) => CliResult::ok(json!({ "text": text })),
+        Err(e) => CliResult::err(format!("could not read scenario import: {e}")),
+    }
+}
+
 /// `scenario_read_mission`, evaluating a compiled `mission.lua` under `root` and
 /// handing back the table it built.
 ///
@@ -499,6 +521,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_media_delete,
             scenario_media_read,
             scenario_media_write,
+            scenario_export,
+            scenario_import,
             scenario_read_mission,
             scenario_runtime_install,
             scenario_runtime_status,
