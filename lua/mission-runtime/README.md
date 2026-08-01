@@ -5,7 +5,7 @@ The Lua that plays a coilbox scenario inside the engine. It is coilbox-authored 
 ## Layout
 
 - `luarules/gadgets/coilbox_mission_runtime.lua`, the gadget. It gates on the modoption, loads the compiled mission, and hands it to the rest of the runtime.
-- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, and `coilbox_vars.lua` the mission's variables. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out.
+- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, and `coilbox_groups.lua` its groups. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out.
 - `missions/runtime.lua`, the version marker and capability table. Coilbox reads it out of an installed game to decide what the editor may offer.
 - `tests/`, checks that run outside the engine with `luajit`. Not part of what a game vendors.
 
@@ -27,6 +27,7 @@ GG.CoilboxMission = {
   units   = <scenario actor id -> unitID, for the actors currently alive>,
   triggers = <the trigger engine, synced half only>,
   vars    = <the mission's variables, synced half only>,
+  groups  = <the scenario's groups, synced half only>,
 }
 ```
 
@@ -36,7 +37,8 @@ GG.CoilboxMission = {
 
 The runtime takes over the start rather than sharing it, so a mission plays the same wherever it was launched from:
 
-- `GameStart`: every actor is created at the ground height under its position, and each team's `startUnits` are placed in a square grid on that team's engine start position. Actors are addressable afterwards through `GG.CoilboxMission.units`.
+- `GameStart`: every actor is created at the ground height under its position, each prefab's buildings at their origin plus their own offset, each team's `startUnits` in a square grid on that team's engine start position, and last every group the scenario does not call `dormant`. Actors are addressable afterwards through `GG.CoilboxMission.units`, groups through `GG.CoilboxMission.groups`. Groups are placed last so one ordered to guard an actor has something to guard.
+- A building is put through `Spring.Pos2BuildPos` on the way. `Spring.CreateUnit` does not snap, and a base a few elmos off the build grid cannot be rebuilt where it stood and sits at the wrong height on a slope. That call answers with the height a builder would have used, so it replaces the ground read for buildings.
 - Game frame 1: every mission team's bank is set to its `resources`, defaulting to nothing. This is how the normal starting resources are suppressed. `income` is then paid in every frame, spread over the second it is quoted per.
 - A team whose scenario entry sets `noCommander` has anything the game spawns for it removed, from load until the end of game frame 1. Only creations with no builder are touched, so nothing anyone has begun building is affected.
 
@@ -113,6 +115,53 @@ GG.CoilboxMission.vars.set("alertLevel", 3)
 GG.CoilboxMission.vars.add("kills", 1)
 ```
 
+## Groups
+
+A group is a block of units spawned and ordered together under one id: a raiding party, a reinforcement wave, a garrison. The scenario says what is in it, where it lands, what it does, and whether it is there from the start. A group's `units` are counts by def, which is what the editor draws, so the runtime expands them in the order the scenario lists them and places the block in a square grid on the group's own position.
+
+A group has two states, and both actions earn their keep:
+
+- On the map or not. A group the scenario does not call `dormant` is placed at game start. A dormant one waits for `spawn_group`.
+- Awake or asleep. Asleep is a group standing there on hold position: its units exist, defend themselves, and do not wander off before the mission says so. Awake is a group running its orders.
+
+So a dormant garrison is `spawn_group` when the mission wants it standing there and `wake_group` when it wants it moving, and a reinforcement wave is `wake_group` on its own, which spawns it and sends it off in one action.
+
+- `spawn_group` places a group unless it already has units standing, so a trigger that fires twice does not double it and a wiped group can be sent again. It leaves the group as asleep or awake as it found it.
+- `wake_group` runs the group's authored orders, placing it first if it is not on the map. "Wake the reinforcements" with nothing to wake would say nothing and do nothing.
+- `give_orders` replaces a group's orders and wakes it, because a group told to move that stands there holding position is a mission that looks broken and reports nothing. It does not place one: ordering units nothing asked for is not what the author wrote.
+- `gift_units` hands a group's units to another participant, as a gift rather than a capture. The group keeps them, so the mission can go on ordering a squad it gave the player.
+- An action aimed at a group with nothing on the map is reported once. That is what a mission that forgot its `spawn_group` looks like.
+
+A game's own actions, and the rest of the runtime, drive a group through that handle rather than around it, so the roll of who is still standing stays right:
+
+```lua
+GG.CoilboxMission.groups.units("raiders")     -- its units that are alive
+GG.CoilboxMission.groups.isAwake("raiders")
+GG.CoilboxMission.groups.spawn("raiders")
+GG.CoilboxMission.groups.wake("raiders")
+GG.CoilboxMission.groups.orders("raiders", { { kind = "move", waypoints = { { x = 0, z = 0 } } } })
+GG.CoilboxMission.groups.gift("raiders", "player")
+```
+
+Sleep is the move state and nothing else. Each unit's own move state is read back before it is put on hold, so waking hands back the game's default for that unit type rather than guessing at one. Fire state is left alone: a garrison that will not defend itself is a stranger thing than one that will.
+
+### Orders
+
+An order list is one queue. The first command replaces whatever the unit was doing and the rest queue behind it, which is what a player holding shift through a path gets. Every unit in the group is given the same queue.
+
+- `move`, `patrol` and `fight` are one command per waypoint. A scenario carries no height, so the ground is read at the moment the order is given.
+- `patrol` is the engine's own. Giving the first patrol point to a unit with an empty queue makes the engine close the loop back to where the unit is standing, so a group patrols between its spawn and the points the author drew, exactly as it would if a player had shift-clicked them.
+- `guard` is one command and no more. Guarding never finishes, so a second queued guard would never come up. A guard on a group names one of its units.
+- `attack` is one command per unit in the target, which is what shift-attacking a squad gives a player and what lets a group work through what it was pointed at.
+
+A target is an actor id or a group id, one name space, because the editor offers the author one list. A declared actor that has died, or a group that has been wiped, is a target that is not there rather than a name the mission got wrong, so only an undeclared name is reported.
+
+## Prefab bases
+
+A prefab is a base the author drags around as one piece, so its buildings are stored as offsets from an origin and resolved against it at game start. A building carries its own facing, and a factory carries the `queue` it starts with and whether it `repeat`s.
+
+A build order is the negative of the unit def id. The engine reads the shift and control keys on one as "five of these" and "twenty of these", so each is given with no options at all and appends exactly one unit. Build orders always append, so nothing clears the queue either. `repeat` goes last and needs its 0-or-1 parameter, and the engine refuses it outright for a factory whose def cannot repeat, which is the game's decision rather than the mission's.
+
 ## Conventions
 
 - Everything vendored is named `coilbox_*` so a game maintainer can see at a glance which files came from here.
@@ -130,6 +179,7 @@ luajit lua/mission-runtime/tests/start_test.lua
 luajit lua/mission-runtime/tests/trigger_test.lua
 luajit lua/mission-runtime/tests/zone_test.lua
 luajit lua/mission-runtime/tests/var_test.lua
+luajit lua/mission-runtime/tests/group_test.lua
 luajit lua/mission-runtime/tests/mission_trigger_test.lua
 ```
 

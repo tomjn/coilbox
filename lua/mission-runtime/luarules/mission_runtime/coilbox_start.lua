@@ -10,8 +10,8 @@ local M = {}
 -- Spring's four facings, and the one a unit gets when the scenario does not say.
 local DEFAULT_FACING = 0
 
--- Gap between a team's start units, in elmos. Two medium units placed this far
--- apart do not spawn inside each other.
+-- Gap between units the runtime places as a block, in elmos. Two medium units
+-- placed this far apart do not spawn inside each other.
 local START_UNIT_SPACING = 64
 
 local function sortedKeys(map)
@@ -138,6 +138,83 @@ function M.placements(mission, plan, startPositions)
 					x = origin.x + offsets[i].x,
 					z = origin.z + offsets[i].z,
 					facing = DEFAULT_FACING,
+				}
+			end
+		end
+	end
+
+	return placements, problems
+end
+
+--- The units one group puts on the map, in a grid on the group's own position.
+--
+-- A group's `units` are counts by def, because that is what the editor draws.
+-- The runtime wants one placement each, so they are expanded in the order the
+-- scenario lists them and the same group spawns the same block every time.
+--
+-- @param group one entry from the mission's `groups`
+-- @param team the engine team number the group belongs to
+-- @return array of placements
+function M.groupPlacements(group, team)
+	local defs = {}
+	for _, entry in ipairs(group.units or {}) do
+		local count = math.floor(tonumber(entry.count) or 0)
+		for _ = 1, count do
+			defs[#defs + 1] = entry.def
+		end
+	end
+
+	local offsets = M.gridOffsets(#defs, START_UNIT_SPACING)
+	local placements = {}
+	for i, unitDef in ipairs(defs) do
+		placements[i] = {
+			group = group.id,
+			unitDef = unitDef,
+			team = team,
+			x = group.pos.x + offsets[i].x,
+			z = group.pos.z + offsets[i].z,
+			facing = DEFAULT_FACING,
+		}
+	end
+	return placements
+end
+
+--- Every prefab's buildings, as placements in map coordinates.
+--
+-- A prefab is a base the author drags around as one piece, so its buildings are
+-- stored as offsets from an origin and resolved against it here. A factory's
+-- `queue` and its `repeat` flag ride along on the placement, because only the
+-- caller can talk to a factory once it exists.
+--
+-- @param mission the compiled mission table
+-- @param plan the result of teamPlan
+-- @return array of placements, array of problems to log
+function M.prefabPlacements(mission, plan)
+	local teamById = {}
+	for _, team in ipairs(plan) do
+		teamById[team.id] = team
+	end
+
+	local placements, problems = {}, {}
+
+	for _, prefab in ipairs((mission or {}).prefabs or {}) do
+		local team = teamById[prefab.team]
+		if not team then
+			problems[#problems + 1] = string.format(
+				"prefab %s belongs to team %s, which the mission has no engine team for",
+				tostring(prefab.id), tostring(prefab.team))
+		else
+			for _, building in ipairs(prefab.buildings or {}) do
+				placements[#placements + 1] = {
+					prefab = prefab.id,
+					unitDef = building.def,
+					team = team.team,
+					x = prefab.origin.x + building.offset.x,
+					z = prefab.origin.z + building.offset.z,
+					facing = building.facing or DEFAULT_FACING,
+					queue = building.queue,
+					-- `repeat` is a Lua keyword, so the compiled mission quotes it.
+					repeatQueue = building["repeat"] == true,
 				}
 			end
 		end
