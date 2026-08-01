@@ -78,7 +78,7 @@ import {
   setScenarioGame,
   setScenarioMap,
 } from "./setup";
-import { startsSummary } from "./teams";
+import { startsSummary, startUnitDefs } from "./teams";
 import { useGameUnits } from "./useGameUnits";
 
 /**
@@ -237,8 +237,15 @@ export function SetupPanel({
 
   /* ---- The three changes that cost something. ---- */
 
+  // A team's start units have no position, so they are not placements, but they
+  // are still unit defs the new game has to have.
   const placedDefs = useMemo(
-    () => placementDefs(scenarioPlacements(scenario)),
+    () => [
+      ...new Set([
+        ...placementDefs(scenarioPlacements(scenario)),
+        ...startUnitDefs(scenario),
+      ]),
+    ],
     [scenario],
   );
   const carriesCoordinates =
@@ -654,6 +661,9 @@ function ParticipantRemovalNotice({
       held.actors > 0 && count(held.actors, "actor"),
       held.groups > 0 && count(held.groups, "group"),
       held.prefabs > 0 && count(held.prefabs, "base"),
+      // Listed rather than only explained below, because a participant whose
+      // only holding is a start used to read as owning nothing at all.
+      held.team && "a start",
     ].filter((part): part is string => !!part),
   );
 
