@@ -176,6 +176,28 @@ export const scenarioWriteMission = defineCommand<
   { dir: string; media: string[] }
 >("coilbox-scenario", "scenario_write_mission");
 
+/**
+ * The compiled mission folders in the loose game at `root`, sorted. Every launch
+ * into a game that vendors the runtime writes one and leaves it there, so this
+ * is what a game has accumulated. Folders only: the runtime's own `runtime.lua`
+ * and the game's `extensions.lua` are files and are never listed.
+ */
+export const scenarioListMissions = defineCommand<
+  { root: string },
+  { missions: string[] }
+>("coilbox-scenario", "scenario_list_missions");
+
+/**
+ * Remove one `missions/<scenarioId>/` from the loose game at `root`, dialogue
+ * clips and all. The undo for {@link scenarioWriteMission}: the runtime the game
+ * vendors stays, and only a folder is ever removed. Fails on a packaged
+ * `.sd7`/`.sdz`, which coilbox never wrote into.
+ */
+export const scenarioDeleteMission = defineCommand<
+  { root: string; scenarioId: string },
+  Record<string, never>
+>("coilbox-scenario", "scenario_delete_mission");
+
 /** Best-effort removal of a stored dialogue clip. */
 export const scenarioMediaDelete = defineCommand<
   { scenarioId: string; file: string },

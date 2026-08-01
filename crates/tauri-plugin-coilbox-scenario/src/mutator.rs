@@ -77,6 +77,42 @@ pub fn mission_dir(dir: &Path, scenario_id: &str) -> PathBuf {
     dir.join(MISSIONS).join(scenario_id)
 }
 
+/// Every compiled mission folder in a game archive, sorted.
+///
+/// A launch into a game that vendors the runtime writes one and leaves it there,
+/// so this is how a player finds out what has accumulated (issue #814). Only
+/// directories are listed, which is what leaves the runtime's own
+/// `missions/runtime.lua` and the game's `missions/extensions.lua` out: they are
+/// files, and neither is a mission.
+pub fn list_missions(dir: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(dir.join(MISSIONS)) else {
+        return Vec::new();
+    };
+    let mut found: Vec<String> = entries
+        .flatten()
+        .filter(|entry| entry.path().is_dir())
+        .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
+        .filter(|name| !name.starts_with('.'))
+        .collect();
+    found.sort();
+    found
+}
+
+/// Remove one compiled mission folder, leaving everything else under
+/// `missions/` alone.
+///
+/// A name that is not a folder is left where it is rather than removed, so the
+/// runtime a game vendors can never be taken out through here even if a caller
+/// asks for it by name. A folder that is already gone is not an error: the
+/// caller wanted it gone.
+pub fn remove_mission(dir: &Path, scenario_id: &str) -> Result<(), String> {
+    let path = mission_dir(dir, scenario_id);
+    if !path.is_dir() {
+        return Ok(());
+    }
+    std::fs::remove_dir_all(&path).map_err(|e| format!("could not remove {}: {e}", path.display()))
+}
+
 /// Copy a scenario's stored dialogue clips in beside its compiled mission.
 ///
 /// The document references them by bare file name, because that is how the
@@ -194,5 +230,62 @@ mod tests {
         let dest = tempfile::tempdir().expect("tempdir");
         let copied = copy_media(Path::new("/no/such/media"), dest.path()).expect("copy");
         assert!(copied.is_empty());
+    }
+
+    /// A game with a runtime and two launches behind it: the two missions are
+    /// listed, and the runtime's own files are not.
+    #[test]
+    fn only_mission_folders_are_listed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        write_file(&mission_dir(dir.path(), "b-scen").join("mission.lua"), "b").expect("write");
+        write_file(&mission_dir(dir.path(), "a-scen").join("mission.lua"), "a").expect("write");
+        write_file(&dir.path().join("missions/runtime.lua"), "return {}").expect("write");
+        write_file(&dir.path().join("missions/extensions.lua"), "return {}").expect("write");
+
+        assert_eq!(list_missions(dir.path()), vec!["a-scen", "b-scen"]);
+    }
+
+    #[test]
+    fn a_game_with_no_missions_folder_lists_none() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        assert!(list_missions(dir.path()).is_empty());
+    }
+
+    /// Removing one mission takes its dialogue clips with it and leaves the
+    /// runtime, the game's own declarations and every other mission alone.
+    #[test]
+    fn removing_a_mission_leaves_the_runtime_and_the_rest() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        write_file(&mission_dir(dir.path(), "gone").join("mission.lua"), "x").expect("write");
+        write_file(&mission_dir(dir.path(), "gone").join("voice.ogg"), "clip").expect("write");
+        write_file(&mission_dir(dir.path(), "stays").join("mission.lua"), "y").expect("write");
+        write_file(&dir.path().join("missions/runtime.lua"), "return {}").expect("write");
+
+        remove_mission(dir.path(), "gone").expect("remove");
+
+        assert!(!mission_dir(dir.path(), "gone").exists());
+        assert!(mission_dir(dir.path(), "stays")
+            .join("mission.lua")
+            .exists());
+        assert!(dir.path().join("missions/runtime.lua").exists());
+    }
+
+    /// The runtime marker is a file, so asking for it by name removes nothing.
+    /// The command's own id check already refuses the name, this is the second
+    /// lock on the same door.
+    #[test]
+    fn a_file_under_missions_is_never_removed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        write_file(&dir.path().join("missions/runtime.lua"), "return {}").expect("write");
+
+        remove_mission(dir.path(), "runtime.lua").expect("remove");
+
+        assert!(dir.path().join("missions/runtime.lua").exists());
+    }
+
+    #[test]
+    fn removing_a_mission_that_is_already_gone_is_fine() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        remove_mission(dir.path(), "never-here").expect("remove");
     }
 }

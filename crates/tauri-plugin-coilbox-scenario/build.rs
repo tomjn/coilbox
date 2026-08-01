@@ -15,6 +15,8 @@ const COMMANDS: &[&str] = &[
     "scenario_read_mission",
     "scenario_runtime_install",
     "scenario_runtime_status",
+    "scenario_list_missions",
+    "scenario_delete_mission",
     "scenario_test_mutator",
     "scenario_write_mission",
 ];

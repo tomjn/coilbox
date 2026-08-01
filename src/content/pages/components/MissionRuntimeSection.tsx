@@ -1,5 +1,5 @@
 import { Button, cn } from "@picoframe/frame";
-import { ChevronRight, Download, Loader2 } from "lucide-react";
+import { ChevronRight, Download, Loader2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/collapsible";
 import {
   type RuntimeMarker,
+  scenarioDeleteMission,
+  scenarioListMissions,
   scenarioRuntimeInstall,
   scenarioRuntimeStatus,
 } from "@/scenario/bindings";
@@ -23,7 +25,9 @@ import {
   type RuntimeInstallState,
   runtimeInstallState,
 } from "@/scenario/install";
+import { type GameMission, gameMissions } from "@/scenario/missions";
 import { mutatorOffer } from "@/scenario/offer";
+import { useScenarios } from "@/scenario/scenarios";
 import type { GameItem } from "../../bindings";
 import { isSdd } from "../../format";
 
@@ -177,6 +181,133 @@ function CapabilityPanel({
   );
 }
 
+/** One mission folder: what it is called, and where it came from. */
+function MissionRow({
+  mission,
+  busy,
+  onRemove,
+}: {
+  mission: GameMission;
+  busy: boolean;
+  onRemove: () => void;
+}) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <span className={cn("truncate text-sm", !mission.name && "font-mono")}>
+          {mission.name ?? mission.id}
+        </span>
+        {mission.ours && !mission.name && (
+          <Badge variant="outline" className="text-[10px]">
+            no scenario here any more
+          </Badge>
+        )}
+        {!mission.ours && (
+          <Badge variant="secondary" className="text-[10px]">
+            the game's own
+          </Badge>
+        )}
+      </div>
+      {mission.ours && (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          onClick={onRemove}
+        >
+          {busy ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Trash2 className="size-4" />
+          )}
+          Remove
+        </Button>
+      )}
+    </li>
+  );
+}
+
+/**
+ * The missions coilbox has written into this game, and a way to take them back
+ * out (issue #814).
+ *
+ * Launching a scenario here writes `missions/<scenario id>/` and nothing has
+ * ever removed it, so a game a player tests against collects a folder per
+ * scenario, and one whose scenario was deleted since is still launchable by
+ * hand. The game's own missions are listed beside them but carry no Remove
+ * button: they are the game's content, and coilbox did not put them there.
+ */
+function WrittenMissions({ root }: { root: string }) {
+  const { scenarios } = useScenarios();
+  const [folders, setFolders] = useState<string[]>([]);
+  const [removing, setRemoving] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    scenarioListMissions({ root })
+      .then(({ missions }) => {
+        if (!cancelled) setFolders(missions);
+      })
+      .catch(() => {
+        // A game whose missions cannot be listed simply shows none. There is
+        // nothing here a player has to be told about.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [root]);
+
+  const missions = gameMissions(folders, scenarios);
+  if (missions.length === 0) return null;
+
+  const ours = missions.filter((m) => m.ours).length;
+  const headline =
+    ours > 0
+      ? `Coilbox has written ${ours} mission${ours === 1 ? "" : "s"} into this game`
+      : `This game ships ${missions.length} mission${missions.length === 1 ? "" : "s"} of its own`;
+
+  const remove = async (mission: GameMission) => {
+    setRemoving(mission.id);
+    try {
+      await scenarioDeleteMission({ root, scenarioId: mission.id });
+      setFolders((current) => current.filter((id) => id !== mission.id));
+      toast.success(`Removed ${mission.name ?? mission.id} from the game.`);
+    } catch (e) {
+      toast.error(msg(e));
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  return (
+    <Collapsible className="border-t border-border/50 pt-3">
+      <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-1 text-left text-sm text-muted-foreground hover:text-foreground">
+        <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+        {headline}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <p className="mt-3 max-w-prose text-sm text-muted-foreground">
+          Testing a scenario here leaves its compiled mission in the game
+          folder. Removing one takes the folder and its dialogue clips, and
+          nothing else. The mission runtime stays, and testing that scenario
+          again writes it back.
+        </p>
+        <ul className="mt-3 flex flex-col gap-2">
+          {missions.map((mission) => (
+            <MissionRow
+              key={mission.id}
+              mission={mission}
+              busy={removing === mission.id}
+              onRemove={() => remove(mission)}
+            />
+          ))}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 /**
  * What a packaged `.sd7`/`.sdz` gets in place of the install action: why the
  * runtime cannot go into it, and the test mutator coilbox generates instead.
@@ -309,6 +440,7 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
           installed={installed}
           available={available}
         />
+        <WrittenMissions root={root} />
       </div>
       {error && <p className="break-words text-sm text-destructive">{error}</p>}
     </section>
