@@ -3,10 +3,11 @@
  *
  * Every field is built from the parameter's entry in `triggerTypes.ts` rather
  * than from the name of the type it belongs to, so a condition or action added
- * to that table arrives with a form and no change here. A type coilbox has never
- * heard of, which a game's `missions/extensions.lua` may declare, has no entry to
- * build a form from, so its parameters are shown as they are and kept as they
- * are rather than being dropped.
+ * to that table arrives with a form and no change here. A game's own types
+ * arrive the same way: `missions/extensions.lua` declares the same parameter
+ * shape, and `stepTypes` hands the two over as one table (#776). A type neither
+ * declares has no entry to build a form from, so its parameters are shown as
+ * they are and kept as they are rather than being dropped.
  *
  * The rule the whole panel exists for: a parameter that names something in the
  * document is a dropdown over that registry. A zone is picked, never typed, so
@@ -30,6 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import type { ExtensionTypes } from "../../extensions";
 import type { Point, Scenario, ScenarioParam, TriggerStep } from "../../model";
 import type { ParamSpec } from "../../triggerTypes";
 import { OrderRow } from "./GroupControls";
@@ -90,6 +92,7 @@ export function StepRow({
   step,
   at,
   scenario,
+  extensions,
   units,
   unitsLoading,
   picking,
@@ -102,6 +105,8 @@ export function StepRow({
   /** Where this step sits, which is what a point pick is written back to. */
   at: StepRef;
   scenario: Scenario;
+  /** The types the scenario's game declares for itself. */
+  extensions: ExtensionTypes;
   units: UnitDatasetEntry[];
   unitsLoading: boolean;
   /** What the map is being asked for, or null when it is not waiting. */
@@ -113,13 +118,13 @@ export function StepRow({
   onMove: ((delta: number) => void) | null;
   onRemove: () => void;
 }) {
-  const spec = stepTypes(at.list)[step.type];
+  const spec = stepTypes(at.list, extensions)[step.type];
 
   return (
     <li className="rounded-md border border-border/60 bg-muted/20 p-2">
       <div className="flex items-center gap-1.5">
         <span className="min-w-0 flex-1 truncate text-xs font-medium">
-          {stepLabel(step.type)}
+          {stepLabel(step.type, extensions)}
         </span>
         {!spec && (
           <span
@@ -155,7 +160,7 @@ export function StepRow({
           size="sm"
           variant="ghost"
           className="size-7 p-0 text-destructive hover:text-destructive"
-          aria-label={`Remove ${stepLabel(step.type)}`}
+          aria-label={`Remove ${stepLabel(step.type, extensions)}`}
           onClick={onRemove}
         >
           <X className="size-3.5" />
@@ -172,7 +177,7 @@ export function StepRow({
               name={name}
               spec={param}
               value={step.params[name]}
-              type={step.type}
+              typeLabel={stepLabel(step.type, extensions)}
               at={at}
               scenario={scenario}
               units={units}
@@ -204,29 +209,40 @@ export function StepRow({
  * There are two reasons, and the runtime's comes first because it is the one the
  * author cannot fix by editing the document: the target runtime does not
  * implement the type (#765), or its references have nothing to point at yet.
+ *
+ * A type the game declares itself (#776) is offered on the same footing as
+ * coilbox's own, and is never gated: the game implements it, so the game can run
+ * it. What it looks like is the game's to say, so its declared description is
+ * shown where a built-in type shows its parameter names.
  */
 export function AddStep({
   list,
   scenario,
+  extensions,
   unitDefs,
   gate,
   onAdd,
 }: {
   list: StepList;
   scenario: Scenario;
+  /** The types the scenario's game declares for itself. */
+  extensions: ExtensionTypes;
   unitDefs: string[];
   /** Why each type the target runtime cannot run is unavailable, by type name. */
   gate: Record<string, string>;
   onAdd: (step: TriggerStep) => void;
 }) {
-  const table = stepTypes(list);
+  const table = stepTypes(list, extensions);
+  const declared =
+    list === "conditions" ? extensions.conditions : extensions.actions;
   const options = Object.entries(table).map(([type, spec]) => {
     const defaults = stepDefaults(spec, { scenario, unitDefs });
     const reason = gate[type] ?? defaults.needs;
     return {
       value: type,
-      label: stepLabel(type),
-      description: Object.keys(spec).join(", ") || undefined,
+      label: stepLabel(type, extensions),
+      description:
+        declared[type]?.description ?? (Object.keys(spec).join(", ") || undefined),
       trailing: reason,
       disabled: reason !== undefined,
     };
@@ -239,7 +255,7 @@ export function AddStep({
       placeholder={list === "conditions" ? "Add a condition" : "Add an action"}
       options={options}
       onValueChange={(type) => {
-        if (gate[type]) return;
+        if (gate[type] || !table[type]) return;
         const defaults = stepDefaults(table[type], { scenario, unitDefs });
         if (defaults.params) onAdd({ type, params: defaults.params });
       }}
@@ -256,7 +272,7 @@ function ParamField({
   name,
   spec,
   value,
-  type,
+  typeLabel,
   at,
   scenario,
   units,
@@ -269,8 +285,8 @@ function ParamField({
   name: string;
   spec: ParamSpec;
   value: ScenarioParam | undefined;
-  /** The step's type, for naming the control. */
-  type: string;
+  /** What the step's type is called, for naming the control. */
+  typeLabel: string;
   at: StepRef;
   scenario: Scenario;
   units: UnitDatasetEntry[];
@@ -279,7 +295,7 @@ function ParamField({
   onPick: (target: PointTarget | null) => void;
   onChange: (value: ScenarioParam | undefined) => void;
 }) {
-  const label = `${stepLabel(type)} ${name}`;
+  const label = `${typeLabel} ${name}`;
   // An optional parameter that is set can be put back to whatever the runtime
   // does by default, which is what leaving it out means.
   const clearable = spec.optional === true && value !== undefined;

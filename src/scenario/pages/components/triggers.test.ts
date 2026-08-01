@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newScenario } from "../../create";
+import { parseExtensions } from "../../extensions";
 import {
   parseScenario,
   type Scenario,
@@ -23,6 +24,7 @@ import {
   stepAt,
   stepDefaults,
   stepLabel,
+  stepTypes,
   triggerSummary,
 } from "./triggers";
 
@@ -377,6 +379,83 @@ describe("stepDefaults", () => {
         expect(read, `${type} does not load again`).not.toBeNull();
       }
     }
+  });
+});
+
+/**
+ * The palette a game's own types join. What is proved here is that they arrive
+ * with the same shape a built-in type has, so every other function in this file
+ * treats them the same way.
+ */
+describe("stepTypes with a game's own types", () => {
+  const extensions = parseExtensions({
+    handler: "luarules/mission_extensions/demo.lua",
+    conditions: [
+      {
+        type: "sf_research_above",
+        label: "Research above",
+        params: [
+          { name: "team", kind: "teamId" },
+          { name: "amount", kind: "number" },
+        ],
+      },
+    ],
+    actions: [{ type: "sf_grant_research", params: [] }],
+  });
+
+  it("offers coilbox's types and the game's in one table", () => {
+    const conditions = stepTypes("conditions", extensions);
+    expect(conditions.time_elapsed).toBe(CONDITION_TYPES.time_elapsed);
+    expect(conditions.sf_research_above).toEqual({
+      team: { kind: "teamId" },
+      amount: { kind: "number" },
+    });
+    expect(stepTypes("actions", extensions).sf_grant_research).toEqual({});
+  });
+
+  it("keeps the two lists apart", () => {
+    expect(stepTypes("actions", extensions).sf_research_above).toBeUndefined();
+  });
+
+  it("is coilbox's table untouched for a game that declares nothing", () => {
+    expect(stepTypes("conditions")).toBe(CONDITION_TYPES);
+    expect(stepTypes("actions")).toBe(ACTION_TYPES);
+  });
+
+  it("fills a declared type's parameters in like any other", () => {
+    const scenario = document();
+    const spec = stepTypes("conditions", extensions).sf_research_above;
+    expect(stepDefaults(spec, { scenario, unitDefs: [] })).toEqual({
+      params: { team: scenario.setup.participants[0].id, amount: 0 },
+    });
+  });
+
+  it("calls a declared type what its declaration calls it", () => {
+    expect(stepLabel("sf_research_above", extensions)).toBe("Research above");
+    expect(stepLabel("time_elapsed", extensions)).toBe("Time elapsed");
+  });
+
+  it("rewrites a reference a declared type holds when a trigger is renamed", () => {
+    const declared = parseExtensions({
+      handler: "h.lua",
+      actions: [
+        {
+          type: "sf_arm",
+          params: [{ name: "which", kind: "triggerId" }],
+        },
+      ],
+    });
+    const base = addStep(document(), "open", "actions", {
+      type: "sf_arm",
+      params: { which: "open" },
+    });
+
+    const renamed = renameTrigger(base, "open", "opened", declared);
+
+    expect(renamed.triggers[0].actions[0].params.which).toBe("opened");
+    expect(
+      renameTrigger(base, "open", "opened").triggers[0].actions[0].params.which,
+    ).toBe("open");
   });
 });
 

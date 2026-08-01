@@ -24,12 +24,27 @@ import {
   paletteGate,
   requiredRuntimeVersion,
 } from "../../gating";
+import {
+  type ExtensionTypes,
+  NO_EXTENSIONS,
+  parseExtensions,
+} from "../../extensions";
 import { type ScenarioRoute, scenarioRoute } from "../../launch";
 import type { Scenario } from "../../model";
 
 export interface ScenarioGate {
   /** Why each condition and action type cannot be used, keyed by type name. */
   gate: PaletteGate;
+  /**
+   * The condition and action types the game declares for itself, which the
+   * palette offers on top of coilbox's own.
+   *
+   * Ungated, unlike the rest of the palette. An extension type is the game's to
+   * implement, so it runs on either route: the mutator is stacked on the game,
+   * so the game's own `missions/extensions.lua` and its handler are in the VFS
+   * underneath it either way.
+   */
+  extensions: ExtensionTypes;
   /** Which runtime the palette is measured against, when it stops anything. */
   note: string | null;
   /**
@@ -47,9 +62,15 @@ export interface ScenarioGate {
 interface RuntimeStatus {
   installed: RuntimeMarker | null;
   available: RuntimeMarker | null;
+  /** `missions/extensions.lua` as it evaluated, unread. */
+  extensions: unknown;
 }
 
-const NOTHING: RuntimeStatus = { installed: null, available: null };
+const NOTHING: RuntimeStatus = {
+  installed: null,
+  available: null,
+  extensions: null,
+};
 
 export function useScenarioGate(scenario: Scenario): ScenarioGate {
   const { target } = usePreferredTarget();
@@ -83,6 +104,7 @@ export function useScenarioGate(scenario: Scenario): ScenarioGate {
     if (!game) {
       return {
         gate: NO_GATE,
+        extensions: NO_EXTENSIONS,
         note: null,
         route: null,
         reason: null,
@@ -97,8 +119,16 @@ export function useScenarioGate(scenario: Scenario): ScenarioGate {
     const gate = paletteGate(
       gateTarget(route, status.installed, status.available),
     );
+    // The game's own runtime is what an extension may not redefine, on top of
+    // coilbox's tables, because a game running ahead of this build owns types
+    // coilbox has no table for.
+    const extensions = parseExtensions(status.extensions, [
+      ...(status.installed?.conditions ?? []),
+      ...(status.installed?.actions ?? []),
+    ]);
     return {
       gate,
+      extensions,
       note: gatedCount(gate) > 0 ? reason : null,
       route,
       reason,

@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import type { ExtensionTypes } from "../../extensions";
 import type { PaletteGate } from "../../gating";
 import type { Scenario, ScenarioTrigger } from "../../model";
 import { EditorPanel } from "./panels";
@@ -71,7 +72,7 @@ export function TriggerPanel({
   // What the runtime that will play this scenario can and cannot run. Read here
   // rather than passed in, because the trigger lists are the only thing in the
   // editor a runtime version gates.
-  const { gate, note } = useScenarioGate(scenario);
+  const { gate, extensions, note } = useScenarioGate(scenario);
 
   const count = scenario.triggers.length;
   const create = () => {
@@ -93,6 +94,15 @@ export function TriggerPanel({
       {note && (
         <p className="mb-3 max-w-prose text-[11px] text-muted-foreground">
           {note} Types it does not implement are listed but cannot be added.
+        </p>
+      )}
+      {extensions.problems.length > 0 && (
+        // The game developer wrote missions/extensions.lua, not the person
+        // reading this, so it says what was dropped rather than asking them to
+        // fix it.
+        <p className="mb-3 max-w-prose text-[11px] text-amber-300">
+          {scenario.setup.gameName} declares trigger types coilbox could not
+          read, so they are not offered: {extensions.problems.join("; ")}
         </p>
       )}
       <div className="flex flex-col gap-4 lg:flex-row">
@@ -135,6 +145,7 @@ export function TriggerPanel({
               unitsLoading={unitsLoading}
               unitDefs={unitDefs}
               gate={gate}
+              extensions={extensions}
               picking={picking}
               onPick={onPick}
               onChange={onChange}
@@ -196,6 +207,7 @@ function TriggerForm({
   unitsLoading,
   unitDefs,
   gate,
+  extensions,
   picking,
   onPick,
   onChange,
@@ -208,6 +220,9 @@ function TriggerForm({
   unitDefs: string[];
   /** The types the target runtime cannot run, for the two pickers. */
   gate: PaletteGate;
+  /** The types the scenario's game declares for itself, which both pickers
+   *  offer on top of coilbox's own. */
+  extensions: ExtensionTypes;
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
@@ -223,7 +238,12 @@ function TriggerForm({
         <TriggerName
           id={trigger.id}
           onRename={(name) => {
-            const next = renameTrigger(scenario, trigger.id, name);
+            const next = renameTrigger(
+              scenario,
+              trigger.id,
+              name,
+              extensions,
+            );
             if (next === scenario) return false;
             onChange(next);
             onSelect(name.trim());
@@ -306,6 +326,7 @@ function TriggerForm({
         unitsLoading={unitsLoading}
         unitDefs={unitDefs}
         gate={gate.conditions}
+        extensions={extensions}
         picking={picking}
         onPick={onPick}
         onChange={onChange}
@@ -318,6 +339,7 @@ function TriggerForm({
         unitsLoading={unitsLoading}
         unitDefs={unitDefs}
         gate={gate.actions}
+        extensions={extensions}
         picking={picking}
         onPick={onPick}
         onChange={onChange}
@@ -412,6 +434,7 @@ function StepSection({
   unitsLoading,
   unitDefs,
   gate,
+  extensions,
   picking,
   onPick,
   onChange,
@@ -424,6 +447,8 @@ function StepSection({
   unitDefs: string[];
   /** Why each type this list cannot offer is unavailable, by type name. */
   gate: Record<string, string>;
+  /** The types the scenario's game declares for itself. */
+  extensions: ExtensionTypes;
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
@@ -478,6 +503,7 @@ function StepSection({
               step={step}
               at={{ triggerId: trigger.id, list, index }}
               scenario={scenario}
+              extensions={extensions}
               units={units}
               unitsLoading={unitsLoading}
               picking={picking}
@@ -520,6 +546,7 @@ function StepSection({
       <AddStep
         list={list}
         scenario={scenario}
+        extensions={extensions}
         unitDefs={unitDefs}
         gate={gate}
         onAdd={(step) => onChange(addStep(scenario, trigger.id, list, step))}

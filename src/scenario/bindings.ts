@@ -117,13 +117,23 @@ export const scenarioRuntimeInstall = defineCommand<
 >("coilbox-scenario", "scenario_runtime_install");
 
 /**
- * The runtime the game at `root` has installed, and the one this build of
- * coilbox ships. Either is null when it cannot be read: a game that has not
- * adopted the runtime has no marker at all.
+ * The runtime the game at `root` has installed, the one this build of coilbox
+ * ships, and the condition and action types the game declares for itself in
+ * `missions/extensions.lua`. Each is null when it cannot be read: a game that has
+ * not adopted the runtime has no marker at all, and most games declare no types
+ * of their own.
+ *
+ * `extensions` is whatever that file evaluated to, unread. The editor's half of
+ * it is `parseExtensions` in `extensions.ts`, which is where a hand-written
+ * declaration is checked.
  */
 export const scenarioRuntimeStatus = defineCommand<
   { root: string },
-  { installed: RuntimeMarker | null; available: RuntimeMarker | null }
+  {
+    installed: RuntimeMarker | null;
+    available: RuntimeMarker | null;
+    extensions: unknown;
+  }
 >("coilbox-scenario", "scenario_runtime_status");
 
 /**

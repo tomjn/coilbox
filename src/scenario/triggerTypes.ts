@@ -23,23 +23,29 @@
  * `triggerId` → `triggers`, `objectiveId` → `objectives`, `dialogueId` →
  * `dialogue`, `teamId` → a `setup.participants` id (and `Scenario.teams` key),
  * `varName` → a `Scenario.vars` key.
+ *
+ * A list rather than a bare union, because a game's `missions/extensions.lua`
+ * names a kind as a string and `extensions.ts` has to check that it is one.
  */
-export type ParamKind =
-  | "string"
-  | "number"
-  | "boolean"
-  | "strings"
-  | "point"
-  | "orders"
-  | "enum"
-  | "zoneId"
-  | "actorId"
-  | "groupId"
-  | "triggerId"
-  | "objectiveId"
-  | "dialogueId"
-  | "teamId"
-  | "varName";
+export const PARAM_KINDS = [
+  "string",
+  "number",
+  "boolean",
+  "strings",
+  "point",
+  "orders",
+  "enum",
+  "zoneId",
+  "actorId",
+  "groupId",
+  "triggerId",
+  "objectiveId",
+  "dialogueId",
+  "teamId",
+  "varName",
+] as const;
+
+export type ParamKind = (typeof PARAM_KINDS)[number];
 
 export interface ParamSpec {
   kind: ParamKind;

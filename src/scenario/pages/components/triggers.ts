@@ -28,6 +28,11 @@ import type {
   TriggerStep,
 } from "../../model";
 import {
+  type ExtensionTypes,
+  extensionSpecs,
+  NO_EXTENSIONS,
+} from "../../extensions";
+import {
   ACTION_TYPES,
   CONDITION_TYPES,
   type ParamKind,
@@ -46,15 +51,34 @@ export interface StepRef {
   index: number;
 }
 
-/** The type table one of the two lists is drawn from. */
-export function stepTypes(list: StepList): Record<string, TypeSpec> {
-  return list === "conditions" ? CONDITION_TYPES : ACTION_TYPES;
+/**
+ * The type table one of the two lists is drawn from: coilbox's own, plus the
+ * ones the scenario's game declares in its `missions/extensions.lua`.
+ *
+ * Coilbox's win a collision, though `parseExtensions` has already refused one,
+ * because an engine-level type is never an extension's to redefine and the
+ * palette should not be the place that rule is first noticed.
+ */
+export function stepTypes(
+  list: StepList,
+  extensions: ExtensionTypes = NO_EXTENSIONS,
+): Record<string, TypeSpec> {
+  const declared = extensionSpecs(
+    list === "conditions" ? extensions.conditions : extensions.actions,
+  );
+  const own = list === "conditions" ? CONDITION_TYPES : ACTION_TYPES;
+  return Object.keys(declared).length === 0 ? own : { ...declared, ...own };
 }
 
-/** What a condition or action type is called on screen. Derived rather than
- *  looked up, so a type a game declares reads the same way a built-in one
- *  does. */
-export function stepLabel(type: string): string {
+/** What a condition or action type is called on screen. A game's own type is
+ *  called what its declaration says. Coilbox's own, and one nothing declares,
+ *  are read off the type name. */
+export function stepLabel(
+  type: string,
+  extensions: ExtensionTypes = NO_EXTENSIONS,
+): string {
+  const declared = extensions.conditions[type] ?? extensions.actions[type];
+  if (declared) return declared.label;
   const words = type.replace(/_/g, " ");
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
@@ -152,8 +176,13 @@ export function moveTrigger(
 }
 
 /** The parameters of a step that hold the given reference kind. */
-function refParams(step: TriggerStep, list: StepList, kind: ParamKind) {
-  const spec = stepTypes(list)[step.type];
+function refParams(
+  step: TriggerStep,
+  list: StepList,
+  kind: ParamKind,
+  extensions: ExtensionTypes,
+) {
+  const spec = stepTypes(list, extensions)[step.type];
   if (!spec) return [];
   return Object.entries(spec)
     .filter(([, param]) => param.kind === kind)
@@ -166,18 +195,20 @@ function refParams(step: TriggerStep, list: StepList, kind: ParamKind) {
  *
  * The reference kind is what makes this general: a zone, an objective, a
  * dialogue line and a variable are all named by a parameter the type table
- * declares, so renaming any of them is this one rewrite with a different kind,
- * and a reference a game extension declares is carried over too.
+ * declares, so renaming any of them is this one rewrite with a different kind.
+ * A reference a game extension declares is carried over too, when the caller
+ * knows what the game declares.
  */
 export function rewriteRefs(
   scenario: Scenario,
   kind: ParamKind,
   from: string,
   to: string,
+  extensions: ExtensionTypes = NO_EXTENSIONS,
 ): Scenario {
   const rewrite = (list: StepList) => (step: TriggerStep) => {
     let params = step.params;
-    for (const name of refParams(step, list, kind)) {
+    for (const name of refParams(step, list, kind, extensions)) {
       if (params[name] === from) params = { ...params, [name]: to };
     }
     return params === step.params ? step : { ...step, params };
@@ -212,12 +243,13 @@ export function renameTrigger(
   scenario: Scenario,
   from: string,
   to: string,
+  extensions: ExtensionTypes = NO_EXTENSIONS,
 ): Scenario {
   const wanted = to.trim();
   if (!wanted || wanted === from) return scenario;
   if (!scenario.triggers.some((t) => t.id === from)) return scenario;
   if (scenario.triggers.some((t) => t.id === wanted)) return scenario;
-  const rewritten = rewriteRefs(scenario, "triggerId", from, wanted);
+  const rewritten = rewriteRefs(scenario, "triggerId", from, wanted, extensions);
   return {
     ...rewritten,
     triggers: rewritten.triggers.map((t) =>
