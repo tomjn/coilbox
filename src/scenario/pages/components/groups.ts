@@ -70,7 +70,8 @@ export function orderOfKind(
   previous?: ScenarioOrder,
 ): ScenarioOrder {
   if (kind === "guard" || kind === "attack") {
-    const target = previous && !("waypoints" in previous) ? previous.target : "";
+    const target =
+      previous && !("waypoints" in previous) ? previous.target : "";
     return { kind, target };
   }
   return { kind, waypoints: previous ? (orderWaypoints(previous) ?? []) : [] };
@@ -307,6 +308,41 @@ export function removeWaypoint(scenario: Scenario, key: string): Scenario {
       ? waypoints.filter((_, i) => i !== ref.waypoint)
       : null,
   );
+}
+
+/**
+ * A path cut into steps no longer than `spacing` elmos.
+ *
+ * A path is drawn on the terrain, and a straight line between two points a
+ * kilometre apart disappears into every hill between them. Cutting it up gives
+ * the layer somewhere to sample the ground. `closed` leaves out the repeat of
+ * the first point, because a patrol is drawn as a loop that closes itself.
+ */
+export function drapePoints(
+  points: Point[],
+  spacing: number,
+  closed = false,
+): Point[] {
+  if (points.length < 2) return points.slice();
+  const out: Point[] = [];
+  const last = closed ? points.length : points.length - 1;
+  for (let i = 0; i < last; i++) {
+    const from = points[i];
+    const to = points[(i + 1) % points.length];
+    const steps = Math.max(
+      1,
+      Math.ceil(Math.hypot(to.x - from.x, to.z - from.z) / spacing),
+    );
+    for (let step = 0; step < steps; step++) {
+      const t = step / steps;
+      out.push({
+        x: from.x + (to.x - from.x) * t,
+        z: from.z + (to.z - from.z) * t,
+      });
+    }
+  }
+  if (!closed) out.push(points[points.length - 1]);
+  return out;
 }
 
 /* -------------------------------------------------------------------------- *

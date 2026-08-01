@@ -5,6 +5,7 @@ import {
   addGroup,
   addWaypoint,
   clampCount,
+  drapePoints,
   editGroup,
   groupLabel,
   groupSize,
@@ -20,9 +21,9 @@ import {
   targetLabel,
   targetOptions,
   uniqueLabels,
+  withOrder,
   withoutOrder,
   withoutUnit,
-  withOrder,
   withUnit,
 } from "./groups";
 
@@ -45,7 +46,13 @@ function document(): Scenario {
   return {
     ...newScenario("test"),
     actors: [
-      { id: "a1", unitDef: "armcom", team: "p0", pos: { x: 0, z: 0 }, facing: 0 },
+      {
+        id: "a1",
+        unitDef: "armcom",
+        team: "p0",
+        pos: { x: 0, z: 0 },
+        facing: 0,
+      },
       {
         id: "a2",
         unitDef: "armcom",
@@ -235,6 +242,50 @@ describe("waypoints", () => {
     );
     expect(removeWaypoint(before, pathKey("gone", 0, 0))).toBe(before);
     expect(moveWaypoint(before, "group:g1#0", { x: 1, z: 1 })).toBe(before);
+  });
+});
+
+describe("draping a path", () => {
+  const line = [
+    { x: 0, z: 0 },
+    { x: 100, z: 0 },
+  ];
+
+  it("cuts a segment into steps no longer than the spacing", () => {
+    expect(drapePoints(line, 50)).toEqual([
+      { x: 0, z: 0 },
+      { x: 50, z: 0 },
+      { x: 100, z: 0 },
+    ]);
+  });
+
+  it("leaves a short segment alone but for its ends", () => {
+    expect(drapePoints(line, 400)).toEqual(line);
+  });
+
+  it("closes a loop without repeating the first point", () => {
+    const loop = drapePoints(
+      [
+        { x: 0, z: 0 },
+        { x: 100, z: 0 },
+        { x: 100, z: 100 },
+      ],
+      100,
+      true,
+    );
+    // The diagonal home is longer than the spacing, so it is cut in two, and
+    // the first point is not repeated at the end.
+    expect(loop).toEqual([
+      { x: 0, z: 0 },
+      { x: 100, z: 0 },
+      { x: 100, z: 100 },
+      { x: 50, z: 50 },
+    ]);
+  });
+
+  it("has nothing to cut up when there is one point or none", () => {
+    expect(drapePoints([{ x: 5, z: 5 }], 10)).toEqual([{ x: 5, z: 5 }]);
+    expect(drapePoints([], 10)).toEqual([]);
   });
 });
 
