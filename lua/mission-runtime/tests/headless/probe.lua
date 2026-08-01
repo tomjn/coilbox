@@ -75,8 +75,15 @@ local function armed(id)
 	return state().triggers:isEnabled(id)
 end
 
+--- What a game rules param holds, or nil.
+--
+-- `Spring.GetGameRulesParam` returns no values at all for a param nothing has
+-- set, not nil, so passing the call straight on hands the caller an empty
+-- expression list and `tostring(rules(name))` raises. Bound to one value, so a
+-- detail string can say "nil" rather than taking its step down with it.
 local function rules(name)
-	return Spring.GetGameRulesParam(name)
+	local value = Spring.GetGameRulesParam(name)
+	return value
 end
 
 local function defOf(unitID)
@@ -105,11 +112,21 @@ end
 --- Put a unit on the map for the player, at the ground height, and make it
 -- proof against anything the mission's own units do to it. A check about a zone
 -- being held is about the runtime's clock, not about whether a scout survives
--- three raiders.
+-- three raiders, nor about where they leave it.
+--
+-- Armour stops the damage and nothing else. The engine scales damage by the
+-- armour multiple and impulse by nothing, and a ground unit answers impulse by
+-- skidding, so an armoured unit under fire still slides. Two more calls take the
+-- rest away: MoveCtrl gives it the scripted move type, which refuses impulse
+-- outright and is never pushed, and dropping it out of solid-object collisions
+-- keeps a unit that is itself skidding from shoving it on the way past. What is
+-- left stands exactly where it was put for the whole run.
 local function playerUnit(defName, x, z)
 	local unitID = Spring.CreateUnit(defName, x, Spring.GetGroundHeight(x, z), z, 0, 0)
 	if unitID then
 		Spring.SetUnitArmored(unitID, true, 0)
+		Spring.MoveCtrl.Enable(unitID)
+		Spring.SetUnitBlocking(unitID, false, false)
 	end
 	return unitID
 end
@@ -255,6 +272,12 @@ plans.garrison = {
 
 -- Siege: a prefab base, a standing group, and a zone the player has to hold for
 -- a minute before the mission ends.
+--
+-- The unit doing the holding, and where it was put. A hold that never completes
+-- has two possible causes, the runtime's clock and a unit that wandered off, and
+-- reading the position back tells them apart.
+local siegeUnit, siegeX, siegeZ
+
 plans.siege = {
 	-- The hold is 60 seconds and the player's unit walks in at frame 30, so the
 	-- mission cannot end before frame 1830. The deadline is the slack on top.
@@ -274,8 +297,19 @@ plans.siege = {
 			check("the mission has not ended", rules("coilbox_mission_over") == 0)
 			check("nor has its objective", rules("coilbox_mission_objective_take-keep") == ACTIVE)
 		end },
+		-- An aircraft, and the one place in the probe where the def matters. The
+		-- keep holds the mission's factory, and the base game teleports any enemy
+		-- ground unit standing near a factory out to the edge of a box around it
+		-- (Balanced Annihilation's Prevent Lab Hax gadget). That box swallows the
+		-- whole zone, so a ground unit put anywhere in the keep is moved to within
+		-- a couple of elmos of the zone's edge and the first nudge takes it out.
+		-- The gadget skips anything that flies, a zone is a flat footprint that
+		-- counts a unit whatever its altitude, and this one is pinned, so it holds
+		-- the spot it was given.
 		{ frame = 30, run = function()
-			playerUnit("armpw", 20, 20)
+			siegeUnit = playerUnit("armpeep", 20, 20)
+			local x, _, z = Spring.GetUnitPosition(siegeUnit)
+			siegeX, siegeZ = x, z
 		end },
 		{ frame = 1500, run = function()
 			check("a hold short of the minute settles nothing",
@@ -283,6 +317,11 @@ plans.siege = {
 			check("and does not end the mission", rules("coilbox_mission_over") == 0)
 		end },
 		{ frame = 1980, run = function()
+			local x, _, z = Spring.GetUnitPosition(siegeUnit)
+			check("the unit the probe stood in the zone is still where it put it",
+				x == siegeX and z == siegeZ,
+				tostring(x) .. "," .. tostring(z) .. " from "
+					.. tostring(siegeX) .. "," .. tostring(siegeZ))
 			check("holding the zone for the minute completes the objective",
 				rules("coilbox_mission_objective_take-keep") == COMPLETE,
 				rules("coilbox_mission_objective_take-keep"))
