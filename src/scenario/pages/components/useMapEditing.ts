@@ -28,7 +28,10 @@
  * Not everything drawn on the map is picked up by pressing it. A zone is a sheet
  * of ground and can cover the whole view, so a press on one leaves the button
  * where it was, with the camera or with whatever the mode draws. It is selected
- * by a click and moved by the handle at its middle.
+ * by a click and moved by the handle at its middle. Because sheets are passed
+ * over that way, a press reaches a handle lying under one, which it has to: a
+ * zone's own sheet, and every zone drawn over it, lie between the camera and
+ * the handles.
  */
 
 import { useEffect, useRef } from "react";
@@ -41,7 +44,9 @@ import {
   dragKeys,
   isClick,
   type PointerPos,
+  type PointerTargets,
   pointerNdc,
+  pointerTargets,
   pressGesture,
 } from "./editing";
 import type { Placement } from "./placements";
@@ -296,18 +301,25 @@ export function useMapEditing(deps: MapEditingDeps): void {
     const overlayFor = (key: string): OverlayLayer | null =>
       overlays().find((one) => one.has(key)) ?? null;
 
-    /** The placement key under the pointer, if any. Only the drawn layers are
-     *  raycast: the terrain would answer flat, and nothing else is pickable. */
-    const pick = (event: PointerEvent): string | null => {
+    /** Whether a press on a key picks that object up. Only an overlay has a say:
+     *  a drawn unit is always something to pick up. */
+    const grabbable = (key: string): boolean =>
+      overlayFor(key)?.grabbable?.(key) ?? true;
+
+    /** What the pointer is over. Only the drawn layers are raycast: the terrain
+     *  would answer flat, and nothing else is pickable. */
+    const pick = (event: PointerEvent): PointerTargets => {
       const rect = dom.getBoundingClientRect();
       const ndc = pointerNdc({ x: event.clientX, y: event.clientY }, rect);
       raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), handle.camera);
       const roots = [layer.root, ...overlays().map((one) => one.root)];
+      const keys: string[] = [];
       for (const hit of raycaster.intersectObjects(roots, true)) {
         const key = placementOf(hit.object);
-        if (key) return key;
+        // The same object can be hit twice, front face and back.
+        if (key && key !== keys[keys.length - 1]) keys.push(key);
       }
-      return null;
+      return pointerTargets(keys, grabbable);
     };
 
     /** Move the objects a drag is carrying, without touching the document. */
@@ -330,14 +342,16 @@ export function useMapEditing(deps: MapEditingDeps): void {
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
       pressed = { x: event.clientX, y: event.clientY };
-      const key = pick(event);
+      const { select, grab } = pick(event);
       const origin = groundPoint(event);
-      const owner = key ? overlayFor(key) : null;
       const gesture = pressGesture({
-        key,
-        grabbable: !key || !owner || (owner.grabbable?.(key) ?? true),
+        grab,
         draws: !!latest.current.onDragGround,
       });
+      // What a drag would carry, once there is somewhere on the map to carry it
+      // from. The two are read together because a gesture needs both.
+      const key = grab;
+      const owner = key ? overlayFor(key) : null;
 
       if (gesture !== "grab" || !key || !origin) {
         // Bare ground, or something lying over it that a press does not pick up.
@@ -345,7 +359,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
         // the camera's pan, so the camera stands down for it. In a mode that
         // does not, the camera keeps the button and pans. Either way what was
         // under the press is remembered, so a click can still select it.
-        pressedKey = key;
+        pressedKey = select;
         if (gesture === "draw" && origin) {
           band = { from: pressed, origin, to: origin, moved: false };
           handle.controls.enabled = false;

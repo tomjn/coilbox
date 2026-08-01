@@ -13,6 +13,7 @@ import {
   normaliseActorState,
   parsePlacementKey,
   pointerNdc,
+  pointerTargets,
   pressGesture,
   removePlacement,
   setActorState,
@@ -73,35 +74,51 @@ describe("isClick", () => {
   });
 });
 
+describe("pointerTargets", () => {
+  /** A zone's sheet is the one thing a press cannot pick up. */
+  const grabbable = (key: string) =>
+    !key.startsWith("zone:") || key.includes("@");
+
+  it("finds nothing under a pointer on bare ground", () => {
+    expect(pointerTargets([], grabbable)).toEqual({ select: null, grab: null });
+  });
+
+  it("selects and grabs the nearest thing when it can be picked up", () => {
+    expect(pointerTargets(["actor:a1", "zone:z1"], grabbable)).toEqual({
+      select: "actor:a1",
+      grab: "actor:a1",
+    });
+  });
+
+  it("grabs a handle through the sheet lying over it", () => {
+    // A zone's move handle sits at the middle of its own sheet, and other
+    // zones' sheets drape over it, so the sheet is the nearer hit. Without
+    // this the handle could not be grabbed at all.
+    expect(
+      pointerTargets(["zone:z1", "zone:z2@move", "zone:z2"], grabbable),
+    ).toEqual({ select: "zone:z1", grab: "zone:z2@move" });
+  });
+
+  it("has nothing to grab where there are only sheets", () => {
+    // Panning past a zone that fills the view (#910), and drawing a zone
+    // inside another (#837), are both this.
+    expect(pointerTargets(["zone:z1", "zone:z2"], grabbable)).toEqual({
+      select: "zone:z1",
+      grab: null,
+    });
+  });
+});
+
 describe("pressGesture", () => {
-  it("picks up what the press is over", () => {
-    expect(
-      pressGesture({ key: "actor:a1", grabbable: true, draws: false }),
-    ).toBe("grab");
+  it("picks up what the press can grab", () => {
+    expect(pressGesture({ grab: "actor:a1", draws: false })).toBe("grab");
     // Even in a mode that draws: a unit is a thing, not the ground under it.
-    expect(pressGesture({ key: "actor:a1", grabbable: true, draws: true })).toBe(
-      "grab",
-    );
+    expect(pressGesture({ grab: "actor:a1", draws: true })).toBe("grab");
   });
 
-  it("leaves bare ground to the camera, or to the mode that draws", () => {
-    expect(pressGesture({ key: null, grabbable: true, draws: false })).toBe(
-      "camera",
-    );
-    expect(pressGesture({ key: null, grabbable: true, draws: true })).toBe(
-      "draw",
-    );
-  });
-
-  it("treats something that cannot be picked up as the ground it covers", () => {
-    // A zone's sheet. Panning past one that fills the view (#910), and drawing
-    // a zone inside another (#837), are both this.
-    expect(
-      pressGesture({ key: "zone:z1", grabbable: false, draws: false }),
-    ).toBe("camera");
-    expect(pressGesture({ key: "zone:z1", grabbable: false, draws: true })).toBe(
-      "draw",
-    );
+  it("leaves the rest to the camera, or to the mode that draws", () => {
+    expect(pressGesture({ grab: null, draws: false })).toBe("camera");
+    expect(pressGesture({ grab: null, draws: true })).toBe("draw");
   });
 });
 
