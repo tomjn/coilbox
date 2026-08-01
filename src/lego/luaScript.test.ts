@@ -101,6 +101,21 @@ describe("buildLuaScript", () => {
     expect(lua).not.toMatch(/local end\b/);
   });
 
+  it("escapes a hostile piece name in the piece() lookup argument", () => {
+    // Piece names normally come from the editor already identifier-safe, but
+    // an imported project can carry anything as a piece name. The lookup
+    // argument still has to stay inside its own literal.
+    const lua = buildLuaScript(
+      project(
+        [{ id: "w1", name: 'wheel"); os.execute("rm', role: "wheel" }],
+        [{ presetId: "wheels.roll", params: {} }],
+      ),
+    );
+
+    expect(lua).toContain('piece("wheel\\"); os.execute(\\"rm")');
+    expect(lua).not.toContain('piece("wheel"); os.execute("rm")');
+  });
+
   it("spins every wheel and stops every one", () => {
     const lua = buildLuaScript(
       project(

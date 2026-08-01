@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type LegoProject, newProject } from "./model";
 import type { UnitBounds } from "./s3oBuild";
-import { buildUnitDef } from "./unitDef";
+import { buildUnitDef, luaString } from "./unitDef";
 
 /** A measured model. Most of these only care about the two ground axes, so y
  *  and the middle carry stand-in values unless a test says otherwise. */
@@ -31,6 +31,54 @@ function project(name: string, unitName?: string) {
     now: "2026-07-28T00:00:00Z",
   });
 }
+
+describe("luaString", () => {
+  it("escapes the two characters that would end the literal", () => {
+    expect(luaString('a "quote" and a \\ backslash')).toBe(
+      '"a \\"quote\\" and a \\\\ backslash"',
+    );
+  });
+
+  it("escapes the whitespace that cannot appear raw in a short string", () => {
+    expect(luaString("one\ntwo\r\nthree\tfour")).toBe(
+      '"one\\ntwo\\r\\nthree\\tfour"',
+    );
+  });
+
+  it("pads a control-character escape to three digits", () => {
+    // "\05" would read back as byte 5, losing the digit that followed.
+    expect(luaString("\x005")).toBe('"\\0005"');
+    expect(luaString("\x07\x1b\x7f")).toBe('"\\007\\027\\127"');
+  });
+
+  it("leaves non-ASCII alone, so the UTF-8 bytes survive", () => {
+    expect(luaString("café ← 战地")).toBe('"café ← 战地"');
+  });
+
+  it("does not let a hostile project name break out of the literal", () => {
+    const hostile = '", os.execute("rm -rf /"), "';
+    const lua = buildUnitDef(
+      project(hostile, "hostile"),
+      bounds({ x: 32, z: 32 }),
+    );
+
+    expect(lua).toContain(`name = "\\", os.execute(\\"rm -rf /\\"), \\""`);
+    expect(lua).not.toContain('os.execute("rm');
+  });
+
+  it("keeps a newline or control character in a project name out of the source lines", () => {
+    const lua = buildUnitDef(
+      project("up\nreturn 1 --", "newline"),
+      bounds({ x: 32, z: 32 }),
+    );
+
+    expect(lua).toContain('name = "up\\nreturn 1 --"');
+    const escaped = lua
+      .split("\n")
+      .some((l) => l.trim().startsWith("return 1"));
+    expect(escaped).toBe(false);
+  });
+});
 
 describe("buildUnitDef", () => {
   it("keys the table by the unit name and points objectname and script at it", () => {
