@@ -19,10 +19,13 @@ import {
 } from "@/mapconv/pages/components/MapPreview3D";
 import { usePreferredTarget } from "@/play/config";
 import type { Scenario, ScenarioZone } from "../../model";
+import { ActorControls } from "./ActorControls";
 import {
   canTurn,
+  editActor,
   movePlacement,
   removePlacement,
+  setActorState,
   turnPlacement,
 } from "./editing";
 import { EDITOR_MODES } from "./modes";
@@ -143,6 +146,13 @@ export function ScenarioMapScene({
   });
 
   const picked = units.placements.find((p) => p.key === selected) ?? null;
+  // Only an actor has fields of its own to edit: a group's units and a prefab's
+  // buildings are described by the entry they belong to, which #761 and #762
+  // give their own panels.
+  const pickedActor =
+    (picked?.kind === "actor" &&
+      scenario.actors.find((a) => a.id === picked.id)) ||
+    null;
 
   const status = mapSceneStatus({
     mapName,
@@ -321,7 +331,21 @@ export function ScenarioMapScene({
               onChange(removePlacement(scenario, picked.key));
               setSelected(null);
             }}
-          />
+          >
+            {pickedActor && (
+              <ActorControls
+                key={pickedActor.id}
+                actor={pickedActor}
+                participants={scenario.setup.participants}
+                onEdit={(patch) =>
+                  onChange(editActor(scenario, pickedActor.id, patch))
+                }
+                onState={(state) =>
+                  onChange(setActorState(scenario, pickedActor.id, state))
+                }
+              />
+            )}
+          </SelectionBar>
         )}
         {pickedZone && (
           <ZoneBar
@@ -372,10 +396,14 @@ function SelectionBar({
   placement,
   onTurn,
   onDelete,
+  children,
 }: {
   placement: Placement;
   onTurn: () => void;
   onDelete: () => void;
+  /** Controls for what kind of thing this is: an actor's team and its
+   *  overrides, and whatever a group or a prefab grows later. */
+  children?: ReactNode;
 }) {
   const turnable = canTurn(placement.key);
   const what =
@@ -391,6 +419,7 @@ function SelectionBar({
         {placement.def}
         <span className="ml-1.5 text-muted-foreground">{what}</span>
       </span>
+      {children}
       <Button
         size="sm"
         variant="ghost"
