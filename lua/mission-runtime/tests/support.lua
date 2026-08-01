@@ -94,6 +94,7 @@ function M.missionFiles(mission)
 		["luarules/mission_runtime/coilbox_dialogue.lua"] = module(
 			"luarules/mission_runtime/coilbox_dialogue.lua"),
 		["luarules/mission_runtime/coilbox_view.lua"] = module("luarules/mission_runtime/coilbox_view.lua"),
+		["luarules/mission_runtime/coilbox_reveal.lua"] = module("luarules/mission_runtime/coilbox_reveal.lua"),
 		["missions/demo/mission.lua"] = function()
 			return mission
 		end,
@@ -166,6 +167,8 @@ function M.newEngine(modOptions, files, options)
 		sonarStealth = {},
 		sensors = {},
 		resourcing = {},
+		losMask = {},
+		losState = {},
 		noDraw = {},
 		noMinimap = {},
 		-- Every Spring.PlaySoundFile call, as { name, volume }.
@@ -504,6 +507,18 @@ function M.newEngine(modOptions, files, options)
 			end,
 			SetUnitResourcing = function(unitID, resources)
 				engine.resourcing[unitID] = resources
+			end,
+			-- Which ally teams the engine has stopped updating a unit's visibility
+			-- for, and what it was left at. Recorded rather than acted on: whether
+			-- an ally team can see a unit is the engine's, and pinning it is the
+			-- whole of what the runtime does about it.
+			SetUnitLosMask = function(unitID, allyTeam, bits)
+				engine.losMask[unitID] = engine.losMask[unitID] or {}
+				engine.losMask[unitID][allyTeam] = bits
+			end,
+			SetUnitLosState = function(unitID, allyTeam, bits)
+				engine.losState[unitID] = engine.losState[unitID] or {}
+				engine.losState[unitID][allyTeam] = bits
 			end,
 			SetUnitNoDraw = function(unitID, flag)
 				engine.noDraw[unitID] = flag

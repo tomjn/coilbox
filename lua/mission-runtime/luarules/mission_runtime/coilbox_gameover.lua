@@ -41,8 +41,9 @@ M.WINNER_PREFIX = "coilbox_mission_winner_"
 M.ANCHOR_X = 0
 M.ANCHOR_Z = 0
 
--- What an anchor must not do. It stands in a corner for the whole mission, so it
--- may not shoot, build, or pay into the economy the author balanced.
+-- What a unit the runtime places for its own reasons must not do. It stands
+-- somewhere for the whole mission, so it may not shoot, build, or pay into the
+-- economy the author balanced.
 local function suitable(def)
 	-- A missing field reads as zero rather than disqualifying the def. A runtime
 	-- that finds no anchor at all is worse off than one that anchors with a
@@ -59,6 +60,24 @@ local function suitable(def)
 		and zero(def.metalUpkeep) and zero(def.energyUpkeep)
 		and zero(def.windGenerator) and zero(def.tidalGenerator)
 		and zero(def.extractsMetal)
+end
+
+--- The unit def the runtime builds its own units from: the first one this game
+-- has that does nothing at all. Chosen by ascending def id, which every machine
+-- reads the same way, because a unit created on one machine and not another is a
+-- desync rather than a cosmetic difference.
+--
+-- The anchor is one of these, and so is the spotter that lights a revealed area.
+-- Nothing about the rule is about ending a mission, but this is where the first
+-- one that needed it lives.
+function M.inertDef()
+	for id = 1, #UnitDefs do
+		local def = UnitDefs[id]
+		if def and suitable(def) then
+			return def
+		end
+	end
+	return nil
 end
 
 --- Register the mission-ending actions on a trigger engine.
@@ -100,7 +119,7 @@ function M.register(engine, state, hooks)
 		return human
 	end
 
-	--- The participant a `victory` or `defeat` with no team means.
+	--- The participant an action that names no team means.
 	--
 	-- The one a human is playing, which is what the editor's "the player" means
 	-- and the only team an author writing no name can be talking about.
@@ -124,12 +143,17 @@ function M.register(engine, state, hooks)
 		if not fallback then
 			return nil
 		end
-		engine:report("end-no-human", "warning", string.format(
-			"no human is playing a mission team, ending for %s instead", tostring(fallback.id)))
+		engine:report("no-human", "warning", string.format(
+			"no human is playing a mission team, using %s instead", tostring(fallback.id)))
 		return fallback.id
 	end
 
 	local handle = {}
+
+	--- The participant an action that names no team means, for the rest of the
+	-- runtime. `reveal_area` asks the same question `victory` does, and "the
+	-- player" has to be the same team whichever asks.
+	handle.playerTeam = defaultTeam
 
 	--- Whether the mission has ended.
 	function handle.isOver()
@@ -226,20 +250,6 @@ function M.register(engine, state, hooks)
 	-- The anchor.
 	--------------------------------------------------------------------------------
 
-	--- The unit def every anchor is built from: the first one this game has that
-	-- does nothing at all. Chosen by ascending def id, which every machine reads
-	-- the same way, because a unit created on one machine and not another is a
-	-- desync rather than a cosmetic difference.
-	local function anchorDef()
-		for id = 1, #UnitDefs do
-			local def = UnitDefs[id]
-			if def and suitable(def) then
-				return def
-			end
-		end
-		return nil
-	end
-
 	--- Take everything off an anchor that would otherwise reach the mission: what
 	-- it collides with, what it sees, and what it earns. Being invulnerable and
 	-- undrawn is the gadget's, because it owns both.
@@ -272,7 +282,7 @@ function M.register(engine, state, hooks)
 			return 0
 		end
 
-		local def = anchorDef()
+		local def = M.inertDef()
 		if not def then
 			engine:report("anchor-def", "warning",
 				"no unit def in this game can be a mission anchor, so a team that loses "

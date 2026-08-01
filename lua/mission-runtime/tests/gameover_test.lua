@@ -269,7 +269,7 @@ check("and it earns nothing", (engine.resourcing[anchor] or {}).umm == 0)
 
 local told = false
 for _, message in ipairs(engine.sent) do
-	told = told or (message[1] == "coilbox_mission_anchor" and message[2] == anchor)
+	told = told or (message[1] == "coilbox_mission_hidden" and message[2] == anchor)
 end
 check("the unsynced half is told which unit it is", told)
 
