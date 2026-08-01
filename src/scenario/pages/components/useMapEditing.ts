@@ -24,6 +24,11 @@
  * A mode that draws rather than places takes that button for the whole gesture:
  * a press, a drag and a release across bare ground is `onDragGround`, and the
  * camera pans on the middle button while such a mode is current.
+ *
+ * Not everything drawn on the map is picked up by pressing it. A zone is a sheet
+ * of ground and can cover the whole view, so a press on one leaves the button
+ * where it was, with the camera or with whatever the mode draws. It is selected
+ * by a click and moved by the handle at its middle.
  */
 
 import { useEffect, useRef } from "react";
@@ -37,6 +42,7 @@ import {
   isClick,
   type PointerPos,
   pointerNdc,
+  pressGesture,
 } from "./editing";
 import type { Placement } from "./placements";
 import { sceneToWorld, worldToScene } from "./scene";
@@ -56,6 +62,15 @@ export interface OverlayLayer {
   root: THREE.Object3D;
   /** Whether a picked key is one of this layer's. */
   has: (key: string) => boolean;
+  /**
+   * Whether a press on one of its keys picks that object up. Left out by a
+   * layer whose objects are all grabbable.
+   *
+   * A zone's sheet says no: it lies over the ground and can cover the whole
+   * view, so a press on it stays the camera's, or the mode's to draw with. Such
+   * an object is still selected by a click, and moved by a handle of its own.
+   */
+  grabbable?: (key: string) => boolean;
   /** Show a drag in progress, without touching the document. The layer redraws
    *  and renders the scene itself. Undone by the layer's next draw. */
   drag: (key: string, delta: Point) => void;
@@ -239,6 +254,9 @@ export function useMapEditing(deps: MapEditingDeps): void {
     let drag: Drag | null = null;
     let band: GroundDrag | null = null;
     let pressed: PointerPos | null = null;
+    /** What the press was over when it was not something to pick up, so a
+     *  release that turns out to be a click can still select it. */
+    let pressedKey: string | null = null;
 
     /** The map position a pointer is over, or null when the ray misses the
      *  ground plane entirely, which only happens looking at the horizon. */
@@ -314,21 +332,29 @@ export function useMapEditing(deps: MapEditingDeps): void {
       pressed = { x: event.clientX, y: event.clientY };
       const key = pick(event);
       const origin = groundPoint(event);
+      const owner = key ? overlayFor(key) : null;
+      const gesture = pressGesture({
+        key,
+        grabbable: !key || !owner || (owner.grabbable?.(key) ?? true),
+        draws: !!latest.current.onDragGround,
+      });
 
-      if (!key) {
-        // Bare ground. In a mode that draws, this button is the drawing gesture
-        // rather than the camera's pan, so the camera stands down for it.
-        if (latest.current.onDragGround && origin) {
+      if (gesture !== "grab" || !key || !origin) {
+        // Bare ground, or something lying over it that a press does not pick up.
+        // In a mode that draws, this button is the drawing gesture rather than
+        // the camera's pan, so the camera stands down for it. In a mode that
+        // does not, the camera keeps the button and pans. Either way what was
+        // under the press is remembered, so a click can still select it.
+        pressedKey = key;
+        if (gesture === "draw" && origin) {
           band = { from: pressed, origin, to: origin, moved: false };
           handle.controls.enabled = false;
         }
         return;
       }
-      if (!origin) return;
 
       // An overlay draws its own objects, so it is told about the drag rather
       // than having them moved out from under it.
-      const owner = overlayFor(key);
       if (owner) {
         drag = {
           key,
@@ -397,9 +423,11 @@ export function useMapEditing(deps: MapEditingDeps): void {
       const gesture = drag;
       const drawn = band;
       const from = pressed;
+      const over = pressedKey;
       drag = null;
       band = null;
       pressed = null;
+      pressedKey = null;
       handle.controls.enabled = true;
       dom.style.cursor = drawingCursor(latest.current);
       if (gesture) {
@@ -415,6 +443,13 @@ export function useMapEditing(deps: MapEditingDeps): void {
       // on empty ground or a pan of the camera.
       if (!from || !isClick(from, { x: event.clientX, y: event.clientY }))
         return;
+      // A click on something a press does not pick up selects it, which is how
+      // a zone is chosen: the press could not, because it might have been the
+      // start of a pan or of a zone drawn inside this one.
+      if (over) {
+        latest.current.onSelect(over);
+        return;
+      }
       const place = latest.current.onPlace;
       const at = groundPoint(event);
       if (place && at) place(at);
@@ -431,6 +466,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
       drag = null;
       band = null;
       pressed = null;
+      pressedKey = null;
       handle.controls.enabled = true;
     };
 

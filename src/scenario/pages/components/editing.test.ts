@@ -13,6 +13,7 @@ import {
   normaliseActorState,
   parsePlacementKey,
   pointerNdc,
+  pressGesture,
   removePlacement,
   setActorState,
   turnFacing,
@@ -69,6 +70,38 @@ describe("isClick", () => {
   it("counts a travelled pointer as a drag", () => {
     expect(isClick({ x: 10, y: 10 }, { x: 40, y: 10 })).toBe(false);
     expect(isClick({ x: 10, y: 10 }, { x: 10, y: 40 })).toBe(false);
+  });
+});
+
+describe("pressGesture", () => {
+  it("picks up what the press is over", () => {
+    expect(
+      pressGesture({ key: "actor:a1", grabbable: true, draws: false }),
+    ).toBe("grab");
+    // Even in a mode that draws: a unit is a thing, not the ground under it.
+    expect(pressGesture({ key: "actor:a1", grabbable: true, draws: true })).toBe(
+      "grab",
+    );
+  });
+
+  it("leaves bare ground to the camera, or to the mode that draws", () => {
+    expect(pressGesture({ key: null, grabbable: true, draws: false })).toBe(
+      "camera",
+    );
+    expect(pressGesture({ key: null, grabbable: true, draws: true })).toBe(
+      "draw",
+    );
+  });
+
+  it("treats something that cannot be picked up as the ground it covers", () => {
+    // A zone's sheet. Panning past one that fills the view (#910), and drawing
+    // a zone inside another (#837), are both this.
+    expect(
+      pressGesture({ key: "zone:z1", grabbable: false, draws: false }),
+    ).toBe("camera");
+    expect(pressGesture({ key: "zone:z1", grabbable: false, draws: true })).toBe(
+      "draw",
+    );
   });
 });
 

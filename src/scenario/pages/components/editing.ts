@@ -37,6 +37,31 @@ export interface PointerPos {
 }
 
 /**
+ * What a press on the map begins: picking something up, drawing on the ground,
+ * or moving the camera.
+ *
+ * One button does all three, so what is under it decides. Only something a press
+ * can pick up wins it: a zone's sheet is drawn over the ground and can cover the
+ * whole view, so it is selected by a click and moved by its own handle, and a
+ * drag that starts on one belongs to the camera or to the zone being drawn
+ * inside it (#910, #837).
+ */
+export type PressGesture = "grab" | "draw" | "camera";
+
+export function pressGesture(opts: {
+  /** What the pointer is over, or null for bare ground. */
+  key: string | null;
+  /** Whether a press on that thing picks it up. False for something that can
+   *  only be selected. */
+  grabbable: boolean;
+  /** Whether the current mode draws a shape by dragging across the ground. */
+  draws: boolean;
+}): PressGesture {
+  if (opts.key && opts.grabbable) return "grab";
+  return opts.draws ? "draw" : "camera";
+}
+
+/**
  * Whether a press and release were the same gesture.
  *
  * The camera pans on the left button, so a left press is not free: press and
