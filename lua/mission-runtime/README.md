@@ -5,7 +5,7 @@ The Lua that plays a coilbox scenario inside the engine. It is coilbox-authored 
 ## Layout
 
 - `luarules/gadgets/coilbox_mission_runtime.lua`, the gadget. It gates on the modoption, loads the compiled mission, and hands it to the rest of the runtime.
-- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, `coilbox_view.lua` where it points the player, `coilbox_reveal.lua` what it shows them, and `coilbox_gameover.lua` how it ends. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` and `coilbox_view.lua` are pure as well, because saying a line, moving a camera and dropping a marker are all deciding that the mission asked and nothing more.
+- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, `coilbox_view.lua` where it points the player, `coilbox_reveal.lua` what it shows them, `coilbox_restrictions.lua` what its teams may build and do, and `coilbox_gameover.lua` how it ends. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` and `coilbox_view.lua` are pure as well, because saying a line, moving a camera and dropping a marker are all deciding that the mission asked and nothing more.
 - `luaui/widgets/coilbox_mission_ui.lua`, the widget: the objectives panel, the dialogue panel, the debrief and the name over a named actor. `luaui/mission_ui/coilbox_panel_model.lua` is everything it decides before it draws, pure and tested outside the engine.
 - `missions/runtime.lua`, the version marker and capability table. Coilbox reads it out of an installed game to decide what the editor may offer.
 - `tests/`, checks that run outside the engine with `luajit`. Not part of what a game vendors.
@@ -34,6 +34,7 @@ GG.CoilboxMission = {
   dialogue = <what it says, synced half only>,
   view    = <where it points the player, synced half only>,
   reveal  = <what it shows them, synced half only>,
+  restrictions = <what its teams may build and do, synced half only>,
   gameOver = <what ends the mission, synced half only>,
 }
 ```
@@ -212,6 +213,29 @@ A prefab is a base the author drags around as one piece, so its buildings are st
 
 A build order is the negative of the unit def id. The engine reads the shift and control keys on one as "five of these" and "twenty of these", so each is given with no options at all and appends exactly one unit. Build orders always append, so nothing clears the queue either. `repeat` goes last and needs its 0-or-1 parameter, and the engine refuses it outright for a factory whose def cannot repeat, which is the game's decision rather than the mission's.
 
+## Restrictions
+
+A scenario says what its teams may build, with `restrictions.buildable`, an allow or a deny list of unit defs, and what they may do, with `restrictions.commands`, engine command names withheld. `AllowUnitCreation` and `AllowCommand` are where both land.
+
+The engine has its own `[RESTRICT]` block and the runtime does not use it, because it is global and permanent. `unlock_unit` is why: a restriction a mission lifts halfway through, for one participant, is the thing `[RESTRICT]` cannot express.
+
+A restriction binds every team the scenario declares, which is the reach `[RESTRICT]` has. The format names no team, so binding the human player alone would be a rule the mission never stated, and it would leave an author no way to restrict an enemy at all. `unlock_unit` is the other end: an author who wants a rule for the player only writes the restriction and unlocks the def for everyone else. A team the scenario says nothing about, Gaia included, is not the mission's to restrict.
+
+- A refused build drops the order that asked for it. Otherwise a factory queue jams on a unit it will never be allowed to build and a builder stands at the site retrying for the rest of the mission.
+- The build icon is still in the menu, so a player clicking one gets a builder that walks over and does nothing ([#832](https://github.com/tomjn/coilbox/issues/832)).
+- What the runtime itself places is unaffected. `AllowUnitCreation` is consulted for builders and factories only, never for `Spring.CreateUnit`, so a mission may hand a team a unit that team is forbidden to build.
+- A command synced Lua gave is let through. A restriction is what the player may not do, and a mission that withheld `attack` and then could not order its own raiders to attack would be restricting its author.
+- A command is named the way the engine names it, so `selfd` is `CMD.SELFD`. A name the engine has no command for is reported.
+- Neither callin is defined unless the mission asks for one. `AllowCommand` is consulted for every order anyone gives for the length of the game, and a mission that restricts nothing should pay nothing.
+
+`unlock_unit` lifts the buildable restriction on one def for one participant, and no participant named means the team a human is playing, the same team a `victory` that names none is about. Under an allow list it adds the def rather than taking it off a list: both modes are the same question asked from opposite ends, which is why one action answers both. Unlocking a def nothing was restricting is reported, because an author's mid-mission reward that the player already had is a mission that looks like it did something and did not.
+
+```lua
+GG.CoilboxMission.restrictions.allowsBuild(unitDefID, team)   -- team is an engine team
+GG.CoilboxMission.restrictions.allowsCommand(cmdID, team)
+GG.CoilboxMission.restrictions.unlock("armestor", "player")
+```
+
 ## Objectives
 
 An objective is a line of text the player is working towards, with an id, a `kind` of `primary` or `secondary`, and whether it starts `hidden`. The runtime owns one thing about it: whether it is still open, and how it ended. `complete_objective` and `fail_objective` settle one.
@@ -313,7 +337,7 @@ GG.CoilboxMission.gameOver.defeat("player")
 - Files under `missions/` are data. They are read with an empty environment, so they may not call the engine or touch globals.
 - Files under `luarules/mission_runtime/` are code. They are read with the gadget's own environment, so they may call the engine, and a module that does not need to should not.
 - Adding a condition or action type means adding it to `missions/runtime.lua` and bumping `version` in the same change. A type that has shipped is never removed: a scenario asking for it would then silently do nothing.
-- Version 1 has not shipped to a game yet, so a type it declares and does not implement is a gap to close rather than a lie to version around. `unlock_unit` is the last one, and it waits on the runtime enforcing a scenario's restrictions ([#793](https://github.com/tomjn/coilbox/issues/793)).
+- Version 1 has not shipped to a game yet, so a type it declares and does not implement is a gap to close rather than a lie to version around. There are none left: every condition and action in `missions/runtime.lua` is implemented.
 
 ## Tests
 
@@ -330,6 +354,7 @@ luajit lua/mission-runtime/tests/gameover_test.lua
 luajit lua/mission-runtime/tests/dialogue_test.lua
 luajit lua/mission-runtime/tests/view_test.lua
 luajit lua/mission-runtime/tests/reveal_test.lua
+luajit lua/mission-runtime/tests/restriction_test.lua
 luajit lua/mission-runtime/tests/panel_test.lua
 luajit lua/mission-runtime/tests/mission_trigger_test.lua
 ```
