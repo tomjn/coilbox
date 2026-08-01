@@ -95,4 +95,38 @@ describe("scenario fixture corpus", () => {
 
     expect(missing).toEqual([]);
   });
+
+  /**
+   * Type-name coverage isn't enough: a fixture can name a type without
+   * exercising the shape of data it carries. Issue #811 found the corpus had
+   * no prefab at all, so no prefab building with a factory queue and no
+   * queue with `repeat` either, and every group was `dormant`, so none of
+   * them started on the map. Guard those shapes explicitly, the same way the
+   * type-name check above is guarded, so a fixture that stops exercising one
+   * fails here instead of silently leaving `mission.lua` untested.
+   */
+  it("covers every prefab and group-dormancy shape", () => {
+    const allPrefabs = fixtures.flatMap(({ scenario }) => scenario.prefabs);
+    const allBuildings = allPrefabs.flatMap((p) => p.buildings);
+    const allGroups = fixtures.flatMap(({ scenario }) => scenario.groups);
+
+    const shapes: Record<string, boolean> = {
+      "a prefab": allPrefabs.length > 0,
+      "a prefab building with a factory queue": allBuildings.some(
+        (b) => (b.queue?.length ?? 0) > 0,
+      ),
+      "a factory queue that repeats": allBuildings.some(
+        (b) => b.repeat === true,
+      ),
+      "a group that starts on the map (not dormant)": allGroups.some(
+        (g) => g.dormant === false,
+      ),
+    };
+
+    const missing = Object.entries(shapes)
+      .filter(([, present]) => !present)
+      .map(([label]) => label);
+
+    expect(missing).toEqual([]);
+  });
 });

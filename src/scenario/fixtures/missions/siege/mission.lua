@@ -31,8 +31,41 @@ return {
       state = { name = "Warlord" },
     },
   },
-  groups = {},
-  prefabs = {},
+  groups = {
+    {
+      id = "keep-guard",
+      team = "defenders",
+      units = {
+        { def = "corak", count = 3 },
+      },
+      pos = { x = -10, z = -10 },
+      orders = {
+        { kind = "guard", target = "warlord" },
+      },
+      dormant = false,
+    },
+  },
+  prefabs = {
+    {
+      id = "keep-base",
+      team = "defenders",
+      origin = { x = -30, z = -30 },
+      buildings = {
+        {
+          def = "corlab",
+          offset = { x = 0, z = 0 },
+          facing = 2,
+          queue = { "corak", "corak", "corthud" },
+          ["repeat"] = true,
+        },
+        {
+          def = "cormex",
+          offset = { x = 15, z = 0 },
+          facing = 0,
+        },
+      },
+    },
+  },
   restrictions = {},
   vars = {},
   triggers = {
