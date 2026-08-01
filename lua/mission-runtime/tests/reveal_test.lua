@@ -190,9 +190,61 @@ playTo(engine, 15, 3600)
 check("a reveal with no deadline is the rest of the mission", #spotters(engine) == 1)
 
 --------------------------------------------------------------------------------
+-- A reveal fired by an event, which lands between ticks. Its deadline runs from
+-- when it ran, not from the tick before it, or a mission that reveals an area on
+-- a death gets a shorter reveal than the author wrote.
+--------------------------------------------------------------------------------
+
+engine = playing({
+	actors = { { id = "scout", unitDef = "grunt", team = "enemy", pos = { x = 800, z = 800 }, facing = 0 } },
+	triggers = {
+		{
+			id = "look",
+			enabled = true,
+			["repeat"] = false,
+			conditions = { op = "all", conditions = { { type = "unit_dead", params = { actor = "scout" } } } },
+			actions = { reveals({ zone = "depot", team = "player", seconds = 1 }) },
+		},
+	},
+})
+at = playTo(engine, 15, 20)
+engine.env.Spring.DestroyUnit(engine.GG.CoilboxMission.units.scout)
+check("a reveal fired between ticks lights the zone", #spotters(engine) == 1)
+
+at = playTo(engine, at + 1, 45)
+check("and its second runs from the frame the trigger fired on",
+	#spotters(engine) == 1, #spotters(engine))
+
+playTo(engine, at + 1, 60)
+check("so the fog comes back a tick later than the tick before it would have",
+	#spotters(engine) == 0, #spotters(engine))
+
+--------------------------------------------------------------------------------
 -- A trigger that reveals the same zone over and over. One spotter, and the last
 -- reveal decides when the fog comes back.
 --------------------------------------------------------------------------------
+
+engine = playing({
+	triggers = {
+		once("look", { reveals({ zone = "depot", team = "player", seconds = 1 }) }),
+		{
+			id = "again",
+			enabled = true,
+			["repeat"] = false,
+			conditions = { op = "all", conditions = { { type = "time_elapsed", params = { seconds = 1 } } } },
+			actions = { reveals({ zone = "depot", team = "player", seconds = 10 }) },
+		},
+	},
+})
+at = playTo(engine, 15, 60)
+check("a second reveal of a lit zone puts the deadline back", #spotters(engine) == 1,
+	#spotters(engine))
+check("without adding a second spotter", engine.GG.CoilboxMission.reveal.spotterCount(0) == 1)
+
+playTo(engine, at + 1, 345)
+check("and the zone goes dark on the later deadline, not the earlier one",
+	#spotters(engine) == 0, #spotters(engine))
+
 
 engine = playing({
 	triggers = {
@@ -262,6 +314,58 @@ check("and it is not something the team built", marks:find("built") == nil, mark
 check("while the engine still counts it, which is what makes the zone visible: "
 	.. "the team has its anchor and its spotter",
 	engine.env.Spring.GetTeamUnitCount(0) == 2, engine.env.Spring.GetTeamUnitCount(0))
+
+-- The tally of what a team has built is kept off the events rather than off the
+-- roll, so a spotter arriving has to be kept out of it too.
+engine = playing({
+	triggers = {
+		once("look", { reveals({ zone = "depot", team = "player" }) }),
+		{
+			id = "two-walls",
+			enabled = true,
+			["repeat"] = true,
+			conditions = {
+				op = "all",
+				conditions = {
+					{ type = "unit_built", params = { team = "player", unitDef = "wall", count = 2 } },
+				},
+			},
+			actions = { { type = "probe", params = { mark = "two" } } },
+		},
+	},
+})
+engine.env:GameFrame(15)
+engine.spawn("wall", 0)
+check("a spotter does not count towards what a team has built",
+	table.concat(engine.fired, ",") == "", table.concat(engine.fired, ","))
+
+engine.spawn("wall", 0)
+check("while the units the team really built do",
+	table.concat(engine.fired, ",") == "two", table.concat(engine.fired, ","))
+
+-- And a spotter going out is not a death, or a mission watching for one would
+-- see the reveal end as the thing it was watching for.
+engine = playing({
+	actors = { { id = "scout", unitDef = "grunt", team = "player", pos = { x = 800, z = 800 }, facing = 0 } },
+	triggers = {
+		once("look", { reveals({ zone = "depot", team = "player", seconds = 1 }) }),
+		{
+			id = "mourn",
+			enabled = true,
+			["repeat"] = true,
+			conditions = { op = "all", conditions = { { type = "unit_dead", params = { actor = "scout" } } } },
+			actions = { { type = "probe", params = { mark = "dead" } } },
+		},
+	},
+})
+engine.env:GameFrame(15)
+engine.env.Spring.DestroyUnit(engine.GG.CoilboxMission.units.scout)
+check("a death is a death", table.concat(engine.fired, ",") == "dead", table.concat(engine.fired, ","))
+
+playTo(engine, 16, 60)
+check("but a spotter going out is not one the mission sees",
+	table.concat(engine.fired, ",") == "dead", table.concat(engine.fired, ","))
+check("even though it did go out", #spotters(engine) == 0)
 
 --------------------------------------------------------------------------------
 -- What an author can get wrong.
