@@ -233,6 +233,106 @@ export function validateMission(mission: unknown): MissionIssue[] {
   return issues;
 }
 
+/* -------------------------------------------------------------------------- *
+ * Saying where an issue is, in the author's words.
+ *
+ * The paths above locate a problem in the compiled file, which is the right
+ * thing to carry around and the wrong thing to put in front of the person who
+ * wrote the scenario. `triggers["open"].actions[0].params.group` is the same
+ * fact as `Trigger "open", action 1, group`, and only the second one tells them
+ * where to click.
+ * -------------------------------------------------------------------------- */
+
+/** What each part of a compiled path is called in the editor. */
+const PART: Record<string, string> = {
+  actors: "Actor",
+  groups: "Group",
+  prefabs: "Prefab",
+  zones: "Zone",
+  triggers: "Trigger",
+  objectives: "Objective",
+  dialogue: "Dialogue line",
+  teams: "Team",
+  conditions: "Condition",
+  actions: "Action",
+  orders: "Order",
+};
+
+/** A name, optionally subscripted by an id or a position. */
+const PART_PATTERN =
+  /([A-Za-z_][A-Za-z0-9_]*)(?:\[(\d+|"(?:[^"\\]|\\.)*")\])?/y;
+
+interface PathPart {
+  name: string;
+  /** The `["id"]` or `[0]` that followed the name, verbatim. */
+  ref: string | null;
+}
+
+/**
+ * Split a compiled path into its parts, or null when it is not one. The load
+ * failure an unreadable mission comes back as is located by file name rather
+ * than by path, and that is worth showing as it stands.
+ */
+function pathParts(path: string): PathPart[] | null {
+  const parts: PathPart[] = [];
+  let at = 0;
+  while (at < path.length) {
+    PART_PATTERN.lastIndex = at;
+    const match = PART_PATTERN.exec(path);
+    if (!match) return null;
+    parts.push({ name: match[1], ref: match[2] ?? null });
+    at = PART_PATTERN.lastIndex;
+    if (at === path.length) break;
+    if (path[at] !== ".") return null;
+    at += 1;
+  }
+  return parts.length > 0 ? parts : null;
+}
+
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+/**
+ * Where an issue is, in the terms the editor uses. Null when the path does not
+ * point into the mission table.
+ *
+ * A list position is counted from one, because that is how the panel that holds
+ * it is read. An entry that has an id is named by it, because that is what the
+ * author typed.
+ */
+export function issueLocation(path: string): string | null {
+  const parts = pathParts(path);
+  if (!parts) return null;
+  const said: string[] = [];
+  for (const { name, ref } of parts) {
+    // `params` is how the compiled file nests a step's parameters. The author
+    // sees the parameter, not the table it sits in.
+    if (name === "params") continue;
+    // A name with no entry here is a parameter or a field, which is already
+    // what the form calls it.
+    const label = PART[name] ?? name;
+    if (ref === null) said.push(label);
+    else if (ref.startsWith('"')) said.push(`${label} ${quoted(ref)}`);
+    else said.push(`${label} ${Number(ref) + 1}`);
+  }
+  const [first, ...rest] = said;
+  if (!first) return null;
+  return [first, ...rest.map(lowerFirst)].join(", ");
+}
+
+/** An id out of a compiled path, in plain quotes rather than Lua escapes. */
+function quoted(ref: string): string {
+  try {
+    return `"${JSON.parse(ref)}"`;
+  } catch {
+    return ref;
+  }
+}
+
+/** One issue as the author is told it: where it is, then what is wrong. */
+export function describeIssue(issue: MissionIssue): string {
+  return `${issueLocation(issue.path) ?? issue.path}: ${issue.message}`;
+}
+
 /**
  * Read a compiled mission back out of the game archive at `root` and validate
  * it. An empty array means the engine can be shown the mission.

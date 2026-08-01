@@ -1,5 +1,5 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Rocket } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { PresetPickerDrawer } from "@/campaign/pages/components/PresetPickerDrawer";
@@ -18,6 +18,7 @@ import { DialoguePanel } from "./components/DialoguePanel";
 import { ObjectivePanel } from "./components/ObjectivePanel";
 import { RestrictionPanel } from "./components/RestrictionPanel";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
+import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
 import { TriggerPanel } from "./components/TriggerPanel";
 import {
   applyPoint,
@@ -101,6 +102,13 @@ export default function ScenarioEditPage() {
       ),
     });
 
+  const openTest = () =>
+    drawer.open({
+      title: `Test ${scenario.name} in game`,
+      width: "32rem",
+      content: <ScenarioTestDrawer scenario={scenario} />,
+    });
+
   const { participants } = scenario.setup;
 
   // Held loosely, the way a base being moved is: a step that has been deleted
@@ -170,6 +178,12 @@ export default function ScenarioEditPage() {
           onClick={openPresetPicker}
         >
           {scenario.setup.gameName ? "Change setup" : "Set up from preset"}
+        </Button>
+        {/* Testing belongs with the setup, because the setup is all a launch
+            consumes: the game named here decides whether the scenario is played
+            as itself or through the test mutator. */}
+        <Button size="sm" className="shrink-0" onClick={openTest}>
+          <Rocket className="size-4" /> Test in game
         </Button>
       </section>
 

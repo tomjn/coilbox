@@ -24,7 +24,7 @@ import {
   paletteGate,
   requiredRuntimeVersion,
 } from "../../gating";
-import { scenarioRoute } from "../../launch";
+import { type ScenarioRoute, scenarioRoute } from "../../launch";
 import type { Scenario } from "../../model";
 
 export interface ScenarioGate {
@@ -32,6 +32,16 @@ export interface ScenarioGate {
   gate: PaletteGate;
   /** Which runtime the palette is measured against, when it stops anything. */
   note: string | null;
+  /**
+   * How the scenario would reach the engine, and why, for the test button to
+   * say before it launches. Null until the game is known, which is the same
+   * condition that gates nothing.
+   */
+  route: ScenarioRoute | null;
+  reason: string | null;
+  /** The runtime this build of coilbox ships, which is the one a test mutator
+   *  would carry. Null when it could not be read. */
+  available: RuntimeMarker | null;
 }
 
 interface RuntimeStatus {
@@ -69,7 +79,16 @@ export function useScenarioGate(scenario: Scenario): ScenarioGate {
 
   const required = requiredRuntimeVersion(scenario);
   return useMemo(() => {
-    if (!game) return { gate: NO_GATE, note: null };
+    const available = status.available;
+    if (!game) {
+      return {
+        gate: NO_GATE,
+        note: null,
+        route: null,
+        reason: null,
+        available,
+      };
+    }
     const { route, reason } = scenarioRoute({
       game,
       installed: status.installed?.version ?? null,
@@ -78,6 +97,12 @@ export function useScenarioGate(scenario: Scenario): ScenarioGate {
     const gate = paletteGate(
       gateTarget(route, status.installed, status.available),
     );
-    return { gate, note: gatedCount(gate) > 0 ? reason : null };
+    return {
+      gate,
+      note: gatedCount(gate) > 0 ? reason : null,
+      route,
+      reason,
+      available,
+    };
   }, [game, status, required]);
 }
