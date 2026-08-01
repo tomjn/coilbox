@@ -198,6 +198,8 @@ function M.register(engine, state, hooks)
 	-- a mission sends wave after wave. A group that is still standing is left
 	-- alone, so a trigger that fires twice does not double it.
 	local function place(group)
+		engine:log("notice", "PLACE " .. tostring(group.id) .. " "
+			.. (debug and debug.traceback() or "no debug"):gsub("\n", " ~ "))
 		if #members[group.id] > 0 then
 			return
 		end
