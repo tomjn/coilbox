@@ -143,6 +143,33 @@ engine.env:GameFrame(1)
 check("and it still says so long after the start window has closed",
 	mission.suppressesStart(1) == true)
 
+-- Issue #888. A game whose start is a sequence of pre-game phases rather than a
+-- call asks the same question about the game, because a faction picker and a
+-- start position picker are global and decide nothing the mission has decided.
+check("a game whose teams do not all belong to the mission still runs its phases",
+	mission.suppressesEveryStart() == false)
+
+local OWNS_EVERY_START = compiled({
+	teams = {
+		player = { team = 0, noCommander = true },
+		enemy = { team = 1, noCommander = true },
+	},
+})
+
+local function owningEveryStart(options)
+	local owner = load({ coilbox_mission = "demo" }, missionFiles(OWNS_EVERY_START), options)
+	owner.env:Initialize()
+	return owner.GG.CoilboxMission
+end
+
+check("a game whose every team the mission started skips them",
+	owningEveryStart().suppressesEveryStart() == true)
+check("and Gaia is not a team that wants a start",
+	owningEveryStart({ teamList = { 0, 1, 2 }, gaiaTeam = 2 })
+		.suppressesEveryStart() == true)
+check("but a team the mission says nothing about is",
+	owningEveryStart({ teamList = { 0, 1, 2 } }).suppressesEveryStart() == false)
+
 --------------------------------------------------------------------------------
 -- Economy.
 --------------------------------------------------------------------------------
