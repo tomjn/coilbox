@@ -10,23 +10,31 @@
  * mode's own state, such as the unit type it is about to place. The list is
  * static and every entry is resolved on every render, in order, so that is safe.
  *
- * Groups (#761) and prefab bases (#762) are added by pushing an entry onto
- * {@link EDITOR_MODES}. Both pick units the way actors does: `useGameUnits` for
- * the scenario's game, `UnitDefSelect` to pick one of them.
+ * Prefab bases (#762) are added by pushing an entry onto {@link EDITOR_MODES}.
+ * They pick units the way actors and groups do: `useGameUnits` for the
+ * scenario's game, `UnitDefSelect` to pick one of them.
  */
 
+import { Input } from "@picoframe/frame";
 import {
   Circle,
   type LucideIcon,
   MousePointer2,
   Square,
   User,
+  Users,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Point, Scenario, ScenarioZone } from "../../model";
 import { addActor } from "./editing";
+import {
+  addGroup,
+  clampCount,
+  DEFAULT_GROUP_COUNT,
+  MAX_GROUP_COUNT,
+} from "./groups";
 import { placementKey } from "./placements";
 import { TeamSelect } from "./TeamSelect";
 import { useGameUnits } from "./useGameUnits";
@@ -216,5 +224,80 @@ const actorsMode: EditorMode = {
   },
 };
 
+/**
+ * A block of units at one point, which is what a group is.
+ *
+ * A group holds counts rather than positions, so what is placed is a number of
+ * one unit type and the rest is added to it from the selection bar. The runtime
+ * lays the counts out in a formation around the point, which is what the editor
+ * draws, so the click puts down the middle of the block rather than its first
+ * unit.
+ */
+const groupsMode: EditorMode = {
+  id: "groups",
+  label: "Groups",
+  icon: Users,
+  hint: "Pick a unit and a count, then click the map to place a group.",
+  use: ({ scenario, onChange, onSelect }) => {
+    const [unitDef, setUnitDef] = useState("");
+    const [count, setCount] = useState(DEFAULT_GROUP_COUNT);
+    const [team, setTeam] = useState("");
+    const participants = scenario.setup.participants;
+    const owner = participants.some((p) => p.id === team)
+      ? team
+      : (participants[0]?.id ?? "");
+    const { units, loading } = useGameUnits(scenario.setup.gameName);
+
+    return {
+      place: unitDef
+        ? (pos: Point) => {
+            const id = crypto.randomUUID();
+            onChange(
+              addGroup(scenario, id, {
+                team: owner,
+                units: [{ def: unitDef, count }],
+                pos,
+                orders: [],
+                dormant: false,
+              }),
+            );
+            onSelect(placementKey("group", id, 0));
+          }
+        : null,
+      controls: (
+        <>
+          <UnitDefSelect
+            units={units}
+            value={unitDef}
+            onValueChange={setUnitDef}
+            loading={loading}
+            size="sm"
+            className="w-48"
+          />
+          <Input
+            aria-label="How many units"
+            type="number"
+            min={1}
+            max={MAX_GROUP_COUNT}
+            value={count}
+            onChange={(e) => setCount(clampCount(Number(e.target.value)))}
+            className="h-8 w-16 bg-card/80 text-xs backdrop-blur"
+          />
+          <TeamSelect
+            participants={participants}
+            value={owner}
+            onValueChange={setTeam}
+          />
+        </>
+      ),
+    };
+  },
+};
+
 /** Every mode the editor offers, in the order the strip shows them. */
-export const EDITOR_MODES: EditorMode[] = [selectMode, zonesMode, actorsMode];
+export const EDITOR_MODES: EditorMode[] = [
+  selectMode,
+  zonesMode,
+  actorsMode,
+  groupsMode,
+];
