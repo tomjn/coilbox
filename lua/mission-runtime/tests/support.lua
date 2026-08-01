@@ -97,6 +97,8 @@ function M.missionFiles(mission)
 		["luarules/mission_runtime/coilbox_reveal.lua"] = module("luarules/mission_runtime/coilbox_reveal.lua"),
 		["luarules/mission_runtime/coilbox_restrictions.lua"] = module(
 			"luarules/mission_runtime/coilbox_restrictions.lua"),
+		["luarules/mission_runtime/coilbox_extensions.lua"] = module(
+			"luarules/mission_runtime/coilbox_extensions.lua"),
 		["missions/demo/mission.lua"] = function()
 			return mission
 		end,
