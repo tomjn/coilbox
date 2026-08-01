@@ -196,29 +196,39 @@ export function StepRow({
   );
 }
 
-/** One condition or action added to the end of a list. Types whose references
- *  have nothing to point at are greyed with what they need first, rather than
- *  being left out, so the list says what the runtime can do. */
+/**
+ * One condition or action added to the end of a list.
+ *
+ * A type that cannot be used is greyed with the reason rather than left out, so
+ * the list says what the runtime can do and what it would take to do the rest.
+ * There are two reasons, and the runtime's comes first because it is the one the
+ * author cannot fix by editing the document: the target runtime does not
+ * implement the type (#765), or its references have nothing to point at yet.
+ */
 export function AddStep({
   list,
   scenario,
   unitDefs,
+  gate,
   onAdd,
 }: {
   list: StepList;
   scenario: Scenario;
   unitDefs: string[];
+  /** Why each type the target runtime cannot run is unavailable, by type name. */
+  gate: Record<string, string>;
   onAdd: (step: TriggerStep) => void;
 }) {
   const table = stepTypes(list);
   const options = Object.entries(table).map(([type, spec]) => {
     const defaults = stepDefaults(spec, { scenario, unitDefs });
+    const reason = gate[type] ?? defaults.needs;
     return {
       value: type,
       label: stepLabel(type),
       description: Object.keys(spec).join(", ") || undefined,
-      trailing: defaults.needs,
-      disabled: defaults.needs !== undefined,
+      trailing: reason,
+      disabled: reason !== undefined,
     };
   });
 
@@ -229,6 +239,7 @@ export function AddStep({
       placeholder={list === "conditions" ? "Add a condition" : "Add an action"}
       options={options}
       onValueChange={(type) => {
+        if (gate[type]) return;
         const defaults = stepDefaults(table[type], { scenario, unitDefs });
         if (defaults.params) onAdd({ type, params: defaults.params });
       }}

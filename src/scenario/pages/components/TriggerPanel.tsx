@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import type { PaletteGate } from "../../gating";
 import type { Scenario, ScenarioTrigger } from "../../model";
 import { EditorPanel } from "./panels";
 import { AddStep, StepRow } from "./TriggerSteps";
@@ -42,6 +43,7 @@ import {
   stepsOf,
   triggerSummary,
 } from "./triggers";
+import { useScenarioGate } from "./useScenarioGate";
 
 export function TriggerPanel({
   scenario,
@@ -66,6 +68,10 @@ export function TriggerPanel({
     scenario.triggers[0] ??
     null;
   const unitDefs = useMemo(() => units.map((u) => u.name), [units]);
+  // What the runtime that will play this scenario can and cannot run. Read here
+  // rather than passed in, because the trigger lists are the only thing in the
+  // editor a runtime version gates.
+  const { gate, note } = useScenarioGate(scenario);
 
   const count = scenario.triggers.length;
   const create = () => {
@@ -84,6 +90,11 @@ export function TriggerPanel({
           : `${count} trigger${count === 1 ? "" : "s"}`
       }
     >
+      {note && (
+        <p className="mb-3 max-w-prose text-[11px] text-muted-foreground">
+          {note} Types it does not implement are listed but cannot be added.
+        </p>
+      )}
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="flex shrink-0 flex-col gap-2 lg:w-60">
           {count === 0 ? (
@@ -123,6 +134,7 @@ export function TriggerPanel({
               units={units}
               unitsLoading={unitsLoading}
               unitDefs={unitDefs}
+              gate={gate}
               picking={picking}
               onPick={onPick}
               onChange={onChange}
@@ -183,6 +195,7 @@ function TriggerForm({
   units,
   unitsLoading,
   unitDefs,
+  gate,
   picking,
   onPick,
   onChange,
@@ -193,6 +206,8 @@ function TriggerForm({
   units: UnitDatasetEntry[];
   unitsLoading: boolean;
   unitDefs: string[];
+  /** The types the target runtime cannot run, for the two pickers. */
+  gate: PaletteGate;
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
@@ -290,6 +305,7 @@ function TriggerForm({
         units={units}
         unitsLoading={unitsLoading}
         unitDefs={unitDefs}
+        gate={gate.conditions}
         picking={picking}
         onPick={onPick}
         onChange={onChange}
@@ -301,6 +317,7 @@ function TriggerForm({
         units={units}
         unitsLoading={unitsLoading}
         unitDefs={unitDefs}
+        gate={gate.actions}
         picking={picking}
         onPick={onPick}
         onChange={onChange}
@@ -394,6 +411,7 @@ function StepSection({
   units,
   unitsLoading,
   unitDefs,
+  gate,
   picking,
   onPick,
   onChange,
@@ -404,6 +422,8 @@ function StepSection({
   units: UnitDatasetEntry[];
   unitsLoading: boolean;
   unitDefs: string[];
+  /** Why each type this list cannot offer is unavailable, by type name. */
+  gate: Record<string, string>;
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
@@ -501,6 +521,7 @@ function StepSection({
         list={list}
         scenario={scenario}
         unitDefs={unitDefs}
+        gate={gate}
         onAdd={(step) => onChange(addStep(scenario, trigger.id, list, step))}
       />
     </section>
