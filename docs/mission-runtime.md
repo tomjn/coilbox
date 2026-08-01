@@ -57,7 +57,25 @@ end
 
 Read it at the moment you would end the game rather than caching it at load. The runtime's gadget sits at `layer = 1000`, so it initialises after yours and the table is not there yet while your own `Initialize` runs.
 
-No game has adopted the runtime yet, so this guard has not been through a real game's end conditions. Doing that on Splinter Faction is [issue #772](https://github.com/tomjn/coilbox/issues/772).
+This has now been through a real game's end conditions, on Splinter Faction ([issue #772](https://github.com/tomjn/coilbox/issues/772)). It is one line in one file, because Splinter Faction aliases the engine call once and both of its endings go through the alias. `LuaRules/Gadgets/game_end.lua` line 69 reads:
+
+```lua
+local GameOver = Spring.GameOver
+```
+
+and becomes:
+
+```lua
+local spGameOver = Spring.GameOver
+local function GameOver(winners)
+    if GG.CoilboxMission then return end
+    spGameOver(winners)
+end
+```
+
+That covers both call sites, the last ally team standing at line 322 and the everyone-left case at line 465, and nothing else in the game calls `Spring.GameOver` at all. Look for the alias before you go patching call sites: a game that reads `Spring.GameOver` into a local is the common shape, and the local is the cheaper place to guard.
+
+Without it a mission ends when your game says so. In the proof the player wiped the enemy out 700 frames before the mission's own timer, and Splinter Faction's `game_end` declared the win: `Spring.IsGameOver()=true coilbox_mission_over=0`. With the guard the same run reads `Spring.IsGameOver()=false` and the mission ends itself.
 
 The engine also ends a game itself when an ally team has nothing left, and that is not something you can guard. The runtime handles it with the anchor unit instead, and that half holds whether or not you have added your guard, because being demoted to spectator mid-mission is the damage even when nobody declares a winner.
 
@@ -90,6 +108,8 @@ Enough to be worth knowing before you adopt it:
 - **The start.** Every actor, prefab building, per-team start unit and non-dormant group is created at game start. A building is put through `Spring.Pos2BuildPos` on the way, so it sits on the build grid and can be rebuilt where it stood.
 - **Starting resources, for every mission team.** At game frame 1 each team the scenario declares has its bank set to the scenario's number, defaulting to nothing. That is how the game's usual opening bank is suppressed. Free income, if the scenario asks for it, is paid every frame.
 - **Commanders, only where asked.** A team whose scenario entry sets `noCommander` has whatever the game spawned for it removed, from load until the end of game frame 1, and only creations with no builder are touched. Teams without the flag keep the commander your game gave them. Suppression removes rather than prevents, because the engine offers no veto: `AllowUnitCreation` is consulted for builders and factories only, never for `Spring.CreateUnit`, which is what a start gadget uses.
+
+  **This does not work if your game spawns late.** The window closes at game frame 1, so a game that picks a faction or a start position before it spawns misses it entirely. Splinter Faction spawns on frame 1800, and its commanders arrive despite `noCommander`: [issue #884](https://github.com/tomjn/coilbox/issues/884).
 - **Game over**, through your guard and the anchor unit.
 - **`AllowUnitCreation` and `AllowCommand`, only when a mission restricts something.** Both callins are hot, and a mission that restricts nothing defines neither.
 
@@ -154,6 +174,14 @@ scripts/mission-headless.sh
 ```
 
 A real engine. It builds a scratch game out of the runtime plus the compiled fixtures and plays each one in `spring-headless`, which simulates with no OpenGL context. A probe gadget stands in for the player: it walks a unit into a zone, kills an actor, hands one over, and checks what the runtime did about it. Nothing in CI runs this, because a runner has no engine, no game and no map. The script's header lists the environment variables that point it at them.
+
+```sh
+scripts/mission-sf-proof.sh
+```
+
+The adoption proof, and it runs the other way round from the two above. Both of those play a runtime the harness itself laid down, which settles the runtime's behaviour and says nothing about adoption. This one plays the runtime out of a real game: the scratch mutator carries only a probe, and depends on a loose Splinter Faction that coilbox's own **Install the mission runtime** button wrote into. It copies `src/scenario/fixtures/missions/splinter/mission.lua` to `missions/splinter/mission.lua` in that game, which is where coilbox's launch path puts a compiled mission, and removes it again unless you pass `--keep-mission`.
+
+**The adoption proof has found what a second game costs.** Every general claim held on a game the runtime had never seen: the gadget loaded out of the game's own `LuaRules`, read its own version marker, published the mission, placed the scenario's units, overrode the game's opening bank, kept the game's `game_end` out of the ending once the guard was in, and ended the mission itself with the right winner. The one thing that did not hold was start suppression, because Splinter Faction spawns 1800 frames after the runtime stops watching ([issue #884](https://github.com/tomjn/coilbox/issues/884)). That is the failure the proof exists to find, and no amount of running against Balanced Annihilation would have found it.
 
 **The headless run has found bugs the stub could not.** `gift_units` moved nothing between teams that were not allied, and the runtime never noticed, because it asked for a share and threw the refusal away. The stub agreed with everything, so all fifteen suites passed on it. The fix was to ask for a capture instead, and to report a refusal ([issue #857](https://github.com/tomjn/coilbox/issues/857)). This is the whole argument for keeping the headless harness: a stub can only ever agree with the reading of the engine's source that was written into it.
 
