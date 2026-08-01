@@ -75,8 +75,15 @@ local function armed(id)
 	return state().triggers:isEnabled(id)
 end
 
+--- What a game rules param holds, or nil.
+--
+-- `Spring.GetGameRulesParam` returns no values at all for a param nothing has
+-- set, not nil, so passing the call straight on hands the caller an empty
+-- expression list and `tostring(rules(name))` raises. Bound to one value, so a
+-- detail string can say "nil" rather than taking its step down with it.
 local function rules(name)
-	return Spring.GetGameRulesParam(name)
+	local value = Spring.GetGameRulesParam(name)
+	return value
 end
 
 local function defOf(unitID)
