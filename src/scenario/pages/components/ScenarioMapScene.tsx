@@ -652,8 +652,8 @@ export function ScenarioMapScene({
         drawing={units.drawing}
       />
       <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
-        {mapName} · drag or middle-drag to pan · drag a unit or a zone to move
-        it · right-drag to turn · scroll to zoom
+        {mapName} · drag or middle-drag to pan · drag a unit to move it · drag a
+        zone's middle handle to move it · right-drag to turn · scroll to zoom
       </p>
     </Surface>
   );
@@ -764,6 +764,9 @@ function ZoneBar({
       />
       <span className="font-mono text-[11px] text-muted-foreground">
         {size}
+      </span>
+      <span className="text-[11px] text-muted-foreground">
+        drag the orange handle to move it, a white one to resize it
       </span>
       <Button
         size="sm"
