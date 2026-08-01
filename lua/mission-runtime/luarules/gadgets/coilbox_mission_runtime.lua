@@ -138,6 +138,13 @@ if not REVEAL then
 	return false
 end
 
+local RESTRICTIONS, restrictionsError =
+	includeTable("luarules/mission_runtime/coilbox_restrictions.lua")
+if not RESTRICTIONS then
+	log("error", restrictionsError)
+	return false
+end
+
 -- Refuse a mission built for a newer runtime than the game vendored. Running it
 -- anyway would quietly drop whatever this version cannot read, and a mission
 -- that half works is harder to diagnose than one that refuses to start.
@@ -272,6 +279,8 @@ if gadgetHandler:IsSyncedCode() then
 	local gameOver
 	-- The reveals that are lit, and the spotters lighting them.
 	local reveal
+	-- What the mission's teams may build and do.
+	local restrictions
 
 	--- Tell the triggers something happened.
 	--
@@ -541,6 +550,10 @@ if gadgetHandler:IsSyncedCode() then
 			def = GAMEOVER.inertDef,
 		})
 		published.reveal = reveal
+		-- After the game over, which is where "the team a human is playing" comes
+		-- from, because that is the team an unlock_unit naming none is about.
+		restrictions = RESTRICTIONS.register(triggers, published)
+		published.restrictions = restrictions
 		-- Saying a line and playing a sound are things the player sees and hears
 		-- rather than things that happen in the game, so synced Lua decides only
 		-- that they happened and the unsynced half takes it from there.
@@ -592,6 +605,47 @@ if gadgetHandler:IsSyncedCode() then
 		-- ended evaluates nothing: the result is already in the replay.
 		if not gameOver.isOver() then
 			triggers:frame(frame)
+		end
+	end
+
+	-- What the mission's teams may build and do.
+	--
+	-- Both callins are defined only when the mission asks for one, because both
+	-- are hot: AllowCommand is consulted for every order anyone gives for the
+	-- length of the game. A mission that restricts nothing pays nothing, which is
+	-- the bargain the modoption gate makes for a normal game.
+	--
+	-- Explicit booleans on the way out. A gadget handler reads a nil return as a
+	-- refusal, so "no opinion" is not something to leave unsaid here.
+	local RESTRICTED = MISSION.restrictions or {}
+
+	if RESTRICTED.buildable then
+		--- Refuse a build the mission forbids this team. The team is the builder's,
+		-- which is the team the unit would have been built on.
+		--
+		-- The second return is what the engine does with the order that asked.
+		-- Dropping it is what stops a factory queue jamming on a unit it will never
+		-- be allowed to build, and a builder standing at the site retrying forever.
+		function gadget:AllowUnitCreation(unitDefID, _, builderTeam)
+			if restrictions.allowsBuild(unitDefID, builderTeam) then
+				return true
+			end
+			return false, true
+		end
+	end
+
+	if RESTRICTED.commands and #RESTRICTED.commands > 0 then
+		--- Withhold a command the mission took away.
+		--
+		-- A command synced Lua gave is let through. A restriction is what the
+		-- player may not do, and the runtime ordering its own groups about is the
+		-- mission itself: a mission that withheld `attack` and then could not order
+		-- its raiders to attack would be restricting its author.
+		function gadget:AllowCommand(_, _, unitTeam, cmdID, _, _, _, _, _, fromLua)
+			if fromLua then
+				return true
+			end
+			return restrictions.allowsCommand(cmdID, unitTeam)
 		end
 	end
 
