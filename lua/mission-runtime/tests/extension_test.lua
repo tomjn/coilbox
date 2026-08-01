@@ -241,6 +241,7 @@ files["missions/extensions.lua"] = function(env)
 end
 files[HANDLER] = function(env)
 	handlerSawSpring = env.Spring ~= nil
+	env.SF_HANDLER_GLOBAL = true
 	return { conditions = {}, actions = {} }
 end
 engine = load({ coilbox_mission = "demo" }, files)
@@ -248,7 +249,9 @@ engine.env:Initialize()
 
 check("the declaration is read in an empty environment, so it cannot reach the engine",
 	declarationSawSpring == false, tostring(declarationSawSpring))
-check("and the handler in the gadget's, so it can", handlerSawSpring == true,
-	tostring(handlerSawSpring))
+check("and the handler in one that reaches it, so a game's code can call the engine",
+	handlerSawSpring == true, tostring(handlerSawSpring))
+check("but a global the handler sets does not land in the runtime's environment",
+	rawget(engine.env, "SF_HANDLER_GLOBAL") == nil)
 
 support.report()

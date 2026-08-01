@@ -8,8 +8,11 @@
 -- types is dispatched to the game's code like any other.
 --
 -- The declaration is data and the handler is code, so they are read the way the
--- gadget reads each: the declaration in an empty environment, the handler in the
--- gadget's own.
+-- gadget reads each: the declaration in an empty environment, the handler in one
+-- that reaches the engine. The handler's is `hooks.env()`, a table of the game's
+-- own that falls through to the gadget's environment, so the game's code can
+-- read GG and call the engine and a global it sets does not land in the
+-- runtime's.
 --
 -- Two rules decide what is registered, and both are here rather than in the
 -- handler, so a game cannot opt out of either.
@@ -66,7 +69,8 @@ end
 --- Register everything missions/extensions.lua and the game's handler agree on.
 --
 -- `hooks.has(path)` says whether the archive holds a file, `hooks.load(path,
--- env)` evaluates one and returns the table it built or nil and why not, and
+-- env)` evaluates one and returns the table it built or nil and why not,
+-- `hooks.env()` is the environment the game's own code runs in, and
 -- `hooks.log(level, message)` reports. A game with no declaration registers
 -- nothing and says nothing: that is nearly every game.
 --
@@ -95,7 +99,7 @@ function M.register(engine, state, hooks)
 		hooks.log("error", M.DECLARATION .. " names a handler this game has no " .. handlerPath)
 		return registered
 	end
-	local handler, handlerErr = hooks.load(handlerPath)
+	local handler, handlerErr = hooks.load(handlerPath, hooks.env())
 	if not handler then
 		hooks.log("error", handlerErr)
 		return registered

@@ -630,6 +630,18 @@ if gadgetHandler:IsSyncedCode() then
 				return VFS.FileExists(path, VFS.ZIP)
 			end,
 			load = includeTable,
+			-- What a game's own handler runs in. A table of its own that falls
+			-- through to this gadget's environment: the handler is code, so it has
+			-- to reach the engine and GG, and a global it sets should land in its
+			-- own table rather than in the runtime's.
+			--
+			-- Named rather than left to VFS.Include's default, because the default
+			-- is not this environment. A handler included with no environment at all
+			-- cannot see GG, which is where a game keeps everything an extension is
+			-- likely to want (issue #776).
+			env = function()
+				return setmetatable({}, { __index = getfenv(1) })
+			end,
 			log = log,
 		})
 
