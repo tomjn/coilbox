@@ -42,7 +42,7 @@ import {
   targetOptions,
 } from "./groups";
 import { EDITOR_MODES } from "./modes";
-import type { Placement } from "./placements";
+import { type Placement, placementKey } from "./placements";
 import { authoringCamera, clampToPlane, mapSceneStatus } from "./scene";
 import { useGameUnits } from "./useGameUnits";
 import { useMapEditing } from "./useMapEditing";
@@ -444,9 +444,12 @@ export function ScenarioMapScene({
             what={`${groupLabel(scenario.groups, pickedGroup.id)} · point ${
               pathRef.waypoint + 1
             }`}
+            // Back to the group the point belonged to rather than to nothing,
+            // so its other points keep their knobs and a path being drawn is
+            // still being drawn.
             onDelete={() => {
               onChange(removeWaypoint(scenario, selected));
-              setSelected(null);
+              setSelected(placementKey("group", pathRef.groupId, 0));
             }}
           />
         )}
