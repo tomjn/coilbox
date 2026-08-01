@@ -29,6 +29,7 @@ import { scenarioRuntimeStatus, scenarioWriteMission } from "./bindings";
 import { compileScenario, missionPath } from "./compile";
 import type { Scenario } from "./model";
 import { isMutatorArchive, writeTestMutator } from "./mutator";
+import { packagedArchiveReason } from "./offer";
 import { type MissionIssue, validateCompiledMission } from "./validate";
 
 /**
@@ -73,9 +74,7 @@ export function scenarioRoute(opts: {
   });
 
   if (!isSdd(game.primaryArchive) || !game.primaryArchive.path) {
-    return mutator(
-      `${game.name} is a packaged archive, which cannot be written into. The scenario is played through coilbox's test mutator instead.`,
-    );
+    return mutator(packagedArchiveReason(game.name));
   }
   if (installed === null) {
     return mutator(
