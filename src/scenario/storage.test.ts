@@ -125,6 +125,29 @@ describe("saveScenario", () => {
     expect(saved.updatedAt).not.toBe("2026-01-01T00:00:00.000Z");
   });
 
+  it("stamps the runtime version the document's triggers need", async () => {
+    const saved = await saveScenario(
+      scenario({
+        runtimeVersion: 7,
+        triggers: [
+          {
+            id: "t1",
+            enabled: true,
+            repeat: false,
+            conditions: {
+              op: "all",
+              conditions: [{ type: "var", params: {} }],
+            },
+            actions: [],
+          },
+        ],
+      }),
+    );
+
+    // Every shipped type is version 1, so a stored 7 was never computed here.
+    expect(saved.runtimeVersion).toBe(1);
+  });
+
   it("writes JSON the parser accepts, under the scenario's id", async () => {
     await saveScenario(scenario({ name: "Ambush at the pass" }));
 

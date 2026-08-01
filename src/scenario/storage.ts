@@ -8,6 +8,7 @@ import {
   scenarioMediaWrite,
   scenarioSave,
 } from "./bindings";
+import { requiredRuntimeVersion } from "./gating";
 import { parseScenarioJson, type Scenario } from "./model";
 import {
   dropMissingDialogueMedia,
@@ -43,14 +44,20 @@ export async function listScenarios(): Promise<Scenario[]> {
 }
 
 /**
- * Persist a scenario, stamping `updatedAt` (and `createdAt` on the first save).
- * Returns the stamped document so the caller can hold the same value that was
- * written, rather than one whose timestamps have already drifted.
+ * Persist a scenario, stamping `updatedAt` (and `createdAt` on the first save)
+ * and the runtime version its triggers need. Returns the stamped document so the
+ * caller can hold the same value that was written, rather than one whose
+ * timestamps have already drifted.
+ *
+ * `runtimeVersion` is computed here rather than by each editor panel because
+ * every path that changes a document goes through this one function, including
+ * import, so a scenario on disk always names the runtime it actually needs.
  */
 export async function saveScenario(scenario: Scenario): Promise<Scenario> {
   const now = new Date().toISOString();
   const stamped: Scenario = {
     ...scenario,
+    runtimeVersion: requiredRuntimeVersion(scenario),
     createdAt: scenario.createdAt || now,
     updatedAt: now,
   };
