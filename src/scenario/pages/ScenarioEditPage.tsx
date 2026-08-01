@@ -15,6 +15,7 @@ import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { saveScenario } from "../storage";
 import { ObjectivePanel } from "./components/ObjectivePanel";
+import { RestrictionPanel } from "./components/RestrictionPanel";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
 import { TriggerPanel } from "./components/TriggerPanel";
 import {
@@ -25,6 +26,7 @@ import {
   stepLabel,
 } from "./components/triggers";
 import { useGameUnits } from "./components/useGameUnits";
+import { VarPanel } from "./components/VarPanel";
 
 const BACK = "/scenario-builder";
 
@@ -194,6 +196,13 @@ export default function ScenarioEditPage() {
         scenario={scenario}
         onChange={(next) => void persist(next)}
       />
+      <RestrictionPanel
+        scenario={scenario}
+        onChange={(next) => void persist(next)}
+        units={gameUnits.units}
+        unitsLoading={gameUnits.loading}
+      />
+      <VarPanel scenario={scenario} onChange={(next) => void persist(next)} />
     </div>
   );
 }
