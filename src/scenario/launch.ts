@@ -160,6 +160,13 @@ export interface ScenarioLaunchInput {
   rescan: () => Promise<GameItem[]>;
   /** Start the engine. Called only once the mission has validated. */
   launch: (config: BattleConfig) => Promise<{ exitCode: number | null }>;
+  /**
+   * Units to forbid outright, as the engine `[RESTRICT]` block. A campaign
+   * mission's own restriction list, which is authored around the scenario
+   * rather than inside it. Distinct from the scenario's `restrictions`, which
+   * the runtime enforces and can lift mid-mission.
+   */
+  disabledUnits?: string[];
 }
 
 export type ScenarioLaunchResult =
@@ -223,7 +230,7 @@ async function writeIntoGame(
 export async function launchScenario(
   input: ScenarioLaunchInput,
 ): Promise<ScenarioLaunchResult> {
-  const { scenario, dataDir, games, rescan, launch } = input;
+  const { scenario, dataDir, games, rescan, launch, disabledUnits } = input;
   const wanted = scenario.setup.gameName;
   const game = games.find((g) => g.name === wanted);
   if (!game) {
@@ -288,6 +295,7 @@ export async function launchScenario(
     mapName: scenario.setup.mapName,
     gameType,
     startPosType: scenario.setup.startPosType,
+    disabledUnits,
     modOptions: {
       ...scenario.setup.modOptionValues,
       [MISSION_MODOPTION]: scenario.id,
