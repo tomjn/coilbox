@@ -13,9 +13,14 @@ local check, load, logged, sent = support.check, support.load, support.logged, s
 local missionFiles, fixture = support.missionFiles, support.fixture
 
 --- Start a fixture mission and run up to the first frame the game is playing.
+--
+-- The def list starts with one that does nothing at all, because that is what
+-- the runtime builds a spotter from and the fixtures' own defs all move and
+-- shoot.
 local function playing(id)
 	local engine = load({ coilbox_mission = "demo" }, missionFiles(fixture(id)), {
 		startPositions = { [0] = { x = 500, z = 500 }, [1] = { x = 100, z = 100 } },
+		defList = { { name = "marker", speed = 0, weapons = {} } },
 	})
 	engine.env:Initialize()
 	engine.env:GameStart()
@@ -23,8 +28,9 @@ local function playing(id)
 end
 
 --- Stand in for the action types later issues implement, recording that they
--- ran. Registering onto the published engine is the seam a game's own
--- extensions use too.
+-- ran. `unlock_unit` is the last one left, and it waits on the runtime enforcing
+-- a scenario's restrictions (#793). Registering onto the published engine is the
+-- seam a game's own extensions use too.
 local function record(triggers, kinds)
 	local ran = {}
 	for _, kind in ipairs(kinds) do
@@ -49,7 +55,7 @@ check("the trigger engine is published", state.triggers ~= nil)
 check("a trigger the scenario disabled starts disabled", state.triggers:isEnabled("unlock") == false)
 check("every other trigger starts armed", state.triggers:isEnabled("count-check") == true)
 
-local ran = record(state.triggers, { "reveal_area", "unlock_unit" })
+local ran = record(state.triggers, { "unlock_unit" })
 
 engine.env:GameFrame(0)
 check("nothing fires while the start window is open", state.triggers:isEnabled("count-check") == true)
@@ -88,7 +94,36 @@ check("and its disable_trigger took effect", state.triggers:isEnabled("count-che
 engine.give(state.units.outpost, 0)
 check("an actor changing hands fires the trigger watching for it",
 	state.triggers:isEnabled("outpost-captured") == false)
-check("that trigger's actions ran", ranAll(ran) == "unlock_unit,reveal_area", ranAll(ran))
+check("that trigger's actions ran", ranAll(ran) == "unlock_unit", ranAll(ran))
+
+-- The mission reveals its supply depot to the player for thirty seconds. The
+-- zone is a circle of 50 at the origin, so the spotter is one unit standing
+-- there with sight enough to cover it.
+local lit
+for _, unitID in ipairs(engine.order) do
+	if state.reveal.isSpotter(unitID) then
+		lit = unitID
+	end
+end
+check("the trigger's reveal_area lit the zone it named", lit ~= nil)
+check("from the middle of it", lit and engine.units[lit].x == 0 and engine.units[lit].z == 0)
+check("for the team the mission named", lit and engine.units[lit].team == 0,
+	lit and engine.units[lit].team)
+check("and the mission's own counting does not see the unit doing it",
+	lit and state.reveal.spotterCount(0) == 1, lit and state.reveal.spotterCount(0))
+
+-- The capture landed on frame 45, so the thirty seconds are up on frame 945.
+for at = 46, 930 do
+	engine.env:GameFrame(at)
+end
+check("and it stays lit for the thirty seconds the mission asked for",
+	state.reveal.spotterCount(0) == 1, state.reveal.spotterCount(0))
+
+for at = 931, 945 do
+	engine.env:GameFrame(at)
+end
+check("after which the fog comes back", state.reveal.spotterCount(0) == 0,
+	state.reveal.spotterCount(0))
 
 -- The mission gifts a dormant group it never spawned. Nothing to hand over, and
 -- an author who forgot the spawn_group is told so rather than left wondering.
@@ -101,11 +136,22 @@ check("gifting a group that was never spawned says so",
 
 engine, state = playing("ambush")
 
--- Only the two types no issue has implemented yet. The mission's dialogue and
--- its sound run for real, so what they said is read off the messages the synced
--- half sent rather than off a stand-in.
-local staged = record(state.triggers, { "camera_pan", "map_marker" })
 local scout = state.units.scout
+
+--- What the mission has staged for the player so far: every camera move and
+-- every marker, in the order they went out. Read off the messages the synced
+-- half sent, because that is the whole of what those two actions do.
+local function staged()
+	local out = {}
+	for _, entry in ipairs(engine.sent) do
+		if entry[1] == "coilbox_mission_camera" then
+			out[#out + 1] = "pan " .. entry[2] .. "/" .. entry[3] .. " over " .. entry[4]
+		elseif entry[1] == "coilbox_mission_marker" then
+			out[#out + 1] = "mark " .. entry[2] .. "/" .. entry[3] .. " " .. entry[4]
+		end
+	end
+	return table.concat(out, ", ")
+end
 
 --- The dialogue lines this mission has said so far.
 local function said()
@@ -114,7 +160,7 @@ end
 
 engine.env:GameFrame(1)
 engine.env:GameFrame(15)
-check("a healthy actor trips nothing", said() == "" and #staged == 0, said())
+check("a healthy actor trips nothing", said() == "" and staged() == "", said())
 
 engine.env.Spring.SetUnitHealth(scout, 40)
 check("health is not read between ticks", said() == "")
@@ -147,9 +193,10 @@ engine.move(patrol, 100, 100)
 engine.env:GameFrame(60)
 check("walking into the pass springs it", state.triggers:isEnabled("spring-ambush") == false)
 check("and the whole trigger ran, in the order the mission wrote it",
-	said() == "warn,warn,warn" and ranAll(staged) == "camera_pan,map_marker"
+	said() == "warn,warn,warn"
+	and staged() == "pan 50/50 over 2, mark 50/50 Ambush!"
 	and table.concat(sent(engine, "coilbox_mission_sound"), ",") == "alarm.wav",
-	said() .. " / " .. ranAll(staged))
+	said() .. " / " .. staged())
 
 --------------------------------------------------------------------------------
 -- The raiders: spawn_group, wake_group and give_orders as the mission wrote
