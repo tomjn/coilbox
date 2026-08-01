@@ -24,6 +24,7 @@ import {
 } from "../../content/pages/components/states";
 import { scenarioExport, scenarioImport } from "../bindings";
 import { newScenario } from "../create";
+import { scenarioContents } from "../listing";
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import {
@@ -33,19 +34,6 @@ import {
   saveScenario,
 } from "../storage";
 import { scenarioImportErrorMessage } from "../transfer";
-
-/** What a scenario holds, for the list row's second line. */
-function contentsLine(scenario: Scenario): string {
-  const counts = [
-    [scenario.actors.length + scenario.groups.length, "unit placement"],
-    [scenario.zones.length, "zone"],
-    [scenario.triggers.length, "trigger"],
-    [scenario.objectives.length, "objective"],
-  ] as const;
-  return counts
-    .map(([n, noun]) => `${n} ${noun}${n === 1 ? "" : "s"}`)
-    .join(" · ");
-}
 
 /**
  * Scenario Builder landing: create a scenario, import a shared one, and list
@@ -203,7 +191,7 @@ export default function ScenarioBuilderPage() {
                   {scenario.setup.mapName || "No map"}
                 </span>
                 <span className="truncate text-xs text-muted-foreground/80">
-                  {contentsLine(scenario)}
+                  {scenarioContents(scenario)}
                 </span>
               </div>
               <div className="ml-auto flex shrink-0 items-center gap-2">
