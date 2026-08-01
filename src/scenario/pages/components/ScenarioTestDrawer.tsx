@@ -12,6 +12,9 @@
  * {@link launchScenario} compiles and reads the mission back before starting
  * anything, and a reference that does not resolve stops there, because the
  * engine's answer to a bad id is silence.
+ *
+ * The Scenarios page opens this same drawer in `play` mode, because a player
+ * pressing Play wants exactly the launch an author testing a change wants.
  */
 
 import { Button } from "@picoframe/frame";
@@ -48,7 +51,20 @@ const BUSY_LABEL: Record<string, string> = {
   playing: "Game running",
 };
 
-export function ScenarioTestDrawer({ scenario }: { scenario: Scenario }) {
+export function ScenarioTestDrawer({
+  scenario,
+  /**
+   * Who pressed the button. The launch is identical either way. What changes is
+   * the wording and how much of the result is worth showing, because a player
+   * is not testing anything and the folder the mission was written into is the
+   * author's business rather than theirs.
+   */
+  mode = "test",
+}: {
+  scenario: Scenario;
+  mode?: "test" | "play";
+}) {
+  const testing = mode === "test";
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const play = usePlay();
@@ -152,7 +168,9 @@ export function ScenarioTestDrawer({ scenario }: { scenario: Scenario }) {
             ? BUSY_LABEL[phase.state]
             : waiting
               ? "Reading your installed games"
-              : "Test in game"}
+              : testing
+                ? "Test in game"
+                : "Play"}
         </Button>
       </div>
 
@@ -185,20 +203,28 @@ export function ScenarioTestDrawer({ scenario }: { scenario: Scenario }) {
           <p>
             {phase.result.exitCode !== null && phase.result.exitCode !== 0
               ? `The engine exited with code ${phase.result.exitCode}. Its infolog says why.`
-              : "The game has closed. Test again to play a change."}
+              : testing
+                ? "The game has closed. Test again to play a change."
+                : "The game has closed. Play it again from here."}
           </p>
-          <p>
-            Played as <code>{phase.result.gameType}</code>, from{" "}
-            <code className="break-all">{phase.result.mission}</code>.
-          </p>
-          <p className="break-all">
-            <code>{phase.result.dir}</code>
-          </p>
-          {phase.result.route === "mutator" ? (
-            <p>
-              Deleting <code>{MUTATOR_FOLDER}</code> undoes everything this
-              wrote.
-            </p>
+          {/* Where the mission was written is the author's problem to debug, so
+              a player is not shown paths they have no use for. */}
+          {testing ? (
+            <>
+              <p>
+                Played as <code>{phase.result.gameType}</code>, from{" "}
+                <code className="break-all">{phase.result.mission}</code>.
+              </p>
+              <p className="break-all">
+                <code>{phase.result.dir}</code>
+              </p>
+              {phase.result.route === "mutator" ? (
+                <p>
+                  Deleting <code>{MUTATOR_FOLDER}</code> undoes everything this
+                  wrote.
+                </p>
+              ) : null}
+            </>
           ) : null}
         </div>
       ) : null}
