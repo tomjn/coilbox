@@ -259,7 +259,8 @@ const PART: Record<string, string> = {
 };
 
 /** A name, optionally subscripted by an id or a position. */
-const PART_PATTERN = /([A-Za-z_][A-Za-z0-9_]*)(?:\[(\d+|"(?:[^"\\]|\\.)*")\])?/y;
+const PART_PATTERN =
+  /([A-Za-z_][A-Za-z0-9_]*)(?:\[(\d+|"(?:[^"\\]|\\.)*")\])?/y;
 
 interface PathPart {
   name: string;
