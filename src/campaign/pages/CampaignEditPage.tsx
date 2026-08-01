@@ -15,6 +15,7 @@ import { refIsVideo } from "@/lib/assetUrl";
 import { usePreferredTarget } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
+import { useScenarios } from "@/scenario/scenarios";
 import {
   DetailLoading,
   ErrorBanner,
@@ -22,12 +23,14 @@ import {
 } from "../../content/pages/components/states";
 import { campaignImageDelete, campaignSave } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
+import { missionFromScenario, scenarioAttachment } from "../missionScenario";
 import type { Campaign, CampaignMission } from "../model";
 import { CampaignImage, CampaignImageField } from "./components/CampaignImage";
 import { DECORATIVE_DEFAULTS, PlaybackTuning } from "./components/MediaPlayer";
 import { MissionEditorDrawer } from "./components/MissionEditorDrawer";
 import { PanoramaScroller } from "./components/PanoramaScroller";
 import { PresetPickerDrawer } from "./components/PresetPickerDrawer";
+import { ScenarioPickerDrawer } from "./components/ScenarioPicker";
 
 const BACK = "/campaign-builder";
 
@@ -58,6 +61,7 @@ export default function CampaignEditPage() {
   const { id } = useParams();
   const { campaigns, loading } = useCampaigns();
   const { presets } = useSkirmishPresets();
+  const { scenarios } = useScenarios();
   const drawer = useDrawer();
   // Map minimaps for the mission-row thumbnails, keyed by map name.
   const { target } = usePreferredTarget();
@@ -188,6 +192,26 @@ export default function CampaignEditPage() {
       ),
     });
 
+  const openScenarioPicker = () =>
+    drawer.open({
+      title: "Add mission from scenario",
+      width: "32rem",
+      content: (
+        <ScenarioPickerDrawer
+          scenarios={scenarios}
+          initialGameName={
+            campaign.missions.length === 0 ? presetGame : undefined
+          }
+          onPick={(scenario) =>
+            void persist({
+              ...campaign,
+              missions: [...campaign.missions, missionFromScenario(scenario)],
+            })
+          }
+        />
+      ),
+    });
+
   return (
     <div className="flex flex-col gap-5 p-4">
       <Link
@@ -281,19 +305,30 @@ export default function CampaignEditPage() {
           <h2 className="text-sm font-medium">
             Missions ({campaign.missions.length})
           </h2>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            onClick={openPresetPicker}
-          >
-            <Plus className="size-4" /> Add mission
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={openPresetPicker}
+            >
+              <Plus className="size-4" /> From preset
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={openScenarioPicker}
+            >
+              <Plus className="size-4" /> From scenario
+            </Button>
+          </div>
         </div>
 
         {campaign.missions.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No missions yet. Add one from a saved skirmish preset.
+            No missions yet. Add one from a saved skirmish preset, or from a
+            scenario.
           </div>
         ) : (
           <ul className="flex flex-col gap-3">
@@ -356,8 +391,15 @@ export default function CampaignEditPage() {
                         {m.subtitle ? `${m.subtitle} · ` : ""}
                         {m.snapshot.gameName || "No game"} ·{" "}
                         {m.snapshot.mapName || "No map"}
+                        {m.scenario ? ` · scenario: ${m.scenario.name}` : ""}
                         {m.skippable ? " · skippable" : ""}
                       </span>
+                      {scenarioAttachment(m, scenarios).state === "stale" && (
+                        <span className="truncate text-xs text-amber-600 dark:text-amber-500">
+                          The scenario has been edited since this copy was
+                          attached.
+                        </span>
+                      )}
                     </div>
                     <div className="ml-auto flex shrink-0 items-center gap-2">
                       <Button

@@ -119,14 +119,16 @@ describe("scenarioAttachment", () => {
     const live = scenario({ updatedAt: "2026-02-02T00:00:00.000Z" });
     const found = scenarioAttachment(attached, [live]);
     expect(found.state).toBe("stale");
-    expect(found).toMatchObject({ live: { updatedAt: "2026-02-02T00:00:00.000Z" } });
+    expect(found).toMatchObject({
+      live: { updatedAt: "2026-02-02T00:00:00.000Z" },
+    });
   });
 
   it("reports orphaned when no stored scenario has that id", () => {
     const attached = attachScenario(mission(), scenario());
     expect(scenarioAttachment(attached, []).state).toBe("orphaned");
-    expect(scenarioAttachment(attached, [scenario({ id: "other" })]).state).toBe(
-      "orphaned",
-    );
+    expect(
+      scenarioAttachment(attached, [scenario({ id: "other" })]).state,
+    ).toBe("orphaned");
   });
 });

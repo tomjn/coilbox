@@ -148,16 +148,19 @@ describe("parseCampaignJson - attached scenario", () => {
   });
 
   it("parses an attached scenario into the mission", () => {
-    const m = parseCampaignJson(
-      campaignJson({ scenario: scenarioJson }),
-    )!.missions[0];
+    const m = parseCampaignJson(campaignJson({ scenario: scenarioJson }))!
+      .missions[0];
     expect(m.scenario?.id).toBe("s1");
     expect(m.scenario?.name).toBe("Ambush");
     expect(m.scenario?.updatedAt).toBe("2026-01-01T00:00:00.000Z");
   });
 
   it("rejects the campaign when a present scenario will not parse", () => {
-    expect(parseCampaignJson(campaignJson({ scenario: { name: "no id" } }))).toBeNull();
-    expect(parseCampaignJson(campaignJson({ scenario: "nonsense" }))).toBeNull();
+    expect(
+      parseCampaignJson(campaignJson({ scenario: { name: "no id" } })),
+    ).toBeNull();
+    expect(
+      parseCampaignJson(campaignJson({ scenario: "nonsense" })),
+    ).toBeNull();
   });
 });
