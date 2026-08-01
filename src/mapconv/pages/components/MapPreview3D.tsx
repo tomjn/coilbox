@@ -183,6 +183,33 @@ const RIPPLE_WAVES: [number, number, number, number][] = [
 type Srcs = { height: string; texture: string };
 
 /**
+ * A built scene, handed to a view that has its own content to put on the map.
+ *
+ * The preview owns the terrain, the water, the sky and the lights. A view that
+ * wants more than that, such as the scenario editor's units, zones and paths,
+ * adds its objects to `scene`, calls `render` after each change, and is free to
+ * retune `camera` and `controls` for its own way of working.
+ *
+ * Scene space is not engine space. The map's longer side is normalised to a
+ * fixed extent, so `scale` is the scene units one engine world unit (elmo)
+ * takes, and the terrain spans `planeWidth` by `planeDepth` centred on the
+ * origin, lying in XZ with height along +Y.
+ */
+export interface MapScene3D {
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  controls: OrbitControls;
+  renderer: THREE.WebGLRenderer;
+  /** Draw one frame. Call after mutating anything in the scene. */
+  render: () => void;
+  /** Scene units per engine world unit. */
+  scale: number;
+  /** Terrain extent in scene units. */
+  planeWidth: number;
+  planeDepth: number;
+}
+
+/**
  * A small 3D terrain preview: the heightmap drives vertex displacement and the
  * diffuse texture is draped over it. Vertical scale is physically correct — it
  * comes from the same `minHeight`/`maxHeight` the compile uses, so a flat height
@@ -215,6 +242,7 @@ export function MapPreview3D({
   enableZoom = true,
   enablePan = true,
   initialWater,
+  onScene,
 }: {
   /** File path to the heightmap image (mapconv flow); resolved via `mc_image_info`. */
   heightmapPath?: string;
@@ -267,6 +295,12 @@ export function MapPreview3D({
   /** Seed the water toggle explicitly (used when the chrome is hidden); undefined
    * falls back to the map's own water heuristic (and to "no water" for wireframe). */
   initialWater?: boolean;
+  /** Handed the built scene so a view can add its own content to the map and
+   * retune the camera. Called with null when that scene is torn down, which is
+   * the point at which anything the view added is already gone. Changing the
+   * callback does not rebuild the scene. The latest one is always the one
+   * called. */
+  onScene?: (handle: MapScene3D | null) => void;
 }) {
   // Setting-aware reduce-motion (General settings -> Motion & effects), which
   // itself follows the OS preference in its default "system" mode.
@@ -287,6 +321,11 @@ export function MapPreview3D({
   const waterRef = useRef<THREE.Mesh | null>(null);
   const renderRef = useRef<(() => void) | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+  // Read at hand-over and hand-back time rather than captured by the build, so a
+  // caller passing an inline callback neither rebuilds the scene nor gets a
+  // stale closure back.
+  const onSceneRef = useRef(onScene);
+  onSceneRef.current = onScene;
   // Mirror current toggle state so a freshly (re)built scene starts consistent.
   const wantWater = useRef(water);
   wantWater.current = water;
@@ -358,6 +397,7 @@ export function MapPreview3D({
       let animationFrame: number | undefined;
       let spinStart: (() => void) | undefined;
       let spinEnd: (() => void) | undefined;
+      let handedOver = false;
 
       const longest = Math.max(worldWidth, worldHeight);
       const s = BASE / longest;
@@ -820,7 +860,24 @@ uniform vec2 wPlane;`,
         }
 
         fitCanvas();
-        if (!cancelled) setBuilt(true);
+        if (cancelled) return;
+        // Hand the finished scene to whoever wants to put their own content on
+        // it. After the canvas fit, so the camera it may retune already has the
+        // right aspect.
+        if (onSceneRef.current) {
+          handedOver = true;
+          onSceneRef.current({
+            scene,
+            camera,
+            controls,
+            renderer,
+            render,
+            scale: s,
+            planeWidth: planeW,
+            planeDepth: planeH,
+          });
+        }
+        setBuilt(true);
       })();
 
       return {
@@ -829,6 +886,9 @@ uniform vec2 wPlane;`,
         dispose: () => {
           cancelled = true;
           setBuilt(false);
+          // Withdraw the scene first, so a view drops its references to objects
+          // that are about to be disposed below.
+          if (handedOver) onSceneRef.current?.(null);
           if (animationFrame !== undefined)
             cancelAnimationFrame(animationFrame);
           if (controls) {
