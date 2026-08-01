@@ -1,14 +1,7 @@
 import { MapPreview3D } from "../../../mapconv/pages/components/MapPreview3D";
 import type { MapPreviewConfig } from "../../model";
+import { clampSpin } from "../../slots";
 import { useMissionMapAssets } from "./useMissionMapAssets";
-
-/** Clamp the stored spin multiplier's magnitude to the editor's slider range,
- * keeping its sign (negative = reverse direction). Default 1. */
-function clampSpin(v: number | undefined): number {
-  const n = v ?? 1;
-  const magnitude = Math.min(4, Math.max(0.25, Math.abs(n)));
-  return n < 0 ? -magnitude : magnitude;
-}
 
 /**
  * The mission's map as the full-bleed briefing backdrop: a spinning, no-controls
