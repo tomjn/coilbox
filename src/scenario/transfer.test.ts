@@ -5,6 +5,7 @@ import {
   dropMissingDialogueMedia,
   encodeScenarioExport,
   readScenarioExport,
+  scenarioImportErrorMessage,
   scenarioMediaFiles,
 } from "./transfer";
 
@@ -128,6 +129,21 @@ describe("readScenarioExport rejections", () => {
     expect(read.ok).toBe(true);
     if (!read.ok) return;
     expect(read.payload.media).toEqual({ "a.png": PORTRAIT });
+  });
+});
+
+describe("scenarioImportErrorMessage", () => {
+  it("tells a wrong-kind file apart from a damaged one", () => {
+    expect(scenarioImportErrorMessage("wrong-kind")).toContain(
+      "not a scenario",
+    );
+    expect(scenarioImportErrorMessage("malformed")).toContain("damaged");
+    expect(scenarioImportErrorMessage("unsupported-version")).toContain(
+      "newer version",
+    );
+    expect(scenarioImportErrorMessage("unknown-format")).toContain(
+      "coilbox scenario",
+    );
   });
 });
 
