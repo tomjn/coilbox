@@ -96,9 +96,11 @@ function createSelectionRing(handle: MapScene3D) {
       Math.max(size.x, size.z) * 0.8,
       MIN_RING_ELMOS * handle.scale,
     );
+    // Two elmos clear of the ground, which is a hand's breadth on a map, not a
+    // scene unit, which on a 12km map is the height of a tall building.
     ring.position.set(
       object.position.x,
-      object.position.y + 1,
+      object.position.y + 2 * handle.scale,
       object.position.z,
     );
     ring.scale.set(radius, radius, 1);
