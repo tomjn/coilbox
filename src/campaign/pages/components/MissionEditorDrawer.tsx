@@ -33,6 +33,7 @@ import {
   MissionMapSideGraphic,
 } from "./MissionMapPreview";
 import { MissionAvField } from "./MissionMediaFields";
+import { MissionScenarioField } from "./MissionScenarioField";
 import { PanoramaScroller } from "./PanoramaScroller";
 import { UnitRestrictions } from "./UnitRestrictions";
 
@@ -361,6 +362,8 @@ export function MissionEditorDrawer({
           onCheckedChange={(v) => patch({ skippable: v })}
         />
       </label>
+
+      <MissionScenarioField mission={mission} onChange={setMission} />
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">Panorama</span>

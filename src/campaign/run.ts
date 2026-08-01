@@ -4,7 +4,7 @@ import {
   contentListReplays,
   type ReplayFile,
 } from "../content/bindings";
-import { useUnitsyncScan } from "../content/config";
+import { primeScan, useUnitsyncScan } from "../content/config";
 import { useReplayUserState } from "../content/replayUserState";
 import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
@@ -16,6 +16,7 @@ import {
   resultFromDemoInfo,
 } from "../play/detect";
 import { usePlay } from "../play/PlayProvider";
+import { launchScenario } from "../scenario/launch";
 import { useCampaignProgress } from "./campaigns";
 import type { Campaign, CampaignMission } from "./model";
 import { applyDefeat, applyVictory, nextAvailableMission } from "./results";
@@ -107,6 +108,11 @@ export interface MissionRequirement {
  * decoded (see `detect.ts`) to auto-resolve Victory/Defeat; when the replay
  * can't be found or its winner can't be read, the player is asked directly via
  * the manual Victory/Defeat prompt instead.
+ *
+ * A mission carrying a scenario goes through `launchScenario` instead of
+ * building the config here, so there is one compile-write-validate path and the
+ * campaign gets its refusals for free. Everything after the engine exits is the
+ * same either way.
  */
 export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
   const { target, loading: targetLoading } = usePreferredTarget();
@@ -175,18 +181,6 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     const game = games.find((g) => g.name === snapshot.gameName);
     const map = maps.find((m) => m.name === snapshot.mapName);
     if (!game || !map) return;
-    // Build the engine config exactly as the skirmish launcher does, from the
-    // snapshot's five draft fields, plus the mission's disabled-unit list. The
-    // snapshot already holds only the options the author set, so they pass
-    // straight through (see the run.ts note in the page).
-    const config: BattleConfig = toBattleConfig({
-      participants: snapshot.participants,
-      mapName: map.name,
-      gameType: game.name,
-      startPosType: snapshot.startPosType,
-      modOptions: snapshot.modOptionValues,
-      disabledUnits: mission.disabledUnits,
-    });
     setError(null);
     // Snapshot the replay files that exist before the engine runs, so a diff
     // afterwards finds the one this launch just wrote. A failure here (content
@@ -199,15 +193,53 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     } catch {
       beforePaths = null;
     }
-    try {
-      const res = await launch("campaign", {
+    const startEngine = (config: BattleConfig) =>
+      launch("campaign", {
         config,
         executable: target.executable,
         dataDir: target.dataDir,
       });
+    try {
+      let exitCode: number | null;
+      if (mission.scenario) {
+        // A mission that carries a scenario is launched the one way a scenario
+        // is ever launched: compiled, written where the game will look for it,
+        // and read back before the engine is started. A refusal means nothing
+        // ran, so it is shown and no result is looked for.
+        const result = await launchScenario({
+          scenario: mission.scenario,
+          dataDir: target.dataDir,
+          games,
+          disabledUnits: mission.disabledUnits,
+          rescan: async () =>
+            (await primeScan(target.enginePath, target.dataDir, true)).games,
+          launch: startEngine,
+        });
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+        exitCode = result.exitCode;
+      } else {
+        // Build the engine config exactly as the skirmish launcher does, from
+        // the snapshot's five draft fields, plus the mission's disabled-unit
+        // list. The snapshot already holds only the options the author set, so
+        // they pass straight through (see the run.ts note in the page).
+        const res = await startEngine(
+          toBattleConfig({
+            participants: snapshot.participants,
+            mapName: map.name,
+            gameType: game.name,
+            startPosType: snapshot.startPosType,
+            modOptions: snapshot.modOptionValues,
+            disabledUnits: mission.disabledUnits,
+          }),
+        );
+        exitCode = res.exitCode;
+      }
       // Cancelled before the game started: no outcome to report, no progress
-      // written, no detection — drop straight back to the briefing.
-      if (res.exitCode === null) return;
+      // written, no detection. Drop straight back to the briefing.
+      if (exitCode === null) return;
       if (beforePaths === null) {
         setPhase("result");
         return;
@@ -246,6 +278,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     maps,
     snapshot,
     mission.disabledUnits,
+    mission.scenario,
     launch,
     applyResult,
     campaign.id,

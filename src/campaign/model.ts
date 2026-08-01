@@ -1,5 +1,6 @@
 import { asContainer } from "../container/container";
 import type { SkirmishDraft } from "../play/drafts";
+import { parseScenario, type Scenario } from "../scenario/model";
 
 /**
  * Campaign schema — the single source of truth for the shape of a campaign
@@ -8,7 +9,9 @@ import type { SkirmishDraft } from "../play/drafts";
  *
  * A campaign is an authored sequence of skirmish missions. Each mission carries a
  * *snapshot* of a full skirmish setup (copied from a preset at attach time) so the
- * campaign plays identically regardless of later preset edits.
+ * campaign plays identically regardless of later preset edits. A mission may
+ * also carry a scenario, snapshotted on exactly the same terms, which is what
+ * the mission runtime plays once the engine is up.
  */
 
 /**
@@ -128,6 +131,16 @@ export interface CampaignMission {
    * already-attached mission.
    */
   snapshot: SkirmishDraft;
+  /**
+   * A whole scenario document copied in when it was attached, on the same terms
+   * as `snapshot`: a copy, never a live reference, so editing the source
+   * scenario never changes an already-attached mission. Absent on a
+   * preset-only mission, which plays as an ordinary skirmish.
+   *
+   * The mission keeps only out-of-engine presentation. Everything the runtime
+   * plays (spawns, zones, triggers, objectives, dialogue) is in here.
+   */
+  scenario?: Scenario;
   /** Internal unit names to forbid, applied as `[RESTRICT] Limit=0` at launch. */
   disabledUnits: string[];
   /** Playable even if the previous mission is incomplete. */
@@ -292,6 +305,16 @@ export function parseCampaignJson(json: string): Campaign | null {
     if (typeof m.title !== "string") return null;
     // The snapshot is the launch payload; a mission without one is unplayable.
     if (typeof m.snapshot !== "object" || m.snapshot === null) return null;
+    // An attached scenario is optional, but a *present* one that will not parse
+    // rejects the campaign rather than being dropped. Dropping it would leave a
+    // mission that still launches and quietly plays as a plain skirmish, with
+    // none of the triggers the author wrote.
+    let scenario: Scenario | undefined;
+    if (m.scenario !== undefined && m.scenario !== null) {
+      const parsed = parseScenario(m.scenario);
+      if (!parsed) return null;
+      scenario = parsed;
+    }
     seen.add(m.id);
     missions.push({
       id: m.id,
@@ -311,6 +334,7 @@ export function parseCampaignJson(json: string): Campaign | null {
       sideGraphicMap: parseMapPreview(m.sideGraphicMap),
       mapDownload: parseMapDownload(m.mapDownload),
       snapshot: m.snapshot as SkirmishDraft,
+      scenario,
       disabledUnits: stringArray(m.disabledUnits),
       skippable: m.skippable === true,
     });
