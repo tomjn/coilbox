@@ -42,7 +42,9 @@ import {
   targetOptions,
 } from "./groups";
 import { EDITOR_MODES } from "./modes";
+import { PrefabControls } from "./PrefabControls";
 import { type Placement, placementKey } from "./placements";
+import { editPrefab, removePrefab, setOrigin, setQueue } from "./prefabs";
 import { authoringCamera, clampToPlane, mapSceneStatus } from "./scene";
 import { useGameUnits } from "./useGameUnits";
 import { useMapEditing } from "./useMapEditing";
@@ -113,7 +115,7 @@ export function ScenarioMapScene({
   // each one may hold state of its own.
   const mode = EDITOR_MODES.find((m) => m.id === modeId) ?? EDITOR_MODES[0];
   const behaviours = EDITOR_MODES.map((m) =>
-    m.use({ scenario, onChange, onSelect: setSelected }),
+    m.use({ scenario, onChange, selected, onSelect: setSelected }),
   );
   const behaviour = behaviours[EDITOR_MODES.indexOf(mode)];
 
@@ -169,15 +171,27 @@ export function ScenarioMapScene({
   const drawingPath =
     drawing && drawingOrder && orderWaypoints(drawingOrder) ? drawing : null;
 
-  // Putting a point down is what a click means while a path is being drawn, in
-  // whatever mode: the author is answering a question they asked of a group, not
-  // placing something new.
+  // Which base the map is waiting for a point for, held as loosely as a path
+  // being drawn: a base that has been deleted stops the map waiting for it.
+  const [movingBase, setMovingBase] = useState<string | null>(null);
+  const moving = scenario.prefabs.some((p) => p.id === movingBase)
+    ? movingBase
+    : null;
+
+  // Answering a question the author asked is what a click means while one is
+  // outstanding, in whatever mode: a point on a path being drawn, or the place
+  // a base is being moved to, rather than something new being placed.
   const onPlace = drawingPath
     ? (pos: Point) =>
         onChange(
           addWaypoint(scenario, drawingPath.groupId, drawingPath.order, pos),
         )
-    : behaviour.place;
+    : moving
+      ? (pos: Point) => {
+          onChange(setOrigin(scenario, moving, pos));
+          setMovingBase(null);
+        }
+      : behaviour.place;
 
   useMapEditing({
     handle,
@@ -204,11 +218,15 @@ export function ScenarioMapScene({
     },
   });
 
-  // A prefab's buildings are described by the entry they belong to, which #762
-  // gives its own panel. Actors and groups have theirs.
+  // A drawn unit is described by the entry it belongs to, and each of the three
+  // kinds has a panel of its own.
   const pickedActor =
     (picked?.kind === "actor" &&
       scenario.actors.find((a) => a.id === picked.id)) ||
+    null;
+  const pickedPrefab =
+    (picked?.kind === "prefab" &&
+      scenario.prefabs.find((p) => p.id === picked.id)) ||
     null;
   const gameUnits = useGameUnits(scenario.setup.gameName);
 
@@ -429,14 +447,56 @@ export function ScenarioMapScene({
                 }
               />
             )}
+            {picked.kind === "prefab" && pickedPrefab && (
+              <PrefabControls
+                key={`${pickedPrefab.id}#${picked.index}`}
+                prefab={pickedPrefab}
+                index={picked.index}
+                participants={scenario.setup.participants}
+                units={gameUnits.units}
+                unitsLoading={gameUnits.loading}
+                moving={moving === pickedPrefab.id}
+                onEdit={(patch) =>
+                  onChange(editPrefab(scenario, pickedPrefab.id, patch))
+                }
+                onQueue={(queue, repeat) =>
+                  onChange(
+                    setQueue(
+                      scenario,
+                      pickedPrefab.id,
+                      picked.index,
+                      queue,
+                      repeat,
+                    ),
+                  )
+                }
+                onMove={(on) => setMovingBase(on ? pickedPrefab.id : null)}
+                onDelete={() => {
+                  onChange(removePrefab(scenario, pickedPrefab.id));
+                  setSelected(null);
+                }}
+              />
+            )}
           </SelectionBar>
         )}
         {drawingPath && pickedGroup && (
-          <DrawingBar
-            what={`${groupLabel(scenario.groups, pickedGroup.id)} · ${
-              pickedGroup.orders[drawingPath.order].kind
-            }`}
+          <ClickMapBar
+            message={
+              <>
+                Click the map to add points to{" "}
+                <span className="font-mono">
+                  {groupLabel(scenario.groups, pickedGroup.id)} ·{" "}
+                  {pickedGroup.orders[drawingPath.order].kind}
+                </span>
+              </>
+            }
             onDone={() => setDrawing(null)}
+          />
+        )}
+        {moving && (
+          <ClickMapBar
+            message="Click the map to put this base's origin there, buildings and all"
+            onDone={() => setMovingBase(null)}
           />
         )}
         {pathRef && selected && pickedGroup && (
@@ -610,19 +670,24 @@ function ZoneBar({
 }
 
 /**
- * A path being drawn, and the way to stop drawing it.
+ * A question the map is waiting for an answer to: a path being drawn, or a base
+ * being moved.
  *
- * Its own bar rather than a line in the group's controls, because while a path
- * is being drawn the click that adds a point is also the click that would
+ * Its own bar rather than a line in the panel that asked, because while one of
+ * these is outstanding the click that answers it is also the click that would
  * otherwise place something, and that is worth saying where it cannot be missed.
  */
-function DrawingBar({ what, onDone }: { what: string; onDone: () => void }) {
+function ClickMapBar({
+  message,
+  onDone,
+}: {
+  message: ReactNode;
+  onDone: () => void;
+}) {
   return (
     <div className="flex w-fit items-center gap-1.5 rounded-md border border-lime-400/60 bg-card/85 p-1 pl-2 backdrop-blur">
       <MapPin className="size-3.5 text-lime-300" />
-      <span className="text-[11px]">
-        Click the map to add points to <span className="font-mono">{what}</span>
-      </span>
+      <span className="text-[11px]">{message}</span>
       <Button
         size="sm"
         variant="ghost"
