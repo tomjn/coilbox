@@ -13,8 +13,13 @@
  * ground".
  *
  * Everything drawn here carries a `placementKey`, so the shared picking in
- * `useMapEditing` sees zones and their resize handles the same way it sees
- * units. The arithmetic, what a drag does to a zone, is in `zones.ts`.
+ * `useMapEditing` sees zones and their handles the same way it sees units. The
+ * sheet is selected by a click but never dragged, because it is ground: a zone
+ * filling the view would otherwise take every drag meant for the camera or for
+ * the next zone drawn inside it. What moves a zone is the handle at its middle,
+ * drawn with the corner handles on whichever zone is selected.
+ *
+ * The arithmetic, what a drag does to a zone, is in `zones.ts`.
  */
 
 import * as THREE from "three";
@@ -53,6 +58,10 @@ const HANDLE_ELMOS = 88;
 const ZONE_COLOR = 0x38bdf8;
 const SELECTED_COLOR = 0xfacc15;
 
+/** What the handle that moves a whole zone is drawn in. Neither the white of
+ *  the corners that resize it nor the yellow of the zone it sits on. */
+const MOVE_HANDLE_COLOR = 0xf97316;
+
 export interface ZonesLayerDeps {
   handle: MapScene3D;
   /** Map extent in elmos, as `useMissionMapAssets` reports it. */
@@ -68,6 +77,9 @@ export interface ZonesLayer {
   /** Whether this layer owns a picked key, which is what tells the pointer
    *  layer that a hit was a zone rather than a unit. */
   has: (key: string) => boolean;
+  /** Whether a press on a key picks it up. Only a handle does: a zone's sheet
+   *  is ground, so pressing it belongs to the camera or to the mode. */
+  grabbable: (key: string) => boolean;
   /** Draw this list, replacing whatever was drawn before. `selectedId` gets the
    *  brighter outline and the resize handles. */
   draw: (zones: ScenarioZone[], selectedId: string | null) => void;
@@ -211,11 +223,23 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
         color: 0xffffff,
         depthTest: false,
       });
-      owned.push(handleGeometry, handleMaterial);
+      // The move handle is a diamond rather than a ball, and its own colour, so
+      // the one knob that moves the whole zone is not mistaken for the corners
+      // that resize it.
+      const moveGeometry = new THREE.OctahedronGeometry(HANDLE_ELMOS * 0.7);
+      const moveMaterial = new THREE.MeshBasicMaterial({
+        color: MOVE_HANDLE_COLOR,
+        depthTest: false,
+      });
+      owned.push(handleGeometry, handleMaterial, moveGeometry, moveMaterial);
       for (const name of zoneHandles(zone)) {
         const offset = zoneHandleOffset(zone, name);
         if (!offset) continue;
-        const knob = new THREE.Mesh(handleGeometry, handleMaterial);
+        const move = name === "move";
+        const knob = new THREE.Mesh(
+          move ? moveGeometry : handleGeometry,
+          move ? moveMaterial : handleMaterial,
+        );
         knob.position.set(offset.x, relief(centre, offset), offset.z);
         knob.renderOrder = 4;
         knob.userData = { placementKey: zoneKey(zone.id, name) };
@@ -242,6 +266,7 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
   return {
     root,
     has: (key: string) => keys.has(key),
+    grabbable: (key: string) => !!parseZoneKey(key)?.handle,
     draw: (zones, selected) => {
       drawn = zones;
       selectedId = selected;

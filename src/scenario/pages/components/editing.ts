@@ -36,6 +36,56 @@ export interface PointerPos {
   y: number;
 }
 
+/** What the pointer is over, out of everything the ray passed through. */
+export interface PointerTargets {
+  /** The nearest thing with a key, which is what a click selects. */
+  select: string | null;
+  /**
+   * The nearest thing a press can pick up, which is not always the nearest
+   * thing. A zone's sheet lies over its own handles: it is what a click on the
+   * zone selects, and the handle inside it is what a drag moves.
+   */
+  grab: string | null;
+}
+
+/**
+ * What a ray found, read as a selection and a grab.
+ *
+ * `keys` is every drawn thing the ray passed through, nearest first. Anything a
+ * press cannot pick up is passed over in the search for something it can, which
+ * is what lets a handle be grabbed through the sheet lying over it. Nothing else
+ * on the map is see-through, so nothing else is reached this way.
+ */
+export function pointerTargets(
+  keys: string[],
+  grabbable: (key: string) => boolean,
+): PointerTargets {
+  const grab = keys.find(grabbable) ?? null;
+  return { select: keys[0] ?? null, grab };
+}
+
+/**
+ * What a press on the map begins: picking something up, drawing on the ground,
+ * or moving the camera.
+ *
+ * One button does all three, so what is under it decides. Only something a press
+ * can pick up wins it: a zone's sheet is drawn over the ground and can cover the
+ * whole view, so it is selected by a click and moved by its own handle, and a
+ * drag that starts on one belongs to the camera or to the zone being drawn
+ * inside it (#910, #837).
+ */
+export type PressGesture = "grab" | "draw" | "camera";
+
+export function pressGesture(opts: {
+  /** What the press can pick up, as {@link pointerTargets} read it. */
+  grab: string | null;
+  /** Whether the current mode draws a shape by dragging across the ground. */
+  draws: boolean;
+}): PressGesture {
+  if (opts.grab) return "grab";
+  return opts.draws ? "draw" : "camera";
+}
+
 /**
  * Whether a press and release were the same gesture.
  *

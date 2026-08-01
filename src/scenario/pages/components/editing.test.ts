@@ -13,6 +13,8 @@ import {
   normaliseActorState,
   parsePlacementKey,
   pointerNdc,
+  pointerTargets,
+  pressGesture,
   removePlacement,
   setActorState,
   turnFacing,
@@ -69,6 +71,54 @@ describe("isClick", () => {
   it("counts a travelled pointer as a drag", () => {
     expect(isClick({ x: 10, y: 10 }, { x: 40, y: 10 })).toBe(false);
     expect(isClick({ x: 10, y: 10 }, { x: 10, y: 40 })).toBe(false);
+  });
+});
+
+describe("pointerTargets", () => {
+  /** A zone's sheet is the one thing a press cannot pick up. */
+  const grabbable = (key: string) =>
+    !key.startsWith("zone:") || key.includes("@");
+
+  it("finds nothing under a pointer on bare ground", () => {
+    expect(pointerTargets([], grabbable)).toEqual({ select: null, grab: null });
+  });
+
+  it("selects and grabs the nearest thing when it can be picked up", () => {
+    expect(pointerTargets(["actor:a1", "zone:z1"], grabbable)).toEqual({
+      select: "actor:a1",
+      grab: "actor:a1",
+    });
+  });
+
+  it("grabs a handle through the sheet lying over it", () => {
+    // A zone's move handle sits at the middle of its own sheet, and other
+    // zones' sheets drape over it, so the sheet is the nearer hit. Without
+    // this the handle could not be grabbed at all.
+    expect(
+      pointerTargets(["zone:z1", "zone:z2@move", "zone:z2"], grabbable),
+    ).toEqual({ select: "zone:z1", grab: "zone:z2@move" });
+  });
+
+  it("has nothing to grab where there are only sheets", () => {
+    // Panning past a zone that fills the view (#910), and drawing a zone
+    // inside another (#837), are both this.
+    expect(pointerTargets(["zone:z1", "zone:z2"], grabbable)).toEqual({
+      select: "zone:z1",
+      grab: null,
+    });
+  });
+});
+
+describe("pressGesture", () => {
+  it("picks up what the press can grab", () => {
+    expect(pressGesture({ grab: "actor:a1", draws: false })).toBe("grab");
+    // Even in a mode that draws: a unit is a thing, not the ground under it.
+    expect(pressGesture({ grab: "actor:a1", draws: true })).toBe("grab");
+  });
+
+  it("leaves the rest to the camera, or to the mode that draws", () => {
+    expect(pressGesture({ grab: null, draws: false })).toBe("camera");
+    expect(pressGesture({ grab: null, draws: true })).toBe("draw");
   });
 });
 

@@ -108,7 +108,7 @@ const selectMode: EditorMode = {
   id: "select",
   label: "Select",
   icon: MousePointer2,
-  hint: "Drag a unit to move it. Click bare ground to deselect.",
+  hint: "Drag a unit to move it. Click a zone, then drag its orange middle handle to move that. Click bare ground to deselect.",
   use: () => ({ place: null }),
 };
 
@@ -128,7 +128,7 @@ const zonesMode: EditorMode = {
   id: "zones",
   label: "Zones",
   icon: Square,
-  hint: "Drag on the map to draw a zone. Middle-drag pans while this mode is on.",
+  hint: "Drag anywhere to draw a zone, inside another one if you like. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on.",
   use: ({ scenario, onChange, onSelect }) => {
     const [shape, setShape] = useState<ZoneShape>("box");
     const [draft, setDraft] = useState<ScenarioZone | null>(null);

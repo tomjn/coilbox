@@ -24,9 +24,16 @@ import type { Point, Scenario, ScenarioZone } from "../../model";
  */
 export const MIN_ZONE_ELMOS = 48;
 
-/** Which part of a drawn zone is being dragged. A corner by its compass point,
- *  because engine z grows southward, so `min` is the north-west corner. */
-export type ZoneHandle = "nw" | "ne" | "sw" | "se" | "radius";
+/**
+ * Which part of a drawn zone is being dragged. A corner by its compass point,
+ * because engine z grows southward, so `min` is the north-west corner.
+ *
+ * `move` is the whole zone, grabbed by the handle at its middle. A zone is a
+ * sheet of ground, so its body is not what moves it: a zone big enough to fill
+ * the view would otherwise swallow every drag meant for the camera or for the
+ * next zone drawn inside it.
+ */
+export type ZoneHandle = "move" | "nw" | "ne" | "sw" | "se" | "radius";
 
 /** The shapes a zone can be drawn as. */
 export type ZoneShape = ScenarioZone["shape"];
@@ -53,7 +60,7 @@ export function parseZoneKey(
   const at = rest.lastIndexOf("@");
   if (at <= 0) return { id: rest, handle: null };
   const handle = rest.slice(at + 1);
-  const known: ZoneHandle[] = ["nw", "ne", "sw", "se", "radius"];
+  const known: ZoneHandle[] = ["move", "nw", "ne", "sw", "se", "radius"];
   if (!known.includes(handle as ZoneHandle)) return null;
   return { id: rest.slice(0, at), handle: handle as ZoneHandle };
 }
@@ -146,6 +153,7 @@ export function zoneHandleOffset(
   handle: ZoneHandle,
 ): Point | null {
   const { halfX, halfZ } = zoneExtent(zone);
+  if (handle === "move") return { x: 0, z: 0 };
   if (zone.shape === "circle")
     return handle === "radius" ? { x: halfX, z: 0 } : null;
   switch (handle) {
@@ -162,14 +170,17 @@ export function zoneHandleOffset(
   }
 }
 
-/** Every handle a zone offers, in the order it draws them. */
+/** Every handle a zone offers, in the order it draws them. The move handle
+ *  first, because it is the one every zone has. */
 export function zoneHandles(zone: ScenarioZone): ZoneHandle[] {
-  return zone.shape === "circle" ? ["radius"] : ["nw", "ne", "sw", "se"];
+  return zone.shape === "circle"
+    ? ["move", "radius"]
+    : ["move", "nw", "ne", "sw", "se"];
 }
 
 /**
- * A zone with a drag applied: the whole thing moved when `handle` is null, one
- * corner or the radius moved when it is not.
+ * A zone with a drag applied: the whole thing moved by the move handle or by no
+ * handle at all, one corner or the radius moved by the handle that names it.
  *
  * Dragging a corner past its opposite flips the box rather than emptying it,
  * which is what normalising the corners means when it happens live.
@@ -179,8 +190,9 @@ export function dragZone(
   handle: ZoneHandle | null,
   delta: Point,
 ): ScenarioZone {
+  const whole = !handle || handle === "move";
   if (zone.shape === "circle") {
-    if (!handle)
+    if (whole)
       return {
         ...zone,
         center: round({
@@ -194,7 +206,7 @@ export function dragZone(
     return { ...zone, radius: Math.round(Math.max(MIN_ZONE_ELMOS, radius)) };
   }
 
-  if (!handle) {
+  if (whole) {
     return {
       ...zone,
       min: round({ x: zone.min.x + delta.x, z: zone.min.z + delta.z }),
