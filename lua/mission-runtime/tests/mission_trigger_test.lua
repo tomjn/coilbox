@@ -118,7 +118,10 @@ check("after which the fog comes back", state.reveal.spotterCount(0) == 0,
 -- an author who forgot the spawn_group is told so rather than left wondering.
 check("gifting a group that was never spawned says so",
 	logged(engine, "group reinforcements has no units on the map to gift"),
-	table.concat(engine.logs, " / "))
+	table.concat(engine.logs, " / ")
+		.. " | members=" .. #state.groups.units("reinforcements")
+		.. " | teams=" .. tostring(state.teams[1] and state.teams[1].id)
+		.. "," .. tostring(state.teams[2] and state.teams[2].id))
 
 --------------------------------------------------------------------------------
 -- Ambush: an actor's health and its death.
