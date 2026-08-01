@@ -9,7 +9,7 @@
 -- luaui/ and missions/ are installed into a game.
 
 local support = dofile((arg[0]:match("^(.*)/[^/]+$") or ".") .. "/support.lua")
-local check, load, logged = support.check, support.load, support.logged
+local check, load, logged, sent = support.check, support.load, support.logged, support.sent
 local missionFiles, fixture = support.missionFiles, support.fixture
 
 --- Start a fixture mission and run up to the first frame the game is playing.
@@ -101,24 +101,31 @@ check("gifting a group that was never spawned says so",
 
 engine, state = playing("ambush")
 
-local lines = record(state.triggers, { "dialogue", "play_sound", "camera_pan", "map_marker" })
+-- Only the two types no issue has implemented yet. The mission's dialogue and
+-- its sound run for real, so what they said is read off the messages the synced
+-- half sent rather than off a stand-in.
+local staged = record(state.triggers, { "camera_pan", "map_marker" })
 local scout = state.units.scout
+
+--- The dialogue lines this mission has said so far.
+local function said()
+	return table.concat(sent(engine, "coilbox_mission_dialogue"), ",")
+end
 
 engine.env:GameFrame(1)
 engine.env:GameFrame(15)
-check("a healthy actor trips nothing", #lines == 0, ranAll(lines))
+check("a healthy actor trips nothing", said() == "" and #staged == 0, said())
 
 engine.env.Spring.SetUnitHealth(scout, 40)
-check("health is not read between ticks", #lines == 0)
+check("health is not read between ticks", said() == "")
 engine.env:GameFrame(30)
-check("an actor below its stated health fires on the polled tick",
-	ranAll(lines) == "dialogue", ranAll(lines))
+check("an actor below its stated health fires on the polled tick", said() == "warn", said())
 check("the trigger watching it is spent", state.triggers:isEnabled("scout-wounded") == false)
 check("the trigger watching its death is not", state.triggers:isEnabled("scout-down") == true)
 
 engine.env.Spring.DestroyUnit(scout)
 check("a dead actor fires on the death itself", state.triggers:isEnabled("scout-down") == false)
-check("its dialogue ran", ranAll(lines) == "dialogue,dialogue", ranAll(lines))
+check("its dialogue ran", said() == "warn,warn", said())
 
 --------------------------------------------------------------------------------
 -- The ambush itself: a box zone the player has to walk into.
@@ -139,8 +146,10 @@ check("a dormant group is not on the map before it is spawned",
 engine.move(patrol, 100, 100)
 engine.env:GameFrame(60)
 check("walking into the pass springs it", state.triggers:isEnabled("spring-ambush") == false)
-check("and the whole trigger ran",
-	ranAll(lines) == "dialogue,dialogue,dialogue,camera_pan,map_marker,play_sound", ranAll(lines))
+check("and the whole trigger ran, in the order the mission wrote it",
+	said() == "warn,warn,warn" and ranAll(staged) == "camera_pan,map_marker"
+	and table.concat(sent(engine, "coilbox_mission_sound"), ",") == "alarm.wav",
+	said() .. " / " .. ranAll(staged))
 
 --------------------------------------------------------------------------------
 -- The raiders: spawn_group, wake_group and give_orders as the mission wrote
