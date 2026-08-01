@@ -1,16 +1,34 @@
 import { Button } from "@picoframe/frame";
-import { Frame, Layers, Loader2, MountainSnow, Unplug } from "lucide-react";
+import {
+  Frame,
+  Layers,
+  Loader2,
+  MountainSnow,
+  RotateCw,
+  Trash2,
+  Unplug,
+} from "lucide-react";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import { Link } from "react-router";
 import * as THREE from "three";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   MapPreview3D,
   type MapScene3D,
 } from "@/mapconv/pages/components/MapPreview3D";
 import { usePreferredTarget } from "@/play/config";
 import type { Scenario } from "../../model";
+import {
+  canTurn,
+  movePlacement,
+  removePlacement,
+  turnPlacement,
+} from "./editing";
+import { EDITOR_MODES } from "./modes";
+import type { Placement } from "./placements";
 import { authoringCamera, clampToPlane, mapSceneStatus } from "./scene";
+import { useMapEditing } from "./useMapEditing";
 import { type ScenarioUnitsState, useScenarioUnits } from "./useScenarioUnits";
 
 /** What the surface says when there is no scene to show. */
@@ -40,10 +58,20 @@ function SurfaceMessage({
  * terrain so a pan cannot strand the view in empty space.
  *
  * The units the document places are drawn on top of it by
- * {@link useScenarioUnits}. The zones, paths and pickers that follow take the
- * same scene the same way.
+ * {@link useScenarioUnits}, and pointing at them is {@link useMapEditing}. The
+ * zones, paths and pickers that follow take the same scene the same way.
+ *
+ * The surface owns which mode is current and what is selected, because both are
+ * answers to something that happened on the map. The document is not owned here:
+ * every edit goes out through `onChange` and comes back as a new `scenario`.
  */
-export function ScenarioMapScene({ scenario }: { scenario: Scenario }) {
+export function ScenarioMapScene({
+  scenario,
+  onChange,
+}: {
+  scenario: Scenario;
+  onChange: (next: Scenario) => void;
+}) {
   const mapName = scenario.setup.mapName;
   const assets = useMissionMapAssets(mapName);
   const { loading: enginesLoading } = usePreferredTarget();
@@ -52,6 +80,32 @@ export function ScenarioMapScene({ scenario }: { scenario: Scenario }) {
   // does not re-render the hook that owns that layer.
   const [handle, setHandle] = useState<MapScene3D | null>(null);
   const units = useScenarioUnits(handle, scenario, assets);
+  const [modeId, setModeId] = useState(EDITOR_MODES[0].id);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  // Every mode is resolved on every render, in the order of a static list, so
+  // each one may hold state of its own.
+  const mode = EDITOR_MODES.find((m) => m.id === modeId) ?? EDITOR_MODES[0];
+  const behaviours = EDITOR_MODES.map((m) =>
+    m.use({ scenario, onChange, onSelect: setSelected }),
+  );
+  const behaviour = behaviours[EDITOR_MODES.indexOf(mode)];
+
+  useMapEditing({
+    handle,
+    layer: units.layer,
+    placements: units.placements,
+    worldWidth: assets.worldWidth,
+    worldHeight: assets.worldHeight,
+    groundAt: units.groundAt,
+    selected,
+    drawing: units.drawing,
+    onSelect: setSelected,
+    onPlace: behaviour.place,
+    onMove: (key, delta) => onChange(movePlacement(scenario, key, delta)),
+  });
+
+  const picked = units.placements.find((p) => p.key === selected) ?? null;
 
   const status = mapSceneStatus({
     mapName,
@@ -198,6 +252,40 @@ export function ScenarioMapScene({ scenario }: { scenario: Scenario }) {
         worldHeight={assets.worldHeight}
         onScene={onScene}
       />
+
+      <div className="absolute left-2 top-2 flex max-w-[calc(100%-9rem)] flex-col gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            value={mode.id}
+            onValueChange={(next) => next && setModeId(next)}
+            className="bg-card/80 backdrop-blur"
+            aria-label="Placement mode"
+          >
+            {EDITOR_MODES.map((m) => (
+              <ToggleGroupItem key={m.id} value={m.id} className="h-8 gap-1.5">
+                <m.icon className="size-3.5" /> {m.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          {behaviour.controls}
+        </div>
+        <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
+          {mode.hint}
+        </p>
+        {picked && (
+          <SelectionBar
+            placement={picked}
+            onTurn={() => onChange(turnPlacement(scenario, picked.key))}
+            onDelete={() => {
+              onChange(removePlacement(scenario, picked.key));
+              setSelected(null);
+            }}
+          />
+        )}
+      </div>
+
       <Button
         size="sm"
         variant="outline"
@@ -214,9 +302,64 @@ export function ScenarioMapScene({ scenario }: { scenario: Scenario }) {
         drawing={units.drawing}
       />
       <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
-        {mapName} · drag to pan · right-drag to turn · scroll to zoom
+        {mapName} · drag to pan · drag a unit to move it · right-drag to turn ·
+        scroll to zoom
       </p>
     </Surface>
+  );
+}
+
+/**
+ * What is selected, and the two things that can be done to it that a drag
+ * cannot: turn it a quarter turn, and delete it.
+ *
+ * A group's units are spawned facing south together, so there is nothing to turn
+ * on one, and the button says so rather than disappearing.
+ */
+function SelectionBar({
+  placement,
+  onTurn,
+  onDelete,
+}: {
+  placement: Placement;
+  onTurn: () => void;
+  onDelete: () => void;
+}) {
+  const turnable = canTurn(placement.key);
+  const what =
+    placement.kind === "actor"
+      ? "actor"
+      : placement.kind === "group"
+        ? `group unit ${placement.index + 1}`
+        : `base building ${placement.index + 1}`;
+
+  return (
+    <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card/85 p-1 pl-2 backdrop-blur">
+      <span className="font-mono text-[11px]">
+        {placement.def}
+        <span className="ml-1.5 text-muted-foreground">{what}</span>
+      </span>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 gap-1.5 px-2 text-xs"
+        onClick={onTurn}
+        disabled={!turnable}
+        title={
+          turnable ? "Turn a quarter turn" : "A group's units all face south"
+        }
+      >
+        <RotateCw className="size-3.5" /> Turn
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+        onClick={onDelete}
+      >
+        <Trash2 className="size-3.5" /> Delete
+      </Button>
+    </div>
   );
 }
 
