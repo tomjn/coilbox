@@ -35,6 +35,9 @@ export function useMissionMapAssets(mapName: string) {
     heightSrc: heightUrl,
     textureSrc: textureUrl,
     appearance: minimap.appearance,
+    /** The map's own team start positions, in elmos from its north-west corner,
+     *  which is the space the scenario's own positions are in. */
+    startPositions: minimap.startPositions,
     skyboxSrc: skybox.dataUrl,
     minHeight: heightmap.data?.minHeight ?? 0,
     maxHeight: heightmap.data?.maxHeight ?? 0,

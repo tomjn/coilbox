@@ -55,9 +55,11 @@ import { PrefabControls } from "./PrefabControls";
 import { type Placement, placementKey } from "./placements";
 import { editPrefab, removePrefab, setOrigin, setQueue } from "./prefabs";
 import { authoringCamera, clampToPlane, mapSceneStatus } from "./scene";
+import { startMarkers } from "./startPositions";
 import { useGameUnits } from "./useGameUnits";
 import { useMapEditing } from "./useMapEditing";
 import { useScenarioPaths } from "./useScenarioPaths";
+import { useScenarioStarts } from "./useScenarioStarts";
 import { type ScenarioUnitsState, useScenarioUnits } from "./useScenarioUnits";
 import { useScenarioZones } from "./useScenarioZones";
 import {
@@ -173,6 +175,16 @@ export function ScenarioMapScene({
     units.groundAt,
     pickedZone?.id ?? null,
   );
+
+  // The map's own start positions, which is what an author orients against and
+  // the only way to see where a participant would come down.
+  const { startPositions } = assets;
+  const { setup } = scenario;
+  const starts = useMemo(
+    () => startMarkers(startPositions, setup),
+    [startPositions, setup],
+  );
+  useScenarioStarts(handle, starts, assets, units.groundAt);
 
   const picked = units.placements.find((p) => p.key === selected) ?? null;
   // A group is what is being worked on whether one of its units or one of its
