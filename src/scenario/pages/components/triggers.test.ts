@@ -1,0 +1,406 @@
+import { describe, expect, it } from "vitest";
+import { newScenario } from "../../create";
+import {
+  parseScenario,
+  type Scenario,
+  type ScenarioTrigger,
+} from "../../model";
+import { ACTION_TYPES, CONDITION_TYPES } from "../../triggerTypes";
+import {
+  addStep,
+  addTrigger,
+  applyPoint,
+  editTrigger,
+  moveStep,
+  moveTrigger,
+  nextTriggerId,
+  paramOrders,
+  registryOptions,
+  removeStep,
+  removeTrigger,
+  renameTrigger,
+  setStepParam,
+  stepAt,
+  stepDefaults,
+  stepLabel,
+  triggerSummary,
+} from "./triggers";
+
+const trigger = (
+  id: string,
+  extra: Partial<ScenarioTrigger> = {},
+): ScenarioTrigger => ({
+  id,
+  enabled: true,
+  repeat: false,
+  conditions: { op: "all", conditions: [] },
+  actions: [],
+  ...extra,
+});
+
+function document(): Scenario {
+  return {
+    ...newScenario("test"),
+    zones: [
+      {
+        id: "z1",
+        name: "Pass",
+        shape: "circle",
+        center: { x: 0, z: 0 },
+        radius: 100,
+      },
+      {
+        id: "z2",
+        name: "Pass",
+        shape: "box",
+        min: { x: 0, z: 0 },
+        max: { x: 1, z: 1 },
+      },
+    ],
+    actors: [
+      {
+        id: "a1",
+        unitDef: "armcom",
+        team: "p0",
+        pos: { x: 0, z: 0 },
+        facing: 0,
+      },
+    ],
+    groups: [
+      {
+        id: "g1",
+        team: "p0",
+        units: [{ def: "armpw", count: 3 }],
+        pos: { x: 0, z: 0 },
+        orders: [],
+        dormant: false,
+      },
+    ],
+    vars: { alertLevel: 0 },
+    triggers: [trigger("open"), trigger("close")],
+  };
+}
+
+describe("nextTriggerId", () => {
+  it("numbers past what the list already holds", () => {
+    expect(nextTriggerId([])).toBe("trigger-1");
+    expect(nextTriggerId([trigger("open")])).toBe("trigger-2");
+  });
+
+  it("steps over a number an author has already used", () => {
+    expect(nextTriggerId([trigger("trigger-2"), trigger("open")])).toBe(
+      "trigger-3",
+    );
+    expect(
+      nextTriggerId([
+        trigger("trigger-3"),
+        trigger("trigger-4"),
+        trigger("open"),
+      ]),
+    ).toBe("trigger-5");
+  });
+});
+
+describe("the trigger list", () => {
+  it("adds an armed trigger with nothing in it", () => {
+    const s = addTrigger(document(), "new-one");
+    expect(s.triggers[2]).toEqual(trigger("new-one"));
+  });
+
+  it("removes a trigger and leaves the rest alone", () => {
+    const s = removeTrigger(document(), "open");
+    expect(s.triggers.map((t) => t.id)).toEqual(["close"]);
+  });
+
+  it("hands the same document back for a trigger that is not there", () => {
+    const before = document();
+    expect(removeTrigger(before, "nope")).toBe(before);
+    expect(editTrigger(before, "nope", { repeat: true })).toBe(before);
+    expect(moveTrigger(before, "nope", 1)).toBe(before);
+  });
+
+  it("keeps a cooldown that is a wait and drops one that is not", () => {
+    const set = editTrigger(document(), "open", { repeat: true, cooldown: 30 });
+    expect(set.triggers[0].cooldown).toBe(30);
+
+    for (const cooldown of [0, -1, Number.NaN, undefined]) {
+      const cleared = editTrigger(set, "open", { cooldown });
+      expect("cooldown" in cleared.triggers[0]).toBe(false);
+    }
+  });
+
+  it("moves a trigger up and down, and not off either end", () => {
+    const before = document();
+    expect(moveTrigger(before, "close", -1).triggers.map((t) => t.id)).toEqual([
+      "close",
+      "open",
+    ]);
+    expect(moveTrigger(before, "open", -1)).toBe(before);
+    expect(moveTrigger(before, "close", 1)).toBe(before);
+  });
+});
+
+describe("renameTrigger", () => {
+  const withRefs = () => ({
+    ...document(),
+    triggers: [
+      trigger("open", {
+        actions: [
+          { type: "enable_trigger", params: { trigger: "close" } },
+          { type: "victory", params: {} },
+        ],
+      }),
+      trigger("close", {
+        actions: [{ type: "disable_trigger", params: { trigger: "close" } }],
+      }),
+    ],
+  });
+
+  it("rewrites every parameter that named the trigger", () => {
+    const s = renameTrigger(withRefs(), "close", "shut");
+
+    expect(s.triggers.map((t) => t.id)).toEqual(["open", "shut"]);
+    expect(s.triggers[0].actions[0].params.trigger).toBe("shut");
+    expect(s.triggers[1].actions[0].params.trigger).toBe("shut");
+  });
+
+  it("leaves the parameters of other types alone", () => {
+    const s = renameTrigger(withRefs(), "close", "shut");
+    expect(s.triggers[0].actions[1].params).toEqual({});
+  });
+
+  it("refuses a name that is empty, unchanged or already taken", () => {
+    const before = withRefs();
+    expect(renameTrigger(before, "close", "  ")).toBe(before);
+    expect(renameTrigger(before, "close", "close")).toBe(before);
+    expect(renameTrigger(before, "close", "open")).toBe(before);
+    expect(renameTrigger(before, "gone", "shut")).toBe(before);
+  });
+
+  it("keeps the document loadable", () => {
+    const s = renameTrigger(withRefs(), "close", "shut");
+    expect(parseScenario(JSON.parse(JSON.stringify(s)))).not.toBeNull();
+  });
+});
+
+describe("conditions and actions", () => {
+  const ref = { triggerId: "open", list: "actions" as const, index: 0 };
+
+  const withAction = () =>
+    addStep(document(), "open", "actions", {
+      type: "spawn_group",
+      params: { group: "g1" },
+    });
+
+  it("adds a step to the list it names", () => {
+    const s = addStep(document(), "open", "conditions", {
+      type: "time_elapsed",
+      params: { seconds: 60 },
+    });
+    expect(s.triggers[0].conditions.conditions).toHaveLength(1);
+    expect(s.triggers[0].actions).toHaveLength(0);
+  });
+
+  it("reads and removes the step a ref names", () => {
+    const s = withAction();
+    expect(stepAt(s, ref)?.type).toBe("spawn_group");
+    expect(stepAt(s, { ...ref, index: 4 })).toBeNull();
+    expect(removeStep(s, ref).triggers[0].actions).toHaveLength(0);
+  });
+
+  it("moves an action within its list", () => {
+    const two = addStep(withAction(), "open", "actions", {
+      type: "victory",
+      params: {},
+    });
+    const moved = moveStep(two, { ...ref, index: 1 }, -1);
+    expect(moved.triggers[0].actions.map((a) => a.type)).toEqual([
+      "victory",
+      "spawn_group",
+    ]);
+    expect(moveStep(two, ref, -1)).toBe(two);
+  });
+
+  it("sets a parameter and clears an optional one", () => {
+    const s = setStepParam(withAction(), ref, "team", "p1");
+    expect(stepAt(s, ref)?.params.team).toBe("p1");
+
+    const cleared = setStepParam(s, ref, "team", undefined);
+    expect(stepAt(cleared, ref)?.params).toEqual({ group: "g1" });
+  });
+});
+
+describe("applyPoint", () => {
+  const ref = { triggerId: "open", list: "actions" as const, index: 0 };
+
+  const withPan = () =>
+    addStep(document(), "open", "actions", {
+      type: "camera_pan",
+      params: { pos: { x: 0, z: 0 } },
+    });
+
+  it("writes a whole-number point into the parameter", () => {
+    const s = applyPoint(
+      withPan(),
+      { ref, param: "pos" },
+      { x: 10.4, z: -2.6 },
+    );
+    expect(stepAt(s, ref)?.params.pos).toEqual({ x: 10, z: -3 });
+  });
+
+  it("adds a waypoint to one order of an orders parameter", () => {
+    const before = addStep(document(), "open", "actions", {
+      type: "give_orders",
+      params: {
+        group: "g1",
+        orders: [
+          { kind: "guard", target: "a1" },
+          { kind: "patrol", waypoints: [] },
+        ],
+      },
+    });
+
+    const s = applyPoint(
+      before,
+      { ref, param: "orders", order: 1 },
+      { x: 5, z: 5 },
+    );
+    const orders = paramOrders(stepAt(s, ref)?.params.orders);
+    expect(orders[1]).toEqual({ kind: "patrol", waypoints: [{ x: 5, z: 5 }] });
+
+    // An order with no path takes no points, and a target order has none.
+    expect(
+      applyPoint(before, { ref, param: "orders", order: 0 }, { x: 5, z: 5 }),
+    ).toBe(before);
+    expect(
+      applyPoint(before, { ref, param: "orders", order: 9 }, { x: 5, z: 5 }),
+    ).toBe(before);
+  });
+
+  it("does nothing once the step it was asked for is gone", () => {
+    const before = document();
+    expect(applyPoint(before, { ref, param: "pos" }, { x: 1, z: 1 })).toBe(
+      before,
+    );
+  });
+});
+
+describe("registryOptions", () => {
+  it("numbers zones that share a name, so a picker can tell them apart", () => {
+    expect(registryOptions(document(), "zoneId")).toEqual([
+      { value: "z1", label: "Pass 1", description: "circle" },
+      { value: "z2", label: "Pass 2", description: "box" },
+    ]);
+  });
+
+  it("names groups by their place and vars by their key", () => {
+    expect(registryOptions(document(), "groupId")?.[0]).toMatchObject({
+      value: "g1",
+      label: "Group 1",
+    });
+    expect(registryOptions(document(), "varName")?.[0].value).toBe(
+      "alertLevel",
+    );
+  });
+
+  it("has nothing to offer for a kind that is not a reference", () => {
+    expect(registryOptions(document(), "number")).toBeNull();
+    expect(registryOptions(document(), "point")).toBeNull();
+  });
+});
+
+describe("stepDefaults", () => {
+  const ctx = (scenario: Scenario, unitDefs: string[] = ["armcom"]) => ({
+    scenario,
+    unitDefs,
+  });
+
+  it("fills every required parameter and leaves the optional ones out", () => {
+    const got = stepDefaults(CONDITION_TYPES.units_in_zone, ctx(document()));
+    expect(got.params).toEqual({ zone: "z1" });
+  });
+
+  it("takes the first of each registry, so nothing is typed", () => {
+    const got = stepDefaults(ACTION_TYPES.set_var, ctx(document()));
+    expect(got.params).toEqual({ name: "alertLevel", value: 0 });
+  });
+
+  it("says what a type needs when its registry is empty", () => {
+    const bare = { ...document(), zones: [] };
+    expect(stepDefaults(CONDITION_TYPES.units_in_zone, ctx(bare)).needs).toBe(
+      "Needs a zone",
+    );
+
+    const noVars = { ...document(), vars: {} };
+    expect(stepDefaults(ACTION_TYPES.set_var, ctx(noVars)).needs).toBe(
+      "Needs a variable",
+    );
+  });
+
+  it("takes a unit type from the game rather than from the document", () => {
+    expect(
+      stepDefaults(ACTION_TYPES.unlock_unit, ctx(document())).params,
+    ).toEqual({ unitDef: "armcom" });
+    expect(
+      stepDefaults(ACTION_TYPES.unlock_unit, ctx(document(), [])).needs,
+    ).toBe("Needs the game's units");
+  });
+
+  it("starts an enum on its first value", () => {
+    expect(stepDefaults(CONDITION_TYPES.var, ctx(document())).params).toEqual({
+      name: "alertLevel",
+      op: "eq",
+      value: 0,
+    });
+  });
+
+  /**
+   * The reason defaults exist at all: `parseScenario` refuses a whole document
+   * over one missing required parameter, so every type the picker offers has to
+   * produce a step that loads again.
+   */
+  it("produces a step every type can be saved and read back with", () => {
+    const base = document();
+    const context = ctx(base);
+    for (const [list, table] of [
+      ["conditions", CONDITION_TYPES],
+      ["actions", ACTION_TYPES],
+    ] as const) {
+      for (const [type, spec] of Object.entries(table)) {
+        const defaults = stepDefaults(spec, context);
+        if (!defaults.params) continue;
+        const s = addStep(base, "open", list, {
+          type,
+          params: defaults.params,
+        });
+        const read = parseScenario(JSON.parse(JSON.stringify(s)));
+        expect(read, `${type} does not load again`).not.toBeNull();
+      }
+    }
+  });
+});
+
+describe("labels", () => {
+  it("reads a type name as a sentence", () => {
+    expect(stepLabel("units_in_zone")).toBe("Units in zone");
+    expect(stepLabel("sf_weather")).toBe("Sf weather");
+  });
+
+  it("says what a trigger holds", () => {
+    expect(triggerSummary(trigger("t"))).toBe("always · 0 actions");
+    expect(
+      triggerSummary(
+        trigger("t", {
+          conditions: {
+            op: "any",
+            conditions: [
+              { type: "time_elapsed", params: { seconds: 1 } },
+              { type: "time_elapsed", params: { seconds: 2 } },
+            ],
+          },
+          actions: [{ type: "victory", params: {} }],
+        }),
+      ),
+    ).toBe("any of 2 conditions · 1 action");
+  });
+});

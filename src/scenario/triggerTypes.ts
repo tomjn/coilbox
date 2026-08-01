@@ -151,3 +151,29 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
   victory: { team: { kind: "teamId", optional: true } },
   defeat: { team: { kind: "teamId", optional: true } },
 };
+
+/**
+ * The runtime version that added a condition or action, for the types that did
+ * not ship in version 1.
+ *
+ * Everything in the two tables above shipped in version 1, so this is empty
+ * today. A type a later runtime adds goes here in the same change that adds it
+ * to its table and bumps `missions/runtime.lua`, and that is what raises the
+ * `runtimeVersion` of every scenario using it. Nothing is ever removed: a type
+ * that has shipped keeps the version it shipped in.
+ *
+ * One map for both tables, because a condition and an action never share a name.
+ */
+export const TYPE_RUNTIME_VERSION: Record<string, number> = {};
+
+/**
+ * The lowest runtime version that implements a condition or action.
+ *
+ * Version 1 for anything this build has not been told otherwise about, which
+ * covers every type version 1 shipped and every type a game's own
+ * `missions/extensions.lua` declares. An extension type is the game's to
+ * implement, so it says nothing about which coilbox runtime a scenario needs.
+ */
+export function typeRuntimeVersion(type: string): number {
+  return TYPE_RUNTIME_VERSION[type] ?? 1;
+}
