@@ -30,7 +30,11 @@ import { compileScenario, missionPath } from "./compile";
 import type { Scenario } from "./model";
 import { isMutatorArchive, writeTestMutator } from "./mutator";
 import { packagedArchiveReason } from "./offer";
-import { type MissionIssue, validateCompiledMission } from "./validate";
+import {
+  describeIssue,
+  type MissionIssue,
+  validateCompiledMission,
+} from "./validate";
 
 /**
  * The modoption that turns a game into a mission. Its value is the scenario id,
@@ -97,7 +101,40 @@ export function missionIssueMessage(issues: MissionIssue[]): string {
   const [first] = issues;
   if (!first) return "";
   const more = issues.length - 1;
-  return `The compiled mission has ${issues.length} problem${issues.length === 1 ? "" : "s"}, so it was not launched. ${first.path}: ${first.message}${more > 0 ? ` (and ${more} more)` : ""}`;
+  return `The compiled mission has ${issues.length} problem${issues.length === 1 ? "" : "s"}, so it was not launched. ${describeIssue(first)}${more > 0 ? ` (and ${more} more)` : ""}`;
+}
+
+/**
+ * Why a scenario cannot be put in front of the engine at all, before any of it
+ * is compiled. Null when it can be tried.
+ *
+ * This is the button's own reason for being disabled, so it is the things the
+ * author has to go and fix elsewhere: no engine, no setup, a game they have not
+ * installed, a game already running. Everything wrong *inside* the scenario is
+ * {@link launchScenario}'s answer, because it takes compiling to find out.
+ *
+ * `games` is null until the content scan has answered, which is not a blocker:
+ * a scenario is not stopped from being tested because a read is in flight.
+ */
+export function scenarioLaunchBlocker(opts: {
+  scenario: Scenario;
+  hasEngine: boolean;
+  games: GameItem[] | null;
+  running: boolean;
+}): string | null {
+  const { scenario, hasEngine, games, running } = opts;
+  const { gameName, mapName } = scenario.setup;
+  if (!hasEngine) {
+    return "No engine is installed. Add one from Content before testing a scenario.";
+  }
+  if (!gameName || !mapName) {
+    return "This scenario has no game and map yet. Set it up from a preset first.";
+  }
+  if (games && !games.some((g) => g.name === gameName)) {
+    return `${gameName} is not installed. Install it from Content, or set the scenario up on a game you have.`;
+  }
+  if (running) return "A game is already running.";
+  return null;
 }
 
 export interface ScenarioLaunchInput {

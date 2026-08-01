@@ -21,6 +21,7 @@ import {
   launchScenario,
   MISSION_MODOPTION,
   missionIssueMessage,
+  scenarioLaunchBlocker,
   scenarioRoute,
 } from "./launch";
 import { parseScenario, type Scenario } from "./model";
@@ -247,12 +248,59 @@ describe("launchScenario", () => {
 describe("missionIssueMessage", () => {
   it("leads with the first problem and counts the rest", () => {
     const message = missionIssueMessage([
-      { path: "actors[0].team", message: 'no team called "x"' },
-      { path: "actors[1].team", message: 'no team called "y"' },
+      { path: 'actors["boss"].team', message: 'no team called "x"' },
+      { path: 'actors["mate"].team', message: 'no team called "y"' },
     ]);
 
     expect(message).toContain("2 problems");
-    expect(message).toContain('actors[0].team: no team called "x"');
+    expect(message).toContain('Actor "boss", team: no team called "x"');
     expect(message).toContain("(and 1 more)");
+  });
+});
+
+describe("scenarioLaunchBlocker", () => {
+  const blocker = (
+    overrides: Partial<Parameters<typeof scenarioLaunchBlocker>[0]> = {},
+  ) =>
+    scenarioLaunchBlocker({
+      scenario: build(),
+      hasEngine: true,
+      games: [LOOSE],
+      running: false,
+      ...overrides,
+    });
+
+  it("lets a scenario whose game is installed be tested", () => {
+    expect(blocker()).toBeNull();
+  });
+
+  it("stops a scenario with no engine to run it", () => {
+    expect(blocker({ hasEngine: false })).toContain("No engine");
+  });
+
+  it("stops a scenario that has no setup yet", () => {
+    const scenario = build({
+      setup: {
+        gameName: "",
+        mapName: "",
+        startPosType: 0,
+        modOptionValues: {},
+        participants: [you],
+      },
+    });
+
+    expect(blocker({ scenario })).toContain("no game and map");
+  });
+
+  it("stops a scenario set in a game that is not installed", () => {
+    expect(blocker({ games: [] })).toContain("Splinter Faction test");
+  });
+
+  it("waits rather than blocking while the scan has not answered", () => {
+    expect(blocker({ games: null })).toBeNull();
+  });
+
+  it("stops a second launch while a game is running", () => {
+    expect(blocker({ running: true })).toContain("already running");
   });
 });
