@@ -19,6 +19,13 @@ describe("runtimeInstallState", () => {
     expect(runtimeInstallState(null, marker(1))).toBe("missing");
   });
 
+  it("separates a broken marker from an absent one", () => {
+    expect(runtimeInstallState(null, marker(1), "could not read it")).toBe(
+      "broken",
+    );
+    expect(runtimeInstallState(null, marker(1), null)).toBe("missing");
+  });
+
   it("offers an update to a game vendoring an older runtime", () => {
     expect(runtimeInstallState(marker(1), marker(2))).toBe("outdated");
   });

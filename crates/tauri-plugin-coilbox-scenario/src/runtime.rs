@@ -162,9 +162,20 @@ fn read_data(root: &Path, rel: &str) -> Result<serde_json::Value, String> {
 }
 
 /// Read a game's installed version marker. An error means no runtime is
-/// installed, or the one there is will not load.
+/// installed, or the one there is will not load. [`marker_present`] tells the
+/// two apart.
 pub fn read_marker(root: &Path) -> Result<serde_json::Value, String> {
     read_data(root, MARKER)
+}
+
+/// Whether the game has a marker file at all, so a marker that will not load
+/// can be told from a game that never adopted the runtime.
+///
+/// The path is the one an install writes, which is the only way a marker gets
+/// there. A hand-vendored marker under some other spelling reads as absent, the
+/// same as it did before this check existed.
+pub fn marker_present(root: &Path) -> bool {
+    root.join(MARKER).is_file()
 }
 
 /// Read the condition and action types a game declares for itself. An error
@@ -279,6 +290,19 @@ mod tests {
     fn a_game_with_no_runtime_has_no_marker() {
         let game = tempfile::tempdir().expect("tempdir");
         assert!(read_marker(game.path()).is_err());
+        assert!(!marker_present(game.path()));
+    }
+
+    /// The two failures a caller has to tell apart: a marker that is not there,
+    /// and one that is there and will not load.
+    #[test]
+    fn a_marker_that_will_not_load_is_still_present() {
+        let game = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(game.path().join("missions")).expect("mkdir");
+        std::fs::write(game.path().join(MARKER), "return {").expect("write");
+
+        assert!(read_marker(game.path()).is_err());
+        assert!(marker_present(game.path()));
     }
 
     #[test]

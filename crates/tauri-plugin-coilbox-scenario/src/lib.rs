@@ -377,6 +377,11 @@ async fn scenario_runtime_install<R: Runtime>(app: AppHandle<R>, root: String) -
 /// a build with no bundled runtime has nothing to offer, and most games declare
 /// no types of their own.
 ///
+/// `installedError` is why the game's own marker would not load, and is set only
+/// when the file is there to load. Without it a broken marker is indistinguishable
+/// from a game that never adopted the runtime, and the user is told to install a
+/// runtime that is already there (issue #806).
+///
 /// The extensions come from the game and never from coilbox's own runtime
 /// folder, because they are the game's to declare. They are read here rather
 /// than through a command of their own so the editor learns what the game runs
@@ -384,15 +389,21 @@ async fn scenario_runtime_install<R: Runtime>(app: AppHandle<R>, root: String) -
 #[tauri::command]
 async fn scenario_runtime_status<R: Runtime>(app: AppHandle<R>, root: String) -> CliResult {
     let dir = writable_game_dir(&root).ok();
-    let installed = dir
-        .as_deref()
-        .and_then(|dir| runtime::read_marker(dir).ok());
+    let (installed, installed_error) = match dir.as_deref() {
+        Some(dir) => match runtime::read_marker(dir) {
+            Ok(marker) => (Some(marker), None),
+            Err(e) if runtime::marker_present(dir) => (None, Some(e)),
+            Err(_) => (None, None),
+        },
+        None => (None, None),
+    };
     let extensions = dir
         .as_deref()
         .and_then(|dir| runtime::read_extensions(dir).ok());
     let available = runtime::runtime_dir(&app).and_then(|dir| runtime::read_marker(&dir).ok());
     CliResult::ok(json!({
         "installed": installed,
+        "installedError": installed_error,
         "available": available,
         "extensions": extensions,
     }))
