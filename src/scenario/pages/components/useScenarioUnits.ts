@@ -8,7 +8,7 @@
  * scenario's name does not re-read every model in it.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   loadUnitsyncUnitModel,
@@ -17,9 +17,9 @@ import {
 } from "@/content/config";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { usePreferredTarget } from "@/play/config";
-import type { Scenario } from "../../model";
-import { scenarioPlacements, teamColor } from "./placements";
-import { type HeightField, readHeightField } from "./terrain";
+import type { Point, Scenario } from "../../model";
+import { type Placement, scenarioPlacements, teamColor } from "./placements";
+import { groundHeight, type HeightField, readHeightField } from "./terrain";
 import { createUnitsLayer, type UnitsLayer } from "./unitsLayer";
 
 /** The map inputs the layer needs, as `useMissionMapAssets` reports them. */
@@ -31,7 +31,8 @@ export interface MapExtent {
   worldHeight: number;
 }
 
-/** What the editor's surface can say about what it just drew. */
+/** What the editor's surface can say about what it just drew, and what editing
+ *  it needs to reach. */
 export interface ScenarioUnitsState {
   /** Units placed by the document, whether or not each one could be drawn. */
   placed: number;
@@ -41,6 +42,15 @@ export interface ScenarioUnitsState {
   drawing: boolean;
   /** The scenario names a game that is not in the scanned content. */
   gameMissing: boolean;
+  /** The drawn objects, for picking one off a click. Null until there is a
+   *  scene and a heightmap to draw on. */
+  layer: UnitsLayer | null;
+  /** The document flattened into the units on the map, which is what a hit on
+   *  one of those objects resolves against. */
+  placements: Placement[];
+  /** The map's ground height in elmos at an engine position, or 0 while the
+   *  heightmap is still being read. */
+  groundAt: (pos: Point) => number;
 }
 
 /**
@@ -189,10 +199,29 @@ export function useScenarioUnits(
     // the archive alone would leave the first draw's markers on the map.
   }, [layer, placements, colorKey, defsReady, objectNames]);
 
+  const groundAt = useCallback(
+    (pos: Point) =>
+      field
+        ? groundHeight(
+            field,
+            pos.x,
+            pos.z,
+            worldWidth,
+            worldHeight,
+            minHeight,
+            maxHeight,
+          )
+        : 0,
+    [field, worldWidth, worldHeight, minHeight, maxHeight],
+  );
+
   return {
     placed: placements.length,
     missing,
     drawing,
     gameMissing: !!gameName && !!scan.data && !game,
+    layer,
+    placements,
+    groundAt,
   };
 }
