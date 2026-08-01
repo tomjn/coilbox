@@ -27,24 +27,6 @@ local function playing(id)
 	return engine, engine.GG.CoilboxMission
 end
 
---- Stand in for the action types later issues implement, recording that they
--- ran. `unlock_unit` is the last one left, and it waits on the runtime enforcing
--- a scenario's restrictions (#793). Registering onto the published engine is the
--- seam a game's own extensions use too.
-local function record(triggers, kinds)
-	local ran = {}
-	for _, kind in ipairs(kinds) do
-		triggers:addAction(kind, function()
-			ran[#ran + 1] = kind
-		end)
-	end
-	return ran
-end
-
-local function ranAll(ran)
-	return table.concat(ran, ",")
-end
-
 --------------------------------------------------------------------------------
 -- Garrison: what a team owns, what it has built, and what it has lost.
 --------------------------------------------------------------------------------
@@ -55,7 +37,8 @@ check("the trigger engine is published", state.triggers ~= nil)
 check("a trigger the scenario disabled starts disabled", state.triggers:isEnabled("unlock") == false)
 check("every other trigger starts armed", state.triggers:isEnabled("count-check") == true)
 
-local ran = record(state.triggers, { "unlock_unit" })
+check("a mission that restricts nothing enforces nothing",
+	engine.env.AllowUnitCreation == nil and engine.env.AllowCommand == nil)
 
 engine.env:GameFrame(0)
 check("nothing fires while the start window is open", state.triggers:isEnabled("count-check") == true)
@@ -72,7 +55,12 @@ engine.env:GameFrame(30)
 check("a unit count reaching its minimum fires", state.triggers:isEnabled("count-check") == false)
 check("a fired trigger's enable_trigger arms another", state.triggers:isEnabled("unlock") == false,
 	"unlock should have been armed and then spent")
-check("the trigger it armed ran in the same pass", ranAll(ran) == "unlock_unit", ranAll(ran))
+-- The armed trigger's one action is an unlock_unit, and this mission restricts
+-- nothing, so the unlock has nothing to lift and says so. That report is the
+-- proof it ran: an author unlocking a unit the player could already build is
+-- told rather than left with a reward that changed nothing.
+check("the trigger it armed ran in the same pass",
+	logged(engine, "nothing restricts armestor for player, so unlock_unit does nothing"))
 check("the var an earlier action set is what let it hold", state.vars.get("garrisonBuilt") == 1,
 	tostring(state.vars.get("garrisonBuilt")))
 
@@ -94,8 +82,9 @@ check("and its disable_trigger took effect", state.triggers:isEnabled("count-che
 engine.give(state.units.outpost, 0)
 check("an actor changing hands fires the trigger watching for it",
 	state.triggers:isEnabled("outpost-captured") == false)
-check("that trigger's actions ran", ranAll(ran) == "unlock_unit", ranAll(ran))
 
+-- That trigger's own actions are a gift and a reveal, both proved below.
+--
 -- The mission reveals its supply depot to the player for thirty seconds. The
 -- zone is a circle of 50 at the origin, so the spotter is one unit standing
 -- there with sight enough to cover it.

@@ -95,6 +95,8 @@ function M.missionFiles(mission)
 			"luarules/mission_runtime/coilbox_dialogue.lua"),
 		["luarules/mission_runtime/coilbox_view.lua"] = module("luarules/mission_runtime/coilbox_view.lua"),
 		["luarules/mission_runtime/coilbox_reveal.lua"] = module("luarules/mission_runtime/coilbox_reveal.lua"),
+		["luarules/mission_runtime/coilbox_restrictions.lua"] = module(
+			"luarules/mission_runtime/coilbox_restrictions.lua"),
 		["missions/demo/mission.lua"] = function()
 			return mission
 		end,
@@ -554,6 +556,8 @@ function M.newEngine(modOptions, files, options)
 			GUARD = 25,
 			FIRE_STATE = 45,
 			MOVE_STATE = 50,
+			SELFD = 65,
+			RECLAIM = 90,
 			REPEAT = 115,
 			MOVESTATE_HOLDPOS = 0,
 			MOVESTATE_MANEUVER = 1,
