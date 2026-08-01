@@ -25,6 +25,15 @@
 
 local M = {}
 
+-- The outcome, mirrored for the debrief. Spring.GameOver is what the replay
+-- reads, and LuaUI cannot read it back: the engine hands the winning ally teams
+-- to the GameOver callin, but the stock widget handler calls a widget's GameOver
+-- with no arguments at all. So the mission's own ending is mirrored the way an
+-- objective's state is, and the panel that draws the debrief reads it there.
+M.OVER_PARAM = "coilbox_mission_over"
+M.WINNERS_PARAM = "coilbox_mission_winners"
+M.WINNER_PREFIX = "coilbox_mission_winner_"
+
 -- Where an anchor stands. The engine clamps a creation into the map, so this is
 -- the corner: the furthest a fixed point can be from anything a mission is
 -- about. It is still a place a zone could cover, which is why the runtime's own
@@ -132,6 +141,13 @@ function M.register(engine, state, hooks)
 	local function finish(what, participant, winners)
 		over = true
 		Spring.GameOver(winners)
+		Spring.SetGameRulesParam(M.OVER_PARAM, 1)
+		-- How many won, because "nobody" is a real answer and a reader that only
+		-- asks whether its own ally team is in the list cannot tell it from a loss.
+		Spring.SetGameRulesParam(M.WINNERS_PARAM, #winners)
+		for _, allyTeam in ipairs(winners) do
+			Spring.SetGameRulesParam(M.WINNER_PREFIX .. allyTeam, 1)
+		end
 		engine:log("notice", string.format(
 			"mission over: %s for %s, ally teams %s won",
 			what, tostring(participant), table.concat(winners, ", ")))
@@ -317,6 +333,10 @@ function M.register(engine, state, hooks)
 		engine:log("warning", string.format(
 			"the mission anchor for team %s was destroyed", tostring(team)))
 	end
+
+	-- Before the first frame, so a panel reading the outcome finds "not yet"
+	-- rather than nothing at all, the way it finds every objective already there.
+	Spring.SetGameRulesParam(M.OVER_PARAM, 0)
 
 	engine:addAction("victory", function(params)
 		handle.victory(params.team)

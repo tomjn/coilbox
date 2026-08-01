@@ -38,6 +38,18 @@ function M.root()
 	return arg[0]:match("^(.*)/tests/[^/]+$") or "."
 end
 
+--- The payload of every message of one kind the synced half sent its unsynced
+-- half, in the order it sent them.
+function M.sent(engine, message)
+	local payloads = {}
+	for _, entry in ipairs(engine.sent) do
+		if entry[1] == message then
+			payloads[#payloads + 1] = entry[2]
+		end
+	end
+	return payloads
+end
+
 function M.logged(engine, needle)
 	for _, line in ipairs(engine.logs) do
 		if line:find(needle, 1, true) then
@@ -79,6 +91,8 @@ function M.missionFiles(mission)
 			"luarules/mission_runtime/coilbox_objectives.lua"),
 		["luarules/mission_runtime/coilbox_gameover.lua"] = module(
 			"luarules/mission_runtime/coilbox_gameover.lua"),
+		["luarules/mission_runtime/coilbox_dialogue.lua"] = module(
+			"luarules/mission_runtime/coilbox_dialogue.lua"),
 		["missions/demo/mission.lua"] = function()
 			return mission
 		end,
@@ -153,6 +167,10 @@ function M.newEngine(modOptions, files, options)
 		resourcing = {},
 		noDraw = {},
 		noMinimap = {},
+		-- Every Spring.PlaySoundFile call, as { name, volume }.
+		sounds = {},
+		-- Every call the unsynced half made into LuaUI, as { name, ... }.
+		luaUI = {},
 	}
 
 	--- Engine team -> ally team. A team nothing says otherwise about is in an ally
@@ -489,6 +507,14 @@ function M.newEngine(modOptions, files, options)
 			SetUnitNoMinimap = function(unitID, flag)
 				engine.noMinimap[unitID] = flag
 			end,
+			-- Answers false for a name the game has no sound for, the way the
+			-- engine's own does when the lookup falls through sounds.lua and the
+			-- VFS both. `options.sounds` is the set of names that exist; a test
+			-- that says nothing about them has every sound.
+			PlaySoundFile = function(name, volume)
+				table.insert(engine.sounds, { name, volume })
+				return options.sounds == nil or options.sounds[name] == true
+			end,
 		},
 		Game = { mapName = "Test Map", gameSpeed = 30 },
 		-- The engine's own command constants, at the numbers it uses.
@@ -531,6 +557,18 @@ function M.newEngine(modOptions, files, options)
 		SendToUnsynced = function(...)
 			table.insert(engine.sent, { ... })
 		end,
+		-- Calling into another Lua handle. The engine answers any name with a
+		-- callable and does nothing at all when the other handle has no such
+		-- global, so the stub records the call and never refuses one.
+		Script = {
+			LuaUI = setmetatable({}, {
+				__index = function(_, name)
+					return function(...)
+						table.insert(engine.luaUI, { name, ... })
+					end
+				end,
+			}),
+		},
 	}
 	-- The handler points the gadget table at itself so `function gadget:Foo()`
 	-- inside the chunk lands on the gadget.

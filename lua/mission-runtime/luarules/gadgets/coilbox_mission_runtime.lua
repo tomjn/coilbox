@@ -120,6 +120,12 @@ if not GAMEOVER then
 	return false
 end
 
+local DIALOGUE, dialogueError = includeTable("luarules/mission_runtime/coilbox_dialogue.lua")
+if not DIALOGUE then
+	log("error", dialogueError)
+	return false
+end
+
 -- Refuse a mission built for a newer runtime than the game vendored. Running it
 -- anyway would quietly drop whatever this version cannot read, and a mission
 -- that half works is harder to diagnose than one that refuses to start.
@@ -168,6 +174,21 @@ end
 local ACTOR_MESSAGE = "coilbox_mission_actor"
 -- And the one that says a unit is an anchor, which the unsynced half hides.
 local ANCHOR_MESSAGE = "coilbox_mission_anchor"
+-- And the two that reach the player rather than the game: a line of dialogue,
+-- which the widget draws, and a sound, which the unsynced half plays outright.
+local DIALOGUE_MESSAGE = "coilbox_mission_dialogue"
+local SOUND_MESSAGE = "coilbox_mission_sound"
+
+-- The global the widget registers on the widget handler to hear a line. A
+-- missing one is a no-op in the engine, so a game with no LuaUI, or a player who
+-- has switched the widget off, costs nothing here.
+local DIALOGUE_GLOBAL = "CoilboxMissionDialogue"
+
+-- Which unit an actor became, mirrored for LuaUI. An actor's display name has no
+-- synced engine call behind it -- nothing renames a unit -- so the name is drawn
+-- over the unit instead, and the panel that draws it needs to know which unit
+-- that is. 0 means the actor is not on the map.
+local ACTOR_RULES_PREFIX = "coilbox_mission_actor_"
 
 -- The rest of the runtime reads the mission through GG, in both halves. Both
 -- compute the team plan, because it is derived from the mission and deriving it
@@ -364,6 +385,9 @@ if gadgetHandler:IsSyncedCode() then
 					-- screen. It cannot read a synced table, so it is told which
 					-- unit each actor became.
 					SendToUnsynced(ACTOR_MESSAGE, placement.actor, unitID)
+					-- And LuaUI cannot be told at all, so it reads the same fact
+					-- out of a rules param.
+					Spring.SetGameRulesParam(ACTOR_RULES_PREFIX .. placement.actor, unitID)
 				end
 			end
 		end
@@ -468,7 +492,24 @@ if gadgetHandler:IsSyncedCode() then
 			end,
 		})
 		published.gameOver = gameOver
+		-- Saying a line and playing a sound are things the player sees and hears
+		-- rather than things that happen in the game, so synced Lua decides only
+		-- that they happened and the unsynced half takes it from there.
+		published.dialogue = DIALOGUE.register(triggers, published, {
+			say = function(lineId)
+				SendToUnsynced(DIALOGUE_MESSAGE, lineId)
+			end,
+			sound = function(name)
+				SendToUnsynced(SOUND_MESSAGE, name)
+			end,
+		})
 		published.triggers = triggers
+
+		-- Before the first frame, so a panel reading which unit an actor is finds
+		-- "not on the map" rather than nothing at all.
+		for id in pairs(published.actors) do
+			Spring.SetGameRulesParam(ACTOR_RULES_PREFIX .. id, 0)
+		end
 
 		log("notice", string.format(
 			"mission %s loaded, runtime version %s", MISSION_ID, tostring(RUNTIME.version)))
@@ -557,6 +598,7 @@ if gadgetHandler:IsSyncedCode() then
 		if actor then
 			actorOfUnit[unitID] = nil
 			units[actor] = nil
+			Spring.SetGameRulesParam(ACTOR_RULES_PREFIX .. actor, 0)
 		end
 		-- After the bookkeeping, so a trigger asking whether an actor is dead
 		-- reads the answer this death just wrote.
@@ -595,6 +637,20 @@ else
 		Spring.SetUnitNoSelect(unitID, true)
 	end
 
+	-- Sounds that would not play, so a name the game has no sound for is one
+	-- warning rather than one every time the trigger fires.
+	local badSound = {}
+
+	--- Play a sound the mission asked for. The name goes to the engine as the
+	-- author wrote it, so it is either an item in the game's own sounds.lua or a
+	-- path to a file in the game.
+	local function playSound(name)
+		if not Spring.PlaySoundFile(name, 1) and not badSound[name] then
+			badSound[name] = true
+			log("warning", "this game has no sound called " .. tostring(name))
+		end
+	end
+
 	--- Returns nothing: a true return would stop the message reaching the gadgets
 	-- behind this one, and their messages are not ours to swallow.
 	function gadget:RecvFromSynced(message, first, second)
@@ -602,6 +658,16 @@ else
 			actorBecame(first, second)
 		elseif message == ANCHOR_MESSAGE then
 			hideAnchor(first)
+		elseif message == DIALOGUE_MESSAGE then
+			-- The panel is a widget, so the line goes on to LuaUI, which draws it
+			-- and plays its clip in step with the text. A game with no LuaUI, or a
+			-- player who has switched the widget off, gets no dialogue: there is
+			-- nowhere for it to appear.
+			Script.LuaUI[DIALOGUE_GLOBAL](first)
+		elseif message == SOUND_MESSAGE then
+			-- Played here rather than in the widget, because a sound is not part of
+			-- the conversation and has nothing to queue behind.
+			playSound(first)
 		end
 	end
 end

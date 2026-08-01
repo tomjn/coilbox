@@ -81,6 +81,45 @@ engine.env:GameFrame(15)
 check("victory for the other side declares theirs", winners(engine) == "1", winners(engine))
 
 --------------------------------------------------------------------------------
+-- The outcome, mirrored for the debrief.
+--
+-- Spring.GameOver is what the replay reads and LuaUI cannot read it back: the
+-- engine hands the winning ally teams to the GameOver callin and the stock
+-- widget handler calls a widget's GameOver with no arguments at all.
+--------------------------------------------------------------------------------
+
+local function mirrored(engine, name)
+	return engine.env.Spring.GetGameRulesParam(name)
+end
+
+engine = playing({})
+check("a running mission says it is not over", mirrored(engine, "coilbox_mission_over") == 0,
+	tostring(mirrored(engine, "coilbox_mission_over")))
+
+engine = playing({ triggers = { once("won", { ends("victory", "player") }) } })
+engine.env:GameFrame(15)
+
+check("an ended mission says so outside synced Lua",
+	mirrored(engine, "coilbox_mission_over") == 1)
+check("and says how many won, because nobody winning is a real answer",
+	mirrored(engine, "coilbox_mission_winners") == 1)
+check("and names each winner", mirrored(engine, "coilbox_mission_winner_0") == 1)
+check("and nobody else", mirrored(engine, "coilbox_mission_winner_1") == nil)
+
+engine = playing({ triggers = { once("lost", { ends("defeat", "player") }) } })
+engine.env:GameFrame(15)
+check("a defeat names the ally teams that won it instead",
+	mirrored(engine, "coilbox_mission_winner_1") == 1
+	and mirrored(engine, "coilbox_mission_winner_0") == nil)
+
+engine = playing({ triggers = { once("lost", { ends("defeat", "player") }) } },
+	{ allyTeamList = { 0 } })
+engine.env:GameFrame(15)
+check("a defeat with nobody left to win it says nobody won",
+	mirrored(engine, "coilbox_mission_winners") == 0,
+	tostring(mirrored(engine, "coilbox_mission_winners")))
+
+--------------------------------------------------------------------------------
 -- Defeat: everyone else wins. A replay says who won and nothing else, so a loss
 -- is the player's ally team being absent from that list.
 --------------------------------------------------------------------------------

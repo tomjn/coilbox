@@ -5,7 +5,8 @@ The Lua that plays a coilbox scenario inside the engine. It is coilbox-authored 
 ## Layout
 
 - `luarules/gadgets/coilbox_mission_runtime.lua`, the gadget. It gates on the modoption, loads the compiled mission, and hands it to the rest of the runtime.
-- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, and `coilbox_gameover.lua` how it ends. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out.
+- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, and `coilbox_gameover.lua` how it ends. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` is pure as well, because saying a line is deciding that it was said and nothing more.
+- `luaui/widgets/coilbox_mission_ui.lua`, the widget: the objectives panel, the dialogue panel, the debrief and the name over a named actor. `luaui/mission_ui/coilbox_panel_model.lua` is everything it decides before it draws, pure and tested outside the engine.
 - `missions/runtime.lua`, the version marker and capability table. Coilbox reads it out of an installed game to decide what the editor may offer.
 - `tests/`, checks that run outside the engine with `luajit`. Not part of what a game vendors.
 
@@ -29,6 +30,7 @@ GG.CoilboxMission = {
   vars    = <the mission's variables, synced half only>,
   groups  = <the scenario's groups, synced half only>,
   objectives = <the mission's objectives, synced half only>,
+  dialogue = <what it says, synced half only>,
   gameOver = <what ends the mission, synced half only>,
 }
 ```
@@ -183,6 +185,51 @@ GG.CoilboxMission.objectives.complete("take-keep")
 GG.CoilboxMission.objectives.fail("take-keep")
 ```
 
+## Dialogue and sound
+
+A dialogue line is a radio message: an id, a speaker, a line of text, and optionally a portrait and a voice clip. The scenario declares them and a trigger fires one with `dialogue`. Portraits and clips are bare file names, and the launch path copies them in beside the compiled mission, so they are read from `missions/<id>/`.
+
+`play_sound` is the same idea without the panel. Its `sound` is passed to `Spring.PlaySoundFile` as the author wrote it, so it is an item in the game's own `sounds.lua` or a path to a file in the game. Unlike a dialogue clip it is not something coilbox ships beside the mission.
+
+- A line id the scenario never declared says nothing and is reported. Like an objective and unlike a var it cannot be invented: a line is its speaker and its text as much as its id.
+- The synced half decides only that a line was said. Which is why the whole message is the id: what a line looks like and sounds like is the reader's, and the reader has the compiled mission.
+
+```lua
+GG.CoilboxMission.dialogue.get("warn")     -- the scenario's record for a line
+GG.CoilboxMission.dialogue.say("warn")
+GG.CoilboxMission.dialogue.sound("alarm.wav")
+```
+
+## The panels
+
+The objectives panel, the dialogue panel and the debrief are one LuaUI widget, `coilbox_mission_ui`. It reads the mission's state out of game rules params, reads the mission itself out of the archive the same way the gadget does, and never talks back: nothing on one player's screen may reach the game.
+
+- The objectives panel lists what the mission is asking for: primaries first, then secondaries, each in the order the scenario lists them. A hidden objective is left out while it is active, and settling one is what reveals it.
+- The dialogue panel shows one line at a time, with its speaker, its portrait and its clip. Lines queue rather than interrupt, because a trigger with two lines in it is an author writing an exchange. A line holds the panel for as long as its text takes to read, three seconds at least and twelve at most, and the backlog behind it is capped at six.
+- The debrief appears once the mission is over and says whether the player won, with how each objective ended. Clicking it dismisses it.
+- An actor the author gave a `name` has that name drawn over its unit. This is the one piece of actor state with no engine call behind it, because nothing renames a unit.
+
+What the widget draws is decided in `coilbox_panel_model.lua`, which is pure: it takes a function that reads a game rules param and a function that measures a string, and answers with what to draw. That is the only part of a widget a test outside the engine can reach, so all of it lives there.
+
+### What crosses between the halves
+
+Anything that never changes, the widget reads out of the compiled mission itself. Everything else is a game rules param, because the engine keeps one table of them for every Lua handle and answers `Spring.GetGameRulesParam` from all of them:
+
+| Param | What it says |
+| --- | --- |
+| `coilbox_mission_objective_<id>` | `0` active, `1` complete, `-1` failed |
+| `coilbox_mission_var_<name>` | the var's number |
+| `coilbox_mission_actor_<id>` | the unit that actor is, or `0` when it is not on the map |
+| `coilbox_mission_over` | `1` once the mission has ended |
+| `coilbox_mission_winners` | how many ally teams won |
+| `coilbox_mission_winner_<allyTeam>` | `1` for each of them |
+
+Every one of those is written before the first frame, so a reader never finds one missing.
+
+The one exception is a line of dialogue, which is an event rather than a state: two lines in one frame would overwrite each other in a param, and the second half of an exchange is the half worth having. So the synced half sends it to its unsynced half, which passes it to LuaUI with `Script.LuaUI.CoilboxMissionDialogue(<line id>)`. A game with no LuaUI, or a player who has switched the widget off, gets no dialogue: the engine treats a call to a global nothing registered as doing nothing, and there is nowhere for a line to appear anyway. A sound is played by the unsynced half rather than passed on, because it has no conversation to queue behind.
+
+The outcome is mirrored despite `Spring.GameOver` already carrying it, because LuaUI cannot read it back: the engine hands the winning ally teams to the `GameOver` callin and the stock widget handler calls a widget's `GameOver` with no arguments at all.
+
 ## Ending a mission
 
 The runtime ends a mission with `Spring.GameOver`, the same call a normal game ends with, so the result lands in the replay and coilbox reads a scenario's outcome through the code path it already reads a skirmish's through. Nothing of ours in between, and nothing to keep in step.
@@ -191,6 +238,7 @@ The runtime ends a mission with `Spring.GameOver`, the same call a normal game e
 - `defeat` names a participant and declares every other ally team the winner, Gaia aside. That is what a losing player's replay has to say: a reader deciding whether the player lost asks whether the player's ally team is in the winning list, so a loss is that list without them in it.
 - Either with no team named means the team a human is playing. Failing that, the lowest engine team number, said out loud, because that is the first slot in the start script and where the player sits in a mission coilbox launched.
 - A mission ends once. The second ending is reported, and nothing is evaluated afterwards: no polled tick, no event. The result is already in the replay, and a trigger that spawns a wave into a finished mission is a mission that looks broken.
+- The outcome is mirrored into `coilbox_mission_over`, `coilbox_mission_winners` and one `coilbox_mission_winner_<allyTeam>` per winner. That is a copy of what went to `Spring.GameOver` and it exists for the debrief, which cannot read the call back. See [what crosses between the halves](#what-crosses-between-the-halves).
 
 The actions run in the order the trigger lists them, so a trigger that wins and then plays a line plays the line.
 
@@ -231,9 +279,13 @@ luajit lua/mission-runtime/tests/var_test.lua
 luajit lua/mission-runtime/tests/group_test.lua
 luajit lua/mission-runtime/tests/objective_test.lua
 luajit lua/mission-runtime/tests/gameover_test.lua
+luajit lua/mission-runtime/tests/dialogue_test.lua
+luajit lua/mission-runtime/tests/panel_test.lua
 luajit lua/mission-runtime/tests/mission_trigger_test.lua
 ```
 
 `tests/support.lua` holds the shared scaffolding: a stub of the slice of the engine the runtime touches, which records what the runtime asked for and plays back the callins it reacts to.
 
 `mission_trigger_test.lua` runs the scenario fixtures in `src/scenario/fixtures/missions/`, which are the files coilbox's own compiler emits. The runtime is proved against the emitted shape rather than against one written to suit it.
+
+Nothing here proves the widget. Everything a widget does is OpenGL, a font and a mouse, and none of the three exists outside a running engine. `panel_test.lua` proves what the widget decides before it draws: which objectives are visible and in what order, which name goes over which unit, how long a line holds the panel, where a line of text breaks, and whether the player won. That the drawing then lands where it should, that the panels do not sit on top of the game's own UI, and that a portrait loads, are claims only a real engine can settle.
