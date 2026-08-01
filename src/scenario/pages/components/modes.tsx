@@ -10,21 +10,35 @@
  * mode's own state, such as the unit type it is about to place. The list is
  * static and every entry is resolved on every render, in order, so that is safe.
  *
- * Zones (#759), groups (#761) and prefab bases (#762) are added by pushing an
- * entry onto {@link EDITOR_MODES}. Actors is here already because the shared
- * interaction needs one real mode to be worth anything, and it is deliberately
- * thin: #760 replaces its unit def field with the game unit browser from lego,
- * and takes over what an actor is placed with.
+ * Groups (#761) and prefab bases (#762) are added by pushing an entry onto
+ * {@link EDITOR_MODES}. Actors is here already because the shared interaction
+ * needs one real mode to be worth anything, and it is deliberately thin: #760
+ * replaces its unit def field with the game unit browser from lego, and takes
+ * over what an actor is placed with.
  */
 
 import { Input } from "@picoframe/frame";
-import { type LucideIcon, MousePointer2, User } from "lucide-react";
+import {
+  Circle,
+  type LucideIcon,
+  MousePointer2,
+  Square,
+  User,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Participant } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
-import type { Point, Scenario } from "../../model";
+import type { Point, Scenario, ScenarioZone } from "../../model";
 import { addActor } from "./editing";
 import { placementKey } from "./placements";
+import type { GroundDragPhase } from "./useMapEditing";
+import {
+  addZone,
+  nextZoneName,
+  type ZoneShape,
+  zoneFromDrag,
+  zoneKey,
+} from "./zones";
 
 /** What a mode is given: the document as it stands, and the way to change it. */
 export interface ModeContext {
@@ -40,10 +54,24 @@ export interface ModeContext {
 export interface ModeBehaviour {
   /**
    * What a click on empty ground puts down, or null for a mode that places
-   * nothing. Null is also what makes the pointer an arrow rather than a
-   * crosshair, and what makes a click on bare ground clear the selection.
+   * nothing. Null is also what makes a click on bare ground clear the
+   * selection.
    */
   place: ((pos: Point) => void) | null;
+  /**
+   * What a drag across bare ground draws, or null for a mode that draws
+   * nothing. Called as the drag moves and once more when it ends or is taken
+   * away, so a mode can show what it is about to make and write the document
+   * only on "end". A mode that sets this takes the left button off the camera,
+   * which pans on the middle button instead while the mode is current.
+   */
+  draw?: ((from: Point, to: Point, phase: GroundDragPhase) => void) | null;
+  /**
+   * Zones the mode is part way through drawing, shown alongside the document's
+   * own. A half-drawn zone lives here rather than in the document, so a drag
+   * never writes to disk.
+   */
+  draftZones?: ScenarioZone[];
   /** The mode's own controls, shown beside the mode strip. */
   controls?: ReactNode;
 }
@@ -67,6 +95,72 @@ const selectMode: EditorMode = {
   icon: MousePointer2,
   hint: "Drag a unit to move it. Click bare ground to deselect.",
   use: () => ({ place: null }),
+};
+
+/** The id a half-drawn zone carries. Never written to the document, and not a
+ *  UUID, so it cannot collide with one that is. */
+const DRAFT_ZONE_ID = "draft-zone";
+
+/**
+ * An area of the map, drawn by dragging one out.
+ *
+ * A box goes corner to corner and a circle out from its centre, so the gesture
+ * matches the shape rather than the other way round. The zone being dragged out
+ * is held here until the pointer comes up, because every change to the document
+ * is saved and a drag would otherwise write a file per frame.
+ */
+const zonesMode: EditorMode = {
+  id: "zones",
+  label: "Zones",
+  icon: Square,
+  hint: "Drag on the map to draw a zone. Middle-drag pans while this mode is on.",
+  use: ({ scenario, onChange, onSelect }) => {
+    const [shape, setShape] = useState<ZoneShape>("box");
+    const [draft, setDraft] = useState<ScenarioZone | null>(null);
+
+    return {
+      place: null,
+      // Left undefined rather than empty when there is no draft, so the surface
+      // is handed the same list twice running and does not redraw for nothing.
+      draftZones: draft ? [draft] : undefined,
+      draw: (from, to, phase) => {
+        if (phase === "cancel") {
+          setDraft(null);
+          return;
+        }
+        if (phase === "move") {
+          setDraft(zoneFromDrag(shape, from, to, DRAFT_ZONE_ID, "New zone"));
+          return;
+        }
+        setDraft(null);
+        const zone = zoneFromDrag(
+          shape,
+          from,
+          to,
+          crypto.randomUUID(),
+          nextZoneName(scenario.zones),
+        );
+        onChange(addZone(scenario, zone));
+        onSelect(zoneKey(zone.id));
+      },
+      controls: (
+        <OptionSelect
+          size="sm"
+          className="w-32"
+          value={shape}
+          onValueChange={(next) => setShape(next as ZoneShape)}
+          options={[
+            { value: "box", label: "Box", icon: <Square className="size-3" /> },
+            {
+              value: "circle",
+              label: "Circle",
+              icon: <Circle className="size-3" />,
+            },
+          ]}
+        />
+      ),
+    };
+  },
 };
 
 /** One unit at one point, which is what an actor is. */
@@ -136,4 +230,4 @@ function Swatch({ participant }: { participant: Participant }) {
 }
 
 /** Every mode the editor offers, in the order the strip shows them. */
-export const EDITOR_MODES: EditorMode[] = [selectMode, actorsMode];
+export const EDITOR_MODES: EditorMode[] = [selectMode, zonesMode, actorsMode];

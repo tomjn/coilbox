@@ -20,6 +20,10 @@
  * something the camera is switched off, and the drawn objects are moved
  * directly. The document is written once, on release, because writing it every
  * frame would rebuild the whole scene every frame.
+ *
+ * A mode that draws rather than places takes that button for the whole gesture:
+ * a press, a drag and a release across bare ground is `onDragGround`, and the
+ * camera pans on the middle button while such a mode is current.
  */
 
 import { useEffect, useRef } from "react";
@@ -37,6 +41,29 @@ import {
 import type { Placement } from "./placements";
 import { sceneToWorld, worldToScene } from "./scene";
 import type { UnitsLayer } from "./unitsLayer";
+
+/**
+ * Pickable things on the map that are not units: zones today, patrol paths
+ * later. Raycast alongside the units and sorted with them by distance, so a
+ * unit standing inside a zone is still the nearer hit.
+ *
+ * An overlay owns how its objects are drawn, so a drag of one is handed back to
+ * it rather than moved here: resizing a zone changes its shape, which is not
+ * something moving an object can express.
+ */
+export interface OverlayLayer {
+  /** The group its objects hang off. Every one carries a `placementKey`. */
+  root: THREE.Object3D;
+  /** Whether a picked key is one of this layer's. */
+  has: (key: string) => boolean;
+  /** Show a drag in progress, without touching the document. The layer redraws
+   *  and renders the scene itself. Undone by the layer's next draw. */
+  drag: (key: string, delta: Point) => void;
+}
+
+/** How far a drag across bare ground has got: still moving, finished, or taken
+ *  away by the browser before it finished. */
+export type GroundDragPhase = "move" | "end" | "cancel";
 
 /** What the surface hands the pointer layer. Everything but `handle` and
  *  `layer` is read at the moment of a gesture rather than captured, so changing
@@ -62,6 +89,19 @@ export interface MapEditingDeps {
   /** A click on empty ground in a mode that places something. Null in a mode
    *  that places nothing, which is what makes that mode read-only. */
   onPlace: ((pos: Point) => void) | null;
+  /**
+   * A drag across bare ground, from where it was pressed to where the pointer
+   * has got to, both in elmos.
+   *
+   * Called as the drag moves and once more when it ends, so a mode can show the
+   * shape it is drawing and write the document only at the end. Null in a mode
+   * that draws nothing, which is what leaves the left button panning the camera.
+   */
+  onDragGround:
+    | ((from: Point, to: Point, phase: GroundDragPhase) => void)
+    | null;
+  /** Anything pickable that is not a unit. */
+  overlay?: OverlayLayer | null;
   /** A drag that finished, in elmos moved. */
   onMove: (key: string, delta: Point) => void;
 }
@@ -134,6 +174,14 @@ function placementOf(object: THREE.Object3D): string | null {
   return null;
 }
 
+/** What the pointer looks like: a crosshair wherever a gesture on bare ground
+ *  would put something down or draw something, an arrow where it would not. */
+function drawingCursor(
+  deps: Pick<MapEditingDeps, "onPlace" | "onDragGround">,
+): string {
+  return deps.onPlace || deps.onDragGround ? "crosshair" : "";
+}
+
 /** What one drag is moving: the thing that was picked up, and where every
  *  object moving with it started. */
 interface Drag {
@@ -141,9 +189,21 @@ interface Drag {
   from: PointerPos;
   /** Where on the map the pointer was when the drag started. */
   origin: Point;
+  /** The drawn units carried along, empty when an overlay owns the drag and
+   *  redraws its own object. */
   members: { key: string; object: THREE.Object3D; pos: Point }[];
+  overlay: boolean;
   moved: boolean;
   delta: Point;
+}
+
+/** A drag across bare ground: where it began on the map, and where it has got
+ *  to, so a release that lands off the map still ends where it was last seen. */
+interface GroundDrag {
+  from: PointerPos;
+  origin: Point;
+  to: Point;
+  moved: boolean;
 }
 
 /**
@@ -169,6 +229,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
     const ring = createSelectionRing(handle);
     ringRef.current = ring;
     let drag: Drag | null = null;
+    let band: GroundDrag | null = null;
     let pressed: PointerPos | null = null;
 
     /** The map position a pointer is over, or null when the ray misses the
@@ -199,13 +260,15 @@ export function useMapEditing(deps: MapEditingDeps): void {
       return clampToMap(relief ?? flat, worldWidth, worldHeight);
     };
 
-    /** The placement key under the pointer, if any. Only the units layer is
+    /** The placement key under the pointer, if any. Only the drawn layers are
      *  raycast: the terrain would answer flat, and nothing else is pickable. */
     const pick = (event: PointerEvent): string | null => {
       const rect = dom.getBoundingClientRect();
       const ndc = pointerNdc({ x: event.clientX, y: event.clientY }, rect);
       raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), handle.camera);
-      for (const hit of raycaster.intersectObject(layer.root, true)) {
+      const overlay = latest.current.overlay;
+      const roots = overlay ? [layer.root, overlay.root] : [layer.root];
+      for (const hit of raycaster.intersectObjects(roots, true)) {
         const key = placementOf(hit.object);
         if (key) return key;
       }
@@ -233,10 +296,36 @@ export function useMapEditing(deps: MapEditingDeps): void {
       if (event.button !== 0) return;
       pressed = { x: event.clientX, y: event.clientY };
       const key = pick(event);
-      if (!key) return;
-
       const origin = groundPoint(event);
+
+      if (!key) {
+        // Bare ground. In a mode that draws, this button is the drawing gesture
+        // rather than the camera's pan, so the camera stands down for it.
+        if (latest.current.onDragGround && origin) {
+          band = { from: pressed, origin, to: origin, moved: false };
+          handle.controls.enabled = false;
+        }
+        return;
+      }
       if (!origin) return;
+
+      // An overlay draws its own objects, so it is told about the drag rather
+      // than having them moved out from under it.
+      if (latest.current.overlay?.has(key)) {
+        drag = {
+          key,
+          from: pressed,
+          origin,
+          members: [],
+          overlay: true,
+          moved: false,
+          delta: { x: 0, z: 0 },
+        };
+        handle.controls.enabled = false;
+        latest.current.onSelect(key);
+        return;
+      }
+
       const { placements } = latest.current;
       const members = dragKeys(placements, key).flatMap((member) => {
         const object = layer.objects.get(member);
@@ -252,6 +341,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
         from: pressed,
         origin,
         members,
+        overlay: false,
         moved: false,
         delta: { x: 0, z: 0 },
       };
@@ -262,30 +352,49 @@ export function useMapEditing(deps: MapEditingDeps): void {
     };
 
     const onPointerMove = (event: PointerEvent) => {
-      if (!drag) return;
       const now = { x: event.clientX, y: event.clientY };
+
+      if (band) {
+        if (!band.moved && isClick(band.from, now)) return;
+        band.moved = true;
+        const at = groundPoint(event);
+        if (!at) return;
+        band.to = at;
+        latest.current.onDragGround?.(band.origin, at, "move");
+        return;
+      }
+
+      if (!drag) return;
       if (!drag.moved && isClick(drag.from, now)) return;
       drag.moved = true;
       dom.style.cursor = "grabbing";
       const at = groundPoint(event);
       if (!at) return;
       drag.delta = { x: at.x - drag.origin.x, z: at.z - drag.origin.z };
-      carry(drag.delta);
+      if (drag.overlay) latest.current.overlay?.drag(drag.key, drag.delta);
+      else carry(drag.delta);
     };
 
     const finish = (event: PointerEvent) => {
       const gesture = drag;
+      const drawn = band;
       const from = pressed;
       drag = null;
+      band = null;
       pressed = null;
       handle.controls.enabled = true;
-      dom.style.cursor = latest.current.onPlace ? "crosshair" : "";
+      dom.style.cursor = drawingCursor(latest.current);
       if (gesture) {
         if (gesture.moved) latest.current.onMove(gesture.key, gesture.delta);
         return;
       }
-      // Nothing was picked up, so this was either a click on empty ground or a
-      // pan of the camera.
+      if (drawn?.moved) {
+        const at = groundPoint(event) ?? drawn.to;
+        latest.current.onDragGround?.(drawn.origin, at, "end");
+        return;
+      }
+      // Nothing was picked up and nothing was drawn, so this was either a click
+      // on empty ground or a pan of the camera.
       if (!from || !isClick(from, { x: event.clientX, y: event.clientY }))
         return;
       const place = latest.current.onPlace;
@@ -297,8 +406,12 @@ export function useMapEditing(deps: MapEditingDeps): void {
     const onPointerCancel = () => {
       // Put back whatever the abandoned drag had moved. The next render of the
       // units layer would do it too, but only if the document changed.
-      if (drag) carry({ x: 0, z: 0 });
+      if (drag && !drag.overlay) carry({ x: 0, z: 0 });
+      if (drag?.overlay) latest.current.overlay?.drag(drag.key, { x: 0, z: 0 });
+      if (band?.moved)
+        latest.current.onDragGround?.(band.origin, band.to, "cancel");
       drag = null;
+      band = null;
       pressed = null;
       handle.controls.enabled = true;
     };
@@ -335,9 +448,13 @@ export function useMapEditing(deps: MapEditingDeps): void {
     handle.render();
   }, [handle, layer, selected, placements, drawing]);
 
-  // The cursor says whether a click will put something down.
+  // The cursor says whether a gesture on bare ground will make something.
+  const { onPlace, onDragGround } = deps;
   useEffect(() => {
     if (!handle) return;
-    handle.renderer.domElement.style.cursor = deps.onPlace ? "crosshair" : "";
-  }, [handle, deps.onPlace]);
+    handle.renderer.domElement.style.cursor = drawingCursor({
+      onPlace,
+      onDragGround,
+    });
+  }, [handle, onPlace, onDragGround]);
 }

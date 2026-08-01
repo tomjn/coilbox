@@ -1,4 +1,4 @@
-import { Button } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import {
   Frame,
   Layers,
@@ -8,7 +8,7 @@ import {
   Trash2,
   Unplug,
 } from "lucide-react";
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import * as THREE from "three";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
@@ -18,7 +18,7 @@ import {
   type MapScene3D,
 } from "@/mapconv/pages/components/MapPreview3D";
 import { usePreferredTarget } from "@/play/config";
-import type { Scenario } from "../../model";
+import type { Scenario, ScenarioZone } from "../../model";
 import {
   canTurn,
   movePlacement,
@@ -30,6 +30,14 @@ import type { Placement } from "./placements";
 import { authoringCamera, clampToPlane, mapSceneStatus } from "./scene";
 import { useMapEditing } from "./useMapEditing";
 import { type ScenarioUnitsState, useScenarioUnits } from "./useScenarioUnits";
+import { useScenarioZones } from "./useScenarioZones";
+import {
+  moveZone,
+  parseZoneKey,
+  removeZone,
+  renameZone,
+  zoneExtent,
+} from "./zones";
 
 /** What the surface says when there is no scene to show. */
 function SurfaceMessage({
@@ -91,6 +99,25 @@ export function ScenarioMapScene({
   );
   const behaviour = behaviours[EDITOR_MODES.indexOf(mode)];
 
+  // A zone key names either the zone or one of its resize handles, and both
+  // mean the same zone is what is selected.
+  const zoneRef = selected ? parseZoneKey(selected) : null;
+  const pickedZone =
+    scenario.zones.find((zone) => zone.id === zoneRef?.id) ?? null;
+
+  const { draftZones } = behaviour;
+  const zones = useMemo(
+    () => (draftZones ? [...scenario.zones, ...draftZones] : scenario.zones),
+    [scenario.zones, draftZones],
+  );
+  const zonesLayer = useScenarioZones(
+    handle,
+    zones,
+    assets,
+    units.groundAt,
+    pickedZone?.id ?? null,
+  );
+
   useMapEditing({
     handle,
     layer: units.layer,
@@ -100,9 +127,19 @@ export function ScenarioMapScene({
     groundAt: units.groundAt,
     selected,
     drawing: units.drawing,
+    // A zone is a sheet lying over the ground, so it steps aside for a mode
+    // that puts things on the ground: otherwise a zone covering a corner of the
+    // map would be a corner of the map nothing could be placed on.
+    overlay: behaviour.place ? null : zonesLayer,
     onSelect: setSelected,
     onPlace: behaviour.place,
-    onMove: (key, delta) => onChange(movePlacement(scenario, key, delta)),
+    onDragGround: behaviour.draw ?? null,
+    onMove: (key, delta) =>
+      onChange(
+        parseZoneKey(key)
+          ? moveZone(scenario, key, delta)
+          : movePlacement(scenario, key, delta),
+      ),
   });
 
   const picked = units.placements.find((p) => p.key === selected) ?? null;
@@ -140,10 +177,12 @@ export function ScenarioMapScene({
 
       // Pan on the left button, because it is the gesture used most and the one
       // a mouse always has. Rotate moves to the right button, which the preview
-      // otherwise spends on a second pan.
+      // otherwise spends on a second pan. The middle button pans too, because a
+      // mode that draws takes the left button for the whole gesture and the
+      // wheel already does the dollying the middle button would otherwise.
       controls.mouseButtons = {
         LEFT: THREE.MOUSE.PAN,
-        MIDDLE: THREE.MOUSE.DOLLY,
+        MIDDLE: THREE.MOUSE.PAN,
         RIGHT: THREE.MOUSE.ROTATE,
       };
       // Pan across the ground rather than across the screen, so dragging moves
@@ -284,6 +323,19 @@ export function ScenarioMapScene({
             }}
           />
         )}
+        {pickedZone && (
+          <ZoneBar
+            key={pickedZone.id}
+            zone={pickedZone}
+            onRename={(name) =>
+              onChange(renameZone(scenario, pickedZone.id, name))
+            }
+            onDelete={() => {
+              onChange(removeZone(scenario, pickedZone.id));
+              setSelected(null);
+            }}
+          />
+        )}
       </div>
 
       <Button
@@ -302,8 +354,8 @@ export function ScenarioMapScene({
         drawing={units.drawing}
       />
       <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
-        {mapName} · drag to pan · drag a unit to move it · right-drag to turn ·
-        scroll to zoom
+        {mapName} · drag or middle-drag to pan · drag a unit or a zone to move
+        it · right-drag to turn · scroll to zoom
       </p>
     </Surface>
   );
@@ -351,6 +403,65 @@ function SelectionBar({
       >
         <RotateCw className="size-3.5" /> Turn
       </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+        onClick={onDelete}
+      >
+        <Trash2 className="size-3.5" /> Delete
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * The selected zone: its name, its size, and the way to delete it.
+ *
+ * The name is what triggers pick a zone by, so it is the one thing about a zone
+ * that cannot be set by dragging and the only field here. It is committed when
+ * the box is left rather than on every keystroke, because every change to the
+ * document is written to disk.
+ *
+ * Mounted per zone by its id, so moving the selection reseeds the box.
+ */
+function ZoneBar({
+  zone,
+  onRename,
+  onDelete,
+}: {
+  zone: ScenarioZone;
+  onRename: (name: string) => void;
+  onDelete: () => void;
+}) {
+  const [name, setName] = useState(zone.name);
+  const { halfX, halfZ } = zoneExtent(zone);
+  const size =
+    zone.shape === "circle"
+      ? `circle · radius ${zone.radius}`
+      : `box · ${Math.round(halfX * 2)} × ${Math.round(halfZ * 2)}`;
+
+  const commit = () => {
+    const trimmed = name.trim();
+    if (trimmed) onRename(trimmed);
+    else setName(zone.name);
+  };
+
+  return (
+    <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card/85 p-1 pl-2 backdrop-blur">
+      <Input
+        aria-label="Zone name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        className="h-7 w-40 text-xs"
+      />
+      <span className="font-mono text-[11px] text-muted-foreground">
+        {size}
+      </span>
       <Button
         size="sm"
         variant="ghost"
