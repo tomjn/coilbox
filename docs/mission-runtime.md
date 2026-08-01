@@ -234,6 +234,8 @@ scripts/mission-sf-jericho.sh
 
 The same shape again, on the same game, asking the other half of the question. The adoption proof asks whether Splinter Faction can host the runtime. This plays **Silence the Jericho**, the first mission authored end to end in the Scenario Builder ([issue #773](https://github.com/tomjn/coilbox/issues/773)), and asks whether it is won: the dormant patrols spawn and wake, the trigger zones fire, the radio lines are said, and destroying the Jericho structure ends the mission with the player's ally team the winner. The mission is `src/scenario/fixtures/jericho.json` and its compiled Lua is in the corpus beside it. It needs the same setup as the proof below, plus `AcidicQuarry 5.17` in `maps/`, because a scenario's zones are map coordinates.
 
+To play the same mission in coilbox rather than headless, import it: [Play the example mission](scenarios.md#play-the-example-mission) is the download and the setup, and the setup is the proof's.
+
 #### Running the proof yourself
 
 The proof needs a game that has taken both halves of the contract, and neither half is in this repo. The runtime comes from coilbox's own install button. The three guards are Splinter Faction's change to make and are not upstream yet, so this repo keeps them as a patch, `scripts/sf-proof/splinterfaction-guards.patch`. That file is the exact text of all three, and it is what a maintainer would be sent.

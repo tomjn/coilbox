@@ -232,7 +232,24 @@ The button is disabled with a reason for the things you have to fix elsewhere: n
 
 **Import** reads one back. It **always makes a new copy**: importing your own export gives you a second scenario with a new id, never an overwrite. A file that is not a coilbox scenario, is damaged, or was made by a newer coilbox is rejected with a reason rather than half-read. A clip an import cannot write, one over 16 MB for instance, is skipped and the line that named it loses it, rather than the whole scenario being refused.
 
-Scenarios do not have a bundled form of their own. To ship one, attach it to a campaign mission and bundle the campaign, which carries the whole scenario document. **A bundled campaign's dialogue portraits and voice clips are not carried yet**, so its radio messages play silent: [issue #877](https://github.com/tomjn/coilbox/issues/877). Exporting and importing a campaign does carry them. See [Campaigns](campaigns.md#missions-that-play-a-scenario).
+Scenarios do not have a bundled form of their own. To ship one, attach it to a campaign mission and bundle the campaign, which carries the whole scenario document. **A bundled campaign's dialogue portraits and voice clips are not carried yet**, so its radio messages play silent: [issue #877](https://github.com/tomjn/coilbox/issues/877). Exporting and importing a campaign does carry them. See [Campaigns](campaigns.md#missions-that-play-a-scenario). Shipping a read-only scenario inside a distribution profile is [issue #786](https://github.com/tomjn/coilbox/issues/786) and is not built.
+
+## Play the example mission
+
+**Silence the Jericho** is the first mission authored end to end in the Scenario Builder, and you can download it as an export: [silence-the-jericho.json](/scenarios/silence-the-jericho.json).
+
+Importing it takes nothing but coilbox. Turn on Advanced mode in Settings > General, open **Scenario Builder > Builder**, press **Import** and pick the file. You get a new scenario you can read and edit like any other.
+
+Playing it needs the game it was written for. That machine also needs, in this order:
+
+1. **A loose Splinter Faction**, cloned into your Spring data folder as `games/SplinterFaction.sdd`. A packaged `.sd7` or `.sdz` cannot be written into, so it cannot take the runtime. The mission names its game `SplinterFaction $VERSION`, which is the archive name a loose checkout reports. A copy reporting a different name is a different game as far as the launch is concerned.
+2. **The mission runtime installed into it.** Open **Content > Games**, pick Splinter Faction, and press **Install the mission runtime**.
+3. **The three adoption guards.** They are not upstream in Splinter Faction yet, so this repo keeps them as `scripts/sf-proof/splinterfaction-guards.patch`. Without them the game's own end conditions end the mission early, and its faction picker and start-spot picker run over the top of a mission that is already playing. See [running the proof yourself](mission-runtime.md#running-the-proof-yourself).
+4. **The map `AcidicQuarry 5.17`** in `maps/`. A scenario's zones are map coordinates, so this mission plays on that map and no other.
+
+With all four the mission appears under **Play > Scenarios** with a **Play** button, and **Test in game** in the editor runs the same pipeline.
+
+The export is built from `src/scenario/fixtures/jericho.json` by `bun scripts/build-jericho-export.mjs`, and `src/scenario/example.test.ts` fails if the two ever drift apart.
 
 ## Win and loss
 
