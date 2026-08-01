@@ -34,9 +34,41 @@ export const ELMOS_PER_FOOTPRINT = 16;
 /** A conservative stand-in health value, easy to find and retune by hand. */
 const DEFAULT_MAX_DAMAGE = 1000;
 
-/** Quote a value as a Lua string literal. Shared with the scratch game's modinfo. */
+/** Escapes for characters that cannot appear raw in a quoted Lua string. */
+const LUA_STRING_ESCAPES: Record<string, string> = {
+  "\\": "\\\\",
+  '"': '\\"',
+  "\n": "\\n",
+  "\r": "\\r",
+  "\t": "\\t",
+};
+
+/**
+ * Quote a value as a Lua string literal. Shared with the scratch game's
+ * modinfo. Project names reach this from lego's clipboard import, which
+ * accepts any string, so this has to hold for anything: a quote or backslash
+ * would end the literal, and a raw newline is a syntax error in a short
+ * string.
+ *
+ * Remaining control characters become three-digit `\ddd` escapes. The three
+ * digits are not optional padding: `\0` followed by the digit `5` would
+ * otherwise read back as byte 5.
+ *
+ * Anything above ASCII is left alone, since Lua strings are byte strings and
+ * the file is written as UTF-8, so the bytes survive the round trip.
+ *
+ * Kept in step by hand with the scenario compiler's own `luaString` in
+ * `src/scenario/compile.ts`, which lego does not import to avoid pulling the
+ * scenario editor's dependency graph into the unit builder.
+ */
 export function luaString(value: string): string {
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  const body = value.replace(
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: escaping them is the point
+    /[\\"\n\r\t\x00-\x1f\x7f]/g,
+    (ch) =>
+      LUA_STRING_ESCAPES[ch] ?? `\\${ch.charCodeAt(0).toString().padStart(3, "0")}`,
+  );
+  return `"${body}"`;
 }
 
 /**
