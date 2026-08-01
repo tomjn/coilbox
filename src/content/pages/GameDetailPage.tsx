@@ -274,7 +274,7 @@ export default function GameDetailPage() {
 
       <OptionsList options={gameInfo?.options ?? []} title="Game options" />
 
-      <MissionRuntimeSection archive={game.primaryArchive} />
+      <MissionRuntimeSection game={game} />
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
