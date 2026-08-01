@@ -57,7 +57,10 @@ describe("luaString", () => {
 
   it("does not let a hostile project name break out of the literal", () => {
     const hostile = '", os.execute("rm -rf /"), "';
-    const lua = buildUnitDef(project(hostile, "hostile"), bounds({ x: 32, z: 32 }));
+    const lua = buildUnitDef(
+      project(hostile, "hostile"),
+      bounds({ x: 32, z: 32 }),
+    );
 
     expect(lua).toContain(`name = "\\", os.execute(\\"rm -rf /\\"), \\""`);
     expect(lua).not.toContain('os.execute("rm');
@@ -70,7 +73,9 @@ describe("luaString", () => {
     );
 
     expect(lua).toContain('name = "up\\nreturn 1 --"');
-    const escaped = lua.split("\n").some((l) => l.trim().startsWith("return 1"));
+    const escaped = lua
+      .split("\n")
+      .some((l) => l.trim().startsWith("return 1"));
     expect(escaped).toBe(false);
   });
 });

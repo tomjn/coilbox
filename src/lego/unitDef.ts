@@ -66,7 +66,8 @@ export function luaString(value: string): string {
     // biome-ignore lint/suspicious/noControlCharactersInRegex: escaping them is the point
     /[\\"\n\r\t\x00-\x1f\x7f]/g,
     (ch) =>
-      LUA_STRING_ESCAPES[ch] ?? `\\${ch.charCodeAt(0).toString().padStart(3, "0")}`,
+      LUA_STRING_ESCAPES[ch] ??
+      `\\${ch.charCodeAt(0).toString().padStart(3, "0")}`,
   );
   return `"${body}"`;
 }
