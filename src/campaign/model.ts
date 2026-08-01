@@ -278,6 +278,13 @@ export function parseCampaignJson(json: string): Campaign | null {
     container.payload !== null
   ) {
     d = container.payload as Record<string, unknown>;
+    // An export carrying scenario media puts the document under `campaign`
+    // beside the clips (`transfer.ts`, kindVersion 2), so unwrap that too. A
+    // campaign document has no `campaign` field of its own, so this is
+    // unambiguous.
+    if (typeof d.campaign === "object" && d.campaign !== null) {
+      d = d.campaign as Record<string, unknown>;
+    }
   } else if (
     // Also accept the legacy export/share wrapper (`CampaignExportFile`).
     d.format === "coilbox-campaign" &&

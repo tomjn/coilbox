@@ -58,7 +58,7 @@ export const CONTAINER_KINDS: readonly ContainerKind[] = [
  * is reported as `newer` rather than silently misread.
  */
 export const SUPPORTED_KIND_VERSIONS: Record<ContainerKind, number> = {
-  campaign: 1,
+  campaign: 2,
   preset: 1,
   challenge: 1,
   "setup-pack": 1,
@@ -257,6 +257,12 @@ export function sniffPayloadKind(payload: unknown): ContainerKind | null {
   if (typeof payload !== "object" || payload === null) return null;
   const p = payload as Record<string, unknown>;
   if (p.type === "ta" && Array.isArray(p.missions)) return "campaign";
+  // A campaign export carrying scenario media wraps the document the same way a
+  // scenario export does, so recognise the wrapper too (kindVersion 2).
+  if (typeof p.campaign === "object" && p.campaign !== null) {
+    const c = p.campaign as Record<string, unknown>;
+    if (c.type === "ta" && Array.isArray(c.missions)) return "campaign";
+  }
   // A scenario export wraps the document beside its dialogue media, so the
   // shape to recognise is the wrapper, not the document.
   if (typeof p.scenario === "object" && p.scenario !== null) {
