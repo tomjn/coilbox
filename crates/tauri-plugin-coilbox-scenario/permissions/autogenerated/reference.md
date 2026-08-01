@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows the scenario plugin's storage, dialogue-media, file export and import, compiled-mission read-back and write, mission-runtime install and test-mutator commands.
+Allows the scenario plugin's storage, dialogue-media, file export and import, compiled-mission read-back, write, list and remove, mission-runtime install and test-mutator commands.
 
 #### This default permission set includes the following:
 
@@ -16,6 +16,8 @@ Allows the scenario plugin's storage, dialogue-media, file export and import, co
 - `allow-scenario-read-mission`
 - `allow-scenario-runtime-install`
 - `allow-scenario-runtime-status`
+- `allow-scenario-list-missions`
+- `allow-scenario-delete-mission`
 - `allow-scenario-test-mutator`
 - `allow-scenario-write-mission`
 
@@ -50,6 +52,32 @@ Enables the scenario_delete command without any pre-configured scope.
 <td>
 
 Denies the scenario_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:allow-scenario-delete-mission`
+
+</td>
+<td>
+
+Enables the scenario_delete_mission command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:deny-scenario-delete-mission`
+
+</td>
+<td>
+
+Denies the scenario_delete_mission command without any pre-configured scope.
 
 </td>
 </tr>
@@ -128,6 +156,32 @@ Enables the scenario_list command without any pre-configured scope.
 <td>
 
 Denies the scenario_list command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:allow-scenario-list-missions`
+
+</td>
+<td>
+
+Enables the scenario_list_missions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:deny-scenario-list-missions`
+
+</td>
+<td>
+
+Denies the scenario_list_missions command without any pre-configured scope.
 
 </td>
 </tr>

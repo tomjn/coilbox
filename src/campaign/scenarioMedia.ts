@@ -3,8 +3,9 @@ import {
   dropMissingDialogueMedia,
   scenarioMediaFiles,
 } from "../scenario/transfer";
+import { campaignList } from "./bindings";
 import type { Campaign } from "./model";
-import type { CampaignScenarioMedia } from "./transfer";
+import { type CampaignScenarioMedia, parseCampaignExport } from "./transfer";
 
 /**
  * Moving an attached scenario's dialogue clips in and out of a campaign export
@@ -117,6 +118,59 @@ export async function restoreCampaignScenarioMedia(
     written.set(scenarioId, landed);
   }
   return written;
+}
+
+/**
+ * Campaigns whose clips this session has already materialised, so a second
+ * launch does not decode and rewrite the same files.
+ */
+const materialised = new Set<string>();
+
+/**
+ * Put a bundled campaign's dialogue clips in the media store, before one of its
+ * missions is launched (issue #877).
+ *
+ * An imported campaign wrote its clips at import time. A bundled one never went
+ * through import: it is read straight out of `.coilbox/campaigns/` as the file
+ * the builder exported, and `parseCampaignJson` unwraps the document and leaves
+ * the clips beside it untouched. So without this a distribution's missions play
+ * their radio messages with no portrait and no voice.
+ *
+ * They go in the ordinary media store, under the ids the export carried, even
+ * though the campaign itself is read-only. That store is the only place
+ * `scenario_write_mission` reads from, so anywhere else would mean teaching the
+ * write path a second root for the sake of a handful of small files. Nothing
+ * collects them again either: `scenarioIsAttached` and {@link clipIsAttached}
+ * both count bundled campaigns, so the clips are held exactly as an imported
+ * campaign's are.
+ *
+ * Called on the launch path rather than when the list is read, because the list
+ * is read on every app start for the sidebar's campaign gate and this decodes
+ * and writes files. A campaign that carries no media, which is every local one
+ * and every campaign authored before the scenario editor, costs one read.
+ */
+export async function ensureCampaignScenarioMedia(
+  campaignId: string,
+): Promise<void> {
+  if (materialised.has(campaignId)) return;
+  materialised.add(campaignId);
+  try {
+    const { items } = await campaignList({});
+    for (const item of items) {
+      if (item.source !== "bundled") continue;
+      const parsed = parseCampaignExport(item.json);
+      if (!parsed || parsed.campaign.id !== campaignId || !parsed.media) {
+        continue;
+      }
+      await restoreCampaignScenarioMedia(parsed.media);
+      return;
+    }
+  } catch (e) {
+    // Retry on the next launch: a clip that did not land only costs a line its
+    // picture, so this must never be the reason a mission does not start.
+    materialised.delete(campaignId);
+    console.warn("could not materialise bundled dialogue clips", e);
+  }
 }
 
 /**

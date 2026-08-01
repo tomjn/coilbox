@@ -464,6 +464,45 @@ async fn scenario_write_mission<R: Runtime>(
     }
 }
 
+/// `scenario_list_missions`, the compiled mission folders in a loose game.
+///
+/// Every launch into a game that vendors the runtime writes one and leaves it
+/// there, so a player who has tested five scenarios has five folders and no way
+/// to see them (issue #814). Folders only, so the runtime's own `runtime.lua`
+/// and the game's `extensions.lua` are never listed. A packaged `.sd7`/`.sdz`
+/// fails here, as it does for every write, because coilbox never put anything
+/// in one.
+#[tauri::command]
+async fn scenario_list_missions(root: String) -> CliResult {
+    match writable_game_dir(&root) {
+        Ok(dir) => CliResult::ok(json!({ "missions": mutator::list_missions(&dir) })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `scenario_delete_mission`, removing one `missions/<scenarioId>/` from a loose
+/// game, dialogue clips and all.
+///
+/// The undo for [`scenario_write_mission`], and only for that: the runtime the
+/// game vendors stays, so the game can still play the missions it kept, and only
+/// a folder is ever removed. Both guards are the write path's own, an id of
+/// `[A-Za-z0-9-]+` and a game folder coilbox may write into, so nothing this
+/// command can reach is something the other could not have written.
+#[tauri::command]
+async fn scenario_delete_mission(root: String, scenario_id: String) -> CliResult {
+    if !valid_id(&scenario_id) {
+        return CliResult::err(format!("invalid scenario id: {scenario_id}"));
+    }
+    let dir = match writable_game_dir(&root) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    match mutator::remove_mission(&dir, &scenario_id) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `scenario_test_mutator`, generating the game a scenario is tested in.
 ///
 /// A game that has not vendored the runtime, and a packaged one that cannot be
@@ -564,6 +603,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_read_mission,
             scenario_runtime_install,
             scenario_runtime_status,
+            scenario_list_missions,
+            scenario_delete_mission,
             scenario_test_mutator,
             scenario_write_mission
         ])

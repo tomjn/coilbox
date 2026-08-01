@@ -307,6 +307,18 @@
           "markdownDescription": "Denies the scenario_delete command without any pre-configured scope."
         },
         {
+          "description": "Enables the scenario_delete_mission command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-scenario-delete-mission",
+          "markdownDescription": "Enables the scenario_delete_mission command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scenario_delete_mission command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-scenario-delete-mission",
+          "markdownDescription": "Denies the scenario_delete_mission command without any pre-configured scope."
+        },
+        {
           "description": "Enables the scenario_export command without any pre-configured scope.",
           "type": "string",
           "const": "allow-scenario-export",
@@ -341,6 +353,18 @@
           "type": "string",
           "const": "deny-scenario-list",
           "markdownDescription": "Denies the scenario_list command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the scenario_list_missions command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-scenario-list-missions",
+          "markdownDescription": "Enables the scenario_list_missions command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scenario_list_missions command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-scenario-list-missions",
+          "markdownDescription": "Denies the scenario_list_missions command without any pre-configured scope."
         },
         {
           "description": "Enables the scenario_media_delete command without any pre-configured scope.",
@@ -463,10 +487,10 @@
           "markdownDescription": "Denies the scenario_write_mission command without any pre-configured scope."
         },
         {
-          "description": "Allows the scenario plugin's storage, dialogue-media, file export and import, compiled-mission read-back and write, mission-runtime install and test-mutator commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`\n- `allow-scenario-media-read`\n- `allow-scenario-media-write`\n- `allow-scenario-export`\n- `allow-scenario-import`\n- `allow-scenario-read-mission`\n- `allow-scenario-runtime-install`\n- `allow-scenario-runtime-status`\n- `allow-scenario-test-mutator`\n- `allow-scenario-write-mission`",
+          "description": "Allows the scenario plugin's storage, dialogue-media, file export and import, compiled-mission read-back, write, list and remove, mission-runtime install and test-mutator commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`\n- `allow-scenario-media-read`\n- `allow-scenario-media-write`\n- `allow-scenario-export`\n- `allow-scenario-import`\n- `allow-scenario-read-mission`\n- `allow-scenario-runtime-install`\n- `allow-scenario-runtime-status`\n- `allow-scenario-list-missions`\n- `allow-scenario-delete-mission`\n- `allow-scenario-test-mutator`\n- `allow-scenario-write-mission`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the scenario plugin's storage, dialogue-media, file export and import, compiled-mission read-back and write, mission-runtime install and test-mutator commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`\n- `allow-scenario-media-read`\n- `allow-scenario-media-write`\n- `allow-scenario-export`\n- `allow-scenario-import`\n- `allow-scenario-read-mission`\n- `allow-scenario-runtime-install`\n- `allow-scenario-runtime-status`\n- `allow-scenario-test-mutator`\n- `allow-scenario-write-mission`"
+          "markdownDescription": "Allows the scenario plugin's storage, dialogue-media, file export and import, compiled-mission read-back, write, list and remove, mission-runtime install and test-mutator commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`\n- `allow-scenario-media-read`\n- `allow-scenario-media-write`\n- `allow-scenario-export`\n- `allow-scenario-import`\n- `allow-scenario-read-mission`\n- `allow-scenario-runtime-install`\n- `allow-scenario-runtime-status`\n- `allow-scenario-list-missions`\n- `allow-scenario-delete-mission`\n- `allow-scenario-test-mutator`\n- `allow-scenario-write-mission`"
         }
       ]
     }
