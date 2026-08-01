@@ -110,9 +110,9 @@ describe("collectCampaignScenarioMedia", () => {
   });
 
   it("is empty for a campaign with no scenarios", async () => {
-    expect(await collectCampaignScenarioMedia(campaign([mission("m1")]))).toEqual(
-      {},
-    );
+    expect(
+      await collectCampaignScenarioMedia(campaign([mission("m1")])),
+    ).toEqual({});
     expect(mediaReadMock).not.toHaveBeenCalled();
   });
 
