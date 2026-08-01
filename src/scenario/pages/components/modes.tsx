@@ -11,13 +11,10 @@
  * static and every entry is resolved on every render, in order, so that is safe.
  *
  * Groups (#761) and prefab bases (#762) are added by pushing an entry onto
- * {@link EDITOR_MODES}. Actors is here already because the shared interaction
- * needs one real mode to be worth anything, and it is deliberately thin: #760
- * replaces its unit def field with the game unit browser from lego, and takes
- * over what an actor is placed with.
+ * {@link EDITOR_MODES}. Both pick units the way actors does: `useGameUnits` for
+ * the scenario's game, `UnitDefSelect` to pick one of them.
  */
 
-import { Input } from "@picoframe/frame";
 import {
   Circle,
   type LucideIcon,
@@ -26,11 +23,13 @@ import {
   User,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import type { Participant } from "@/play/config";
+import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Point, Scenario, ScenarioZone } from "../../model";
 import { addActor } from "./editing";
 import { placementKey } from "./placements";
+import { TeamSelect } from "./TeamSelect";
+import { useGameUnits } from "./useGameUnits";
 import type { GroundDragPhase } from "./useMapEditing";
 import {
   addZone,
@@ -163,20 +162,28 @@ const zonesMode: EditorMode = {
   },
 };
 
-/** One unit at one point, which is what an actor is. */
+/**
+ * One unit at one point, which is what an actor is.
+ *
+ * The unit is picked from the game's own unit list, the same picker the lego
+ * builder stands its reference figure with, so an author places what the game
+ * has rather than what they can spell. Nothing is placed until a unit is picked:
+ * an actor naming a def the game does not have draws as a marker box and spawns
+ * nothing, which is not a thing a click should be able to make by accident.
+ */
 const actorsMode: EditorMode = {
   id: "actors",
   label: "Actors",
   icon: User,
-  hint: "Click the map to place one unit.",
+  hint: "Pick a unit, then click the map to place one.",
   use: ({ scenario, onChange, onSelect }) => {
-    const [def, setDef] = useState("");
+    const [unitDef, setUnitDef] = useState("");
     const [team, setTeam] = useState("");
     const participants = scenario.setup.participants;
     const owner = participants.some((p) => p.id === team)
       ? team
       : (participants[0]?.id ?? "");
-    const unitDef = def.trim();
+    const { units, loading } = useGameUnits(scenario.setup.gameName);
 
     return {
       place: unitDef
@@ -190,44 +197,24 @@ const actorsMode: EditorMode = {
         : null,
       controls: (
         <>
-          <Input
-            aria-label="Unit to place"
-            placeholder="Unit def, e.g. armpw"
-            value={def}
-            onChange={(e) => setDef(e.target.value)}
-            className="h-8 w-44 text-xs"
-          />
-          <OptionSelect
+          <UnitDefSelect
+            units={units}
+            value={unitDef}
+            onValueChange={setUnitDef}
+            loading={loading}
             size="sm"
-            className="w-36"
+            className="w-48"
+          />
+          <TeamSelect
+            participants={participants}
             value={owner}
             onValueChange={setTeam}
-            placeholder="Team"
-            options={participants.map((p) => ({
-              value: p.id,
-              label: p.name,
-              icon: <Swatch participant={p} />,
-            }))}
           />
         </>
       ),
     };
   },
 };
-
-/** A participant's colour, so a team is picked by the colour its units are
- *  drawn in rather than by a name that is often just "AI 1". */
-function Swatch({ participant }: { participant: Participant }) {
-  const [r, g, b] = participant.color;
-  return (
-    <span
-      className="size-3 shrink-0 rounded-sm border border-border/60"
-      style={{
-        backgroundColor: `rgb(${r * 255} ${g * 255} ${b * 255})`,
-      }}
-    />
-  );
-}
 
 /** Every mode the editor offers, in the order the strip shows them. */
 export const EDITOR_MODES: EditorMode[] = [selectMode, zonesMode, actorsMode];
