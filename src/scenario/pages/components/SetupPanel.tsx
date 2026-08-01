@@ -101,6 +101,17 @@ function list(parts: string[]): string {
 const count = (n: number, one: string, many = `${one}s`) =>
   `${n} ${n === 1 ? one : many}`;
 
+/** What a document has standing on its map, by kind: "1 zone and 2 actors". */
+function placedList(scenario: Scenario): string {
+  const kinds: [number, string][] = [
+    [scenario.zones.length, "zone"],
+    [scenario.actors.length, "actor"],
+    [scenario.groups.length, "group"],
+    [scenario.prefabs.length, "base"],
+  ];
+  return list(kinds.filter(([n]) => n > 0).map(([n, one]) => count(n, one)));
+}
+
 export function SetupPanel({
   scenario,
   onChange,
@@ -530,13 +541,8 @@ function MapChangeNotice({
       }
     >
       <span>
-        {count(
-          cost.placed,
-          "zone, actor, group or base",
-          "zones, actors, groups and bases",
-        )}{" "}
-        stand somewhere on this map, and the same position is a different place
-        on {mapName}.{" "}
+        {placedList(scenario)} stand somewhere on the current map, and the same
+        position is a different place on {mapName}.{" "}
         {to
           ? cost.offMap > 0
             ? `Kept as they are, ${count(cost.offMap, "coordinate")} would be off ${mapName}, where the engine clamps whatever stands there onto the edge.`
