@@ -5,6 +5,7 @@ import {
   campaignProgressSave,
 } from "./bindings";
 import { type Campaign, type ProgressFile, parseCampaignJson } from "./model";
+import { sweepOrphanedScenarioMedia } from "./scenarioMedia";
 
 /** A parsed campaign plus where it came from (bundled campaigns are read-only). */
 export interface LoadedCampaign {
@@ -38,6 +39,10 @@ async function fetchCampaigns(): Promise<LoadedCampaign[]> {
       console.warn("skipping invalid campaign document", item.source);
     }
   }
+  // Every campaign there is, which is what deciding whether a dialogue clip is
+  // still named needs. Not awaited: the list must not wait on a disk sweep, and
+  // the sweep only ever removes folders this list does not name.
+  void sweepOrphanedScenarioMedia(loaded.map((l) => l.campaign));
   return loaded;
 }
 

@@ -1,4 +1,5 @@
 import { scenarioMediaRead, scenarioMediaWrite } from "../scenario/bindings";
+import { listScenarios, sweepScenarioMedia } from "../scenario/storage";
 import {
   dropMissingDialogueMedia,
   scenarioMediaFiles,
@@ -139,10 +140,10 @@ const materialised = new Set<string>();
  * They go in the ordinary media store, under the ids the export carried, even
  * though the campaign itself is read-only. That store is the only place
  * `scenario_write_mission` reads from, so anywhere else would mean teaching the
- * write path a second root for the sake of a handful of small files. Nothing
- * collects them again either: `scenarioIsAttached` and {@link clipIsAttached}
- * both count bundled campaigns, so the clips are held exactly as an imported
- * campaign's are.
+ * write path a second root for the sake of a handful of small files. While the
+ * campaign is bundled they are held the way an imported campaign's are, because
+ * `scenarioIsAttached` and {@link clipIsAttached} both count bundled campaigns.
+ * When it stops being bundled {@link sweepOrphanedScenarioMedia} takes them.
  *
  * Called on the launch path rather than when the list is read, because the list
  * is read on every app start for the sidebar's campaign gate and this decodes
@@ -170,6 +171,61 @@ export async function ensureCampaignScenarioMedia(
     // picture, so this must never be the reason a mission does not start.
     materialised.delete(campaignId);
     console.warn("could not materialise bundled dialogue clips", e);
+  }
+}
+
+/** Every scenario id something on this machine still names its clips by. */
+export function namedScenarioIds(
+  scenarios: readonly { id: string }[],
+  campaigns: readonly Campaign[],
+): Set<string> {
+  const named = new Set<string>();
+  for (const scenario of scenarios) named.add(scenario.id);
+  for (const campaign of campaigns) {
+    for (const mission of campaign.missions) {
+      if (mission.scenario) named.add(mission.scenario.id);
+    }
+  }
+  return named;
+}
+
+/** Whether this session has already swept. */
+let swept = false;
+
+/**
+ * Drop the media folders nothing names any more (issue #919).
+ *
+ * A scenario's own clips go when the scenario does. A bundled campaign's are
+ * written here on the launch path instead, and the only thing holding them is
+ * the campaign still being bundled. A distribution that drops that campaign, or
+ * ships a version of it whose scenarios carry different clips, leaves the old
+ * folders behind for good. So does a local campaign the author deleted after
+ * deleting the scenario it attached, which kept the clips for its sake.
+ *
+ * `campaigns` is every campaign there is, because the caller has just read them
+ * all. A partial list would read a folder that is named as one that is not, so
+ * a caller that could not read them must not call this at all.
+ *
+ * Once a session, off the campaign list read, which happens on start for the
+ * sidebar's campaign gate. Anything orphaned after that is collected on the next
+ * start: these are a handful of small files, so this is tidiness rather than a
+ * cost worth scanning the disk repeatedly for.
+ */
+export async function sweepOrphanedScenarioMedia(
+  campaigns: readonly Campaign[],
+): Promise<void> {
+  if (swept) return;
+  swept = true;
+  try {
+    const removed = await sweepScenarioMedia(
+      namedScenarioIds(await listScenarios(), campaigns),
+    );
+    if (removed.length > 0) {
+      console.info("dropped dialogue clips nothing names", removed);
+    }
+  } catch (e) {
+    swept = false;
+    console.warn("could not sweep orphaned dialogue clips", e);
   }
 }
 

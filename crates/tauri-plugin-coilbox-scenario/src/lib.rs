@@ -586,6 +586,51 @@ async fn scenario_media_delete<R: Runtime>(
     CliResult::ok(json!({}))
 }
 
+/// `scenario_media_sweep`, dropping every `media/<id>/` folder whose id is not in
+/// `keep` (issue #919).
+///
+/// A scenario's own clips go when the scenario does, but a bundled campaign's are
+/// written here on the launch path and nothing named them afterwards. A
+/// distribution that stops shipping that campaign leaves the folder behind for
+/// good.
+///
+/// Which ids are still named is the frontend's to decide, because only it reads
+/// the campaign documents. This end does no more than remove what it is told to,
+/// and only folders whose name is a scenario id, so nothing else under `media/`
+/// can be caught by a caller that got its list wrong.
+#[tauri::command]
+async fn scenario_media_sweep<R: Runtime>(app: AppHandle<R>, keep: Vec<String>) -> CliResult {
+    let dir = match media_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    CliResult::ok(json!({ "removed": sweep_media(&dir, &keep) }))
+}
+
+/// Remove every folder under `dir` whose name is a scenario id not in `keep`,
+/// and say which ones went. A missing `dir` sweeps nothing, because a machine
+/// with no dialogue clips has no folder.
+fn sweep_media(dir: &Path, keep: &[String]) -> Vec<String> {
+    let keep: std::collections::HashSet<&str> = keep.iter().map(String::as_str).collect();
+    let mut removed: Vec<String> = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return removed;
+    };
+    for entry in entries.flatten() {
+        let Some(id) = entry.file_name().to_str().map(str::to_string) else {
+            continue;
+        };
+        if !valid_id(&id) || keep.contains(id.as_str()) || !entry.path().is_dir() {
+            continue;
+        }
+        if std::fs::remove_dir_all(entry.path()).is_ok() {
+            removed.push(id);
+        }
+    }
+    removed.sort();
+    removed
+}
+
 /// Build the plugin. Registered as `"coilbox-scenario"` (the crate name minus the
 /// `tauri-plugin-` prefix), so the frontend invokes `plugin:coilbox-scenario|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -596,6 +641,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_delete,
             scenario_media_import,
             scenario_media_delete,
+            scenario_media_sweep,
             scenario_media_read,
             scenario_media_write,
             scenario_export,
@@ -669,6 +715,31 @@ mod tests {
         assert!(data_uri_bytes("data:image/png;base64,!!!!").is_none());
         let huge = "A".repeat(MAX_MEDIA_BYTES * 2);
         assert!(data_uri_bytes(&format!("data:audio/ogg;base64,{huge}")).is_none());
+    }
+
+    #[test]
+    fn sweep_media_drops_only_the_folders_nothing_names() {
+        let tmp = tempfile::tempdir().unwrap();
+        for id in ["kept", "gone", "also-gone"] {
+            std::fs::create_dir(tmp.path().join(id)).unwrap();
+            std::fs::write(tmp.path().join(id).join("a.png"), b"x").unwrap();
+        }
+        // Not a scenario id, and not a folder. Neither is this command's to touch.
+        std::fs::create_dir(tmp.path().join("..hidden")).unwrap();
+        std::fs::write(tmp.path().join("notes.txt"), b"x").unwrap();
+
+        let removed = sweep_media(tmp.path(), &["kept".to_string()]);
+
+        assert_eq!(removed, vec!["also-gone".to_string(), "gone".to_string()]);
+        assert!(tmp.path().join("kept").join("a.png").exists());
+        assert!(!tmp.path().join("gone").exists());
+        assert!(tmp.path().join("..hidden").exists());
+        assert!(tmp.path().join("notes.txt").exists());
+    }
+
+    #[test]
+    fn sweep_media_with_a_missing_folder_removes_nothing() {
+        assert!(sweep_media(Path::new("/no/such/media/dir"), &[]).is_empty());
     }
 
     #[test]

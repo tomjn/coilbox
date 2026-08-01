@@ -203,3 +203,13 @@ export const scenarioMediaDelete = defineCommand<
   { scenarioId: string; file: string },
   Record<string, never>
 >("coilbox-scenario", "scenario_media_delete");
+
+/**
+ * Drop every stored media folder whose scenario id is not in `keep`, and say
+ * which ones went. Which ids are still named is the caller's to work out, so
+ * this must never be called on a list that a failed read left short.
+ */
+export const scenarioMediaSweep = defineCommand<
+  { keep: string[] },
+  { removed: string[] }
+>("coilbox-scenario", "scenario_media_sweep");
