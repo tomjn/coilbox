@@ -75,18 +75,22 @@ local function unitsIn(zone, allegiance)
 	return Spring.GetUnitsInRectangle(zone.xmin, zone.zmin, zone.xmax, zone.zmax, allegiance)
 end
 
---- How many units are in a zone. `defs`, when given, is a set of unit def names
--- to count and nothing else.
-local function countIn(zone, allegiance, defs)
-	local units = unitsIn(zone, allegiance)
+--- Whether a unit in a zone is one the condition asked about. `defs`, when
+-- given, is a set of unit def names to count and nothing else.
+local function counted(unitID, defs)
 	if not defs then
-		return #units
+		return true
 	end
+	local def = UnitDefs[Spring.GetUnitDefID(unitID)]
+	return def ~= nil and defs[def.name] == true
+end
 
+--- How many units are in a zone. `skip` answers for a unit the mission does not
+-- count as being anywhere.
+local function countIn(zone, allegiance, defs, skip)
 	local count = 0
-	for _, unitID in ipairs(units) do
-		local def = UnitDefs[Spring.GetUnitDefID(unitID)]
-		if def and defs[def.name] then
+	for _, unitID in ipairs(unitsIn(zone, allegiance)) do
+		if not skip(unitID) and counted(unitID, defs) then
 			count = count + 1
 		end
 	end
@@ -122,6 +126,13 @@ function M.register(engine, state)
 	local engineTeam = {}
 	for _, team in ipairs(state.teams or {}) do
 		engineTeam[team.id] = team.team
+	end
+
+	--- Whether a unit is a mission anchor, which stands somewhere for the sake of
+	-- keeping its team's unit count above nothing and is in no zone as far as the
+	-- mission is concerned.
+	local function isAnchor(unitID)
+		return state.gameOver ~= nil and state.gameOver.isAnchor(unitID)
 	end
 
 	--- The zone a condition names, or nil once it has said so.
@@ -162,7 +173,7 @@ function M.register(engine, state)
 			if not min and not max then
 				min = 1
 			end
-			return within(countIn(zone, allegiance, defSet(params.unitDefs)), min, max)
+			return within(countIn(zone, allegiance, defSet(params.unitDefs), isAnchor), min, max)
 		end,
 	})
 
@@ -210,7 +221,7 @@ function M.register(engine, state)
 	engine:addTick(function(ctx)
 		for _, entry in ipairs(watched) do
 			local held = heldSince[entry.zone.id]
-			if countIn(entry.zone, entry.allegiance, nil) > 0 then
+			if countIn(entry.zone, entry.allegiance, nil, isAnchor) > 0 then
 				held[entry.team] = held[entry.team] or ctx.frame
 			else
 				held[entry.team] = false

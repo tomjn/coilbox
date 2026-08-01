@@ -108,6 +108,18 @@ if not GROUPS then
 	return false
 end
 
+local OBJECTIVES, objectivesError = includeTable("luarules/mission_runtime/coilbox_objectives.lua")
+if not OBJECTIVES then
+	log("error", objectivesError)
+	return false
+end
+
+local GAMEOVER, gameOverError = includeTable("luarules/mission_runtime/coilbox_gameover.lua")
+if not GAMEOVER then
+	log("error", gameOverError)
+	return false
+end
+
 -- Refuse a mission built for a newer runtime than the game vendored. Running it
 -- anyway would quietly drop whatever this version cannot read, and a mission
 -- that half works is harder to diagnose than one that refuses to start.
@@ -154,6 +166,8 @@ end
 -- Names the message the synced half sends its unsynced half when an actor has
 -- become a unit.
 local ACTOR_MESSAGE = "coilbox_mission_actor"
+-- And the one that says a unit is an anchor, which the unsynced half hides.
+local ANCHOR_MESSAGE = "coilbox_mission_anchor"
 
 -- The rest of the runtime reads the mission through GG, in both halves. Both
 -- compute the team plan, because it is derived from the mission and deriving it
@@ -180,10 +194,11 @@ local function publish()
 		actors = actors,
 		units = {},
 		-- The synced half adds `triggers`, the trigger engine, `vars`, the
-		-- mission's variables, and `groups`, the scenario's groups. Registering
-		-- a condition or action type on the engine is how the rest of the
-		-- runtime, and a game's own extensions, join in; going through `vars`
-		-- and `groups` is how they read and drive those.
+		-- mission's variables, `groups`, the scenario's groups, `objectives`,
+		-- its objectives, and `gameOver`, which ends it. Registering a condition
+		-- or action type on the engine is how the rest of the runtime, and a
+		-- game's own extensions, join in; going through the handles is how they
+		-- read and drive what those own.
 	}
 	return GG.CoilboxMission, problems
 end
@@ -211,14 +226,20 @@ if gadgetHandler:IsSyncedCode() then
 	local unitHooks
 	-- The scenario's groups, once registered.
 	local groups
+	-- What ends the mission, and what stops anything else ending it.
+	local gameOver
 
 	--- Tell the triggers something happened.
 	--
 	-- Nothing is raised while the start window is open. The mission's own spawns
 	-- and the game's suppressed ones all land in there, and a mission counting
 	-- what a team has built should not be counting the units it was handed.
+	--
+	-- Nothing is raised after the mission has ended either. The result is already
+	-- in the replay, and a trigger that spawns a wave into a finished mission is
+	-- a mission that looks broken.
 	local function raise(name, payload)
-		if suppressing or not triggers then
+		if suppressing or not triggers or gameOver.isOver() then
 			return
 		end
 		triggers:event(name, payload)
@@ -350,10 +371,13 @@ if gadgetHandler:IsSyncedCode() then
 		-- After the actors, so a standing group ordered to guard one of them has
 		-- something to guard.
 		local grouped = groups.start()
+		-- Last, and inside the start window like everything else the runtime
+		-- places, so no trigger ever sees an anchor being created.
+		local anchored = gameOver.place()
 
 		log("notice", string.format(
-			"mission %s spawned %d of %d units and %d in groups",
-			MISSION_ID, spawned, #placements, grouped))
+			"mission %s spawned %d of %d units, %d in groups and %d anchors",
+			MISSION_ID, spawned, #placements, grouped, anchored))
 	end
 
 	--- Set every mission team's bank to what the scenario asked for. Teams the
@@ -426,6 +450,24 @@ if gadgetHandler:IsSyncedCode() then
 			end,
 		})
 		published.groups = groups
+		-- Before the first frame, so every objective has a state a panel can read
+		-- from the moment the mission starts.
+		published.objectives = OBJECTIVES.register(triggers, published)
+		-- The anchors are units, so they go through the gadget's own creation the
+		-- way a group's do.
+		gameOver = GAMEOVER.register(triggers, published, {
+			spawn = function(placement)
+				local unitID = create(placement)
+				if unitID then
+					-- Invulnerable through the same path an actor is, and hidden by
+					-- the unsynced half, which owns what this player's screen shows.
+					applyState(unitID, { invulnerable = true })
+					SendToUnsynced(ANCHOR_MESSAGE, unitID)
+				end
+				return unitID
+			end,
+		})
+		published.gameOver = gameOver
 		published.triggers = triggers
 
 		log("notice", string.format(
@@ -446,8 +488,11 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		addIncome()
 		-- Last, so the world a trigger reads on this frame is the finished one.
-		-- The engine owns how often it actually evaluates.
-		triggers:frame(frame)
+		-- The engine owns how often it actually evaluates. A mission that has
+		-- ended evaluates nothing: the result is already in the replay.
+		if not gameOver.isOver() then
+			triggers:frame(frame)
+		end
 	end
 
 	--- Undo the start the game would have given a team the scenario spawns for
@@ -507,6 +552,7 @@ if gadgetHandler:IsSyncedCode() then
 	function gadget:UnitDestroyed(unitID, unitDefID, unitTeam)
 		invulnerable[unitID] = nil
 		groups.removed(unitID)
+		gameOver.removed(unitID)
 		local actor = actorOfUnit[unitID]
 		if actor then
 			actorOfUnit[unitID] = nil
@@ -528,22 +574,34 @@ else
 		published = publish()
 	end
 
-	--- Told which unit an actor became. Anything about an actor that is local to
-	-- this player's screen is applied here, because the engine has no synced call
-	-- for it.
-	--
-	-- Returns nothing: a true return would stop the message reaching the gadgets
-	-- behind this one, and their messages are not ours to swallow.
-	function gadget:RecvFromSynced(message, actorId, unitID)
-		if message ~= ACTOR_MESSAGE then
-			return
-		end
-
+	--- Which unit an actor became. Anything about an actor that is local to this
+	-- player's screen is applied here, because the engine has no synced call for
+	-- it.
+	local function actorBecame(actorId, unitID)
 		published.units[actorId] = unitID
 
 		local actor = published.actors[actorId]
 		if actor and actor.state and actor.state.unselectable then
 			Spring.SetUnitNoSelect(unitID, true)
+		end
+	end
+
+	--- Take an anchor off this player's screen. It exists to keep the team's unit
+	-- count above nothing and for no other reason, so it is drawn nowhere, on no
+	-- minimap, and cannot be selected -- not even by a select-all.
+	local function hideAnchor(unitID)
+		Spring.SetUnitNoDraw(unitID, true)
+		Spring.SetUnitNoMinimap(unitID, true)
+		Spring.SetUnitNoSelect(unitID, true)
+	end
+
+	--- Returns nothing: a true return would stop the message reaching the gadgets
+	-- behind this one, and their messages are not ours to swallow.
+	function gadget:RecvFromSynced(message, first, second)
+		if message == ACTOR_MESSAGE then
+			actorBecame(first, second)
+		elseif message == ANCHOR_MESSAGE then
+			hideAnchor(first)
 		end
 	end
 end
