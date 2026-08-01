@@ -625,7 +625,7 @@ function GameChangeNotice({
               ? `${gameName} is not installed, so coilbox cannot say which of the ${count(defs.length, "unit type")} this scenario places it has.`
               : missing.length === 0
                 ? `${gameName} has all ${count(defs.length, "unit type")} this scenario places.`
-                : `${count(missing.length, "unit type")} this scenario places ${missing.length === 1 ? "is" : "are"} not in ${gameName}: ${list(missing)}. They stay in the document and draw as boxes until you change them.`}
+                : `${count(missing.length, "unit type")} this scenario places ${missing.length === 1 ? "is" : "are"} not in ${gameName}: ${list(missing)}. They stay in the document until you change them, and the ones standing on the map draw as boxes.`}
         {optionCount > 0 &&
           ` The ${count(optionCount, "mod option")} set for ${oldGameName || "the old game"} ${optionCount === 1 ? "is" : "are"} dropped, because ${gameName} declares its own.`}
       </span>
