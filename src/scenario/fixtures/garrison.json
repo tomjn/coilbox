@@ -61,7 +61,17 @@
       "team": "player",
       "units": [{ "def": "armpw", "count": 2 }],
       "pos": { "x": 0, "z": 0 },
-      "orders": [],
+      "orders": [
+        { "kind": "move", "waypoints": [{ "x": 0, "z": 0 }] },
+        {
+          "kind": "patrol",
+          "waypoints": [{ "x": 0, "z": 0 }, { "x": 20, "z": 20 }]
+        },
+        {
+          "kind": "fight",
+          "waypoints": [{ "x": 20, "z": 20 }, { "x": 40, "z": 40 }]
+        }
+      ],
       "dormant": true
     }
   ],

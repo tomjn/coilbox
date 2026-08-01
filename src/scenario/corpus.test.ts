@@ -129,4 +129,45 @@ describe("scenario fixture corpus", () => {
 
     expect(missing).toEqual([]);
   });
+
+  /**
+   * `ScenarioOrder` in model.ts allows five kinds: `move`, `patrol` and
+   * `fight` (a waypoint list) or `guard` and `attack` (a target). Before this
+   * fixture only ever used `guard` and `attack`, which is also the gap issue
+   * #811 named. An order appears either as a group's opening orders or as the
+   * payload of a `give_orders` action, so both are read.
+   */
+  const ORDER_KINDS = ["move", "patrol", "fight", "guard", "attack"] as const;
+
+  function orderKindsOf(orders: unknown): string[] {
+    if (!Array.isArray(orders)) return [];
+    return orders
+      .map((o) =>
+        typeof o === "object" && o !== null
+          ? (o as { kind?: unknown }).kind
+          : undefined,
+      )
+      .filter((k): k is string => typeof k === "string");
+  }
+
+  it("covers every order kind ScenarioOrder allows", () => {
+    const seenKinds = new Set<string>();
+    for (const { scenario } of fixtures) {
+      for (const group of scenario.groups) {
+        for (const order of group.orders) seenKinds.add(order.kind);
+      }
+      for (const trigger of scenario.triggers) {
+        for (const action of trigger.actions) {
+          if (action.type !== "give_orders") continue;
+          for (const kind of orderKindsOf(action.params.orders)) {
+            seenKinds.add(kind);
+          }
+        }
+      }
+    }
+
+    const missing = ORDER_KINDS.filter((k) => !seenKinds.has(k));
+
+    expect(missing).toEqual([]);
+  });
 });
