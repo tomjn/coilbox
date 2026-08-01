@@ -160,10 +160,13 @@ export function useScenarioUnits(
 
   const [missing, setMissing] = useState<string[]>([]);
   const [drawing, setDrawing] = useState(false);
-  // Nothing is drawn while the unit defs are still loading: drawing first would
-  // fill the map with marker boxes and then replace every one of them.
-  const defsReady = status !== "loading";
-  // biome-ignore lint/correctness/useExhaustiveDependencies: colorKey and archive are what changed when a colour or the game did, both of which the layer reads through its ref rather than its arguments
+  // Nothing is drawn until the game's unit defs have settled one way or the
+  // other. Drawing before that fills the map with marker boxes for units the
+  // game does have, and says so in the caption.
+  const defsReady = archive
+    ? status === "ready" || status === "error" || status === "unsyncable"
+    : !scan.loading;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: colorKey is what changed when a team's colour did, which the layer reads through its ref rather than its arguments
   useEffect(() => {
     if (!layer || !defsReady) return;
     let cancelled = false;
@@ -181,7 +184,10 @@ export function useScenarioUnits(
     return () => {
       cancelled = true;
     };
-  }, [layer, placements, colorKey, defsReady, archive]);
+    // `objectNames` rather than the archive name: a dataset already in the
+    // session cache resolves in the same render the archive does, so keying on
+    // the archive alone would leave the first draw's markers on the map.
+  }, [layer, placements, colorKey, defsReady, objectNames]);
 
   return {
     placed: placements.length,
