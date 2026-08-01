@@ -11,11 +11,7 @@
         "kind": "you",
         "name": "You",
         "side": "Federation of Kala",
-        "color": [
-          0.9,
-          0.24,
-          0.2
-        ],
+        "color": [0.9, 0.24, 0.2],
         "allyTeam": 0,
         "spectator": false
       },
@@ -24,11 +20,7 @@
         "kind": "ai",
         "name": "AI 1",
         "side": "Loz Alliance",
-        "color": [
-          0.31,
-          0.55,
-          1
-        ],
+        "color": [0.31, 0.55, 1],
         "allyTeam": 1,
         "spectator": false
       }
@@ -243,10 +235,7 @@
             "z": 0
           },
           "facing": 0,
-          "queue": [
-            "lozroach",
-            "lozscorpion"
-          ]
+          "queue": ["lozroach", "lozscorpion"]
         },
         {
           "def": "fusionpowerplant",
@@ -284,17 +273,10 @@
     }
   ],
   "restrictions": {
-    "commands": [
-      "selfd"
-    ],
+    "commands": ["selfd"],
     "buildable": {
       "mode": "allow",
-      "units": [
-        "fedmetalextractor",
-        "fedstinger",
-        "lozroach",
-        "lozscorpion"
-      ]
+      "units": ["fedmetalextractor", "fedstinger", "lozroach", "lozscorpion"]
     }
   },
   "vars": {
