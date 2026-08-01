@@ -79,7 +79,9 @@ check("its add_var ran on the event, not on the next tick", state.vars.get("garr
 	tostring(state.vars.get("garrisonBuilt")))
 check("and its disable_trigger took effect", state.triggers:isEnabled("count-check") == false)
 
+local beforeGift = #state.groups.units("reinforcements")
 engine.give(state.units.outpost, 0)
+local afterGift = #state.groups.units("reinforcements")
 check("an actor changing hands fires the trigger watching for it",
 	state.triggers:isEnabled("outpost-captured") == false)
 
@@ -119,7 +121,8 @@ check("after which the fog comes back", state.reveal.spotterCount(0) == 0,
 check("gifting a group that was never spawned says so",
 	logged(engine, "group reinforcements has no units on the map to gift"),
 	table.concat(engine.logs, " / ")
-		.. " | members=" .. #state.groups.units("reinforcements")
+		.. " | members=" .. beforeGift .. "/" .. afterGift
+		.. "/" .. #state.groups.units("reinforcements")
 		.. " | teams=" .. tostring(state.teams[1] and state.teams[1].id)
 		.. "," .. tostring(state.teams[2] and state.teams[2].id))
 
