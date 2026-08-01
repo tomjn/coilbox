@@ -201,6 +201,12 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
       });
     try {
       let exitCode: number | null;
+      // The start script the engine was actually given. Detection reads the
+      // local player's name off it, because that is the name the replay records
+      // and there is more than one place a mission's could come from: a
+      // scenario mission's config is built inside `launchScenario` from the
+      // scenario's own setup, not from the snapshot read here.
+      let launched: BattleConfig;
       if (mission.scenario) {
         // A mission that carries a scenario is launched the one way a scenario
         // is ever launched: compiled, written where the game will look for it,
@@ -219,22 +225,22 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           setError(result.message);
           return;
         }
+        launched = result.config;
         exitCode = result.exitCode;
       } else {
         // Build the engine config exactly as the skirmish launcher does, from
         // the snapshot's five draft fields, plus the mission's disabled-unit
         // list. The snapshot already holds only the options the author set, so
         // they pass straight through (see the run.ts note in the page).
-        const res = await startEngine(
-          toBattleConfig({
-            participants: snapshot.participants,
-            mapName: map.name,
-            gameType: game.name,
-            startPosType: snapshot.startPosType,
-            modOptions: snapshot.modOptionValues,
-            disabledUnits: mission.disabledUnits,
-          }),
-        );
+        launched = toBattleConfig({
+          participants: snapshot.participants,
+          mapName: map.name,
+          gameType: game.name,
+          startPosType: snapshot.startPosType,
+          modOptions: snapshot.modOptionValues,
+          disabledUnits: mission.disabledUnits,
+        });
+        const res = await startEngine(launched);
         exitCode = res.exitCode;
       }
       // Cancelled before the game started: no outcome to report, no progress
@@ -252,7 +258,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
       const { outcome, replay } = await detectMissionResult({
         target,
         beforePaths,
-        playerName: snapshot.participants[0]?.name ?? "",
+        playerName: launched.myPlayerName,
       }).catch((): { outcome: DetectedResult; replay: null } => ({
         outcome: "ambiguous",
         replay: null,
