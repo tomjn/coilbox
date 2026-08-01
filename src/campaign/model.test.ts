@@ -128,3 +128,36 @@ describe("parseCampaignJson — media playback", () => {
     expect(c!.backgroundPlayback).toEqual({ autoplay: false, loop: true });
   });
 });
+
+describe("parseCampaignJson - attached scenario", () => {
+  const scenarioJson = {
+    schemaVersion: 1,
+    id: "s1",
+    name: "Ambush",
+    runtimeVersion: 1,
+    setup: { participants: [], gameName: "BAR", mapName: "Comet Catcher" },
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  it("leaves a campaign written before scenarios existed unchanged", () => {
+    const c = parseCampaignJson(campaignJson());
+    expect(c).not.toBeNull();
+    const m = c!.missions[0];
+    expect(m.scenario).toBeUndefined();
+    expect("scenario" in JSON.parse(JSON.stringify(m))).toBe(false);
+  });
+
+  it("parses an attached scenario into the mission", () => {
+    const m = parseCampaignJson(
+      campaignJson({ scenario: scenarioJson }),
+    )!.missions[0];
+    expect(m.scenario?.id).toBe("s1");
+    expect(m.scenario?.name).toBe("Ambush");
+    expect(m.scenario?.updatedAt).toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it("rejects the campaign when a present scenario will not parse", () => {
+    expect(parseCampaignJson(campaignJson({ scenario: { name: "no id" } }))).toBeNull();
+    expect(parseCampaignJson(campaignJson({ scenario: "nonsense" }))).toBeNull();
+  });
+});
