@@ -10,25 +10,26 @@
  * mode's own state, such as the unit type it is about to place. The list is
  * static and every entry is resolved on every render, in order, so that is safe.
  *
- * Prefab bases (#762) are added by pushing an entry onto {@link EDITOR_MODES}.
- * They pick units the way actors and groups do: `useGameUnits` for the
+ * Every mode picks units the way the others do: `useGameUnits` for the
  * scenario's game, `UnitDefSelect` to pick one of them.
  */
 
-import { Input } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import {
   Circle,
+  Factory,
   type LucideIcon,
   MousePointer2,
+  Plus,
   Square,
   User,
   Users,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Point, Scenario, ScenarioZone } from "../../model";
-import { addActor } from "./editing";
+import { addActor, parsePlacementKey } from "./editing";
 import {
   addGroup,
   clampCount,
@@ -36,6 +37,7 @@ import {
   MAX_GROUP_COUNT,
 } from "./groups";
 import { placementKey } from "./placements";
+import { addBuilding, addPrefab, buildingUnits } from "./prefabs";
 import { TeamSelect } from "./TeamSelect";
 import { useGameUnits } from "./useGameUnits";
 import type { GroundDragPhase } from "./useMapEditing";
@@ -52,9 +54,15 @@ export interface ModeContext {
   scenario: Scenario;
   /** Write a new document. Saved by the page, so a mode never persists. */
   onChange: (next: Scenario) => void;
+  /**
+   * What is selected across the whole surface, which for most modes is nothing
+   * to do with placing. Prefabs read it: a click adds to the base already
+   * selected rather than starting a second one-building base beside it.
+   */
+  selected: string | null;
   /** Select what was just placed, so it can be turned or deleted straight
-   *  away. */
-  onSelect: (key: string) => void;
+   *  away. Null clears the selection, which is how a mode lets go of it. */
+  onSelect: (key: string | null) => void;
 }
 
 /** What a resolved mode contributes to the surface. */
@@ -294,10 +302,112 @@ const groupsMode: EditorMode = {
   },
 };
 
+/**
+ * A pre-built base: several buildings put down as one cluster.
+ *
+ * Laying a base out is a run of clicks, so a click adds to the base that is
+ * selected and only starts a new one when nothing is. Placing a building selects
+ * it, which keeps that run going, and "New base" lets go of the selection so the
+ * next click starts the next base. That is also why the team picker gives way to
+ * that button: a building added to a base belongs to whoever the base does.
+ *
+ * The picker offers the game's static units only. The runtime puts a def through
+ * the engine's build grid when the game calls it a building and not otherwise,
+ * so a tank in a base would spawn wherever it was dropped, off the grid and
+ * unable to be rebuilt where it stood. Mobile units are what actors and groups
+ * are for.
+ */
+const prefabsMode: EditorMode = {
+  id: "prefabs",
+  label: "Bases",
+  icon: Factory,
+  hint: "Pick a building and click the map. Clicks add to the base you have selected.",
+  use: ({ scenario, onChange, onSelect, selected }) => {
+    const [unitDef, setUnitDef] = useState("");
+    const [team, setTeam] = useState("");
+    const participants = scenario.setup.participants;
+    const owner = participants.some((p) => p.id === team)
+      ? team
+      : (participants[0]?.id ?? "");
+    const { units, loading } = useGameUnits(scenario.setup.gameName);
+    const options = useMemo(() => buildingUnits(units), [units]);
+
+    // What a click adds to, which is whichever base the selection belongs to.
+    const ref = selected ? parsePlacementKey(selected) : null;
+    const base =
+      (ref?.kind === "prefab" &&
+        scenario.prefabs.find((p) => p.id === ref.id)) ||
+      null;
+
+    return {
+      place: unitDef
+        ? (pos: Point) => {
+            if (base) {
+              onChange(
+                addBuilding(scenario, base.id, {
+                  def: unitDef,
+                  // Offsets are measured from the base's origin, so what the
+                  // document gets is the click less that.
+                  offset: {
+                    x: pos.x - base.origin.x,
+                    z: pos.z - base.origin.z,
+                  },
+                  facing: 0,
+                }),
+              );
+              onSelect(placementKey("prefab", base.id, base.buildings.length));
+              return;
+            }
+            const id = crypto.randomUUID();
+            onChange(
+              addPrefab(scenario, id, {
+                team: owner,
+                origin: pos,
+                buildings: [
+                  { def: unitDef, offset: { x: 0, z: 0 }, facing: 0 },
+                ],
+              }),
+            );
+            onSelect(placementKey("prefab", id, 0));
+          }
+        : null,
+      controls: (
+        <>
+          <UnitDefSelect
+            units={options}
+            value={unitDef}
+            onValueChange={setUnitDef}
+            loading={loading}
+            size="sm"
+            className="w-48"
+          />
+          {base ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 bg-card/80 text-xs backdrop-blur"
+              onClick={() => onSelect(null)}
+            >
+              <Plus className="size-3.5" /> New base
+            </Button>
+          ) : (
+            <TeamSelect
+              participants={participants}
+              value={owner}
+              onValueChange={setTeam}
+            />
+          )}
+        </>
+      ),
+    };
+  },
+};
+
 /** Every mode the editor offers, in the order the strip shows them. */
 export const EDITOR_MODES: EditorMode[] = [
   selectMode,
   zonesMode,
   actorsMode,
   groupsMode,
+  prefabsMode,
 ];
