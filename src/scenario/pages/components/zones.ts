@@ -69,10 +69,7 @@ function round(pos: Point): Point {
  * The one piece of this file the runtime also has, so it is the one to keep an
  * eye on: `index` in `coilbox_zones.lua` takes the same two mins and two maxes.
  */
-export function normaliseBox(
-  a: Point,
-  b: Point,
-): { min: Point; max: Point } {
+export function normaliseBox(a: Point, b: Point): { min: Point; max: Point } {
   return {
     min: { x: Math.min(a.x, b.x), z: Math.min(a.z, b.z) },
     max: { x: Math.max(a.x, b.x), z: Math.max(a.z, b.z) },
@@ -131,7 +128,10 @@ export function zoneCenter(zone: ScenarioZone): Point {
 }
 
 /** How far a zone reaches from its centre along each axis, in elmos. */
-export function zoneExtent(zone: ScenarioZone): { halfX: number; halfZ: number } {
+export function zoneExtent(zone: ScenarioZone): {
+  halfX: number;
+  halfZ: number;
+} {
   if (zone.shape === "circle")
     return { halfX: zone.radius, halfZ: zone.radius };
   return {
@@ -183,7 +183,10 @@ export function dragZone(
     if (!handle)
       return {
         ...zone,
-        center: round({ x: zone.center.x + delta.x, z: zone.center.z + delta.z }),
+        center: round({
+          x: zone.center.x + delta.x,
+          z: zone.center.z + delta.z,
+        }),
       };
     // The handle sits one radius east of the centre, so where it lands is what
     // the new radius is, however far round the drag carried it.
@@ -271,7 +274,9 @@ export function renameZone(
  *  deleted the wrong zone would not want their triggers rewritten. */
 export function removeZone(scenario: Scenario, id: string): Scenario {
   const zones = scenario.zones.filter((zone) => zone.id !== id);
-  return zones.length === scenario.zones.length ? scenario : { ...scenario, zones };
+  return zones.length === scenario.zones.length
+    ? scenario
+    : { ...scenario, zones };
 }
 
 /** The name a newly drawn zone gets: the first "Zone n" no zone already has, so
