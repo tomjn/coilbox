@@ -65,9 +65,20 @@ export async function saveScenario(scenario: Scenario): Promise<Scenario> {
   return stamped;
 }
 
-/** Delete a scenario and the dialogue media stored alongside it. */
-export async function deleteScenario(id: string): Promise<void> {
-  await scenarioDelete({ id });
+/**
+ * Delete a scenario and, unless `keepMedia`, the dialogue media stored alongside
+ * it.
+ *
+ * A campaign mission that attached this scenario carries the whole document, but
+ * its dialogue names portraits and voice clips by file name in this store, so
+ * deleting them leaves that mission playing silent (issue #866). Callers that
+ * know about campaigns pass `keepMedia` for a scenario one of them attached.
+ */
+export async function deleteScenario(
+  id: string,
+  opts: { keepMedia?: boolean } = {},
+): Promise<void> {
+  await scenarioDelete({ id, keepMedia: opts.keepMedia === true });
 }
 
 /**

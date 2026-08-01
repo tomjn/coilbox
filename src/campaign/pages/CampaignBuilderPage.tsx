@@ -38,7 +38,16 @@ import {
 import { refreshCampaigns, useCampaigns } from "../campaigns";
 import { inlineCampaignImages, materializeCampaignImages } from "../images";
 import type { Campaign } from "../model";
-import { parseCampaignExport, wrapCampaignForExport } from "../transfer";
+import {
+  collectCampaignScenarioMedia,
+  dropUnavailableDialogueMedia,
+  restoreCampaignScenarioMedia,
+} from "../scenarioMedia";
+import {
+  type CampaignExportContents,
+  parseCampaignExport,
+  wrapCampaignForExport,
+} from "../transfer";
 import { CampaignIconBox } from "./components/CampaignImage";
 
 /** Every game+map a campaign's missions need installed, deduped by the shared
@@ -98,22 +107,30 @@ export default function CampaignBuilderPage() {
     }
   };
 
-  const [pendingCampaign, setPendingCampaign] = useState<Campaign | null>(null);
+  const [pendingCampaign, setPendingCampaign] =
+    useState<CampaignExportContents | null>(null);
   const { target } = usePreferredTarget();
 
   // Mint a fresh id so importing never collides with an existing campaign,
-  // materialize every inlined (data-URI) image — icon, background and each
-  // mission's panorama + side graphic — to disk as files under the new id,
-  // then save. Only runs once every mission's game+map clears the resolve
-  // gate (#387) — nothing is written to disk before that.
-  const finishImport = async (parsed: Campaign) => {
+  // materialize every inlined (data-URI) image (icon, background and each
+  // mission's panorama + side graphic) to disk as files under the new id, write
+  // any attached scenario's dialogue clips into the scenario media store, then
+  // save. Only runs once every mission's game+map clears the resolve gate
+  // (#387), so nothing is written to disk before that.
+  const finishImport = async (parsed: CampaignExportContents) => {
     const id = crypto.randomUUID();
-    const materialized = await materializeCampaignImages(parsed, id);
+    const materialized = await materializeCampaignImages(parsed.campaign, id);
+    const withMedia = parsed.media
+      ? dropUnavailableDialogueMedia(
+          materialized,
+          await restoreCampaignScenarioMedia(parsed.media),
+        )
+      : materialized;
     const now = new Date().toISOString();
     const campaign: Campaign = {
-      ...materialized,
+      ...withMedia,
       id,
-      createdAt: parsed.createdAt || now,
+      createdAt: parsed.campaign.createdAt || now,
       updatedAt: now,
     };
     await campaignSave({ id, json: JSON.stringify(campaign) });
@@ -161,8 +178,14 @@ export default function CampaignBuilderPage() {
     setActionError(null);
     try {
       // Inline every stored image (icon, background, each mission's panorama and
-      // side graphic) as a data URI so the export is a single self-contained file.
-      const file = wrapCampaignForExport(await inlineCampaignImages(campaign));
+      // side graphic) as a data URI, and read every attached scenario's dialogue
+      // clips out of the media store, so the export is one self-contained file
+      // that still plays its radio messages elsewhere (#769).
+      const [inlined, media] = await Promise.all([
+        inlineCampaignImages(campaign),
+        collectCampaignScenarioMedia(campaign),
+      ]);
+      const file = wrapCampaignForExport(inlined, media);
       const dest = await save({
         title: "Export campaign",
         defaultPath: `${campaign.title || "campaign"}.json`,
@@ -305,7 +328,7 @@ export default function CampaignBuilderPage() {
       {pendingCampaign && (
         <ResolveContentGate
           title="Set up this campaign"
-          requirements={requirementsForCampaign(pendingCampaign)}
+          requirements={requirementsForCampaign(pendingCampaign.campaign)}
           target={target ?? undefined}
           onContinue={() =>
             finishImport(pendingCampaign).then(() => setPendingCampaign(null))

@@ -17,6 +17,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { useCampaigns } from "../../campaign/campaigns";
+import { scenarioIsAttached } from "../../campaign/missionScenario";
 import {
   EmptyState,
   ErrorBanner,
@@ -46,6 +48,7 @@ import { scenarioImportErrorMessage } from "../transfer";
  */
 export default function ScenarioBuilderPage() {
   const { scenarios, loading, error, refresh } = useScenarios();
+  const { campaigns } = useCampaigns();
   const navigate = useNavigate();
   const drawer = useDrawer();
   const [busy, setBusy] = useState(false);
@@ -119,10 +122,20 @@ export default function ScenarioBuilderPage() {
     }
   };
 
+  // A campaign mission that attached this scenario carries the document but
+  // still loads its dialogue clips out of the scenario media store by name, so
+  // deleting the scenario keeps the clips when a campaign is still playing them
+  // (issue #866).
+  const attached = (id: string) =>
+    scenarioIsAttached(
+      campaigns.map((c) => c.campaign),
+      id,
+    );
+
   const remove = async (id: string) => {
     setActionError(null);
     try {
-      await deleteScenario(id);
+      await deleteScenario(id, { keepMedia: attached(id) });
       await refreshScenarios();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
@@ -224,8 +237,10 @@ export default function ScenarioBuilderPage() {
                   <PopoverContent className="flex w-56 flex-col gap-2">
                     <p className="text-sm">
                       Delete{" "}
-                      <span className="font-medium">{scenario.name}</span> and
-                      its dialogue clips? This can't be undone.
+                      <span className="font-medium">{scenario.name}</span>
+                      {attached(scenario.id)
+                        ? "? A campaign mission uses it, so its dialogue clips stay behind for that mission. This can't be undone."
+                        : " and its dialogue clips? This can't be undone."}
                     </p>
                     <Button
                       size="sm"

@@ -15,7 +15,7 @@
 
 import type { SkirmishDraft } from "../play/drafts";
 import type { Scenario } from "../scenario/model";
-import type { CampaignMission } from "./model";
+import type { Campaign, CampaignMission } from "./model";
 
 /**
  * What a mission's attached scenario is, relative to the scenarios stored on
@@ -73,6 +73,23 @@ export function missionFromScenario(scenario: Scenario): CampaignMission {
     disabledUnits: [],
     skippable: false,
   };
+}
+
+/**
+ * True when any campaign has a mission carrying a snapshot of this scenario.
+ *
+ * Deleting a scenario also deletes its dialogue clips, which an attached
+ * mission still loads by file name, so this is what decides whether the clips
+ * outlive the document (issue #866). Bundled campaigns count: they play here
+ * too.
+ */
+export function scenarioIsAttached(
+  campaigns: Campaign[],
+  scenarioId: string,
+): boolean {
+  return campaigns.some((campaign) =>
+    campaign.missions.some((m) => m.scenario?.id === scenarioId),
+  );
 }
 
 /**

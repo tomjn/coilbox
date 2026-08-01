@@ -24,9 +24,13 @@ export const scenarioSave = defineCommand<
   Record<string, never>
 >("coilbox-scenario", "scenario_save");
 
-/** Delete a scenario document and its imported dialogue media. */
+/**
+ * Delete a scenario document and its imported dialogue media. `keepMedia` leaves
+ * the clips on disk, for a scenario a campaign mission has attached: the mission
+ * carries the document but still loads the clips out of this store by name.
+ */
 export const scenarioDelete = defineCommand<
-  { id: string },
+  { id: string; keepMedia?: boolean },
   Record<string, never>
 >("coilbox-scenario", "scenario_delete");
 
