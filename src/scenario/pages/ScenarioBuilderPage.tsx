@@ -1,6 +1,14 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, Input, useDrawer } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import {
+  Download,
+  Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -51,28 +59,31 @@ function contentsLine(scenario: Scenario): string {
 export default function ScenarioBuilderPage() {
   const { scenarios, loading, error, refresh } = useScenarios();
   const navigate = useNavigate();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const drawer = useDrawer();
   const [busy, setBusy] = useState(false);
+  const [rescanning, setRescanning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const create = async () => {
-    const trimmed = name.trim();
-    if (!trimmed || busy) return;
-    setBusy(true);
-    setActionError(null);
+  const openNew = () =>
+    drawer.open({
+      title: "New scenario",
+      width: "28rem",
+      content: (
+        <NewScenarioForm
+          onCreated={(id) => {
+            drawer.close();
+            navigate(`/scenario-builder/${id}`);
+          }}
+        />
+      ),
+    });
+
+  const rescan = async () => {
+    setRescanning(true);
     try {
-      const saved = await saveScenario(
-        newScenario(trimmed, description.trim()),
-      );
-      await refreshScenarios();
-      setName("");
-      setDescription("");
-      navigate(`/scenario-builder/${saved.id}`);
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
+      await refresh();
     } finally {
-      setBusy(false);
+      setRescanning(false);
     }
   };
 
@@ -132,38 +143,28 @@ export default function ScenarioBuilderPage() {
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Scenario Builder</h1>
-        <p className="text-sm text-muted-foreground">
-          Author a mission's in-engine content: what spawns, what the triggers
-          watch for, and what wins it. A scenario stands alone, so you can play
-          one on its own or attach it to a campaign mission later.
-        </p>
-      </header>
-
-      {actionError && <ErrorBanner message={actionError} />}
-      {error && <ErrorBanner message={error} />}
-
-      <section className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-4">
-        <h2 className="text-sm font-medium">New scenario</h2>
-        <Input
-          value={name}
-          placeholder="Name"
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Textarea
-          value={description}
-          placeholder="Description (optional)"
-          className="min-h-16"
-          onChange={(e) => setDescription(e.target.value)}
-        />
-        <div className="flex gap-2">
+      <header className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-lg font-semibold">Scenario Builder</h1>
+          <p className="text-sm text-muted-foreground">
+            Author a mission's in-engine content: what spawns, what the triggers
+            watch for, and what wins it. A scenario stands alone, so you can
+            play one on its own or attach it to a campaign mission later.
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
           <Button
+            variant="outline"
             className="gap-1.5"
-            onClick={create}
-            disabled={!name.trim() || busy}
+            onClick={rescan}
+            disabled={rescanning}
           >
-            <Plus className="size-4" /> Create
+            {rescanning ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+            Rescan
           </Button>
           <Button
             variant="outline"
@@ -173,13 +174,19 @@ export default function ScenarioBuilderPage() {
           >
             <Download className="size-4" /> Import
           </Button>
+          <Button className="gap-1.5" onClick={openNew}>
+            <Plus className="size-4" /> New scenario
+          </Button>
         </div>
-      </section>
+      </header>
+
+      {actionError && <ErrorBanner message={actionError} />}
+      {error && <ErrorBanner message={error} />}
 
       {loading ? (
         <SkeletonList />
       ) : scenarios.length === 0 ? (
-        <EmptyState label="No scenarios yet. Create or import one above." />
+        <EmptyState label="No scenarios yet. Start one with New scenario, or import a shared one." />
       ) : (
         <ul className="flex flex-col gap-2">
           {scenarios.map((scenario) => (
@@ -246,16 +253,59 @@ export default function ScenarioBuilderPage() {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
 
-      {!loading && (
-        <button
-          type="button"
-          onClick={refresh}
-          className="self-start text-xs text-muted-foreground hover:underline"
-        >
-          Refresh
-        </button>
-      )}
+/**
+ * The new-scenario form, shown in the drawer behind the New scenario button.
+ * It saves the empty scenario itself, so the page only has to open the editor
+ * on the id it hands back. Mirrors the campaign builder's own form.
+ */
+function NewScenarioForm({ onCreated }: { onCreated: (id: string) => void }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const create = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const saved = await saveScenario(
+        newScenario(trimmed, description.trim()),
+      );
+      await refreshScenarios();
+      onCreated(saved.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Input
+        value={name}
+        placeholder="Name"
+        onChange={(e) => setName(e.target.value)}
+      />
+      <Textarea
+        value={description}
+        placeholder="Description (optional)"
+        className="min-h-16"
+        onChange={(e) => setDescription(e.target.value)}
+      />
+      {error && <ErrorBanner message={error} />}
+      <Button
+        className="gap-1.5"
+        onClick={create}
+        disabled={!name.trim() || busy}
+      >
+        <Plus className="size-4" /> {busy ? "Creating…" : "Create"}
+      </Button>
     </div>
   );
 }
