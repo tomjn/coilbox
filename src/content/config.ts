@@ -616,6 +616,37 @@ export function useUnitsyncUnitDataset(
 
 /** Session cache of read models, keyed by `dataDir::engine::game::object`. */
 const unitModelCache = new Map<string, UnitModelResult>();
+/** In-flight reads, so a view asking for the same model twice waits once. */
+const unitModelPending = new Map<string, Promise<UnitModelResult>>();
+
+/**
+ * Read one unit's model, off the session cache when it is already there.
+ *
+ * The promise behind {@link useUnitsyncUnitModel}, for a view that needs many
+ * models at once rather than one: the scenario editor draws every unit a
+ * document places, which is a list it only knows at render time and cannot turn
+ * into a fixed number of hook calls.
+ */
+export function loadUnitsyncUnitModel(
+  enginePath: string,
+  dataDir: string,
+  gameArchive: string,
+  object: string,
+): Promise<UnitModelResult> {
+  const key = `${dataDir}::${enginePath}::${gameArchive}::${object}`;
+  const cached = unitModelCache.get(key);
+  if (cached) return Promise.resolve(cached);
+  const inFlight = unitModelPending.get(key);
+  if (inFlight) return inFlight;
+  const read = unitsyncUnitModel({ enginePath, dataDir, gameArchive, object })
+    .then((res) => {
+      unitModelCache.set(key, res);
+      return res;
+    })
+    .finally(() => unitModelPending.delete(key));
+  unitModelPending.set(key, read);
+  return read;
+}
 
 /**
  * Read one unit's model out of a game's archive. Mounts the game's archive set,
@@ -653,10 +684,9 @@ export function useUnitsyncUnitModel(
     setModel(null);
     setFailed(false);
     setLoading(true);
-    unitsyncUnitModel({ enginePath, dataDir, gameArchive, object })
+    loadUnitsyncUnitModel(enginePath, dataDir, gameArchive, object)
       .then((res) => {
         if (cancelled) return;
-        unitModelCache.set(key, res);
         setModel(res);
         setLoading(false);
       })

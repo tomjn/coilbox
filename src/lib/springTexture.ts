@@ -15,11 +15,14 @@ import { DDSLoader } from "three/addons/loaders/DDSLoader.js";
 import { textureArrived } from "./textureArrival";
 
 /**
- * What a team-colour region is drawn in.
+ * What a team-colour region is drawn in when the caller has no colour of its
+ * own.
  *
  * The regions are black in the texture a unit is painted with and marked in the
  * red channel of a second one, because the engine paints them in the player's
- * colour. A viewer has no player to take a colour from, so it picks one.
+ * colour. A viewer of a lone model has no player to take a colour from, so it
+ * picks one. A view that does know whose the unit is, such as the scenario
+ * editor, passes that colour instead.
  */
 export const TEAM_COLOUR = 0x1028cc;
 
@@ -89,10 +92,11 @@ export function releaseSpringTexture(url: string): void {
 export function paintTeamColour(
   material: THREE.MeshStandardMaterial,
   mask: THREE.Texture,
+  colour: THREE.ColorRepresentation = TEAM_COLOUR,
 ): void {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.teamMask = { value: mask };
-    shader.uniforms.teamColour = { value: new THREE.Color(TEAM_COLOUR) };
+    shader.uniforms.teamColour = { value: new THREE.Color(colour) };
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
