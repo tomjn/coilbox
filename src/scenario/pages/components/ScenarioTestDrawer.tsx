@@ -20,7 +20,11 @@
 import { Button } from "@picoframe/frame";
 import { Rocket } from "lucide-react";
 import { useState } from "react";
-import { primeScan, useUnitsyncScan } from "@/content/config";
+import {
+  primeScan,
+  useUnitsyncHeightmap,
+  useUnitsyncScan,
+} from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import {
@@ -67,6 +71,23 @@ export function ScenarioTestDrawer({
   const testing = mode === "test";
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  // How big the map is, so the validator can say a position is past its far
+  // edge as well as before its near one. The same unitsync read the editing
+  // surface already makes, and cached with it, so this costs nothing extra. A
+  // map that has not answered yet leaves the extent out rather than blocking
+  // the launch, which drops the far-edge half of the check for that run.
+  const heightmap = useUnitsyncHeightmap(
+    target?.enginePath,
+    target?.dataDir,
+    scenario.setup.mapName,
+  );
+  const samplesX = heightmap.data?.width;
+  const samplesZ = heightmap.data?.height;
+  const mapExtent =
+    samplesX && samplesZ
+      ? // World extent = (samples - 1) x 8 elmos, as `useMissionMapAssets` reports it.
+        { width: (samplesX - 1) * 8, height: (samplesZ - 1) * 8 }
+      : undefined;
   const play = usePlay();
   const { route, reason, available } = useScenarioGate(scenario);
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
@@ -105,6 +126,7 @@ export function ScenarioTestDrawer({
         scenario,
         dataDir: target.dataDir,
         games: scan.data?.games ?? [],
+        map: mapExtent,
         rescan: async () => {
           setPhase({ state: "scanning" });
           const rescanned = await primeScan(

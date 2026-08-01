@@ -37,6 +37,19 @@ export interface MissionIssue {
   message: string;
 }
 
+/**
+ * A map's extent in elmos, the way `useMissionMapAssets` reports it.
+ *
+ * The validator reads a file, not a map, so a caller that knows which map the
+ * scenario is set on hands the size in. Without it only the near edge can be
+ * checked, because a coordinate below zero is off every map and one above zero
+ * is only off a map you have measured.
+ */
+export interface MapExtent {
+  width: number;
+  height: number;
+}
+
 /** The parameter kinds that hold a cross-reference, and what to call each one. */
 const NOUN = {
   zoneId: "zone",
@@ -176,12 +189,113 @@ function checkStep(
   }
 }
 
+/* -------------------------------------------------------------------------- *
+ * Coordinates that are not on the map.
+ *
+ * Spring measures a map from its north-west corner, so every position in a
+ * scenario is a positive offset from that corner and a negative one is off the
+ * map. `CUnit::PreInit` answers an off-map creation by clamping it into bounds
+ * rather than refusing it, so the mission that plays is not the mission that was
+ * authored: units pile onto the edge and nothing says why. Issue #868 shipped
+ * three fixtures laid out around a centre origin and the headless engine run
+ * passed anyway.
+ *
+ * Zero is the map edge, not off it. The editor's own `clampToMap` puts a drag
+ * that overshoots on exactly zero, so refusing it here would refuse an ordinary
+ * edit. The fixture corpus is stricter about its own coordinates for a different
+ * reason, that a fixture sitting on the edge cannot show it was not clamped
+ * there.
+ * -------------------------------------------------------------------------- */
+
+/** One `{ x, z }` found in a compiled mission, and where it sits. */
+interface FoundPoint {
+  path: string;
+  x: number;
+  z: number;
+}
+
+const isPoint = (v: unknown): v is { x: number; z: number } =>
+  isRecord(v) && typeof v.x === "number" && typeof v.z === "number";
+
+/**
+ * Every `{ x, z }` anywhere in a value, with the compiled path it sits at.
+ *
+ * A walk rather than a list of the fields that hold one, because a position
+ * reaches the file through an actor, a group, a zone, a waypoint, a prefab and
+ * any `point` trigger parameter, including one a game's own extension declared.
+ * An entry carrying an id is named by it, the way {@link at} names one.
+ */
+function pointsIn(value: unknown, path = ""): FoundPoint[] {
+  if (isPoint(value)) return [{ path, x: value.x, z: value.z }];
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) => {
+      const id = asRecord(entry).id;
+      const ref = typeof id === "string" ? JSON.stringify(id) : String(index);
+      return pointsIn(entry, `${path}[${ref}]`);
+    });
+  }
+  if (isRecord(value)) {
+    return Object.entries(value).flatMap(([key, entry]) =>
+      pointsIn(entry, path ? `${path}.${key}` : key),
+    );
+  }
+  return [];
+}
+
+/** Why a position is not on the map, or null when it is. */
+function offMap(x: number, z: number, map?: MapExtent): string | null {
+  if (x < 0 || z < 0) {
+    return `${x},${z} is off the map. Spring measures a map from its north-west corner, so x and z start at 0.`;
+  }
+  if (!map || map.width <= 0 || map.height <= 0) return null;
+  if (x > map.width || z > map.height) {
+    return `${x},${z} is off the map, which is ${map.width} by ${map.height} elmos.`;
+  }
+  return null;
+}
+
+function checkPositions(
+  mission: Record<string, unknown>,
+  map: MapExtent | undefined,
+  issues: MissionIssue[],
+): void {
+  for (const point of pointsIn(mission)) {
+    // A prefab building's offset is measured from its prefab's origin and is
+    // free to point north or west of it. Where it lands is checked below.
+    if (point.path.endsWith(".offset")) continue;
+    const message = offMap(point.x, point.z, map);
+    if (message) issues.push({ path: point.path, message });
+  }
+
+  asArray(mission.prefabs).forEach((raw, index) => {
+    const prefab = asRecord(raw);
+    const origin = prefab.origin;
+    if (!isPoint(origin)) return;
+    const where = at("prefabs", prefab, index);
+    asArray(prefab.buildings).forEach((entry, i) => {
+      const building = asRecord(entry);
+      const offset = building.offset;
+      if (!isPoint(offset)) return;
+      const message = offMap(origin.x + offset.x, origin.z + offset.z, map);
+      if (message) {
+        issues.push({ path: `${where}.buildings[${i}].offset`, message });
+      }
+    });
+  });
+}
+
 /**
  * Resolve every cross-reference in an evaluated mission, and report all of them
  * rather than the first. An author fixing one typo at a time through the engine
  * is the failure this whole step exists to avoid.
+ *
+ * `map` is the extent of the map the scenario is set on, when the caller knows
+ * it. Without it a position is only checked against the near edge.
  */
-export function validateMission(mission: unknown): MissionIssue[] {
+export function validateMission(
+  mission: unknown,
+  map?: MapExtent,
+): MissionIssue[] {
   if (!isRecord(mission)) {
     return [
       { path: "mission", message: "the compiled mission returned no table" },
@@ -230,6 +344,8 @@ export function validateMission(mission: unknown): MissionIssue[] {
     });
   });
 
+  checkPositions(mission, map, issues);
+
   return issues;
 }
 
@@ -256,6 +372,8 @@ const PART: Record<string, string> = {
   conditions: "Condition",
   actions: "Action",
   orders: "Order",
+  waypoints: "Waypoint",
+  buildings: "Building",
 };
 
 /** A name, optionally subscripted by an id or a position. */
@@ -344,6 +462,7 @@ export function describeIssue(issue: MissionIssue): string {
 export async function validateCompiledMission(
   root: string,
   scenarioId: string,
+  map?: MapExtent,
 ): Promise<MissionIssue[]> {
   const path = missionPath(scenarioId);
   let mission: unknown;
@@ -353,5 +472,5 @@ export async function validateCompiledMission(
     const message = err instanceof Error ? err.message : String(err);
     return [{ path, message }];
   }
-  return validateMission(mission);
+  return validateMission(mission, map);
 }

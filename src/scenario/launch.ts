@@ -32,6 +32,7 @@ import { isMutatorArchive, writeTestMutator } from "./mutator";
 import { packagedArchiveReason } from "./offer";
 import {
   describeIssue,
+  type MapExtent,
   type MissionIssue,
   validateCompiledMission,
 } from "./validate";
@@ -171,6 +172,12 @@ export interface ScenarioLaunchInput {
    * mid-mission.
    */
   disabledUnits?: string[];
+  /**
+   * The extent of the map the scenario is set on, when the caller has read it.
+   * Only a caller with an engine to ask unitsync with can, so it is optional,
+   * and without it a position is checked against the near edge only.
+   */
+  map?: MapExtent;
 }
 
 export type ScenarioLaunchResult =
@@ -213,6 +220,7 @@ async function installedRuntime(root: string): Promise<number | null> {
 async function writeIntoGame(
   root: string,
   scenario: Scenario,
+  map?: MapExtent,
 ): Promise<{ mission: string; issues: MissionIssue[] }> {
   await scenarioWriteMission({
     root,
@@ -221,7 +229,7 @@ async function writeIntoGame(
   });
   return {
     mission: missionPath(scenario.id),
-    issues: await validateCompiledMission(root, scenario.id),
+    issues: await validateCompiledMission(root, scenario.id, map),
   };
 }
 
@@ -234,7 +242,8 @@ async function writeIntoGame(
 export async function launchScenario(
   input: ScenarioLaunchInput,
 ): Promise<ScenarioLaunchResult> {
-  const { scenario, dataDir, games, rescan, launch, disabledUnits } = input;
+  const { scenario, dataDir, games, rescan, launch, disabledUnits, map } =
+    input;
   const wanted = scenario.setup.gameName;
   const game = games.find((g) => g.name === wanted);
   if (!game) {
@@ -261,9 +270,9 @@ export async function launchScenario(
 
   if (adopted) {
     dir = adopted;
-    written = await writeIntoGame(adopted, scenario);
+    written = await writeIntoGame(adopted, scenario, map);
   } else {
-    const mutator = await writeTestMutator(dataDir, scenario);
+    const mutator = await writeTestMutator(dataDir, scenario, map);
     dir = mutator.dir;
     written = { mission: missionPath(scenario.id), issues: mutator.issues };
     if (mutator.version < scenario.runtimeVersion) {
