@@ -372,15 +372,30 @@ async fn scenario_runtime_install<R: Runtime>(app: AppHandle<R>, root: String) -
 }
 
 /// `scenario_runtime_status`, the runtime a game has installed and the one
-/// coilbox ships. Either is null when it cannot be read: an unadopted game has
-/// no marker, and a build with no bundled runtime has nothing to offer.
+/// coilbox ships, plus the condition and action types the game declares for
+/// itself. Each is null when it cannot be read: an unadopted game has no marker,
+/// a build with no bundled runtime has nothing to offer, and most games declare
+/// no types of their own.
+///
+/// The extensions come from the game and never from coilbox's own runtime
+/// folder, because they are the game's to declare. They are read here rather
+/// than through a command of their own so the editor learns what the game runs
+/// and what it supports in one round trip.
 #[tauri::command]
 async fn scenario_runtime_status<R: Runtime>(app: AppHandle<R>, root: String) -> CliResult {
-    let installed = writable_game_dir(&root)
-        .ok()
-        .and_then(|dir| runtime::read_marker(&dir).ok());
+    let dir = writable_game_dir(&root).ok();
+    let installed = dir
+        .as_deref()
+        .and_then(|dir| runtime::read_marker(dir).ok());
+    let extensions = dir
+        .as_deref()
+        .and_then(|dir| runtime::read_extensions(dir).ok());
     let available = runtime::runtime_dir(&app).and_then(|dir| runtime::read_marker(&dir).ok());
-    CliResult::ok(json!({ "installed": installed, "available": available }))
+    CliResult::ok(json!({
+        "installed": installed,
+        "available": available,
+        "extensions": extensions,
+    }))
 }
 
 /// Write a compiled mission into a game archive folder, with the scenario's

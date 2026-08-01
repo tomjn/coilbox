@@ -5,9 +5,10 @@ The Lua that plays a coilbox scenario inside the engine. It is coilbox-authored 
 ## Layout
 
 - `luarules/gadgets/coilbox_mission_runtime.lua`, the gadget. It gates on the modoption, loads the compiled mission, and hands it to the rest of the runtime.
-- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, `coilbox_view.lua` where it points the player, `coilbox_reveal.lua` what it shows them, `coilbox_restrictions.lua` what its teams may build and do, and `coilbox_gameover.lua` how it ends. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` and `coilbox_view.lua` are pure as well, because saying a line, moving a camera and dropping a marker are all deciding that the mission asked and nothing more.
+- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, `coilbox_view.lua` where it points the player, `coilbox_reveal.lua` what it shows them, `coilbox_restrictions.lua` what its teams may build and do, `coilbox_gameover.lua` how it ends, and `coilbox_extensions.lua` the condition and action types a game declares for itself. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` and `coilbox_view.lua` are pure as well, because saying a line, moving a camera and dropping a marker are all deciding that the mission asked and nothing more.
 - `luaui/widgets/coilbox_mission_ui.lua`, the widget: the objectives panel, the dialogue panel, the debrief and the name over a named actor. `luaui/mission_ui/coilbox_panel_model.lua` is everything it decides before it draws, pure and tested outside the engine.
 - `missions/runtime.lua`, the version marker and capability table. Coilbox reads it out of an installed game to decide what the editor may offer.
+- `missions/extensions.lua` is *not* here, and never installed. It is the game's own file, declaring the game's own trigger types, and both the runtime and the editor read it out of whatever game has one. See [Game extensions](#game-extensions).
 - `tests/`, checks that run outside the engine with `luajit`, and `tests/headless/`, the probe and scratch game that run inside one. Not part of what a game vendors.
 
 A game vendoring the runtime takes `luarules/`, `luaui/` and `missions/`, and nothing else.
@@ -104,6 +105,19 @@ A trigger fires when its condition group holds. The group is flat, one `op` over
 - Nothing is raised while the start window is open, so a mission's own placed units are not counted as units its team built.
 - A condition type nothing has registered is false, and an action type nothing has registered does nothing. Both are reported once. This is what a mission built for a newer runtime does, and it is why the capability table in `missions/runtime.lua` exists.
 - Triggers that set each other off inside one frame are cut off after sixteen passes and reported. Synced Lua that does not return takes the game with it.
+
+## Game extensions
+
+`coilbox_extensions.lua` is the same registration seam, offered to the game. A game that ships `missions/extensions.lua` declaring condition and action types of its own, and a handler implementing them, gets a trigger naming one dispatched to its code. The format is in [docs/mission-runtime.md](../../docs/mission-runtime.md#4-optional-declare-your-own-condition-and-action-types), which is the page a game maintainer reads. What matters here is how the module holds the line.
+
+- **Registration is the loader's, not the game's.** The handler returns a table of implementations rather than being handed the engine, so the two rules below are structural rather than something a game is asked to respect.
+- **A type the version marker declares is refused**, whichever of its two lists it is in, with an error naming it. `missions/runtime.lua` is the boundary: what it declares is the runtime's, and everything else is the game's to add.
+- **Only what the declaration lists is registered.** An implementation with no declaration would be a type the game can run and the editor cannot offer, so it is reported and dropped. A declaration with no implementation is reported too, and behaves like any type nothing registered.
+- **It registers last**, after every module above, so the marker's list and the engine's registrations are the same list by the time a game's own are read.
+- **The declaration is read in an empty environment and the handler in one that reaches the engine.** The handler's is a table of its own falling through to the gadget's, so it can read `GG`, where a game keeps everything an extension is likely to want, and its own globals stay out of the runtime's. `VFS.Include` with no environment at all does not reach `GG`, which is what the Splinter Faction proof found.
+- **`ctx.teamOf(name)`** is added to the shared context here: the engine team number for a team the scenario names, which is the one piece of the runtime's bookkeeping an extension cannot do without.
+
+What was registered is published on `GG.CoilboxMission.extensions` as `{ conditions = { ... }, actions = { ... } }`, so a game's own Lua can see what the runtime took.
 
 ## Zones
 
@@ -389,6 +403,7 @@ What it has settled:
 What it has caught:
 
 - `gift_units` moved nothing between teams that were not allied, and the runtime never noticed, because it asked for a share and threw the refusal away ([#857](https://github.com/tomjn/coilbox/issues/857)). The stub agreed with everything, so all fifteen suites passed on it. Fixed by asking for a capture and reporting a refusal. The stub now takes an `AllowUnitTransfer` of its own.
+- A game's extension handler could not see `GG`, so both of its types failed on their first call ([#776](https://github.com/tomjn/coilbox/issues/776)). `VFS.Include` with no environment does not hand the chunk the gadget's, and the stub's stand-in did. Fixed by naming the environment. `scripts/mission-sf-extension.sh` is where it showed up.
 
 What it still cannot settle:
 

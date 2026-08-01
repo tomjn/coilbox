@@ -13,6 +13,7 @@ For authoring, see [Scenarios](scenarios.md).
 - **One guard** in whatever your game starts a team with. Two, if starting a team is a sequence of pre-game phases rather than a call.
 - **Nothing in a normal game.** Without the `coilbox_mission` modoption the gadget's chunk returns `false` before it defines a callin or reads a file, so the gadget handler drops it. The cost of the runtime in an ordinary match is reading one file at load.
 - **One unit per human-played team in a mission.** The runtime places an invisible anchor so the engine cannot end the mission early. It shows in that team's unit count and nowhere else ([issue #820](https://github.com/tomjn/coilbox/issues/820)).
+- **Nothing for your own systems, unless you want them.** [Declaring condition and action types of your own](#4-optional-declare-your-own-condition-and-action-types) is two files and no coilbox release, and a game that declares none loses nothing.
 
 A game that has not adopted the runtime is not shut out of scenarios. It just cannot play them itself, and everything goes through coilbox's test mutator instead, which is a development route and never a distribution one.
 
@@ -126,13 +127,132 @@ end
 
 `scripts/mission-sf-proof.sh` reads that param back out. With both guards the phase is `done` at frame 2 and the game never loaded a start spot. Without the second one it reads `faction` at frame 2 and `placement` at frame 1000.
 
-## Game extensions are designed but not built
+### 4. Optional: declare your own condition and action types
 
-The design is that a game ships `missions/extensions.lua` declaring extra condition and action types with display metadata, the runtime dispatches unknown types to the game's handler, and the editor reads the same file and adds them to its palette. That is how a game's own systems become editable without coilbox knowing what they are.
+Your game has systems coilbox has never heard of. Splinter Faction has research points, a weather model and a faction chooser, and none of them mean anything to a generic runtime. Declare trigger types for them and a mission author can use them the way they use `unit_dead`, with a form for the parameters and no coilbox release in between ([issue #776](https://github.com/tomjn/coilbox/issues/776)).
 
-**None of it is implemented yet.** The work is [issue #776](https://github.com/tomjn/coilbox/issues/776). What exists today is the format's tolerance for it: coilbox parses, stores and re-emits an unknown condition or action type with its parameters untouched, the compile step skips its references rather than refusing them, and the editor draws it with an "unknown type" badge. A runtime with no handler registered for a type treats it as a condition that is false and an action that does nothing, and reports it once in the infolog.
+Two files, both yours:
 
-So do not write an `extensions.lua` yet. Everything engine-level, spawns, orders, zones, sight, restrictions, game over, camera, markers and rules params, stays in the generic runtime whatever happens with extensions.
+```
+<yourgame>.sdd/
+  missions/extensions.lua                    what the types are called and what they take
+  luarules/mission_extensions/<yours>.lua     what they do
+```
+
+Neither is coilbox's to overwrite. Keep them out of `luarules/mission_runtime/` and do not name them `coilbox_*`, because those are the two things a runtime update deletes when it stops shipping a file.
+
+#### The declaration
+
+Data only, no globals and no engine calls, exactly like `missions/runtime.lua` beside it. It is read twice: by the runtime at load, and by coilbox's editor to build its palette.
+
+```lua
+return {
+  -- The code below, by VFS path.
+  handler = "luarules/mission_extensions/research.lua",
+
+  conditions = {
+    {
+      type = "sf_research_above",
+      label = "Research above",
+      description = "The team's research points have passed this number",
+      params = {
+        { name = "team", kind = "teamId" },
+        { name = "amount", kind = "number" },
+      },
+    },
+  },
+
+  actions = {
+    {
+      type = "sf_grant_research",
+      label = "Grant research",
+      description = "Pay research points into a team's ledger",
+      params = {
+        { name = "team", kind = "teamId" },
+        { name = "amount", kind = "number" },
+      },
+    },
+  },
+}
+```
+
+- `type` is the name a trigger stores and the runtime dispatches on. Prefix it with something of your own, the way both of these do, so it cannot collide with a type a later coilbox adds.
+- `label` is what the palette calls it, and `description` is the line under it. Both are optional. A type with no label is read off its name, so `sf_weather` shows as "Sf weather".
+- `params` is a list rather than a table, because it is drawn in the order you write it.
+
+A parameter's `kind` is one of:
+
+| kind | the field the author gets |
+| --- | --- |
+| `string` | a text box |
+| `number` | a number box |
+| `boolean` | a switch |
+| `strings` | a list of typed values |
+| `point` | a place clicked on the map |
+| `orders` | the order editor a group's own orders use |
+| `enum` | a dropdown over your `values = { ... }` |
+| `zoneId` `actorId` `groupId` `triggerId` `objectiveId` `dialogueId` `teamId` `varName` | a dropdown over the scenario's own zones, actors, groups, triggers, objectives, dialogue lines, teams or variables |
+
+Add `optional = true` for a parameter an author may leave out. Your code then gets `nil` and applies its own default.
+
+The id kinds are the ones worth reaching for. A `zoneId` parameter is picked from the zones the scenario has, so it cannot name one that does not exist, and it follows a rename. Anything a parameter of an id kind holds is checked at compile time before the mission is launched.
+
+#### The handler
+
+Code, so the runtime runs it in an environment that reaches the engine and `GG`. It returns implementations keyed by type name:
+
+```lua
+return {
+  conditions = {
+    sf_research_above = {
+      -- The events this reacts to. Leave it out and it is evaluated on the
+      -- polled tick, twice a second, which is what an aggregate wants.
+      -- events = { "unit_destroyed" },
+      test = function(params, ctx)
+        local team = ctx.teamOf(params.team)
+        return team ~= nil and GG.Research.Get(team) > (tonumber(params.amount) or 0)
+      end,
+    },
+  },
+
+  actions = {
+    sf_grant_research = function(params, ctx)
+      local team = ctx.teamOf(params.team)
+      if team then
+        GG.Research.Add(team, tonumber(params.amount) or 0, "mission")
+      end
+    end,
+  },
+}
+```
+
+`params` is what the author filled in, verbatim. `ctx` is shared with the rest of the runtime and carries:
+
+- `ctx.teamOf(name)`, the engine team number for a team the scenario names. Trigger parameters carry the author's team names, so a `teamId` parameter goes through here before the engine sees it.
+- `ctx.state`, which is `GG.CoilboxMission`: the mission, its actors and their units, its zones, vars, groups and objectives, and the handles that drive them. `lua/mission-runtime/README.md` documents every one.
+- `ctx.engine`, the trigger engine. `ctx.engine:event(name, payload)` raises an event of your own, which a condition of yours can then declare in its `events`.
+- `ctx.frame`, the game frame, and `ctx.event` when this pass came from an event.
+
+Your globals stay yours: the handler runs in a table of its own that falls through to the gadget's environment, so it can read `GG` and call `Spring`, and anything it sets does not land in the runtime.
+
+#### The boundary
+
+**An extension adds a game concept, never an engine one.** Everything engine-level, spawns, orders, zones, sight, restrictions, game over, camera, markers and rules params, stays in the generic runtime.
+
+That is enforced rather than asked for. A declaration naming a type `missions/runtime.lua` declares is refused with an error in the infolog, whichever of the two lists it is in, and the runtime's own version is what the mission runs. The editor refuses the same names and says so above the trigger list.
+
+Two smaller rules follow from the same idea, that what runs is what an author can edit:
+
+- The handler may only implement types the declaration lists. One it implements and the declaration does not is reported and not registered.
+- A type the declaration lists and the handler does not implement is reported. The condition never holds and the action does nothing, which is what any unimplemented type does.
+
+#### What the author sees
+
+Your types are in the two pickers with the rest, labelled and described as you wrote them, and their parameters are edited by the same fields a built-in type's are. They are never greyed out on a runtime version, because you implement them: they run on whichever route the scenario takes, since coilbox's test mutator is stacked on your game and reads your declaration through it.
+
+Coilbox reads the declaration out of a loose `.sdd` only, through the same sandboxed Lua the version marker goes through. A packaged `.sd7` or `.sdz` runs its extensions fine and cannot have them read by the editor, which is the same limit that applies to the version marker.
+
+A declaration coilbox cannot make sense of costs you only the part that is wrong. A type whose parameter names a `kind` this coilbox has no field for is dropped, with the reason shown above the trigger list, and the rest of the file is offered as usual.
 
 ## How the game knows it is a mission
 
@@ -227,6 +347,14 @@ scripts/mission-sf-proof.sh
 ```
 
 The adoption proof, and it runs the other way round from the two above. Both of those play a runtime the harness itself laid down, which settles the runtime's behaviour and says nothing about adoption. This one plays the runtime out of a real game: the scratch mutator carries only a probe, and depends on a loose Splinter Faction that coilbox's own **Install the mission runtime** button wrote into. It copies `src/scenario/fixtures/missions/splinter/mission.lua` to `missions/splinter/mission.lua` in that game, which is where coilbox's launch path puts a compiled mission, and removes it again unless you pass `--keep-mission`.
+
+```sh
+scripts/mission-sf-extension.sh
+```
+
+The same game again, asking whether a game's own trigger types run. It plays a mission whose action pays research points into Splinter Faction's ledger and whose condition waits on the balance, and the number it quotes is that game's own `researchPoints` rules param, which nothing in coilbox can write. The declaration and the handler are in `scripts/sf-extension/` rather than in the game, because they are the proof's rather than Splinter Faction's, and the script copies all three files in and takes them out again unless you pass `--keep`.
+
+It also proves the boundary by running into it. The declaration names `time_elapsed` on purpose, and the mission's first trigger waits on one, so a run where an extension could redefine an engine-level type is a run where nothing happens.
 
 ```sh
 scripts/mission-sf-jericho.sh

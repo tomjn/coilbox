@@ -145,6 +145,12 @@ if not RESTRICTIONS then
 	return false
 end
 
+local EXTENSIONS, extensionsError = includeTable("luarules/mission_runtime/coilbox_extensions.lua")
+if not EXTENSIONS then
+	log("error", extensionsError)
+	return false
+end
+
 -- Refuse a mission built for a newer runtime than the game vendored. Running it
 -- anyway would quietly drop whatever this version cannot read, and a mission
 -- that half works is harder to diagnose than one that refuses to start.
@@ -278,9 +284,10 @@ local function publish()
 		-- The synced half adds `triggers`, the trigger engine, `vars`, the
 		-- mission's variables, `groups`, the scenario's groups, `objectives`,
 		-- its objectives, and `gameOver`, which ends it. Registering a condition
-		-- or action type on the engine is how the rest of the runtime, and a
-		-- game's own extensions, join in; going through the handles is how they
-		-- read and drive what those own.
+		-- or action type on the engine is how the rest of the runtime joins in,
+		-- and `extensions` is the same seam offered to a game's own Lua through
+		-- missions/extensions.lua; going through the handles is how they read
+		-- and drive what those own.
 	}
 	return GG.CoilboxMission, problems
 end
@@ -613,6 +620,30 @@ if gadgetHandler:IsSyncedCode() then
 			end,
 		})
 		published.triggers = triggers
+
+		-- Last, so every type the runtime itself implements is registered before a
+		-- game's own are read. What the game may add is checked against the version
+		-- marker rather than against what happens to be registered, but registering
+		-- after the runtime is what makes the two the same list.
+		published.extensions = EXTENSIONS.register(triggers, published, {
+			has = function(path)
+				return VFS.FileExists(path, VFS.ZIP)
+			end,
+			load = includeTable,
+			-- What a game's own handler runs in. A table of its own that falls
+			-- through to this gadget's environment: the handler is code, so it has
+			-- to reach the engine and GG, and a global it sets should land in its
+			-- own table rather than in the runtime's.
+			--
+			-- Named rather than left to VFS.Include's default, because the default
+			-- is not this environment. A handler included with no environment at all
+			-- cannot see GG, which is where a game keeps everything an extension is
+			-- likely to want (issue #776).
+			env = function()
+				return setmetatable({}, { __index = getfenv(1) })
+			end,
+			log = log,
+		})
 
 		-- Before the first frame, so a panel reading which unit an actor is finds
 		-- "not on the map" rather than nothing at all.
