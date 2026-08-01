@@ -168,8 +168,6 @@ check("an order about an actor that has died is not reported as a bad name",
 local siege
 engine, siege = playing("siege")
 
-local ended = record(siege.triggers, { "complete_objective", "victory", "fail_objective", "defeat" })
-
 --- Run the game on to `frame`, ticking every frame the way the engine does.
 local function playTo(from, frame)
 	for at = from, frame do
@@ -178,26 +176,49 @@ local function playTo(from, frame)
 	return frame
 end
 
+--- The mission's objective and who has won, as text. Read off the real
+-- objectives and the real Spring.GameOver call rather than off stand-ins,
+-- because what a replay says is the whole point of ending a mission.
+local function outcome()
+	return tostring(siege.objectives.get("take-keep")) .. "/"
+		.. (engine.gameOver[1] and table.concat(engine.gameOver[1], ",") or "playing")
+end
+
 local at = playTo(1, 60)
 check("the defenders sitting in their own keep do not complete the player's objective",
-	#ended == 0, ranAll(ended))
+	outcome() == "active/playing", outcome())
 
 local squad = engine.spawn("armpw", 0)
 engine.move(squad, 20, 20)
 at = playTo(at + 1, 1800)
-check("taking the keep does not complete a hold on its own", #ended == 0, ranAll(ended))
+check("taking the keep does not complete a hold on its own", outcome() == "active/playing", outcome())
 
 engine.move(squad, 900, 900)
 at = playTo(at + 1, 1830)
-check("and leaving before the minute is up loses the hold", #ended == 0, ranAll(ended))
+check("and leaving before the minute is up loses the hold", outcome() == "active/playing", outcome())
 
 engine.move(squad, 20, 20)
 at = playTo(at + 1, 3600)
-check("so the minute has to be served from the return", #ended == 0, ranAll(ended))
+check("so the minute has to be served from the return", outcome() == "active/playing", outcome())
 
 playTo(at + 1, 3660)
-check("a minute held end to end completes the objective and wins",
-	ranAll(ended) == "complete_objective,victory", ranAll(ended))
+check("a minute held end to end completes the objective and wins the mission for the player",
+	outcome() == "complete/0", outcome())
+check("which is one Spring.GameOver call and no more", #engine.gameOver == 1, #engine.gameOver)
+
+--------------------------------------------------------------------------------
+-- The same mission lost: the clock runs out with the player never in the keep.
+--------------------------------------------------------------------------------
+
+engine, siege = playing("siege")
+
+at = playTo(1, 17999)
+check("the mission is still running a frame before its deadline",
+	outcome() == "active/playing", outcome())
+
+playTo(at + 1, 18010)
+check("the deadline fails the objective and hands the win to everyone else",
+	outcome() == "failed/1", outcome())
 
 --------------------------------------------------------------------------------
 -- Triggers are synced only.

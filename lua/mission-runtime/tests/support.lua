@@ -75,6 +75,10 @@ function M.missionFiles(mission)
 		["luarules/mission_runtime/coilbox_zones.lua"] = module("luarules/mission_runtime/coilbox_zones.lua"),
 		["luarules/mission_runtime/coilbox_vars.lua"] = module("luarules/mission_runtime/coilbox_vars.lua"),
 		["luarules/mission_runtime/coilbox_groups.lua"] = module("luarules/mission_runtime/coilbox_groups.lua"),
+		["luarules/mission_runtime/coilbox_objectives.lua"] = module(
+			"luarules/mission_runtime/coilbox_objectives.lua"),
+		["luarules/mission_runtime/coilbox_gameover.lua"] = module(
+			"luarules/mission_runtime/coilbox_gameover.lua"),
 		["missions/demo/mission.lua"] = function()
 			return mission
 		end,
@@ -101,6 +105,15 @@ end
 -- `options.synced` picks which half of the gadget is being loaded, `options.defs`
 -- limits which unit defs exist so a scenario naming a missing one can be tested,
 -- and `options.startPositions` is keyed by engine team number.
+--
+-- `options.defList` is an array of `{ name = , <def fields> }` created in that
+-- order before anything else, for a test that cares which def id came first or
+-- what a def does. Every other def moves and shoots, which is what nearly every
+-- def in a game does.
+--
+-- `options.players` is keyed by player id and says which team each one is on,
+-- `options.allyTeams` is keyed by engine team number, and `options.allyTeamList`
+-- is every ally team the game has.
 function M.newEngine(modOptions, files, options)
 	options = options or {}
 
@@ -129,18 +142,55 @@ function M.newEngine(modOptions, files, options)
 		-- Every unit def a Pos2BuildPos call named, so a test can say which
 		-- placements went through the build grid.
 		snapped = {},
+		-- Every Spring.GameOver call, as its list of winning ally teams.
+		gameOver = {},
+		-- What has been done to a unit to take it out of the game: the anchor is
+		-- the only thing the runtime does this to.
+		blocking = {},
+		stealth = {},
+		sonarStealth = {},
+		sensors = {},
+		resourcing = {},
+		noDraw = {},
+		noMinimap = {},
 	}
 
+	--- Engine team -> ally team. A team nothing says otherwise about is in an ally
+	-- team of its own number, which is what a mission of one participant a side
+	-- has.
+	local function allyTeamOf(team)
+		return (options.allyTeams or {})[team] or team
+	end
+
 	--- The def id the engine would have given this name, invented on first use.
-	-- `options.buildings` is the set of def names that occupy the build grid.
-	local function unitDef(name)
+	-- `options.buildings` is the set of def names that occupy the build grid, and
+	-- `fields` overrides what the def does.
+	local function unitDef(name, fields)
 		local def = engine.env.UnitDefNames[name]
 		if not def then
+			-- A def moves and shoots unless the test says otherwise, because that
+			-- is what nearly every def in a game does and what the runtime has to
+			-- sift through to find something inert enough to anchor with.
 			def = {
 				id = engine.nextDefID,
 				name = name,
 				isBuilding = (options.buildings or {})[name] == true,
+				speed = 30,
+				weapons = { { weaponDef = 1 } },
+				buildSpeed = 0,
+				metalMake = 0,
+				energyMake = 0,
+				metalUpkeep = 0,
+				energyUpkeep = 0,
+				windGenerator = 0,
+				tidalGenerator = 0,
+				extractsMetal = 0,
 			}
+			for key, value in pairs(fields or {}) do
+				if key ~= "name" then
+					def[key] = value
+				end
+			end
 			engine.nextDefID = engine.nextDefID + 1
 			engine.env.UnitDefNames[name] = def
 			engine.env.UnitDefs[def.id] = def
@@ -384,6 +434,61 @@ function M.newEngine(modOptions, files, options)
 			GetGameRulesParam = function(name)
 				return engine.rulesParams[name]
 			end,
+			-- Declaring the game over. Recorded rather than acted on: what the
+			-- runtime passes here is the whole of what a replay says about who won.
+			GameOver = function(winners)
+				table.insert(engine.gameOver, winners)
+				return #winners
+			end,
+			GetTeamInfo = function(team)
+				return team, 0, false, false, "", allyTeamOf(team), 1, {}
+			end,
+			GetAllyTeamList = function()
+				-- Two sides unless a test says otherwise, which is what a mission
+				-- with one participant a side has.
+				return options.allyTeamList or { 0, 1 }
+			end,
+			-- Nothing, the way the engine answers when the game has no Gaia team.
+			GetGaiaTeamID = function()
+				return options.gaiaTeam
+			end,
+			GetPlayerList = function()
+				local ids = {}
+				for id in pairs(options.players or {}) do
+					ids[#ids + 1] = id
+				end
+				table.sort(ids)
+				return ids
+			end,
+			GetPlayerInfo = function(playerID)
+				local player = (options.players or {})[playerID] or {}
+				return "player" .. playerID, true, player.spectator == true, player.team,
+					allyTeamOf(player.team)
+			end,
+			SetUnitBlocking = function(unitID, isBlocking)
+				engine.blocking[unitID] = isBlocking
+				return isBlocking
+			end,
+			SetUnitStealth = function(unitID, stealth)
+				engine.stealth[unitID] = stealth
+			end,
+			SetUnitSonarStealth = function(unitID, stealth)
+				engine.sonarStealth[unitID] = stealth
+			end,
+			SetUnitSensorRadius = function(unitID, sensor, radius)
+				engine.sensors[unitID] = engine.sensors[unitID] or {}
+				engine.sensors[unitID][sensor] = radius
+				return radius
+			end,
+			SetUnitResourcing = function(unitID, resources)
+				engine.resourcing[unitID] = resources
+			end,
+			SetUnitNoDraw = function(unitID, flag)
+				engine.noDraw[unitID] = flag
+			end,
+			SetUnitNoMinimap = function(unitID, flag)
+				engine.noMinimap[unitID] = flag
+			end,
 		},
 		Game = { mapName = "Test Map", gameSpeed = 30 },
 		-- The engine's own command constants, at the numbers it uses.
@@ -437,6 +542,11 @@ function M.newEngine(modOptions, files, options)
 	-- The engine has every unit def loaded before a gadget runs. The stub invents
 	-- them as they are used, which is enough until something reads a def before it
 	-- has spawned one, so the names a test declares are made up front.
+	-- Listed defs first and in order, so a test that cares which def id came first
+	-- gets the ids it asked for rather than whatever pairs() walked into.
+	for _, entry in ipairs(options.defList or {}) do
+		unitDef(entry.name, entry)
+	end
 	for _, set in ipairs({ options.buildings or {}, options.defs or {} }) do
 		for name in pairs(set) do
 			unitDef(name)

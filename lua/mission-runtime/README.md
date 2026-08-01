@@ -5,7 +5,7 @@ The Lua that plays a coilbox scenario inside the engine. It is coilbox-authored 
 ## Layout
 
 - `luarules/gadgets/coilbox_mission_runtime.lua`, the gadget. It gates on the modoption, loads the compiled mission, and hands it to the rest of the runtime.
-- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, and `coilbox_groups.lua` its groups. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out.
+- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, and `coilbox_gameover.lua` how it ends. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out.
 - `missions/runtime.lua`, the version marker and capability table. Coilbox reads it out of an installed game to decide what the editor may offer.
 - `tests/`, checks that run outside the engine with `luajit`. Not part of what a game vendors.
 
@@ -28,6 +28,8 @@ GG.CoilboxMission = {
   triggers = <the trigger engine, synced half only>,
   vars    = <the mission's variables, synced half only>,
   groups  = <the scenario's groups, synced half only>,
+  objectives = <the mission's objectives, synced half only>,
+  gameOver = <what ends the mission, synced half only>,
 }
 ```
 
@@ -38,6 +40,7 @@ GG.CoilboxMission = {
 The runtime takes over the start rather than sharing it, so a mission plays the same wherever it was launched from:
 
 - `GameStart`: every actor is created at the ground height under its position, each prefab's buildings at their origin plus their own offset, each team's `startUnits` in a square grid on that team's engine start position, and last every group the scenario does not call `dormant`. Actors are addressable afterwards through `GG.CoilboxMission.units`, groups through `GG.CoilboxMission.groups`. Groups are placed last so one ordered to guard an actor has something to guard.
+- Last of all, one anchor for each mission team a human is playing, so that team can never be empty. See [the anchor](#the-anchor).
 - A building is put through `Spring.Pos2BuildPos` on the way. `Spring.CreateUnit` does not snap, and a base a few elmos off the build grid cannot be rebuilt where it stood and sits at the wrong height on a slope. That call answers with the height a builder would have used, so it replaces the ground read for buildings.
 - Game frame 1: every mission team's bank is set to its `resources`, defaulting to nothing. This is how the normal starting resources are suppressed. `income` is then paid in every frame, spread over the second it is quoted per.
 - A team whose scenario entry sets `noCommander` has anything the game spawns for it removed, from load until the end of game frame 1. Only creations with no builder are touched, so nothing anyone has begun building is affected.
@@ -162,6 +165,52 @@ A prefab is a base the author drags around as one piece, so its buildings are st
 
 A build order is the negative of the unit def id. The engine reads the shift and control keys on one as "five of these" and "twenty of these", so each is given with no options at all and appends exactly one unit. Build orders always append, so nothing clears the queue either. `repeat` goes last and needs its 0-or-1 parameter, and the engine refuses it outright for a factory whose def cannot repeat, which is the game's decision rather than the mission's.
 
+## Objectives
+
+An objective is a line of text the player is working towards, with an id, a `kind` of `primary` or `secondary`, and whether it starts `hidden`. The runtime owns one thing about it: whether it is still open, and how it ended. `complete_objective` and `fail_objective` settle one.
+
+- The first outcome sticks. A repeating trigger that goes on failing an objective the player has already completed would otherwise rewrite the debrief twice a second, and an author who wants a second chance at something writes a second objective. The second outcome is reported.
+- An objective the scenario never declared is reported and settles nothing. Unlike a var it cannot be invented: its text and its kind are the scenario's, and there is nothing to draw without them.
+- Settling an objective does not end the mission. A mission with three objectives and one ending is the ordinary case, so `victory` and `defeat` say when it is over.
+
+Every objective is mirrored into a game rules param named `coilbox_mission_objective_<id>`, for the same reason a var is: the panel that draws them runs outside synced Lua. A rules param is a float, so the state is one: `0` still open, `1` completed, `-1` failed. Every declared objective is written before the first frame, so a reader never finds one missing.
+
+The text, the kind and `hidden` are not mirrored. They never change, so a reader takes them from the compiled mission it is already looking at. A hidden objective is one to leave undrawn while its state is `0`.
+
+```lua
+GG.CoilboxMission.objectives.get("take-keep")   -- "active", "complete" or "failed"
+GG.CoilboxMission.objectives.complete("take-keep")
+GG.CoilboxMission.objectives.fail("take-keep")
+```
+
+## Ending a mission
+
+The runtime ends a mission with `Spring.GameOver`, the same call a normal game ends with, so the result lands in the replay and coilbox reads a scenario's outcome through the code path it already reads a skirmish's through. Nothing of ours in between, and nothing to keep in step.
+
+- `victory` names a participant and declares its ally team the only winner.
+- `defeat` names a participant and declares every other ally team the winner, Gaia aside. That is what a losing player's replay has to say: a reader deciding whether the player lost asks whether the player's ally team is in the winning list, so a loss is that list without them in it.
+- Either with no team named means the team a human is playing. Failing that, the lowest engine team number, said out loud, because that is the first slot in the start script and where the player sits in a mission coilbox launched.
+- A mission ends once. The second ending is reported, and nothing is evaluated afterwards: no polled tick, no event. The result is already in the replay, and a trigger that spawns a wave into a finished mission is a mission that looks broken.
+
+The actions run in the order the trigger lists them, so a trigger that wins and then plays a line plays the line.
+
+### The anchor
+
+A game ends itself when an ally team has nothing left. The engine's own `game_end` gadget kills every team in that ally team, which demotes its players to spectators and hands the win to the survivors. A mission where the player legitimately reaches zero units, the convoy driving off the map or the last commando spent, would end there in a loss halfway through.
+
+So each mission team a human is playing gets one anchor: a unit that is on the map for no other reason. The team is never empty, so nothing but the runtime decides the mission is over. This is the other half of the adoption contract, and it holds whether or not the vendoring game has added its guard to `Spring.GameOver`, because being spectated mid-mission is the damage even when nobody declares a winner.
+
+- The def is the first one the game has that does nothing at all: immobile, unarmed, builds nothing, and neither makes nor spends resources. Chosen by ascending def id, because a unit created on one machine and not another is a desync. A game with no such def gets no anchor, and is told what that costs.
+- It is placed with everything else the runtime places, inside the start window, so no trigger sees it arrive and no team counts it as something it built. The engine clamps a creation into the map, so it stands in the corner.
+- It is invulnerable, blocks nothing, sees nothing, is stealthed, earns nothing, and the unsynced half draws it nowhere, puts it on no minimap and lets nothing select it.
+- The runtime's own counting skips it. `unit_count` takes it off a team's total and `units_in_zone` and `zone_held_for` leave it out, so a mission asking whether the player has anything left, or whether a zone is clear, gets the answer it would have got without an anchor. It still shows in that team's unit count in the game's own UI, which is the price.
+
+```lua
+GG.CoilboxMission.gameOver.isOver()
+GG.CoilboxMission.gameOver.victory("player")
+GG.CoilboxMission.gameOver.defeat("player")
+```
+
 ## Conventions
 
 - Everything vendored is named `coilbox_*` so a game maintainer can see at a glance which files came from here.
@@ -180,6 +229,8 @@ luajit lua/mission-runtime/tests/trigger_test.lua
 luajit lua/mission-runtime/tests/zone_test.lua
 luajit lua/mission-runtime/tests/var_test.lua
 luajit lua/mission-runtime/tests/group_test.lua
+luajit lua/mission-runtime/tests/objective_test.lua
+luajit lua/mission-runtime/tests/gameover_test.lua
 luajit lua/mission-runtime/tests/mission_trigger_test.lua
 ```
 

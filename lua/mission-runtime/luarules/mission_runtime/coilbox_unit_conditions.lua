@@ -96,6 +96,18 @@ function M.register(engine, state)
 		end,
 	})
 
+	--- How many of a team's units are mission anchors rather than its own.
+	--
+	-- An anchor is there to keep the engine from deciding a team with nothing
+	-- left has lost, and a mission asking "does the player have anything left"
+	-- has to get the answer it would have got without one.
+	local function anchors(team, defID)
+		if not state.gameOver then
+			return 0
+		end
+		return state.gameOver.anchorCount(team, defID)
+	end
+
 	-- Polled: a team's holdings change with every death and every build, and an
 	-- aggregate nobody can see change is not worth a callin per unit.
 	engine:addCondition("unit_count", {
@@ -111,11 +123,11 @@ function M.register(engine, state)
 				for _, name in ipairs(defs) do
 					local def = UnitDefNames[name]
 					if def then
-						count = count + Spring.GetTeamUnitDefCount(team, def.id)
+						count = count + Spring.GetTeamUnitDefCount(team, def.id) - anchors(team, def.id)
 					end
 				end
 			else
-				count = Spring.GetTeamUnitCount(team) or 0
+				count = (Spring.GetTeamUnitCount(team) or 0) - anchors(team)
 			end
 
 			return within(count, tonumber(params.min), tonumber(params.max))
