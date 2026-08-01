@@ -126,6 +126,23 @@ engine.env:GameFrame(1)
 check("the start window closes once the game is running",
 	engine.units[engine.spawn("armcom", 1)].alive == true)
 
+-- Issue #884. Undoing a start only reaches as far as the window, and Splinter
+-- Faction spawns 1800 frames past it, so what a game is actually asked to do is
+-- not spawn. The question it asks holds for the whole mission, because it is the
+-- scenario's own answer rather than anything about what frame it is.
+engine = started()
+local mission = engine.GG.CoilboxMission
+check("the contract says a team the scenario spawns for is the mission's",
+	mission.suppressesStart(1) == true)
+check("and that a team it does not spawn for is still the game's",
+	mission.suppressesStart(0) == false)
+check("and says nothing about a team the mission has no participant for",
+	mission.suppressesStart(7) == false)
+
+engine.env:GameFrame(1)
+check("and it still says so long after the start window has closed",
+	mission.suppressesStart(1) == true)
+
 --------------------------------------------------------------------------------
 -- Economy.
 --------------------------------------------------------------------------------
