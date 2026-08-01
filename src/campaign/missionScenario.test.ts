@@ -5,8 +5,9 @@ import {
   detachScenario,
   missionFromScenario,
   scenarioAttachment,
+  scenarioIsAttached,
 } from "./missionScenario";
-import type { CampaignMission } from "./model";
+import type { Campaign, CampaignMission } from "./model";
 
 function scenario(over: Partial<Scenario> = {}): Scenario {
   return {
@@ -98,6 +99,34 @@ describe("missionFromScenario", () => {
     expect(built.objectives).toEqual([]);
     expect(built.scenario?.id).toBe("s1");
     expect(built.snapshot.gameName).toBe("BAR");
+  });
+});
+
+describe("scenarioIsAttached", () => {
+  const campaign = (missions: CampaignMission[]): Campaign => ({
+    schemaVersion: 1,
+    id: "c1",
+    type: "ta",
+    title: "Test",
+    description: "",
+    missions,
+    createdAt: "t0",
+    updatedAt: "t1",
+  });
+
+  it("finds a scenario a mission carries", () => {
+    const attached = attachScenario(mission(), scenario());
+    expect(scenarioIsAttached([campaign([attached])], "s1")).toBe(true);
+  });
+
+  it("is false when no mission carries it", () => {
+    expect(scenarioIsAttached([campaign([mission()])], "s1")).toBe(false);
+    const attached = attachScenario(mission(), scenario({ id: "other" }));
+    expect(scenarioIsAttached([campaign([attached])], "s1")).toBe(false);
+  });
+
+  it("is false with no campaigns at all", () => {
+    expect(scenarioIsAttached([], "s1")).toBe(false);
   });
 });
 

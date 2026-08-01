@@ -162,7 +162,12 @@ describe("saveScenario", () => {
 describe("deleteScenario and media", () => {
   it("deletes by id", async () => {
     await deleteScenario("s1");
-    expect(deleteMock).toHaveBeenCalledWith({ id: "s1" });
+    expect(deleteMock).toHaveBeenCalledWith({ id: "s1", keepMedia: false });
+  });
+
+  it("keeps the dialogue clips when a campaign still plays them", async () => {
+    await deleteScenario("s1", { keepMedia: true });
+    expect(deleteMock).toHaveBeenCalledWith({ id: "s1", keepMedia: true });
   });
 
   it("returns the stored filename an import produced", async () => {

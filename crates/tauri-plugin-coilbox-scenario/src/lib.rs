@@ -119,8 +119,18 @@ async fn scenario_save<R: Runtime>(app: AppHandle<R>, id: String, json: String) 
 
 /// `scenario_delete`, removing a scenario document and its media folder.
 /// Best-effort on the media, because a scenario with no dialogue clips has none.
+///
+/// `keep_media` leaves the clips behind (issue #866). A campaign mission that
+/// attached this scenario carries the whole document, but its dialogue still
+/// names the clips by file name in this store, so wiping them would leave the
+/// mission playing its radio messages with no portrait and no voice. The caller
+/// decides, because only the frontend knows which campaigns attached what.
 #[tauri::command]
-async fn scenario_delete<R: Runtime>(app: AppHandle<R>, id: String) -> CliResult {
+async fn scenario_delete<R: Runtime>(
+    app: AppHandle<R>,
+    id: String,
+    keep_media: Option<bool>,
+) -> CliResult {
     if !valid_id(&id) {
         return CliResult::err(format!("invalid scenario id: {id}"));
     }
@@ -133,8 +143,10 @@ async fn scenario_delete<R: Runtime>(app: AppHandle<R>, id: String) -> CliResult
             return CliResult::err(format!("could not delete scenario: {e}"));
         }
     }
-    if let Ok(dir) = media_dir(&app) {
-        let _ = std::fs::remove_dir_all(dir.join(&id));
+    if !keep_media.unwrap_or(false) {
+        if let Ok(dir) = media_dir(&app) {
+            let _ = std::fs::remove_dir_all(dir.join(&id));
+        }
     }
     CliResult::ok(json!({}))
 }
