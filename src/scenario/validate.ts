@@ -200,11 +200,18 @@ function checkStep(
  * three fixtures laid out around a centre origin and the headless engine run
  * passed anyway.
  *
- * Zero is the map edge, not off it. The editor's own `clampToMap` puts a drag
- * that overshoots on exactly zero, so refusing it here would refuse an ordinary
- * edit. The fixture corpus is stricter about its own coordinates for a different
- * reason, that a fixture sitting on the edge cannot show it was not clamped
- * there.
+ * This is about the places a mission puts something, so a zone's own bounds are
+ * left out. A zone is an area a condition tests against rather than a creation,
+ * nothing clamps it, and an area that overhangs the edge simply covers less
+ * ground. The editor draws one that way itself: `atLeastMinimum` in `zones.ts`
+ * grows a box below the minimum size about its own centre, so a small zone drawn
+ * against the edge legitimately sits a few elmos past it.
+ *
+ * Zero is the map edge, not off it, for the same reason. The editor's
+ * `clampToMap` puts a drag that overshoots on exactly zero, so refusing it here
+ * would refuse an ordinary edit. The fixture corpus is stricter about its own
+ * coordinates for a different reason, that a fixture sitting on the edge cannot
+ * show it was not clamped there.
  * -------------------------------------------------------------------------- */
 
 /** One `{ x, z }` found in a compiled mission, and where it sits. */
@@ -221,9 +228,9 @@ const isPoint = (v: unknown): v is { x: number; z: number } =>
  * Every `{ x, z }` anywhere in a value, with the compiled path it sits at.
  *
  * A walk rather than a list of the fields that hold one, because a position
- * reaches the file through an actor, a group, a zone, a waypoint, a prefab and
- * any `point` trigger parameter, including one a game's own extension declared.
- * An entry carrying an id is named by it, the way {@link at} names one.
+ * reaches the file through an actor, a group, a waypoint, a prefab and any
+ * `point` trigger parameter, including one a game's own extension declared. An
+ * entry carrying an id is named by it, the way {@link at} names one.
  */
 function pointsIn(value: unknown, path = ""): FoundPoint[] {
   if (isPoint(value)) return [{ path, x: value.x, z: value.z }];
@@ -260,6 +267,9 @@ function checkPositions(
   issues: MissionIssue[],
 ): void {
   for (const point of pointsIn(mission)) {
+    // A zone is an area rather than a placement, and an ordinary edit puts one a
+    // little past the edge. See the note above.
+    if (point.path.startsWith("zones")) continue;
     // A prefab building's offset is measured from its prefab's origin and is
     // free to point north or west of it. Where it lands is checked below.
     if (point.path.endsWith(".offset")) continue;

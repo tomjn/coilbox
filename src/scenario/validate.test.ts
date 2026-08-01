@@ -310,8 +310,10 @@ describe("a coordinate that is not on the map", () => {
       ],
     });
 
+    // The zone is left out on purpose: it is an area rather than a placement,
+    // and the editor's own atLeastMinimum puts a small one drawn against the
+    // edge a few elmos past it.
     expect(validateMission(doc).map((i) => i.path)).toEqual([
-      'zones["gate"].min',
       'groups["wave1"].orders[0].waypoints[0]',
       'triggers["open"].actions[0].params.pos',
     ]);
