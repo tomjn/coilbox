@@ -151,14 +151,74 @@ pub fn install(src: &Path, dest: &Path) -> Result<Vec<String>, String> {
     Ok(written)
 }
 
+/// Unwrap Lua's `[string "name"]:` chunk markers.
+///
+/// A marker naming `chunk` becomes `line `, because the caller has already named
+/// that file. Any other becomes the bare name, so an error raised in an included
+/// sibling still says which file it came from.
+fn unwrap_chunk_names(line: &str, chunk: &str) -> String {
+    const OPEN: &str = "[string \"";
+    const CLOSE: &str = "\"]:";
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(start) = rest.find(OPEN) {
+        let (before, marker) = rest.split_at(start);
+        out.push_str(before);
+        let body = &marker[OPEN.len()..];
+        let Some(end) = body.find(CLOSE) else {
+            out.push_str(marker);
+            return out;
+        };
+        let name = &body[..end];
+        if name == chunk {
+            out.push_str("line ");
+        } else {
+            out.push_str(name);
+            out.push(':');
+        }
+        rest = &body[end + CLOSE.len()..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// A Lua error as a player should read it (issue #915).
+///
+/// The sandbox reports a bad file as `syntax error: [string
+/// "missions/runtime.lua"]:3: unexpected symbol near ','` followed by a stack
+/// traceback whose only frame is coilbox's own `VFS.Include` call. The file and
+/// the line are what a game author can act on, so the traceback is dropped and
+/// the chunk markers unwrapped. The raw error goes to stderr for whoever is
+/// working on the sandbox.
+fn tidy_lua_error(raw: &str, chunk: &str) -> String {
+    let head = raw.split("stack traceback:").next().unwrap_or(raw);
+    let first = head
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("");
+    let tidied = unwrap_chunk_names(first, chunk);
+    if tidied.is_empty() {
+        raw.trim().to_string()
+    } else {
+        tidied
+    }
+}
+
 /// Read one of the runtime's data files out of a game, through the gadget's own
 /// code path: a sandboxed Spring Lua VM rooted at the archive, and
 /// `VFS.Include`. Both files are data with no globals and no engine calls, so
 /// what comes back here is what the engine will read.
 fn read_data(root: &Path, rel: &str) -> Result<serde_json::Value, String> {
     let lua = SpringLua::new(root).map_err(|e| format!("could not start the Lua sandbox: {e}"))?;
-    lua.include_value(rel)
-        .map_err(|e| format!("could not read {rel}: {e}"))
+    lua.include_value(rel).map_err(|e| {
+        let raw = e.to_string();
+        eprintln!(
+            "coilbox-scenario: {} would not load: {raw}",
+            root.join(rel).display()
+        );
+        format!("could not read {rel}: {}", tidy_lua_error(&raw, rel))
+    })
 }
 
 /// Read a game's installed version marker. An error means no runtime is
@@ -303,6 +363,61 @@ mod tests {
 
         assert!(read_marker(game.path()).is_err());
         assert!(marker_present(game.path()));
+    }
+
+    /// What a player is shown for a broken marker: the line and what is wrong
+    /// with it, and none of the sandbox's own frames (issue #915).
+    #[test]
+    fn a_broken_marker_reads_as_a_line_and_a_reason() {
+        let game = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(game.path().join("missions")).expect("mkdir");
+        std::fs::write(game.path().join(MARKER), "return {\n  version = 1,\n  ,\n}")
+            .expect("write");
+
+        let message = read_marker(game.path()).expect_err("should not load");
+
+        assert!(!message.contains("stack traceback"), "{message}");
+        assert!(!message.contains("[string"), "{message}");
+        assert!(!message.contains("VFS.Include"), "{message}");
+        assert!(
+            message.starts_with("could not read missions/runtime.lua: "),
+            "{message}"
+        );
+        assert!(message.contains("line 3:"), "{message}");
+    }
+
+    #[test]
+    fn tidying_drops_the_traceback_and_names_the_line() {
+        let raw = "syntax error: [string \"missions/runtime.lua\"]:3: unexpected symbol near ','\nstack traceback:\n\t[C]: in function 'VFS.Include'";
+        assert_eq!(
+            tidy_lua_error(raw, "missions/runtime.lua"),
+            "syntax error: line 3: unexpected symbol near ','"
+        );
+    }
+
+    /// An error raised in a file the marker included keeps its own name, because
+    /// that is the file the author has to go and fix.
+    #[test]
+    fn tidying_keeps_the_name_of_another_file() {
+        let raw = "runtime error: [string \"missions/shared.lua\"]:7: attempt to index a nil value";
+        assert_eq!(
+            tidy_lua_error(raw, "missions/runtime.lua"),
+            "runtime error: missions/shared.lua:7: attempt to index a nil value"
+        );
+    }
+
+    /// An error with no chunk marker at all (a VFS read failure, say) is passed
+    /// through as it was written.
+    #[test]
+    fn tidying_leaves_a_plain_message_alone() {
+        assert_eq!(
+            tidy_lua_error(
+                "VFS.Include: missions/runtime.lua: No such file or directory",
+                "missions/runtime.lua"
+            ),
+            "VFS.Include: missions/runtime.lua: No such file or directory"
+        );
+        assert_eq!(tidy_lua_error("", "missions/runtime.lua"), "");
     }
 
     #[test]
