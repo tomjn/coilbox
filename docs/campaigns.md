@@ -29,7 +29,7 @@ A mission's skirmish setup is a **snapshot**: when you attach a preset to a miss
 Missions carry more than a still panorama:
 
 - **Briefing** — authored as **Markdown**. Embed media inline by relative path with the image syntax: `![](images/intro.jpg)` shows an image, and a source ending in an audio or video extension renders an `<audio>` / `<video>` player instead (`![](briefings/vo.mp3)`, `![](briefings/intro.mp4)`).
-- **Panorama** and **side graphic** — each can be a still image **or** a looping, muted video, in addition to the existing live-3D-map option.
+- **Panorama** and **side graphic**: each can be a still image, a looping muted video, the mission's map as a live 3D preview, or one of the mission's game's units as a spinning 3D model. Pick the source in the mission editor. If the player's install can't draw the chosen unit, the briefing shows that slot's image instead.
 - **Voiceover** (audio) and **cutscene** (video) — optional players shown on the briefing screen.
 
 How the files are stored depends on where the campaign comes from:
