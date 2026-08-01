@@ -212,7 +212,7 @@ local steps = {
 		note("at frame 2, enemy [" .. inventory(ENEMY) .. "]")
 
 		-- The limited start force, as a group rather than as startUnits, because
-		-- the editor has no way to write a scenario's `teams` block (issue #900).
+		-- the editor has no way to write a scenario's `teams` block (issue #899).
 		check("the mission placed the player's strike team, three A.K.s",
 			owns(PLAYER, "fedak") == 3, owns(PLAYER, "fedak"))
 		check("and its one Lifter", owns(PLAYER, "fedengineer") == 1,
@@ -251,7 +251,9 @@ local steps = {
 
 	-- The `deploy` trigger has no conditions, so it fires on the trigger
 	-- engine's first pass. That is how a scenario says "at the start", because
-	-- the format has no other hook for it (issue #901).
+	-- the format has no other hook for it (issue #901), and it is the only way
+	-- to get a patrol standing on the map asleep rather than either walking its
+	-- route from frame 0 or not being there at all (issue #900).
 	{ frame = 45, run = function()
 		note("after deploy, enemy [" .. inventory(ENEMY) .. "]")
 		check("deploy spawned the ridge patrol", owns(ENEMY, "lozflea") == 2,
