@@ -1,6 +1,7 @@
 import {
   decodeContainerText,
   encodeContainerJson,
+  type OpenError,
   type OpenResult,
   readContainer,
 } from "../container/container";
@@ -121,4 +122,18 @@ export function readScenarioExport(text: string): OpenResult<ScenarioExport> {
     "scenario",
     parseScenarioPayload,
   );
+}
+
+/** What an import failure says, for an inline error banner. */
+export function scenarioImportErrorMessage(error: OpenError): string {
+  switch (error) {
+    case "unknown-format":
+      return "That file isn't a coilbox scenario.";
+    case "unsupported-version":
+      return "That scenario was made by a newer version of coilbox. Update coilbox to open it.";
+    case "wrong-kind":
+      return "That's a coilbox file, but not a scenario.";
+    default:
+      return "That scenario file is damaged or incomplete.";
+  }
 }

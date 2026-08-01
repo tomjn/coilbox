@@ -42,6 +42,7 @@ These are hidden unless **Advanced mode** is on (Settings > General). They're mo
 | uberstress       | Run         | `#/uberstress`         |
 | uberstress       | History     | `#/uberstress/history` |
 | Campaign Builder | Builder     | `#/campaign-builder`   |
+| Scenario Builder | Builder     | `#/scenario-builder`   |
 | mapconv          | Projects    | `#/mapconv/projects`   |
 | mapconv          | Compile     | `#/mapconv`            |
 | mapconv          | Decompile   | `#/mapconv/decompile`  |
@@ -65,6 +66,7 @@ Reachable by clicking through the lists above; not sidebar items, but you can de
 | `#/campaign/:id`                    | A campaign's mission list      |
 | `#/campaign/:id/:missionId`         | A mission briefing/result      |
 | `#/campaign-builder/:id`            | Editing a campaign (advanced)  |
+| `#/scenario-builder/:id`            | Editing a scenario (advanced)  |
 
 ## Settings sections
 

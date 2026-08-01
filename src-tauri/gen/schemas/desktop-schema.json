@@ -2529,16 +2529,28 @@
           "markdownDescription": "Denies the runlite_state_save command without any pre-configured scope."
         },
         {
-          "description": "Allows the scenario plugin's storage, dialogue-media, compiled-mission read-back and write, mission-runtime install and test-mutator commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`\n- `allow-scenario-media-read`\n- `allow-scenario-media-write`\n- `allow-scenario-read-mission`\n- `allow-scenario-runtime-install`\n- `allow-scenario-runtime-status`\n- `allow-scenario-test-mutator`\n- `allow-scenario-write-mission`",
+          "description": "Allows the scenario plugin's storage, dialogue-media, file export and import, compiled-mission read-back and write, mission-runtime install and test-mutator commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`\n- `allow-scenario-media-read`\n- `allow-scenario-media-write`\n- `allow-scenario-export`\n- `allow-scenario-import`\n- `allow-scenario-read-mission`\n- `allow-scenario-runtime-install`\n- `allow-scenario-runtime-status`\n- `allow-scenario-test-mutator`\n- `allow-scenario-write-mission`",
           "type": "string",
           "const": "coilbox-scenario:default",
-          "markdownDescription": "Allows the scenario plugin's storage, dialogue-media, compiled-mission read-back and write, mission-runtime install and test-mutator commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`\n- `allow-scenario-media-read`\n- `allow-scenario-media-write`\n- `allow-scenario-read-mission`\n- `allow-scenario-runtime-install`\n- `allow-scenario-runtime-status`\n- `allow-scenario-test-mutator`\n- `allow-scenario-write-mission`"
+          "markdownDescription": "Allows the scenario plugin's storage, dialogue-media, file export and import, compiled-mission read-back and write, mission-runtime install and test-mutator commands.\n#### This default permission set includes:\n\n- `allow-scenario-list`\n- `allow-scenario-save`\n- `allow-scenario-delete`\n- `allow-scenario-media-import`\n- `allow-scenario-media-delete`\n- `allow-scenario-media-read`\n- `allow-scenario-media-write`\n- `allow-scenario-export`\n- `allow-scenario-import`\n- `allow-scenario-read-mission`\n- `allow-scenario-runtime-install`\n- `allow-scenario-runtime-status`\n- `allow-scenario-test-mutator`\n- `allow-scenario-write-mission`"
         },
         {
           "description": "Enables the scenario_delete command without any pre-configured scope.",
           "type": "string",
           "const": "coilbox-scenario:allow-scenario-delete",
           "markdownDescription": "Enables the scenario_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the scenario_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:allow-scenario-export",
+          "markdownDescription": "Enables the scenario_export command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the scenario_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:allow-scenario-import",
+          "markdownDescription": "Enables the scenario_import command without any pre-configured scope."
         },
         {
           "description": "Enables the scenario_list command without any pre-configured scope.",
@@ -2611,6 +2623,18 @@
           "type": "string",
           "const": "coilbox-scenario:deny-scenario-delete",
           "markdownDescription": "Denies the scenario_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scenario_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:deny-scenario-export",
+          "markdownDescription": "Denies the scenario_export command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scenario_import command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-scenario:deny-scenario-import",
+          "markdownDescription": "Denies the scenario_import command without any pre-configured scope."
         },
         {
           "description": "Denies the scenario_list command without any pre-configured scope.",

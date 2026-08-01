@@ -61,6 +61,23 @@ export const scenarioMediaWrite = defineCommand<
 >("coilbox-scenario", "scenario_media_write");
 
 /**
+ * Write an exported scenario's text to a path the user picked in the save
+ * dialog. Opaque: the container text comes from {@link exportScenario}.
+ */
+export const scenarioExport = defineCommand<
+  { text: string; dest: string },
+  Record<string, never>
+>("coilbox-scenario", "scenario_export");
+
+/**
+ * Read a scenario file the user picked, for {@link importScenario} to decode.
+ */
+export const scenarioImport = defineCommand<{ src: string }, { text: string }>(
+  "coilbox-scenario",
+  "scenario_import",
+);
+
+/**
  * Evaluate a compiled `mission.lua` at `path` (VFS-relative) inside the game
  * archive directory `root`, and return the table it built. The read half of the
  * compile step's validator, run through the same `VFS.Include` the mission
