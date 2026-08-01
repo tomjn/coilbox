@@ -1,15 +1,24 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, cn, Input } from "@picoframe/frame";
 import {
   Frame,
   Layers,
   Loader2,
   MapPin,
+  Maximize2,
+  Minimize2,
   MountainSnow,
   RotateCw,
   Trash2,
   Unplug,
 } from "lucide-react";
-import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link } from "react-router";
 import * as THREE from "three";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
@@ -122,6 +131,21 @@ export function ScenarioMapScene({
   const units = useScenarioUnits(handle, scenario, assets);
   const [modeId, setModeId] = useState(EDITOR_MODES[0].id);
   const [selected, setSelected] = useState<string | null>(null);
+  // A fixed panel is too small to author a 12km map on (#886). Expanding takes
+  // the whole window rather than opening a second view, so the scene, its
+  // camera and everything the modes hold carry straight over.
+  const [expanded, setExpanded] = useState(false);
+
+  // Escape is the way out of anything that has taken over the window, so it is
+  // the way out of this too.
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpanded(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded]);
 
   // Every mode is resolved on every render, in the order of a static list, so
   // each one may hold state of its own.
@@ -314,7 +338,7 @@ export function ScenarioMapScene({
 
   if (status === "no-map")
     return (
-      <Surface>
+      <Surface expanded={expanded}>
         <SurfaceMessage icon={<Layers className="size-6" />}>
           Pick a setup to choose the map this scenario is authored on.
         </SurfaceMessage>
@@ -323,7 +347,7 @@ export function ScenarioMapScene({
 
   if (status === "loading")
     return (
-      <Surface>
+      <Surface expanded={expanded}>
         <SurfaceMessage
           icon={<Loader2 className="size-6 animate-spin opacity-40" />}
         >
@@ -334,7 +358,7 @@ export function ScenarioMapScene({
 
   if (status === "no-engine")
     return (
-      <Surface>
+      <Surface expanded={expanded}>
         <SurfaceMessage icon={<Unplug className="size-6" />}>
           <p>
             Coilbox reads maps through an engine, and there is no engine
@@ -352,7 +376,7 @@ export function ScenarioMapScene({
 
   if (status === "error")
     return (
-      <Surface>
+      <Surface expanded={expanded}>
         <SurfaceMessage icon={<MountainSnow className="size-6" />}>
           <p>
             {mapName} could not be read. It is most likely not installed for the
@@ -372,7 +396,7 @@ export function ScenarioMapScene({
     );
 
   return (
-    <Surface>
+    <Surface expanded={expanded}>
       <MapPreview3D
         className="h-full w-full"
         framed={false}
@@ -390,7 +414,7 @@ export function ScenarioMapScene({
         onScene={onScene}
       />
 
-      <div className="absolute left-2 top-2 flex max-w-[calc(100%-9rem)] flex-col gap-1.5">
+      <div className="absolute left-2 top-2 flex max-w-[calc(100%-16rem)] flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <ToggleGroup
             type="single"
@@ -543,16 +567,35 @@ export function ScenarioMapScene({
         )}
       </div>
 
-      <Button
-        size="sm"
-        variant="outline"
-        className="absolute right-2 top-2 gap-1.5 bg-card/80 backdrop-blur"
-        onClick={() => {
-          if (sceneRef.current) frameMap(sceneRef.current);
-        }}
-      >
-        <Frame className="size-3.5" /> Frame map
-      </Button>
+      <div className="absolute right-2 top-2 flex items-center gap-1.5">
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5 bg-card/80 backdrop-blur"
+          onClick={() => {
+            if (sceneRef.current) frameMap(sceneRef.current);
+          }}
+        >
+          <Frame className="size-3.5" /> Frame map
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5 bg-card/80 backdrop-blur"
+          onClick={() => setExpanded((on) => !on)}
+          title={expanded ? "Back to the page (Esc)" : "Fill the window"}
+        >
+          {expanded ? (
+            <>
+              <Minimize2 className="size-3.5" /> Collapse
+            </>
+          ) : (
+            <>
+              <Maximize2 className="size-3.5" /> Expand
+            </>
+          )}
+        </Button>
+      </div>
       <UnitsNote
         units={units}
         gameName={scenario.setup.gameName}
@@ -776,11 +819,31 @@ function UnitsNote({
   );
 }
 
-/** The fixed working area the scene and its stand-ins share, so the page does
- * not jump as the map resolves. */
-function Surface({ children }: { children: ReactNode }) {
+/**
+ * The working area the scene and its stand-ins share, so the page does not jump
+ * as the map resolves.
+ *
+ * Expanded it is the whole window. Not a dialog and not a second scene: the same
+ * element grows, so the canvas resizes in place, the camera keeps the view it
+ * had, and the mode strip, the selection bar and the click bar come along
+ * because they were always children of this.
+ */
+function Surface({
+  expanded,
+  children,
+}: {
+  expanded: boolean;
+  children: ReactNode;
+}) {
   return (
-    <section className="relative h-[30rem] overflow-hidden rounded-lg border border-border/50 bg-gradient-to-b from-muted/20 to-muted/40">
+    <section
+      className={cn(
+        "overflow-hidden bg-gradient-to-b from-muted/20 to-muted/40",
+        expanded
+          ? "fixed inset-0 z-50 border-0"
+          : "relative h-[30rem] rounded-lg border border-border/50",
+      )}
+    >
       {children}
     </section>
   );
