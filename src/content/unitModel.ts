@@ -62,8 +62,15 @@ function modelTexture(file: string, data = false): THREE.Texture {
  * `.3do` derives its face normals with the opposite sign to the usual
  * convention, and shipped models of both formats are inconsistent about
  * winding, so a single-sided view of a real unit has holes in it.
+ *
+ * `teamColour` is what the regions the engine would paint in the owning
+ * player's colour are painted in. It defaults to the lone-model viewer's stand-in
+ * blue; a view that knows whose unit this is passes that team's colour.
  */
-export function buildModel(model: UnitModelResult): BuiltModel {
+export function buildModel(
+  model: UnitModelResult,
+  teamColour: THREE.ColorRepresentation = TEAM_COLOUR,
+): BuiltModel {
   const geometries: THREE.BufferGeometry[] = [];
   const materials = new Map<string, THREE.MeshStandardMaterial>();
 
@@ -77,13 +84,17 @@ export function buildModel(model: UnitModelResult): BuiltModel {
     const file = texture?.file;
     const material = new THREE.MeshStandardMaterial({
       map: file ? modelTexture(file) : null,
-      color: file ? 0xffffff : texture?.teamColour ? TEAM_COLOUR : UNTEXTURED,
+      color: file ? 0xffffff : texture?.teamColour ? teamColour : UNTEXTURED,
       roughness: 0.75,
       metalness: 0.05,
       side: THREE.DoubleSide,
     });
     if (file && model.teamMask?.file) {
-      paintTeamColour(material, modelTexture(model.teamMask.file, true));
+      paintTeamColour(
+        material,
+        modelTexture(model.teamMask.file, true),
+        teamColour,
+      );
     }
     materials.set(key, material);
     return material;
