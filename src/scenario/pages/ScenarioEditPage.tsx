@@ -14,6 +14,7 @@ import {
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { saveScenario } from "../storage";
+import { DialoguePanel } from "./components/DialoguePanel";
 import { ObjectivePanel } from "./components/ObjectivePanel";
 import { RestrictionPanel } from "./components/RestrictionPanel";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
@@ -193,6 +194,10 @@ export default function ScenarioEditPage() {
         onPick={setPick}
       />
       <ObjectivePanel
+        scenario={scenario}
+        onChange={(next) => void persist(next)}
+      />
+      <DialoguePanel
         scenario={scenario}
         onChange={(next) => void persist(next)}
       />
