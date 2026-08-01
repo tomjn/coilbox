@@ -1309,7 +1309,11 @@ mod tests {
             Duration::from_secs(10),
         )
         .expect("demotool should finish");
-        assert!(out.len() > 200_000, "expected a big dump, got {}", out.len());
+        assert!(
+            out.len() > 200_000,
+            "expected a big dump, got {}",
+            out.len()
+        );
         assert_eq!(parse_winners(&out), Some(vec![1]));
     }
 
