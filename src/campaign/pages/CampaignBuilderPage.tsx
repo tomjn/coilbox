@@ -1,6 +1,14 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, Input, useDrawer } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import {
+  Download,
+  Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -51,46 +59,42 @@ function requirementsForCampaign(campaign: Campaign) {
 export default function CampaignBuilderPage() {
   const { campaigns, loading, error, refresh } = useCampaigns();
   const navigate = useNavigate();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const drawer = useDrawer();
   const [busy, setBusy] = useState(false);
+  const [rescanning, setRescanning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const openNew = (initialTitle?: string) =>
+    drawer.open({
+      title: "New campaign",
+      width: "28rem",
+      content: (
+        <NewCampaignForm
+          initialTitle={initialTitle}
+          onCreated={(id) => {
+            drawer.close();
+            navigate(`/campaign-builder/${id}`, { state: { presetGame } });
+          }}
+        />
+      ),
+    });
 
   // Game detail's "New campaign" action (issue #372) lands here with the game
   // preselected in the query string. There's no campaign-level game field (a
   // campaign's game is set per-mission from a preset), so this only seeds the
   // title and is carried forward to prefill the first "Add mission" picker.
   const presetGame = useGamePresetParam();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the preset arrives, not on every drawer identity change
   useEffect(() => {
-    if (presetGame) setTitle((t) => t || `${presetGame} Campaign`);
+    if (presetGame) openNew(`${presetGame} Campaign`);
   }, [presetGame]);
 
-  const create = async () => {
-    const trimmed = title.trim();
-    if (!trimmed || busy) return;
-    setBusy(true);
-    setActionError(null);
+  const rescan = async () => {
+    setRescanning(true);
     try {
-      const now = new Date().toISOString();
-      const campaign: Campaign = {
-        schemaVersion: 1,
-        id: crypto.randomUUID(),
-        type: "ta",
-        title: trimmed,
-        description: description.trim(),
-        missions: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      await campaignSave({ id: campaign.id, json: JSON.stringify(campaign) });
-      await refreshCampaigns();
-      setTitle("");
-      setDescription("");
-      navigate(`/campaign-builder/${campaign.id}`, { state: { presetGame } });
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
+      await refresh();
     } finally {
-      setBusy(false);
+      setRescanning(false);
     }
   };
 
@@ -173,37 +177,27 @@ export default function CampaignBuilderPage() {
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Campaign Builder</h1>
-        <p className="text-sm text-muted-foreground">
-          Author a sequence of skirmish missions from your saved presets. Local
-          campaigns are editable; bundled campaigns are read-only.
-        </p>
-      </header>
-
-      {actionError && <ErrorBanner message={actionError} />}
-      {error && <ErrorBanner message={error} />}
-
-      <section className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-4">
-        <h2 className="text-sm font-medium">New campaign</h2>
-        <Input
-          value={title}
-          placeholder="Title"
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <Textarea
-          value={description}
-          placeholder="Description (optional)"
-          className="min-h-16"
-          onChange={(e) => setDescription(e.target.value)}
-        />
-        <div className="flex gap-2">
+      <header className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-lg font-semibold">Campaign Builder</h1>
+          <p className="text-sm text-muted-foreground">
+            Author a sequence of skirmish missions from your saved presets.
+            Local campaigns are editable; bundled campaigns are read-only.
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
           <Button
+            variant="outline"
             className="gap-1.5"
-            onClick={create}
-            disabled={!title.trim() || busy}
+            onClick={rescan}
+            disabled={rescanning}
           >
-            <Plus className="size-4" /> Create
+            {rescanning ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+            Rescan
           </Button>
           <Button
             variant="outline"
@@ -213,13 +207,19 @@ export default function CampaignBuilderPage() {
           >
             <Download className="size-4" /> Import
           </Button>
+          <Button className="gap-1.5" onClick={() => openNew()}>
+            <Plus className="size-4" /> New campaign
+          </Button>
         </div>
-      </section>
+      </header>
+
+      {actionError && <ErrorBanner message={actionError} />}
+      {error && <ErrorBanner message={error} />}
 
       {loading ? (
         <SkeletonList />
       ) : campaigns.length === 0 ? (
-        <EmptyState label="No campaigns yet. Create or import one above." />
+        <EmptyState label="No campaigns yet. Start one with New campaign, or import a shared one." />
       ) : (
         <ul className="flex flex-col gap-2">
           {campaigns.map(({ campaign, source }) => {
@@ -302,16 +302,6 @@ export default function CampaignBuilderPage() {
         </ul>
       )}
 
-      {!loading && (
-        <button
-          type="button"
-          onClick={refresh}
-          className="self-start text-xs text-muted-foreground hover:underline"
-        >
-          Refresh
-        </button>
-      )}
-
       {pendingCampaign && (
         <ResolveContentGate
           title="Set up this campaign"
@@ -323,6 +313,75 @@ export default function CampaignBuilderPage() {
           onCancel={() => setPendingCampaign(null)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * The new-campaign form, shown in the drawer behind the New campaign button.
+ * It saves the empty campaign itself, the same way the conquest hub's generate
+ * form does, so the page only has to open the editor on the id it hands back.
+ */
+function NewCampaignForm({
+  onCreated,
+  initialTitle,
+}: {
+  onCreated: (id: string) => void;
+  /** Seed from game detail's "New campaign" action (issue #372). */
+  initialTitle?: string;
+}) {
+  const [title, setTitle] = useState(initialTitle ?? "");
+  const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const create = async () => {
+    const trimmed = title.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const now = new Date().toISOString();
+      const campaign: Campaign = {
+        schemaVersion: 1,
+        id: crypto.randomUUID(),
+        type: "ta",
+        title: trimmed,
+        description: description.trim(),
+        missions: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      await campaignSave({ id: campaign.id, json: JSON.stringify(campaign) });
+      await refreshCampaigns();
+      onCreated(campaign.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Input
+        value={title}
+        placeholder="Title"
+        onChange={(e) => setTitle(e.target.value)}
+      />
+      <Textarea
+        value={description}
+        placeholder="Description (optional)"
+        className="min-h-16"
+        onChange={(e) => setDescription(e.target.value)}
+      />
+      {error && <ErrorBanner message={error} />}
+      <Button
+        className="gap-1.5"
+        onClick={create}
+        disabled={!title.trim() || busy}
+      >
+        <Plus className="size-4" /> {busy ? "Creating…" : "Create"}
+      </Button>
     </div>
   );
 }
