@@ -228,6 +228,12 @@ scripts/mission-sf-proof.sh
 
 The adoption proof, and it runs the other way round from the two above. Both of those play a runtime the harness itself laid down, which settles the runtime's behaviour and says nothing about adoption. This one plays the runtime out of a real game: the scratch mutator carries only a probe, and depends on a loose Splinter Faction that coilbox's own **Install the mission runtime** button wrote into. It copies `src/scenario/fixtures/missions/splinter/mission.lua` to `missions/splinter/mission.lua` in that game, which is where coilbox's launch path puts a compiled mission, and removes it again unless you pass `--keep-mission`.
 
+```sh
+scripts/mission-sf-jericho.sh
+```
+
+The same shape again, on the same game, asking the other half of the question. The adoption proof asks whether Splinter Faction can host the runtime. This plays **Silence the Jericho**, the first mission authored end to end in the Scenario Builder ([issue #773](https://github.com/tomjn/coilbox/issues/773)), and asks whether it is won: the dormant patrols spawn and wake, the trigger zones fire, the radio lines are said, and destroying the Jericho structure ends the mission with the player's ally team the winner. The mission is `src/scenario/fixtures/jericho.json` and its compiled Lua is in the corpus beside it. It needs the same setup as the proof below, plus `AcidicQuarry 5.17` in `maps/`, because a scenario's zones are map coordinates.
+
 #### Running the proof yourself
 
 The proof needs a game that has taken both halves of the contract, and neither half is in this repo. The runtime comes from coilbox's own install button. The three guards are Splinter Faction's change to make and are not upstream yet, so this repo keeps them as a patch, `scripts/sf-proof/splinterfaction-guards.patch`. That file is the exact text of all three, and it is what a maintainer would be sent.
