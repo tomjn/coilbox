@@ -7,11 +7,10 @@
  * on. So each of the three costs something, and this module is the arithmetic
  * that says what, and the rewrites that pay it.
  *
- * Arithmetic on plain values, so it can be tested without a browser. The drawer
- * that shows it is `ScenarioSetupDrawer.tsx`.
+ * Arithmetic on plain values, so it can be tested without a browser. The panel
+ * that shows it is `SetupPanel.tsx`.
  */
 
-import type { Participant } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
 import type {
   Point,
@@ -192,7 +191,10 @@ export function scaleScenarioToMap(
     ...scaled,
     zones: scaled.zones.map((zone) =>
       zone.shape === "circle"
-        ? { ...zone, radius: Math.max(1, Math.round(zone.radius * radiusFactor)) }
+        ? {
+            ...zone,
+            radius: Math.max(1, Math.round(zone.radius * radiusFactor)),
+          }
         : zone,
     ),
   };
@@ -226,10 +228,7 @@ export interface MapCost {
   offMap: number;
 }
 
-export function mapCost(
-  scenario: Scenario,
-  extent: MapExtent | null,
-): MapCost {
+export function mapCost(scenario: Scenario, extent: MapExtent | null): MapCost {
   const placed =
     scenario.zones.length +
     scenario.actors.length +
@@ -262,7 +261,10 @@ export function setScenarioMap(scenario: Scenario, mapName: string): Scenario {
  * Everything the document places stays, because a unit def a game does not have
  * is something the author has to see and decide about rather than lose.
  */
-export function setScenarioGame(scenario: Scenario, gameName: string): Scenario {
+export function setScenarioGame(
+  scenario: Scenario,
+  gameName: string,
+): Scenario {
   if (scenario.setup.gameName === gameName) return scenario;
   return {
     ...scenario,
@@ -425,9 +427,7 @@ export function removeScenarioParticipant(
         : scenario.prefabs.map((p) => (p.team === id ? { ...p, team: to } : p)),
   };
   if (to === null) return next;
-  return rewriteTriggerTeams(next, (named) =>
-    named === id ? to : undefined,
-  );
+  return rewriteTriggerTeams(next, (named) => (named === id ? to : undefined));
 }
 
 /**
@@ -482,13 +482,4 @@ export function applyPresetSetup(
     })),
   };
   return rewriteTriggerTeams(next, to);
-}
-
-/** The setup's participant list replaced, for every change that is not a
- *  removal: a colour, a faction, a team slot, an AI, one more opponent. */
-export function setScenarioParticipants(
-  scenario: Scenario,
-  participants: Participant[],
-): Scenario {
-  return { ...scenario, setup: { ...scenario.setup, participants } };
 }

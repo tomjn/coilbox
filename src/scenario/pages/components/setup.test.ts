@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { initialParticipants } from "../../../play/participants";
 import { newScenario } from "../../create";
 import type { Scenario } from "../../model";
-import { initialParticipants } from "../../../play/participants";
 import {
   applyPresetSetup,
   defsMissingFrom,
@@ -287,9 +287,7 @@ describe("what a participant holds", () => {
 
   it("says a fresh scenario's participants hold nothing", () => {
     const fresh = newScenario("fresh");
-    expect(
-      holdsNothing(participantHoldings(fresh, ids(fresh)[1])),
-    ).toBe(true);
+    expect(holdsNothing(participantHoldings(fresh, ids(fresh)[1]))).toBe(true);
   });
 });
 
