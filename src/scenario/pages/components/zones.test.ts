@@ -140,7 +140,13 @@ describe("zoneFromDrag", () => {
   });
 
   it("holds a tiny drag to the minimum size", () => {
-    const tiny = zoneFromDrag("box", { x: 100, z: 100 }, { x: 104, z: 102 }, "n", "Z");
+    const tiny = zoneFromDrag(
+      "box",
+      { x: 100, z: 100 },
+      { x: 104, z: 102 },
+      "n",
+      "Z",
+    );
     expect(tiny).toMatchObject({ shape: "box" });
     if (tiny.shape !== "box") throw new Error("expected a box");
     expect(tiny.max.x - tiny.min.x).toBe(MIN_ZONE_ELMOS);
@@ -148,7 +154,13 @@ describe("zoneFromDrag", () => {
     // Grown about the middle of the drag, so it appears where it was drawn.
     expect(zoneCenter(tiny)).toEqual({ x: 102, z: 101 });
 
-    const dot = zoneFromDrag("circle", { x: 500, z: 500 }, { x: 502, z: 500 }, "n", "Z");
+    const dot = zoneFromDrag(
+      "circle",
+      { x: 500, z: 500 },
+      { x: 502, z: 500 },
+      "n",
+      "Z",
+    );
     expect(dot).toMatchObject({ radius: MIN_ZONE_ELMOS });
   });
 });
@@ -254,7 +266,10 @@ describe("moveZone", () => {
   });
 
   it("resizes through a handle key", () => {
-    const next = moveZone(document(), zoneKey("z2", "radius"), { x: 200, z: 0 });
+    const next = moveZone(document(), zoneKey("z2", "radius"), {
+      x: 200,
+      z: 0,
+    });
     expect(next.zones[1]).toMatchObject({ radius: 500 });
   });
 
