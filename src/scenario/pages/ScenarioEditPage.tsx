@@ -27,6 +27,7 @@ import { RestrictionPanel } from "./components/RestrictionPanel";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
 import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
 import { SetupPanel } from "./components/SetupPanel";
+import { createScenarioSaver, type ScenarioSaver } from "./components/saving";
 import { TriggerPanel } from "./components/TriggerPanel";
 import {
   applyPoint,
@@ -82,20 +83,28 @@ export default function ScenarioEditPage() {
     }
   }, [stored, loadedId]);
 
-  /** Write a document to disk and show what was written. The whole editor's one
-   *  way out, including a step through the history: undoing is an edit like any
-   *  other, because there is no save button to defer it to. */
-  const persist = useCallback(async (next: Scenario) => {
+  // One queue for the whole editing session, so writes land in the order they
+  // were asked for and only the newest one is shown. See `saving.ts`.
+  const saver = useRef<ScenarioSaver>(undefined);
+  if (!saver.current) {
+    saver.current = createScenarioSaver({
+      write: saveScenario,
+      onWritten: async (written) => {
+        scenarioRef.current = written;
+        setScenario(written);
+        await refreshScenarios();
+      },
+      onError: (e) => setError(e instanceof Error ? e.message : String(e)),
+    });
+  }
+
+  /** Show a document and write it to disk. The whole editor's one way out,
+   *  including a step through the history: undoing is an edit like any other,
+   *  because there is no save button to defer it to. */
+  const persist = useCallback((next: Scenario) => {
     scenarioRef.current = next;
     setScenario(next);
-    try {
-      const written = await saveScenario(next);
-      scenarioRef.current = written;
-      setScenario(written);
-      await refreshScenarios();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
+    saver.current?.save(next);
   }, []);
 
   /** An edit the author made, which is the only kind that goes in the history.
@@ -108,7 +117,7 @@ export default function ScenarioEditPage() {
         historyRef.current = recorded;
         setHistory(recorded);
       }
-      void persist(next);
+      persist(next);
     },
     [persist],
   );
@@ -121,7 +130,7 @@ export default function ScenarioEditPage() {
       if (!taken) return;
       historyRef.current = taken.history;
       setHistory(taken.history);
-      void persist(taken.document);
+      persist(taken.document);
     },
     [persist],
   );
