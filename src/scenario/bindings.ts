@@ -127,6 +127,18 @@ export const scenarioTestMutator = defineCommand<
   }
 >("coilbox-scenario", "scenario_test_mutator");
 
+/**
+ * Write a compiled mission into the loose game at `root`, under
+ * `missions/<scenarioId>/`, with the scenario's dialogue clips beside it. The
+ * launch-time half of the adoption contract: a game that vendors the runtime
+ * plays a scenario out of its own archive. `dir` is the folder the files landed
+ * in. Fails on a packaged `.sd7`/`.sdz`, which gets the test mutator instead.
+ */
+export const scenarioWriteMission = defineCommand<
+  { root: string; scenarioId: string; mission: string },
+  { dir: string; media: string[] }
+>("coilbox-scenario", "scenario_write_mission");
+
 /** Best-effort removal of a stored dialogue clip. */
 export const scenarioMediaDelete = defineCommand<
   { scenarioId: string; file: string },

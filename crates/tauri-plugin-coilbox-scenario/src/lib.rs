@@ -349,6 +349,61 @@ async fn scenario_runtime_status<R: Runtime>(app: AppHandle<R>, root: String) ->
     CliResult::ok(json!({ "installed": installed, "available": available }))
 }
 
+/// Write a compiled mission into a game archive folder, with the scenario's
+/// dialogue clips beside it, and hand back the folder it landed in and the clips
+/// that were copied.
+///
+/// Shared by the two routes a scenario reaches the engine through: the game's
+/// own `missions/` when it has vendored the runtime, and the test mutator's when
+/// it has not. Both write the same tree, so the runtime finds the mission in the
+/// same place whichever route was taken.
+fn write_mission<R: Runtime>(
+    app: &AppHandle<R>,
+    dir: &Path,
+    scenario_id: &str,
+    mission: &str,
+) -> Result<(PathBuf, Vec<String>), String> {
+    let missions = mutator::mission_dir(dir, scenario_id);
+    mutator::write_file(&missions.join("mission.lua"), mission)?;
+    let media = media_dir(app)?.join(scenario_id);
+    let clips = mutator::copy_media(&media, &missions)?;
+    Ok((missions, clips))
+}
+
+/// `scenario_write_mission`, writing a compiled mission into the loose game at
+/// `root`, under `missions/<scenarioId>/`.
+///
+/// This is the launch-time half of the adoption contract: a game that vendors
+/// the runtime plays a scenario out of its own archive, and the start script
+/// names it with the `coilbox_mission` modoption. Only that one folder is
+/// written, so nothing the game ships is touched and deleting the folder undoes
+/// it.
+///
+/// Unlike the test mutator, the game's other missions are left alone. They are
+/// the game's own content, and a game may ship as many as it likes.
+#[tauri::command]
+async fn scenario_write_mission<R: Runtime>(
+    app: AppHandle<R>,
+    root: String,
+    scenario_id: String,
+    mission: String,
+) -> CliResult {
+    if !valid_id(&scenario_id) {
+        return CliResult::err(format!("invalid scenario id: {scenario_id}"));
+    }
+    let dir = match writable_game_dir(&root) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    match write_mission(&app, &dir, &scenario_id, &mission) {
+        Ok((missions, media)) => CliResult::ok(json!({
+            "dir": missions.to_string_lossy(),
+            "media": media,
+        })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `scenario_test_mutator`, generating the game a scenario is tested in.
 ///
 /// A game that has not vendored the runtime, and a packaged one that cannot be
@@ -396,16 +451,8 @@ async fn scenario_test_mutator<R: Runtime>(
     if let Err(e) = mutator::prune_missions(&dir, &scenario_id) {
         return CliResult::err(e);
     }
-    let missions = mutator::mission_dir(&dir, &scenario_id);
-    if let Err(e) = mutator::write_file(&missions.join("mission.lua"), &mission) {
-        return CliResult::err(e);
-    }
-    let media = match media_dir(&app) {
-        Ok(d) => d.join(&scenario_id),
-        Err(e) => return CliResult::err(e),
-    };
-    let clips = match mutator::copy_media(&media, &missions) {
-        Ok(c) => c,
+    let clips = match write_mission(&app, &dir, &scenario_id, &mission) {
+        Ok((_, clips)) => clips,
         Err(e) => return CliResult::err(e),
     };
     match runtime::read_marker(&dir) {
@@ -455,7 +502,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_read_mission,
             scenario_runtime_install,
             scenario_runtime_status,
-            scenario_test_mutator
+            scenario_test_mutator,
+            scenario_write_mission
         ])
         .build()
 }
