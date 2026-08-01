@@ -453,11 +453,22 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     return null;
   }
 
+  // Imported names are made unique the same way rawImport.ts and compounds.ts
+  // already make theirs: `uniquePieceName` normalises, so `luaScript.ts` can
+  // still assume a name is identifier-safe, and dedupes against siblings, so
+  // two pieces that normalise the same way do not collide into one Lua local.
+  // A hole punched by rejecting the piece, or losing the whole import by
+  // rejecting the document, would both be worse than silently renaming it,
+  // and match parseLegoProjectJson's own contract just above: this project is
+  // merely wrong, not unparsable.
   const pieces: LegoPiece[] = [];
+  const takenNames = new Set<string>();
   for (const raw of d.pieces) {
     const piece = parsePiece(raw);
     if (!piece) return null;
-    pieces.push(piece);
+    const name = uniquePieceName(piece.name, takenNames);
+    takenNames.add(name);
+    pieces.push(name === piece.name ? piece : { ...piece, name });
   }
   if (pieces.length === 0) return null;
 

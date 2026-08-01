@@ -386,15 +386,45 @@ describe("parseLegoProjectJson", () => {
   });
 
   it("loads a project that has problems, rather than refusing to open it", () => {
-    // Two pieces called the same thing. Refusing would leave no way to fix it.
-    const doc = project([
-      piece("root", null),
-      piece("a", "root", "turret"),
-      piece("b", "root", "turret"),
-    ]);
+    // `a` hangs off a parent that no longer exists. Refusing to open the
+    // project would leave no way to fix it.
+    const doc = project([piece("root", null), piece("a", "ghost")]);
     const parsed = parseLegoProjectJson(JSON.stringify(doc));
     expect(parsed).not.toBeNull();
     expect(projectProblems(parsed as LegoProject)).not.toEqual([]);
+  });
+
+  it("normalises an imported piece name, the same way the editor does", () => {
+    // `parsePiece` is the only write path that does not already go through
+    // `normalisePieceName`, since it is reachable from clipboard/JSON import
+    // rather than the editor UI. A name with punctuation would otherwise
+    // become an invalid Lua identifier the moment the document is a script.
+    const doc = project([
+      piece("root", null),
+      piece("a", "root", 'wheel"); os.execute("rm'),
+    ]);
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+    expect(parsed?.pieces[1].name).toBe(
+      normalisePieceName('wheel"); os.execute("rm'),
+    );
+    expect(projectProblems(parsed as LegoProject)).toEqual([]);
+  });
+
+  it("makes two imported pieces that normalise the same way unique", () => {
+    // Two different hostile names, "wheel!" and "wheel?", both collapse to
+    // "wheel" under normalisePieceName. Left alone that is two pieces sharing
+    // one Lua local, and the second declaration silently shadows the first,
+    // binding the wrong piece to any code that references it by name.
+    const doc = project([
+      piece("root", null),
+      piece("a", "root", "wheel!"),
+      piece("b", "root", "wheel?"),
+    ]);
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+    const names = parsed?.pieces.slice(1).map((p) => p.name);
+    expect(names).toEqual(["wheel", "wheel2"]);
+    expect(new Set(names).size).toBe(2);
+    expect(projectProblems(parsed as LegoProject)).toEqual([]);
   });
 
   it("fills in transforms a hand-edited file left out", () => {

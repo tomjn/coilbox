@@ -1,8 +1,33 @@
+import { spawnSync } from "node:child_process";
+
 import { describe, expect, it } from "vitest";
 
 import { declaredPieces, missingPieces } from "./luaPieces";
 import { buildLuaScript, unitScript } from "./luaScript";
-import { type LegoPiece, type LegoProject, newProject } from "./model";
+import {
+  type LegoPiece,
+  type LegoProject,
+  newProject,
+  parseLegoProjectJson,
+} from "./model";
+
+/**
+ * Whether luajit can compile `lua` without a syntax error. Uses `loadstring`
+ * rather than running the script, since a generated unit script calls engine
+ * globals (`piece`, `Spin`, ...) that only exist inside Recoil.
+ */
+function luaCompiles(lua: string): boolean {
+  const result = spawnSync(
+    "luajit",
+    [
+      "-e",
+      "local src = io.read('*a'); local f, err = loadstring(src); " +
+        "if not f then io.stderr:write(err); os.exit(1) end os.exit(0)",
+    ],
+    { input: lua },
+  );
+  return result.status === 0;
+}
 
 function project(
   pieces: Partial<LegoPiece>[],
@@ -114,6 +139,34 @@ describe("buildLuaScript", () => {
 
     expect(lua).toContain('piece("wheel\\"); os.execute(\\"rm")');
     expect(lua).not.toContain('piece("wheel"); os.execute("rm")');
+  });
+
+  it("parses under luajit once a hostile import has gone through parseLegoProjectJson", () => {
+    // Escaping the piece() argument is not enough on its own: the same name
+    // also becomes a Lua identifier on the left of `local <name> = ...`, and
+    // no string escape can fix that. The fix lives in parseLegoProjectJson
+    // (see model.test.ts), so this checks the two together, on the real
+    // parser rather than a hand-built project, and against luajit itself
+    // rather than asserting only on the generated string.
+    const doc = project(
+      [
+        { id: "w1", name: 'wheel"); os.execute("rm', role: "wheel" },
+        // "wheel!" and "wheel?" both normalise to "wheel": a collision that
+        // has to be resolved too, or the second declaration silently
+        // shadows the first and Spin() ends up spinning the wrong piece.
+        { id: "w2", name: "wheel!", role: "wheel" },
+        { id: "w3", name: "wheel?", role: "wheel" },
+      ],
+      [{ presetId: "wheels.roll", params: {} }],
+    );
+
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+    expect(parsed).not.toBeNull();
+
+    const lua = buildLuaScript(parsed as LegoProject);
+    const names = declaredPieces(lua);
+    expect(new Set(names).size).toBe(names.length);
+    expect(luaCompiles(lua)).toBe(true);
   });
 
   it("spins every wheel and stops every one", () => {
