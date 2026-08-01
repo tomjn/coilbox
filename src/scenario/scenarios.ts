@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { playableScenarios } from "./listing";
 import type { Scenario } from "./model";
 import { listScenarios } from "./storage";
 
@@ -74,6 +75,17 @@ export function useScenarios() {
   }, []);
 
   return { scenarios, loading, error, refresh };
+}
+
+/**
+ * Whether there is anything on the Scenarios page, which is what decides
+ * whether a player sees it in the nav at all. A stored draft with no game or
+ * map does not count, the same way it is not listed. Mirrors the Campaigns
+ * item, which appears once a campaign exists.
+ */
+export function useHasScenarios(): boolean {
+  const { scenarios, loading } = useScenarios();
+  return !loading && playableScenarios(scenarios).length > 0;
 }
 
 /**

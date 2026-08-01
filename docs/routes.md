@@ -12,6 +12,7 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | ------------- | ------------- | -------------------- | ------------------ | -------- |
 | Play          | Singleplayer  | `#/play/skirmish`    | `play.skirmish`    | no       |
 | Play          | Campaigns     | `#/campaign`         | `campaign.list`    | no¹      |
+| Play          | Scenarios     | `#/scenarios`        | `scenario.list`    | no¹      |
 | Play          | Replays       | `#/play/replays`     | `play.replays`     | no       |
 | Multiplayer   | Login         | `#/lobby`            | `multiplayer.lobby`| no²      |
 | Multiplayer   | Chat          | `#/chat`             | `multiplayer.chat` | no²      |
@@ -24,7 +25,7 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Downloads     | Maps          | `#/downloads/maps`   | `downloads.maps`   | no       |
 | Downloads     | Games         | `#/downloads/games`  | `downloads.games`  | **yes**  |
 
-¹ **Campaigns** only appears in the sidebar once at least one campaign exists (bundled or created locally). Until then the item is hidden automatically.
+¹ **Campaigns** only appears in the sidebar once at least one campaign exists (bundled or created locally), and **Scenarios** once at least one scenario names a game and a map. Until then the item is hidden automatically.
 
 ² **Multiplayer** items appear contextually, not via the profile: **Login** shows only while logged out; **Chat** and **Battles** appear after the first connect; **Battle Room** only while you're in a battle.
 
