@@ -22,6 +22,11 @@ const VENDORED: [&str; 3] = ["luarules", "luaui", "missions"];
 /// The version marker and capability table, relative to the game root.
 pub const MARKER: &str = "missions/runtime.lua";
 
+/// A game's own condition and action types, relative to the game root. The
+/// game's file, never coilbox's: it is the one thing under `missions/` that an
+/// install does not write and an update does not touch.
+pub const EXTENSIONS: &str = "missions/extensions.lua";
+
 /// Where the bundled runtime lives.
 ///
 /// `bundle.resources` is assembled by `tauri build`, and the in-bundle layout of
@@ -146,13 +151,26 @@ pub fn install(src: &Path, dest: &Path) -> Result<Vec<String>, String> {
     Ok(written)
 }
 
-/// Read a game's installed version marker, through the gadget's own code path: a
-/// sandboxed Spring Lua VM rooted at the archive, and `VFS.Include`. An error
-/// means no runtime is installed, or the one there is will not load.
-pub fn read_marker(root: &Path) -> Result<serde_json::Value, String> {
+/// Read one of the runtime's data files out of a game, through the gadget's own
+/// code path: a sandboxed Spring Lua VM rooted at the archive, and
+/// `VFS.Include`. Both files are data with no globals and no engine calls, so
+/// what comes back here is what the engine will read.
+fn read_data(root: &Path, rel: &str) -> Result<serde_json::Value, String> {
     let lua = SpringLua::new(root).map_err(|e| format!("could not start the Lua sandbox: {e}"))?;
-    lua.include_value(MARKER)
-        .map_err(|e| format!("could not read {MARKER}: {e}"))
+    lua.include_value(rel)
+        .map_err(|e| format!("could not read {rel}: {e}"))
+}
+
+/// Read a game's installed version marker. An error means no runtime is
+/// installed, or the one there is will not load.
+pub fn read_marker(root: &Path) -> Result<serde_json::Value, String> {
+    read_data(root, MARKER)
+}
+
+/// Read the condition and action types a game declares for itself. An error
+/// means the game declares none, which is nearly every game.
+pub fn read_extensions(root: &Path) -> Result<serde_json::Value, String> {
+    read_data(root, EXTENSIONS)
 }
 
 #[cfg(test)]
@@ -214,6 +232,47 @@ mod tests {
 
         assert_eq!(marker["version"], 1);
         assert_eq!(marker["conditions"], serde_json::json!(["unit_dead"]));
+    }
+
+    /// A game's own types come back as the declaration wrote them: lists stay
+    /// lists, so the order the game declared its parameters in is the order the
+    /// editor draws them.
+    #[test]
+    fn a_games_own_types_read_back_through_the_vfs() {
+        let game = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(game.path().join("missions")).expect("mkdir");
+        std::fs::write(
+            game.path().join("missions/extensions.lua"),
+            r#"return {
+                handler = "luarules/mission_extensions/demo.lua",
+                conditions = {
+                    {
+                        type = "demo_ready",
+                        label = "Ready",
+                        params = {
+                            { name = "team", kind = "teamId" },
+                            { name = "amount", kind = "number", optional = true },
+                        },
+                    },
+                },
+            }"#,
+        )
+        .expect("write");
+
+        let declared = read_extensions(game.path()).expect("extensions");
+
+        assert_eq!(declared["handler"], "luarules/mission_extensions/demo.lua");
+        assert_eq!(declared["conditions"][0]["type"], "demo_ready");
+        assert_eq!(declared["conditions"][0]["params"][0]["name"], "team");
+        assert_eq!(declared["conditions"][0]["params"][1]["optional"], true);
+    }
+
+    #[test]
+    fn a_game_that_declares_no_types_of_its_own_has_no_declaration() {
+        let src = source_tree();
+        let game = tempfile::tempdir().expect("tempdir");
+        install(src.path(), game.path()).expect("install");
+        assert!(read_extensions(game.path()).is_err());
     }
 
     #[test]
