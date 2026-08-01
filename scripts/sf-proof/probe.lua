@@ -138,6 +138,10 @@ local ACTIVE, COMPLETE = 0, 1
 -- Spring.CreateUnit. So the frames below straddle both deadlines: frame 2 is
 -- inside the window the runtime documents its suppression over, and 1000 and
 -- 1900 are after each of the game's.
+--
+-- Both phases are also read here, through the game's own "phase" rules param,
+-- which is what its faction picker and its spot picker draw off. A mission owns
+-- the faction and the start position, so the game skips both (issue #888).
 --------------------------------------------------------------------------------
 
 local VICTORY_FRAME = 90 * 30 -- the mission's time_elapsed trigger, in frames
@@ -165,6 +169,17 @@ local steps = {
 			state and state.suppressesStart and state.suppressesStart(PLAYER) == true)
 		check("and the enemy's", state and state.suppressesStart
 			and state.suppressesStart(ENEMY) == true)
+		check("and that it owns every start in the game",
+			state and state.suppressesEveryStart and state.suppressesEveryStart() == true)
+
+		-- The game's own phase machine, read through the param its pickers draw
+		-- off. Skipped outright rather than run behind the mission (issue #888).
+		note("at frame 2, the game's phase is " .. tostring(rules("phase"))
+			.. " and it loaded " .. tostring(rules("spotCount")) .. " start spots")
+		check("the game skipped its faction phase", rules("phase") == "done",
+			rules("phase"))
+		check("and never loaded the spots its placement phase would pick from",
+			rules("spotCount") == nil, rules("spotCount"))
 
 		note("at frame 2, " .. armies())
 		check("inside the suppression window the player owns only what the scenario placed",
@@ -194,11 +209,15 @@ local steps = {
 	-- After SplinterFaction's faction-choice deadline.
 	{ frame = 1000, run = function()
 		note("at frame 1000, past the game's 900-frame faction deadline, " .. armies())
+		check("the faction deadline came and went without a phase to advance",
+			rules("phase") == "done", rules("phase"))
 	end },
 
 	-- After its placement deadline, which is the frame it creates start units on.
 	{ frame = 1900, run = function()
 		note("at frame 1900, past the game's placement deadline, " .. armies())
+		check("and the placement deadline the same way",
+			rules("phase") == "done", rules("phase"))
 		check("the game's own start is still suppressed for the player",
 			unplaced(PLAYER, "fedengineer") == 0, unplaced(PLAYER, "fedengineer"))
 		check("and for the enemy",

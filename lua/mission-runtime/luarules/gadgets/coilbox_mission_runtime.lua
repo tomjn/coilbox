@@ -252,6 +252,25 @@ local function publish()
 		suppressesStart = function(teamID)
 			return noCommander[teamID] == true
 		end,
+		--- The same question asked about the game rather than about one team.
+		--
+		-- A game whose start is a sequence rather than a call asks this one. A
+		-- faction choice and a start position picker decide nothing a mission has
+		-- already decided, so a game skips the whole sequence when this is true
+		-- and runs it when some team still needs a start out of it (issue #888).
+		--
+		-- Read against the engine's team list rather than the scenario's, because
+		-- a team the mission says nothing about still wants the start the game
+		-- would have given it, and the sequence is what decides that start.
+		suppressesEveryStart = function()
+			local gaia = Spring.GetGaiaTeamID()
+			for _, teamID in ipairs(Spring.GetTeamList() or {}) do
+				if teamID ~= gaia and not noCommander[teamID] then
+					return false
+				end
+			end
+			return true
+		end,
 		-- Actor records by id, and the unit each one currently is. An actor
 		-- with no entry in `units` is one that has died or never spawned.
 		actors = actors,

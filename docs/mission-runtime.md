@@ -10,6 +10,7 @@ For authoring, see [Scenarios](scenarios.md).
 
 - **Three folders of Lua**, all of it named `coilbox_*` so you can see at a glance what came from here.
 - **One guard** in whatever your game calls `Spring.GameOver()` from.
+- **One guard** in whatever your game starts a team with. Two, if starting a team is a sequence of pre-game phases rather than a call.
 - **Nothing in a normal game.** Without the `coilbox_mission` modoption the gadget's chunk returns `false` before it defines a callin or reads a file, so the gadget handler drops it. The cost of the runtime in an ordinary match is reading one file at load.
 - **One unit per human-played team in a mission.** The runtime places an invisible anchor so the engine cannot end the mission early. It shows in that team's unit count and nowhere else ([issue #820](https://github.com/tomjn/coilbox/issues/820)).
 
@@ -79,7 +80,53 @@ Without it a mission ends when your game says so. In the proof the player wiped 
 
 The engine also ends a game itself when an ally team has nothing left, and that is not something you can guard. The runtime handles it with the anchor unit instead, and that half holds whether or not you have added your guard, because being demoted to spectator mid-mission is the damage even when nobody declares a winner.
 
-### 3. Game extensions are designed but not built
+### 3. Do not start a team the mission has already started
+
+A scenario says which of its teams it places the opening units for. Ask before your own start gadget spawns, and spawn nothing when the answer is true:
+
+```lua
+if not (GG.CoilboxMission and GG.CoilboxMission.suppressesStart(teamID)) then
+    SpawnStartUnit(teamID)
+end
+```
+
+Called where you would spawn, once per team. The answer is the scenario's, so it holds for the whole mission rather than for a window, and you get the same answer whatever frame you ask on.
+
+The runtime cannot do this for you. The engine offers no veto on `Spring.CreateUnit`: `AllowUnitCreation` is consulted for builders and factories only, never for the call a start gadget makes. So all the runtime can do by itself is destroy what your game just made, and destroying a real commander is worse than never spawning one. Splinter Faction's `LuaRules/Gadgets/game_team_com_ends.lua` line 66 answers an ally team's last commander dying with `Spring.KillTeam(teamID)`, which takes the player's own units and their seat in the game with it ([issue #884](https://github.com/tomjn/coilbox/issues/884)).
+
+It removes an unasked-for start anyway, from load until the end of game frame 1, so a game that has not added the guard and spawns at frame 0 still works. Treat that as a fallback and nothing more. It is ahead of the commander bookkeeping only because it is that early, and no frame number is reliably ahead of a rule the runtime cannot see.
+
+#### If your start is a sequence of phases
+
+A game that picks a faction, or asks the player where to land, before it spawns has a second guard to add. A mission chose both before the game loaded, so those phases have nothing left to ask, and running them anyway leaves a picker sitting over the first minute of a mission that is already playing ([issue #888](https://github.com/tomjn/coilbox/issues/888)).
+
+Skip the sequence outright:
+
+```lua
+if GG.CoilboxMission and GG.CoilboxMission.suppressesEveryStart() then
+    -- go straight to whatever "the pre-game is over" is in your game
+end
+```
+
+`suppressesEveryStart()` is the same question asked about the game rather than about one team: true when the mission owns the start of every non-Gaia team in it. A pre-game phase is global, so it is the whole game that decides whether one is worth running. A game with a team the mission says nothing about gets `false`, because that team still has a start to decide.
+
+This is yours to skip rather than the runtime's to stop. A phase machine is your gadget's own state and your own rules params, and the runtime can reach neither. What it can do is answer the question, and `GG.CoilboxMission` is on the table from the moment the runtime initialises, which is before any gadget's `GameStart`.
+
+On Splinter Faction the sequence is a faction-choice phase with a 900-frame deadline and then a start-spot placement phase with another, so its start units land on frame 1800. `LuaRules/Gadgets/game_spawn.lua` takes both guards: the spawn one at the top of `SpawnStartUnit`, and the phase one at the top of `gadget:GameStart`, after the teams are collected and before it loads the map's start spots.
+
+```lua
+if GG.CoilboxMission and GG.CoilboxMission.suppressesEveryStart() then
+    phase = "done"
+    Spring.SetGameRulesParam("phase", "done")
+    return
+end
+```
+
+`phase` is that game's own rules param, and both its pickers read it: each removes itself as soon as the phase is not its own. Writing `done` is also how the rest of the game learns the match is running, so its research ledger and its survival AI start at frame 0 instead of at 1800.
+
+`scripts/mission-sf-proof.sh` reads that param back out. With both guards the phase is `done` at frame 2 and the game never loaded a start spot. Without the second one it reads `faction` at frame 2 and `placement` at frame 1000.
+
+## Game extensions are designed but not built
 
 The design is that a game ships `missions/extensions.lua` declaring extra condition and action types with display metadata, the runtime dispatches unknown types to the game's handler, and the editor reads the same file and adds them to its palette. That is how a game's own systems become editable without coilbox knowing what they are.
 
@@ -107,9 +154,9 @@ Enough to be worth knowing before you adopt it:
 
 - **The start.** Every actor, prefab building, per-team start unit and non-dormant group is created at game start. A building is put through `Spring.Pos2BuildPos` on the way, so it sits on the build grid and can be rebuilt where it stood.
 - **Starting resources, for every mission team.** At game frame 1 each team the scenario declares has its bank set to the scenario's number, defaulting to nothing. That is how the game's usual opening bank is suppressed. Free income, if the scenario asks for it, is paid every frame.
-- **Commanders, only where asked.** A team whose scenario entry sets `noCommander` has whatever the game spawned for it removed, from load until the end of game frame 1, and only creations with no builder are touched. Teams without the flag keep the commander your game gave them. Suppression removes rather than prevents, because the engine offers no veto: `AllowUnitCreation` is consulted for builders and factories only, never for `Spring.CreateUnit`, which is what a start gadget uses.
+- **Commanders, only where asked.** A team whose scenario entry sets `noCommander` is a team the runtime starts and your game does not, which is [contract item 3](#3-do-not-start-a-team-the-mission-has-already-started). Teams without the flag keep the commander your game gave them.
 
-  **This does not work if your game spawns late.** The window closes at game frame 1, so a game that picks a faction or a start position before it spawns misses it entirely. Splinter Faction spawns on frame 1800, and its commanders arrive despite `noCommander`: [issue #884](https://github.com/tomjn/coilbox/issues/884).
+  Add the guard and nothing else happens. Skip it and the runtime falls back to removing what your game spawned, from load until the end of game frame 1, touching only creations with no builder. That window is no use to a game that spawns later than frame 1: Splinter Faction spawns on frame 1800, and its commanders arrived despite `noCommander` until it took the guard ([issue #884](https://github.com/tomjn/coilbox/issues/884)).
 - **Game over**, through your guard and the anchor unit.
 - **`AllowUnitCreation` and `AllowCommand`, only when a mission restricts something.** Both callins are hot, and a mission that restricts nothing defines neither.
 
@@ -181,7 +228,9 @@ scripts/mission-sf-proof.sh
 
 The adoption proof, and it runs the other way round from the two above. Both of those play a runtime the harness itself laid down, which settles the runtime's behaviour and says nothing about adoption. This one plays the runtime out of a real game: the scratch mutator carries only a probe, and depends on a loose Splinter Faction that coilbox's own **Install the mission runtime** button wrote into. It copies `src/scenario/fixtures/missions/splinter/mission.lua` to `missions/splinter/mission.lua` in that game, which is where coilbox's launch path puts a compiled mission, and removes it again unless you pass `--keep-mission`.
 
-**The adoption proof has found what a second game costs.** Every general claim held on a game the runtime had never seen: the gadget loaded out of the game's own `LuaRules`, read its own version marker, published the mission, placed the scenario's units, overrode the game's opening bank, kept the game's `game_end` out of the ending once the guard was in, and ended the mission itself with the right winner. The one thing that did not hold was start suppression, because Splinter Faction spawns 1800 frames after the runtime stops watching ([issue #884](https://github.com/tomjn/coilbox/issues/884)). That is the failure the proof exists to find, and no amount of running against Balanced Annihilation would have found it.
+**The adoption proof has found what a second game costs.** Every general claim held on a game the runtime had never seen: the gadget loaded out of the game's own `LuaRules`, read its own version marker, published the mission, placed the scenario's units, overrode the game's opening bank, kept the game's `game_end` out of the ending once the guard was in, and ended the mission itself with the right winner.
+
+What did not hold was the start, twice over, and both are why contract item 3 exists. Splinter Faction spawns 1800 frames after the runtime stops watching, so its commanders arrived despite `noCommander` ([issue #884](https://github.com/tomjn/coilbox/issues/884)). Then, once it was spawning nothing, its faction picker and its spot picker still ran to frame 1800 over a mission that was already playing ([issue #888](https://github.com/tomjn/coilbox/issues/888)). Neither is fixable from inside the runtime, and no amount of running against Balanced Annihilation would have found either.
 
 **The headless run has found bugs the stub could not.** `gift_units` moved nothing between teams that were not allied, and the runtime never noticed, because it asked for a share and threw the refusal away. The stub agreed with everything, so all fifteen suites passed on it. The fix was to ask for a capture instead, and to report a refusal ([issue #857](https://github.com/tomjn/coilbox/issues/857)). This is the whole argument for keeping the headless harness: a stub can only ever agree with the reading of the engine's source that was written into it.
 

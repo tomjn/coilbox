@@ -487,6 +487,10 @@ function M.newEngine(modOptions, files, options)
 				-- with one participant a side has.
 				return options.allyTeamList or { 0, 1 }
 			end,
+			GetTeamList = function()
+				-- Two teams unless a test says otherwise, matching the two sides.
+				return options.teamList or { 0, 1 }
+			end,
 			-- Nothing, the way the engine answers when the game has no Gaia team.
 			GetGaiaTeamID = function()
 				return options.gaiaTeam
