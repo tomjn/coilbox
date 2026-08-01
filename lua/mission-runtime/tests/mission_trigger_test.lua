@@ -117,7 +117,8 @@ check("after which the fog comes back", state.reveal.spotterCount(0) == 0,
 -- The mission gifts a dormant group it never spawned. Nothing to hand over, and
 -- an author who forgot the spawn_group is told so rather than left wondering.
 check("gifting a group that was never spawned says so",
-	logged(engine, "group reinforcements has no units on the map to gift"))
+	logged(engine, "group reinforcements has no units on the map to gift"),
+	table.concat(engine.logs, " / "))
 
 --------------------------------------------------------------------------------
 -- Ambush: an actor's health and its death.
