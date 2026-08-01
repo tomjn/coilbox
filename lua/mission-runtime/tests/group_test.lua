@@ -146,12 +146,23 @@ local MISSION = compiled({
 	},
 })
 
-local engine = load({ coilbox_mission = "demo" }, missionFiles(MISSION), {
+local engine
+
+-- Balanced Annihilation's own `AllowUnitTransfer`, which is what the runtime met
+-- in a real engine: a share between teams that are not allied is refused, and a
+-- capture is not. Every team here is an ally team of its own, so the gift the
+-- mission makes at four seconds crosses ally lines.
+local function noShareToEnemy(unitID, newTeam, given)
+	return not given or engine.units[unitID].team == newTeam
+end
+
+engine = load({ coilbox_mission = "demo" }, missionFiles(MISSION), {
 	buildings = { armlab = true, armsolar = true },
 	-- Named up front, because a prefab factory's queue is read before anything
 	-- has spawned one of what it names. The real engine has every def loaded
 	-- before a gadget runs.
 	defs = { armpw = true, armrock = true, corcom = true, armlab = true, armsolar = true },
+	allowTransfer = noShareToEnemy,
 })
 engine.env:Initialize()
 engine.env:GameStart()
@@ -253,7 +264,30 @@ check("give_orders is one command per waypoint, replacing the queue",
 playTo(135)
 check("gift_units moves every unit in the group to the other team",
 	engine.units[wave[1]].team == 0 and engine.units[wave[2]].team == 0)
+check("across ally lines, which is what a game refuses a share between",
+	not logged(engine, "refused to hand"))
 check("and the group still holds them", #state.groups.units("wave") == 2)
+
+-- A game may refuse a capture too, and then there is nothing the runtime can do
+-- but say so. Silence here is the whole of what an author would see.
+local refusing = load({ coilbox_mission = "demo" }, missionFiles(MISSION), {
+	buildings = { armlab = true, armsolar = true },
+	defs = { armpw = true, armrock = true, corcom = true, armlab = true, armsolar = true },
+	allowTransfer = function()
+		return false
+	end,
+})
+refusing.env:Initialize()
+refusing.env:GameStart()
+for tick = 1, 135 do
+	refusing.env:GameFrame(tick)
+end
+local refused = refusing.GG.CoilboxMission.groups.units("wave")
+check("a game that refuses the transfer leaves the units where they were",
+	refusing.units[refused[1]].team == 1 and refusing.units[refused[2]].team == 1,
+	tostring(refusing.units[refused[1]].team))
+check("and the refusal is reported rather than swallowed",
+	logged(refusing, "the game refused to hand 2 of group wave's 2 units to team player"))
 
 --------------------------------------------------------------------------------
 -- An attack on a group is one command per unit in it, which is what

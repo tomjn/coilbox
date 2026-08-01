@@ -232,13 +232,19 @@ plans.garrison = {
 				tostring(seen.los) .. "/" .. tostring(seen.radar))
 			check("the spotter is not counted as a unit its team owns",
 				state().reveal.spotterCount(0, Spring.GetUnitDefID(spotter)) == 1)
-			-- The trigger's other action is a gift_units, and it moves nothing
-			-- here: this game refuses a share between enemies, and the runtime
-			-- throws the refusal away. See #857. What is checked is the runtime's
-			-- own bookkeeping, which is right either way.
-			check("gifting a group leaves it holding its units",
-				#state().groups.units("reinforcements") == 2,
-				#state().groups.units("reinforcements"))
+			-- The trigger's other action is a gift_units, from the player's team to
+			-- the garrison's, and the two are not allied. This game refuses a share
+			-- between enemies, so whether the units moved is a claim only a real
+			-- engine settles.
+			local gifted = state().groups.units("reinforcements")
+			check("gifting a group leaves it holding its units", #gifted == 2, #gifted)
+			local moved = 0
+			for _, unitID in ipairs(gifted) do
+				if Spring.GetUnitTeam(unitID) == 1 then
+					moved = moved + 1
+				end
+			end
+			check("and gift_units moved every one of them across ally lines", moved == 2, moved)
 		end },
 		{ frame = 1250, run = function()
 			check("the reveal runs out and the spotter comes off the map",

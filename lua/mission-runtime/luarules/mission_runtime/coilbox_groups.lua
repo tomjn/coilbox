@@ -291,9 +291,17 @@ function M.register(engine, state, hooks)
 
 	--- Hand a group's units to another participant. This is `gift_units`.
 	--
-	-- Given rather than captured, so the engine tells everyone what it was: a
-	-- mission handing the player a squad is a gift, and the units keep their
-	-- group so the mission can go on ordering them.
+	-- Captured rather than given, because a give is the form a game refuses. The
+	-- engine passes that flag straight to `AllowUnitTransfer`, and the usual
+	-- anti-grief gadget says no to a share between teams that are not allied,
+	-- which is most of what a mission gifts for. Everything else about the two is
+	-- the same: `UnitGiven` fires either way, the queue is cleared either way, and
+	-- what is left over is a stats counter.
+	--
+	-- The group keeps its units, so the mission can go on ordering a squad it gave
+	-- the player. A game that refuses the move outright is reported, because an
+	-- action that says it worked and did nothing is not something an author can
+	-- see.
 	function handle.gift(id, team)
 		local group = groupOfName(id)
 		if not group then
@@ -310,8 +318,17 @@ function M.register(engine, state, hooks)
 			return
 		end
 
+		local refused = 0
 		for _, unitID in ipairs(members[group.id]) do
-			Spring.TransferUnit(unitID, newTeam, true)
+			if not Spring.TransferUnit(unitID, newTeam, false) then
+				refused = refused + 1
+			end
+		end
+		if refused > 0 then
+			engine:report("group-gift-refused:" .. tostring(group.id) .. ":" .. tostring(team),
+				"warning", string.format(
+					"the game refused to hand %d of group %s's %d units to team %s",
+					refused, tostring(group.id), #members[group.id], tostring(team)))
 		end
 	end
 

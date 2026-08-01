@@ -88,7 +88,7 @@ Evaluation splits two ways:
 A trigger fires when its condition group holds. The group is flat, one `op` over one list, with no nesting. An empty list holds under `all` and does not under `any`. Firing settles the trigger's own state first and runs its actions second, so an action has the last word: a fire-once trigger that re-enables itself stays armed.
 
 - `repeat = false` disarms the trigger when it fires. `enable_trigger` re-arms it.
-- `repeat = true` leaves it armed, so it fires on every pass its conditions hold. `cooldown`, in seconds, is how a mission slows that down. The compiled format does not carry `cooldown` yet ([#795](https://github.com/tomjn/coilbox/issues/795)). The runtime reads it so that adding it is an editor change only.
+- `repeat = true` leaves it armed, so it fires on every pass its conditions hold. `cooldown`, in seconds, is how a mission slows that down.
 - Nothing is raised while the start window is open, so a mission's own placed units are not counted as units its team built.
 - A condition type nothing has registered is false, and an action type nothing has registered does nothing. Both are reported once. This is what a mission built for a newer runtime does, and it is why the capability table in `missions/runtime.lua` exists.
 - Triggers that set each other off inside one frame are cut off after sixteen passes and reported. Synced Lua that does not return takes the game with it.
@@ -180,7 +180,7 @@ So a dormant garrison is `spawn_group` when the mission wants it standing there 
 - `spawn_group` places a group unless it already has units standing, so a trigger that fires twice does not double it and a wiped group can be sent again. It leaves the group as asleep or awake as it found it.
 - `wake_group` runs the group's authored orders, placing it first if it is not on the map. "Wake the reinforcements" with nothing to wake would say nothing and do nothing.
 - `give_orders` replaces a group's orders and wakes it, because a group told to move that stands there holding position is a mission that looks broken and reports nothing. It does not place one: ordering units nothing asked for is not what the author wrote.
-- `gift_units` hands a group's units to another participant, as a gift rather than a capture. The group keeps them, so the mission can go on ordering a squad it gave the player.
+- `gift_units` hands a group's units to another participant, as a capture rather than a gift. A give is the form a game refuses: the engine passes that flag straight to `AllowUnitTransfer`, and the usual anti-grief gadget says no to a share between teams that are not allied, which is most of what a mission gifts for. Everything else about the two is the same. The group keeps its units, so the mission can go on ordering a squad it gave the player, and a game that refuses the move outright is reported.
 - An action aimed at a group with nothing on the map is reported once. That is what a mission that forgot its `spawn_group` looks like.
 
 A game's own actions, and the rest of the runtime, drive a group through that handle rather than around it, so the roll of who is still standing stays right:
@@ -372,10 +372,11 @@ What it has settled:
 - The rules params. Objectives, vars, the unit an actor became, the game over and the winning ally team all come back out of `Spring.GetGameRulesParam`.
 - Triggers firing on a zone entered, a unit count reached, a unit finished, a death and a capture, and one mission ending: `zone_held_for` completes its objective and hands the win to the player's ally team at the frame the clock says.
 - A reveal. A capture lights a zone with one spotter, no other ally team can see it, and it comes off the map when its 30 seconds are up.
+- `gift_units` across ally lines. The garrison mission hands the player's squad to an enemy team, and both units arrive.
 
 What it has caught:
 
-- `gift_units` moves nothing between teams that are not allied, and the runtime never notices. A game may refuse a share between enemies through `AllowUnitTransfer`, Balanced Annihilation does, and `Spring.TransferUnit`'s refusal is thrown away ([#857](https://github.com/tomjn/coilbox/issues/857)). The stub always agrees, so every suite passed on it.
+- `gift_units` moved nothing between teams that were not allied, and the runtime never noticed, because it asked for a share and threw the refusal away ([#857](https://github.com/tomjn/coilbox/issues/857)). The stub agreed with everything, so all fifteen suites passed on it. Fixed by asking for a capture and reporting a refusal. The stub now takes an `AllowUnitTransfer` of its own.
 
 What it still cannot settle:
 
