@@ -74,7 +74,7 @@ local function GameOver(winners)
 end
 ```
 
-That covers both call sites, the last ally team standing at line 322 and the everyone-left case at line 465, and nothing else in the game calls `Spring.GameOver` at all. Look for the alias before you go patching call sites: a game that reads `Spring.GameOver` into a local is the common shape, and the local is the cheaper place to guard.
+That covers both call sites, the last ally team standing at line 322 and the everyone-left case at line 465, and nothing else in the game calls `Spring.GameOver` at all. This guard and the two below are not in Splinter Faction upstream. They live here as `scripts/sf-proof/splinterfaction-guards.patch`, which is what [the adoption proof](#running-the-proof-yourself) applies and what a maintainer would be sent. The snippets on this page are the shape of each change. The patch is the change itself, comments and all. Look for the alias before you go patching call sites: a game that reads `Spring.GameOver` into a local is the common shape, and the local is the cheaper place to guard.
 
 Without it a mission ends when your game says so. In the proof the player wiped the enemy out 700 frames before the mission's own timer, and Splinter Faction's `game_end` declared the win: `Spring.IsGameOver()=true coilbox_mission_over=0`. With the guard the same run reads `Spring.IsGameOver()=false` and the mission ends itself.
 
@@ -227,6 +227,19 @@ scripts/mission-sf-proof.sh
 ```
 
 The adoption proof, and it runs the other way round from the two above. Both of those play a runtime the harness itself laid down, which settles the runtime's behaviour and says nothing about adoption. This one plays the runtime out of a real game: the scratch mutator carries only a probe, and depends on a loose Splinter Faction that coilbox's own **Install the mission runtime** button wrote into. It copies `src/scenario/fixtures/missions/splinter/mission.lua` to `missions/splinter/mission.lua` in that game, which is where coilbox's launch path puts a compiled mission, and removes it again unless you pass `--keep-mission`.
+
+#### Running the proof yourself
+
+The proof needs a game that has taken both halves of the contract, and neither half is in this repo. The runtime comes from coilbox's own install button. The three guards are Splinter Faction's change to make and are not upstream yet, so this repo keeps them as a patch, `scripts/sf-proof/splinterfaction-guards.patch`. That file is the exact text of all three, and it is what a maintainer would be sent.
+
+1. Clone [Splinter Faction](https://github.com/SplinterFaction/SplinterFaction) into your Spring data folder as `games/SplinterFaction.sdd`.
+2. In coilbox, open **Content > Games**, pick Splinter Faction, and press **Install the mission runtime**.
+3. Run `scripts/mission-sf-proof.sh --apply-guards`. It applies the patch, names the three guards it added and prints the command that undoes them.
+4. You need `spring-headless`, and a map in `maps/`. The script's header lists the environment variables if yours are somewhere other than `~/.spring`.
+
+Without `--apply-guards` the script checks for the guards and stops, listing what is missing and the `git apply` line that adds it. That is the default because a proof that quietly edits your game install is worse than one that refuses and tells you what to apply. Either way nothing is written into the game without saying so first, and a re-run adds nothing twice.
+
+The patch is stored with this repo's LF line endings while Splinter Faction checks `.lua` out with CRLF, so both the script and the command it prints apply it with `--ignore-whitespace`.
 
 **The adoption proof has found what a second game costs.** Every general claim held on a game the runtime had never seen: the gadget loaded out of the game's own `LuaRules`, read its own version marker, published the mission, placed the scenario's units, overrode the game's opening bank, kept the game's `game_end` out of the ending once the guard was in, and ended the mission itself with the right winner.
 

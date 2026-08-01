@@ -1,0 +1,88 @@
+The mission runtime guards for Splinter Faction.
+
+These are the game side of the coilbox mission runtime's adoption contract, items
+2 and 3 in docs/mission-runtime.md. They are Splinter Faction's changes to make,
+not coilbox's, so they live here as a patch rather than in the game.
+
+Three guards, in two of the game's own gadgets:
+
+1. game_end.lua holds back the game's own ending while a mission is running. The
+   file already aliases Spring.GameOver into a local and both call sites go
+   through it, so the alias is the only place that needs the check.
+2. game_spawn.lua does not spawn a start unit for a team whose mission placed
+   its opening units. Guarding SpawnStartUnit covers all four call sites.
+3. game_spawn.lua skips the faction and start-spot phases outright when the
+   mission owns every team's start, because a mission picked both before the
+   game loaded and the pickers would otherwise sit over the first minute of a
+   mission that is already playing.
+
+All three are inert in a normal game: GG.CoilboxMission exists only when the
+coilbox_mission modoption named a mission the runtime then loaded.
+
+The two files are Splinter Faction's own, under the GNU GPL v2 or later, and
+these additions are offered under the same terms.
+
+Apply it to a clone of https://github.com/SplinterFaction/SplinterFaction with:
+
+    git -C <SplinterFaction.sdd> apply <this file>
+
+and undo it with the same command plus -R. scripts/mission-sf-proof.sh checks for
+these guards and will apply this patch for you if you pass --apply-guards.
+
+diff --git a/LuaRules/Gadgets/game_end.lua b/LuaRules/Gadgets/game_end.lua
+index 0bade32..b7456de 100644
+--- a/LuaRules/Gadgets/game_end.lua
++++ b/LuaRules/Gadgets/game_end.lua
+@@ -66,7 +66,14 @@ if gadgetHandler:IsSyncedCode() then
+ 	local GetTeamUnitCount = Spring.GetTeamUnitCount
+ 	local GetAIInfo = Spring.GetAIInfo
+ 	local GetTeamLuaAI = Spring.GetTeamLuaAI
+-	local GameOver = Spring.GameOver
++	-- Coilbox mission runtime: a mission decides when it is over, so hold back
++	-- the game's own ending while one is running. Both calls below go through
++	-- this local. See missions/runtime.lua.
++	local spGameOver = Spring.GameOver
++	local function GameOver(winners)
++		if GG.CoilboxMission then return end
++		spGameOver(winners)
++	end
+ 	local AreTeamsAllied = Spring.AreTeamsAllied
+ 	local GetGameFrame = Spring.GetGameFrame
+
+diff --git a/LuaRules/Gadgets/game_spawn.lua b/LuaRules/Gadgets/game_spawn.lua
+index b5ff549..4aead83 100644
+--- a/LuaRules/Gadgets/game_spawn.lua
++++ b/LuaRules/Gadgets/game_spawn.lua
+@@ -587,6 +587,13 @@ end
+ --------------------------------------------------------------------------------
+
+ local function SpawnStartUnit(teamID, spawnX, spawnZ)
++	-- A coilbox mission places this team's opening units itself, and undoing a
++	-- start after the fact is not something the runtime can do safely here:
++	-- game_team_com_ends.lua reads a commander dying as the team dying.
++	if GG.CoilboxMission and GG.CoilboxMission.suppressesStart(teamID) then
++		return
++	end
++
+ 	local startUnit = GetStartUnit(teamID)
+ 	if not startUnit or startUnit == "" then return end
+
+@@ -695,6 +702,18 @@ function gadget:GameStart()
+ 		end
+ 	end
+
++	-- A coilbox mission picked the faction and the start position before the game
++	-- loaded, so both phases below have nothing left to ask. Running them anyway
++	-- puts a faction picker and a spot picker over the first minute of a mission
++	-- that is already playing. Going straight to "done" also tells the ledger and
++	-- the survival AI the game is running, which is what they read this param for.
++	if GG.CoilboxMission and GG.CoilboxMission.suppressesEveryStart() then
++		phase = "done"
++		Spring.SetGameRulesParam("phase", "done")
++		Spring.Echo("[Game Spawn] a coilbox mission owns every start, skipping the pre-game phases")
++		return
++	end
++
+ 	-- Load and partition map spots before broadcasting phase so the game rules
+ 	-- params are ready when widgets first read them.
+ 	LoadMapSpots()
