@@ -277,8 +277,11 @@ function AddUnit({
  * A path is drawn on the map rather than typed, so what is here is the count of
  * points, the way to start adding more and the way to clear them. A target is
  * picked by name, because the document holds an id and nobody can read one.
+ *
+ * Shared with the trigger panel, where a `give_orders` action carries the same
+ * list of orders and edits it the same way.
  */
-function OrderRow({
+export function OrderRow({
   order,
   targets,
   drawing,

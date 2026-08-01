@@ -204,6 +204,12 @@ export type ScenarioTrigger = {
   enabled: boolean;
   /** Fire every time the conditions hold, rather than once. */
   repeat: boolean;
+  /**
+   * Seconds a repeating trigger waits after firing before it may fire again.
+   * Absent is no wait, which on the polled tick means twice a second, so this is
+   * how a mission slows a repeating trigger down without counting in a var.
+   */
+  cooldown?: number;
   conditions: { op: "all" | "any"; conditions: ScenarioCondition[] };
   actions: ScenarioAction[];
 };
@@ -597,7 +603,7 @@ function parseTrigger(t: Record<string, unknown>): ScenarioTrigger | null {
     actions.push(action);
   }
 
-  return {
+  const trigger: ScenarioTrigger = {
     id: tid,
     // Absent means armed: a trigger nobody thought about should fire.
     enabled: t.enabled !== false,
@@ -605,6 +611,10 @@ function parseTrigger(t: Record<string, unknown>): ScenarioTrigger | null {
     conditions: { op: group.op === "any" ? "any" : "all", conditions },
     actions,
   };
+  // A wait of zero or less is what leaving it out means, so it is left out.
+  const cooldown = num(t.cooldown);
+  if (cooldown !== undefined && cooldown > 0) trigger.cooldown = cooldown;
+  return trigger;
 }
 
 function parseAmounts(

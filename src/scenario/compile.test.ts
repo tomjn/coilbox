@@ -115,6 +115,20 @@ describe("compileScenario", () => {
     );
   });
 
+  it("emits a trigger's cooldown, and nothing when it has none", () => {
+    const withWait = compileScenario(
+      build({
+        triggers: [{ id: "t1", repeat: true, cooldown: 30, actions: [] }],
+      }),
+    );
+    expect(withWait).toContain("cooldown = 30,");
+
+    const without = compileScenario(
+      build({ triggers: [{ id: "t1", repeat: true, actions: [] }] }),
+    );
+    expect(without).not.toContain("cooldown");
+  });
+
   it("is byte-identical whatever order the author-keyed tables came in", () => {
     const first = compileScenario(
       build({

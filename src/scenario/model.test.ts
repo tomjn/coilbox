@@ -360,6 +360,16 @@ describe("parseScenario — triggers", () => {
     expect(s?.triggers[0].repeat).toBe(true);
   });
 
+  it("keeps a cooldown and drops one that is not a wait", () => {
+    const kept = parseScenario(doc({ triggers: [trigger({ cooldown: 30 })] }));
+    expect(kept?.triggers[0].cooldown).toBe(30);
+
+    for (const cooldown of [0, -5, "30", null]) {
+      const s = parseScenario(doc({ triggers: [trigger({ cooldown })] }));
+      expect(s?.triggers[0].cooldown).toBeUndefined();
+    }
+  });
+
   it("falls back to an all-of condition group", () => {
     const s = parseScenario(
       doc({ triggers: [trigger({ conditions: { op: "some" } })] }),

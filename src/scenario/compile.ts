@@ -276,6 +276,7 @@ const trigger = (t: ScenarioTrigger): LuaTable =>
     ["id", t.id],
     ["enabled", t.enabled],
     ["repeat", t.repeat],
+    ["cooldown", t.cooldown],
     [
       "conditions",
       tbl([
