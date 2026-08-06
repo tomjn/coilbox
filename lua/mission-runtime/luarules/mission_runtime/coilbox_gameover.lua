@@ -22,6 +22,13 @@
 -- map for any other purpose: hidden, invulnerable, blind, non-blocking, and
 -- ignored by the runtime's own counting. The team is never empty, so nothing
 -- else decides the mission is over.
+--
+-- Whether a game counts that unit is the game's own rule, and not one the
+-- runtime can read: Splinter Faction discounts a def carrying
+-- customParams.decoration. So the anchor is checked rather than trusted. A
+-- mission team that dies while the mission is still running is one the anchor
+-- did not hold, and it is reported as that rather than left looking like the
+-- runtime not working (issue #933).
 
 local M = {}
 
@@ -97,6 +104,12 @@ function M.register(engine, state, hooks)
 
 	-- unitID -> { team = engine team, defID = }, for the anchors that are standing.
 	local anchors = {}
+	-- The mission teams the anchor is holding open, as a set of engine teams, and
+	-- the def they were anchored with. Recorded when they are placed rather than
+	-- worked out again later: by the time the engine says a team died its players
+	-- are already spectators, so nobody is playing it any more.
+	local held = {}
+	local anchorDef
 	local over = false
 
 	--- The ally team a team belongs to, or nil for a team the engine does not
@@ -281,6 +294,9 @@ function M.register(engine, state, hooks)
 		if #wanted == 0 then
 			return 0
 		end
+		for _, team in ipairs(wanted) do
+			held[team.team] = true
+		end
 
 		local def = M.inertDef()
 		if not def then
@@ -290,6 +306,7 @@ function M.register(engine, state, hooks)
 			return 0
 		end
 
+		anchorDef = def.name
 		local placed = 0
 		for _, team in ipairs(wanted) do
 			local unitID = hooks.spawn({
@@ -342,6 +359,43 @@ function M.register(engine, state, hooks)
 		anchors[unitID] = nil
 		engine:log("warning", string.format(
 			"the mission anchor for team %s was destroyed", tostring(team)))
+	end
+
+	--- What a team's anchor was doing when the team died, for the report below.
+	--
+	-- A standing anchor and a dead team is a game that does not count the anchor.
+	-- A gone one is a team that really was left with nothing, and losing the
+	-- anchor is already reported where it happens.
+	local function anchorState(team)
+		if not anchorDef then
+			return "none, because no def in this game could be one"
+		end
+		if handle.anchorCount(team) > 0 then
+			return anchorDef .. ", still standing"
+		end
+		return anchorDef .. ", already destroyed"
+	end
+
+	--- A team died. Fed from the gadget's TeamDied.
+	--
+	-- Nothing but the runtime should end a mission, and a team dying ends one: its
+	-- players are spectators and the game goes on without them. The anchor is what
+	-- stops the usual cause, the team reaching zero units, and it only works if the
+	-- game counts the anchor as a unit that team has. Nothing the runtime can read
+	-- says whether it does. Splinter Faction's game_end.lua discounts a def
+	-- carrying customParams.decoration, and that is one convention out of however
+	-- many games have one. So the anchor is watched rather than reasoned about, and
+	-- a team that dies under one says so out loud (issue #933).
+	function handle.teamDied(team)
+		if over or not held[team] then
+			return
+		end
+		held[team] = nil
+		engine:report("team-died:" .. tostring(team), "error", string.format(
+			"team %s died while the mission was still running, so the game ended the "
+			.. "mission rather than the runtime. Its anchor was %s. An anchor only holds "
+			.. "a team open in a game that counts it as a unit that team has.",
+			tostring(team), anchorState(team)))
 	end
 
 	-- Before the first frame, so a panel reading the outcome finds "not yet"

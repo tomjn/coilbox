@@ -803,6 +803,13 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
+	--- A team died, which is the game taking its players out of the mission and
+	-- putting them in the stands. The anchor is what should have stopped that, so
+	-- the game over is told and says whether the anchor was there when it happened.
+	function gadget:TeamDied(teamID)
+		gameOver.teamDied(teamID)
+	end
+
 	function gadget:UnitDestroyed(unitID, unitDefID, unitTeam)
 		invulnerable[unitID] = nil
 		groups.removed(unitID)
