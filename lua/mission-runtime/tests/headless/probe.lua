@@ -8,9 +8,13 @@
 -- Not part of what a game vendors, and not something a mission ever ships with.
 --
 -- Every check is one line of stdout, `HARNESS ok` or `HARNESS fail`, which the
--- script counts. The probe drives the mission from GameFrame rather than waiting
--- for anything, because a headless run has nobody at the keyboard: walking a
--- unit into a zone is the only way most missions ever fire.
+-- script counts, and `HARNESS skip` for a claim this run cannot reach at all.
+-- The probe drives the mission from GameFrame rather than waiting for anything,
+-- because a headless run has nobody at the keyboard: walking a unit into a zone
+-- is the only way most missions ever fire.
+--
+-- The synced half checks the runtime and the unsynced half checks the widget,
+-- because only one of them can see LuaUI.
 
 function gadget:GetInfo()
 	return {
@@ -28,7 +32,64 @@ end
 
 local MISSION_ID = Spring.GetModOptions().coilbox_mission
 
+--------------------------------------------------------------------------------
+-- Reporting. Above the split, because both halves have checks to make: the
+-- runtime is the synced half's and the widget is the unsynced half's.
+--------------------------------------------------------------------------------
+
+local function say(line)
+	Spring.Echo("HARNESS " .. line)
+end
+
+local function check(name, ok, detail)
+	if ok then
+		say("ok " .. name)
+	else
+		say("fail " .. name .. (detail and (": " .. tostring(detail)) or ""))
+	end
+end
+
+--------------------------------------------------------------------------------
+-- The unsynced half: the orders a player would give, and the widget.
+--
+-- The widget runs in another Lua state, and the one thing about it visible from
+-- a gadget is the global it registers. `Script.LuaUI(name)` answers whether the
+-- LuaUI state has a function of that name, which is what
+-- `widgetHandler:RegisterGlobal` writes and what `Script.LuaUI[name](...)`
+-- reaches. So the global is both the claim and the way to read it, and it is
+-- there for exactly as long as the widget is: a handler that throws a widget out
+-- over an error in any of its callins takes that widget's globals down with it.
+--
+-- `Script` is unsynced only, which is why the widget is checked from here.
+--------------------------------------------------------------------------------
+
 if not gadgetHandler:IsSyncedCode() then
+	local DIALOGUE_GLOBAL = "CoilboxMissionDialogue"
+
+	-- The runtime's own message for a line of dialogue. Every unsynced gadget is
+	-- handed it, and it is the frame the runtime passes that line to LuaUI.
+	local DIALOGUE_MESSAGE = "coilbox_mission_dialogue"
+
+	--- Whether LuaUI is running at all. `Script.LuaUI` answers nothing when it is
+	-- not, which is what a game whose own LuaUI died at its entry point looks like
+	-- from here.
+	local function luaUI()
+		return Script.LuaUI() == true
+	end
+
+	local function widgetLoaded()
+		return Script.LuaUI(DIALOGUE_GLOBAL) == true
+	end
+
+	-- Whether the widget is being checked at all, decided on the first frame
+	-- because LuaUI is loaded after the gadgets are. A run with no LuaUI says so
+	-- once rather than failing every widget check with the same missing state.
+	local proving
+
+	-- A mission says its opening line more than once when the trigger repeats, and
+	-- the claim is about the first.
+	local heardLine = false
+
 	-- Nothing in a headless run paces the simulation but the local server, and it
 	-- paces it at the speed a player would watch. The checks are about frames,
 	-- not seconds, so the run is asked for the fastest speed it will give.
@@ -56,31 +117,40 @@ if not gadgetHandler:IsSyncedCode() then
 		end
 	end
 
+	--- The widget half, on the first frame the run reaches.
+	function gadget:GameFrame()
+		if proving ~= nil then
+			return
+		end
+		proving = luaUI()
+		if not proving then
+			say("skip this run has no LuaUI, so nothing in it reaches the mission widget")
+		elseif MISSION_ID then
+			check("the game's own widget handler loads the mission widget out of luaui/widgets",
+				widgetLoaded())
+		else
+			check("a game with no mission is left with no mission widget", not widgetLoaded())
+		end
+	end
+
 	function gadget:RecvFromSynced(message, ...)
 		if message == "coilbox_harness_done" then
+			-- Last of all, because a widget the handler threw out over an error in
+			-- any callin between the first frame and this one is a widget whose
+			-- global has gone with it.
+			if proving and MISSION_ID then
+				check("and it is still loaded at the end of the mission", widgetLoaded())
+			end
 			Spring.Quit()
 		elseif message == "coilbox_harness_player_order" then
 			playerOrder(...)
+		elseif message == DIALOGUE_MESSAGE and proving and not heardLine then
+			heardLine = true
+			check("a line the mission says has the widget's global to arrive at", widgetLoaded())
 		end
 	end
 
 	return
-end
-
---------------------------------------------------------------------------------
--- Reporting.
---------------------------------------------------------------------------------
-
-local function say(line)
-	Spring.Echo("HARNESS " .. line)
-end
-
-local function check(name, ok, detail)
-	if ok then
-		say("ok " .. name)
-	else
-		say("fail " .. name .. (detail and (": " .. tostring(detail)) or ""))
-	end
 end
 
 --------------------------------------------------------------------------------

@@ -343,6 +343,8 @@ scripts/mission-headless.sh
 
 A real engine. It builds a scratch game out of the runtime plus the compiled fixtures and plays each one in `spring-headless`, which simulates with no OpenGL context. A probe gadget stands in for the player: it walks a unit into a zone, kills an actor, hands one over, tells a factory and a builder to make something the mission forbids, waits for the mission to unlock one of those, and checks what the runtime did about it. Nothing in CI runs this, because a runner has no engine, no game and no map. The script's header lists the environment variables that point it at them.
 
+The probe's unsynced half checks the widget, because the engine's `Script.LuaUI` is unsynced and a widget's registered global is the only thing about it a gadget can see. That needs the game's LuaUI to load, and a game's entry point includes `LuaUI/*.lua` files a current engine no longer ships, so the script links the data directory's own `LuaUI/` into the run. Without one it says so and skips the widget checks.
+
 The probe also gives an order as the player rather than as the runtime, which is the only way a withheld command can be proved: everything synced Lua gives is `fromLua`, and the runtime lets all of that through. The engine lets a Lua handle put an order on the wire only when the local player controls that handle's team, and a gadget's is every team at once, so the harness turns god mode on to make the local player that controller. It changes who may order what and nothing about how an order is carried or judged.
 
 ```sh
@@ -388,11 +390,14 @@ What did not hold was the start, twice over, and both are why contract item 3 ex
 
 ### What is still unproven
 
-One claim nobody has watched happen, because Balanced Annihilation's LuaUI does not load against a current engine, which is the game the harness runs on:
+The mission UI widget is loaded and run by a real game's own widget handler in the headless run, which is as far as a run with no screen goes ([issue #850](https://github.com/tomjn/coilbox/issues/850)). It initialises out of the vendored `luaui/widgets/`, registers the global the runtime's dialogue call reaches, draws every frame of the mission without raising, and takes itself back off in a game with no mission.
 
-- **The mission UI widget has never been reached.** The objectives panel, the dialogue panel and the debrief are proved only as far as `coilbox_panel_model.lua`, which is pure and decides what to draw. That the drawing then lands where it should, that the panels do not sit on top of the game's own UI, and that a portrait loads, are open: [issue #850](https://github.com/tomjn/coilbox/issues/850).
+What is left is what a screen would show:
 
-Anything a widget does is OpenGL, a font and a mouse, and none of the three exists outside a running engine, so the widget will always need a real one to settle.
+- **Nobody has looked at the panels.** That the drawing lands where it should, that the panels do not sit on top of the game's own UI, and that a portrait loads are still open. `coilbox_panel_model.lua` is what decides all of that before the drawing, and it is pure and tested.
+- **A line of dialogue is proved to the seam, not past it.** When the runtime hands a line to LuaUI the widget's global is there to take it. What the widget's queue then does with the line is `panel_test.lua`'s, because a headless run has nothing to read it back with.
+
+A font and a mouse still need a real screen, so those two will always need a person to settle.
 
 ## Further reference
 
