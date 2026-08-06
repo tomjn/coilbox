@@ -30,12 +30,23 @@ import {
  * `crates/coilbox-springlua/tests/eval.rs`, which evaluates real emitter output.
  */
 
-/** One unresolved reference, located by where it sits in the compiled file. */
+/** One thing wrong with a mission, located by where it sits in the compiled file. */
 export interface MissionIssue {
   /** For example `triggers["open"].actions[0].params.group`. */
   path: string;
   message: string;
+  /**
+   * How much it matters. An error is a mission that will not play as written,
+   * and it is refused before the engine is started. A warning is a mission that
+   * plays with something in it the player will read as a bug, so it is shown and
+   * let through. Absent means an error.
+   */
+  severity?: "error" | "warning";
 }
+
+/** True when an issue stops a launch, which is everything but a warning. */
+export const isBlocking = (issue: MissionIssue): boolean =>
+  issue.severity !== "warning";
 
 /**
  * A map's extent in elmos, the way `useMissionMapAssets` reports it.
@@ -339,6 +350,45 @@ function checkUnitNames(
 }
 
 /**
+ * Text the player reads that nobody wrote.
+ *
+ * An objective with no text reaches the objectives panel as a blank line, and a
+ * dialogue line with no text opens the radio panel on an empty message, held
+ * there by the panel's own minimum reading time. Neither stops anything working,
+ * and both read to a player as a bug in the game rather than as an unfinished
+ * mission.
+ *
+ * So they are warnings rather than errors. Writing the triggers first and the
+ * words afterwards is the ordinary way a mission gets written, and refusing to
+ * play one until every line is filled in would refuse a mission mid-edit.
+ *
+ * Whitespace counts as empty, because the editor's own lists already say "No
+ * text yet" about a `text.trim()` of nothing.
+ */
+function checkText(
+  mission: Record<string, unknown>,
+  issues: MissionIssue[],
+): void {
+  const blank = (value: unknown) =>
+    typeof value !== "string" || value.trim() === "";
+
+  const say = (list: "objectives" | "dialogue", message: string) => {
+    asArray(mission[list]).forEach((raw, index) => {
+      const entry = asRecord(raw);
+      if (!blank(entry.text)) return;
+      issues.push({
+        path: `${at(list, entry, index)}.text`,
+        message,
+        severity: "warning",
+      });
+    });
+  };
+
+  say("objectives", "no text, so the objectives panel shows a blank line");
+  say("dialogue", "no text, so the radio panel opens on an empty message");
+}
+
+/**
  * Resolve every cross-reference in an evaluated mission, and report all of them
  * rather than the first. An author fixing one typo at a time through the engine
  * is the failure this whole step exists to avoid.
@@ -400,6 +450,7 @@ export function validateMission(
 
   checkUnitNames(mission, issues);
   checkPositions(mission, map, issues);
+  checkText(mission, issues);
 
   return issues;
 }

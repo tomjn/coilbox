@@ -263,6 +263,28 @@ describe("launchScenario", () => {
     expect(!result.ok && result.message).toContain('no team called "nobody"');
   });
 
+  /**
+   * Issue #853. A blank objective is a mission that plays, so it is carried out
+   * with the result rather than being a reason to refuse the launch.
+   */
+  it("plays a mission that only warns, and hands the warnings back", async () => {
+    readMissionMock.mockResolvedValue({
+      mission: {
+        schemaVersion: 1,
+        teams: { you: { team: 0 } },
+        objectives: [{ id: "hold", kind: "primary", text: "" }],
+      },
+    });
+
+    const result = await run(build(), [LOOSE]);
+
+    expect(launch).toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.warnings.map((i) => i.path)).toEqual([
+      'objectives["hold"].text',
+    ]);
+  });
+
   it("refuses a mission the engine could not load at all", async () => {
     readMissionMock.mockRejectedValue(new Error("unexpected symbol near '}'"));
 

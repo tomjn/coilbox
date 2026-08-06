@@ -32,6 +32,7 @@ import { isMutatorArchive, writeTestMutator } from "./mutator";
 import { packagedArchiveReason } from "./offer";
 import {
   describeIssue,
+  isBlocking,
   type MapExtent,
   type MissionIssue,
   validateCompiledMission,
@@ -194,6 +195,12 @@ export type ScenarioLaunchResult =
       gameType: string;
       config: BattleConfig;
       exitCode: number | null;
+      /**
+       * What validated as a warning: the mission played, and the player saw
+       * something in it that reads as a bug. Shown after the launch rather than
+       * instead of it.
+       */
+      warnings: MissionIssue[];
     }
   | { ok: false; message: string; issues: MissionIssue[] };
 
@@ -282,9 +289,13 @@ export async function launchScenario(
     }
   }
 
-  if (written.issues.length > 0) {
-    return refuse(missionIssueMessage(written.issues), written.issues);
+  // Only an error stops the launch. A warning is a mission that plays, so it
+  // rides along with the result and is shown once the game has closed.
+  const blocking = written.issues.filter(isBlocking);
+  if (blocking.length > 0) {
+    return refuse(missionIssueMessage(blocking), blocking);
   }
+  const warnings = written.issues.filter((issue) => !isBlocking(issue));
 
   // An adopted game plays the scenario as itself. The mutator has to be found
   // first: the engine reads its game list from the archive cache unitsync
@@ -338,5 +349,6 @@ export async function launchScenario(
     gameType,
     config,
     exitCode,
+    warnings,
   };
 }

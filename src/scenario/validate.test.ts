@@ -11,6 +11,7 @@ vi.mock("./bindings", () => ({
 
 import {
   describeIssue,
+  isBlocking,
   issueLocation,
   validateCompiledMission,
   validateMission,
@@ -41,8 +42,8 @@ function mission(overrides: Record<string, unknown> = {}) {
     ],
     prefabs: [{ id: "base", team: "player" }],
     vars: { Alarm: 0 },
-    objectives: [{ id: "kill-boss", kind: "primary" }],
-    dialogue: [{ id: "intro", speaker: "HQ" }],
+    objectives: [{ id: "kill-boss", kind: "primary", text: "Kill the boss." }],
+    dialogue: [{ id: "intro", speaker: "HQ", text: "Move out." }],
     triggers: [],
     ...overrides,
   };
@@ -267,6 +268,69 @@ describe("validateMission", () => {
     );
 
     expect(issues).toEqual([]);
+  });
+
+  /**
+   * Issue #853. A blank objective reaches the player's panel as an empty line
+   * and a blank dialogue line opens the radio panel on an empty message, so both
+   * are said. Neither stops the mission working, so neither refuses a launch.
+   */
+  describe("text nobody wrote", () => {
+    it("warns about an objective with no text", () => {
+      const issues = validateMission(
+        mission({
+          objectives: [{ id: "kill-boss", kind: "primary", text: "" }],
+        }),
+      );
+
+      expect(issues).toEqual([
+        {
+          path: 'objectives["kill-boss"].text',
+          message: "no text, so the objectives panel shows a blank line",
+          severity: "warning",
+        },
+      ]);
+      expect(issues.filter(isBlocking)).toEqual([]);
+    });
+
+    it("warns about a dialogue line with no text", () => {
+      const issues = validateMission(
+        mission({ dialogue: [{ id: "intro", speaker: "HQ", text: "   " }] }),
+      );
+
+      expect(issues).toEqual([
+        {
+          path: 'dialogue["intro"].text',
+          message: "no text, so the radio panel opens on an empty message",
+          severity: "warning",
+        },
+      ]);
+    });
+
+    it("leaves text that was written alone", () => {
+      expect(
+        validateMission(
+          mission({
+            objectives: [
+              { id: "kill-boss", kind: "primary", text: "Kill it." },
+            ],
+            dialogue: [{ id: "intro", speaker: "HQ", text: "Move out." }],
+          }),
+        ),
+      ).toEqual([]);
+    });
+
+    it("says where it is in the author's words", () => {
+      expect(
+        describeIssue({
+          path: 'objectives["kill-boss"].text',
+          message: "no text, so the objectives panel shows a blank line",
+          severity: "warning",
+        }),
+      ).toBe(
+        'Objective "kill-boss", text: no text, so the objectives panel shows a blank line',
+      );
+    });
   });
 
   it("says so when the file returned no table", () => {
