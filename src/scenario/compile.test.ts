@@ -83,6 +83,27 @@ describe("table keys", () => {
     expect(emitted).not.toContain("repeat = true");
   });
 
+  it("emits the id a prefab building is named by", () => {
+    const emitted = compileScenario(
+      build({
+        prefabs: [
+          {
+            id: "pf1",
+            team: "p0",
+            origin: { x: 100, z: 100 },
+            buildings: [
+              { id: "keep-lab", def: "armlab", offset: { x: 0, z: 0 } },
+              { def: "armsolar", offset: { x: 64, z: 0 } },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(emitted).toContain('id = "keep-lab"');
+    expect(emitted).toContain('def = "armsolar"');
+  });
+
   it("brackets author-chosen keys that are not bare identifiers", () => {
     const emitted = compileScenario(
       build({ vars: { alarm: 1, end: 2, "wave count": 3, "7": 4 } }),

@@ -67,7 +67,7 @@ Scenario {
   zones: [{ id, name, shape: box|circle, coords }]
   actors: [{ id, unitDef, team, pos, facing, state: { hp?, invulnerable?, unselectable?, name? } }]
   groups: [{ id, team, units: [{ def, count }], orders: [patrol|move|guard...], dormant }]
-  prefabs: [{ id, team, origin, buildings: [{ def, offset, facing, queue?, repeat? }] }]
+  prefabs: [{ id, team, origin, buildings: [{ id?, def, offset, facing, queue?, repeat? }] }]
   restrictions: { buildable?: { mode: allow|deny, units }, commands?: string[] }
   vars: { name: initial }
   triggers: [{ id, enabled, repeat, conditions: { op, [...] }, actions: [...] }]

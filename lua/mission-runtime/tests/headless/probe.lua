@@ -122,16 +122,6 @@ local function owns(team, defName)
 	return Spring.GetTeamUnitDefCount(team, def.id)
 end
 
---- The first unit a team owns of a def, or nil. A team of nil is a participant
--- this mission has no engine team for, and owns nothing.
-local function find(team, defName)
-	for _, unitID in ipairs(team and Spring.GetTeamUnits(team) or {}) do
-		if defOf(unitID) == defName then
-			return unitID
-		end
-	end
-end
-
 --- Put a unit on the map for the player, at the ground height, and make it
 -- proof against anything the mission's own units do to it. A check about a zone
 -- being held is about the runtime's clock, not about whether a scout survives
@@ -255,19 +245,11 @@ local function halfFootprint(unitID)
 	return xsize * 4, zsize * 4
 end
 
---- The engine team behind a participant id.
-local function teamOf(id)
-	for _, entry in ipairs(state().teams or {}) do
-		if entry.id == id then
-			return entry.team
-		end
-	end
-end
-
 --- Every unit the mission places at the start, with the spot its document asks
--- for. Actors and groups come back from the runtime by name. A prefab's
--- buildings do not, because nothing records them, so they are found by def and
--- team, which is enough while no prefab places two of a def.
+-- for. Everything comes back from the runtime by name: an actor, a group's
+-- units, and since issue #878 a prefab's buildings too. A building with no name
+-- is one nothing records, so the fixture is checked for that rather than the
+-- probe going back to finding a building by its unit def.
 local function startPlacements()
 	local mission = state().mission
 	local wanted = {}
@@ -301,9 +283,13 @@ local function startPlacements()
 	end
 
 	for _, prefab in ipairs(mission.prefabs or {}) do
-		for _, building in ipairs(prefab.buildings or {}) do
+		for index, building in ipairs(prefab.buildings or {}) do
+			-- A building the fixture forgot to name would drop out of every check
+			-- below with nothing said, so it is a failure in its own right.
+			check(string.format("prefab %s's building %d is named", prefab.id, index),
+				building.id ~= nil, building.def)
 			want(string.format("prefab %s's %s", prefab.id, building.def),
-				find(teamOf(prefab.team), building.def), building.def,
+				state().units[building.id], building.def,
 				prefab.origin.x + building.offset.x,
 				prefab.origin.z + building.offset.z,
 				building.facing)
@@ -621,6 +607,14 @@ local BUILD_REACH = 110
 
 local siegeBuilder, siegeOrdered
 
+-- The keep's factory, by the name the scenario gave that building. Every step
+-- below that talks to it goes through here, so what the runtime records about a
+-- prefab building is what the whole fixture is driven by rather than a def scan
+-- that would break the moment the base held two factories (issue #878).
+local function keepLab()
+	return state().units["keep-lab"]
+end
+
 plans.siege = {
 	-- The hold is 60 seconds and the player's unit walks in at frame 30, so the
 	-- mission cannot end before frame 1830. The deadline is the slack on top.
@@ -630,14 +624,18 @@ plans.siege = {
 		{ frame = 5, run = function()
 			check("a group the scenario does not call dormant starts on the map",
 				#state().groups.units("keep-guard") == 3, #state().groups.units("keep-guard"))
-			local lab = find(1, "corlab")
-			check("a prefab's factory is on the map", lab ~= nil)
+			local lab = keepLab()
+			check("a prefab's factory is on the map under the name the scenario gave it",
+				defOf(lab) == "corlab", defOf(lab))
 			local queue = lab and Spring.GetFactoryCommands(lab, -1) or {}
 			check("with the queue the prefab wrote, one order per unit", #queue == 3, #queue)
 			local states = lab and Spring.GetUnitStates(lab) or {}
 			check("and repeating, so the queue does not empty", states["repeat"] == true,
 				tostring(states["repeat"]))
-			check("a prefab's other buildings are placed too", owns(1, "cormex") == 1, owns(1, "cormex"))
+			check("a prefab's other buildings are addressable too",
+				defOf(state().units["keep-mex"]) == "cormex", defOf(state().units["keep-mex"]))
+			check("and its rules param names the unit it became",
+				rules("coilbox_mission_actor_keep-lab") == lab, rules("coilbox_mission_actor_keep-lab"))
 			check("the mission has not ended", rules("coilbox_mission_over") == 0)
 			check("nor has its objective", rules("coilbox_mission_objective_take-keep") == ACTIVE)
 			-- Everything the restriction steps below claim is about a mission
@@ -702,7 +700,7 @@ plans.siege = {
 		-- right-clicked rather than stopped, and a factory with something under
 		-- construction starts nothing else until that is gone.
 		{ frame = 420, run = function()
-			local lab = find(1, "corlab")
+			local lab = keepLab()
 			Spring.GiveOrderToUnit(lab, CMD.REPEAT, { 0 }, 0)
 			for _, defName in ipairs({ "corak", FORBIDDEN_UNIT }) do
 				-- Ctrl is twenty of them and alt takes them off the front, which
@@ -716,7 +714,7 @@ plans.siege = {
 			end
 		end },
 		{ frame = 450, run = function()
-			local lab = find(1, "corlab")
+			local lab = keepLab()
 			local queue = Spring.GetFactoryCommands(lab, -1)
 			check("the probe emptied the keep factory's queue", #queue == 0, queueText(queue))
 			-- The forbidden def first, and the queue read straight back: a factory
@@ -761,6 +759,28 @@ plans.siege = {
 			local orders = Spring.GetUnitCommands(siegeOrdered, -1)
 			check("and the same command from the runtime itself is let through",
 				#orders == 1 and orders[1].id == CMD.ATTACK, queueText(orders))
+		end },
+		-- What issue #878 was about: a trigger that fires on a prefab building
+		-- dying. The lab is done being the restriction fixture by now, and the
+		-- trigger's set_var is what says the runtime knew which unit it was.
+		{ frame = 700, run = function()
+			check("nothing has fired the trigger watching the keep's factory",
+				armed("lab-down") == true)
+			check("and its var is still where the scenario set it",
+				rules("coilbox_mission_var_labDown") == 0,
+				rules("coilbox_mission_var_labDown"))
+			Spring.DestroyUnit(keepLab(), false, true)
+		end },
+		{ frame = 705, run = function()
+			check("killing a prefab building fires the trigger that names it",
+				armed("lab-down") == false)
+			check("and its set_var wrote the var out",
+				rules("coilbox_mission_var_labDown") == 1,
+				rules("coilbox_mission_var_labDown"))
+			check("while the building it named is no longer on the map",
+				keepLab() == nil, keepLab())
+			check("and the other building in the base is untouched",
+				defOf(state().units["keep-mex"]) == "cormex")
 		end },
 		{ frame = 1500, run = function()
 			check("a hold short of the minute settles nothing",

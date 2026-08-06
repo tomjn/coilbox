@@ -86,6 +86,14 @@ local MISSION = compiled({
 			dormant = true,
 		},
 		{
+			id = "keepers",
+			team = "enemy",
+			pos = { x = 1500, z = 1500 },
+			units = { { def = "armpw", count = 1 } },
+			orders = { { kind = "guard", target = "base-lab" } },
+			dormant = true,
+		},
+		{
 			id = "lost",
 			team = "nobody",
 			pos = { x = 0, z = 0 },
@@ -101,6 +109,7 @@ local MISSION = compiled({
 			origin = { x = 200, z = 200 },
 			buildings = {
 				{
+					id = "base-lab",
 					def = "armlab",
 					offset = { x = 0, z = 0 },
 					facing = 1,
@@ -143,6 +152,7 @@ local MISSION = compiled({
 				},
 			},
 		}),
+		at(10, { { type = "wake_group", params = { group = "keepers" } } }),
 	},
 })
 
@@ -365,16 +375,22 @@ check("and a group that has been wiped spawns again",
 -- Prefab bases.
 --------------------------------------------------------------------------------
 
-local lab, solar
+-- The lab is named, so the runtime says which unit it became. The solar is not,
+-- and is still found the way everything had to be before issue #878: by def.
+local lab = state.units["base-lab"]
+local solar
 for unitID, unit in pairs(engine.units) do
-	if unit.def == "armlab" then
-		lab = unitID
-	elseif unit.def == "armsolar" then
+	if unit.def == "armsolar" then
 		solar = unitID
 	end
 end
 
 check("a prefab's buildings are on the map", lab ~= nil and solar ~= nil)
+check("a named building is addressable by the name the scenario gave it",
+	engine.units[lab].def == "armlab", tostring(lab))
+check("and its record is published beside the actors",
+	state.buildings["base-lab"].def == "armlab")
+check("an unnamed one is not addressable", state.buildings["armsolar"] == nil)
 check("at the origin plus their own offset, snapped to the build grid",
 	engine.units[lab].x == 192 and engine.units[solar].x == 256,
 	tostring(engine.units[lab].x) .. "," .. tostring(engine.units[solar].x))
@@ -390,6 +406,23 @@ check("a factory queue is one build order per entry, with no options at all",
 check("a queue naming a def this game does not have skips it and says so",
 	logged(engine, "queue names notaunit"))
 check("a building with no queue is left alone", shapes(solar) == "", shapes(solar))
+
+-- An order target is one name space: an actor, a group, or a named building.
+playTo(315)
+local keepers = state.groups.units("keepers")
+check("a group can be ordered to guard a prefab building by name",
+	shapes(keepers[1]) == string.format("%d/0/%d", CMD.GUARD, lab), shapes(keepers[1]))
+
+-- A building that has been destroyed is a target that is simply not there any
+-- more, the way a dead actor is. Only a name the mission never declared is worth
+-- a word to the author.
+engine.env.Spring.DestroyUnit(lab)
+state.groups.orders("keepers", { { kind = "guard", target = "base-lab" } })
+check("and a building that has died is not a name the runtime complains about",
+	not logged(engine, "to give an order about"))
+state.groups.orders("keepers", { { kind = "guard", target = "no-such-thing" } })
+check("while one the mission never declared still is",
+	logged(engine, "nothing named no-such-thing to give an order about"))
 
 --------------------------------------------------------------------------------
 -- Groups are synced only.

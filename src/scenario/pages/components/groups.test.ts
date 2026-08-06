@@ -4,6 +4,7 @@ import type { Scenario, ScenarioGroup } from "../../model";
 import {
   addGroup,
   addWaypoint,
+  buildingTargets,
   clampCount,
   drapePoints,
   editGroup,
@@ -321,5 +322,61 @@ describe("names", () => {
     expect(targetLabel(document(), "a3")).toBe("Jarmen Kell");
     expect(targetLabel(document(), "")).toBe("nothing yet");
     expect(targetLabel(document(), "deleted")).toBe("something that is gone");
+  });
+
+  /**
+   * Issue #878. A named prefab building answers to the runtime's `units` table
+   * the way an actor does, so an order can be pointed at one.
+   */
+  describe("prefab buildings", () => {
+    const withBase = (): Scenario => ({
+      ...document(),
+      prefabs: [
+        {
+          id: "pf1",
+          team: "p1",
+          origin: { x: 500, z: 500 },
+          buildings: [
+            { id: "b1", def: "corlab", offset: { x: 0, z: 0 }, facing: 0 },
+            { def: "cormex", offset: { x: 64, z: 0 }, facing: 0 },
+          ],
+        },
+      ],
+    });
+
+    it("offers a named one and leaves an unnamed one out", () => {
+      expect(buildingTargets(withBase().prefabs)).toEqual([
+        { id: "b1", label: "Base 1's corlab", def: "corlab" },
+      ]);
+    });
+
+    it("numbers two of a def in the same base apart", () => {
+      const scenario = withBase();
+      const buildings = [
+        scenario.prefabs[0].buildings[0],
+        {
+          id: "b2",
+          def: "corlab",
+          offset: { x: 96, z: 0 },
+          facing: 0 as const,
+        },
+      ];
+      expect(
+        buildingTargets([{ ...scenario.prefabs[0], buildings }]).map(
+          (b) => b.label,
+        ),
+      ).toEqual(["Base 1's corlab 1", "Base 1's corlab 2"]);
+    });
+
+    it("puts them in the order picker between the actors and the groups", () => {
+      expect(targetOptions(withBase()).map((o) => o.value)).toEqual([
+        "a1",
+        "a2",
+        "a3",
+        "b1",
+        "g1",
+      ]);
+      expect(targetLabel(withBase(), "b1")).toBe("Base 1's corlab");
+    });
   });
 });

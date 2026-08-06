@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { compileScenario, scenarioMissionValue } from "./compile";
+import { requiredRuntimeVersion } from "./gating";
 import { parseScenario, type Scenario } from "./model";
 import { ACTION_TYPES, CONDITION_TYPES } from "./triggerTypes";
 
@@ -57,6 +58,15 @@ describe("scenario fixture corpus", () => {
 
       const issues = validateMission(scenarioMissionValue(scenario));
       expect(issues).toEqual([]);
+    });
+
+    /**
+     * A fixture's `runtimeVersion` is written by hand, and the runtime refuses a
+     * mission that asks for more than it has. One that asks for less is worse:
+     * it runs on a runtime that ignores half of it.
+     */
+    it(`${file} asks for the runtime it actually needs`, () => {
+      expect(scenario.runtimeVersion).toBe(requiredRuntimeVersion(scenario));
     });
 
     it(`${file} matches its checked-in compiled Lua`, () => {
@@ -124,6 +134,20 @@ describe("scenario fixture corpus", () => {
       "a factory queue that repeats": allBuildings.some(
         (b) => b.repeat === true,
       ),
+      // Issue #878. Without one the runtime records nothing about any prefab
+      // building and the headless probe is back to finding one by unit def.
+      "a prefab building a trigger names": fixtures.some(({ scenario }) => {
+        const named = new Set(
+          scenario.prefabs.flatMap((p) => p.buildings.map((b) => b.id)),
+        );
+        return scenario.triggers.some((t) =>
+          t.conditions.conditions.some((c) =>
+            Object.values(c.params).some(
+              (v) => typeof v === "string" && named.has(v),
+            ),
+          ),
+        );
+      }),
       "a group that starts on the map (not dormant)": allGroups.some(
         (g) => g.dormant === false,
       ),

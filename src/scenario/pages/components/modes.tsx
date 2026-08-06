@@ -345,6 +345,10 @@ const prefabsMode: EditorMode = {
             if (base) {
               onChange(
                 addBuilding(scenario, base.id, {
+                  // Minted here rather than when a trigger first wants one, so
+                  // every building the editor puts down can be named after the
+                  // fact without moving the base's ids around.
+                  id: crypto.randomUUID(),
                   def: unitDef,
                   // Offsets are measured from the base's origin, so what the
                   // document gets is the click less that.
@@ -364,7 +368,12 @@ const prefabsMode: EditorMode = {
                 team: owner,
                 origin: pos,
                 buildings: [
-                  { def: unitDef, offset: { x: 0, z: 0 }, facing: 0 },
+                  {
+                    id: crypto.randomUUID(),
+                    def: unitDef,
+                    offset: { x: 0, z: 0 },
+                    facing: 0,
+                  },
                 ],
               }),
             );

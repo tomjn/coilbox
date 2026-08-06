@@ -233,6 +233,18 @@ local function publish()
 		actors[actor.id] = actor
 	end
 
+	-- The prefab buildings the author named. A base is placed as one piece, so a
+	-- building only gets an id when the scenario wants to talk about that
+	-- building, and the ones that have one are addressable exactly as actors are.
+	local buildings = {}
+	for _, prefab in ipairs(MISSION.prefabs or {}) do
+		for _, building in ipairs(prefab.buildings or {}) do
+			if building.id then
+				buildings[building.id] = building
+			end
+		end
+	end
+
 	local noCommander = {}
 	for _, team in ipairs(teams) do
 		if team.noCommander then
@@ -277,9 +289,12 @@ local function publish()
 			end
 			return true
 		end,
-		-- Actor records by id, and the unit each one currently is. An actor
-		-- with no entry in `units` is one that has died or never spawned.
+		-- Actor records by id, and the named prefab buildings by theirs. `units`
+		-- holds the unit each one currently is, in one name space, so a trigger
+		-- naming either gets a unit back. A name with no entry in `units` is one
+		-- that has died or never spawned.
 		actors = actors,
+		buildings = buildings,
 		units = {},
 		-- The synced half adds `triggers`, the trigger engine, `vars`, the
 		-- mission's variables, `groups`, the scenario's groups, `objectives`,
@@ -646,8 +661,12 @@ if gadgetHandler:IsSyncedCode() then
 		})
 
 		-- Before the first frame, so a panel reading which unit an actor is finds
-		-- "not on the map" rather than nothing at all.
+		-- "not on the map" rather than nothing at all. Named prefab buildings
+		-- too, because they answer to the same table and the same param.
 		for id in pairs(published.actors) do
+			Spring.SetGameRulesParam(ACTOR_RULES_PREFIX .. id, 0)
+		end
+		for id in pairs(published.buildings) do
 			Spring.SetGameRulesParam(ACTOR_RULES_PREFIX .. id, 0)
 		end
 

@@ -407,6 +407,7 @@ function mission(scenario: Scenario): LuaTable {
             "buildings",
             p.buildings.map((b) =>
               tbl([
+                ["id", b.id],
                 ["def", b.def],
                 ["offset", point(b.offset)],
                 ["facing", b.facing],

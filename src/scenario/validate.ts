@@ -53,7 +53,7 @@ export interface MapExtent {
 /** The parameter kinds that hold a cross-reference, and what to call each one. */
 const NOUN = {
   zoneId: "zone",
-  actorId: "actor",
+  actorId: "actor or building",
   groupId: "group",
   triggerId: "trigger",
   objectiveId: "objective",
@@ -87,10 +87,26 @@ function declared(list: unknown): Set<string> {
   return ids;
 }
 
+/**
+ * The ids the prefab buildings declare. A named building answers to the same
+ * `units` table an actor does, so it is picked out of the same list and resolves
+ * against the same kind (issue #878).
+ */
+function declaredBuildings(prefabs: unknown): Set<string> {
+  const ids = new Set<string>();
+  for (const prefab of asArray(prefabs)) {
+    for (const id of declared(asRecord(prefab).buildings)) ids.add(id);
+  }
+  return ids;
+}
+
 function registries(mission: Record<string, unknown>): Registry {
   return {
     zoneId: declared(mission.zones),
-    actorId: declared(mission.actors),
+    actorId: new Set([
+      ...declared(mission.actors),
+      ...declaredBuildings(mission.prefabs),
+    ]),
     groupId: declared(mission.groups),
     triggerId: declared(mission.triggers),
     objectiveId: declared(mission.objectives),
@@ -130,8 +146,8 @@ function resolve(
 
 /**
  * A `guard` or `attack` order aims at one thing the mission placed, which the
- * document allows to be either an actor or a group, so the target resolves
- * against both registries.
+ * document allows to be an actor, a named prefab building or a group, so the
+ * target resolves against both registries. The first two share a registry.
  */
 function checkOrders(
   value: unknown,
@@ -145,13 +161,13 @@ function checkOrders(
     const where = `${path}[${index}].target`;
     const target = order.target;
     if (typeof target !== "string" || target === "") {
-      issues.push({ path: where, message: "no actor or group given" });
+      issues.push({ path: where, message: "no target given" });
       return;
     }
     if (!known.actorId.has(target) && !known.groupId.has(target)) {
       issues.push({
         path: where,
-        message: `no actor or group called "${target}"`,
+        message: `nothing called "${target}" for an order to aim at`,
       });
     }
   });
@@ -295,6 +311,34 @@ function checkPositions(
 }
 
 /**
+ * Two things answering to one name. Actors and named prefab buildings share the
+ * runtime's `units` table, so a building that takes an actor's id, or another
+ * building's, leaves every trigger naming it pointing at whichever the runtime
+ * placed last.
+ */
+function checkUnitNames(
+  mission: Record<string, unknown>,
+  issues: MissionIssue[],
+): void {
+  const taken = declared(mission.actors);
+  asArray(mission.prefabs).forEach((raw, index) => {
+    const prefab = asRecord(raw);
+    const where = at("prefabs", prefab, index);
+    asArray(prefab.buildings).forEach((entry, i) => {
+      const id = asRecord(entry).id;
+      if (typeof id !== "string" || id === "") return;
+      if (taken.has(id)) {
+        issues.push({
+          path: `${where}.buildings[${i}].id`,
+          message: `"${id}" already names an actor or another building, and a trigger naming it would reach only one of them.`,
+        });
+      }
+      taken.add(id);
+    });
+  });
+}
+
+/**
  * Resolve every cross-reference in an evaluated mission, and report all of them
  * rather than the first. An author fixing one typo at a time through the engine
  * is the failure this whole step exists to avoid.
@@ -354,6 +398,7 @@ export function validateMission(
     });
   });
 
+  checkUnitNames(mission, issues);
   checkPositions(mission, map, issues);
 
   return issues;

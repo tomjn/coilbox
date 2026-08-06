@@ -309,6 +309,30 @@ describe("registryOptions", () => {
     expect(registryOptions(document(), "number")).toBeNull();
     expect(registryOptions(document(), "point")).toBeNull();
   });
+
+  // Issue #878. A trigger that reads an actor reads a named prefab building the
+  // same way, so the picker offers both out of one list.
+  it("offers a named prefab building beside the actors", () => {
+    const scenario: Scenario = {
+      ...document(),
+      prefabs: [
+        {
+          id: "pf1",
+          team: "p0",
+          origin: { x: 500, z: 500 },
+          buildings: [
+            { id: "b1", def: "corlab", offset: { x: 0, z: 0 }, facing: 0 },
+            { def: "cormex", offset: { x: 64, z: 0 }, facing: 0 },
+          ],
+        },
+      ],
+    };
+
+    expect(registryOptions(scenario, "actorId")).toEqual([
+      { value: "a1", label: "armcom", description: "armcom" },
+      { value: "b1", label: "Base 1's corlab", description: "corlab" },
+    ]);
+  });
 });
 
 describe("stepDefaults", () => {
