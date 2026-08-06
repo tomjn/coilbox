@@ -12,26 +12,41 @@ use std::path::{Path, PathBuf};
 /// Candidate `libunitsync` filenames across platforms.
 const UNITSYNC_NAMES: &[&str] = &["libunitsync.dylib", "unitsync.dll", "libunitsync.so"];
 
-/// Resolve the worker path. `UNITSYNC_WORKER` overrides everything (handy for
-/// `tauri dev` and tests); otherwise look for `coilbox-unitsync-worker` (`.exe` on
-/// Windows) in the `.coilbox` subfolder next to the executable (where the Windows
-/// installer tucks sidecars to keep the install root clean), then next to the
-/// executable itself as `externalBin` arranges (dev, and if the move didn't run).
-pub fn resolve_sidecar() -> Option<PathBuf> {
-    if let Ok(p) = std::env::var("UNITSYNC_WORKER") {
-        if !p.is_empty() {
-            return Some(PathBuf::from(p));
-        }
+/// Pick the worker path from an already-read override and executable directory.
+/// The override wins outright. Otherwise look for `coilbox-unitsync-worker` (`.exe`
+/// on Windows) in the `.coilbox` subfolder next to the executable (where the
+/// Windows installer tucks sidecars to keep the install root clean), then next to
+/// the executable itself as `externalBin` arranges (dev, and if the move didn't
+/// run). Split out from `resolve_sidecar` so tests inject rather than set env.
+fn resolve_sidecar_in(
+    worker_override: Option<&str>,
+    exe_dir: Option<&Path>,
+    exists: impl Fn(&Path) -> bool,
+) -> Option<PathBuf> {
+    if let Some(p) = worker_override.filter(|p| !p.is_empty()) {
+        return Some(PathBuf::from(p));
     }
-    let exe = std::env::current_exe().ok()?;
-    let dir = exe.parent()?;
+    let dir = exe_dir?;
     let name = format!("coilbox-unitsync-worker{}", std::env::consts::EXE_SUFFIX);
     let tucked = dir.join(".coilbox").join(&name);
-    if tucked.exists() {
+    if exists(&tucked) {
         return Some(tucked);
     }
     let candidate = dir.join(&name);
-    candidate.exists().then_some(candidate)
+    exists(&candidate).then_some(candidate)
+}
+
+/// Resolve the worker path, reading the `UNITSYNC_WORKER` override (handy for
+/// `tauri dev`) and the executable's directory once here so the choice itself
+/// stays pure.
+pub fn resolve_sidecar() -> Option<PathBuf> {
+    let worker_override = std::env::var("UNITSYNC_WORKER").ok();
+    let exe = std::env::current_exe().ok();
+    resolve_sidecar_in(
+        worker_override.as_deref(),
+        exe.as_deref().and_then(Path::parent),
+        |p| p.exists(),
+    )
 }
 
 /// Find the `libunitsync.*` inside an engine directory (the `Engine.path` from
@@ -618,10 +633,39 @@ mod tests {
     }
 
     #[test]
-    fn resolve_sidecar_honors_env_override() {
-        std::env::set_var("UNITSYNC_WORKER", "/custom/worker");
-        assert_eq!(resolve_sidecar(), Some(PathBuf::from("/custom/worker")));
-        std::env::remove_var("UNITSYNC_WORKER");
+    fn resolve_sidecar_honors_worker_override() {
+        let found = resolve_sidecar_in(Some("/custom/worker"), Some(Path::new("/app")), |_| true);
+        assert_eq!(found, Some(PathBuf::from("/custom/worker")));
+    }
+
+    #[test]
+    fn resolve_sidecar_ignores_empty_override() {
+        let name = format!("coilbox-unitsync-worker{}", std::env::consts::EXE_SUFFIX);
+        let tucked = Path::new("/app").join(".coilbox").join(&name);
+        let found = resolve_sidecar_in(Some(""), Some(Path::new("/app")), |p| p == tucked);
+        assert_eq!(found, Some(tucked));
+    }
+
+    #[test]
+    fn resolve_sidecar_prefers_tucked_then_beside_exe() {
+        let name = format!("coilbox-unitsync-worker{}", std::env::consts::EXE_SUFFIX);
+        let tucked = Path::new("/app").join(".coilbox").join(&name);
+        let beside = Path::new("/app").join(&name);
+
+        let both = resolve_sidecar_in(None, Some(Path::new("/app")), |_| true);
+        assert_eq!(both, Some(tucked));
+
+        let only_beside = resolve_sidecar_in(None, Some(Path::new("/app")), |p| p == beside);
+        assert_eq!(only_beside, Some(beside));
+    }
+
+    #[test]
+    fn resolve_sidecar_absent_without_file_or_exe_dir() {
+        assert_eq!(
+            resolve_sidecar_in(None, Some(Path::new("/app")), |_| false),
+            None
+        );
+        assert_eq!(resolve_sidecar_in(None, None, |_| true), None);
     }
 
     #[test]
