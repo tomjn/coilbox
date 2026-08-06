@@ -66,7 +66,13 @@ return {
       },
     },
   },
-  restrictions = {},
+  restrictions = {
+    buildable = {
+      mode = "deny",
+      units = { "corthud", "armllt" },
+    },
+    commands = { "attack" },
+  },
   vars = {},
   triggers = {
     {

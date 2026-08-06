@@ -278,7 +278,7 @@ Enough to be worth knowing before you adopt it:
 
   Add the guard and nothing else happens. Skip it and the runtime falls back to removing what your game spawned, from load until the end of game frame 1, touching only creations with no builder. That window is no use to a game that spawns later than frame 1: Splinter Faction spawns on frame 1800, and its commanders arrived despite `noCommander` until it took the guard ([issue #884](https://github.com/tomjn/coilbox/issues/884)).
 - **Game over**, through your guard and the anchor unit.
-- **`AllowUnitCreation` and `AllowCommand`, only when a mission restricts something.** Both callins are hot, and a mission that restricts nothing defines neither.
+- **`AllowUnitCreation` and `AllowCommand`, only when a mission restricts something.** Both callins are hot, and a mission that restricts nothing defines neither. A build order the mission forbids is dropped rather than kept, so a factory queue moves on to the order behind it and a builder does not stand at the site retrying. A command the mission withholds never reaches the unit, and the orders the runtime gives its own groups are not held to it.
 
 Everything else your game does carries on. The runtime does not touch your economy, your unit definitions or your own gadgets.
 
@@ -340,7 +340,9 @@ Every `tests/*_test.lua` file, each in its own `luajit`, against a stub of the s
 scripts/mission-headless.sh
 ```
 
-A real engine. It builds a scratch game out of the runtime plus the compiled fixtures and plays each one in `spring-headless`, which simulates with no OpenGL context. A probe gadget stands in for the player: it walks a unit into a zone, kills an actor, hands one over, and checks what the runtime did about it. Nothing in CI runs this, because a runner has no engine, no game and no map. The script's header lists the environment variables that point it at them.
+A real engine. It builds a scratch game out of the runtime plus the compiled fixtures and plays each one in `spring-headless`, which simulates with no OpenGL context. A probe gadget stands in for the player: it walks a unit into a zone, kills an actor, hands one over, tells a factory and a builder to make something the mission forbids, and checks what the runtime did about it. Nothing in CI runs this, because a runner has no engine, no game and no map. The script's header lists the environment variables that point it at them.
+
+The probe also gives an order as the player rather than as the runtime, which is the only way a withheld command can be proved: everything synced Lua gives is `fromLua`, and the runtime lets all of that through. The engine lets a Lua handle put an order on the wire only when the local player controls that handle's team, and a gadget's is every team at once, so the harness turns god mode on to make the local player that controller. It changes who may order what and nothing about how an order is carried or judged.
 
 ```sh
 scripts/mission-sf-proof.sh
@@ -385,10 +387,9 @@ What did not hold was the start, twice over, and both are why contract item 3 ex
 
 ### What is still unproven
 
-Two claims nobody has watched happen, both because Balanced Annihilation's LuaUI does not load against a current engine, which is the game the harness runs on:
+One claim nobody has watched happen, because Balanced Annihilation's LuaUI does not load against a current engine, which is the game the harness runs on:
 
 - **The mission UI widget has never been reached.** The objectives panel, the dialogue panel and the debrief are proved only as far as `coilbox_panel_model.lua`, which is pure and decides what to draw. That the drawing then lands where it should, that the panels do not sit on top of the game's own UI, and that a portrait loads, are open: [issue #850](https://github.com/tomjn/coilbox/issues/850).
-- **Restrictions have never run in an engine.** `AllowUnitCreation` returning `false, true` to clear a factory queue, and `AllowCommand` withholding a command, are the two callins with no fixture behind them, because all three fixtures restrict nothing: [issue #849](https://github.com/tomjn/coilbox/issues/849).
 
 Anything a widget does is OpenGL, a font and a mouse, and none of the three exists outside a running engine, so the widget will always need a real one to settle.
 

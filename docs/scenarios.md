@@ -283,9 +283,8 @@ Honest limits, all of them things you can hit while authoring:
 - **A mission coilbox wrote into a game stays there.** There is no in-app way to remove one: [issue #814](https://github.com/tomjn/coilbox/issues/814).
 - **A scenario cannot be set up without a preset:** [issue #821](https://github.com/tomjn/coilbox/issues/821).
 
-Two things nobody has watched happen, so treat them as unproven rather than working:
+One thing nobody has watched happen, so treat it as unproven rather than working:
 
 - **The objectives panel, dialogue panel and debrief have never been drawn in a real engine.** What they decide to draw is tested outside one, but nothing has confirmed they appear, that they do not sit on top of the game's own UI, or that a portrait loads: [issue #850](https://github.com/tomjn/coilbox/issues/850).
-- **Restrictions have never run in a real engine.** They are proved against a stub only, because none of the runtime's test missions restricts anything: [issue #849](https://github.com/tomjn/coilbox/issues/849).
 
 For what the runtime does and does not do inside the engine, and how a game adopts it, see [the mission runtime](mission-runtime.md).
