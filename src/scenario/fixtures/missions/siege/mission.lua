@@ -2,7 +2,7 @@
 -- Do not edit: change the scenario and compile again.
 return {
   schemaVersion = 1,
-  runtimeVersion = 1,
+  runtimeVersion = 2,
   id = "siege",
   name = "Siege",
   description = "The player must hold the keep before the clock runs out.",
@@ -52,6 +52,7 @@ return {
       origin = { x = 1900, z = 1900 },
       buildings = {
         {
+          id = "keep-lab",
           def = "corlab",
           offset = { x = 0, z = 0 },
           facing = 2,
@@ -59,6 +60,7 @@ return {
           ["repeat"] = true,
         },
         {
+          id = "keep-mex",
           def = "cormex",
           offset = { x = 128, z = 0 },
           facing = 0,
@@ -73,8 +75,28 @@ return {
     },
     commands = { "attack" },
   },
-  vars = {},
+  vars = { labDown = 0 },
   triggers = {
+    {
+      id = "lab-down",
+      enabled = true,
+      ["repeat"] = false,
+      conditions = {
+        op = "all",
+        conditions = {
+          {
+            type = "unit_dead",
+            params = { actor = "keep-lab" },
+          },
+        },
+      },
+      actions = {
+        {
+          type = "set_var",
+          params = { name = "labDown", value = 1 },
+        },
+      },
+    },
     {
       id = "timer",
       enabled = true,
