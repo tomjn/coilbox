@@ -9,10 +9,13 @@
 //!   - `scenarios/<id>.json`              one document per scenario
 //!   - `media/<scenarioId>/<uuid>.<ext>`  dialogue portraits and voice clips
 //!
-//! Media is copied verbatim, with no re-encode. Unlike campaign art, these files
-//! are not shown in a webview. They are written into the game's VFS beside the
-//! compiled mission, so the engine has to load them as they were authored: an
-//! alpha portrait, or an `.ogg` the engine's sound code accepts.
+//! Media is copied verbatim, with no re-encode. These files are written into the
+//! game's VFS beside the compiled mission, so the engine has to load them as they
+//! were authored: an alpha portrait, or an `.ogg` the engine's sound code accepts.
+//! The editor previews them out of this same folder over the `coilbox://`
+//! protocol's `scenario` root (issue #785), which range-serves, so a voice clip
+//! seeks. `scenario_media_read` stays for the export path, where a clip has to be
+//! inlined as base64 anyway.
 //!
 //! Registered as `"coilbox-scenario"`, so the frontend invokes
 //! `plugin:coilbox-scenario|<cmd>`.

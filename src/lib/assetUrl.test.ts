@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { assetUrl, campaignMediaUrl, isLocalRef, mediaKind } from "./assetUrl";
+import {
+  assetUrl,
+  campaignMediaUrl,
+  isLocalRef,
+  mediaKind,
+  scenarioMediaUrl,
+} from "./assetUrl";
 
 // The suite runs under Node (vitest `environment: "node"`), where `navigator`
 // reports a Node UA, so `isWindows()` is false — URLs take the `coilbox://` form.
@@ -23,6 +29,12 @@ describe("assetUrl", () => {
   it("routes campaign media under the campaign root", () => {
     expect(campaignMediaUrl("camp-1", "a.mp4")).toBe(
       "coilbox://localhost/campaign/camp-1/a.mp4",
+    );
+  });
+
+  it("routes a scenario's dialogue clips under the scenario root", () => {
+    expect(scenarioMediaUrl("sc-1", "abc.ogg")).toBe(
+      "coilbox://localhost/scenario/sc-1/abc.ogg",
     );
   });
 });

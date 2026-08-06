@@ -11,6 +11,10 @@
  * Importing one copies the author's file into the scenario's own media folder
  * under a minted name, so the document never depends on where the author keeps
  * their art.
+ *
+ * The preview reads that stored file back over the `coilbox://` protocol's
+ * `scenario` root, so a voice clip streams and seeks like any other audio
+ * source instead of arriving as one base64 string.
  */
 
 import { Button } from "@picoframe/frame";
@@ -23,16 +27,13 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { loadedCampaigns } from "../../../campaign/campaigns";
 import { clipIsAttached } from "../../../campaign/scenarioMedia";
+import { scenarioMediaUrl } from "../../../lib/assetUrl";
 import type { Scenario, ScenarioDialogue } from "../../model";
-import {
-  deleteScenarioMedia,
-  importScenarioMedia,
-  readScenarioMedia,
-} from "../../storage";
+import { deleteScenarioMedia, importScenarioMedia } from "../../storage";
 import { EditorPanel, NameField, TextField } from "./panels";
 import {
   addDialogue,
@@ -291,7 +292,10 @@ function DialogueForm({
       )}
 
       <div className="flex flex-col gap-2 sm:flex-row">
+        {/* Keyed on the file so replacing a clip starts over rather than
+            inheriting the previous one's load failure. */}
         <MediaField
+          key={`portrait:${line.portrait ?? ""}`}
           field="portrait"
           file={line.portrait}
           scenarioId={scenario.id}
@@ -299,6 +303,7 @@ function DialogueForm({
           onDrop={() => void dropMedia("portrait")}
         />
         <MediaField
+          key={`audio:${line.audio ?? ""}`}
           field="audio"
           file={line.audio}
           scenarioId={scenario.id}
@@ -331,7 +336,7 @@ function MediaField({
   onImport: () => void;
   onDrop: () => void;
 }) {
-  const { url, failed } = useStoredMedia(scenarioId, file);
+  const [failed, setFailed] = useState(false);
   const Icon = field === "portrait" ? ImageIcon : Volume2;
 
   return (
@@ -361,19 +366,21 @@ function MediaField({
               The file is in the document but could not be read back, so it will
               be missing from the mission too.
             </p>
-          ) : !url ? (
-            <p className="text-[11px] text-muted-foreground">
-              Reading the file
-            </p>
           ) : field === "portrait" ? (
             <img
-              src={url}
+              src={scenarioMediaUrl(scenarioId, file)}
               alt="The portrait this line shows"
               className="size-24 rounded border border-border/50 object-cover"
+              onError={() => setFailed(true)}
             />
           ) : (
             // biome-ignore lint/a11y/useMediaCaption: the caption of a voice clip is the line's own text, which is in the box above it
-            <audio src={url} controls className="w-full" />
+            <audio
+              src={scenarioMediaUrl(scenarioId, file)}
+              controls
+              className="w-full"
+              onError={() => setFailed(true)}
+            />
           )}
           <p className="truncate font-mono text-[10px] text-muted-foreground">
             {file}
@@ -392,38 +399,4 @@ function MediaField({
       )}
     </section>
   );
-}
-
-/**
- * A stored clip as a `data:` URL, and whether reading it failed, which is a
- * document naming a file that is not there. Read when the line is looked at
- * rather than for the whole list, because the whole file arrives base64 in
- * memory.
- */
-function useStoredMedia(
-  scenarioId: string,
-  file: string | undefined,
-): { url: string | null; failed: boolean } {
-  const [state, setState] = useState<{ url: string | null; failed: boolean }>({
-    url: null,
-    failed: false,
-  });
-
-  useEffect(() => {
-    setState({ url: null, failed: false });
-    if (!file) return;
-    let live = true;
-    readScenarioMedia(scenarioId, file)
-      .then((url) => {
-        if (live) setState({ url, failed: false });
-      })
-      .catch(() => {
-        if (live) setState({ url: null, failed: true });
-      });
-    return () => {
-      live = false;
-    };
-  }, [scenarioId, file]);
-
-  return state;
 }

@@ -44,6 +44,17 @@ export function campaignMediaUrl(campaignId: string, file: string): string {
   return schemeUrl("campaign", `${campaignId}/${file}`);
 }
 
+/**
+ * URL for one of a scenario's dialogue clips, under `scenario/<id>/<file>`. The
+ * scenario editor shows a portrait and plays a voice clip through this rather
+ * than through the plugin's `data:` URL command, which would hold the whole file
+ * base64 in memory and cannot seek (issue #785). The plugin still reads a clip as
+ * a data URL for export, where the bytes have to be inlined anyway.
+ */
+export function scenarioMediaUrl(scenarioId: string, file: string): string {
+  return schemeUrl("scenario", `${scenarioId}/${file}`);
+}
+
 /** URL for a file in the unit builder's base parts pack, under `legopack/<file>`. */
 export function legoPackUrl(file: string): string {
   return schemeUrl("legopack", file);
