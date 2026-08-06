@@ -3,6 +3,7 @@ import { missionPath } from "./compile";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
+  isUnitDefParam,
   type ParamKind,
   type TypeSpec,
 } from "./triggerTypes";
@@ -349,6 +350,171 @@ function checkUnitNames(
   });
 }
 
+/* -------------------------------------------------------------------------- *
+ * Unit types the game does not have.
+ *
+ * Every check above answers out of the compiled file alone. This one cannot: it
+ * needs the game's unit list, which is a unitsync read. So the list is passed
+ * in, and a caller that has no engine to ask still gets every other check.
+ *
+ * The engine's answer to a def it does not know is the same silence it gives a
+ * bad id: `armcomm` spawns nothing and says nothing. That is what makes these
+ * errors rather than warnings. A team's `startUnits` (issue #899) is the sharp
+ * end of it, because that is the force the mission hands the player at the start
+ * position, and a typo there is a mission that opens on an empty patch of map.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The unit defs in `defs` that a game's unit list does not have. Compared case
+ * insensitively, because a def name is written however a scenario's author typed
+ * it and the engine resolves it either way.
+ *
+ * Also what the setup panel's "changing the game" notice reads, so the notice
+ * and the validator answer the same question the same way.
+ */
+export function defsMissingFrom(
+  defs: string[],
+  units: { name: string }[],
+): string[] {
+  const have = new Set(units.map((u) => u.name.toLowerCase()));
+  return defs.filter((def) => !have.has(def.toLowerCase()));
+}
+
+/** One unit def the compiled mission names, and where it sits. */
+interface FoundDef {
+  path: string;
+  def: string;
+}
+
+/**
+ * Every unit def the compiled mission names.
+ *
+ * A named list rather than a walk like {@link pointsIn}, because a def is a bare
+ * string and a walk would sweep up every other string in the file. The places
+ * are: a team's start units, an actor, a group's members, a prefab building and
+ * its factory queue, and the parameters of a known trigger type that hold one.
+ *
+ * A game extension's parameters are left alone, exactly as {@link checkStep}
+ * leaves them: an unknown type's defs are that game's business.
+ */
+function unitDefsIn(mission: Record<string, unknown>): FoundDef[] {
+  const found: FoundDef[] = [];
+  const add = (path: string, value: unknown) => {
+    if (typeof value === "string" && value !== "")
+      found.push({ path, def: value });
+  };
+  const addEach = (path: string, value: unknown) => {
+    asArray(value).forEach((entry, i) => {
+      add(`${path}[${i}]`, entry);
+    });
+  };
+
+  for (const [id, raw] of Object.entries(asRecord(mission.teams))) {
+    addEach(
+      `teams[${JSON.stringify(id)}].startUnits`,
+      asRecord(raw).startUnits,
+    );
+  }
+
+  asArray(mission.actors).forEach((raw, index) => {
+    const actor = asRecord(raw);
+    add(`${at("actors", actor, index)}.unitDef`, actor.unitDef);
+  });
+
+  asArray(mission.groups).forEach((raw, index) => {
+    const group = asRecord(raw);
+    const where = at("groups", group, index);
+    asArray(group.units).forEach((entry, i) => {
+      add(`${where}.units[${i}].def`, asRecord(entry).def);
+    });
+  });
+
+  asArray(mission.prefabs).forEach((raw, index) => {
+    const prefab = asRecord(raw);
+    const where = at("prefabs", prefab, index);
+    asArray(prefab.buildings).forEach((entry, i) => {
+      const building = asRecord(entry);
+      add(`${where}.buildings[${i}].def`, building.def);
+      addEach(`${where}.buildings[${i}].queue`, building.queue);
+    });
+  });
+
+  const stepDefs = (
+    raw: unknown,
+    types: Record<string, TypeSpec>,
+    path: string,
+  ) => {
+    const step = asRecord(raw);
+    const spec = types[typeof step.type === "string" ? step.type : ""];
+    if (!spec) return;
+    const params = asRecord(step.params);
+    for (const name of Object.keys(spec)) {
+      if (!isUnitDefParam(name)) continue;
+      const where = `${path}.params.${name}`;
+      if (spec[name].kind === "strings") addEach(where, params[name]);
+      else add(where, params[name]);
+    }
+  };
+
+  asArray(mission.triggers).forEach((raw, index) => {
+    const trigger = asRecord(raw);
+    const where = at("triggers", trigger, index);
+    asArray(asRecord(trigger.conditions).conditions).forEach((c, i) => {
+      stepDefs(c, CONDITION_TYPES, `${where}.conditions[${i}]`);
+    });
+    asArray(trigger.actions).forEach((a, i) => {
+      stepDefs(a, ACTION_TYPES, `${where}.actions[${i}]`);
+    });
+  });
+
+  return found;
+}
+
+/**
+ * Every unit def the mission names, against the units the game actually has.
+ *
+ * `units` absent means the caller could not ask, so nothing is checked and
+ * nothing is said: that is the pure path, and every other check still runs.
+ * `units` empty means the caller asked and got nothing back, which is a real
+ * state (a game whose unitsync read failed), and it is said rather than passed
+ * over as a mission with no unit problems.
+ */
+function checkUnitDefs(
+  mission: Record<string, unknown>,
+  units: { name: string }[] | undefined,
+  issues: MissionIssue[],
+): void {
+  if (!units) return;
+  const found = unitDefsIn(mission);
+  if (found.length === 0) return;
+
+  const named = typeof mission.game === "string" ? mission.game : "";
+  const game = named === "" ? "the game" : named;
+
+  if (units.length === 0) {
+    issues.push({
+      path: "mission",
+      message: `coilbox could not read ${game}'s units, so the ${found.length} unit type${found.length === 1 ? "" : "s"} this mission names ${found.length === 1 ? "was" : "were"} not checked against it.`,
+      severity: "warning",
+    });
+    return;
+  }
+
+  const missing = new Set(
+    defsMissingFrom(
+      found.map((entry) => entry.def),
+      units,
+    ).map((def) => def.toLowerCase()),
+  );
+  for (const entry of found) {
+    if (!missing.has(entry.def.toLowerCase())) continue;
+    issues.push({
+      path: entry.path,
+      message: `no unit type called "${entry.def}" in ${game}`,
+    });
+  }
+}
+
 /**
  * Text the player reads that nobody wrote.
  *
@@ -395,10 +561,14 @@ function checkText(
  *
  * `map` is the extent of the map the scenario is set on, when the caller knows
  * it. Without it a position is only checked against the near edge.
+ *
+ * `units` is the game's own unit list, when the caller has read one. Without it
+ * no unit def is checked, and every other check still runs.
  */
 export function validateMission(
   mission: unknown,
   map?: MapExtent,
+  units?: { name: string }[],
 ): MissionIssue[] {
   if (!isRecord(mission)) {
     return [
@@ -450,6 +620,7 @@ export function validateMission(
 
   checkUnitNames(mission, issues);
   checkPositions(mission, map, issues);
+  checkUnitDefs(mission, units, issues);
   checkText(mission, issues);
 
   return issues;
@@ -467,6 +638,7 @@ export function validateMission(
 
 /** What each part of a compiled path is called in the editor. */
 const PART: Record<string, string> = {
+  mission: "Mission",
   actors: "Actor",
   groups: "Group",
   prefabs: "Prefab",
@@ -480,6 +652,9 @@ const PART: Record<string, string> = {
   orders: "Order",
   waypoints: "Waypoint",
   buildings: "Building",
+  startUnits: "Start unit",
+  units: "Unit",
+  queue: "Queue item",
 };
 
 /** A name, optionally subscripted by an id or a position. */
@@ -569,6 +744,7 @@ export async function validateCompiledMission(
   root: string,
   scenarioId: string,
   map?: MapExtent,
+  units?: { name: string }[],
 ): Promise<MissionIssue[]> {
   const path = missionPath(scenarioId);
   let mission: unknown;
@@ -578,5 +754,5 @@ export async function validateCompiledMission(
     const message = err instanceof Error ? err.message : String(err);
     return [{ path, message }];
   }
-  return validateMission(mission, map);
+  return validateMission(mission, map, units);
 }

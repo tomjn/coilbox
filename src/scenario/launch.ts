@@ -179,6 +179,14 @@ export interface ScenarioLaunchInput {
    * and without it a position is checked against the near edge only.
    */
   map?: MapExtent;
+  /**
+   * The units the scenario's game has, when the caller has read them. Optional
+   * for the same reason `map` is, and without it a unit def the game does not
+   * have goes unreported. A caller that read the list and got nothing back
+   * passes the empty list, which the validator says so about rather than
+   * treating as a mission with nothing wrong.
+   */
+  units?: { name: string }[];
 }
 
 export type ScenarioLaunchResult =
@@ -228,6 +236,7 @@ async function writeIntoGame(
   root: string,
   scenario: Scenario,
   map?: MapExtent,
+  units?: { name: string }[],
 ): Promise<{ mission: string; issues: MissionIssue[] }> {
   await scenarioWriteMission({
     root,
@@ -236,7 +245,7 @@ async function writeIntoGame(
   });
   return {
     mission: missionPath(scenario.id),
-    issues: await validateCompiledMission(root, scenario.id, map),
+    issues: await validateCompiledMission(root, scenario.id, map, units),
   };
 }
 
@@ -249,8 +258,16 @@ async function writeIntoGame(
 export async function launchScenario(
   input: ScenarioLaunchInput,
 ): Promise<ScenarioLaunchResult> {
-  const { scenario, dataDir, games, rescan, launch, disabledUnits, map } =
-    input;
+  const {
+    scenario,
+    dataDir,
+    games,
+    rescan,
+    launch,
+    disabledUnits,
+    map,
+    units,
+  } = input;
   const wanted = scenario.setup.gameName;
   const game = games.find((g) => g.name === wanted);
   if (!game) {
@@ -277,9 +294,9 @@ export async function launchScenario(
 
   if (adopted) {
     dir = adopted;
-    written = await writeIntoGame(adopted, scenario, map);
+    written = await writeIntoGame(adopted, scenario, map, units);
   } else {
-    const mutator = await writeTestMutator(dataDir, scenario, map);
+    const mutator = await writeTestMutator(dataDir, scenario, map, units);
     dir = mutator.dir;
     written = { mission: missionPath(scenario.id), issues: mutator.issues };
     if (mutator.version < scenario.runtimeVersion) {

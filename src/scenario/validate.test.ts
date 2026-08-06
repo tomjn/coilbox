@@ -10,6 +10,7 @@ vi.mock("./bindings", () => ({
 }));
 
 import {
+  defsMissingFrom,
   describeIssue,
   isBlocking,
   issueLocation,
@@ -268,6 +269,167 @@ describe("validateMission", () => {
     );
 
     expect(issues).toEqual([]);
+  });
+
+  /**
+   * Issue #908. A def the game does not have spawns nothing and says nothing,
+   * which is the silence this whole step exists to break, so it is an error
+   * rather than a warning. The game's unit list is a unitsync read, so it is
+   * passed in, and a caller with no engine to ask still gets every other check.
+   */
+  describe("a unit type the game does not have", () => {
+    const units = [{ name: "armcom" }, { name: "armpw" }, { name: "ARMSOLAR" }];
+
+    /** A def in every place the compiled file can hold one, half of them typos. */
+    const everywhere = () =>
+      mission({
+        game: "Balanced Annihilation",
+        teams: {
+          player: { team: 0, startUnits: ["armpw", "armcomm"] },
+          "Enemy-1": { team: 1 },
+        },
+        groups: [
+          {
+            id: "wave1",
+            team: "Enemy-1",
+            units: [
+              { def: "armpw", count: 2 },
+              { def: "armflashh", count: 1 },
+            ],
+            orders: [],
+          },
+        ],
+        prefabs: [
+          {
+            id: "base",
+            team: "player",
+            buildings: [{ def: "armsolar", queue: ["armpw", "armzeuss"] }],
+          },
+        ],
+        triggers: [
+          {
+            id: "open",
+            enabled: true,
+            repeat: false,
+            conditions: {
+              op: "all",
+              conditions: [
+                {
+                  type: "units_in_zone",
+                  params: { zone: "gate", unitDefs: ["armpw", "armbad"] },
+                },
+              ],
+            },
+            actions: [{ type: "unlock_unit", params: { unitDef: "armlabb" } }],
+          },
+        ],
+      });
+
+    it("validates clean without a unit list, and is refused with one", () => {
+      expect(validateMission(everywhere())).toEqual([]);
+
+      const issues = validateMission(everywhere(), undefined, units);
+
+      expect(issues.map((i) => i.path)).toEqual([
+        'teams["player"].startUnits[1]',
+        'groups["wave1"].units[1].def',
+        'prefabs["base"].buildings[0].queue[1]',
+        'triggers["open"].conditions[0].params.unitDefs[1]',
+        'triggers["open"].actions[0].params.unitDef',
+      ]);
+      expect(issues.every(isBlocking)).toBe(true);
+    });
+
+    it("names the def and the game it is not in", () => {
+      const issues = validateMission(
+        mission({
+          game: "Balanced Annihilation",
+          actors: [{ id: "boss", unitDef: "armcomm", team: "Enemy-1" }],
+          groups: [],
+        }),
+        undefined,
+        units,
+      );
+
+      expect(issues).toEqual([
+        {
+          path: 'actors["boss"].unitDef',
+          message: 'no unit type called "armcomm" in Balanced Annihilation',
+        },
+      ]);
+      expect(describeIssue(issues[0])).toBe(
+        'Actor "boss", unitDef: no unit type called "armcomm" in Balanced Annihilation',
+      );
+    });
+
+    it("resolves a def however the author cased it", () => {
+      expect(
+        validateMission(
+          mission({
+            actors: [{ id: "boss", unitDef: "ArmSolar", team: "player" }],
+          }),
+          undefined,
+          units,
+        ),
+      ).toEqual([]);
+    });
+
+    it("leaves a game extension's defs to the game", () => {
+      expect(
+        validateMission(
+          withStep({ type: "sf_drop", params: { unitDef: "sf_nothing" } }),
+          undefined,
+          units,
+        ),
+      ).toEqual([]);
+    });
+
+    /**
+     * A read that came back with nothing is a real state: a game whose unitsync
+     * read failed answers with an empty list, and every def in the mission would
+     * otherwise be reported as missing. It is said rather than passed over.
+     */
+    it("says it could not check rather than checking against nothing", () => {
+      const issues = validateMission(
+        mission({
+          game: "Balanced Annihilation",
+          actors: [{ id: "boss", unitDef: "armcom", team: "player" }],
+          groups: [],
+        }),
+        undefined,
+        [],
+      );
+
+      expect(issues).toEqual([
+        {
+          path: "mission",
+          message:
+            "coilbox could not read Balanced Annihilation's units, so the 1 unit type this mission names was not checked against it.",
+          severity: "warning",
+        },
+      ]);
+    });
+
+    it("has nothing to say about a mission that names no unit type", () => {
+      expect(
+        validateMission(
+          mission({ actors: [], groups: [], prefabs: [], teams: {} }),
+          undefined,
+          [],
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("defsMissingFrom", () => {
+    it("names the defs a game does not have, case insensitively", () => {
+      expect(
+        defsMissingFrom(
+          ["armcom", "CORCOM", "corak"],
+          [{ name: "ARMCOM" }, { name: "corcom" }],
+        ),
+      ).toEqual(["corak"]);
+    });
   });
 
   /**

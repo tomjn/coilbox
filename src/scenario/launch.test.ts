@@ -264,6 +264,40 @@ describe("launchScenario", () => {
   });
 
   /**
+   * Issue #908. A unit def the game does not have spawns nothing and says
+   * nothing, so the launch is refused. It takes the game's unit list to know,
+   * and without one the same mission goes through.
+   */
+  it("refuses a mission naming a unit the game does not have", async () => {
+    readMissionMock.mockResolvedValue({
+      mission: {
+        schemaVersion: 1,
+        game: "Splinter Faction test",
+        teams: { you: { team: 0, startUnits: ["ak", "liftr"] } },
+      },
+    });
+
+    expect((await run(build(), [LOOSE])).ok).toBe(true);
+
+    const result = await launchScenario({
+      scenario: build(),
+      dataDir: "/data",
+      games: [LOOSE],
+      rescan,
+      launch,
+      units: [{ name: "ak" }, { name: "lifter" }],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.issues.map((i) => i.path)).toEqual([
+      'teams["you"].startUnits[1]',
+    ]);
+    expect(!result.ok && result.message).toContain(
+      'no unit type called "liftr"',
+    );
+  });
+
+  /**
    * Issue #853. A blank objective is a mission that plays, so it is carried out
    * with the result rather than being a reason to refuse the launch.
    */

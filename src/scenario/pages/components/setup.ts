@@ -272,17 +272,6 @@ export function setScenarioGame(
   };
 }
 
-/** The unit defs in `defs` that a game's unit list does not have. Compared case
- *  insensitively, because a def name is written however a scenario's author
- *  typed it and the engine resolves it either way. */
-export function defsMissingFrom(
-  defs: string[],
-  units: { name: string }[],
-): string[] {
-  const have = new Set(units.map((u) => u.name.toLowerCase()));
-  return defs.filter((def) => !have.has(def.toLowerCase()));
-}
-
 /* -------------------------------------------------------------------------- *
  * The participants.
  * -------------------------------------------------------------------------- */
