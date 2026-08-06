@@ -58,6 +58,19 @@ export interface ParamSpec {
 /** The parameters one condition or action type takes, keyed by parameter name. */
 export type TypeSpec = Record<string, ParamSpec>;
 
+/**
+ * A parameter that holds a unit type, which is picked from the game's units
+ * rather than typed. The table calls these plain strings because the runtime
+ * does, so the name is what says a unit belongs in them.
+ *
+ * Here rather than beside the picker that reads it, because the validator asks
+ * the same question of the compiled file (issue #908) and two answers to it
+ * would drift.
+ */
+export function isUnitDefParam(name: string): boolean {
+  return name === "unitDef" || name === "unitDefs";
+}
+
 /** Comparisons a `var` condition can make. */
 export const VAR_OPS = ["eq", "ne", "lt", "lte", "gt", "gte"] as const;
 

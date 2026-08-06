@@ -62,12 +62,12 @@ import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
 import { getProfile } from "@/profile/profile";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario } from "../../model";
+import { defsMissingFrom } from "../../validate";
 import { EditorPanel } from "./panels";
 import { placementDefs, scenarioPlacements } from "./placements";
 import { StartConditions } from "./StartConditions";
 import {
   applyPresetSetup,
-  defsMissingFrom,
   holdsNothing,
   type MapExtent,
   mapCost,

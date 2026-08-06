@@ -35,6 +35,7 @@ import type {
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
+  isUnitDefParam,
   type ParamKind,
   type ParamSpec,
   type TypeSpec,
@@ -526,13 +527,6 @@ export interface StepContext {
   scenario: Scenario;
   /** The unit types the scenario's game has, for a parameter naming one. */
   unitDefs: string[];
-}
-
-/** A parameter that holds a unit type, which is picked from the game's units
- *  rather than typed. The table calls these plain strings because the runtime
- *  does, so the name is what says a unit belongs in them. */
-export function isUnitDefParam(name: string): boolean {
-  return name === "unitDef" || name === "unitDefs";
 }
 
 /** A full set of starting parameters, or what the type needs before it can be

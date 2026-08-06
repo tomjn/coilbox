@@ -37,6 +37,7 @@ import type { Scenario } from "../../model";
 import { MUTATOR_FOLDER } from "../../mutator";
 import { mutatorOffer } from "../../offer";
 import { describeIssue, type MissionIssue } from "../../validate";
+import { useGameUnits } from "./useGameUnits";
 import { useScenarioGate } from "./useScenarioGate";
 
 type Launched = Extract<ScenarioLaunchResult, { ok: true }>;
@@ -88,6 +89,11 @@ export function ScenarioTestDrawer({
       ? // World extent = (samples - 1) x 8 elmos, as `useMissionMapAssets` reports it.
         { width: (samplesX - 1) * 8, height: (samplesZ - 1) * 8 }
       : undefined;
+  // The game's own units, so a unit def it does not have is refused rather than
+  // spawning nothing in silence. The same cached read the editor's pickers make.
+  // A read that has not answered leaves the list empty, which the validator says
+  // it could not check rather than passing over.
+  const gameUnits = useGameUnits(scenario.setup.gameName);
   const play = usePlay();
   const { route, reason, available } = useScenarioGate(scenario);
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
@@ -127,6 +133,7 @@ export function ScenarioTestDrawer({
         dataDir: target.dataDir,
         games: scan.data?.games ?? [],
         map: mapExtent,
+        units: gameUnits.units,
         rescan: async () => {
           setPhase({ state: "scanning" });
           const rescanned = await primeScan(
@@ -217,6 +224,28 @@ export function ScenarioTestDrawer({
               ))}
             </ul>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* What validated as a warning: the mission played, and the player read
+          something in it as a bug. Said after the launch because it is not a
+          reason to refuse one. */}
+      {phase.state === "done" && phase.result.warnings.length > 0 ? (
+        <div className="flex flex-col gap-2 text-xs text-amber-300">
+          <p>
+            The mission played, but{" "}
+            {phase.result.warnings.length === 1
+              ? "one thing in it reads"
+              : `${phase.result.warnings.length} things in it read`}{" "}
+            to a player as a bug:
+          </p>
+          <ul className="flex list-disc flex-col gap-1 pl-4">
+            {phase.result.warnings.map((issue) => (
+              <li key={`${issue.path}:${issue.message}`}>
+                {describeIssue(issue)}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 

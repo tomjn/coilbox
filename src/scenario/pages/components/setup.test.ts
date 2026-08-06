@@ -4,7 +4,6 @@ import { newScenario } from "../../create";
 import type { Scenario } from "../../model";
 import {
   applyPresetSetup,
-  defsMissingFrom,
   holdsNothing,
   mapCost,
   mapExtent,
@@ -249,15 +248,6 @@ describe("changing the game", () => {
   it("hands the document straight back when the game is the same", () => {
     const before = populated();
     expect(setScenarioGame(before, "Game A")).toBe(before);
-  });
-
-  it("names the defs a game does not have, case insensitively", () => {
-    expect(
-      defsMissingFrom(
-        ["armcom", "CORCOM", "corak"],
-        [{ name: "ARMCOM" }, { name: "corcom" }],
-      ),
-    ).toEqual(["corak"]);
   });
 });
 

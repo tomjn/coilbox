@@ -33,12 +33,11 @@ import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ExtensionTypes } from "../../extensions";
 import type { Point, Scenario, ScenarioParam, TriggerStep } from "../../model";
-import type { ParamSpec } from "../../triggerTypes";
+import { isUnitDefParam, type ParamSpec } from "../../triggerTypes";
 import { OrderRow } from "./GroupControls";
 import { orderOfKind, targetOptions, withOrder, withoutOrder } from "./groups";
 import { TeamSelect } from "./TeamSelect";
 import {
-  isUnitDefParam,
   ordersParam,
   type PointTarget,
   paramOrders,

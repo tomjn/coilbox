@@ -32,6 +32,7 @@ import { isMutatorArchive, writeTestMutator } from "./mutator";
 import { packagedArchiveReason } from "./offer";
 import {
   describeIssue,
+  isBlocking,
   type MapExtent,
   type MissionIssue,
   validateCompiledMission,
@@ -178,6 +179,14 @@ export interface ScenarioLaunchInput {
    * and without it a position is checked against the near edge only.
    */
   map?: MapExtent;
+  /**
+   * The units the scenario's game has, when the caller has read them. Optional
+   * for the same reason `map` is, and without it a unit def the game does not
+   * have goes unreported. A caller that read the list and got nothing back
+   * passes the empty list, which the validator says so about rather than
+   * treating as a mission with nothing wrong.
+   */
+  units?: { name: string }[];
 }
 
 export type ScenarioLaunchResult =
@@ -194,6 +203,12 @@ export type ScenarioLaunchResult =
       gameType: string;
       config: BattleConfig;
       exitCode: number | null;
+      /**
+       * What validated as a warning: the mission played, and the player saw
+       * something in it that reads as a bug. Shown after the launch rather than
+       * instead of it.
+       */
+      warnings: MissionIssue[];
     }
   | { ok: false; message: string; issues: MissionIssue[] };
 
@@ -221,6 +236,7 @@ async function writeIntoGame(
   root: string,
   scenario: Scenario,
   map?: MapExtent,
+  units?: { name: string }[],
 ): Promise<{ mission: string; issues: MissionIssue[] }> {
   await scenarioWriteMission({
     root,
@@ -229,7 +245,7 @@ async function writeIntoGame(
   });
   return {
     mission: missionPath(scenario.id),
-    issues: await validateCompiledMission(root, scenario.id, map),
+    issues: await validateCompiledMission(root, scenario.id, map, units),
   };
 }
 
@@ -242,8 +258,16 @@ async function writeIntoGame(
 export async function launchScenario(
   input: ScenarioLaunchInput,
 ): Promise<ScenarioLaunchResult> {
-  const { scenario, dataDir, games, rescan, launch, disabledUnits, map } =
-    input;
+  const {
+    scenario,
+    dataDir,
+    games,
+    rescan,
+    launch,
+    disabledUnits,
+    map,
+    units,
+  } = input;
   const wanted = scenario.setup.gameName;
   const game = games.find((g) => g.name === wanted);
   if (!game) {
@@ -270,9 +294,9 @@ export async function launchScenario(
 
   if (adopted) {
     dir = adopted;
-    written = await writeIntoGame(adopted, scenario, map);
+    written = await writeIntoGame(adopted, scenario, map, units);
   } else {
-    const mutator = await writeTestMutator(dataDir, scenario, map);
+    const mutator = await writeTestMutator(dataDir, scenario, map, units);
     dir = mutator.dir;
     written = { mission: missionPath(scenario.id), issues: mutator.issues };
     if (mutator.version < scenario.runtimeVersion) {
@@ -282,9 +306,13 @@ export async function launchScenario(
     }
   }
 
-  if (written.issues.length > 0) {
-    return refuse(missionIssueMessage(written.issues), written.issues);
+  // Only an error stops the launch. A warning is a mission that plays, so it
+  // rides along with the result and is shown once the game has closed.
+  const blocking = written.issues.filter(isBlocking);
+  if (blocking.length > 0) {
+    return refuse(missionIssueMessage(blocking), blocking);
   }
+  const warnings = written.issues.filter((issue) => !isBlocking(issue));
 
   // An adopted game plays the scenario as itself. The mutator has to be found
   // first: the engine reads its game list from the archive cache unitsync
@@ -338,5 +366,6 @@ export async function launchScenario(
     gameType,
     config,
     exitCode,
+    warnings,
   };
 }

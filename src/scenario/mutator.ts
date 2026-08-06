@@ -104,6 +104,7 @@ export async function writeTestMutator(
   dataDir: string,
   scenario: Scenario,
   map?: MapExtent,
+  units?: { name: string }[],
 ): Promise<TestMutator> {
   const result = await scenarioTestMutator({
     dataDir,
@@ -115,6 +116,6 @@ export async function writeTestMutator(
     dir: result.dir,
     version: result.installed.version,
     mission: `${MUTATOR_FOLDER}/missions/${scenario.id}/mission.lua`,
-    issues: await validateCompiledMission(result.dir, scenario.id, map),
+    issues: await validateCompiledMission(result.dir, scenario.id, map, units),
   };
 }
