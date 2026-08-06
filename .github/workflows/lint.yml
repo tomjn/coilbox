@@ -50,8 +50,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
-      # clippy must compile the Tauri crate before it can lint it, so the same
-      # system libraries the release build needs are required here too.
+      # clippy must compile the Tauri crate before it can lint it, and the test
+      # step links it, so the same system libraries the release build needs are
+      # required here too.
       - name: Linux build dependencies
         run: |
           sudo apt-get update
@@ -76,3 +77,9 @@ jobs:
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
+      # Clippy compiles the #[cfg(test)] modules but never runs them, so a wrong
+      # Rust test would otherwise pass forever. Shares this job's toolchain,
+      # cache and the three prerequisites above rather than paying for them
+      # twice in a job of its own.
+      - name: Cargo test
+        run: cargo test --workspace
