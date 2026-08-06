@@ -36,6 +36,7 @@ import {
   saveScenario,
 } from "../storage";
 import { scenarioImportErrorMessage } from "../transfer";
+import { ReclaimClipsButton } from "./components/ReclaimClipsButton";
 
 /**
  * Scenario Builder landing: create a scenario, import a shared one, and list
@@ -167,6 +168,7 @@ export default function ScenarioBuilderPage() {
             )}
             Rescan
           </Button>
+          <ReclaimClipsButton />
           <Button
             variant="outline"
             className="gap-1.5"

@@ -1,5 +1,6 @@
 import type { OpenResult } from "../container/container";
 import {
+  type MediaSweepSummary,
   scenarioDelete,
   scenarioList,
   scenarioMediaDelete,
@@ -103,17 +104,22 @@ export async function deleteScenarioMedia(
 }
 
 /**
- * Drop every stored media folder whose scenario id is not in `keep`, and say
- * which ones went.
+ * Drop the stored dialogue clips nothing names any more, and say what went.
  *
- * `keep` has to be the whole of what is still named, so a caller that could not
- * read part of it must not call this at all.
+ * `keep` maps a scenario id to the clip names still referenced under it, so a
+ * folder can survive while a clip inside it goes. It has to be the whole of what
+ * is still named, so a caller that could not read part of it must not call this
+ * at all. `apply` false previews without deleting.
  */
 export async function sweepScenarioMedia(
-  keep: Iterable<string>,
-): Promise<string[]> {
-  const { removed } = await scenarioMediaSweep({ keep: [...keep] });
-  return removed;
+  keep: ReadonlyMap<string, ReadonlySet<string>>,
+  apply: boolean,
+): Promise<MediaSweepSummary> {
+  const { summary } = await scenarioMediaSweep({
+    keep: Object.fromEntries([...keep].map(([id, files]) => [id, [...files]])),
+    apply,
+  });
+  return summary;
 }
 
 /**

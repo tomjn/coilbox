@@ -592,49 +592,130 @@ async fn scenario_media_delete<R: Runtime>(
     CliResult::ok(json!({}))
 }
 
-/// `scenario_media_sweep`, dropping every `media/<id>/` folder whose id is not in
-/// `keep` (issue #919).
+/// What a media sweep found, and whether it acted on it. Counts and names are the
+/// same either way, so a dry run is an exact preview of the apply.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct SweepSummary {
+    /// Whether these were actually deleted (`false` for a dry run).
+    applied: bool,
+    /// Scenario ids whose whole `media/<id>/` folder nothing names.
+    folders: Vec<String>,
+    /// `<id>/<file>` clips inside a folder that is still named, where the clip
+    /// itself is not.
+    files: Vec<String>,
+    /// Total size of everything above.
+    bytes: u64,
+}
+
+/// `scenario_media_sweep`, dropping the dialogue clips nothing names any more
+/// (issues #919 and #916).
 ///
-/// A scenario's own clips go when the scenario does, but a bundled campaign's are
-/// written here on the launch path and nothing named them afterwards. A
-/// distribution that stops shipping that campaign leaves the folder behind for
-/// good.
+/// A scenario's own clips go when the scenario does, but two paths deliberately
+/// leave clips behind. A bundled campaign's are written here on the launch path,
+/// and nothing named them afterwards. A scenario a campaign mission attached
+/// keeps its whole folder when it is deleted, and a clip a campaign mission still
+/// names survives being replaced in the editor. Both are right at the moment they
+/// happen, because the mission plays the file by name, and both leave bytes
+/// nothing can reach once that mission is detached or deleted.
 ///
-/// Which ids are still named is the frontend's to decide, because only it reads
-/// the campaign documents. This end does no more than remove what it is told to,
-/// and only folders whose name is a scenario id, so nothing else under `media/`
-/// can be caught by a caller that got its list wrong.
+/// `keep` maps a scenario id to the clip names still referenced under it. A
+/// folder whose id is absent goes whole, and a folder whose id is present keeps
+/// only the names listed. Which those are is the frontend's to decide, because
+/// only it reads the scenario and campaign documents. This end does no more than
+/// remove what it is told to, and only folders whose name is a scenario id
+/// holding files coilbox could itself have written, so nothing else under
+/// `media/` can be caught by a caller that got its list wrong.
+///
+/// `apply` false counts without deleting, so a caller can show what would go
+/// before it goes. Mirrors `content_prune_rapid_pool`.
 #[tauri::command]
-async fn scenario_media_sweep<R: Runtime>(app: AppHandle<R>, keep: Vec<String>) -> CliResult {
+async fn scenario_media_sweep<R: Runtime>(
+    app: AppHandle<R>,
+    keep: std::collections::HashMap<String, Vec<String>>,
+    apply: bool,
+) -> CliResult {
     let dir = match media_dir(&app) {
         Ok(d) => d,
         Err(e) => return CliResult::err(e),
     };
-    CliResult::ok(json!({ "removed": sweep_media(&dir, &keep) }))
+    CliResult::ok(json!({ "summary": sweep_media(&dir, &keep, apply) }))
 }
 
-/// Remove every folder under `dir` whose name is a scenario id not in `keep`,
-/// and say which ones went. A missing `dir` sweeps nothing, because a machine
-/// with no dialogue clips has no folder.
-fn sweep_media(dir: &Path, keep: &[String]) -> Vec<String> {
-    let keep: std::collections::HashSet<&str> = keep.iter().map(String::as_str).collect();
-    let mut removed: Vec<String> = Vec::new();
+/// Size of one file, or 0 when it cannot be read. A file whose length is unknown
+/// is still worth removing, it just does not count towards the total.
+fn file_len(path: &Path) -> u64 {
+    std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+}
+
+/// Total size of a folder's own files, one level deep, which is all a media
+/// folder ever holds.
+fn folder_len(dir: &Path) -> u64 {
     let Ok(entries) = std::fs::read_dir(dir) else {
-        return removed;
+        return 0;
+    };
+    entries.flatten().map(|e| file_len(&e.path())).sum()
+}
+
+/// Remove the clips under `dir` that `keep` does not name, and say what went.
+/// A missing `dir` sweeps nothing, because a machine with no dialogue clips has
+/// no folder.
+fn sweep_media(
+    dir: &Path,
+    keep: &std::collections::HashMap<String, Vec<String>>,
+    apply: bool,
+) -> SweepSummary {
+    let mut out = SweepSummary {
+        applied: apply,
+        ..Default::default()
+    };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return out;
     };
     for entry in entries.flatten() {
         let Some(id) = entry.file_name().to_str().map(str::to_string) else {
             continue;
         };
-        if !valid_id(&id) || keep.contains(id.as_str()) || !entry.path().is_dir() {
+        let path = entry.path();
+        if !valid_id(&id) || !path.is_dir() {
             continue;
         }
-        if std::fs::remove_dir_all(entry.path()).is_ok() {
-            removed.push(id);
+        match keep.get(&id) {
+            None => {
+                out.bytes += folder_len(&path);
+                if !apply || std::fs::remove_dir_all(&path).is_ok() {
+                    out.folders.push(id);
+                }
+            }
+            Some(named) => sweep_folder(&path, &id, named, apply, &mut out),
         }
     }
-    removed.sort();
-    removed
+    out.folders.sort();
+    out.files.sort();
+    out
+}
+
+/// Remove the files in one still-named folder that `named` does not list. Only
+/// plain files under a name coilbox itself mints are touched, so anything else a
+/// user put there is left alone.
+fn sweep_folder(dir: &Path, id: &str, named: &[String], apply: bool, out: &mut SweepSummary) {
+    let named: std::collections::HashSet<&str> = named.iter().map(String::as_str).collect();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Some(file) = entry.file_name().to_str().map(str::to_string) else {
+            continue;
+        };
+        let path = entry.path();
+        if named.contains(file.as_str()) || !safe_media_name(&file) || !path.is_file() {
+            continue;
+        }
+        out.bytes += file_len(&path);
+        if !apply || std::fs::remove_file(&path).is_ok() {
+            out.files.push(format!("{id}/{file}"));
+        }
+    }
 }
 
 /// Build the plugin. Registered as `"coilbox-scenario"` (the crate name minus the
@@ -723,6 +804,20 @@ mod tests {
         assert!(data_uri_bytes(&format!("data:audio/ogg;base64,{huge}")).is_none());
     }
 
+    /// `keep` as the frontend sends it: a scenario id mapped to the clip names
+    /// something still references under it.
+    fn keep(pairs: &[(&str, &[&str])]) -> std::collections::HashMap<String, Vec<String>> {
+        pairs
+            .iter()
+            .map(|(id, files)| {
+                (
+                    (*id).to_string(),
+                    files.iter().map(|f| (*f).to_string()).collect(),
+                )
+            })
+            .collect()
+    }
+
     #[test]
     fn sweep_media_drops_only_the_folders_nothing_names() {
         let tmp = tempfile::tempdir().unwrap();
@@ -734,18 +829,95 @@ mod tests {
         std::fs::create_dir(tmp.path().join("..hidden")).unwrap();
         std::fs::write(tmp.path().join("notes.txt"), b"x").unwrap();
 
-        let removed = sweep_media(tmp.path(), &["kept".to_string()]);
+        let out = sweep_media(tmp.path(), &keep(&[("kept", &["a.png"])]), true);
 
-        assert_eq!(removed, vec!["also-gone".to_string(), "gone".to_string()]);
+        assert_eq!(
+            out.folders,
+            vec!["also-gone".to_string(), "gone".to_string()]
+        );
+        assert!(out.files.is_empty());
+        assert_eq!(out.bytes, 2);
         assert!(tmp.path().join("kept").join("a.png").exists());
         assert!(!tmp.path().join("gone").exists());
         assert!(tmp.path().join("..hidden").exists());
         assert!(tmp.path().join("notes.txt").exists());
     }
 
+    /// Issue #916. The case that matters is the other way round from the folder
+    /// sweep: a clip something still names has to survive one that nothing does,
+    /// in the same folder.
+    #[test]
+    fn sweep_media_keeps_the_named_clips_inside_a_named_folder() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("scen");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::write(dir.join("named.png"), b"kept").unwrap();
+        std::fs::write(dir.join("also-named.ogg"), b"kept too").unwrap();
+        std::fs::write(dir.join("orphan.png"), b"twelve bytes").unwrap();
+        // Not a name coilbox mints, so not this command's to remove either.
+        std::fs::write(dir.join(".DS_Store"), b"x").unwrap();
+        std::fs::create_dir(dir.join("sub")).unwrap();
+
+        let out = sweep_media(
+            tmp.path(),
+            &keep(&[("scen", &["named.png", "also-named.ogg"])]),
+            true,
+        );
+
+        assert!(out.folders.is_empty());
+        assert_eq!(out.files, vec!["scen/orphan.png".to_string()]);
+        assert_eq!(out.bytes, 12);
+        assert!(dir.join("named.png").exists());
+        assert!(dir.join("also-named.ogg").exists());
+        assert!(!dir.join("orphan.png").exists());
+        assert!(dir.join(".DS_Store").exists());
+        assert!(dir.join("sub").exists());
+    }
+
+    /// A folder named with an empty list is still named, so it stays. Only what
+    /// is inside it goes. This is a scenario whose dialogue lost its last clip.
+    #[test]
+    fn sweep_media_empties_a_named_folder_without_removing_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("scen");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::write(dir.join("orphan.png"), b"x").unwrap();
+
+        let out = sweep_media(tmp.path(), &keep(&[("scen", &[])]), true);
+
+        assert_eq!(out.files, vec!["scen/orphan.png".to_string()]);
+        assert!(dir.exists());
+        assert!(!dir.join("orphan.png").exists());
+    }
+
+    #[test]
+    fn sweep_media_dry_run_counts_the_same_and_deletes_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        for id in ["kept", "gone"] {
+            std::fs::create_dir(tmp.path().join(id)).unwrap();
+            std::fs::write(tmp.path().join(id).join("a.png"), b"xy").unwrap();
+        }
+        std::fs::write(tmp.path().join("kept").join("orphan.ogg"), b"xyz").unwrap();
+        let held = keep(&[("kept", &["a.png"])]);
+
+        let dry = sweep_media(tmp.path(), &held, false);
+        assert!(!dry.applied);
+        assert!(tmp.path().join("gone").exists());
+        assert!(tmp.path().join("kept").join("orphan.ogg").exists());
+
+        let applied = sweep_media(tmp.path(), &held, true);
+        assert!(applied.applied);
+        assert_eq!(dry.folders, applied.folders);
+        assert_eq!(dry.files, applied.files);
+        assert_eq!(dry.bytes, applied.bytes);
+        assert_eq!(applied.bytes, 5);
+    }
+
     #[test]
     fn sweep_media_with_a_missing_folder_removes_nothing() {
-        assert!(sweep_media(Path::new("/no/such/media/dir"), &[]).is_empty());
+        let out = sweep_media(Path::new("/no/such/media/dir"), &keep(&[]), true);
+        assert!(out.folders.is_empty() && out.files.is_empty());
+        assert_eq!(out.bytes, 0);
     }
 
     #[test]

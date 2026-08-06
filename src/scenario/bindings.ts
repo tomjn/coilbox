@@ -204,12 +204,26 @@ export const scenarioMediaDelete = defineCommand<
   Record<string, never>
 >("coilbox-scenario", "scenario_media_delete");
 
+/** What a media sweep found, and whether it acted on it. */
+export interface MediaSweepSummary {
+  /** False for a dry run, where the counts are the same but nothing was deleted. */
+  applied: boolean;
+  /** Scenario ids whose whole media folder nothing names. */
+  folders: string[];
+  /** `<scenarioId>/<file>` clips inside a folder that is still named. */
+  files: string[];
+  bytes: number;
+}
+
 /**
- * Drop every stored media folder whose scenario id is not in `keep`, and say
- * which ones went. Which ids are still named is the caller's to work out, so
- * this must never be called on a list that a failed read left short.
+ * Drop the stored dialogue clips nothing names any more. `keep` maps a scenario
+ * id to the clip names still referenced under it: an absent id loses its whole
+ * folder, and a present one keeps only the names listed.
+ *
+ * What is still named is the caller's to work out, so this must never be called
+ * on a keep set that a failed read left short. `apply` false is a dry run.
  */
 export const scenarioMediaSweep = defineCommand<
-  { keep: string[] },
-  { removed: string[] }
+  { keep: Record<string, string[]>; apply: boolean },
+  { summary: MediaSweepSummary }
 >("coilbox-scenario", "scenario_media_sweep");

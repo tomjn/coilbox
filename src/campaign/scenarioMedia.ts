@@ -1,4 +1,9 @@
-import { scenarioMediaRead, scenarioMediaWrite } from "../scenario/bindings";
+import {
+  type MediaSweepSummary,
+  scenarioMediaRead,
+  scenarioMediaWrite,
+} from "../scenario/bindings";
+import type { Scenario } from "../scenario/model";
 import { listScenarios, sweepScenarioMedia } from "../scenario/storage";
 import {
   dropMissingDialogueMedia,
@@ -174,42 +179,79 @@ export async function ensureCampaignScenarioMedia(
   }
 }
 
-/** Every scenario id something on this machine still names its clips by. */
-export function namedScenarioIds(
-  scenarios: readonly { id: string }[],
-  campaigns: readonly Campaign[],
-): Set<string> {
-  const named = new Set<string>();
-  for (const scenario of scenarios) named.add(scenario.id);
-  for (const campaign of campaigns) {
-    for (const mission of campaign.missions) {
-      if (mission.scenario) named.add(mission.scenario.id);
-    }
-  }
-  return named;
-}
-
 /** Whether this session has already swept. */
 let swept = false;
 
 /**
- * Drop the media folders nothing names any more (issue #919).
+ * Every scenario id something on this machine still names its clips by, mapped
+ * to the clip names named under it.
  *
- * A scenario's own clips go when the scenario does. A bundled campaign's are
- * written here on the launch path instead, and the only thing holding them is
- * the campaign still being bundled. A distribution that drops that campaign, or
- * ships a version of it whose scenarios carry different clips, leaves the old
- * folders behind for good. So does a local campaign the author deleted after
- * deleting the scenario it attached, which kept the clips for its sake.
+ * The two holders are a stored scenario's own dialogue and a campaign mission's
+ * snapshot of one, which are exactly the two the delete paths consult before
+ * they keep a file (`scenarioIsAttached` for the folder, {@link clipIsAttached}
+ * for one clip). An id with an empty set is still a held id: the scenario is
+ * there, it just has no dialogue clips left.
+ */
+export function namedScenarioClips(
+  scenarios: readonly Scenario[],
+  campaigns: readonly Campaign[],
+): Map<string, Set<string>> {
+  const named = new Map<string, Set<string>>();
+  const add = (id: string, files: Iterable<string>) => {
+    const held = named.get(id) ?? new Set<string>();
+    for (const file of files) held.add(file);
+    named.set(id, held);
+  };
+  for (const scenario of scenarios) {
+    add(scenario.id, scenarioMediaFiles(scenario));
+  }
+  for (const campaign of campaigns) {
+    for (const [id, files] of referencedClips(campaign)) add(id, files);
+  }
+  return named;
+}
+
+/**
+ * Look at what a sweep would remove, without removing it. For a caller that
+ * shows the answer before acting on it.
+ */
+export async function previewOrphanedScenarioMedia(
+  campaigns: readonly Campaign[],
+): Promise<MediaSweepSummary> {
+  return sweepScenarioMedia(
+    namedScenarioClips(await listScenarios(), campaigns),
+    false,
+  );
+}
+
+/** How many clips a summary covers, counting a whole folder as the one thing
+ * the user thinks of it as. */
+export function sweptCount(summary: MediaSweepSummary): number {
+  return summary.folders.length + summary.files.length;
+}
+
+/**
+ * Drop the dialogue clips nothing names any more (issues #919 and #916).
+ *
+ * A scenario's own clips go when the scenario does, but three paths leave clips
+ * behind on purpose. A bundled campaign's are written here on the launch path,
+ * and the only thing holding them is the campaign still being bundled. A
+ * scenario a campaign mission attached keeps its whole folder when it is
+ * deleted. A clip a campaign mission still names survives being replaced or
+ * cleared in the editor. Each is right when it happens, because that mission
+ * plays the file by name, and each leaves bytes nothing can reach once the
+ * mission is detached or deleted.
  *
  * `campaigns` is every campaign there is, because the caller has just read them
- * all. A partial list would read a folder that is named as one that is not, so
- * a caller that could not read them must not call this at all.
+ * all. A partial list would read a held clip as an orphan, so a caller that
+ * could not read them must not call this at all.
  *
  * Once a session, off the campaign list read, which happens on start for the
- * sidebar's campaign gate. Anything orphaned after that is collected on the next
- * start: these are a handful of small files, so this is tidiness rather than a
- * cost worth scanning the disk repeatedly for.
+ * sidebar's campaign gate. That is before any editor is open, which matters now
+ * this works per clip: the editor writes an imported file to disk before the
+ * document naming it is saved, so a sweep mid-import could take a live clip.
+ * Anything orphaned after that is collected on the next start, or by the
+ * builder's own Reclaim clips control.
  */
 export async function sweepOrphanedScenarioMedia(
   campaigns: readonly Campaign[],
@@ -217,11 +259,15 @@ export async function sweepOrphanedScenarioMedia(
   if (swept) return;
   swept = true;
   try {
-    const removed = await sweepScenarioMedia(
-      namedScenarioIds(await listScenarios(), campaigns),
+    const summary = await sweepScenarioMedia(
+      namedScenarioClips(await listScenarios(), campaigns),
+      true,
     );
-    if (removed.length > 0) {
-      console.info("dropped dialogue clips nothing names", removed);
+    if (sweptCount(summary) > 0) {
+      console.info(
+        `dropped ${sweptCount(summary)} dialogue clip(s) nothing names, ${summary.bytes} bytes`,
+        summary,
+      );
     }
   } catch (e) {
     swept = false;
