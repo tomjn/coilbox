@@ -84,6 +84,71 @@ describe("requiredRuntimeVersion", () => {
   it("is not raised by a type a game extension declares", () => {
     expect(requiredRuntimeVersion(withTrigger(["sf_weather"], []))).toBe(1);
   });
+
+  /**
+   * Issue #878. Runtime 1 ignores a prefab building's id, and `unit_dead` on a
+   * name it has never heard of holds from the first frame, so a scenario naming
+   * a building has to be refused by an older game rather than half played.
+   */
+  describe("a scenario that names a prefab building", () => {
+    const withBase = (target: string): Scenario => {
+      const scenario = withTrigger([], []);
+      return {
+        ...scenario,
+        prefabs: [
+          {
+            id: "keep",
+            team: "player",
+            origin: { x: 500, z: 500 },
+            buildings: [
+              {
+                id: "keep-lab",
+                def: "corlab",
+                offset: { x: 0, z: 0 },
+                facing: 0,
+              },
+            ],
+          },
+        ],
+        triggers: [
+          {
+            ...scenario.triggers[0],
+            conditions: {
+              op: "all",
+              conditions: [{ type: "unit_dead", params: { actor: target } }],
+            },
+          },
+        ],
+      };
+    };
+
+    it("needs the runtime that records which unit it became", () => {
+      expect(requiredRuntimeVersion(withBase("keep-lab"))).toBe(2);
+    });
+
+    it("is left on the first runtime when nothing names one", () => {
+      expect(requiredRuntimeVersion(withBase("some-actor"))).toBe(1);
+    });
+
+    it("counts a group ordered to guard one", () => {
+      const scenario = withBase("some-actor");
+      expect(
+        requiredRuntimeVersion({
+          ...scenario,
+          groups: [
+            {
+              id: "keepers",
+              team: "player",
+              units: [{ def: "armpw", count: 1 }],
+              pos: { x: 600, z: 600 },
+              orders: [{ kind: "guard", target: "keep-lab" }],
+              dormant: false,
+            },
+          ],
+        }),
+      ).toBe(2);
+    });
+  });
 });
 
 describe("gateTarget", () => {

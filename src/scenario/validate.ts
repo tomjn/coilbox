@@ -53,7 +53,7 @@ export interface MapExtent {
 /** The parameter kinds that hold a cross-reference, and what to call each one. */
 const NOUN = {
   zoneId: "zone",
-  actorId: "actor",
+  actorId: "actor or building",
   groupId: "group",
   triggerId: "trigger",
   objectiveId: "objective",
@@ -87,10 +87,26 @@ function declared(list: unknown): Set<string> {
   return ids;
 }
 
+/**
+ * The ids the prefab buildings declare. A named building answers to the same
+ * `units` table an actor does, so it is picked out of the same list and resolves
+ * against the same kind (issue #878).
+ */
+function declaredBuildings(prefabs: unknown): Set<string> {
+  const ids = new Set<string>();
+  for (const prefab of asArray(prefabs)) {
+    for (const id of declared(asRecord(prefab).buildings)) ids.add(id);
+  }
+  return ids;
+}
+
 function registries(mission: Record<string, unknown>): Registry {
   return {
     zoneId: declared(mission.zones),
-    actorId: declared(mission.actors),
+    actorId: new Set([
+      ...declared(mission.actors),
+      ...declaredBuildings(mission.prefabs),
+    ]),
     groupId: declared(mission.groups),
     triggerId: declared(mission.triggers),
     objectiveId: declared(mission.objectives),
@@ -295,6 +311,34 @@ function checkPositions(
 }
 
 /**
+ * Two things answering to one name. Actors and named prefab buildings share the
+ * runtime's `units` table, so a building that takes an actor's id, or another
+ * building's, leaves every trigger naming it pointing at whichever the runtime
+ * placed last.
+ */
+function checkUnitNames(
+  mission: Record<string, unknown>,
+  issues: MissionIssue[],
+): void {
+  const taken = declared(mission.actors);
+  asArray(mission.prefabs).forEach((raw, index) => {
+    const prefab = asRecord(raw);
+    const where = at("prefabs", prefab, index);
+    asArray(prefab.buildings).forEach((entry, i) => {
+      const id = asRecord(entry).id;
+      if (typeof id !== "string" || id === "") return;
+      if (taken.has(id)) {
+        issues.push({
+          path: `${where}.buildings[${i}].id`,
+          message: `"${id}" already names an actor or another building, and a trigger naming it would reach only one of them.`,
+        });
+      }
+      taken.add(id);
+    });
+  });
+}
+
+/**
  * Resolve every cross-reference in an evaluated mission, and report all of them
  * rather than the first. An author fixing one typo at a time through the engine
  * is the failure this whole step exists to avoid.
@@ -354,6 +398,7 @@ export function validateMission(
     });
   });
 
+  checkUnitNames(mission, issues);
   checkPositions(mission, map, issues);
 
   return issues;

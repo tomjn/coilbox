@@ -39,7 +39,12 @@ import {
   type ParamSpec,
   type TypeSpec,
 } from "../../triggerTypes";
-import { groupSize, type TargetOption, uniqueLabels } from "./groups";
+import {
+  buildingTargets,
+  groupSize,
+  type TargetOption,
+  uniqueLabels,
+} from "./groups";
 
 /** Which of a trigger's two step lists a step sits in. */
 export type StepList = "conditions" | "actions";
@@ -421,7 +426,7 @@ export function applyPoint(
  *  type out with. */
 const NEEDS: Record<string, string> = {
   zoneId: "Needs a zone",
-  actorId: "Needs an actor",
+  actorId: "Needs an actor or a base",
   groupId: "Needs a group",
   triggerId: "Needs a trigger",
   objectiveId: "Needs an objective",
@@ -450,15 +455,24 @@ export function registryOptions(
         description: zone.shape,
       }));
     }
+    // Actors and named prefab buildings both, because the runtime holds them in
+    // one table and a trigger naming either gets a unit back (issue #878).
     case "actorId": {
       const labels = uniqueLabels(
         scenario.actors.map((a) => a.state?.name?.trim() || a.unitDef),
       );
-      return scenario.actors.map((actor, i) => ({
-        value: actor.id,
-        label: labels[i],
-        description: actor.unitDef,
-      }));
+      return [
+        ...scenario.actors.map((actor, i) => ({
+          value: actor.id,
+          label: labels[i],
+          description: actor.unitDef,
+        })),
+        ...buildingTargets(scenario.prefabs).map((building) => ({
+          value: building.id,
+          label: building.label,
+          description: building.def,
+        })),
+      ];
     }
     case "groupId":
       return scenario.groups.map((group, i) => ({

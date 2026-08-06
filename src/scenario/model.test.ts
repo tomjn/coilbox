@@ -318,6 +318,29 @@ describe("parseScenario — prefabs", () => {
     expect(s?.prefabs[0].buildings[0].repeat).toBe(true);
   });
 
+  // Issue #878. A building the author named is addressable as an actor is, so
+  // the id has to survive the round trip like every other cross-reference.
+  it("keeps the id a building is named by", () => {
+    const s = parseScenario(
+      doc({
+        prefabs: [
+          {
+            ...prefab,
+            buildings: [
+              { id: "keep-lab", def: "armlab", offset: { x: 0, z: 0 } },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(s?.prefabs[0].buildings[0].id).toBe("keep-lab");
+  });
+
+  it("leaves a building that has none unnamed", () => {
+    const s = parseScenario(doc({ prefabs: [prefab] }));
+    expect(s?.prefabs[0].buildings[0].id).toBeUndefined();
+  });
+
   it("rejects a building with no offset", () => {
     expect(
       parseScenario(

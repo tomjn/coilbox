@@ -104,6 +104,14 @@ export type ScenarioGroup = {
 
 /** One building in a prefab, placed relative to the prefab's origin. */
 export type PrefabBuilding = {
+  /**
+   * The name triggers know this building by, in the same space as `actors`. A
+   * building with one is addressable exactly as an actor is, so "when the keep's
+   * factory dies" is a `unit_dead` on this id. Optional because a base placed
+   * before ids existed has none, and because nothing needs one until a trigger
+   * points at it.
+   */
+  id?: string;
   def: string;
   offset: Point;
   facing: Facing;
@@ -444,6 +452,8 @@ function parseBuildings(value: unknown): PrefabBuilding[] | null {
       offset,
       facing: parseFacing(raw.facing),
     };
+    const bid = id(raw.id);
+    if (bid !== undefined) building.id = bid;
     if (Array.isArray(raw.queue)) building.queue = stringArray(raw.queue);
     if (raw.repeat === true) building.repeat = true;
     out.push(building);

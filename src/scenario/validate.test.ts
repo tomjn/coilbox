@@ -97,7 +97,7 @@ describe("validateMission", () => {
   it("reports a typo in every kind of reference", () => {
     const cases: [string, unknown][] = [
       ["zone", { type: "reveal_area", params: { zone: "gatee" } }],
-      ["actor", { type: "unit_dead", params: { actor: "bosss" } }],
+      ["actor or building", { type: "unit_dead", params: { actor: "bosss" } }],
       ["group", { type: "spawn_group", params: { group: "wave2" } }],
       ["trigger", { type: "enable_trigger", params: { trigger: "shut" } }],
       [
@@ -110,12 +110,57 @@ describe("validateMission", () => {
     ];
 
     for (const [noun, step] of cases) {
-      const kind = noun === "actor" ? "conditions" : "actions";
+      const kind = noun === "actor or building" ? "conditions" : "actions";
       const issues = validateMission(withStep(step, kind));
       expect(issues, noun).toHaveLength(1);
       expect(issues[0].message).toMatch(new RegExp(`^no ${noun} called `));
       expect(issues[0].path).toContain('triggers["open"]');
     }
+  });
+
+  /**
+   * Issue #878. A named prefab building answers to the runtime's `units` table
+   * the way an actor does, so it resolves against the same kind.
+   */
+  describe("a prefab building the scenario named", () => {
+    const base = (buildings: unknown[]) => ({
+      ...withStep(
+        { type: "unit_dead", params: { actor: "keep-lab" } },
+        "conditions",
+      ),
+      prefabs: [{ id: "keep", team: "player", buildings }],
+    });
+
+    it("resolves a trigger that names it", () => {
+      expect(
+        validateMission(base([{ id: "keep-lab", def: "corlab" }])),
+      ).toEqual([]);
+    });
+
+    it("is not resolved when the building carries no id", () => {
+      expect(validateMission(base([{ def: "corlab" }]))).toEqual([
+        {
+          path: 'triggers["open"].conditions[0].params.actor',
+          message: 'no actor or building called "keep-lab"',
+        },
+      ]);
+    });
+
+    it("reports an id an actor or another building already answers to", () => {
+      const issues = validateMission(
+        base([
+          { id: "keep-lab", def: "corlab" },
+          { id: "keep-lab", def: "cormex" },
+          { id: "boss", def: "corllt" },
+        ]),
+      );
+
+      expect(issues.map((i) => i.path)).toEqual([
+        'prefabs["keep"].buildings[1].id',
+        'prefabs["keep"].buildings[2].id',
+      ]);
+      expect(issues[0].message).toContain("already names an actor");
+    });
   });
 
   it("names the parameter that holds the unresolved id", () => {
@@ -149,7 +194,7 @@ describe("validateMission", () => {
 
     expect(issues.map((i) => i.message)).toEqual([
       'no team called "nobody"',
-      'no actor called "ghost"',
+      'no actor or building called "ghost"',
       'no group called "wave2"',
       'no dialogue line called "outro"',
     ]);

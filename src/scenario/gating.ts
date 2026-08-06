@@ -34,12 +34,55 @@ import {
 } from "./triggerTypes";
 
 /**
+ * The runtime that first recorded which unit each named prefab building became
+ * (issue #878). A runtime behind this ignores a building's id, so `unit_dead` on
+ * one holds from the first frame and the mission plays itself out. That is the
+ * silent half-play the version gate exists to refuse.
+ */
+const PREFAB_BUILDING_VERSION = 2;
+
+/** Every string a value carries, however deeply nested. */
+function stringsIn(value: unknown, out: Set<string>): void {
+  if (typeof value === "string") out.add(value);
+  else if (Array.isArray(value)) for (const item of value) stringsIn(item, out);
+  else if (typeof value === "object" && value !== null)
+    for (const item of Object.values(value)) stringsIn(item, out);
+}
+
+/**
+ * Whether any trigger or order names a prefab building.
+ *
+ * Every string in the triggers and in the groups' opening orders, against the
+ * building ids, rather than the parameters the type table calls references. A
+ * building id is minted rather than typed, so a string equal to one is a
+ * reference to it, and reading them all covers an order target and a parameter a
+ * game's own extension declared as readily as a `unit_dead`. Reading too much
+ * only ever raises the version a scenario asks for, which is the safe way to be
+ * wrong.
+ */
+function namesPrefabBuilding(scenario: Scenario): boolean {
+  const ids = new Set(
+    scenario.prefabs.flatMap((p) =>
+      p.buildings.map((b) => b.id).filter((id): id is string => !!id),
+    ),
+  );
+  if (ids.size === 0) return false;
+
+  const named = new Set<string>();
+  stringsIn(scenario.triggers, named);
+  stringsIn(
+    scenario.groups.map((g) => g.orders),
+    named,
+  );
+  return [...ids].some((id) => named.has(id));
+}
+
+/**
  * The lowest mission runtime version that can play a scenario.
  *
  * The floor is {@link SCENARIO_RUNTIME_VERSION}, the version every launch-set
- * feature needs, raised by any trigger type that arrived later. Trigger types
- * are the only part of the format that has grown so far. A later format feature
- * needing a newer runtime raises the floor from here too.
+ * feature needs, raised by any trigger type that arrived later and by any format
+ * feature an older runtime would ignore.
  *
  * `since` is the version table, taken as an argument so the maximum can be
  * exercised while every shipped type is still version 1.
@@ -56,6 +99,9 @@ export function requiredRuntimeVersion(
     for (const step of trigger.actions) {
       version = Math.max(version, since(step.type));
     }
+  }
+  if (namesPrefabBuilding(scenario)) {
+    version = Math.max(version, PREFAB_BUILDING_VERSION);
   }
   return version;
 }
