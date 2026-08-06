@@ -70,7 +70,12 @@ return {
     },
   },
   prefabs = {},
-  restrictions = {},
+  restrictions = {
+    buildable = {
+      mode = "deny",
+      units = { "armestor" },
+    },
+  },
   vars = { garrisonBuilt = 0 },
   triggers = {
     {

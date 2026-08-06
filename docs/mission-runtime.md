@@ -340,7 +340,7 @@ Every `tests/*_test.lua` file, each in its own `luajit`, against a stub of the s
 scripts/mission-headless.sh
 ```
 
-A real engine. It builds a scratch game out of the runtime plus the compiled fixtures and plays each one in `spring-headless`, which simulates with no OpenGL context. A probe gadget stands in for the player: it walks a unit into a zone, kills an actor, hands one over, tells a factory and a builder to make something the mission forbids, and checks what the runtime did about it. Nothing in CI runs this, because a runner has no engine, no game and no map. The script's header lists the environment variables that point it at them.
+A real engine. It builds a scratch game out of the runtime plus the compiled fixtures and plays each one in `spring-headless`, which simulates with no OpenGL context. A probe gadget stands in for the player: it walks a unit into a zone, kills an actor, hands one over, tells a factory and a builder to make something the mission forbids, waits for the mission to unlock one of those, and checks what the runtime did about it. Nothing in CI runs this, because a runner has no engine, no game and no map. The script's header lists the environment variables that point it at them.
 
 The probe also gives an order as the player rather than as the runtime, which is the only way a withheld command can be proved: everything synced Lua gives is `fromLua`, and the runtime lets all of that through. The engine lets a Lua handle put an order on the wire only when the local player controls that handle's team, and a gadget's is every team at once, so the harness turns god mode on to make the local player that controller. It changes who may order what and nothing about how an order is carried or judged.
 

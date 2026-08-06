@@ -385,7 +385,7 @@ Nothing here proves the widget. Everything a widget does is OpenGL, a font and a
 scripts/mission-headless.sh
 ```
 
-The suites above run against a stub, so every engine call in them is a claim read off the engine's source rather than something anyone has watched happen. This settles the ones that can be settled by watching. It builds a scratch game out of `luarules/`, `luaui/` and `missions/` on top of an installed game, and plays each fixture mission in `spring-headless`, which simulates with no OpenGL context. `tests/headless/probe.lua` is the player: a headless run has nobody at the keyboard, so the probe walks a unit into a zone, kills an actor, hands one over, tells a factory and a builder to make something the mission forbids, and checks what the runtime did about it.
+The suites above run against a stub, so every engine call in them is a claim read off the engine's source rather than something anyone has watched happen. This settles the ones that can be settled by watching. It builds a scratch game out of `luarules/`, `luaui/` and `missions/` on top of an installed game, and plays each fixture mission in `spring-headless`, which simulates with no OpenGL context. `tests/headless/probe.lua` is the player: a headless run has nobody at the keyboard, so the probe walks a unit into a zone, kills an actor, hands one over, tells a factory and a builder to make something the mission forbids, waits for the mission to unlock one of those, and checks what the runtime did about it.
 
 It needs a `spring-headless` binary, a game carrying the fixture missions' unit defs (Balanced Annihilation by default) and any map. The script's own header lists the environment variables that point it at them. Nothing in CI runs it, because a runner has none of the three.
 
@@ -400,6 +400,7 @@ What it has settled:
 - A reveal. A capture lights a zone with one spotter, no other ally team can see it, and it comes off the map when its 30 seconds are up.
 - `gift_units` across ally lines. The garrison mission hands the player's squad to an enemy team, and both units arrive.
 - The restrictions. The siege mission denies two unit defs and withholds one command. A factory and a builder both drop a build order for a denied def rather than keeping it, and both build the order behind it. A withheld command given as the player's never reaches the unit, and the same command from the runtime does.
+- `unlock_unit`, the other end of the same mechanism. The garrison mission denies a def from the start and its `unlock` trigger frees it for the player part way through. One builder given one order at one site is refused before that trigger fires and builds after it.
 
 What it has caught:
 
