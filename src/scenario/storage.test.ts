@@ -30,7 +30,6 @@ import {
   importScenario,
   importScenarioMedia,
   listScenarios,
-  readScenarioMedia,
   saveScenario,
 } from "./storage";
 import { encodeScenarioExport, readScenarioExport } from "./transfer";
@@ -177,14 +176,6 @@ describe("deleteScenario and media", () => {
     expect(mediaImportMock).toHaveBeenCalledWith({
       scenarioId: "s1",
       srcPath: "/tmp/portrait.png",
-    });
-  });
-
-  it("reads a stored clip back as a data URL, for the editor to show", async () => {
-    expect(await readScenarioMedia("s1", "abc.png")).toBe(PORTRAIT);
-    expect(mediaReadMock).toHaveBeenCalledWith({
-      scenarioId: "s1",
-      file: "abc.png",
     });
   });
 

@@ -94,21 +94,6 @@ export async function importScenarioMedia(
   return file;
 }
 
-/**
- * A stored dialogue clip as a `data:` URL, for showing a portrait or playing a
- * voice clip in the editor. The whole file is base64 in memory, so read one when
- * it is looked at rather than for every line in the list. Issue #785 covers
- * serving these off the `coilbox://` protocol instead, which would range-serve
- * and so suit a long clip better.
- */
-export async function readScenarioMedia(
-  scenarioId: string,
-  file: string,
-): Promise<string> {
-  const { dataUrl } = await scenarioMediaRead({ scenarioId, file });
-  return dataUrl;
-}
-
 /** Drop a stored dialogue clip. */
 export async function deleteScenarioMedia(
   scenarioId: string,
