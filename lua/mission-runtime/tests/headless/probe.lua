@@ -437,7 +437,22 @@ plans.ambush = {
 }
 
 -- Garrison: counting what a team owns, what it has built since the start, and
--- what a capture reveals.
+-- what a capture reveals. It is also the fixture that unlocks something, so it
+-- is where the other end of a restriction is read.
+--
+-- The def the mission denies from the start and its `unlock` trigger frees for
+-- the player. The same builder is told to put it up twice at the same site, once
+-- before the trigger fires and once after: one order, two answers, and the only
+-- thing between them is the unlock.
+local UNLOCKED_BUILDING = "armestor"
+
+-- Where the probe builds. Well clear of the depot zone on (2000, 2000) and of
+-- everything else the mission and the steps below put on the map. The site is a
+-- search, so its reach is what keeps it out of them.
+local GARRISON_X, GARRISON_Z, GARRISON_AREA = 1200, 1200, 400
+
+local garrisonBuilder, garrisonX, garrisonY, garrisonZ
+
 plans.garrison = {
 	-- The reveal the capture starts runs for 30 seconds, so the fog cannot come
 	-- back before frame 1050 or so.
@@ -455,6 +470,38 @@ plans.garrison = {
 			check("a team's startUnits are on its start position", owns(1, "armck") == 1, owns(1, "armck"))
 			check("what the runtime placed does not count as something the team built",
 				armed("built-outpost") == true)
+			-- Both unlock steps below claim something about a mission that forbids
+			-- the def its unlock trigger frees. A fixture that stopped forbidding it
+			-- would leave them passing on nothing.
+			local buildable = (state().mission.restrictions or {}).buildable
+			check("the scenario forbids the def its unlock trigger frees",
+				buildable ~= nil and buildable.units[1] == UNLOCKED_BUILDING)
+		end },
+		-- The locked def, ordered before anything has unlocked it. The site is found
+		-- rather than named, because the harness runs on whatever map the machine has
+		-- and an order at a site the engine will not take is refused before the
+		-- runtime is asked about it. The builder is put beside the site so the build
+		-- starts where it stands rather than being walked to.
+		{ frame = 6, run = function()
+			-- The player's bank. The scenario says nothing about the player's team, so
+			-- it opens on whatever the game gives it, and a builder that cannot afford
+			-- what it was told to build waits at the site rather than starting, which
+			-- is the answer these steps have to tell a refusal apart from.
+			Spring.SetTeamResource(0, "metal", 1000)
+			Spring.SetTeamResource(0, "energy", 1000)
+			garrisonX, garrisonY, garrisonZ =
+				buildSite(UNLOCKED_BUILDING, GARRISON_X, GARRISON_Z, GARRISON_AREA)
+			check("the map has a site for the building the mission locks", garrisonX ~= nil)
+			garrisonBuilder = Spring.CreateUnit("armck", garrisonX + 64,
+				Spring.GetGroundHeight(garrisonX + 64, garrisonZ), garrisonZ, 0, 0)
+			buildOrder(garrisonBuilder, UNLOCKED_BUILDING, garrisonX, garrisonY, garrisonZ)
+		end },
+		{ frame = 25, run = function()
+			local orders = Spring.GetUnitCommands(garrisonBuilder, -1)
+			check("a def the mission locks is refused before anything unlocks it",
+				#orders == 0, queueText(orders))
+			check("so nothing goes up on a site the engine had no objection to",
+				owns(0, UNLOCKED_BUILDING) == 0, owns(0, UNLOCKED_BUILDING))
 		end },
 		-- Spread, because three units asked for on one spot is the pile-up the
 		-- placement check above exists to refuse.
@@ -479,6 +526,12 @@ plans.garrison = {
 			check("and stayed armed, because it repeats",
 				armed("reinforcement-wave") == true)
 		end },
+		-- The same order again, now that the trigger above has run its unlock_unit.
+		-- Same builder, same site, same def: what is different is the unlock, so what
+		-- the engine does with it next is what the unlock did.
+		{ frame = 65, run = function()
+			buildOrder(garrisonBuilder, UNLOCKED_BUILDING, garrisonX, garrisonY, garrisonZ)
+		end },
 		{ frame = 90, run = function()
 			Spring.CreateUnit("armestor", 400, Spring.GetGroundHeight(400, 400), 400, 0, 1)
 		end },
@@ -489,6 +542,12 @@ plans.garrison = {
 				rules("coilbox_mission_var_garrisonBuilt") == 2,
 				rules("coilbox_mission_var_garrisonBuilt"))
 			check("its disable_trigger left the other one disarmed", armed("count-check") == false)
+		end },
+		-- Before the capture below hands the mission's own building to the player,
+		-- which would make this a count of two.
+		{ frame = 140, run = function()
+			check("and unlock_unit lifts that, so the same order is kept and started",
+				owns(0, UNLOCKED_BUILDING) == 1, owns(0, UNLOCKED_BUILDING))
 		end },
 		{ frame = 150, run = function()
 			Spring.TransferUnit(state().units.outpost, 0, false)
