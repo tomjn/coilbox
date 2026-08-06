@@ -186,6 +186,11 @@ end
 -- `queue` and its `repeat` flag ride along on the placement, because only the
 -- caller can talk to a factory once it exists.
 --
+-- A building the author named carries that name out as the placement's `actor`.
+-- One building under one name is what an actor is, so a named building goes into
+-- the same `units` table and every condition and order target that reads an
+-- actor reads it without knowing the difference (issue #878).
+--
 -- @param mission the compiled mission table
 -- @param plan the result of teamPlan
 -- @return array of placements, array of problems to log
@@ -207,6 +212,7 @@ function M.prefabPlacements(mission, plan)
 			for _, building in ipairs(prefab.buildings or {}) do
 				placements[#placements + 1] = {
 					prefab = prefab.id,
+					actor = building.id,
 					unitDef = building.def,
 					team = team.team,
 					x = prefab.origin.x + building.offset.x,

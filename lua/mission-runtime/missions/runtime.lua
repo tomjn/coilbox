@@ -6,12 +6,18 @@
 -- the engine and in coilbox's sandboxed Lua reader.
 --
 -- version is what a scenario names in its runtimeVersion. Bump it in the same
--- change that adds a condition or action type below. Never drop a type from a
--- version that has shipped: a scenario asking for it would then start silently
--- doing nothing, which is the failure this file exists to prevent.
+-- change that adds a condition or action type below, or a format feature an
+-- older runtime would ignore. Never drop a type from a version that has shipped:
+-- a scenario asking for it would then start silently doing nothing, which is the
+-- failure this file exists to prevent.
+--
+-- 2 added no types. It records which unit each named prefab building became, so
+-- a trigger can name one (issue #878). Version 1 ignores a building's id, and
+-- `unit_dead` on a name it has never heard of holds from the first frame, so a
+-- scenario that names one has to be refused rather than half played.
 
 return {
-	version = 1,
+	version = 2,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,

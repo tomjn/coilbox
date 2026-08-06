@@ -47,7 +47,9 @@ check("a mission defines GetInfo", type(engine.env.GetInfo) == "function")
 engine.env:Initialize()
 check("a mission reaches the rest of the runtime", engine.GG.CoilboxMission ~= nil)
 check("the mission id is the modoption", (engine.GG.CoilboxMission or {}).id == "demo")
-check("the runtime version is the marker file", (engine.GG.CoilboxMission or {}).runtime.version == 1)
+local MARKER = dofile(support.root() .. "/missions/runtime.lua")
+check("the runtime version is the marker file",
+	(engine.GG.CoilboxMission or {}).runtime.version == MARKER.version, tostring(MARKER.version))
 
 engine, result = load({ coilbox_mission = "demo" }, missionFiles(compiled({ map = "Other Map" })))
 check("the wrong map still runs", result ~= false)

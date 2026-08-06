@@ -89,12 +89,13 @@ function M.register(engine, state, hooks)
 		return group
 	end
 
-	--- The units an order's target names: an actor's unit, or a group's living
-	-- units. One name space, because the editor offers the author one list.
+	--- The units an order's target names: an actor's unit, a named prefab
+	-- building's, or a group's living units. One name space, because the editor
+	-- offers the author one list.
 	--
-	-- A declared actor that has died, or a group that has been wiped, is a target
-	-- that is simply not there any more. Only a name the mission never declared
-	-- is worth reporting.
+	-- A declared actor or building that has died, or a group that has been wiped,
+	-- is a target that is simply not there any more. Only a name the mission never
+	-- declared is worth reporting.
 	local function targetsOf(name)
 		local unitID = state.units[name]
 		if unitID then
@@ -103,11 +104,11 @@ function M.register(engine, state, hooks)
 		if members[name] then
 			return members[name]
 		end
-		if state.actors[name] then
+		if state.actors[name] or (state.buildings and state.buildings[name]) then
 			return {}
 		end
 		engine:report("order-target:" .. tostring(name), "warning",
-			"no actor or group named " .. tostring(name) .. " to give an order about")
+			"nothing named " .. tostring(name) .. " to give an order about")
 		return {}
 	end
 
