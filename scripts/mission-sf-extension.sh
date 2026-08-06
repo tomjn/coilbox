@@ -30,7 +30,7 @@
 #                            COILBOX_SPRING_DATA, then one on PATH.
 #   COILBOX_SPRING_DATA      where games/ and maps/ are. Default ~/.spring.
 #   COILBOX_SF_GAME          the game folder under games/. It must be a loose
-#                            .sdd with the runtime installed. Default
+#                            .sdd, and the runtime is installed into it. Default
 #                            SplinterFaction.sdd.
 #   COILBOX_HARNESS_MAP      the map archive's filename under maps/. Default the
 #                            first one there.
@@ -71,17 +71,19 @@ if [ -z "$ENGINE" ] || [ ! -x "$ENGINE" ]; then
 fi
 
 [ -d "$SF_DIR" ] || { echo "no loose game at $SF_DIR" >&2; exit 2; }
-[ -f "$SF_DIR/missions/runtime.lua" ] || {
-  echo "$SF_GAME has no missions/runtime.lua. Install the mission runtime from Content > Games first" >&2
-  exit 2
-}
 # The game's own file, if it ever has one. Overwriting it would be writing over
-# something a maintainer wrote, so this stops instead.
+# something a maintainer wrote, so this stops instead. Checked before the install
+# below, which never writes this file but does create the folder it sits in.
 [ -e "$SF_DIR/missions/extensions.lua" ] && {
   echo "$SF_GAME already has missions/extensions.lua, which is the game's own." >&2
   echo "Move it aside to run this proof against the one in scripts/sf-extension/." >&2
   exit 2
 }
+
+# What a game declares is only worth proving against the runtime that reads it,
+# so the runtime goes in the way coilbox puts it in (issue #934).
+RUNTIME="$(bash "$ROOT/scripts/mission-runtime-install.sh" "$SF_DIR")"
+read -r RUNTIME_VERSION RUNTIME_FILES <<<"$RUNTIME"
 
 MAP_ARCHIVE="${COILBOX_HARNESS_MAP:-}"
 if [ -z "$MAP_ARCHIVE" ]; then
@@ -171,6 +173,7 @@ echo "game:       $BASE_NAME ($SF_GAME)"
 echo "mutator:    $PROBE_NAME"
 echo "map:        $MAP_NAME"
 echo "mission:    $MISSION_DIR/mission.lua"
+echo "runtime:    version $RUNTIME_VERSION, $RUNTIME_FILES files from lua/mission-runtime"
 echo "extensions: $SF_DIR/missions/extensions.lua"
 echo "handler:    $HANDLER_DIR/research.lua"
 echo

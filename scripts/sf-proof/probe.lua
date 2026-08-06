@@ -12,6 +12,9 @@
 --
 -- Every check is one line of stdout, `HARNESS ok` or `HARNESS fail`, and every
 -- reading the script quotes is `HARNESS note`.
+--
+-- `@RUNTIME_VERSION@` is filled in by the script, so this file is not valid Lua
+-- until it has been copied.
 
 function gadget:GetInfo()
 	return {
@@ -28,6 +31,11 @@ function gadget:GetInfo()
 end
 
 local MISSION_ID = Spring.GetModOptions().coilbox_mission
+-- The version the script installed, substituted in on the way past. Written as a
+-- literal here it went stale the first time the runtime's version was bumped,
+-- and the check passed anyway because the game was still holding the old runtime
+-- (issue #934).
+local RUNTIME_VERSION = @RUNTIME_VERSION@
 
 if not gadgetHandler:IsSyncedCode() then
 	-- A headless run is paced by the local server at the speed a player would
@@ -154,7 +162,7 @@ local steps = {
 		check("and it is the mission the modoption named",
 			state and state.id == MISSION_ID, state and state.id)
 		check("the runtime read its own version marker out of the game",
-			state and state.runtime and state.runtime.version == 1,
+			state and state.runtime and state.runtime.version == RUNTIME_VERSION,
 			state and state.runtime and state.runtime.version)
 
 		check("the runtime placed the player's startUnits",

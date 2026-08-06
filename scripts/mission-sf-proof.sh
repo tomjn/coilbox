@@ -7,10 +7,14 @@
 # runtime it runs is the harness's copy rather than a game's.
 #
 # This runs the other way round. The runtime and the compiled mission come out of
-# a real loose game, the one coilbox's "Install the mission runtime" wrote into,
-# and the scratch mutator carries only scripts/sf-proof/probe.lua. So what passes
-# here is the vendored install, on a game with its own start gadget, its own
-# game_end and 158 unit defs of its own.
+# a real loose game, and the scratch mutator carries only
+# scripts/sf-proof/probe.lua. So what passes here is the vendored install, on a
+# game with its own start gadget, its own game_end and 158 unit defs of its own.
+#
+# The runtime goes into that game on the way in, through coilbox's own install
+# (scripts/mission-runtime-install.sh), rather than being trusted to be there.
+# The game keeps whatever it is given, so a proof that trusted it drifted behind
+# main and stayed green anyway (issue #934).
 #
 # It writes src/scenario/fixtures/missions/splinter/mission.lua into the game, at
 # missions/splinter/mission.lua, which is what coilbox's own launch path does.
@@ -28,7 +32,7 @@
 #                            COILBOX_SPRING_DATA, then one on PATH.
 #   COILBOX_SPRING_DATA      where games/ and maps/ are. Default ~/.spring.
 #   COILBOX_SF_GAME          the game folder under games/. It must be a loose
-#                            .sdd with the runtime installed. Default
+#                            .sdd, and the runtime is installed into it. Default
 #                            SplinterFaction.sdd.
 #   COILBOX_HARNESS_MAP      the map archive's filename under maps/. Default the
 #                            first one there.
@@ -72,13 +76,15 @@ if [ -z "$ENGINE" ] || [ ! -x "$ENGINE" ]; then
 fi
 
 [ -d "$SF_DIR" ] || { echo "no loose game at $SF_DIR" >&2; exit 2; }
-# The marker is what coilbox reads back after an install, so its absence means
-# the game has not adopted the runtime and there is nothing here to prove.
-[ -f "$SF_DIR/missions/runtime.lua" ] || {
-  echo "$SF_GAME has no missions/runtime.lua. Install the mission runtime from Content > Games first" >&2
-  exit 2
-}
 [ -f "$MISSION_SRC" ] || { echo "no compiled mission at $MISSION_SRC" >&2; exit 2; }
+
+# Adopt the runtime this repo ships before playing it, which is the install half
+# of the same contract the rest of this script proves. Trusting whatever the
+# game already had meant the proof measured a runtime that had drifted from
+# main, and stayed green for everything the fixtures happen not to use
+# (issue #934).
+RUNTIME="$(bash "$ROOT/scripts/mission-runtime-install.sh" "$SF_DIR")"
+read -r RUNTIME_VERSION RUNTIME_FILES <<<"$RUNTIME"
 
 # The guards are the game's own change, so the proof reads them rather than
 # assuming them, and never writes them without being asked. Each is checked by
@@ -199,7 +205,8 @@ fi
 # Named to sort last so the probe reads a frame every other gadget, the game's
 # and the runtime's alike, has finished with.
 mkdir -p "$PROBE_GAME/LuaRules/Gadgets"
-cp "$PROOF/probe.lua" "$PROBE_GAME/LuaRules/Gadgets/zzz_coilbox_sf_probe.lua"
+sed "s|@RUNTIME_VERSION@|$RUNTIME_VERSION|g" "$PROOF/probe.lua" \
+  >"$PROBE_GAME/LuaRules/Gadgets/zzz_coilbox_sf_probe.lua"
 sed "s|@BASE@|$BASE_NAME|g" "$PROOF/modinfo.lua" >"$PROBE_GAME/modinfo.lua"
 
 discover
@@ -214,6 +221,7 @@ echo "game:    $BASE_NAME ($SF_GAME)"
 echo "mutator: $PROBE_NAME"
 echo "map:     $MAP_NAME"
 echo "mission: $MISSION_DIR/mission.lua"
+echo "runtime: version $RUNTIME_VERSION, $RUNTIME_FILES files from lua/mission-runtime"
 echo "guards:  all three, in the game"
 echo
 
