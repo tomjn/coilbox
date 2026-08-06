@@ -98,13 +98,15 @@ A group has two states, and both matter:
 
 So a dormant garrison is `spawn_group` when you want it standing there and `wake_group` when you want it moving. A reinforcement wave is `wake_group` on its own, which spawns it and sends it off in one action.
 
-Orders are one queue given to every unit in the group. **Move along**, **Patrol** and **Fight along** take a list of waypoints you draw by clicking on the map. **Guard** and **Attack** take an actor or another group as the target. A patrol closes its loop back to where the group is standing, exactly as it would if a player had shift-clicked the same points.
+Orders are one queue given to every unit in the group. **Move along**, **Patrol** and **Fight along** take a list of waypoints you draw by clicking on the map. **Guard** and **Attack** take an actor, a base's building or another group as the target. A patrol closes its loop back to where the group is standing, exactly as it would if a player had shift-clicked the same points.
 
 ### Bases
 
 A base, a prefab in the format, is a group of buildings you drag around as one piece. The buildings are stored as offsets from the base's origin, so moving the origin moves the lot.
 
 Each building carries its own facing. A factory also carries the **Queue** it starts with and whether it builds that queue **over and over**. The picker is limited to the game's static units, because a mobile unit inside a base would be placed off the build grid.
+
+Every building you place can be named by a trigger, the same way an actor can. It appears in the actor picker as "Base 1's corlab", so "when the keep's factory dies" is a **unit dead** condition on that building. A scenario that names one needs mission runtime 2, which is what stops a game with an older runtime playing it with that trigger dead.
 
 ### Zones
 

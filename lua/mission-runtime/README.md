@@ -28,7 +28,8 @@ GG.CoilboxMission = {
   suppressesStart = <function(teamID): does the mission place this team's start?>,
   suppressesEveryStart = <function(): does it place every team's?>,
   actors  = <actor records by scenario id>,
-  units   = <scenario actor id -> unitID, for the actors currently alive>,
+  buildings = <prefab building records by id, for the buildings the scenario named>,
+  units   = <actor or building id -> unitID, for the ones currently alive>,
   triggers = <the trigger engine, synced half only>,
   zones   = <the scenario's zones, corners the right way round, synced half only>,
   vars    = <the mission's variables, synced half only>,
@@ -48,7 +49,7 @@ GG.CoilboxMission = {
 
 The runtime takes over the start rather than sharing it, so a mission plays the same wherever it was launched from:
 
-- `GameStart`: every actor is created at the ground height under its position, each prefab's buildings at their origin plus their own offset, each team's `startUnits` in a square grid on that team's engine start position, and last every group the scenario does not call `dormant`. Actors are addressable afterwards through `GG.CoilboxMission.units`, groups through `GG.CoilboxMission.groups`. Groups are placed last so one ordered to guard an actor has something to guard.
+- `GameStart`: every actor is created at the ground height under its position, each prefab's buildings at their origin plus their own offset, each team's `startUnits` in a square grid on that team's engine start position, and last every group the scenario does not call `dormant`. Actors are addressable afterwards through `GG.CoilboxMission.units`, groups through `GG.CoilboxMission.groups`, and a prefab building the scenario gave an id to through `units` as well. Groups are placed last so one ordered to guard an actor has something to guard.
 - Last of all, one anchor for each mission team a human is playing, so that team can never be empty. See [the anchor](#the-anchor).
 - A building is put through `Spring.Pos2BuildPos` on the way. `Spring.CreateUnit` does not snap, and a base a few elmos off the build grid cannot be rebuilt where it stood and sits at the wrong height on a slope. That call answers with the height a builder would have used, so it replaces the ground read for buildings.
 - Game frame 1: every mission team's bank is set to its `resources`, defaulting to nothing. This is how the normal starting resources are suppressed. `income` is then paid in every frame, spread over the second it is quoted per.
@@ -231,11 +232,13 @@ An order list is one queue. The first command replaces whatever the unit was doi
 - `guard` is one command and no more. Guarding never finishes, so a second queued guard would never come up. A guard on a group names one of its units.
 - `attack` is one command per unit in the target, which is what shift-attacking a squad gives a player and what lets a group work through what it was pointed at.
 
-A target is an actor id or a group id, one name space, because the editor offers the author one list. A declared actor that has died, or a group that has been wiped, is a target that is not there rather than a name the mission got wrong, so only an undeclared name is reported.
+A target is an actor id, a named prefab building's id or a group id, one name space, because the editor offers the author one list. A declared actor or building that has died, or a group that has been wiped, is a target that is not there rather than a name the mission got wrong, so only an undeclared name is reported.
 
 ## Prefab bases
 
 A prefab is a base the author drags around as one piece, so its buildings are stored as offsets from an origin and resolved against it at game start. A building carries its own facing, and a factory carries the `queue` it starts with and whether it `repeat`s.
+
+A building may also carry an `id`, and one that does is addressable exactly as an actor is: the runtime records which unit it became in `GG.CoilboxMission.units`, publishes the building's record in `GG.CoilboxMission.buildings`, and writes the same `coilbox_mission_actor_<id>` rules param. So "when the keep's factory dies" is a `unit_dead` naming the building, with no trigger type of its own. That is what runtime 2 added ([issue #878](https://github.com/tomjn/coilbox/issues/878)), and a scenario that names a building says `runtimeVersion = 2` so a runtime 1 game refuses it rather than reading past the name.
 
 A build order is the negative of the unit def id. The engine reads the shift and control keys on one as "five of these" and "twenty of these", so each is given with no options at all and appends exactly one unit. Build orders always append, so nothing clears the queue either. `repeat` goes last and needs its 0-or-1 parameter, and the engine refuses it outright for a factory whose def cannot repeat, which is the game's decision rather than the mission's.
 

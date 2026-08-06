@@ -296,7 +296,7 @@ A scenario is JSON in coilbox's app data (`scenario/scenarios/<id>.json`, with d
 
 The emitted file is a single `return { ... }` under a two-line header. It is deterministic: array order is document order, every author-keyed table is emitted in sorted key order, Lua keywords are bracketed so a trigger's `repeat` becomes `["repeat"]`, and a non-finite number throws rather than emitting. Two things are added at compile time that the document cannot carry: each participant's engine team number, and the game and map names.
 
-**The compile step doubles as the validator.** After writing, coilbox reads the file back out of the game folder with `coilbox-springlua`, which evaluates loose Spring Lua against a rooted VFS, and asserts that every id reference resolves before the engine sees it: every actor, group and prefab names a team that has an engine team number, every order target names an actor or a group, and every trigger parameter of an id kind resolves against its registry. An unknown step type is skipped, because it belongs to a game extension.
+**The compile step doubles as the validator.** After writing, coilbox reads the file back out of the game folder with `coilbox-springlua`, which evaluates loose Spring Lua against a rooted VFS, and asserts that every id reference resolves before the engine sees it: every actor, group and prefab names a team that has an engine team number, every order target names an actor, a named prefab building or a group, and every trigger parameter of an id kind resolves against its registry. An unknown step type is skipped, because it belongs to a game extension.
 
 The validator is the same code path the engine will take, not a second implementation that can disagree with it. A scenario that does not validate is not launched, and the reasons are shown in editor terms rather than as compiled paths.
 
@@ -308,7 +308,7 @@ Dialogue portraits and clips are copied into `missions/<id>/` beside the compile
 
 ```lua
 return {
-  version = 1,
+  version = 2,
   schemaVersion = 1,
   conditions = { ... },
   actions = { ... },
@@ -317,11 +317,12 @@ return {
 
 Coilbox reads two of these: the one in the game (`installed`) and the one this build ships (`available`). Every type is then in one of three states. `supported` means the installed runtime declares it. `added` means coilbox's does and the installed one does not, so installing or updating brings it. `extra` means the installed runtime declares it and coilbox does not, so the game is ahead of this build.
 
-A scenario records `runtimeVersion`, the lowest runtime that can play it, computed from the trigger types it uses. It is recomputed on every save, by the one function every write goes through, so a stored document always names the runtime it actually needs. Every launch-set type is version 1, so today that number is always 1.
+A scenario records `runtimeVersion`, the lowest runtime that can play it, computed from the trigger types it uses and from the format features it uses. It is recomputed on every save, by the one function every write goes through, so a stored document always names the runtime it actually needs. Every launch-set type is version 1, and the one thing that asks for more is naming a prefab building, which needs 2.
 
 Two rules keep this honest, and both matter to anyone adding a type:
 
-- **Adding a condition or action means adding it to `missions/runtime.lua` and bumping `version` in the same change.**
+- **Adding a condition or action means adding it to `missions/runtime.lua` and bumping `version` in the same change.** So does a format feature an older runtime would read past, because it would play the mission with a piece of it missing.
+- **A format feature that needs a newer runtime raises the floor in `requiredRuntimeVersion`, on the scenarios that actually use it.** Version 2 is not asked for by every scenario with a base, only by one that names a building.
 - **A type that has shipped is never removed.** A scenario asking for it would then silently do nothing, which is the failure the whole capability table exists to prevent.
 
 The editor greys types the target runtime cannot run, and a game vendoring a runtime older than a scenario needs is treated as a game with no runtime at all, so it falls to the mutator rather than playing a mission with silently dead triggers.
