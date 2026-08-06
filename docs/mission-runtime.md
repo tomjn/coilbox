@@ -351,7 +351,9 @@ The probe also gives an order as the player rather than as the runtime, which is
 scripts/mission-sf-proof.sh
 ```
 
-The adoption proof, and it runs the other way round from the two above. Both of those play a runtime the harness itself laid down, which settles the runtime's behaviour and says nothing about adoption. This one plays the runtime out of a real game: the scratch mutator carries only a probe, and depends on a loose Splinter Faction that coilbox's own **Install the mission runtime** button wrote into. It copies `src/scenario/fixtures/missions/splinter/mission.lua` to `missions/splinter/mission.lua` in that game, which is where coilbox's launch path puts a compiled mission, and removes it again unless you pass `--keep-mission`.
+The adoption proof, and it runs the other way round from the two above. Both of those play a runtime the harness itself laid down, which settles the runtime's behaviour and says nothing about adoption. This one plays the runtime out of a real game: the scratch mutator carries only a probe, and it needs a loose Splinter Faction. It copies `src/scenario/fixtures/missions/splinter/mission.lua` to `missions/splinter/mission.lua` in that game, which is where coilbox's launch path puts a compiled mission, and removes it again unless you pass `--keep-mission`.
+
+It installs the runtime into that game on the way in, through `scripts/mission-runtime-install.sh`. A game keeps the runtime it was last given, so a proof that trusted what was there measured a runtime that had drifted behind `main` and stayed green for everything the fixtures happen not to use ([issue #934](https://github.com/tomjn/coilbox/issues/934)). The install is not a shell copy of the real one: the script runs the scenario plugin's own install through a cargo example, so a harness run writes what the **Install the mission runtime** button writes. The other two Splinter Faction scripts install the same way, for the same reason.
 
 ```sh
 scripts/mission-sf-extension.sh
@@ -371,14 +373,13 @@ To play the same mission in coilbox rather than headless, import it: [Play the e
 
 #### Running the proof yourself
 
-The proof needs a game that has taken both halves of the contract, and neither half is in this repo. The runtime comes from coilbox's own install button. The three guards are Splinter Faction's change to make and are not upstream yet, so this repo keeps them as a patch, `scripts/sf-proof/splinterfaction-guards.patch`. That file is the exact text of all three, and it is what a maintainer would be sent.
+The proof needs a game that has taken both halves of the contract. The script puts the runtime in itself. The three guards are Splinter Faction's change to make and are not upstream yet, so this repo keeps them as a patch, `scripts/sf-proof/splinterfaction-guards.patch`. That file is the exact text of all three, and it is what a maintainer would be sent.
 
 1. Clone [Splinter Faction](https://github.com/SplinterFaction/SplinterFaction) into your Spring data folder as `games/SplinterFaction.sdd`.
-2. In coilbox, open **Content > Games**, pick Splinter Faction, and press **Install the mission runtime**.
-3. Run `scripts/mission-sf-proof.sh --apply-guards`. It applies the patch, names the three guards it added and prints the command that undoes them.
-4. You need `spring-headless`, and a map in `maps/`. The script's header lists the environment variables if yours are somewhere other than `~/.spring`.
+2. Run `scripts/mission-sf-proof.sh --apply-guards`. It installs the runtime, applies the patch, names the three guards it added and prints the command that undoes them.
+3. You need `spring-headless`, `cargo`, and a map in `maps/`. The script's header lists the environment variables if yours are somewhere other than `~/.spring`.
 
-Without `--apply-guards` the script checks for the guards and stops, listing what is missing and the `git apply` line that adds it. That is the default because a proof that quietly edits your game install is worse than one that refuses and tells you what to apply. Either way nothing is written into the game without saying so first, and a re-run adds nothing twice.
+Without `--apply-guards` the script checks for the guards and stops, listing what is missing and the `git apply` line that adds it. The runtime goes in unasked and the guards do not, because the runtime is coilbox's own files in coilbox's own folders and the guards are edits to the game's gadgets. A proof that quietly rewrites someone's gadget is worse than one that refuses and tells you what to apply. Either way the script says what it wrote, and a re-run writes the same thing twice.
 
 The patch is stored with this repo's LF line endings while Splinter Faction checks `.lua` out with CRLF, so both the script and the command it prints apply it with `--ignore-whitespace`.
 
