@@ -146,8 +146,8 @@ function resolve(
 
 /**
  * A `guard` or `attack` order aims at one thing the mission placed, which the
- * document allows to be either an actor or a group, so the target resolves
- * against both registries.
+ * document allows to be an actor, a named prefab building or a group, so the
+ * target resolves against both registries. The first two share a registry.
  */
 function checkOrders(
   value: unknown,
@@ -161,13 +161,13 @@ function checkOrders(
     const where = `${path}[${index}].target`;
     const target = order.target;
     if (typeof target !== "string" || target === "") {
-      issues.push({ path: where, message: "no actor or group given" });
+      issues.push({ path: where, message: "no target given" });
       return;
     }
     if (!known.actorId.has(target) && !known.groupId.has(target)) {
       issues.push({
         path: where,
-        message: `no actor or group called "${target}"`,
+        message: `nothing called "${target}" for an order to aim at`,
       });
     }
   });

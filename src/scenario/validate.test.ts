@@ -253,7 +253,7 @@ describe("validateMission", () => {
     expect(issues).toEqual([
       {
         path: 'groups["wave1"].orders[1].target',
-        message: 'no actor or group called "nobody"',
+        message: 'nothing called "nobody" for an order to aim at',
       },
     ]);
   });
