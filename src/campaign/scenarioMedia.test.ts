@@ -28,7 +28,7 @@ import {
   collectCampaignScenarioMedia,
   dropUnavailableDialogueMedia,
   ensureCampaignScenarioMedia,
-  namedScenarioIds,
+  namedScenarioClips,
   restoreCampaignScenarioMedia,
   sweepOrphanedScenarioMedia,
 } from "./scenarioMedia";
@@ -115,7 +115,9 @@ beforeEach(() => {
   mediaWriteMock.mockResolvedValue({});
   campaignListMock.mockResolvedValue({ items: [] });
   scenarioListMock.mockResolvedValue({ items: [] });
-  mediaSweepMock.mockResolvedValue({ removed: [] });
+  mediaSweepMock.mockResolvedValue({
+    summary: { applied: true, folders: [], files: [], bytes: 0 },
+  });
 });
 
 /** A bundled campaign as it sits in `.coilbox/campaigns/`: the exported file. */
@@ -197,31 +199,67 @@ describe("ensureCampaignScenarioMedia", () => {
 describe("collecting the clips nothing names", () => {
   it("holds a scenario's own clips and every campaign's attached ones", () => {
     expect(
-      namedScenarioIds(
-        [{ id: "local" }],
+      namedScenarioClips(
+        [scenario("local")],
         [
           campaign([mission("m1", scenario("attached"))], "c1"),
           campaign([mission("m1"), mission("m2", scenario("bundled"))], "c2"),
         ],
       ),
-    ).toEqual(new Set(["local", "attached", "bundled"]));
+    ).toEqual(
+      new Map([
+        ["local", new Set(["a.png", "a.ogg"])],
+        ["attached", new Set(["a.png", "a.ogg"])],
+        ["bundled", new Set(["a.png", "a.ogg"])],
+      ]),
+    );
+  });
+
+  /**
+   * Issue #916. The clip a campaign mission is holding is not the one the
+   * stored scenario names, which is exactly what #866 and #871 leave behind. Both
+   * have to survive, or the sweep breaks the mission it was written to tidy up
+   * after.
+   */
+  it("unions the stored scenario's clips with what a mission still names", () => {
+    const stored = scenario("s1", {
+      dialogue: [{ id: "d1", speaker: "V", text: "x", portrait: "new.png" }],
+    });
+    const held = scenario("s1", {
+      dialogue: [{ id: "d1", speaker: "V", text: "x", portrait: "old.png" }],
+    });
+
+    expect(
+      namedScenarioClips([stored], [campaign([mission("m1", held)])]),
+    ).toEqual(new Map([["s1", new Set(["new.png", "old.png"])]]));
+  });
+
+  it("holds a scenario with no dialogue as a named folder with no clips", () => {
+    expect(
+      namedScenarioClips([scenario("bare", { dialogue: [] })], []),
+    ).toEqual(new Map([["bare", new Set()]]));
   });
 
   it("holds nothing when there is nothing to hold", () => {
-    expect(namedScenarioIds([], [])).toEqual(new Set());
+    expect(namedScenarioClips([], [])).toEqual(new Map());
   });
 
-  it("hands the sweep every named id and nothing else", async () => {
+  it("hands the sweep every named clip and nothing else", async () => {
     scenarioListMock.mockResolvedValue({
       items: [JSON.stringify(scenario("kept"))].map((json) => ({ json })),
     });
-    mediaSweepMock.mockResolvedValue({ removed: ["gone"] });
+    mediaSweepMock.mockResolvedValue({
+      summary: { applied: true, folders: ["gone"], files: [], bytes: 12 },
+    });
 
     await sweepOrphanedScenarioMedia([
       campaign([mission("m1", scenario("held"))], "c1"),
     ]);
 
-    expect(mediaSweepMock).toHaveBeenCalledWith({ keep: ["kept", "held"] });
+    expect(mediaSweepMock).toHaveBeenCalledWith({
+      keep: { kept: ["a.png", "a.ogg"], held: ["a.png", "a.ogg"] },
+      apply: true,
+    });
   });
 
   it("sweeps once a session", async () => {
