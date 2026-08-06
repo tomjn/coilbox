@@ -392,6 +392,8 @@ The suites above run against a stub, so every engine call in them is a claim rea
 
 It needs a `spring-headless` binary, a game carrying the fixture missions' unit defs (Balanced Annihilation by default) and any map. The script's own header lists the environment variables that point it at them. Nothing in CI runs it, because a runner has none of the three.
 
+The widget half needs a fourth thing. A game's LuaUI entry point includes the `LuaUI/*.lua` a Spring install used to leave loose in the data directory, and a current engine ships none of them: Balanced Annihilation dies on `LuaUI/utils.lua` before it reaches a widget, and so do Metal Factions and Splinter Faction. So the script links the data directory's own `LuaUI/` in beside `base/`, minus a player's widgets and their config, and says so and skips the widget checks when there is none to link.
+
 What it has settled:
 
 - The modoption gate. A game with no `coilbox_mission` loads no runtime gadget at all, so nothing here is in a normal game's way.
@@ -404,6 +406,7 @@ What it has settled:
 - `gift_units` across ally lines. The garrison mission hands the player's squad to an enemy team, and both units arrive.
 - The restrictions. The siege mission denies two unit defs and withholds one command. A factory and a builder both drop a build order for a denied def rather than keeping it, and both build the order behind it. A withheld command given as the player's never reaches the unit, and the same command from the runtime does.
 - `unlock_unit`, the other end of the same mechanism. The garrison mission denies a def from the start and its `unlock` trigger frees it for the player part way through. One builder given one order at one site is refused before that trigger fires and builds after it.
+- The widget, as far as a run with no screen can take it. A real game's own widget handler finds `coilbox_mission_ui.lua` in the vendored `luaui/widgets/`, and it initialises: the panel model and the compiled mission both come out of the archive, and it registers `CoilboxMissionDialogue`. `Script.LuaUI` is how the probe reads that, because the global a widget registers is the one thing about it a gadget can see, and it is what the runtime's own dialogue call reaches. The widget is still registered when the mission ends, having drawn every frame in between: the objectives panel and the debrief run through `gl.Text` and `gl.Rect` for real, and a widget that raised in any callin would have been thrown out with its global. A game with no mission is left with no widget, because the widget takes itself back off.
 
 What it has caught:
 
@@ -412,4 +415,5 @@ What it has caught:
 
 What it still cannot settle:
 
-- The widget, still. The engine loads LuaUI in a headless run, but the game the harness runs on has none that loads against a current engine, so `luaui/widgets/` has never been reached ([#850](https://github.com/tomjn/coilbox/issues/850)).
+- What the widget drew. A headless run has no screen to read back, so the pixels are still nobody's claim: that a panel lands where it should, that it does not sit on top of the game's own UI, and that a portrait loads. `panel_test.lua` is what decides the first two before the drawing, and the run above proves the drawing itself does not raise.
+- That a line of dialogue reached the widget's queue. The probe reads the seam rather than the far side of it: when the runtime hands a line to LuaUI, the widget's global is there to take it. What the widget then does with the line is `panel_test.lua`'s, because the queue is a local in another Lua state.
