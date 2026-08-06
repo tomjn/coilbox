@@ -17,10 +17,18 @@ local missionFiles, fixture = support.missionFiles, support.fixture
 -- The def list starts with one that does nothing at all, because that is what
 -- the runtime builds a spotter from and the fixtures' own defs all move and
 -- shoot.
+--
+-- The rest of the list is the defs the fixtures restrict. The stub invents a def
+-- the first time something spawns one, and a restriction is read at load, before
+-- anything has, so a mission restricting a def nothing has spawned yet would
+-- load as one that restricts nothing.
 local function playing(id)
 	local engine = load({ coilbox_mission = "demo" }, missionFiles(fixture(id)), {
 		startPositions = { [0] = { x = 500, z = 500 }, [1] = { x = 100, z = 100 } },
-		defList = { { name = "marker", speed = 0, weapons = {} } },
+		defList = {
+			{ name = "marker", speed = 0, weapons = {} },
+			{ name = "armestor" }, { name = "armllt" }, { name = "corthud" },
+		},
 	})
 	engine.env:Initialize()
 	engine.env:GameStart()
@@ -37,8 +45,16 @@ check("the trigger engine is published", state.triggers ~= nil)
 check("a trigger the scenario disabled starts disabled", state.triggers:isEnabled("unlock") == false)
 check("every other trigger starts armed", state.triggers:isEnabled("count-check") == true)
 
-check("a mission that restricts nothing enforces nothing",
-	engine.env.AllowUnitCreation == nil and engine.env.AllowCommand == nil)
+-- This mission denies a unit def and withholds no command, so it should have
+-- gained one of the two callins and not the other.
+check("a mission that restricts what may be built enforces that and nothing else",
+	engine.env.AllowUnitCreation ~= nil and engine.env.AllowCommand == nil)
+
+-- The def the mission's unlock trigger frees further down, so the deny and the
+-- lift are read off the same id.
+local storage = engine.env.UnitDefNames["armestor"].id
+check("and the def it denies is one the player may not build",
+	state.restrictions.allowsBuild(storage, 0) == false)
 
 engine.env:GameFrame(0)
 check("nothing fires while the start window is open", state.triggers:isEnabled("count-check") == true)
@@ -55,12 +71,11 @@ engine.env:GameFrame(30)
 check("a unit count reaching its minimum fires", state.triggers:isEnabled("count-check") == false)
 check("a fired trigger's enable_trigger arms another", state.triggers:isEnabled("unlock") == false,
 	"unlock should have been armed and then spent")
--- The armed trigger's one action is an unlock_unit, and this mission restricts
--- nothing, so the unlock has nothing to lift and says so. That report is the
--- proof it ran: an author unlocking a unit the player could already build is
--- told rather than left with a reward that changed nothing.
-check("the trigger it armed ran in the same pass",
-	logged(engine, "nothing restricts armestor for player, so unlock_unit does nothing"))
+-- The armed trigger's one action is the unlock_unit that lifts the deny above.
+check("the trigger it armed ran in the same pass, and its unlock_unit lifted the deny",
+	state.restrictions.allowsBuild(storage, 0) == true)
+check("without reporting a reward the player already had",
+	not logged(engine, "nothing restricts armestor for player, so unlock_unit does nothing"))
 check("the var an earlier action set is what let it hold", state.vars.get("garrisonBuilt") == 1,
 	tostring(state.vars.get("garrisonBuilt")))
 
@@ -137,6 +152,9 @@ check("gifting a group asks for its units on the team the trigger named",
 --------------------------------------------------------------------------------
 
 engine, state = playing("ambush")
+
+check("a mission that restricts nothing enforces nothing",
+	engine.env.AllowUnitCreation == nil and engine.env.AllowCommand == nil)
 
 local scout = state.units.scout
 
