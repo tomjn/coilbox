@@ -34,11 +34,33 @@ if not gadgetHandler:IsSyncedCode() then
 	-- not seconds, so the run is asked for the fastest speed it will give.
 	function gadget:Initialize()
 		Spring.SendCommands("setspeed 20")
+		-- God mode, for one reason only: without it the unsynced half cannot give
+		-- an order at all. The engine lets a Lua handle put an order on the wire
+		-- only when the local player controls the handle's ctrl team, and a
+		-- gadget's is every team at once, which is nobody's. God mode is what
+		-- registers that as a team the player controls. It changes who may order
+		-- what, and nothing about how an order is carried or judged.
+		Spring.SendCommands("cheat", "godmode 3")
 	end
 
-	function gadget:RecvFromSynced(message)
+	--- Give a unit an order the way a player's click does.
+	--
+	-- The unsynced Spring.GiveOrderToUnit puts the order on the wire as the local
+	-- player's, and it comes back into the simulation with fromLua false, the
+	-- same as a click. Everything the synced half gives is fromLua, and the
+	-- runtime lets all of that through on purpose, so this is the only order a
+	-- headless run has that a withheld command can be proved against.
+	local function playerOrder(unitID, cmdID, ...)
+		if not Spring.GiveOrderToUnit(unitID, cmdID, { ... }, 0) then
+			Spring.Echo("HARNESS fail the unsynced half was refused an order for unit " .. tostring(unitID))
+		end
+	end
+
+	function gadget:RecvFromSynced(message, ...)
 		if message == "coilbox_harness_done" then
 			Spring.Quit()
+		elseif message == "coilbox_harness_player_order" then
+			playerOrder(...)
 		end
 	end
 
@@ -130,6 +152,48 @@ local function playerUnit(defName, x, z)
 		Spring.SetUnitBlocking(unitID, false, false)
 	end
 	return unitID
+end
+
+--- A spot within `reach` of (x, z) that `defName` may be built on, or nil.
+--
+-- The harness runs on whatever map the machine has, and a site has to be flat,
+-- dry and clear, so the sites are found by asking the engine rather than named.
+-- An order at a site the engine will not take is refused before the runtime is
+-- asked about it, which would leave a check about a restriction passing on
+-- nothing.
+local function buildSite(defName, x, z, reach)
+	local def = UnitDefNames[defName]
+	for dz = -reach, reach, 16 do
+		for dx = -reach, reach, 16 do
+			if dx * dx + dz * dz <= reach * reach then
+				local bx, by, bz = Spring.Pos2BuildPos(def.id, x + dx,
+					Spring.GetGroundHeight(x + dx, z + dz), z + dz, 0)
+				-- 2 is the engine's answer for both an open square and one a
+				-- feature can be reclaimed off, and a builder sent to the second
+				-- reclaims before it builds. Only the open one will do here.
+				local blocking, feature = Spring.TestBuildOrder(def.id, bx, by, bz, 0)
+				if blocking == 2 and feature == nil then
+					return bx, by, bz
+				end
+			end
+		end
+	end
+end
+
+--- Order a builder to put a def up at a spot, the way a player's click does.
+local function buildOrder(unitID, defName, x, y, z)
+	Spring.GiveOrderToUnit(unitID, -UnitDefNames[defName].id, { x, y, z, 0 }, 0)
+end
+
+--- A command queue as something a failed check can print. A negative command id
+-- is a def id, which is what a build order is.
+local function queueText(queue)
+	local names = {}
+	for i, command in ipairs(queue) do
+		local id = command.id
+		names[i] = (id < 0 and UnitDefs[-id] and UnitDefs[-id].name) or tostring(id)
+	end
+	return "[" .. table.concat(names, ", ") .. "]"
 end
 
 --------------------------------------------------------------------------------
@@ -470,12 +534,33 @@ plans.garrison = {
 }
 
 -- Siege: a prefab base, a standing group, and a zone the player has to hold for
--- a minute before the mission ends.
+-- a minute before the mission ends. It is also the fixture that restricts
+-- something, so it is where the two callins only an engine can settle are read.
 --
 -- The unit doing the holding, and where it was put. A hold that never completes
 -- has two possible causes, the runtime's clock and a unit that wandered off, and
 -- reading the position back tells them apart.
 local siegeUnit, siegeX, siegeZ
+
+-- What the mission forbids and, beside each, something it says nothing about.
+-- The keep's factory builds the first pair and a construction kbot the second.
+-- The allowed one is the control: without it a queue that is empty because
+-- nothing was ever built reads as the restriction working. Neither of them is a
+-- def the mission places, so counting what a team owns counts only these.
+local FORBIDDEN_UNIT, ALLOWED_UNIT = "corthud", "corstorm"
+local FORBIDDEN_BUILDING, ALLOWED_BUILDING = "armllt", "armsolar"
+
+-- Where the probe works, both well clear of the keep: nothing in the mission is
+-- in range of either, and nothing put up here stands in the zone being held.
+-- The build area is a search, so its reach is what keeps it out of the keep.
+local BUILD_AREA_X, BUILD_AREA_Z, BUILD_AREA = 1200, 1200, 400
+local ORDERED_X, ORDERED_Z = 1000, 1000
+
+-- How far from the builder a site may be. Its build range is 130 elmos, and a
+-- site outside that is one it walks to rather than one it starts.
+local BUILD_REACH = 110
+
+local siegeBuilder, siegeOrdered
 
 plans.siege = {
 	-- The hold is 60 seconds and the player's unit walks in at frame 30, so the
@@ -496,6 +581,12 @@ plans.siege = {
 			check("a prefab's other buildings are placed too", owns(1, "cormex") == 1, owns(1, "cormex"))
 			check("the mission has not ended", rules("coilbox_mission_over") == 0)
 			check("nor has its objective", rules("coilbox_mission_objective_take-keep") == ACTIVE)
+			-- Everything the restriction steps below claim is about a mission
+			-- that restricts something. A fixture that quietly stopped would
+			-- leave them all passing on nothing.
+			local restrictions = state().mission.restrictions or {}
+			check("the scenario forbids a unit def and withholds a command",
+				restrictions.buildable ~= nil and #(restrictions.commands or {}) > 0)
 		end },
 		-- The south-east of the keep, which is the far side of the zone from the
 		-- base. Balanced Annihilation's Prevent Lab Hax gadget teleports any enemy
@@ -509,6 +600,108 @@ plans.siege = {
 			siegeUnit = playerUnit("armpeep", 2100, 2100)
 			local x, _, z = Spring.GetUnitPosition(siegeUnit)
 			siegeX, siegeZ = x, z
+		end },
+		-- Restrictions. The mission denies two unit defs and withholds one
+		-- command, and neither of the callins the runtime answers those with has
+		-- ever been read anywhere but the engine's source.
+		--
+		-- A builder first. Its sites are found rather than named, because the
+		-- harness runs on whatever map the machine has and an order at a site the
+		-- engine will not take is refused before the runtime is asked about it. The
+		-- builder is put beside the site it is allowed, so both are inside its build
+		-- range and are started where it stands rather than walked to. The forbidden
+		-- one is ordered first: a builder that stands at the site retrying rather
+		-- than dropping the order never reaches the second.
+		{ frame = 300, run = function()
+			-- The player's bank, which the scenario says nothing about and the game's
+			-- own start leaves nearly empty. A builder that cannot afford what it was
+			-- told to build waits at the site rather than starting, which is the
+			-- answer this step is trying to tell a refusal apart from.
+			Spring.SetTeamResource(0, "metal", 1000)
+			Spring.SetTeamResource(0, "energy", 1000)
+			local ax, ay, az = buildSite(ALLOWED_BUILDING, BUILD_AREA_X, BUILD_AREA_Z, BUILD_AREA)
+			check("the map has a site for the building the mission allows", ax ~= nil)
+			siegeBuilder = Spring.CreateUnit("armck", ax + 64,
+				Spring.GetGroundHeight(ax + 64, az), az, 0, 0)
+			local fx, fy, fz = buildSite(FORBIDDEN_BUILDING, ax + 64, az, BUILD_REACH)
+			check("and one in the builder's reach for the building it forbids", fx ~= nil)
+			buildOrder(siegeBuilder, FORBIDDEN_BUILDING, fx, fy, fz)
+			buildOrder(siegeBuilder, ALLOWED_BUILDING, ax, ay, az)
+		end },
+		{ frame = 400, run = function()
+			local orders = Spring.GetUnitCommands(siegeBuilder, -1)
+			check("a builder given an order for what the mission forbids does not keep it",
+				#orders == 1 and orders[1].id == -UnitDefNames[ALLOWED_BUILDING].id, queueText(orders))
+			check("and nothing forbidden goes up on a site the engine had no objection to",
+				owns(0, FORBIDDEN_BUILDING) == 0, owns(0, FORBIDDEN_BUILDING))
+			check("while the order behind it is started",
+				owns(0, ALLOWED_BUILDING) == 1, owns(0, ALLOWED_BUILDING))
+		end },
+		-- Then the keep's own factory. It comes with the prefab's queue and a unit
+		-- already on the pad, and both have to go before the probe's pair can be
+		-- what it builds next: a queued build order comes off a factory by being
+		-- right-clicked rather than stopped, and a factory with something under
+		-- construction starts nothing else until that is gone.
+		{ frame = 420, run = function()
+			local lab = find(1, "corlab")
+			Spring.GiveOrderToUnit(lab, CMD.REPEAT, { 0 }, 0)
+			for _, defName in ipairs({ "corak", FORBIDDEN_UNIT }) do
+				-- Ctrl is twenty of them and alt takes them off the front, which
+				-- between them is the whole queue.
+				Spring.GiveOrderToUnit(lab, -UnitDefNames[defName].id, {},
+					{ "right", "ctrl", "alt" })
+			end
+			local onThePad = Spring.GetUnitIsBuilding(lab)
+			if onThePad then
+				Spring.DestroyUnit(onThePad, false, true)
+			end
+		end },
+		{ frame = 450, run = function()
+			local lab = find(1, "corlab")
+			local queue = Spring.GetFactoryCommands(lab, -1)
+			check("the probe emptied the keep factory's queue", #queue == 0, queueText(queue))
+			-- The forbidden def first, and the queue read straight back: a factory
+			-- keeps an order it may not build yet, so one it has dropped is gone by
+			-- the time the order behind it is given.
+			Spring.GiveOrderToUnit(lab, -UnitDefNames[FORBIDDEN_UNIT].id, {}, 0)
+			Spring.GiveOrderToUnit(lab, -UnitDefNames[ALLOWED_UNIT].id, {}, 0)
+			queue = Spring.GetFactoryCommands(lab, -1)
+			check("a factory given an order for what the mission forbids does not keep it",
+				#queue == 1 and queue[1].id == -UnitDefNames[ALLOWED_UNIT].id, queueText(queue))
+		end },
+		{ frame = 510, run = function()
+			check("and builds the order behind it rather than jamming on it",
+				owns(1, ALLOWED_UNIT) == 1, owns(1, ALLOWED_UNIT))
+			check("while nothing forbidden reaches the map",
+				owns(1, FORBIDDEN_UNIT) == 0, owns(1, FORBIDDEN_UNIT))
+		end },
+		{ frame = 600, run = function()
+			siegeOrdered = playerUnit("armpw", ORDERED_X, ORDERED_Z)
+			-- The engine refuses a player's attack on a unit that player cannot
+			-- see, and a refusal there would look exactly like the restriction
+			-- working. The mission's own attack below is not held to it, because
+			-- a synced order counts as coming from inside the game.
+			local seen = Spring.GetUnitLosState(state().units.warlord, 0) or {}
+			check("the unit the player is about to be told to attack is one the player can see",
+				seen.los == true, tostring(seen.los))
+			-- Two orders down the one path a headless run has for an order that
+			-- is not the runtime's own: the withheld one, then one the mission
+			-- says nothing about.
+			SendToUnsynced("coilbox_harness_player_order", siegeOrdered, CMD.ATTACK,
+				state().units.warlord)
+			SendToUnsynced("coilbox_harness_player_order", siegeOrdered, CMD.MOVE,
+				ORDERED_X, Spring.GetGroundHeight(ORDERED_X, ORDERED_Z - 500), ORDERED_Z - 500)
+		end },
+		{ frame = 660, run = function()
+			local orders = Spring.GetUnitCommands(siegeOrdered, -1)
+			check("a command the mission withholds never reaches a unit the player orders",
+				#orders == 1 and orders[1].id == CMD.MOVE, queueText(orders))
+			Spring.GiveOrderToUnit(siegeOrdered, CMD.ATTACK, { state().units.warlord }, 0)
+		end },
+		{ frame = 665, run = function()
+			local orders = Spring.GetUnitCommands(siegeOrdered, -1)
+			check("and the same command from the runtime itself is let through",
+				#orders == 1 and orders[1].id == CMD.ATTACK, queueText(orders))
 		end },
 		{ frame = 1500, run = function()
 			check("a hold short of the minute settles nothing",
