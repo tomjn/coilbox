@@ -12,14 +12,22 @@
 # a stub of the engine. This proves the claims only a real one can settle: that
 # the modoption gate keeps the gadget out of a normal game, that a prefab's
 # factory queue is what the prefab wrote, that a rules param comes back out, that
-# the start suppression works against a game's own start, and that the whole
-# thing loads at all.
+# the start suppression works against a game's own start, that a real game's
+# widget handler loads the mission widget out of the vendored luaui/widgets, and
+# that the whole thing loads at all.
 #
 # Usage: scripts/mission-headless.sh [mission ...]
 # Default: gate, ambush, garrison, siege.
 #
 # Needs a headless engine, a game carrying the fixtures' unit defs (Balanced
 # Annihilation by default) and any map.
+#
+# The widget half needs one thing more. A game's LuaUI entry point includes the
+# LuaUI/*.lua a Spring install used to leave in the data directory, and a current
+# engine ships none of them: Balanced Annihilation dies on LuaUI/utils.lua before
+# a widget is reached, and so do Metal Factions and Splinter Faction. So this
+# links the data directory's own LuaUI/ in beside base/ when there is one, and
+# says so and proves nothing about the widget when there is not.
 #
 #   COILBOX_SPRING_HEADLESS  the binary. Default is spring-headless in
 #                            COILBOX_SPRING_DATA, then one on PATH.
@@ -76,6 +84,23 @@ mkdir -p "$WORK/data/games" "$WORK/data/maps" "$WORK/write"
 ln -s "$DATA_DIR/base" "$WORK/data/base"
 ln -s "$DATA_DIR/games/$GAME_ARCHIVE" "$WORK/data/games/$GAME_ARCHIVE"
 ln -s "$DATA_DIR/maps/$MAP_ARCHIVE" "$WORK/data/maps/$MAP_ARCHIVE"
+
+# Everything in the data directory's LuaUI except a player's own widgets and the
+# config that switches them on and off. Those are the one thing an isolated run
+# is isolated from, and the game under test brings its own.
+LUAUI="$DATA_DIR/LuaUI"
+if [ -d "$LUAUI" ]; then
+  mkdir -p "$WORK/data/LuaUI"
+  for entry in "$LUAUI"/*; do
+    [ -e "$entry" ] || continue
+    case "$(basename "$entry" | tr '[:upper:]' '[:lower:]')" in
+      widgets | config) ;;
+      *) ln -s "$entry" "$WORK/data/LuaUI/" ;;
+    esac
+  done
+else
+  LUAUI=""
+fi
 
 engine() {
   "$ENGINE" --isolation --isolation-dir "$WORK/data" --write-dir "$WORK/write" --only-local "$@"
@@ -148,6 +173,11 @@ fi
 echo "engine: $ENGINE"
 echo "game:   $BASE_NAME"
 echo "map:    $MAP_NAME"
+if [ -n "$LUAUI" ]; then
+  echo "luaui:  $LUAUI"
+else
+  echo "luaui:  none in $DATA_DIR, so this run proves nothing about the widget"
+fi
 echo
 
 failures=0
@@ -182,6 +212,9 @@ run_mission() { # a fixture mission id, or "gate" for a game with no mission
   passed=$(grep -c 'HARNESS ok ' "$log" || true)
   failed=$(grep -c 'HARNESS fail ' "$log" || true)
   grep 'HARNESS fail ' "$log" | sed 's/^.*HARNESS fail /  fail /' || true
+  # A claim the run could not reach. Neither passed nor failed, and said out loud
+  # rather than counted, because a check nothing made is a hole in the run.
+  grep 'HARNESS skip ' "$log" | sed 's/^.*HARNESS skip /  skip /' || true
 
   # The gate is the one claim the probe cannot make for itself. Without the
   # modoption the gadget never defines a callin, so what has to be read is the
@@ -211,6 +244,12 @@ run_mission() { # a fixture mission id, or "gate" for a game with no mission
   fi
   if grep -q 'Removed gadget: *Coilbox' "$log"; then
     echo "  fail the gadget handler removed a coilbox gadget"
+    failed=$((failed + 1))
+  fi
+  # The same for the widget half. A widget that raises in a callin is thrown out
+  # by the widget handler, which says so and carries on.
+  if grep -q 'Removed widget: *Coilbox' "$log"; then
+    echo "  fail the widget handler removed a coilbox widget"
     failed=$((failed + 1))
   fi
 
