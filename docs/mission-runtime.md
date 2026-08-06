@@ -81,6 +81,8 @@ Without it a mission ends when your game says so. In the proof the player wiped 
 
 The engine also ends a game itself when an ally team has nothing left, and that is not something you can guard. The runtime handles it with the anchor unit instead, and that half holds whether or not you have added your guard, because being demoted to spectator mid-mission is the damage even when nobody declares a winner.
 
+The anchor only holds if your game counts it. If your own emptiness check discounts unit defs, the anchor has to be a def it counts. Splinter Faction's `game_end.lua` discounts anything carrying `customParams.decoration`, and no unit in it does today. The runtime cannot read that rule, so it watches for the result instead: a mission team your game kills while a mission is still running is logged as an error naming the def the team was anchored with ([issue #933](https://github.com/tomjn/coilbox/issues/933)). If you see one, the fix is on your side.
+
 ### 3. Do not start a team the mission has already started
 
 A scenario says which of its teams it places the opening units for. Ask before your own start gadget spawns, and spawn nothing when the answer is true:

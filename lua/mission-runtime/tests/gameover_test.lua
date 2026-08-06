@@ -367,6 +367,48 @@ check("an anchor that died is no longer discounted", standing.anchorCount(0) == 
 check("and losing one is reported", logged(engine, "mission anchor for team 0 was destroyed"))
 
 --------------------------------------------------------------------------------
+-- Whether an anchor holds a team open is the game's rule, not the runtime's.
+-- Splinter Faction's game_end discounts a def carrying customParams.decoration,
+-- and that is one convention out of however many games have one. So the anchor
+-- is checked rather than trusted: a mission team the game kills while the
+-- mission is still running is the anchor not working, and it is said out loud
+-- (issue #933).
+--------------------------------------------------------------------------------
+
+engine = anchored({})
+engine.env:TeamDied(0)
+check("a mission team that dies while the mission is running is reported",
+	logged(engine, "team 0 died while the mission was still running"))
+check("and the anchor it should have been held open by is named",
+	logged(engine, "Its anchor was wall, still standing"))
+
+engine = anchored({})
+engine.env:TeamDied(1)
+check("a team the mission is not holding open is nobody's business",
+	not logged(engine, "died while the mission was still running"))
+
+engine = anchored({ triggers = { once("won", { ends("victory", "player") }) } })
+engine.env:GameFrame(15)
+engine.env:TeamDied(0)
+check("nor is a team the game kills once the mission has ended",
+	not logged(engine, "died while the mission was still running"))
+
+engine = anchored({})
+for unitID, unit in pairs(engine.units) do
+	if unit.def == "wall" then
+		engine.env.Spring.DestroyUnit(unitID)
+	end
+end
+engine.env:TeamDied(0)
+check("a team that died with its anchor already gone is told apart from one that did not",
+	logged(engine, "Its anchor was wall, already destroyed"))
+
+engine = anchored({}, { defList = { { name = "turret", speed = 0 }, { name = "grunt" } } })
+engine.env:TeamDied(0)
+check("and so is a team that never had one",
+	logged(engine, "Its anchor was none, because no def in this game could be one"))
+
+--------------------------------------------------------------------------------
 -- Ending a mission is synced only, like the triggers that end it.
 --------------------------------------------------------------------------------
 
