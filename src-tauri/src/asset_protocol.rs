@@ -13,6 +13,9 @@
 //!   - `coilbox://localhost/campaign/<id>/<file>` → `<data_dir>/campaign/media/<id>/<file>`
 //!     (user-authored campaign AV; `data_dir` is the OS app-data dir on a normal
 //!     install, so this works with no `.coilbox` folder)
+//!   - `coilbox://localhost/scenario/<id>/<file>` → `<data_dir>/scenario/media/<id>/<file>`
+//!     (a scenario's dialogue portraits and voice clips, so the editor can show a
+//!     portrait and play a clip without holding the whole file base64 in JS)
 //!   - `coilbox://localhost/legopack/<file>`      → `.coilbox/legoparts/<file>` if
 //!     present, else `<resource_dir>/legoparts/<file>` (the unit builder's base
 //!     parts pack, portable-first so a distribution can ship its own)
@@ -85,15 +88,16 @@ fn safe_segments(path: &str) -> Option<Vec<String>> {
 }
 
 /// Resolve decoded segments to an on-disk path under the selected root, or `None` if
-/// the root is unavailable / the shape is wrong. `read_portable`/`read_campaign_base`
-/// are injected so this is unit-testable without the real filesystem or app handle.
+/// the root is unavailable / the shape is wrong. The bases are injected so this is
+/// unit-testable without the real filesystem or app handle. `data_dir` covers every
+/// root that lives under the app-data dir (campaign, scenario, and the three lego
+/// folders), the plugin-owned ones take their own closure.
 fn resolve_path(
     segments: &[String],
     portable: Option<PathBuf>,
-    campaign_base: impl FnOnce() -> Option<PathBuf>,
+    data_dir: impl FnOnce() -> Option<PathBuf>,
     legopack_base: impl FnOnce() -> Option<PathBuf>,
     extra_packs_base: impl FnOnce() -> Option<PathBuf>,
-    lego_base: impl FnOnce() -> Option<PathBuf>,
     unit_model_base: impl FnOnce() -> Option<PathBuf>,
 ) -> Option<PathBuf> {
     let (root, rest) = segments.split_first()?;
@@ -104,13 +108,15 @@ fn resolve_path(
             }
             Some(rest.iter().fold(portable?, |p, s| p.join(s)))
         }
-        "campaign" => {
-            // campaign/<id>/<file...> — id charset-guarded, at least one file segment.
+        // Both keep their per-owner media in `<data_dir>/<root>/media/<id>/`, so
+        // both are `<root>/<id>/<file...>` with the id charset-guarded and at
+        // least one file segment.
+        "campaign" | "scenario" => {
             let (id, file) = rest.split_first()?;
             if !coilbox_portable::valid_id(id) || file.is_empty() {
                 return None;
             }
-            let base = campaign_base()?.join(id);
+            let base = data_dir()?.join(root).join("media").join(id);
             Some(file.iter().fold(base, |p, s| p.join(s)))
         }
         "legopack" => {
@@ -141,7 +147,7 @@ fn resolve_path(
             let [file] = rest else {
                 return None;
             };
-            Some(lego_base()?.join(folder).join(file))
+            Some(data_dir()?.join("lego").join(folder).join(file))
         }
         "unitmodel" => {
             // unitmodel/<file>: textures copied out of a game archive for the
@@ -266,14 +272,9 @@ pub fn handle<R: Runtime>(
     let full = resolve_path(
         &segments,
         coilbox_portable::portable_root(),
-        || {
-            coilbox_portable::data_dir(app)
-                .ok()
-                .map(|d| d.join("campaign").join("media"))
-        },
+        || coilbox_portable::data_dir(app).ok(),
         || tauri_plugin_coilbox_lego::legopack_dir(app),
         || tauri_plugin_coilbox_lego::extra_packs_dir(app),
-        || coilbox_portable::data_dir(app).ok().map(|d| d.join("lego")),
         || tauri_plugin_coilbox_unitsync::model_texture_dir(app),
     );
     let Some(full) = full else {
@@ -312,13 +313,29 @@ mod tests {
         assert_eq!(safe_segments(""), None);
     }
 
+    /// The app-data roots under one `data_dir`, which is how the real handler
+    /// injects them.
+    fn under_data(segments: &[String]) -> Option<PathBuf> {
+        resolve_path(
+            segments,
+            None,
+            || Some(PathBuf::from("/data")),
+            || None,
+            || None,
+            || None,
+        )
+    }
+
+    fn segs(parts: &[&str]) -> Vec<String> {
+        parts.iter().map(|s| s.to_string()).collect()
+    }
+
     #[test]
     fn resolve_portable_joins_under_root() {
-        let segs = vec!["portable".into(), "images".into(), "x.jpg".into()];
+        let s = segs(&["portable", "images", "x.jpg"]);
         let got = resolve_path(
-            &segs,
+            &s,
             Some(PathBuf::from("/pkg/.coilbox")),
-            || None,
             || None,
             || None,
             || None,
@@ -329,31 +346,39 @@ mod tests {
 
     #[test]
     fn resolve_portable_none_without_root() {
-        let segs = vec!["portable".into(), "x.jpg".into()];
+        let s = segs(&["portable", "x.jpg"]);
         assert_eq!(
-            resolve_path(&segs, None, || None, || None, || None, || None, || None),
+            resolve_path(&s, None, || None, || None, || None, || None),
             None
         );
     }
 
     #[test]
     fn resolve_campaign_guards_id_and_shape() {
-        let base = || Some(PathBuf::from("/data/campaign/media"));
-        let ok = vec!["campaign".into(), "camp-1".into(), "intro.mp4".into()];
         assert_eq!(
-            resolve_path(&ok, None, base, || None, || None, || None, || None),
+            under_data(&segs(&["campaign", "camp-1", "intro.mp4"])),
             Some(PathBuf::from("/data/campaign/media/camp-1/intro.mp4"))
         );
         // missing file segment
-        let no_file = vec!["campaign".into(), "camp-1".into()];
-        assert_eq!(
-            resolve_path(&no_file, None, base, || None, || None, || None, || None),
-            None
-        );
+        assert_eq!(under_data(&segs(&["campaign", "camp-1"])), None);
         // bad id
-        let bad = vec!["campaign".into(), "../x".into(), "intro.mp4".into()];
+        assert_eq!(under_data(&segs(&["campaign", "../x", "intro.mp4"])), None);
+    }
+
+    #[test]
+    fn resolve_scenario_serves_dialogue_media_per_scenario() {
         assert_eq!(
-            resolve_path(&bad, None, base, || None, || None, || None, || None),
+            under_data(&segs(&["scenario", "sc-1", "abc.ogg"])),
+            Some(PathBuf::from("/data/scenario/media/sc-1/abc.ogg"))
+        );
+        // missing file segment
+        assert_eq!(under_data(&segs(&["scenario", "sc-1"])), None);
+        // bad id
+        assert_eq!(under_data(&segs(&["scenario", "../x", "abc.ogg"])), None);
+        // and nothing resolves without an app-data dir
+        let s = segs(&["scenario", "sc-1", "abc.ogg"]);
+        assert_eq!(
+            resolve_path(&s, None, || None, || None, || None, || None),
             None
         );
     }
@@ -361,59 +386,49 @@ mod tests {
     #[test]
     fn resolve_legopack_joins_under_its_base() {
         let base = || Some(PathBuf::from("/res/legoparts"));
-        let segs = vec!["legopack".into(), "parts.bin.gz".into()];
+        let s = segs(&["legopack", "parts.bin.gz"]);
         assert_eq!(
-            resolve_path(&segs, None, || None, base, || None, || None, || None),
+            resolve_path(&s, None, || None, base, || None, || None),
             Some(PathBuf::from("/res/legoparts/parts.bin.gz"))
         );
         // no file segment, and no pack installed
-        let bare = vec!["legopack".into()];
+        let bare = segs(&["legopack"]);
         assert_eq!(
-            resolve_path(&bare, None, || None, base, || None, || None, || None),
+            resolve_path(&bare, None, || None, base, || None, || None),
             None
         );
         assert_eq!(
-            resolve_path(&segs, None, || None, || None, || None, || None, || None),
+            resolve_path(&s, None, || None, || None, || None, || None),
             None
         );
     }
 
     #[test]
     fn resolve_lego_serves_one_flat_folder_per_root() {
-        let base = || Some(PathBuf::from("/data/lego"));
-        let at = |root: &str, file: &str| {
-            let segs = vec![root.to_string(), file.to_string()];
-            resolve_path(&segs, None, || None, || None, || None, base, || None)
-        };
         assert_eq!(
-            at("lego", "abc.png"),
+            under_data(&segs(&["lego", "abc.png"])),
             Some(PathBuf::from("/data/lego/thumbs/abc.png"))
         );
         assert_eq!(
-            at("legogeom", "abc.bin.gz"),
+            under_data(&segs(&["legogeom", "abc.bin.gz"])),
             Some(PathBuf::from("/data/lego/geometry/abc.bin.gz"))
         );
         assert_eq!(
-            at("legotex", "ff00.dds"),
+            under_data(&segs(&["legotex", "ff00.dds"])),
             Some(PathBuf::from("/data/lego/textures/ff00.dds"))
         );
         // None of the three is nested, so a deeper path is not one of its files.
-        let nested = vec!["lego".into(), "sub".into(), "abc.png".into()];
-        assert_eq!(
-            resolve_path(&nested, None, || None, || None, || None, base, || None),
-            None
-        );
+        assert_eq!(under_data(&segs(&["lego", "sub", "abc.png"])), None);
     }
 
     #[test]
     fn resolve_unknown_root_is_none() {
-        let segs = vec!["secret".into(), "x".into()];
+        let s = segs(&["secret", "x"]);
         assert_eq!(
             resolve_path(
-                &segs,
+                &s,
                 Some(PathBuf::from("/pkg")),
-                || None,
-                || None,
+                || Some(PathBuf::from("/data")),
                 || None,
                 || None,
                 || None
@@ -425,15 +440,15 @@ mod tests {
     #[test]
     fn resolve_unitmodel_serves_one_flat_folder() {
         let base = || Some(PathBuf::from("/cache/model-textures"));
-        let segs = vec!["unitmodel".into(), "abc_atlas_dds.dds".into()];
+        let s = segs(&["unitmodel", "abc_atlas_dds.dds"]);
         assert_eq!(
-            resolve_path(&segs, None, || None, || None, || None, || None, base),
+            resolve_path(&s, None, || None, || None, || None, base),
             Some(PathBuf::from("/cache/model-textures/abc_atlas_dds.dds"))
         );
         // The cache is flat, so a nested path is not one of its files.
-        let nested = vec!["unitmodel".into(), "sub".into(), "abc.dds".into()];
+        let nested = segs(&["unitmodel", "sub", "abc.dds"]);
         assert_eq!(
-            resolve_path(&nested, None, || None, || None, || None, || None, base),
+            resolve_path(&nested, None, || None, || None, || None, base),
             None
         );
     }
