@@ -25,7 +25,7 @@
 #                            COILBOX_SPRING_DATA, then one on PATH.
 #   COILBOX_SPRING_DATA      where games/ and maps/ are. Default ~/.spring.
 #   COILBOX_SF_GAME          the game folder under games/. It must be a loose
-#                            .sdd with the runtime installed. Default
+#                            .sdd, and the runtime is installed into it. Default
 #                            SplinterFaction.sdd.
 set -euo pipefail
 
@@ -72,11 +72,13 @@ if [ -z "$ENGINE" ] || [ ! -x "$ENGINE" ]; then
 fi
 
 [ -d "$SF_DIR" ] || { echo "no loose game at $SF_DIR" >&2; exit 2; }
-[ -f "$SF_DIR/missions/runtime.lua" ] || {
-  echo "$SF_GAME has no missions/runtime.lua. Install the mission runtime from Content > Games first" >&2
-  exit 2
-}
 [ -f "$MISSION_SRC" ] || { echo "no compiled mission at $MISSION_SRC" >&2; exit 2; }
+
+# The runtime this repo ships, installed the way coilbox installs it, so the
+# mission is played by the runtime under review rather than by whatever the game
+# was left holding (issue #934).
+RUNTIME="$(bash "$ROOT/scripts/mission-runtime-install.sh" "$SF_DIR")"
+read -r RUNTIME_VERSION RUNTIME_FILES <<<"$RUNTIME"
 
 # The same three guards the adoption proof asks for. This script never writes
 # them: scripts/mission-sf-proof.sh --apply-guards is where that lives.
@@ -166,6 +168,7 @@ echo "game:    $BASE_NAME ($SF_GAME)"
 echo "mutator: $PROBE_NAME"
 echo "map:     $MAP_NAME"
 echo "mission: $MISSION_DIR/mission.lua"
+echo "runtime: version $RUNTIME_VERSION, $RUNTIME_FILES files from lua/mission-runtime"
 echo
 
 LOG="$WORK/jericho.log"
