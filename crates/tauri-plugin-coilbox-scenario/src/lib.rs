@@ -29,7 +29,10 @@ use serde_json::json;
 use std::path::{Path, PathBuf};
 
 mod mutator;
-mod runtime;
+// Public so the harness scripts can install through it rather than copying the
+// runtime into a game by hand (issue #934). See
+// `examples/install-mission-runtime.rs`.
+pub mod runtime;
 use tauri::{
     plugin::{Builder, TauriPlugin},
     AppHandle, Runtime,
