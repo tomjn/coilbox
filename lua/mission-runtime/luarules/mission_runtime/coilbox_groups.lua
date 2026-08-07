@@ -16,6 +16,10 @@
 -- says go, and a reinforcement wave is `wake_group` on its own, which spawns it
 -- and sends it off in one action.
 --
+-- `release_group` is the end of a group's life as the mission's. The units stay
+-- on the map and stay whoever's they are, and the mission stops ordering them
+-- (issue #812).
+--
 -- This module calls the engine, to create, order and hand over units. The
 -- layout of a spawned block is coilbox_start.lua's, and the creation itself is
 -- the gadget's, so the suppression window and the ground read stay in one place.
@@ -333,6 +337,35 @@ function M.register(engine, state, hooks)
 		end
 	end
 
+	--- Let go of a group. This is `release_group`.
+	--
+	-- The mission stops ordering the units and stops counting them as the group's,
+	-- so a squad it handed the player is the player's to command (issue #812).
+	-- Nothing is done to the units themselves: this is the mission letting go, and
+	-- `gift_units` is what changes who owns them. So the two are separate actions,
+	-- and a mission that lends an escort gifts it now and releases it when the
+	-- loan ends rather than deciding both at once.
+	--
+	-- They are woken first. A group that was asleep is standing on hold position,
+	-- and handing the player a squad pinned where the mission left it is a worse
+	-- handover than none at all.
+	--
+	-- A group released and then spawned again is a fresh block, the same as one
+	-- that has been wiped, because the runtime is left holding nothing that says
+	-- otherwise.
+	function handle.release(id)
+		local group = groupOfName(id)
+		if not group or not requireUnits(group, "release") then
+			return
+		end
+		rouse(group.id)
+		local living = members[group.id]
+		for index = #living, 1, -1 do
+			groupOf[living[index]] = nil
+			living[index] = nil
+		end
+	end
+
 	--- A unit is gone. Fed from the gadget's UnitDestroyed, so a group's roll is
 	-- the units that are actually standing and a wiped group can be sent again.
 	function handle.removed(unitID)
@@ -383,6 +416,10 @@ function M.register(engine, state, hooks)
 
 	engine:addAction("gift_units", function(params)
 		handle.gift(params.group, params.team)
+	end)
+
+	engine:addAction("release_group", function(params)
+		handle.release(params.group)
 	end)
 
 	return handle

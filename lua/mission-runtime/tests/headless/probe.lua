@@ -550,6 +550,10 @@ local GARRISON_X, GARRISON_Z, GARRISON_AREA = 1200, 1200, 400
 
 local garrisonBuilder, garrisonX, garrisonY, garrisonZ
 
+-- The units the mission gifts away, read off the group before it lets go of
+-- them, so the release below can be told from the group being wiped.
+local garrisonGifted = {}
+
 plans.garrison = {
 	-- The reveal the capture starts runs for 30 seconds, so the fog cannot come
 	-- back before frame 1050 or so.
@@ -701,6 +705,24 @@ plans.garrison = {
 				end
 			end
 			check("and gift_units moved every one of them across ally lines", moved == 2, moved)
+			garrisonGifted = { gifted[1], gifted[2] }
+		end },
+		-- Issue #812. The mission gifted the squad at three seconds and releases
+		-- it at eight, which is the handover the two actions are separate for: the
+		-- units are the other team's, and now the mission has stopped ordering
+		-- them.
+		{ frame = 260, run = function()
+			check("release_group leaves the mission holding none of the group's units",
+				#state().groups.units("reinforcements") == 0,
+				#state().groups.units("reinforcements"))
+			local standing = 0
+			for _, unitID in ipairs(garrisonGifted) do
+				if Spring.GetUnitIsDead(unitID) == false and Spring.GetUnitTeam(unitID) == 1 then
+					standing = standing + 1
+				end
+			end
+			check("while the units it gave away are still on the map, on the team it gave them to",
+				standing == 2, standing)
 		end },
 		{ frame = 1250, run = function()
 			check("the reveal runs out and the spotter comes off the map",

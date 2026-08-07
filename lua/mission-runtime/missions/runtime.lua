@@ -55,6 +55,7 @@ return {
 		"wake_group",
 		"give_orders",
 		"gift_units",
+		"release_group",
 		"set_var",
 		"add_var",
 		"enable_trigger",

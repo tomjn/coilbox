@@ -212,7 +212,10 @@ So a dormant garrison is `spawn_group` when the mission wants it standing there 
 - `wake_group` runs the group's authored orders, placing it first if it is not on the map. "Wake the reinforcements" with nothing to wake would say nothing and do nothing.
 - `give_orders` replaces a group's orders and wakes it, because a group told to move that stands there holding position is a mission that looks broken and reports nothing. It does not place one: ordering units nothing asked for is not what the author wrote.
 - `gift_units` hands a group's units to another participant, as a capture rather than a gift. A give is the form a game refuses: the engine passes that flag straight to `AllowUnitTransfer`, and the usual anti-grief gadget says no to a share between teams that are not allied, which is most of what a mission gifts for. Everything else about the two is the same. The group keeps its units, so the mission can go on ordering a squad it gave the player, and a game that refuses the move outright is reported.
+- `release_group` is the mission letting go ([#812](https://github.com/tomjn/coilbox/issues/812)). It drops the group's roll, so nothing the mission does afterwards reaches those units, and touches the units themselves not at all. They are woken first, because handing the player a squad pinned on hold position where the mission left it is a worse handover than none. A released group spawned again is a fresh block, the same as a wiped one, because the runtime is left holding nothing that says otherwise. That is what runtime 3 added.
 - An action aimed at a group with nothing on the map is reported once. That is what a mission that forgot its `spawn_group` looks like.
+
+`gift_units` and `release_group` are separate actions rather than a flag on the gift, because the two decisions are not made at the same moment. A mission that hands over a rescued convoy does both in one trigger. One that lends an escort gifts it now and releases it when the loan ends. A mission that spawns a squad already on the player's team and drives it through a tutorial's opening releases it with no gift at all.
 
 A game's own actions, and the rest of the runtime, drive a group through that handle rather than around it, so the roll of who is still standing stays right:
 
@@ -223,6 +226,7 @@ GG.CoilboxMission.groups.spawn("raiders")
 GG.CoilboxMission.groups.wake("raiders")
 GG.CoilboxMission.groups.orders("raiders", { { kind = "move", waypoints = { { x = 0, z = 0 } } } })
 GG.CoilboxMission.groups.gift("raiders", "player")
+GG.CoilboxMission.groups.release("raiders")
 ```
 
 Sleep is the move state and nothing else. Each unit's own move state is read back before it is put on hold, so waking hands back the game's default for that unit type rather than guessing at one. Fire state is left alone: a garrison that will not defend itself is a stranger thing than one that will.

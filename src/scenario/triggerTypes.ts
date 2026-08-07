@@ -147,6 +147,9 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
     group: { kind: "groupId" },
     team: { kind: "teamId" },
   },
+  /** Stop ordering a group. The units stay on the map and stay whoever's they
+   *  are: this is the mission letting go, not a transfer (issue #812). */
+  release_group: { group: { kind: "groupId" } },
   set_var: {
     name: { kind: "varName" },
     value: { kind: "amount" },
@@ -194,15 +197,18 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
  * The runtime version that added a condition or action, for the types that did
  * not ship in version 1.
  *
- * Everything in the two tables above shipped in version 1, so this is empty
- * today. A type a later runtime adds goes here in the same change that adds it
- * to its table and bumps `missions/runtime.lua`, and that is what raises the
+ * A type a later runtime adds goes here in the same change that adds it to its
+ * table and bumps `missions/runtime.lua`, and that is what raises the
  * `runtimeVersion` of every scenario using it. Nothing is ever removed: a type
  * that has shipped keeps the version it shipped in.
  *
  * One map for both tables, because a condition and an action never share a name.
  */
-export const TYPE_RUNTIME_VERSION: Record<string, number> = {};
+export const TYPE_RUNTIME_VERSION: Record<string, number> = {
+  /** Issue #812. A runtime behind 3 ignores it and goes on ordering a squad the
+   *  mission handed the player. */
+  release_group: 3,
+};
 
 /**
  * The lowest runtime version that implements a condition or action.

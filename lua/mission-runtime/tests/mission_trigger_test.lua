@@ -107,6 +107,21 @@ engine.give(state.units.outpost, 0)
 check("an actor changing hands fires the trigger watching for it",
 	state.triggers:isEnabled("outpost-captured") == false)
 
+-- The capture's other action hands the wave's units to the garrison, and the
+-- group keeps them, so the mission can go on ordering the squad it gave away.
+-- Read here rather than after the loops below, because the mission releases the
+-- group at eight seconds and the roll is empty from then on (issue #812).
+--
+-- This is the ask, not the outcome. The stub always agrees; a real game may
+-- refuse a share between enemies, which is #857.
+local gifted = {}
+for index, unitID in ipairs(state.groups.units("reinforcements")) do
+	gifted[index] = unitID
+end
+check("gifting a group asks for its units on the team the trigger named",
+	#gifted == 2 and engine.units[gifted[1]].team == 1 and engine.units[gifted[2]].team == 1,
+	#gifted .. "/" .. tostring(gifted[1] and engine.units[gifted[1]].team))
+
 -- That trigger's own actions are a gift and a reveal, both proved below.
 --
 -- The mission reveals its supply depot to the player for thirty seconds. The
@@ -139,15 +154,15 @@ end
 check("after which the fog comes back", state.reveal.spotterCount(0) == 0,
 	state.reveal.spotterCount(0))
 
--- The capture's other action hands the wave's units to the garrison, and the
--- group keeps them, so the mission can go on ordering the squad it gave away.
---
--- This is the ask, not the outcome. The stub always agrees; a real game may
--- refuse a share between enemies, which is #857.
-local gifted = state.groups.units("reinforcements")
-check("gifting a group asks for its units on the team the trigger named",
-	#gifted == 2 and engine.units[gifted[1]].team == 1 and engine.units[gifted[2]].team == 1,
-	#gifted .. "/" .. tostring(gifted[1] and engine.units[gifted[1]].team))
+-- The mission's release_group ran at eight seconds, long before this frame. The
+-- units it gave away are still standing on the team it gave them to, and the
+-- mission is holding none of them (issue #812).
+check("release_group left the mission holding none of the group's units",
+	#state.groups.units("reinforcements") == 0,
+	#state.groups.units("reinforcements"))
+check("while the units it gave away stand where they were, on the team it gave them to",
+	engine.units[gifted[1]].alive == true and engine.units[gifted[1]].team == 1
+	and engine.units[gifted[2]].alive == true and engine.units[gifted[2]].team == 1)
 
 --------------------------------------------------------------------------------
 -- Ambush: an actor's health and its death.

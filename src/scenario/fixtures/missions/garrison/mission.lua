@@ -158,6 +158,26 @@ return {
       },
     },
     {
+      id = "hand-over",
+      enabled = true,
+      ["repeat"] = false,
+      conditions = {
+        op = "all",
+        conditions = {
+          {
+            type = "time_elapsed",
+            params = { seconds = 8 },
+          },
+        },
+      },
+      actions = {
+        {
+          type = "release_group",
+          params = { group = "reinforcements" },
+        },
+      },
+    },
+    {
       id = "reinforcement-wave",
       enabled = true,
       ["repeat"] = true,

@@ -94,6 +94,14 @@ local MISSION = compiled({
 			dormant = true,
 		},
 		{
+			id = "loaned",
+			team = "enemy",
+			pos = { x = 1700, z = 1700 },
+			units = { { def = "armpw", count = 1 } },
+			orders = {},
+			dormant = true,
+		},
+		{
 			id = "lost",
 			team = "nobody",
 			pos = { x = 0, z = 0 },
@@ -153,6 +161,10 @@ local MISSION = compiled({
 			},
 		}),
 		at(10, { { type = "wake_group", params = { group = "keepers" } } }),
+		at(11, {
+			{ type = "release_group", params = { group = "reserve" } },
+			{ type = "spawn_group", params = { group = "loaned" } },
+		}),
 	},
 })
 
@@ -423,6 +435,50 @@ check("and a building that has died is not a name the runtime complains about",
 state.groups.orders("keepers", { { kind = "guard", target = "no-such-thing" } })
 check("while one the mission never declared still is",
 	logged(engine, "nothing named no-such-thing to give an order about"))
+
+--------------------------------------------------------------------------------
+-- release_group: the mission lets go (issue #812).
+--
+-- The reserve is awake and running its orders when the mission releases it. The
+-- loaned group is spawned asleep on the same tick, so both halves of a handover
+-- are covered: the units are still there, and one that was pinned on hold
+-- position gets its move state back on the way out.
+--------------------------------------------------------------------------------
+
+local released = reserve[1]
+playTo(345)
+
+check("release_group leaves the mission holding none of the group's units",
+	#state.groups.units("reserve") == 0, tostring(#state.groups.units("reserve")))
+check("while the units themselves are untouched, on the map and on their team",
+	engine.units[released].alive == true and engine.units[released].team == 1)
+
+state.groups.orders("reserve", { { kind = "move", waypoints = { { x = 5, z = 5 } } } })
+check("so an order aimed at it afterwards reaches nothing, and says so",
+	logged(engine, "group reserve has no units on the map to order"))
+
+state.groups.spawn("reserve")
+local respawned = state.groups.units("reserve")
+check("and spawning it again is a fresh block, the way a wiped group is",
+	#respawned == 1 and respawned[1] ~= released, tostring(respawned[1]))
+check("with the released unit still standing beside it",
+	engine.units[released].alive == true)
+
+-- The unit id rather than the roll, because the roll is the runtime's own table
+-- and releasing empties it in place.
+local loaned = state.groups.units("loaned")[1]
+check("a group spawned on its own is asleep, holding where it stands",
+	engine.units[loaned].movestate == CMD.MOVESTATE_HOLDPOS)
+state.groups.release("loaned")
+check("releasing one gives it back the move state it came with first, because a "
+	.. "squad pinned where the mission left it is a worse handover than none",
+	engine.units[loaned].movestate == CMD.MOVESTATE_MANEUVER,
+	tostring(engine.units[loaned].movestate))
+check("and the mission is holding none of it either", #state.groups.units("loaned") == 0)
+
+state.groups.release("loaned")
+check("releasing a group the mission is already holding none of says so",
+	logged(engine, "group loaned has no units on the map to release"))
 
 --------------------------------------------------------------------------------
 -- Groups are synced only.

@@ -164,6 +164,7 @@ You cannot build this out of `units_in_zone` with `max = 0`. That reads the mome
 | `wake_group` | Runs a group's orders, placing it first if it is not on the map. |
 | `give_orders` | Replaces a group's orders and wakes it. It does not place one. |
 | `gift_units` | Hands a group's units to another participant. The group keeps them, so the mission can go on ordering a squad it gave away. |
+| `release_group` | Stops the mission ordering a group. The units stay on the map and stay whoever's they are. |
 | `set_var` / `add_var` | Write a variable, or move one by a delta. Either takes a number or another variable. |
 | `enable_trigger` / `disable_trigger` | Arm or disarm another trigger. |
 | `complete_objective` / `fail_objective` | Settle an objective. The first outcome sticks. |
@@ -175,6 +176,8 @@ You cannot build this out of `units_in_zone` with `max = 0`. That reads the mome
 | `map_marker` | Drop one of the map's own labelled points, with your label or none. Optionally on one participant's map. |
 | `victory` | End the mission with the named participant's ally team as the winner. |
 | `defeat` | End the mission with every other ally team as the winner. |
+
+`gift_units` and `release_group` are separate on purpose. A mission that hands over a rescued convoy gifts it and releases it in the same trigger. One that lends an escort gifts it now and releases it when the loan ends, which one flag on the gift could not say. Releasing a group the mission still has orders for is the mission's own bug, and it is reported in the infolog rather than refused. A scenario using `release_group` needs mission runtime 3.
 
 `camera_pan` and `map_marker` with no participant named reach everyone, which is what a single player scenario wants. Naming one is for a co-op or head-to-head mission, where yanking both players' cameras to one side's ambush shows the other player what is coming. A scenario that names one needs mission runtime 3.
 

@@ -8,7 +8,11 @@ import {
   requiredRuntimeVersion,
 } from "./gating";
 import type { Scenario, TriggerStep } from "./model";
-import { ACTION_TYPES, CONDITION_TYPES } from "./triggerTypes";
+import {
+  ACTION_TYPES,
+  CONDITION_TYPES,
+  typeRuntimeVersion,
+} from "./triggerTypes";
 
 const marker = (
   version: number,
@@ -43,12 +47,23 @@ describe("requiredRuntimeVersion", () => {
     expect(requiredRuntimeVersion(newScenario("empty"))).toBe(1);
   });
 
-  it("is the first runtime for every type coilbox ships today", () => {
+  it("is the first runtime for every type the launch set shipped", () => {
+    const launched = (types: Record<string, unknown>) =>
+      Object.keys(types).filter((type) => typeRuntimeVersion(type) === 1);
     const scenario = withTrigger(
-      Object.keys(CONDITION_TYPES),
-      Object.keys(ACTION_TYPES),
+      launched(CONDITION_TYPES),
+      launched(ACTION_TYPES),
     );
     expect(requiredRuntimeVersion(scenario)).toBe(1);
+  });
+
+  /**
+   * Issue #812. A runtime behind 3 has no `release_group`, ignores it, and goes
+   * on ordering the squad the mission handed the player.
+   */
+  it("is raised by an action a later runtime added", () => {
+    expect(requiredRuntimeVersion(withTrigger([], ["release_group"]))).toBe(3);
+    expect(typeRuntimeVersion("release_group")).toBe(3);
   });
 
   it("takes the highest version any type used needs", () => {
