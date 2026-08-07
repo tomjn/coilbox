@@ -3,7 +3,10 @@
 #
 # Builds a scratch game out of lua/mission-runtime/ plus the compiled fixture
 # missions in src/scenario/fixtures/missions/, and plays each one in
-# spring-headless with no OpenGL context. The probe gadget
+# spring-headless with no OpenGL context. The runtime goes in through coilbox's
+# own install (scripts/mission-runtime-install.sh), which is the code behind the
+# **Install the mission runtime** button, so a file the runtime grows reaches
+# this harness without anyone editing this script (issue #936). The probe gadget
 # (lua/mission-runtime/tests/headless/probe.lua) stands in for the player and
 # reports one line per check. This script counts them and fails on anything the
 # engine disagreed with.
@@ -144,18 +147,18 @@ if [ -z "$BASE_NAME" ] || [ -z "$MAP_NAME" ]; then
   exit 2
 fi
 
-# The scratch game gets what coilbox installs into a game and nothing else, so
-# a missing file is a failure here rather than a surprise on someone's machine.
-mkdir -p "$GAME/LuaRules/Gadgets" "$GAME/LuaRules/mission_runtime" \
-  "$GAME/LuaUI/Widgets" "$GAME/LuaUI/mission_ui" "$GAME/missions"
-cp "$RUNTIME/luarules/gadgets/coilbox_mission_runtime.lua" "$GAME/LuaRules/Gadgets/"
-cp "$RUNTIME/luarules/mission_runtime/"*.lua "$GAME/LuaRules/mission_runtime/"
-cp "$RUNTIME/luaui/widgets/coilbox_mission_ui.lua" "$GAME/LuaUI/Widgets/"
-cp "$RUNTIME/luaui/mission_ui/coilbox_panel_model.lua" "$GAME/LuaUI/mission_ui/"
-cp "$RUNTIME/missions/runtime.lua" "$GAME/missions/"
+# The scratch game gets what coilbox installs into a game, through coilbox's own
+# install rather than a copy of it (issue #936). A hand-written file list left
+# the runtime free to grow a file the harness never carried, and a run against a
+# runtime missing it passed.
+mkdir -p "$GAME"
+RUNTIME_INSTALL="$(bash "$ROOT/scripts/mission-runtime-install.sh" "$GAME")"
+read -r RUNTIME_VERSION RUNTIME_FILES <<<"$RUNTIME_INSTALL"
 # Named to sort last, so the probe reads a frame every other gadget has finished
-# with. The runtime is at layer 1000 and the probe at 2000.
-cp "$HEADLESS/probe.lua" "$GAME/LuaRules/Gadgets/zzz_coilbox_harness_probe.lua"
+# with. The runtime is at layer 1000 and the probe at 2000. The install wrote
+# the tree, so the probe goes in beside the runtime's own gadget.
+mkdir -p "$GAME/luarules/gadgets"
+cp "$HEADLESS/probe.lua" "$GAME/luarules/gadgets/zzz_coilbox_harness_probe.lua"
 for mission in "$FIXTURES"/*/; do
   id="$(basename "$mission")"
   mkdir -p "$GAME/missions/$id"
@@ -170,13 +173,14 @@ if [ -z "$GAME_NAME" ]; then
   exit 2
 fi
 
-echo "engine: $ENGINE"
-echo "game:   $BASE_NAME"
-echo "map:    $MAP_NAME"
+echo "engine:  $ENGINE"
+echo "game:    $BASE_NAME"
+echo "map:     $MAP_NAME"
+echo "runtime: version $RUNTIME_VERSION, $RUNTIME_FILES files from lua/mission-runtime"
 if [ -n "$LUAUI" ]; then
-  echo "luaui:  $LUAUI"
+  echo "luaui:   $LUAUI"
 else
-  echo "luaui:  none in $DATA_DIR, so this run proves nothing about the widget"
+  echo "luaui:   none in $DATA_DIR, so this run proves nothing about the widget"
 fi
 echo
 

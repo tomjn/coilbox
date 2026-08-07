@@ -5,7 +5,7 @@ return {
   runtimeVersion = 1,
   id = "splinter",
   name = "Splinter smoke",
-  description = "The smallest scenario that proves the runtime on SplinterFaction: the game's own start is suppressed, the runtime places the player's squad, and a timer ends the mission.",
+  description = "The smallest scenario that proves the runtime on SplinterFaction: the game's own start is suppressed, the runtime places the player's squad, two build icons are greyed against a game that greys its own, and a timer ends the mission.",
   game = "SplinterFaction",
   map = "AcidicQuarry 5.17",
   teams = {
@@ -16,7 +16,7 @@ return {
     },
     player = {
       team = 0,
-      startUnits = { "fedengineer" },
+      startUnits = { "fedengineer_up1" },
       resources = { metal = 750, energy = 750 },
       noCommander = true,
     },
@@ -33,7 +33,12 @@ return {
   },
   groups = {},
   prefabs = {},
-  restrictions = {},
+  restrictions = {
+    buildable = {
+      mode = "deny",
+      units = { "supplydepot", "f1landfac" },
+    },
+  },
   vars = {},
   triggers = {
     {

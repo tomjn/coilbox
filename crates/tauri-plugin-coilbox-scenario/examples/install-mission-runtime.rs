@@ -25,8 +25,12 @@ fn main() {
 
     let dest = Path::new(&dest);
     // What the game was holding, so a run can say the copy it replaced was
-    // behind. An unadopted game has no marker and nothing to say.
-    let before = runtime::read_marker(dest).ok();
+    // behind. An unadopted game has no marker and nothing to say, and asking for
+    // one anyway is what made a first install into an empty folder print a VFS
+    // error and a traceback over the top of its caller (issue #936).
+    let before = runtime::marker_present(dest)
+        .then(|| runtime::read_marker(dest).ok())
+        .flatten();
     let files = match runtime::install(Path::new(&src), dest) {
         Ok(files) => files,
         Err(e) => {

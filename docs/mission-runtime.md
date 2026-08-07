@@ -283,7 +283,9 @@ Enough to be worth knowing before you adopt it:
 - **`AllowUnitCreation` and `AllowCommand`, only when a mission restricts something.** Both callins are hot, and a mission that restricts nothing defines neither. A build order the mission forbids is dropped rather than kept, so a factory queue moves on to the order behind it and a builder does not stand at the site retrying. A command the mission withholds never reaches the unit, and the orders the runtime gives its own groups are not held to it.
 - **The build icons for defs a mission forbids, greyed out.** A mission with a `buildable` restriction sets `disabled` on those command descriptions, on every builder as it arrives on a team and on every unit of a team an `unlock_unit` frees a def for. The icons are edited in place, never removed, so your build menu keeps its order.
 
-  If your game greys build icons of its own, say a tech tree or a supply limit, the two do not arbitrate and the last writer holds the icon. The runtime never un-greys an icon it did not grey itself, so a lock of yours survives a mission finishing with the def beside it. Going the other way, a repaint of yours after the runtime's leaves a forbidden def looking available, and the build is still refused. `AllowUnitCreation` is what actually holds, and the icon is only the sign in front of it.
+  If your game greys build icons of its own, say a tech tree or a supply limit, the two do not arbitrate and the last writer holds the icon. The runtime never un-greys an icon it did not grey itself, so a lock of yours survives a mission finishing with the def beside it. Going the other way, a repaint of yours after the runtime's would leave a forbidden def looking available, so a mission with a `buildable` restriction puts its own greys back every 15 frames. The runtime is at layer 1000, behind your gadgets, so it holds the icon on any frame it repaints and the wrong-looking half second in between is the whole of the cost. `AllowUnitCreation` is what actually holds either way, and the icon is only the sign in front of it.
+
+  Splinter Faction is where this was measured. Its `game_sticky_tech_progression.lua` rewrites `disabled` on every tech-gated icon whenever a team's tech changes, deciding each from its tech alone, and `scripts/mission-sf-proof.sh` grants a tech mid-mission and reads the icons back.
 
 Everything else your game does carries on. The runtime does not touch your economy, your unit definitions or your own gadgets.
 
@@ -355,6 +357,16 @@ A build menu is read through `Spring.GetUnitCmdDescs`, which is the list the eng
 The probe's unsynced half checks the widget, because the engine's `Script.LuaUI` is unsynced and a widget's registered global is the only thing about it a gadget can see. That needs the game's LuaUI to load, and a game's entry point includes `LuaUI/*.lua` files a current engine no longer ships, so the script links the data directory's own `LuaUI/` into the run. Without one it says so and skips the widget checks.
 
 The probe also gives an order as the player rather than as the runtime, which is the only way a withheld command can be proved: everything synced Lua gives is `fromLua`, and the runtime lets all of that through. The engine lets a Lua handle put an order on the wire only when the local player controls that handle's team, and a gadget's is every team at once, so the harness turns god mode on to make the local player that controller. It changes who may order what and nothing about how an order is carried or judged.
+
+```sh
+scripts/mission-clients.sh
+```
+
+Three real clients in one game, which is the only way to watch a client drop something. `camera_pan` and `map_marker` take a team, and every client is handed the same message: which of them acts on it is decided against `Spring.GetMyTeamID()`, so a one-client run can only read what arrived. This plays one ambush across three `spring-headless` processes, a host on the team the fixture names, a second player on the other team, and a spectator watching as the first, and each makes its own claim in its own log.
+
+What it counts is the engine calls the runtime's unsynced half made, because nothing else can be read back: a local map marker has no Lua getter, and the camera in a headless client drifts on its own. The probe replaces `Spring.SetCameraTarget` and `Spring.MarkerAddPoint` with wrappers that count and pass through, which it can do because it loads behind the runtime and both look the call up in the same table.
+
+The spectator is the case the format documents rather than decides: a spectator gets whatever the engine currently has them watching as, and this run has them on the team the mission named, so they see the camera move.
 
 ```sh
 scripts/mission-sf-proof.sh

@@ -28,6 +28,21 @@
 
 local M = {}
 
+-- How often the greyed icons are put back, in frames.
+--
+-- Nothing arbitrates between this module and a game's own build gating, and both
+-- write the same flag on the same icons. Splinter Faction's tech tree decides
+-- each icon from its tech alone and rewrites the lot whenever a team's tech
+-- changes, so a tech grant lifts the grey on a def the mission forbids and the
+-- player is left with an icon they may click and an AllowUnitCreation that
+-- refuses it (issue #955).
+--
+-- Half a second, which is the longest that can last. The gadget is at layer
+-- 1000, behind a game's own gadgets, so the repaint on a frame is the last word
+-- on that frame. Only a mission that forbids something pays for it, and a unit
+-- with no build menu costs one table lookup.
+local REPAINT_INTERVAL = 15
+
 --- Register the restrictions on a trigger engine.
 --
 -- @param engine the trigger engine
@@ -178,6 +193,19 @@ function M.register(engine, state)
 	--- A unit has left the game, so what was greyed on it is nobody's business.
 	function handle.removed(unitID)
 		greyed[unitID] = nil
+	end
+
+	--- Put back what a game's own build gating painted over, on a cadence.
+	--
+	-- Called every frame from the gadget. A mission with nothing to grey returns
+	-- on the first line and never reads a build menu at all.
+	function handle.refresh(frame)
+		if not buildable or frame % REPAINT_INTERVAL ~= 0 then
+			return
+		end
+		for team in pairs(missionTeam) do
+			repaint(team)
+		end
 	end
 
 	--- Lift the buildable restriction on one def for one participant. No

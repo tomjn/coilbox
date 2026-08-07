@@ -145,11 +145,12 @@ if not gadgetHandler:IsSyncedCode() then
 	--- What the ambush's camera moves and markers were aimed at.
 	--
 	-- Which client acts on one is decided inside the runtime's own unsynced half,
-	-- which runs before this gadget does, so a run cannot watch it drop a message
-	-- that is not this client's. What a run can settle is the half only a real
-	-- engine has: that a participant id in the document arrives here as this
-	-- client's engine team number, and that an action naming no participant
-	-- arrives as everyone. The drop itself is proved in view_test.lua.
+	-- and this run has one client, so it cannot watch anybody drop a message that
+	-- is not theirs. What it can settle is the half only a real engine has: that a
+	-- participant id in the document arrives here as this client's engine team
+	-- number, and that an action naming no participant arrives as everyone. The
+	-- drop itself is watched by scripts/mission-clients.sh, which plays the same
+	-- fixture across three clients at once (issue #953).
 	local function checkAimed()
 		local mine = Spring.GetMyTeamID()
 		check("a camera move the scenario aimed at a participant carries that team",

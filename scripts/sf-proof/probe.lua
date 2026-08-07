@@ -88,6 +88,46 @@ local function rules(name)
 	return value
 end
 
+--- A unit of a def a team owns, or nil.
+local function unitOf(team, defName)
+	local def = UnitDefNames[defName]
+	for _, unitID in ipairs(Spring.GetTeamUnits(team) or {}) do
+		if def and Spring.GetUnitDefID(unitID) == def.id then
+			return unitID
+		end
+	end
+end
+
+--- Whether one def's icon is greyed on a unit, or nil when the unit has no icon
+-- for that def at all. Nil rather than false on purpose: a check that wanted a
+-- greyed icon and found no icon is not a check that passed.
+--
+-- Read through Spring.GetUnitCmdDescs, which is what the engine's own build menu
+-- is drawn from, so this is the list a player would be looking at.
+local function iconGreyed(unitID, defName)
+	local def = UnitDefNames[defName]
+	if not def then
+		return nil
+	end
+	for _, desc in ipairs(Spring.GetUnitCmdDescs(unitID) or {}) do
+		if desc.id == -def.id then
+			return desc.disabled == true
+		end
+	end
+end
+
+--- A unit's build menu, one entry per build command, with a `!` on any the
+-- player would see greyed. For a failed check to print.
+local function buildMenu(unitID)
+	local entries = {}
+	for _, desc in ipairs(Spring.GetUnitCmdDescs(unitID) or {}) do
+		if desc.id < 0 and UnitDefs[-desc.id] then
+			entries[#entries + 1] = UnitDefs[-desc.id].name .. (desc.disabled and "!" or "")
+		end
+	end
+	return table.concat(entries, ",")
+end
+
 --- Every unit a team owns, by def name, sorted, as a readable line.
 --
 -- Read as an inventory rather than as counts of named defs, because a game's
@@ -115,7 +155,7 @@ end
 
 --- How many units a team owns that the scenario did not put there.
 --
--- The runtime places the player's one `fedengineer` and the enemy's one
+-- The runtime places the player's one `fedengineer_up1` and the enemy's one
 -- `lozengineer`, and an anchor for each mission team a human plays. Anything
 -- else is the game's own start arriving despite `noCommander`.
 local function unplaced(team, placed)
@@ -155,6 +195,22 @@ local ACTIVE, COMPLETE = 0, 1
 local VICTORY_FRAME = 90 * 30 -- the mission's time_elapsed trigger, in frames
 local DEADLINE = VICTORY_FRAME + 150
 
+-- The four defs the build icon steps read (issue #955). Every one of them is in
+-- the build menu the scenario's engineer carries, and every one of them is
+-- tech-gated: Splinter Faction gates its whole build tree, so there is no icon
+-- in this menu the game never writes.
+--
+-- Two pairs, one per tech the run grants. Each pair is a def the mission forbids
+-- and a def beside it that the mission allows, on the same tech. Granting the
+-- tech frees both as far as the game is concerned, so the allowed one is what
+-- says the game really did repaint and the forbidden one is the claim.
+--
+-- The player has no commander, so no tech is provided and the game starts with
+-- the whole menu greyed. That is why the claims are read after a grant rather
+-- than before one: before it, a greyed icon says nothing about who greyed it.
+local FIRST_TECH, FIRST_DENIED, FIRST_ALLOWED = "tech0", "supplydepot", "fissionpowerplant"
+local SECOND_TECH, SECOND_DENIED, SECOND_ALLOWED = "tech1", "f1landfac", "researchcenter"
+
 local steps = {
 	{ frame = 2, run = function()
 		local state = GG.CoilboxMission
@@ -166,7 +222,7 @@ local steps = {
 			state and state.runtime and state.runtime.version)
 
 		check("the runtime placed the player's startUnits",
-			owns(PLAYER, "fedengineer") == 1, owns(PLAYER, "fedengineer"))
+			owns(PLAYER, "fedengineer_up1") == 1, owns(PLAYER, "fedengineer_up1"))
 		check("and the scenario's actor for the enemy",
 			owns(ENEMY, "lozengineer") == 1, owns(ENEMY, "lozengineer"))
 
@@ -191,7 +247,7 @@ local steps = {
 
 		note("at frame 2, " .. armies())
 		check("inside the suppression window the player owns only what the scenario placed",
-			unplaced(PLAYER, "fedengineer") == 0, unplaced(PLAYER, "fedengineer"))
+			unplaced(PLAYER, "fedengineer_up1") == 0, unplaced(PLAYER, "fedengineer_up1"))
 		check("and so does the enemy",
 			unplaced(ENEMY, "lozengineer") == 0, unplaced(ENEMY, "lozengineer"))
 
@@ -214,6 +270,79 @@ local steps = {
 			metal ~= nil and metal >= 750 and metal < 760, metal)
 	end },
 
+	-- The build icons, against a game that greys its own (issue #955).
+	--
+	-- Nothing arbitrates between the two. The runtime greys what the scenario
+	-- forbids on the callins a unit arrives on, and SplinterFaction's
+	-- game_sticky_tech_progression.lua greys what a team has not teched to, on the
+	-- same callins and again on its own nineteen-frame recheck after any tech
+	-- changes. So the question a real game settles and a stub cannot is what a
+	-- forbidden icon looks like once the game has repainted the menu underneath.
+	{ frame = 3, run = function()
+		local state = GG.CoilboxMission
+		-- Everything below is about a mission that forbids something. A fixture
+		-- that stopped would leave every check here passing on nothing.
+		local buildable = (state.mission.restrictions or {}).buildable
+		check("the scenario forbids a def on each of the two techs this run grants",
+			buildable ~= nil and buildable.units[1] == FIRST_DENIED
+				and buildable.units[2] == SECOND_DENIED)
+		local builder = unitOf(PLAYER, "fedengineer_up1")
+		check("the builder the scenario placed has a build menu to grey",
+			builder ~= nil and buildMenu(builder) ~= "", tostring(builder))
+		note("the builder's menu at frame 3 is " .. buildMenu(builder or 0))
+		check("the game exposes the tech grant this run drives it through",
+			type(GG.TechGrant) == "function", type(GG.TechGrant))
+	end },
+
+	-- With a quantity. The gadget's default is math.huge, and it writes what it
+	-- is given straight into a team rules param, which the engine refuses.
+	{ frame = 20, run = function()
+		GG.TechGrant(FIRST_TECH, PLAYER, 1)
+		note("granted " .. FIRST_TECH .. " to the player at frame 20")
+	end },
+
+	-- Past the game's own recheck, which runs on the first frame after a grant
+	-- with frame % 19 == 17, and past the runtime's repaint on the first with
+	-- frame % 15 == 0.
+	{ frame = 50, run = function()
+		local builder = unitOf(PLAYER, "fedengineer_up1")
+		note("the builder's menu at frame 50 is " .. buildMenu(builder or 0))
+		-- The check that stops the one below passing on a grant that did nothing.
+		-- This def needs the same tech and the mission says nothing about it, so
+		-- the game repainting the menu is the whole of why it is free.
+		check("the tech grant repainted the menu, so a def only the game gated is free",
+			iconGreyed(builder, FIRST_ALLOWED) == false,
+			tostring(iconGreyed(builder, FIRST_ALLOWED)))
+		check("while the def the mission forbids on that tech is greyed again",
+			iconGreyed(builder, FIRST_DENIED) == true,
+			tostring(iconGreyed(builder, FIRST_DENIED)))
+		-- The other side of the same interaction. Nothing has granted the second
+		-- tech yet, so both of its defs are the game's to grey and neither is the
+		-- runtime's to lift.
+		check("and the game's own lock on the next tech is untouched",
+			iconGreyed(builder, SECOND_ALLOWED) == true,
+			tostring(iconGreyed(builder, SECOND_ALLOWED)))
+	end },
+
+	{ frame = 60, run = function()
+		GG.TechGrant(SECOND_TECH, PLAYER, 1)
+		note("granted " .. SECOND_TECH .. " to the player at frame 60")
+	end },
+
+	{ frame = 90, run = function()
+		local builder = unitOf(PLAYER, "fedengineer_up1")
+		note("the builder's menu at frame 90 is " .. buildMenu(builder or 0))
+		check("the second grant repainted the menu too",
+			iconGreyed(builder, SECOND_ALLOWED) == false,
+			tostring(iconGreyed(builder, SECOND_ALLOWED)))
+		check("and the def the mission forbids on that tech is greyed again",
+			iconGreyed(builder, SECOND_DENIED) == true,
+			tostring(iconGreyed(builder, SECOND_DENIED)))
+		check("with the first one still greyed after a second repaint",
+			iconGreyed(builder, FIRST_DENIED) == true,
+			tostring(iconGreyed(builder, FIRST_DENIED)))
+	end },
+
 	-- After SplinterFaction's faction-choice deadline.
 	{ frame = 1000, run = function()
 		note("at frame 1000, past the game's 900-frame faction deadline, " .. armies())
@@ -227,7 +356,7 @@ local steps = {
 		check("and the placement deadline the same way",
 			rules("phase") == "done", rules("phase"))
 		check("the game's own start is still suppressed for the player",
-			unplaced(PLAYER, "fedengineer") == 0, unplaced(PLAYER, "fedengineer"))
+			unplaced(PLAYER, "fedengineer_up1") == 0, unplaced(PLAYER, "fedengineer_up1"))
 		check("and for the enemy",
 			unplaced(ENEMY, "lozengineer") == 0, unplaced(ENEMY, "lozengineer"))
 		-- Suppressed and intact are two claims, and the gap between them is what
@@ -237,7 +366,7 @@ local steps = {
 		-- it read as perfectly suppressed with the player's own units gone too
 		-- (issue #884).
 		check("and the player still holds what the scenario placed",
-			owns(PLAYER, "fedengineer") == 1, owns(PLAYER, "fedengineer"))
+			owns(PLAYER, "fedengineer_up1") == 1, owns(PLAYER, "fedengineer_up1"))
 		check("and so does the enemy",
 			owns(ENEMY, "lozengineer") == 1, owns(ENEMY, "lozengineer"))
 	end },
@@ -272,11 +401,11 @@ local steps = {
 	{ frame = VICTORY_FRAME + 60, run = function()
 		note("at the end, " .. armies())
 		check("the game's own start stayed suppressed for the whole mission, player",
-			unplaced(PLAYER, "fedengineer") == 0, unplaced(PLAYER, "fedengineer"))
+			unplaced(PLAYER, "fedengineer_up1") == 0, unplaced(PLAYER, "fedengineer_up1"))
 		check("the game's own start stayed suppressed for the whole mission, enemy",
 			unplaced(ENEMY, "lozengineer") == 0, unplaced(ENEMY, "lozengineer"))
 		check("and the player is still playing rather than a spectator with no units",
-			owns(PLAYER, "fedengineer") == 1, owns(PLAYER, "fedengineer"))
+			owns(PLAYER, "fedengineer_up1") == 1, owns(PLAYER, "fedengineer_up1"))
 
 		check("the timer completed the mission's objective",
 			rules("coilbox_mission_objective_hold-out") == COMPLETE,
