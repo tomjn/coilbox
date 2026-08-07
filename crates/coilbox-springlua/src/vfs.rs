@@ -218,18 +218,47 @@ enum Kind {
 /// The `dir` the caller asked for is put back on the front verbatim, again as
 /// the engine does (`prefix + f` in `InsertVFSFiles`), so only the part below it
 /// is the index's to spell.
+///
+/// Directories are not in that index: `CDirArchive` builds it from a recursive
+/// file scan, and `CVFSHandler::GetDirsInDir` names a directory by cutting a
+/// file's path at a separator. So a directory with no file under it is not
+/// there to list, each name keeps the separator it was cut at, and a recursive
+/// call cuts at the last separator rather than every one, naming only the
+/// directory a file sits directly in.
+///
+/// The pattern is matched against the whole of that name, as
+/// `InsertVFSFiles` matches it against `f`, so a recursive `DirList` matches
+/// `gadgets/unit_ai.lua` and a `SubDirs` matches `gadgets/` with its slash on.
 fn list(root: &Path, dir: &str, pattern: Option<&str>, recursive: bool, kind: Kind) -> Vec<String> {
     let base = match resolve(root, dir) {
         Some(p) => p,
         None => return Vec::new(),
     };
-    let mut out = Vec::new();
-    walk(&base, &base, pattern, recursive, &kind, &mut out);
-    for name in out.iter_mut() {
-        *name = name.to_lowercase();
-    }
+    // A directory is only in the index if a file is under it, so SubDirs reads
+    // the whole tree even when the call is not recursive.
+    let deep = recursive || matches!(kind, Kind::Dir);
+    let mut index = Vec::new();
+    walk(&base, &base, deep, &mut index);
+
+    let mut out: Vec<String> = index
+        .into_iter()
+        .filter_map(|name| match kind {
+            Kind::File if recursive || !name.contains('/') => Some(name),
+            Kind::File => None,
+            Kind::Dir => {
+                let slash = if recursive {
+                    name.rfind('/')
+                } else {
+                    name.find('/')
+                }?;
+                Some(name[..=slash].to_owned())
+            }
+        })
+        .collect();
     out.sort();
     out.dedup();
+    out.retain(|name| pattern.map(|p| wildcard(p, name)).unwrap_or(true));
+
     let prefix = dir_prefix(dir);
     out.into_iter().map(|name| prefix.clone() + &name).collect()
 }
@@ -245,34 +274,24 @@ fn dir_prefix(dir: &str) -> String {
     dir + "/"
 }
 
-fn walk(
-    base: &Path,
-    dir: &Path,
-    pattern: Option<&str>,
-    recursive: bool,
-    kind: &Kind,
-    out: &mut Vec<String>,
-) {
+/// The files under `base`, named relative to it and lower-cased: the part of
+/// the engine's index this call can see. `deep` is false only when nothing
+/// below the top level can change the answer.
+fn walk(base: &Path, dir: &Path, deep: bool, out: &mut Vec<String>) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        let is_dir = path.is_dir();
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let matches = pattern.map(|p| wildcard(p, &name)).unwrap_or(true);
-        let want = match kind {
-            Kind::File => !is_dir,
-            Kind::Dir => is_dir,
-        };
-        if want && matches {
-            if let Some(rel) = rel_str(base, &path) {
-                out.push(rel);
+        if path.is_dir() {
+            if deep {
+                walk(base, &path, deep, out);
             }
+            continue;
         }
-        if recursive && is_dir {
-            walk(base, &path, pattern, recursive, kind, out);
+        if let Some(rel) = rel_str(base, &path) {
+            out.push(rel.to_lowercase());
         }
     }
 }
@@ -359,7 +378,7 @@ mod tests {
         );
         assert_eq!(
             list(&root, "WithInclude", None, false, Kind::Dir),
-            vec!["WithInclude/sub"]
+            vec!["WithInclude/sub/"]
         );
     }
 
@@ -369,8 +388,70 @@ mod tests {
     fn listing_the_root_names_entries_bare() {
         assert_eq!(
             list(&fixtures(), "", None, false, Kind::Dir),
-            vec!["mission", "modinfo", "selfcontained", "withinclude"]
+            vec!["mission/", "modinfo/", "selfcontained/", "withinclude/"]
         );
+    }
+
+    /// A directory keeps the separator it was cut at, because
+    /// `GetDirsInDir` pushes `name.substr(0, slash + 1)` (issue #973). Lua that
+    /// concatenates a name onto one gets the engine's answer.
+    #[test]
+    fn a_listed_directory_keeps_its_trailing_slash() {
+        assert_eq!(
+            list(&fixtures(), "mission", None, false, Kind::Dir),
+            vec!["mission/missions/"]
+        );
+    }
+
+    /// A recursive listing cuts at the last separator, so it names the
+    /// directory each file sits directly in and not the ones above it.
+    #[test]
+    fn a_recursive_listing_names_only_the_deepest_directory() {
+        assert_eq!(
+            list(&fixtures(), "", None, true, Kind::Dir),
+            vec![
+                "mission/missions/demo/",
+                "modinfo/",
+                "selfcontained/",
+                "withinclude/",
+                "withinclude/sub/",
+            ]
+        );
+    }
+
+    /// A directory with no file under it is not in the index to be listed,
+    /// because `CDirArchive` builds the index from a file scan.
+    #[test]
+    fn a_directory_holding_no_files_is_not_listed() {
+        let tmp = tempfile::tempdir().expect("temp dir");
+        let root = tmp.path();
+        std::fs::create_dir_all(root.join("empty/deeper")).expect("mkdir");
+        std::fs::create_dir_all(root.join("full")).expect("mkdir");
+        std::fs::write(root.join("full/unit_ai.lua"), "").expect("write");
+        assert_eq!(list(root, "", None, false, Kind::Dir), vec!["full/"]);
+    }
+
+    /// The pattern is matched against the whole name below the dir asked for,
+    /// as `InsertVFSFiles` matches it against `f`, so a separator in the
+    /// pattern is matchable. `*` crosses one, because the engine compiles it to
+    /// `.*` and matches the whole string.
+    #[test]
+    fn a_pattern_is_matched_against_the_whole_path_below_the_dir() {
+        let root = fixtures();
+        assert_eq!(
+            list(&root, "withinclude", Some("*/*.lua"), true, Kind::File),
+            vec!["withinclude/sub/extra.lua"]
+        );
+        assert_eq!(
+            list(&root, "withinclude", Some("sub/*"), true, Kind::File),
+            vec!["withinclude/sub/extra.lua"]
+        );
+        // The name a SubDirs pattern sees has the separator on the end.
+        assert_eq!(
+            list(&root, "withinclude", Some("sub/"), false, Kind::Dir),
+            vec!["withinclude/sub/"]
+        );
+        assert!(list(&root, "withinclude", Some("sub"), false, Kind::Dir).is_empty());
     }
 
     /// Two spellings of one name are one entry, because they are one key in
@@ -393,7 +474,7 @@ mod tests {
         );
         assert_eq!(
             list(root, "", None, true, Kind::Dir),
-            vec!["luarules", "luarules/gadgets"]
+            vec!["luarules/gadgets/"]
         );
     }
 
