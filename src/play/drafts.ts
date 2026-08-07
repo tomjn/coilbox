@@ -35,6 +35,26 @@ export interface SkirmishDraft {
   restrictions?: BattleRestrictions;
 }
 
+/**
+ * The draft as it is stored: the setup, plus when the setup screen last wrote it.
+ *
+ * Kept apart from {@link SkirmishDraft} because a preset is a named draft
+ * (`SkirmishPreset extends SkirmishDraft`) and carries its own `lastUsedAt`.
+ * Only the working draft under `play.skirmish` is stamped.
+ */
+export interface StoredSkirmishDraft extends SkirmishDraft {
+  /**
+   * When `SkirmishPage` last persisted this draft, in ms since the epoch.
+   *
+   * Read by the welcome screen's Continue collector, which ranks what you were
+   * last doing across every mode and so needs one comparable number per source.
+   * Optional because a draft saved before this field existed has none: the
+   * collector treats an unstamped draft as no candidate at all and offers a saved
+   * preset instead, until the setup screen next writes.
+   */
+  touchedAt?: number;
+}
+
 export const defaultSkirmishDraft: SkirmishDraft = {
   participants: initialParticipants(),
   gameName: "",
@@ -44,5 +64,5 @@ export const defaultSkirmishDraft: SkirmishDraft = {
 };
 
 export function useSkirmishDraft() {
-  return useSetting<SkirmishDraft>("play.skirmish", defaultSkirmishDraft);
+  return useSetting<StoredSkirmishDraft>("play.skirmish", defaultSkirmishDraft);
 }

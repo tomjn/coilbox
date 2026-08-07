@@ -8,6 +8,8 @@ import type { ConquestStateFile, GalaxyDoc } from "../conquest/model";
 import { mostRecentOpen } from "../lib/recency";
 import type { Battle, LobbyState } from "../multiplayer/bindings";
 import { useMultiplayer } from "../multiplayer/store";
+import type { StoredSkirmishDraft } from "../play/drafts";
+import { useSkirmishDraft } from "../play/drafts";
 import type { SkirmishPreset } from "../play/presets";
 import { useSkirmishPresets } from "../play/presets";
 import type { RunStatus } from "../runlite/model";
@@ -292,16 +294,47 @@ export function battleCandidate(
 }
 
 /**
- * The skirmish setup to offer: the most recently used saved preset.
+ * The skirmish setup to offer: the working draft, falling back to the most
+ * recently used saved preset.
  *
- * The working draft under `play.skirmish` would be the truer answer, but it
- * records no timestamp, so it cannot be ranked against a run you touched
- * yesterday. Presets carry `lastUsedAt`, stamped on save and on load, so they
- * can. Giving the draft a timestamp is new persistence and out of scope here.
+ * The draft is the truer answer, because it is the setup that was on screen. A
+ * match tweaked for ten minutes and never saved is exactly what Continue exists
+ * for, and offering the preset you happened to load a week ago instead is a wrong
+ * answer rather than a missing one. `SkirmishPage` stamps `touchedAt` on the
+ * debounced write that already persists the draft (#1011), so the draft can be
+ * ranked against a Warpath run the same way every other source is.
+ *
+ * The draft wins whenever it is stamped, rather than the two being compared by
+ * recency. Loading a preset writes the draft, so the draft is never the staler of
+ * the two by anything more than the debounce, and "whichever is newer" would be a
+ * second rule to explain for a case that does not arise.
+ *
+ * An unstamped draft is treated as no candidate, not as epoch zero and not as
+ * now. Epoch zero would show a skirmish card claiming a recency it does not have,
+ * and now would jump a week-old setup over a run played this morning. Falling
+ * back to the presets keeps the old answer for one visit, until the setup screen
+ * next writes. A draft naming no game or map is unoffered for the same reason:
+ * those two words are the whole card.
  */
 export function skirmishCandidate(
+  draft: StoredSkirmishDraft,
   presets: readonly SkirmishPreset[],
 ): ResumeCandidate | undefined {
+  const { touchedAt, gameName, mapName } = draft;
+  if (
+    touchedAt !== undefined &&
+    Number.isFinite(touchedAt) &&
+    gameName &&
+    mapName
+  )
+    return {
+      id: "skirmish:draft",
+      kind: "skirmish",
+      title: mapName,
+      detail: gameName,
+      to: "/play/skirmish",
+      touchedAt,
+    };
   const best = mostRecentOpen(
     presets,
     (p) => Number.isFinite(Date.parse(p.lastUsedAt)),
@@ -326,6 +359,7 @@ export interface ResumeSources {
   galaxies: readonly { galaxy: Pick<GalaxyDoc, "id" | "title"> }[];
   conquests: ConquestStateFile;
   lobby: LobbySnapshot | null;
+  draft: StoredSkirmishDraft;
   presets: readonly SkirmishPreset[];
 }
 
@@ -348,7 +382,7 @@ export function collectCandidates(
     warpathCandidate(sources.runs),
     conquestCandidate(sources.galaxies, sources.conquests),
     campaignCandidate(sources.campaigns, sources.progress),
-    skirmishCandidate(sources.presets),
+    skirmishCandidate(sources.draft, sources.presets),
   ].filter((c): c is ResumeCandidate => c !== undefined);
 }
 
@@ -376,6 +410,7 @@ export function useResume(): {
   const galaxies = useGalaxies();
   const conquests = useConquestState();
   const { presets } = useSkirmishPresets();
+  const [draft] = useSkirmishDraft();
   const { mirror } = useMultiplayer();
 
   const now = Date.now();
@@ -388,6 +423,7 @@ export function useResume(): {
         galaxies: galaxies.galaxies,
         conquests: conquests.file,
         lobby: mirror.state,
+        draft,
         presets,
       },
       now,

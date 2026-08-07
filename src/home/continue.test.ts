@@ -22,7 +22,7 @@ vi.mock("../multiplayer/chat/mentionCue", () => ({
 
 import type { Campaign, ProgressFile } from "../campaign/model";
 import type { ConquestStateFile } from "../conquest/model";
-import { defaultSkirmishDraft } from "../play/drafts";
+import { defaultSkirmishDraft, type StoredSkirmishDraft } from "../play/drafts";
 import type { SkirmishPreset } from "../play/presets";
 import type { RunStatus } from "../runlite/model";
 import {
@@ -397,13 +397,45 @@ function preset(over: Partial<SkirmishPreset>): SkirmishPreset {
   };
 }
 
+function draft(over: Partial<StoredSkirmishDraft> = {}): StoredSkirmishDraft {
+  return {
+    ...defaultSkirmishDraft,
+    gameName: "Beyond All Reason",
+    mapName: "Supreme Isthmus",
+    ...over,
+  };
+}
+
+/** The draft as an install that predates the stamp holds it: set up, unstamped. */
+const unstamped = draft();
+
 describe("skirmishCandidate", () => {
   it("finds nothing on a fresh install", () => {
-    expect(skirmishCandidate([])).toBeUndefined();
+    expect(skirmishCandidate(defaultSkirmishDraft, [])).toBeUndefined();
   });
 
-  it("offers the most recently used preset", () => {
-    const c = skirmishCandidate([
+  it("offers the working draft, named by its map and game", () => {
+    const c = skirmishCandidate(draft({ touchedAt: NOW - 60_000 }), []);
+    expect(c?.title).toBe("Supreme Isthmus");
+    expect(c?.detail).toBe("Beyond All Reason");
+    expect(c?.to).toBe("/play/skirmish");
+    expect(c?.touchedAt).toBe(NOW - 60_000);
+  });
+
+  it("prefers the draft to the preset you last loaded", () => {
+    // The point of the whole change: ten minutes of tweaking beats the name of
+    // whatever preset the setup started from, even a preset used since.
+    const c = skirmishCandidate(draft({ touchedAt: NOW - 5_400_000 }), [
+      preset({ name: "Duel", lastUsedAt: minutesAgo(9) }),
+    ]);
+    expect(c?.title).toBe("Supreme Isthmus");
+  });
+
+  it("offers the most recently used preset when the draft is unstamped", () => {
+    // An install upgraded into the stamp has a draft with no `touchedAt`, and it
+    // must not rank as epoch zero or as now. It is not offered at all until the
+    // setup screen next writes, so the old preset answer stands for one visit.
+    const c = skirmishCandidate(unstamped, [
       preset({ id: "old", name: "Old", lastUsedAt: minutesAgo(90) }),
       preset({ id: "new", name: "New", lastUsedAt: minutesAgo(9) }),
     ]);
@@ -412,8 +444,28 @@ describe("skirmishCandidate", () => {
     expect(c?.to).toBe("/play/skirmish");
   });
 
+  it("finds nothing when an unstamped draft is all there is", () => {
+    expect(skirmishCandidate(unstamped, [])).toBeUndefined();
+  });
+
+  it("skips a draft whose stamp is not a number", () => {
+    // Settings are JSON on disk, so a null or a string can arrive here, and a
+    // NaN would be dropped silently by the ranking rather than falling back.
+    const broken = draft({ touchedAt: Number.NaN });
+    expect(skirmishCandidate(broken, [preset({})])?.title).toBe("Duel");
+  });
+
+  it("skips a stamped draft that names no map yet", () => {
+    // The map and game are the whole card, so a stamped but empty draft is worse
+    // than the preset it would displace.
+    const empty = draft({ mapName: "", touchedAt: NOW - 1000 });
+    expect(skirmishCandidate(empty, [preset({})])?.title).toBe("Duel");
+  });
+
   it("skips a preset whose timestamp did not parse", () => {
-    expect(skirmishCandidate([preset({ lastUsedAt: "" })])).toBeUndefined();
+    expect(
+      skirmishCandidate(unstamped, [preset({ lastUsedAt: "" })]),
+    ).toBeUndefined();
   });
 });
 
@@ -426,6 +478,7 @@ const emptySources: ResumeSources = {
   galaxies: [],
   conquests: noConquests,
   lobby: null,
+  draft: defaultSkirmishDraft,
   presets: [],
 };
 
@@ -463,7 +516,8 @@ describe("collectCandidates", () => {
       galaxies: [{ galaxy: { id: "g1", title: "The Rim" } }],
       conquests: conquestFile("g1", minutesAgo(30)),
       lobby: lobby(),
-      presets: [preset({ lastUsedAt: minutesAgo(30) })],
+      draft: draft({ touchedAt: NOW - 30 * 60_000 }),
+      presets: [],
     };
     // Every disk-backed source is touched at the same moment on purpose: this is
     // the order that decides a tie, so it is asserted rather than assumed.
@@ -489,5 +543,20 @@ describe("collectCandidates", () => {
       "skirmish",
       "warpath",
     ]);
+  });
+
+  it("ranks the skirmish on the draft's stamp, not the preset's", () => {
+    // Issue #1011: a setup tweaked a minute ago, from a preset last opened a week
+    // back, used to rank behind an hour-old run because only the preset had a
+    // timestamp.
+    const sources: ResumeSources = {
+      ...emptySources,
+      runs: run("Kappa Reach", minutesAgo(60)),
+      draft: draft({ touchedAt: NOW - 60_000 }),
+      presets: [preset({ lastUsedAt: minutesAgo(10_080) })],
+    };
+    const ranked = rankCandidates(collectCandidates(sources, NOW), NOW);
+    expect(ranked.map((c) => c.kind)).toEqual(["skirmish", "warpath"]);
+    expect(ranked[0].title).toBe("Supreme Isthmus");
   });
 });
