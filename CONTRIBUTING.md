@@ -33,6 +33,14 @@ bun run tauri dev
 bun run sidecar:all
 ```
 
+### macOS keychain prompts in dev
+
+Logging in to the lobby reads a saved password out of the keychain, and macOS keys your "Always Allow" answer to the calling binary's code signature. A dev build is re-signed on every rebuild, so without a workaround you are asked again every time you touch a Rust file.
+
+Debug builds on macOS therefore read the secret by shelling out to `/usr/bin/security`, which is Apple-signed and never changes, so the grant holds. Release builds always use the in-process keychain API. The detail lives in `read_via_security_tool` in `crates/tauri-plugin-coilbox-lobby-servers/src/lib.rs`.
+
+Signing dev builds with a self-signed certificate does not work as an alternative. macOS only derives the stable `teamid:` grant from an Apple-issued certificate, and falls back to the per-build code hash for anything else.
+
 ## Project layout
 
 Coilbox is a picoframe host: `src/app.plugins.ts` composes an array of plugins, and most features are a matched pair.

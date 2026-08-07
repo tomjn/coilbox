@@ -21,9 +21,8 @@ const SERVICE: &str = "coilbox-lobby";
 /// Process-lifetime cache of secrets already read from (or written to) the
 /// keychain, keyed by [`account_key`]. The Rust process survives webview
 /// reloads and reconnect loops, so the OS keychain (and its macOS auth
-/// prompt) is hit at most once per `{server, username}` per app run — on
-/// macOS dev builds "Always Allow" never sticks because the ad-hoc code
-/// signature changes on every rebuild, making repeat reads especially noisy.
+/// prompt) is hit at most once per `{server, username}` per app run. See
+/// `read_via_security_tool` for why macOS dev builds need more than that.
 #[derive(Default)]
 struct CredCache(Mutex<HashMap<String, String>>);
 
@@ -66,6 +65,33 @@ async fn ls_store_credential(
     })
 }
 
+/// Read a secret through `/usr/bin/security` instead of the in-process API.
+///
+/// macOS grants keychain access per calling binary, and a dev build is
+/// re-signed on every rebuild, so an "Always Allow" answer is invalidated as
+/// soon as you touch any Rust file. Signing dev builds with a stable
+/// certificate does not fix it, because macOS only derives the stable
+/// `teamid:` grant from an Apple-issued certificate and falls back to the
+/// per-build code hash otherwise.
+///
+/// `/usr/bin/security` is Apple-signed and never changes, so a grant given to
+/// it holds for good. Anything unexpected returns `None` and falls through to
+/// the in-process read, which keeps the "no entry" and error cases in one
+/// place. Release builds never take this path.
+#[cfg(all(target_os = "macos", debug_assertions))]
+fn read_via_security_tool(account: &str) -> Option<String> {
+    let out = std::process::Command::new("/usr/bin/security")
+        .args(["find-generic-password", "-w", "-s", SERVICE, "-a", account])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let secret = String::from_utf8(out.stdout).ok()?;
+    // `security -w` terminates the secret with a newline of its own.
+    Some(secret.strip_suffix('\n').unwrap_or(&secret).to_owned())
+}
+
 /// `ls_get_credential` — read a stored secret, serving repeats from the cache. A
 /// missing entry is not an error; it resolves with `{ "secret": null }`.
 #[tauri::command]
@@ -76,6 +102,11 @@ async fn ls_get_credential(
 ) -> Result<CliResult, ()> {
     let key = account_key(&server_id, &username);
     if let Some(secret) = cache.0.lock().unwrap().get(&key) {
+        return Ok(CliResult::ok(json!({ "secret": secret })));
+    }
+    #[cfg(all(target_os = "macos", debug_assertions))]
+    if let Some(secret) = read_via_security_tool(&key) {
+        cache.0.lock().unwrap().insert(key, secret.clone());
         return Ok(CliResult::ok(json!({ "secret": secret })));
     }
     let entry = match entry(&server_id, &username) {
