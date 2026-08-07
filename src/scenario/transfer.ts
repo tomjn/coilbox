@@ -5,6 +5,11 @@ import {
   type OpenResult,
   readContainer,
 } from "../container/container";
+import {
+  type ContentRequirement,
+  exactGameRequirement,
+  exactMapRequirement,
+} from "../content/resolveContent";
 import { parseScenario, type Scenario } from "./model";
 
 /**
@@ -43,6 +48,26 @@ export interface ScenarioExport {
   scenario: Scenario;
   /** File name to `data:` URI. Empty when the scenario has no dialogue media. */
   media: Record<string, string>;
+}
+
+/**
+ * What this machine has to have installed before a scenario can be played: the
+ * game and the map its setup names (issue #822).
+ *
+ * Import runs these through the shared resolve-content gate the way a campaign
+ * import does, so a scenario shared from someone else fetches what it needs
+ * before it is written, rather than landing and failing at launch. A draft that
+ * names neither needs nothing, and asking for a game called "" would be a
+ * requirement nobody could ever satisfy.
+ */
+export function scenarioContentRequirements(
+  scenario: Scenario,
+): ContentRequirement[] {
+  const { gameName, mapName } = scenario.setup;
+  return [
+    ...(gameName ? [exactGameRequirement(gameName)] : []),
+    ...(mapName ? [exactMapRequirement(mapName)] : []),
+  ];
 }
 
 /** The bare file names a scenario's dialogue references, deduplicated. */

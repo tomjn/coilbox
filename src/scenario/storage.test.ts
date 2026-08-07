@@ -27,12 +27,12 @@ import {
   deleteScenario,
   deleteScenarioMedia,
   exportScenario,
-  importScenario,
   importScenarioMedia,
   listScenarios,
   saveScenario,
+  storeScenario,
 } from "./storage";
-import { encodeScenarioExport, readScenarioExport } from "./transfer";
+import { readScenarioExport } from "./transfer";
 
 /** A stored document as the plugin hands it back. */
 function stored(id: string, updatedAt: string): { json: string } {
@@ -216,50 +216,31 @@ describe("exportScenario", () => {
   });
 });
 
-describe("importScenario", () => {
+describe("storeScenario", () => {
   it("stores the document under a fresh id and writes its clips", async () => {
-    const text = encodeScenarioExport({
+    const saved = await storeScenario({
       scenario: withPortrait(),
       media: { "abc.png": PORTRAIT },
     });
 
-    const result = await importScenario(text);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.payload.id).not.toBe("s1");
-    expect(result.payload.dialogue[0].portrait).toBe("abc.png");
+    expect(saved.id).not.toBe("s1");
+    expect(saved.dialogue[0].portrait).toBe("abc.png");
     expect(mediaWriteMock).toHaveBeenCalledWith({
-      scenarioId: result.payload.id,
+      scenarioId: saved.id,
       file: "abc.png",
       dataUri: PORTRAIT,
     });
     const [{ id, json }] = saveMock.mock.calls[0] as [
       { id: string; json: string },
     ];
-    expect(id).toBe(result.payload.id);
+    expect(id).toBe(saved.id);
     expect(parseScenarioJson(json)?.name).toBe("s1");
   });
 
   it("drops a dialogue reference whose clip did not arrive", async () => {
-    const text = encodeScenarioExport({
-      scenario: withPortrait(),
-      media: {},
-    });
+    const saved = await storeScenario({ scenario: withPortrait(), media: {} });
 
-    const result = await importScenario(text);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.payload.dialogue[0].portrait).toBeUndefined();
-    expect(mediaWriteMock).not.toHaveBeenCalled();
-  });
-
-  it("writes nothing when the file is not a scenario", async () => {
-    const result = await importScenario("not a scenario");
-
-    expect(result).toEqual({ ok: false, error: "unknown-format" });
-    expect(saveMock).not.toHaveBeenCalled();
+    expect(saved.dialogue[0].portrait).toBeUndefined();
     expect(mediaWriteMock).not.toHaveBeenCalled();
   });
 });

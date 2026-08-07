@@ -1,4 +1,3 @@
-import type { OpenResult } from "../container/container";
 import {
   type MediaSweepSummary,
   scenarioDelete,
@@ -15,7 +14,7 @@ import { parseScenarioJson, type Scenario } from "./model";
 import {
   dropMissingDialogueMedia,
   encodeScenarioExport,
-  readScenarioExport,
+  type ScenarioExport,
   scenarioMediaFiles,
 } from "./transfer";
 
@@ -147,23 +146,22 @@ export async function exportScenario(scenario: Scenario): Promise<string> {
 }
 
 /**
- * Import an exported scenario file's text and store it. Mints a fresh id, so an
- * import never overwrites the scenario it was exported from, then writes the
- * clips into that new id's media folder under the names the document already
- * uses. References to clips that did not make it are dropped, so what is saved
- * is a scenario whose media all exist here.
+ * Store a scenario an import has already decoded. Mints a fresh id, so an import
+ * never overwrites the scenario it was exported from, then writes the clips into
+ * that new id's media folder under the names the document already uses.
+ * References to clips that did not make it are dropped, so what is saved is a
+ * scenario whose media all exist here.
  *
- * Returns the container's typed failure rather than a bare `null`, so the caller
- * can say "that is a campaign, not a scenario" instead of "invalid file".
+ * Decoding and storing are separate steps because the caller has to know what
+ * game and map the scenario needs before anything is written, so it can fetch
+ * them first (issue #822). Nothing here touches disk until that gate has
+ * cleared.
  */
-export async function importScenario(
-  text: string,
-): Promise<OpenResult<Scenario>> {
-  const read = readScenarioExport(text);
-  if (!read.ok) return read;
-
+export async function storeScenario(
+  exported: ScenarioExport,
+): Promise<Scenario> {
   const id = crypto.randomUUID();
-  const { scenario, media } = read.payload;
+  const { scenario, media } = exported;
   const written = new Set<string>();
   for (const [file, dataUri] of Object.entries(media)) {
     try {
@@ -174,9 +172,5 @@ export async function importScenario(
     }
   }
 
-  const saved = await saveScenario({
-    ...dropMissingDialogueMedia(scenario, written),
-    id,
-  });
-  return { ok: true, payload: saved };
+  return saveScenario({ ...dropMissingDialogueMedia(scenario, written), id });
 }

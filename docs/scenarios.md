@@ -253,6 +253,8 @@ The button is disabled with a reason for the things you have to fix elsewhere: n
 
 **Import** reads one back, from either **Play > Scenarios** or the builder. It **always makes a new copy**: importing your own export gives you a second scenario with a new id, never an overwrite. A file that is not a coilbox scenario, is damaged, or was made by a newer coilbox is rejected with a reason rather than half-read. A clip an import cannot write, one over 16 MB for instance, is skipped and the line that named it loses it, rather than the whole scenario being refused.
 
+If the scenario is played on a game or a map you do not have, import offers to download them first, the same way importing a campaign does. Nothing is written until they are both here, so cancelling leaves you with nothing to clean up.
+
 Scenarios do not have a bundled form of their own. To ship one, attach it to a campaign mission and bundle the campaign, which carries the whole scenario document. **A bundled campaign's dialogue portraits and voice clips are not carried yet**, so its radio messages play silent: [issue #877](https://github.com/tomjn/coilbox/issues/877). Exporting and importing a campaign does carry them. See [Campaigns](campaigns.md#missions-that-play-a-scenario). Shipping a read-only scenario inside a distribution profile is [issue #786](https://github.com/tomjn/coilbox/issues/786) and is not built.
 
 ## Play the example mission
