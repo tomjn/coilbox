@@ -212,10 +212,10 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
 }
 
 /**
- * Slot wrapper for picoframe's built-in home page (`home.top`): the dismissible
- * setup card, followed by the get-started suggestions once setup is complete. Both
- * render `null` when not needed, so a healthy install with content shows nothing
- * above the launcher. Slot Components take no props, hence this wrapper.
+ * Slot wrapper for the home page's `home.top`: the dismissible setup card,
+ * followed by the get-started suggestions once setup is complete. Both render
+ * `null` when not needed, so a healthy install with content shows nothing above
+ * the tool grid. Slot Components take no props, hence this wrapper.
  */
 export function HomeSetupCard() {
   return (
