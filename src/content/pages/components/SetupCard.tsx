@@ -212,10 +212,13 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
 }
 
 /**
- * Slot wrapper for the home page's `home.top`: the dismissible setup card,
- * followed by the get-started suggestions once setup is complete. Both render
- * `null` when not needed, so a healthy install with content shows nothing above
- * the tool grid. Slot Components take no props, hence this wrapper.
+ * The `@widget/onboarding` body: the dismissible setup card, followed by the
+ * get-started suggestions once setup is complete. Both render `null` when not
+ * needed, so a healthy install with content shows nothing.
+ *
+ * A distribution embedding this widget in its own markup has asked for the cards
+ * at that spot, so unlike the home page's Onboarding zone it does not consult
+ * the `onboarding` placement.
  */
 export function HomeSetupCard() {
   return (

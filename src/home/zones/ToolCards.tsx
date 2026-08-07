@@ -17,7 +17,7 @@ import { Link } from "react-router";
  * because picoframe swaps it for "No tools available yet." when there is nothing
  * to list. Keeping both in one component is what lets the layout stay ignorant
  * of whether the grid has anything in it. The Greeting zone takes the copy over
- * in issue #986.
+ * in issue #987.
  */
 export default function ToolCards() {
   const { nav } = useFrame();
