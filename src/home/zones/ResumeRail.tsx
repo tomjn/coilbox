@@ -229,7 +229,9 @@ export default function ResumeRail() {
               line worth the room, and it reads better broken than clipped. */}
           <span className="line-clamp-2 text-sm font-medium">{title}</span>
           <span className={`truncate text-xs ${RAIL_DIM_CLASS}`}>{detail}</span>
-          <span className="mt-1 flex items-center gap-1 text-xs font-medium">
+          {/* Pinned to the foot, so the actions line up across a row whose
+              cards stretched to the depth of a title that wrapped. */}
+          <span className="mt-auto flex items-center gap-1 pt-1 text-xs font-medium">
             {action}
             <ArrowRight
               className="size-3.5 transition-transform motion-safe:group-hover:translate-x-0.5"
