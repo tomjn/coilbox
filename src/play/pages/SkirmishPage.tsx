@@ -339,6 +339,11 @@ export default function SkirmishPage() {
 
   // Persist the working draft (debounced — one write after edits settle, not per
   // keystroke). Transient run state (running/error) is intentionally excluded.
+  //
+  // The write stamps `touchedAt` so the welcome screen's Continue zone can rank
+  // the setup you were actually building against a Warpath run or a campaign
+  // mission (#1011). Without it the collector could only offer whichever preset
+  // you last loaded, which is a different setup from the one on screen.
   useEffect(() => {
     const id = setTimeout(() => {
       setDraft({
@@ -348,6 +353,7 @@ export default function SkirmishPage() {
         startPosType,
         modOptionValues,
         restrictions,
+        touchedAt: Date.now(),
       });
     }, 400);
     return () => clearTimeout(id);
