@@ -1,5 +1,6 @@
 import { Slot } from "@picoframe/frame";
 import { backdropStyle, resolveHomeBackground } from "./background";
+import Continue from "./zones/Continue";
 import Greeting from "./zones/Greeting";
 import Onboarding from "./zones/Onboarding";
 import ToolCards from "./zones/ToolCards";
@@ -49,6 +50,14 @@ export default function StackedLayout() {
         </div>
         <Slot id="home.top" />
         <Greeting />
+        {/* Directly under the greeting, because the greeting's tagline promises
+            it ("Pick up where you left off."), and above the tool grid, because
+            resuming beats starting something new. The gap is the layout's, so the
+            zone stays placeable elsewhere, and `empty:hidden` takes the gap away
+            again on an install with nothing to resume. */}
+        <div className="mt-6 empty:hidden">
+          <Continue />
+        </div>
         <ToolCards />
         <Slot id="home.bottom" />
       </div>
