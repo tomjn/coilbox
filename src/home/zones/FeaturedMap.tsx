@@ -71,7 +71,9 @@ export default function FeaturedMap() {
             className={`block truncate text-xs ${art ? ART_DIM_CLASS : "text-muted-foreground"}`}
           >
             {error ??
-              (source === "battle" ? BATTLE_BLURB : (map.blurb ?? "Curated map"))}
+              (source === "battle"
+                ? BATTLE_BLURB
+                : (map.blurb ?? "Curated map"))}
           </span>
         </span>
         <Action

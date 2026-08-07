@@ -376,14 +376,18 @@ describe("preferring a map an open battle is using", () => {
   it("falls back when the only room is on a map it cannot offer", () => {
     // Nothing in the pool has a verified download for this, and inventing one
     // would feature a map that may not be downloadable anywhere.
-    expect(battleFeaturedMap(POOL, lobby(room("Some Random Map v9")))).toBeNull();
+    expect(
+      battleFeaturedMap(POOL, lobby(room("Some Random Map v9"))),
+    ).toBeNull();
   });
 
   it("will not follow a version the curated entry is not", () => {
     // Offering Supreme Isthmus v2.1 because a room is on v2.2 would feature a
     // map that still would not let the player into that room.
     const pool = [map("Isthmus", "Supreme Isthmus v2.1")];
-    expect(battleFeaturedMap(pool, lobby(room("Supreme Isthmus v2.2")))).toBeNull();
+    expect(
+      battleFeaturedMap(pool, lobby(room("Supreme Isthmus v2.2"))),
+    ).toBeNull();
   });
 
   it("matches the spring name whatever case the server sends it in", () => {
@@ -404,7 +408,10 @@ describe("preferring a map an open battle is using", () => {
       room("SpeedMetal", ["a"]),
       room("SpeedMetal", ["a"]),
       room("SpeedMetal", ["a"]),
-      room("DeltaSiegeDry", Array.from({ length: 15 }, (_, i) => `p${i}`)),
+      room(
+        "DeltaSiegeDry",
+        Array.from({ length: 15 }, (_, i) => `p${i}`),
+      ),
     );
     expect(battleFeaturedMap(POOL, busy)?.id).toBe("DeltaSiege");
   });
@@ -422,7 +429,10 @@ describe("preferring a map an open battle is using", () => {
   it("breaks a tie by pool order rather than by what the server sent first", () => {
     const tied = [room("DeltaSiegeDry", ["a"]), room("SpeedMetal", ["a"])];
     const forwards = battleFeaturedMap(POOL, lobby(...tied))?.id;
-    const backwards = battleFeaturedMap(POOL, lobby(...[...tied].reverse()))?.id;
+    const backwards = battleFeaturedMap(
+      POOL,
+      lobby(...[...tied].reverse()),
+    )?.id;
     // Pool order is Fallendell, SpeedMetal, DeltaSiege, so SpeedMetal wins.
     expect(forwards).toBe("SpeedMetal");
     expect(backwards).toBe("SpeedMetal");
@@ -430,7 +440,10 @@ describe("preferring a map an open battle is using", () => {
 
   it("ignores a room whose map is uncurated while following one that is not", () => {
     const mixed = lobby(
-      room("Some Random Map v9", Array.from({ length: 20 }, (_, i) => `p${i}`)),
+      room(
+        "Some Random Map v9",
+        Array.from({ length: 20 }, (_, i) => `p${i}`),
+      ),
       room("DeltaSiegeDry", ["a"]),
     );
     expect(battleFeaturedMap(POOL, mixed)?.id).toBe("DeltaSiege");
@@ -456,7 +469,10 @@ describe("the rotation, with the lobby out of the picture", () => {
 
   it("is untouched when a live connection has nothing worth featuring", () => {
     // Connected, but every room is empty or on an uncurated map.
-    const quiet = lobby(room("SpeedMetal", []), room("Some Random Map v9", ["a"]));
+    const quiet = lobby(
+      room("SpeedMetal", []),
+      room("Some Random Map v9", ["a"]),
+    );
     expect(featuredMapFor(POOL, quiet, DAY).map).toBe(
       pickFeaturedMap(POOL, DAY),
     );
@@ -614,7 +630,10 @@ describe("the featured map card", () => {
   it("says why the map is here when it came from a live battle", () => {
     // The only thing on screen that separates the two sources. Without it the
     // feature cannot be confirmed by looking at the card.
-    const curated = { ...map("Fallendell", "Fallendell_V4"), blurb: "2-4 player" };
+    const curated = {
+      ...map("Fallendell", "Fallendell_V4"),
+      blurb: "2-4 player",
+    };
     expect(render({ map: curated, source: "curated" })).toContain("2-4 player");
     const html = render({ map: curated, source: "battle" });
     expect(html).toContain("Being played now");
