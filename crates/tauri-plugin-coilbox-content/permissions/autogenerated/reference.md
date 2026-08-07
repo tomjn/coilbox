@@ -24,6 +24,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-demo-chat`
 - `allow-content-rewrite-demo`
 - `allow-content-delete-replay`
+- `allow-content-delete-replays`
 - `allow-content-delete-archive`
 - `allow-content-gather-replays`
 - `allow-content-list-saves`
@@ -35,6 +36,8 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-warm-rapid-pool`
 - `allow-content-prune-rapid-pool`
 - `allow-content-reclaim-caches`
+- `allow-content-storage-overview`
+- `allow-content-delete-engine`
 - `allow-content-export-build-tree-html`
 - `allow-content-export-build-tree-zip`
 - `allow-content-export-challenge`
@@ -314,6 +317,32 @@ Denies the content_delete_archive command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-content:allow-content-delete-engine`
+
+</td>
+<td>
+
+Enables the content_delete_engine command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-delete-engine`
+
+</td>
+<td>
+
+Denies the content_delete_engine command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-content:allow-content-delete-replay`
 
 </td>
@@ -333,6 +362,32 @@ Enables the content_delete_replay command without any pre-configured scope.
 <td>
 
 Denies the content_delete_replay command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-delete-replays`
+
+</td>
+<td>
+
+Enables the content_delete_replays command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-delete-replays`
+
+</td>
+<td>
+
+Denies the content_delete_replays command without any pre-configured scope.
 
 </td>
 </tr>
@@ -957,6 +1012,32 @@ Enables the content_stats_watch_stop command without any pre-configured scope.
 <td>
 
 Denies the content_stats_watch_stop command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-storage-overview`
+
+</td>
+<td>
+
+Enables the content_storage_overview command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-storage-overview`
+
+</td>
+<td>
+
+Denies the content_storage_overview command without any pre-configured scope.
 
 </td>
 </tr>

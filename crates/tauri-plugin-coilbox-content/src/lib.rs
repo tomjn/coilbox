@@ -24,6 +24,7 @@ mod scan;
 mod settings_backup;
 mod stats;
 mod stats_watcher;
+mod storage;
 
 use model::{
     load_store, save_store, ContentRoot, ContentState, RootCounts, RootKind, RootSource, StoreFile,
@@ -1057,17 +1058,26 @@ async fn content_delete_save(path: String) -> Result<CliResult, ()> {
 #[tauri::command]
 async fn content_delete_replay(path: String) -> Result<CliResult, ()> {
     let p = PathBuf::from(&path);
-    let ok_ext = p
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.eq_ignore_ascii_case("sdfz") || e.eq_ignore_ascii_case("sdf"))
-        .unwrap_or(false);
-    if !ok_ext {
+    if !demo::is_replay_path(&p) {
         return Ok(CliResult::err("not a replay file".to_string()));
     }
     match std::fs::remove_file(&p) {
         Ok(()) => Ok(CliResult::ok(json!({ "ok": true }))),
         Err(e) => Ok(CliResult::err(format!("delete failed: {e}"))),
+    }
+}
+
+/// `content_delete_replays`: delete a batch of replays, for the storage screen's
+/// bulk cleanup (issue #386). Each path is guarded the same way
+/// `content_delete_replay` guards its one, and a path that fails is skipped with a
+/// reason rather than aborting the batch. `apply=false` sizes the batch without
+/// deleting. See [`demo::delete_replays`].
+#[tauri::command]
+async fn content_delete_replays(paths: Vec<String>, apply: bool) -> Result<CliResult, ()> {
+    let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+    match tauri::async_runtime::spawn_blocking(move || demo::delete_replays(&paths, apply)).await {
+        Ok(summary) => Ok(CliResult::ok(json!({ "summary": summary }))),
+        Err(e) => Ok(CliResult::err(format!("delete replays task failed: {e}"))),
     }
 }
 
@@ -1338,6 +1348,33 @@ async fn content_reclaim_caches<R: Runtime>(
     }
 }
 
+/// `content_storage_overview`: where one content root's disk has gone, broken
+/// down by engines, games, maps, replays, saves, the rapid pool and everything
+/// else (issue #386). One root per call, so the UI can render each as it lands.
+/// A recursive walk of a large pool is not instant. See [`storage::overview`].
+#[tauri::command]
+async fn content_storage_overview(root: String) -> Result<CliResult, ()> {
+    let p = PathBuf::from(&root);
+    match tauri::async_runtime::spawn_blocking(move || storage::overview(&p)).await {
+        Ok(overview) => Ok(CliResult::ok(json!({ "overview": overview }))),
+        Err(e) => Ok(CliResult::err(format!("storage overview task failed: {e}"))),
+    }
+}
+
+/// `content_delete_engine`: remove one installed engine directory and report the
+/// bytes it freed. Guarded by [`storage::delete_engine`], which only accepts a
+/// real directory sitting inside a folder named `engine`, so the command cannot
+/// be turned into an arbitrary recursive delete.
+#[tauri::command]
+async fn content_delete_engine(path: String) -> Result<CliResult, ()> {
+    let p = PathBuf::from(&path);
+    match tauri::async_runtime::spawn_blocking(move || storage::delete_engine(&p)).await {
+        Ok(Ok(bytes)) => Ok(CliResult::ok(json!({ "bytes": bytes }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("delete engine task failed: {e}"))),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -1363,6 +1400,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_demo_chat,
             content_rewrite_demo,
             content_delete_replay,
+            content_delete_replays,
             content_delete_archive,
             content_gather_replays,
             content_list_saves,
@@ -1374,6 +1412,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_warm_rapid_pool,
             content_prune_rapid_pool,
             content_reclaim_caches,
+            content_storage_overview,
+            content_delete_engine,
             content_export_build_tree_html,
             content_export_build_tree_zip,
             content_export_challenge,

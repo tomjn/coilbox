@@ -4,6 +4,7 @@ import {
   Boxes,
   FolderTree,
   Gamepad2,
+  HardDrive,
   Map as MapIcon,
   Package2,
   SlidersHorizontal,
@@ -16,16 +17,18 @@ import EngineSettingsSection from "./pages/EngineSettingsSection";
 import EnginesSection from "./pages/EnginesSection";
 import FoldersSection from "./pages/FoldersSection";
 import { makeLegacyRedirect } from "./pages/LegacyRedirect";
+import StorageSection from "./pages/StorageSection";
 
 /**
  * The content plugin's frontend half. It owns the **Content** sidebar section —
  * Maps and Games browsed from the installed engines via libunitsync (the
- * `tauri-plugin-coilbox-unitsync` worker) — and keeps two configuration-shaped
- * settings sections: Content Folders (Spring/Recoil data roots), Engines
- * (installs found within them), and Engine Settings (a curated, read-only view of
+ * `tauri-plugin-coilbox-unitsync` worker) — and keeps four configuration-shaped
+ * settings sections: Content Folders (Spring/Recoil data roots), Storage (per
+ * root disk usage and the cleanup actions, issue #386), Engines (installs found
+ * within them), and Engine Settings (a curated, read-only view of
  * `springsettings.cfg` via unitsync), at `/settings/content-folders`,
- * `/settings/engines` and `/settings/engine-settings`. Pair with the
- * `tauri-plugin-coilbox-content` crate (ACL id `coilbox-content`), whose persisted
+ * `/settings/storage`, `/settings/engines` and `/settings/engine-settings`. Pair
+ * with the `tauri-plugin-coilbox-content` crate (ACL id `coilbox-content`), whose persisted
  * state.json is the cross-plugin read API for where game content lives.
  *
  * Replays (now under Singleplayer, `play/index.ts`) and the stats profile (now
@@ -181,6 +184,13 @@ const contentPlugin: FramePlugin = {
       title: "Content Folders",
       icon: FolderTree,
       Component: FoldersSection,
+    },
+    {
+      id: "storage",
+      title: "Storage",
+      icon: HardDrive,
+      width: "lg",
+      Component: StorageSection,
     },
     {
       id: "engines",

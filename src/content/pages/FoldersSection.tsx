@@ -6,7 +6,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDefaultWriteRoot } from "../../downloads/config";
-import { useDownloadQueue } from "../../downloads/DownloadQueueProvider";
 import {
   type ContentState,
   contentAddRoot,
@@ -17,8 +16,6 @@ import {
   contentScanRoot,
 } from "../bindings";
 import { useContentPrefs, useContentState, useSetupStatus } from "../config";
-import { canPrune } from "../rapidPool";
-import { ReclaimCachesButton } from "./components/ReclaimCachesButton";
 import { RootCard } from "./components/RootCard";
 
 const msg = (e: unknown): string =>
@@ -44,8 +41,6 @@ export default function FoldersSection() {
   const [addPortable, setAddPortable] = useState(false);
   const { standardPath } = useSetupStatus();
   const ensureWriteRoot = useDefaultWriteRoot();
-  const { active, queued } = useDownloadQueue();
-  const pruneAllowed = canPrune(active, queued.length);
 
   const doRescan = useCallback(async () => {
     setRescanning(true);
@@ -271,8 +266,6 @@ export default function FoldersSection() {
                 key={root.id}
                 root={root}
                 busy={busyRoot === root.path}
-                canPrune={pruneAllowed}
-                pruneBlockReason="Finish or cancel downloads before reclaiming space"
                 onRescan={rescanRoot}
                 onRemove={removeRoot}
                 onOpen={openRoot}
@@ -280,21 +273,6 @@ export default function FoldersSection() {
             ))}
           </div>
         )}
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-col gap-0.5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Caches
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Generated thumbnails, headers, icons and branding art. All
-              regenerate on demand, so clearing them only frees disk space.
-            </p>
-          </div>
-          <ReclaimCachesButton />
-        </div>
       </section>
 
       <section className="space-y-3">
