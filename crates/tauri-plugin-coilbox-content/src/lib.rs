@@ -871,7 +871,8 @@ async fn content_open_path(path: String) -> Result<CliResult, ()> {
 }
 
 /// `content_list_replays` — list demo files under `<root>/demos` and
-/// `<root>/replays` (fast fs metadata; no decoding). `root` is a `ContentRoot.path`.
+/// `<root>/replays`, and in the same folders of every engine installed under the
+/// root (fast fs metadata, no decoding). `root` is a `ContentRoot.path`.
 #[tauri::command]
 async fn content_list_replays(root: String) -> Result<CliResult, ()> {
     let p = PathBuf::from(&root);

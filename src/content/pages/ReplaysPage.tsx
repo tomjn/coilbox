@@ -139,9 +139,11 @@ export function OriginBadge({ origin }: { origin: ReplayOrigin }) {
 }
 
 /**
- * Replays found in the selected content root's `demos/`/`replays/` folder. The
- * list is cheap fs metadata (filename, played date, size); each row opens a
- * detail view that decodes the demo (map preview, players, winner).
+ * Replays found in the selected content root's `demos/`/`replays/` folder and in
+ * those of every engine installed under it (an engine in Portable Mode writes
+ * its replays into its own folder). The list is cheap fs metadata (filename,
+ * played date, size), and each row opens a detail view that decodes the demo
+ * (map preview, players, winner).
  */
 export default function ReplaysPage() {
   const { targets, selected, selectedKey, setSelectedKey } =

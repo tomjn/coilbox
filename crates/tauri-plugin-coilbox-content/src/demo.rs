@@ -20,8 +20,8 @@ use flate2::read::GzDecoder;
 
 use crate::model::{AllyTeamInfo, ChatLine, DemoChat, DemoInfo, PlayerInfo, ReplayFile, StartBox};
 
-/// Folders under a data root that hold client demos. The engine writes to
-/// `demos/` (`DemoRecorder.cpp`); some lobbies/users use `replays/`.
+/// Folders under a write dir that hold client demos. The engine writes to
+/// `demos/` (`DemoRecorder.cpp`), and some lobbies/users use `replays/`.
 pub(crate) const DEMO_DIRS: &[&str] = &["demos", "replays"];
 const DEMO_EXTS: &[&str] = &[".sdfz", ".sdf"];
 
@@ -49,45 +49,24 @@ const MIN_HEADER: usize = OFF_NUM_TEAMS + 4;
 
 // ---- listing ---------------------------------------------------------------
 
-/// List replays under `<root>/demos` and `<root>/replays` (cheap fs metadata
-/// only; demotool is never run here so the list stays fast), newest first.
+/// List a root's replays (cheap fs metadata only, demotool is never run here so
+/// the list stays fast), newest first.
 pub fn list_replays(root: &Path) -> Vec<ReplayFile> {
-    let mut out: Vec<ReplayFile> = Vec::new();
-    let mut seen: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
-    for dir in DEMO_DIRS {
-        let Ok(rd) = std::fs::read_dir(root.join(dir)) else {
-            continue;
-        };
-        for e in rd.flatten() {
-            let name = e.file_name().to_string_lossy().to_string();
-            let lower = name.to_lowercase();
-            if !DEMO_EXTS.iter().any(|ext| lower.ends_with(ext)) {
-                continue;
-            }
-            let path = e.path();
-            if !seen.insert(path.clone()) {
-                continue;
-            }
-            let md = e.metadata().ok();
-            let size_bytes = md.as_ref().map(|m| m.len()).unwrap_or(0);
-            let modified_ms = md
-                .as_ref()
-                .and_then(|m| m.modified().ok())
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0);
+    let mut out: Vec<ReplayFile> = demo_file_entries(root)
+        .into_iter()
+        .map(|e| {
             // Cheap native decode (header + start-script only, no demotool) so the
-            // list can show map/players/duration; best-effort, ignored on failure.
-            let summary = decode_native(&path).ok();
+            // list can show map/players/duration. Best-effort, ignored on failure.
+            let summary = decode_native(&e.path).ok();
             let (skill_min, skill_avg, skill_max) = summary
                 .as_ref()
                 .map(|i| skill_stats(&i.players))
                 .unwrap_or((None, None, None));
-            out.push(ReplayFile {
-                filename: name,
-                path: path.to_string_lossy().into_owned(),
-                size_bytes,
-                modified_ms,
+            ReplayFile {
+                filename: e.filename,
+                path: e.path.to_string_lossy().into_owned(),
+                size_bytes: e.size_bytes,
+                modified_ms: e.modified_ms,
                 map_name: summary
                     .as_ref()
                     .map(|i| i.map_name.clone())
@@ -105,9 +84,9 @@ pub fn list_replays(root: &Path) -> Vec<ReplayFile> {
                 skill_avg,
                 skill_max,
                 remixed: summary.as_ref().map(|i| i.remixed).unwrap_or(false),
-            });
-        }
-    }
+            }
+        })
+        .collect();
     out.sort_by_key(|r| std::cmp::Reverse(r.modified_ms));
     out
 }
@@ -122,14 +101,38 @@ pub struct DemoFileEntry {
     pub modified_ms: u64,
 }
 
-/// Enumerate demo files under `<root>/demos` and `<root>/replays` with fs metadata
-/// only (no decode, no demotool), deduped by path. A missing folder is skipped, so
-/// a root without a demos dir simply yields nothing.
+/// Every directory a root's replays can be written to: the root itself, then each
+/// installed engine directory under it.
+///
+/// The engine writes `demos/` relative to its write dir, and which directory that
+/// is depends on how the engine got installed. A Recoil release extracted whole
+/// into `engine/<version>/` satisfies Recoil's Portable Mode test, so that engine
+/// writes its replays inside its own folder. A springfiles install is not Portable
+/// Mode (pr-downloader deletes the `springsettings.cfg` the test looks for), so
+/// that engine writes to the shared root. Both are searched, so a player gets one
+/// list of their games whichever engine recorded them, including the ones an
+/// engine they have since upgraded past left behind.
+pub fn demo_search_dirs(root: &Path) -> Vec<PathBuf> {
+    let mut out = vec![root.to_path_buf()];
+    for (dir, _) in crate::scan::engine_dirs(root) {
+        if !out.contains(&dir) {
+            out.push(dir);
+        }
+    }
+    out
+}
+
+/// Enumerate demo files under every [`demo_search_dirs`] entry's `demos`/`replays`
+/// folder with fs metadata only (no decode, no demotool), deduped by path. A
+/// missing folder is skipped, so a root without a demos dir simply yields nothing.
 pub fn demo_file_entries(root: &Path) -> Vec<DemoFileEntry> {
     let mut out: Vec<DemoFileEntry> = Vec::new();
     let mut seen: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
-    for dir in DEMO_DIRS {
-        let Ok(rd) = std::fs::read_dir(root.join(dir)) else {
+    for (base, dir) in demo_search_dirs(root)
+        .iter()
+        .flat_map(|b| DEMO_DIRS.iter().map(move |d| (b, d)))
+    {
+        let Ok(rd) = std::fs::read_dir(base.join(dir)) else {
             continue;
         };
         for e in rd.flatten() {
@@ -1273,6 +1276,86 @@ mod tests {
         assert_eq!(list.len(), 2);
         assert!(list.iter().any(|r| r.filename == "a.sdfz"));
         assert!(list.iter().any(|r| r.filename == "b.sdf"));
+    }
+
+    /// The engine writes `demos/` relative to its write dir, and a Recoil release
+    /// extracted into `engine/<version>/` is Portable Mode, so that is its own
+    /// folder. Measured on a real headless match run out of a staged
+    /// `engine/1.0/` (issue #966), which wrote
+    /// `engine/1.0/demos/2026-08-07_..._AcidicQuarry 5.17_....sdfz`.
+    ///
+    /// The fixtures here are real demo files, so a replay only counts when its
+    /// header and start-script actually decode out of the engine directory.
+    #[test]
+    fn a_replay_an_engine_wrote_into_its_own_directory_is_listed() {
+        let root = std::env::temp_dir().join("coilbox_engine_demos_test");
+        let _ = std::fs::remove_dir_all(&root);
+        let demo = build_demo(SCRIPT, true);
+
+        // engine/<version>/, a Recoil install.
+        let flat = root.join("engine").join("1.0");
+        std::fs::create_dir_all(flat.join("demos")).unwrap();
+        std::fs::write(flat.join("spring"), b"x").unwrap();
+        std::fs::write(flat.join("demos").join("flat.sdfz"), &demo).unwrap();
+
+        // engine/<platform>/<version>/, the springfiles layout.
+        let nested = root.join("engine").join("macos_arm64").join("2.0");
+        std::fs::create_dir_all(nested.join("demos")).unwrap();
+        std::fs::write(nested.join("spring-headless"), b"x").unwrap();
+        std::fs::write(nested.join("demos").join("nested.sdfz"), &demo).unwrap();
+
+        // And the shared root, where a non-Portable-Mode engine writes.
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        std::fs::write(root.join("demos").join("shared.sdfz"), &demo).unwrap();
+
+        let list = list_replays(&root);
+        let names: Vec<&str> = list.iter().map(|r| r.filename.as_str()).collect();
+        assert_eq!(list.len(), 3, "got {names:?}");
+        for want in ["flat.sdfz", "nested.sdfz", "shared.sdfz"] {
+            let r = list
+                .iter()
+                .find(|r| r.filename == want)
+                .unwrap_or_else(|| panic!("{want} missing from {names:?}"));
+            assert_eq!(r.map_name.as_deref(), Some("Valles Marineris 2.6.1"));
+        }
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Only a directory that actually holds an engine is a write dir, so a stray
+    /// folder under `engine/` is not searched.
+    #[test]
+    fn a_folder_under_engine_with_no_engine_in_it_is_not_searched() {
+        let root = std::env::temp_dir().join("coilbox_engine_demos_stray_test");
+        let _ = std::fs::remove_dir_all(&root);
+        let stray = root.join("engine").join("leftovers");
+        std::fs::create_dir_all(stray.join("demos")).unwrap();
+        std::fs::write(stray.join("demos").join("x.sdfz"), build_demo(SCRIPT, true)).unwrap();
+
+        assert_eq!(demo_search_dirs(&root), vec![root.clone()]);
+        assert!(list_replays(&root).is_empty());
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A single-folder portable install is both the root and its own engine
+    /// directory, so it must not be searched twice.
+    #[test]
+    fn a_single_folder_install_is_searched_once() {
+        let root = std::env::temp_dir().join("coilbox_engine_demos_portable_test");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        std::fs::write(root.join("spring"), b"x").unwrap();
+        std::fs::write(
+            root.join("demos").join("only.sdfz"),
+            build_demo(SCRIPT, true),
+        )
+        .unwrap();
+
+        assert_eq!(demo_search_dirs(&root), vec![root.clone()]);
+        assert_eq!(list_replays(&root).len(), 1);
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Write an executable `/bin/sh` script standing in for demotool.

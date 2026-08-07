@@ -317,7 +317,10 @@ export interface DemoInfo {
   modOptions: Record<string, string>;
 }
 
-/** List replays in a content root's `demos/`/`replays/` (cheap; newest first). */
+/**
+ * List replays in a content root's `demos/`/`replays/`, and in those of every
+ * engine installed under it (cheap, newest first).
+ */
 export const contentListReplays = defineCommand<
   { root: string },
   { replays: ReplayFile[] }
