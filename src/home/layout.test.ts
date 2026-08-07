@@ -15,6 +15,13 @@ vi.mock("@picoframe/frame", () => ({
 vi.mock("./zones/Onboarding", () => ({ default: () => null }));
 vi.mock("./zones/Greeting", () => ({ default: () => null }));
 
+// The stacked layout also resolves the page backdrop, which reaches the
+// profile's `@`-reference parser and through it @picoframe/plugin-sdk. Same
+// reason, same shim as the frame above.
+vi.mock("@picoframe/plugin-sdk", () => ({
+  defineCommand: () => async () => ({}),
+}));
+
 import type { Profile } from "../profile/profile";
 import { DEFAULT_LAYOUT, homeMode, layoutNames, resolveLayout } from "./layout";
 import StackedLayout from "./StackedLayout";
