@@ -6,6 +6,7 @@ import {
   readThemeColor,
   registerCardArtSource,
   resolveCardArt,
+  themeColorFrom,
 } from "./art";
 import { FALLBACK_THEME_COLOR, proceduralCardArt } from "./proceduralArt";
 
@@ -144,5 +145,36 @@ describe("readThemeColor", () => {
     expect(resolveCardArt("warpath")).toEqual(
       resolveCardArt("warpath", readThemeColor()),
     );
+  });
+});
+
+describe("themeColorFrom", () => {
+  it("takes a colour the theme actually resolved", () => {
+    expect(themeColorFrom("rgb(59, 130, 246)")).toBe("rgb(59, 130, 246)");
+  });
+
+  it("refuses the colour the probe inherits when the theme said nothing", () => {
+    // The condition, not the value. `hsl(var(--primary))` is invalid at
+    // computed-value time under picoframe's default scheme, and CSS resolves an
+    // invalid inherited property to inherit rather than dropping it. Without the
+    // sentinel the probe reported the page's own text colour, which depends on
+    // how far the stylesheets had got, so two launches disagreed (issue #1047).
+    expect(themeColorFrom("rgb(1, 2, 3)")).toBe(FALLBACK_THEME_COLOR);
+    // Some engines serialise without the spaces.
+    expect(themeColorFrom("rgb(1,2,3)")).toBe(FALLBACK_THEME_COLOR);
+  });
+
+  it("refuses a reading that is not there at all", () => {
+    expect(themeColorFrom("")).toBe(FALLBACK_THEME_COLOR);
+    expect(themeColorFrom("   ")).toBe(FALLBACK_THEME_COLOR);
+  });
+
+  it("answers the same on every call, so two launches agree", () => {
+    // Whatever the probe reports, the answer is a function of that reading
+    // alone. A reading it rejects yields one fixed colour rather than a
+    // different guess each time.
+    for (const reading of ["rgb(1, 2, 3)", "", "rgb(9, 9, 9)"]) {
+      expect(themeColorFrom(reading)).toBe(themeColorFrom(reading));
+    }
   });
 });

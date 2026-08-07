@@ -29,26 +29,26 @@ import type {
   ProgressFile,
 } from "../campaign/model";
 import { unitsyncMinimap } from "../content/bindings";
-import type { RogueliteRun } from "../runlite/model";
 import { resolveCardArt } from "./art";
 import {
+  assignPicks,
   type ContentPick,
   campaignPick,
+  collectionPicks,
   contentArtVersion,
   contentCardArt,
+  contentOffers,
   contentPicks,
   gamePick,
+  PICK_PRIORITY,
   picksKey,
   publishContentArt,
   replayPick,
   resetContentArt,
-  resumeRunId,
   scenarioPick,
   skirmishPick,
   subscribeContentArt,
-  warpathPick,
 } from "./contentArt";
-import { warpathCandidate } from "./continue";
 import { resetResolvedMinimaps, resolvePicks } from "./useContentCardArt";
 
 /* -------------------------------------------------------------------------- *
@@ -86,74 +86,18 @@ function progressFile(campaigns: ProgressFile["campaigns"] = {}): ProgressFile {
   return { schemaVersion: 1, campaigns };
 }
 
-/** A run whose current node is `start`, which is where a fresh run sits. */
-function run(over: Partial<RogueliteRun> = {}): RogueliteRun {
-  return {
-    schemaVersion: 1,
-    type: "roguelite-run",
-    name: "Fractured Fringe",
-    settings: {
-      seed: 1,
-      length: "short",
-      difficulty: "normal",
-      ascension: 0,
-      game: { name: "g", shortname: "g" },
-      factionId: "f",
-      skin: "galaxy",
-    },
-    // A deeper battle comes first in the array, so "the battle an edge leads to"
-    // and "the first battle in the list" give different answers. With them in
-    // graph order the edge rule would be untestable, because both rules would be
-    // right for the same reason.
-    nodes: [
-      {
-        id: "c2n0",
-        type: "battle",
-        col: 2,
-        row: 0,
-        battle: {
-          mapName: "Mithril Mountain v2.0.1",
-          enemyAiCount: 1,
-          handicap: 0,
-          techTier: 1,
-        },
-      },
-      { id: "start", type: "start", col: 0, row: 0 },
-      {
-        id: "c1n0",
-        type: "battle",
-        col: 1,
-        row: 0,
-        battle: {
-          mapName: "Altair_Crossing_V4.1",
-          enemyAiCount: 1,
-          handicap: 0,
-          techTier: 1,
-        },
-      },
-      { id: "c1n1", type: "shop", col: 1, row: 1 },
-    ],
-    edges: [
-      ["start", "c1n0"],
-      ["start", "c1n1"],
-      ["c1n0", "c2n0"],
-      ["c1n1", "c2n0"],
-    ],
-    progress: {
-      currentNodeId: "start",
-      visited: ["start"],
-      hull: 10,
-      maxHull: 10,
-      salvage: 0,
-      unlockedUnits: [],
-      perks: [],
-      status: "active",
-    },
-    history: [],
-    createdAt: "2026-07-30T13:16:39.105Z",
-    updatedAt: "2026-07-30T13:16:39.105Z",
-    ...over,
-  } as RogueliteRun;
+/** An install with nothing scanned, for the picks that do not read a collection. */
+const noCollections = { maps: [], games: [] };
+
+/** Every ordering of a list, for asserting a result does not depend on one. */
+function permutations<T>(items: readonly T[]): T[][] {
+  if (items.length <= 1) return [[...items]];
+  return items.flatMap((item, i) =>
+    permutations([...items.slice(0, i), ...items.slice(i + 1)]).map((rest) => [
+      item,
+      ...rest,
+    ]),
+  );
 }
 
 /* -------------------------------------------------------------------------- *
@@ -319,95 +263,157 @@ describe("scenarioPick", () => {
   });
 });
 
-describe("warpathPick", () => {
-  it("shows the fight an edge leads to, not the node you stand on", () => {
-    const r = run();
-    // The real install's every active run sits on `start`, which has no map, so
-    // a current-node rule would leave this card artless for the whole run.
-    expect(r.nodes.find((n) => n.id === "start")?.battle).toBeUndefined();
-    // And not simply the first battle in the list, which is a deeper one here.
-    expect(r.nodes[0].battle?.mapName).toBe("Mithril Mountain v2.0.1");
-    expect(warpathPick({ "run-1": r }, "run-1")).toEqual({
-      kind: "map",
-      mapName: "Altair_Crossing_V4.1",
-    });
-  });
+describe("collectionPicks", () => {
+  // Four rather than three, because with three every ordering of a set is a
+  // rotation of every other, so dropping the sort left the rotation unchanged
+  // and a three-item case could not see it.
+  const shelf = [
+    { name: "Tabula-v6" },
+    { name: "AcidicQuarry 5.17" },
+    { name: "Isthmus v3" },
+    { name: "Comet Catcher Redux 1.5" },
+  ];
 
-  it("falls back to an unvisited battle when every exit is a shop", () => {
-    const r = run({
-      progress: {
-        ...run().progress,
-        currentNodeId: "c1n1",
-        visited: ["start", "c1n1"],
-      },
-      edges: [["c1n1", "c1n1"]],
-    });
-    expect(warpathPick({ "run-1": r }, "run-1")).toEqual({
-      kind: "map",
-      mapName: "Mithril Mountain v2.0.1",
-    });
-  });
-
-  it("skips a battle already fought when it falls back", () => {
-    const r = run({
-      progress: {
-        ...run().progress,
-        currentNodeId: "c1n1",
-        visited: ["start", "c2n0", "c1n1"],
-      },
-      edges: [["c1n1", "c1n1"]],
-    });
-    expect(warpathPick({ "run-1": r }, "run-1")).toEqual({
-      kind: "map",
-      mapName: "Altair_Crossing_V4.1",
-    });
-  });
-
-  it("answers nothing when the collector picked no run", () => {
-    expect(warpathPick({ "run-1": run() }, undefined)).toBeUndefined();
-  });
-
-  it("answers nothing when the picked run has gone", () => {
-    expect(warpathPick({}, "run-1")).toBeUndefined();
-  });
-});
-
-describe("resumeRunId", () => {
-  it("recovers the run the resume collector picked", () => {
-    // Pinned against the collector itself: if `warpathCandidate` ever changes
-    // the id it builds, this fails here rather than blanking the card silently.
-    const runs = {
-      "run-old": { ...runSummary(), updatedAt: "2026-07-01T00:00:00Z" },
-      "run-new": { ...runSummary(), updatedAt: "2026-07-30T00:00:00Z" },
-    };
-    const candidate = warpathCandidate(runs);
-    expect(candidate).toBeDefined();
-    expect(resumeRunId(candidate ? [candidate] : [])).toBe("run-new");
-  });
-
-  it("answers nothing when there is no Warpath candidate", () => {
+  it("offers every member of the collection", () => {
+    expect(collectionPicks(shelf, "map")).toHaveLength(shelf.length);
     expect(
-      resumeRunId([{ kind: "campaign", id: "campaign:c1" }]),
-    ).toBeUndefined();
+      new Set(
+        collectionPicks(shelf, "map").map((p) =>
+          p.kind === "map" ? p.mapName : "",
+        ),
+      ),
+    ).toEqual(new Set(shelf.map((m) => m.name)));
+  });
+
+  it("gives the same answer every time it is asked", () => {
+    // A card that changes picture when you navigate away and back is worse than
+    // a repeated one, so this is the property the whole rotation exists for.
+    expect(collectionPicks(shelf, "map")).toEqual(
+      collectionPicks(shelf, "map"),
+    );
+    expect(collectionPicks(shelf, "game")).toEqual(
+      collectionPicks(shelf, "game"),
+    );
+  });
+
+  it("ignores the order the scan happened to list things in", () => {
+    // Every permutation, so this cannot pass on one that happens to be a
+    // rotation of the sorted order and therefore already agrees with it.
+    for (const order of permutations(shelf)) {
+      expect(collectionPicks(order, "map")).toEqual(
+        collectionPicks(shelf, "map"),
+      );
+    }
+  });
+
+  it("moves when the collection changes", () => {
+    const grown = [...shelf, { name: "Nuclear Winter 1.2" }];
+    expect(collectionPicks(grown, "map")[0]).not.toEqual(
+      collectionPicks(shelf, "map")[0],
+    );
+  });
+
+  it("drops duplicates and blanks", () => {
+    expect(
+      collectionPicks([{ name: "A" }, { name: "A" }, { name: "" }], "map"),
+    ).toEqual([{ kind: "map", mapName: "A" }]);
+  });
+
+  it("offers nothing for an empty collection", () => {
+    expect(collectionPicks([], "map")).toEqual([]);
+  });
+
+  it("builds game picks when asked for games", () => {
+    expect(collectionPicks([{ name: "Metal Factions v2.58" }], "game")).toEqual(
+      [{ kind: "game", gameName: "Metal Factions v2.58" }],
+    );
   });
 });
 
-function runSummary() {
-  return {
-    name: "Fractured Fringe",
-    updatedAt: "2026-07-30T00:00:00Z",
-    settings: { game: { shortname: "BA" } },
-    progress: { status: "active" as const, hull: 10, maxHull: 10 },
-  };
-}
+describe("assignPicks", () => {
+  const map = (mapName: string): ContentPick => ({ kind: "map", mapName });
+
+  it("gives the map to the highest-priority claimant and no one else", () => {
+    const picks = assignPicks(
+      new Map([
+        ["play.replays", [map("Shared")]],
+        ["play.skirmish", [map("Shared")]],
+      ]),
+    );
+    expect(picks.get("play.skirmish")).toEqual(map("Shared"));
+    expect(picks.has("play.replays")).toBe(false);
+  });
+
+  it("settles a three-way collision the same way", () => {
+    const picks = assignPicks(
+      new Map([
+        ["campaign.list", [map("Shared")]],
+        ["scenario.list", [map("Shared")]],
+        ["play.skirmish", [map("Shared")]],
+      ]),
+    );
+    expect([...picks.keys()]).toEqual(["play.skirmish"]);
+  });
+
+  it("leaves one card holding the map when every card wants it", () => {
+    const every = new Map(PICK_PRIORITY.map((id) => [id, [map("Shared")]]));
+    const picks = assignPicks(every);
+    expect([...picks.keys()]).toEqual(["play.skirmish"]);
+  });
+
+  it("answers the same however the offers are ordered", () => {
+    // The page must not depend on which zone rendered first. Offered backwards,
+    // the winner and the iteration order are both unchanged.
+    const forwards = new Map([
+      ["play.skirmish", [map("A")]],
+      ["play.replays", [map("A")]],
+      ["scenario.list", [map("B")]],
+      ["campaign.list", [map("B")]],
+    ]);
+    const backwards = new Map([...forwards].reverse());
+    expect([...assignPicks(backwards)]).toEqual([...assignPicks(forwards)]);
+    expect([...assignPicks(forwards).keys()]).toEqual([
+      "play.skirmish",
+      "scenario.list",
+    ]);
+  });
+
+  it("slides a collection card onto its next member rather than dropping it", () => {
+    const picks = assignPicks(
+      new Map([
+        ["play.skirmish", [map("Shared")]],
+        ["content.maps", [map("Shared"), map("Another")]],
+      ]),
+    );
+    expect(picks.get("content.maps")).toEqual(map("Another"));
+  });
+
+  it("keeps maps and games in separate namespaces", () => {
+    const picks = assignPicks(
+      new Map<string, ContentPick[]>([
+        ["play.skirmish", [map("Twin")]],
+        ["content.games", [{ kind: "game", gameName: "Twin" }]],
+      ]),
+    );
+    expect(picks.get("content.games")).toEqual({
+      kind: "game",
+      gameName: "Twin",
+    });
+  });
+
+  it("ignores a tool that is not in the priority list", () => {
+    // Silently dropping one would be a card that never gets its art and never
+    // says why, so `contentOffers` is held to the list by its own test below.
+    expect(assignPicks(new Map([["nope.nope", [map("A")]]])).size).toBe(0);
+  });
+});
 
 describe("contentPicks", () => {
+  /** The install this milestone was reported from: one map across four cards. */
+  const SHARED = "Valles Marineris 2.6.1";
   const populated = {
-    draft: {
-      gameName: "Metal Factions v2.58",
-      mapName: "Valles Marineris 2.6.1",
-    },
-    replays: [{ mapName: "Valles Marineris 2.6.1" }],
+    draft: { gameName: "Metal Factions v2.58", mapName: SHARED },
+    replays: [{ mapName: SHARED }],
     campaigns: [{ campaign: campaign() }],
     progress: progressFile({
       c1: {
@@ -416,25 +422,91 @@ describe("contentPicks", () => {
         updatedAt: "2026-08-01T09:32:25.999Z",
       },
     }),
-    scenarios: [{ scenario: { setup: { mapName: "AcidicQuarry 5.17" } } }],
-    runs: { "run-1": run() },
-    resumeRunId: "run-1",
+    scenarios: [{ scenario: { setup: { mapName: SHARED } } }],
+    maps: [{ name: SHARED }, { name: "Isthmus v3" }],
+    games: [{ name: "Metal Factions v2.58" }],
   };
 
-  it("covers the six tools it claims", () => {
-    expect([...contentPicks(populated).keys()].sort()).toEqual([
-      "campaign.list",
-      "content.games",
-      "play.replays",
-      "play.skirmish",
-      "runlite.list",
-      "scenario.list",
-    ]);
+  /** The campaign fixture's own mission, moved onto the shared map. */
+  const sharedCampaign = campaign({
+    missions: [
+      mission({ snapshot: { ...mission().snapshot, mapName: SHARED } }),
+    ],
   });
 
-  it("leaves the same map on two cards rather than inventing a second-best", () => {
+  it("hands the shared map to Singleplayer alone", () => {
+    // The reported defect: these four all resolve the same map on this install.
+    // Only the strongest claim keeps it, and the rest fall through to their
+    // illustrations, which are four different pictures.
+    const picks = contentPicks({
+      ...populated,
+      campaigns: [{ campaign: sharedCampaign }],
+    });
+    expect(picks.get("play.skirmish")).toEqual({
+      kind: "map",
+      mapName: SHARED,
+    });
+    expect(picks.has("play.replays")).toBe(false);
+    expect(picks.has("scenario.list")).toBe(false);
+    expect(picks.has("campaign.list")).toBe(false);
+  });
+
+  it("still gives every card a map when they are all different", () => {
+    const picks = contentPicks({
+      ...populated,
+      replays: [{ mapName: "Isthmus v3" }],
+      scenarios: [{ scenario: { setup: { mapName: "Tabula-v6" } } }],
+    });
+    expect(picks.get("play.replays")).toEqual({
+      kind: "map",
+      mapName: "Isthmus v3",
+    });
+    expect(picks.get("scenario.list")).toEqual({
+      kind: "map",
+      mapName: "Tabula-v6",
+    });
+    expect(picks.get("campaign.list")).toEqual({
+      kind: "map",
+      mapName: "Bismuth Valley v2.4.1",
+    });
+  });
+
+  it("shows a map you own on the Maps card, and never the one already used", () => {
     const picks = contentPicks(populated);
-    expect(picks.get("play.skirmish")).toEqual(picks.get("play.replays"));
+    expect(picks.get("content.maps")).toEqual({
+      kind: "map",
+      mapName: "Isthmus v3",
+    });
+  });
+
+  it("shows a game you own on the Games card", () => {
+    expect(contentPicks(populated).get("content.games")).toEqual({
+      kind: "game",
+      gameName: "Metal Factions v2.58",
+    });
+  });
+
+  it("falls back to the shelf when the saved setup names no game", () => {
+    const picks = contentPicks({
+      ...populated,
+      draft: { gameName: "", mapName: SHARED },
+      games: [{ name: "Balanced Annihilation V15.9.8" }],
+    });
+    expect(picks.get("content.games")).toEqual({
+      kind: "game",
+      gameName: "Balanced Annihilation V15.9.8",
+    });
+  });
+
+  it("offers Warpath no map at all", () => {
+    // Issue #1040. A run is a journey across a galaxy and one battle's map says
+    // nothing about it, so the card takes its illustration at every priority.
+    expect(contentOffers(populated).has("runlite.list")).toBe(false);
+    expect(contentPicks(populated).has("runlite.list")).toBe(false);
+  });
+
+  it("gives the same answer on a second render", () => {
+    expect([...contentPicks(populated)]).toEqual([...contentPicks(populated)]);
   });
 
   it("contributes nothing at all on a fresh install", () => {
@@ -445,16 +517,23 @@ describe("contentPicks", () => {
         campaigns: [],
         progress: progressFile(),
         scenarios: [],
-        runs: {},
+        ...noCollections,
       }).size,
     ).toBe(0);
   });
 
   it("drops only the sources that are missing", () => {
-    const picks = contentPicks({ ...populated, replays: [], runs: {} });
+    const picks = contentPicks({ ...populated, replays: [] });
     expect(picks.has("play.replays")).toBe(false);
-    expect(picks.has("runlite.list")).toBe(false);
     expect(picks.has("play.skirmish")).toBe(true);
+  });
+
+  it("offers nothing for a tool the priority list does not rank", () => {
+    // `assignPicks` walks the priority list, so a tool offering content without
+    // a rank would be dropped without a word.
+    for (const toolId of contentOffers(populated).keys()) {
+      expect(PICK_PRIORITY, toolId).toContain(toolId);
+    }
   });
 });
 
@@ -466,7 +545,7 @@ describe("picksKey", () => {
       campaigns: [],
       progress: progressFile(),
       scenarios: [],
-      runs: {},
+      ...noCollections,
     });
     const same = contentPicks({
       draft: { gameName: "g", mapName: "Map A" },
@@ -474,7 +553,7 @@ describe("picksKey", () => {
       campaigns: [],
       progress: progressFile(),
       scenarios: [],
-      runs: {},
+      ...noCollections,
     });
     const b = contentPicks({
       draft: { gameName: "g", mapName: "Map B" },
@@ -482,7 +561,7 @@ describe("picksKey", () => {
       campaigns: [],
       progress: progressFile(),
       scenarios: [],
-      runs: {},
+      ...noCollections,
     });
     expect(picksKey(a)).toBe(picksKey(same));
     expect(picksKey(a)).not.toBe(picksKey(b));

@@ -2,15 +2,15 @@
  * Step 3 of the card-art chain: illustrations Coilbox ships for a handful of
  * tools, drawn in code as SVG.
  *
- * These are the cold-start pictures. A fresh install has no maps, no replays and
- * no campaign progress, so step 2 has nothing to derive art from, and a fresh
- * install is exactly what the readme, the site and any first-run video show. For
- * the tools below a fixed drawing says what the tool is, where a seeded pattern
- * only says which tool it is.
+ * These are not only the cold-start pictures. Issue #1036 promoted them to the
+ * default: a tool card shows its drawing unless real content can say something
+ * the drawing cannot. A fixed drawing says what the tool is, where a seeded
+ * pattern only says which tool it is, and rendered as a group thirty drawings
+ * read as one set while thirty patterns read as a page that has not loaded.
  *
- * Coverage is deliberately partial. Anything not in {@link DRAWINGS} falls
- * through to the procedural floor, which always answers, so adding or dropping a
- * tool here is a local change with no chain consequences.
+ * Anything not in {@link DRAWINGS} still falls through to the procedural floor,
+ * which always answers, so adding or dropping a tool here is a local change with
+ * no chain consequences.
  *
  * ## The dark contract
  *
@@ -477,21 +477,732 @@ const downloads: Drawing = {
 };
 
 /**
- * Tool id to illustration. Everything absent falls through to procedural, which
- * is the deliberate answer for the rest: multiplayer cards are about live state
- * (who is online, which battle you are in) that a fixed picture would misreport,
- * and the builder and modding tools sit behind advanced mode, so they are not
- * part of the fresh-install screenshot this issue is about.
+ * Slabs stacked back into the canvas, the front one lit.
+ *
+ * A save list is a stack of moments and the front of it is the one you would
+ * load. Drawn as trapezoids so the stack has depth without needing a perspective
+ * grid, which the scenario card already owns.
+ */
+const savegames: Drawing = {
+  pools: [
+    [160, 82, 128, 0.18],
+    [252, 148, 86, 0.09],
+  ],
+  paint: (p) => {
+    const slab = (i: number) => {
+      const y = 112 - i * 22;
+      const inset = i * 15;
+      const front = i === 0;
+      return (
+        `<polygon points="${74 + inset},${y} ${246 - inset},${y} ${226 - inset},${y + 15} ${94 + inset},${y + 15}" ` +
+        `fill="${front ? p.line : p.faint}" fill-opacity="${front ? 0.32 : 0.2 - i * 0.03}"/>`
+      );
+    };
+    return (
+      [3, 2, 1, 0].map(slab).join("") +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.22">` +
+      '<path d="M-10 138 L330 138"/>' +
+      "</g>" +
+      `<circle cx="204" cy="119" r="5" fill="${p.spark}" fill-opacity="0.85"/>`
+    );
+  },
+};
+
+/**
+ * A lit gateway with an arrow going through it.
+ *
+ * Logging in is the one thing this card does, and a threshold says it without
+ * drawing a form. Deliberately not a picture of who is online: a fixed drawing
+ * cannot report live state, so it does not try to.
+ */
+const lobbyLogin: Drawing = {
+  pools: [
+    [172, 80, 106, 0.24],
+    [172, 80, 200, 0.08],
+  ],
+  paint: (p) =>
+    `<g fill="none" stroke="${p.faint}" stroke-width="2" stroke-opacity="0.3">` +
+    '<path d="M124 138 L124 78 Q124 40 172 40 Q220 40 220 78 L220 138"/>' +
+    "</g>" +
+    `<g fill="none" stroke="${p.line}" stroke-width="1.5" stroke-opacity="0.42">` +
+    '<path d="M142 138 L142 82 Q142 58 172 58 Q202 58 202 82 L202 138"/>' +
+    "</g>" +
+    `<rect x="108" y="138" width="128" height="4" rx="2" fill="${p.faint}" fill-opacity="0.3"/>` +
+    `<g fill="none" stroke="${p.spark}" stroke-width="2" stroke-opacity="0.55" stroke-linecap="round" stroke-linejoin="round">` +
+    '<path d="M44 100 L112 100"/>' +
+    '<path d="M96 86 L112 100 L96 114"/>' +
+    "</g>" +
+    `<circle cx="172" cy="90" r="5" fill="${p.spark}" fill-opacity="0.85"/>`,
+};
+
+/** Three speech bubbles, the newest lit. A conversation, not a window. */
+const chat: Drawing = {
+  pools: [
+    [110, 54, 116, 0.18],
+    [222, 116, 96, 0.12],
+  ],
+  paint: (p) => {
+    const dots = (x: number, y: number, colour: string, o: number) =>
+      [0, 1, 2]
+        .map(
+          (i) =>
+            `<circle cx="${x + i * 12}" cy="${y}" r="2.5" fill="${colour}" fill-opacity="${o}"/>`,
+        )
+        .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.8" stroke-opacity="0.34">` +
+      '<rect x="38" y="22" width="122" height="38" rx="10"/>' +
+      '<polygon points="58,60 58,74 76,60"/>' +
+      "</g>" +
+      dots(70, 41, p.faint, 0.4) +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.8" stroke-opacity="0.26">` +
+      '<rect x="152" y="70" width="126" height="38" rx="10"/>' +
+      '<polygon points="256,108 256,122 240,108"/>' +
+      "</g>" +
+      dots(188, 89, p.faint, 0.32) +
+      `<g fill="none" stroke="${p.spark}" stroke-width="1.8" stroke-opacity="0.5">` +
+      '<rect x="52" y="98" width="104" height="38" rx="10"/>' +
+      '<polygon points="72,136 72,150 88,136"/>' +
+      "</g>" +
+      dots(86, 117, p.spark, 0.7)
+    );
+  },
+};
+
+/** Several rooms at once, one of them lit. The battle list, not a battle. */
+const battles: Drawing = {
+  pools: [
+    [160, 80, 148, 0.16],
+    [58, 40, 92, 0.1],
+  ],
+  paint: (p) => {
+    const rooms: readonly (readonly [number, number, number])[] = [
+      [62, 52, 27],
+      [140, 34, 19],
+      [214, 72, 33],
+      [96, 116, 22],
+      [180, 128, 16],
+      [286, 26, 14],
+    ];
+    const rings = rooms
+      .map(
+        ([x, y, r]) =>
+          `<circle cx="${x}" cy="${y}" r="${r}" stroke-opacity="0.34"/>`,
+      )
+      .join("");
+    const crews = rooms
+      .flatMap(([x, y, r]) => [
+        `<circle cx="${round(x - r * 0.44)}" cy="${y}" r="3"/>`,
+        `<circle cx="${round(x + r * 0.44)}" cy="${y}" r="3"/>`,
+      ])
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.8">${rings}</g>` +
+      `<g fill="${p.line}" fill-opacity="0.45">${crews}</g>` +
+      `<circle cx="214" cy="72" r="33" fill="none" stroke="${p.spark}" stroke-width="2" stroke-opacity="0.6"/>` +
+      `<circle cx="214" cy="72" r="43" fill="none" stroke="${p.spark}" stroke-width="1" stroke-opacity="0.22"/>`
+    );
+  },
+};
+
+/** One room, its players ranged around it in two sides. */
+const battleRoom: Drawing = {
+  pools: [
+    [160, 80, 74, 0.26],
+    [160, 80, 158, 0.1],
+  ],
+  paint: (p) => {
+    const seat = (angle: number, spark: boolean) => {
+      const rad = (angle * Math.PI) / 180;
+      const x = round(160 + Math.cos(rad) * 66);
+      const y = round(80 + Math.sin(rad) * 46);
+      return `<circle cx="${x}" cy="${y}" r="${spark ? 6 : 5}" fill="${spark ? p.spark : p.line}" fill-opacity="${spark ? 0.85 : 0.5}"/>`;
+    };
+    const left = [150, 180, 210].map((a) => seat(a, false)).join("");
+    const right = [-30, 0, 30].map((a) => seat(a, a === 0)).join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.3">` +
+      '<ellipse cx="160" cy="80" rx="66" ry="46"/>' +
+      '<ellipse cx="160" cy="80" rx="94" ry="66"/>' +
+      "</g>" +
+      `<g fill="none" stroke="${p.line}" stroke-width="1.5" stroke-opacity="0.34" stroke-dasharray="5 7">` +
+      '<path d="M160 22 L160 138"/>' +
+      "</g>" +
+      left +
+      right +
+      `<circle cx="160" cy="80" r="4" fill="${p.spark}" fill-opacity="0.6"/>`
+    );
+  },
+};
+
+/** A rating climbing over a band of the field it is measured against. */
+const stats: Drawing = {
+  pools: [
+    [220, 50, 122, 0.18],
+    [50, 128, 92, 0.09],
+  ],
+  paint: (p) => {
+    const points: readonly (readonly [number, number])[] = [
+      [30, 128],
+      [66, 116],
+      [102, 122],
+      [138, 98],
+      [174, 104],
+      [210, 76],
+      [246, 60],
+      [282, 38],
+    ];
+    const trace = points.map(([x, y]) => `${x} ${y}`).join(" L");
+    const band = points
+      .map(
+        ([x, y]) =>
+          `<rect x="${x - 3}" y="${y + 8}" width="6" height="24" rx="3"/>`,
+      )
+      .join("");
+    const axis = [0, 1, 2, 3, 4]
+      .map((i) => `<path d="M30 ${40 + i * 24} L290 ${40 + i * 24}"/>`)
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.16">${axis}</g>` +
+      `<g fill="${p.faint}" fill-opacity="0.2">${band}</g>` +
+      `<path d="M${trace}" fill="none" stroke="${p.line}" stroke-width="2.5" stroke-opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<circle cx="282" cy="38" r="5.5" fill="${p.spark}" fill-opacity="0.9"/>` +
+      `<circle cx="138" cy="98" r="3.5" fill="${p.spark}" fill-opacity="0.45"/>`
+    );
+  },
+};
+
+/** A shelf of games, one pulled forward. What you have, not what you could get. */
+const games: Drawing = {
+  pools: [
+    [160, 74, 134, 0.17],
+    [44, 138, 84, 0.09],
+  ],
+  paint: (p) => {
+    const cases = [0, 1, 2, 3, 4]
+      .map((i) => {
+        const x = 46 + i * 40;
+        const h = 82 + (i % 3) * 8;
+        return (
+          `<rect x="${x}" y="${round(128 - h)}" width="30" height="${h}" rx="3" fill="${p.line}" fill-opacity="0.16"/>` +
+          `<rect x="${x}" y="${round(128 - h)}" width="30" height="${h}" rx="3" fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.34"/>`
+        );
+      })
+      .join("");
+    return (
+      cases +
+      `<rect x="222" y="36" width="34" height="94" rx="4" fill="${p.line}" fill-opacity="0.24"/>` +
+      `<rect x="222" y="36" width="34" height="94" rx="4" fill="none" stroke="${p.spark}" stroke-width="1.8" stroke-opacity="0.55"/>` +
+      `<rect x="228" y="48" width="22" height="3" rx="1.5" fill="${p.spark}" fill-opacity="0.6"/>` +
+      `<rect x="228" y="56" width="14" height="3" rx="1.5" fill="${p.spark}" fill-opacity="0.4"/>` +
+      `<rect x="30" y="128" width="260" height="4" rx="2" fill="${p.faint}" fill-opacity="0.32"/>`
+    );
+  },
+};
+
+/** Sealed drums stacked on a pallet. An archive is a container, not a screen. */
+const archives: Drawing = {
+  pools: [
+    [160, 70, 118, 0.18],
+    [268, 132, 84, 0.09],
+  ],
+  paint: (p) => {
+    const drum = (cx: number, cy: number, rx: number, ry: number, o: number) =>
+      `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" stroke-opacity="${o}"/>` +
+      `<path d="M${cx - rx} ${cy} L${cx - rx} ${cy + 28}"/>` +
+      `<path d="M${cx + rx} ${cy} L${cx + rx} ${cy + 28}"/>` +
+      `<ellipse cx="${cx}" cy="${cy + 28}" rx="${rx}" ry="${ry}" stroke-opacity="${round(o * 0.6)}"/>`;
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.8">` +
+      drum(160, 26, 52, 15, 0.34) +
+      drum(160, 62, 52, 15, 0.4) +
+      "</g>" +
+      `<g fill="none" stroke="${p.line}" stroke-width="2">` +
+      drum(160, 98, 52, 15, 0.5) +
+      "</g>" +
+      `<rect x="90" y="140" width="140" height="5" rx="2.5" fill="${p.faint}" fill-opacity="0.34"/>` +
+      `<circle cx="160" cy="98" r="5" fill="${p.spark}" fill-opacity="0.8"/>` +
+      `<g fill="none" stroke="${p.spark}" stroke-width="1.5" stroke-opacity="0.35">` +
+      '<path d="M132 126 L188 126"/>' +
+      "</g>"
+    );
+  },
+};
+
+/** One shell holding several different things. A setup pack is a bundle. */
+const setupPacks: Drawing = {
+  pools: [
+    [160, 78, 104, 0.22],
+    [160, 78, 190, 0.08],
+  ],
+  paint: (p) =>
+    `<g fill="none" stroke="${p.faint}" stroke-width="2" stroke-opacity="0.34">` +
+    '<polygon points="160,12 246,58 246,122 160,168 74,122 74,58"/>' +
+    "</g>" +
+    `<g fill="none" stroke="${p.line}" stroke-width="1.5" stroke-opacity="0.3">` +
+    '<polygon points="160,36 224,70 224,118 160,152 96,118 96,70"/>' +
+    "</g>" +
+    `<circle cx="132" cy="76" r="11" fill="${p.line}" fill-opacity="0.3"/>` +
+    `<rect x="176" y="64" width="24" height="24" rx="4" fill="${p.line}" fill-opacity="0.26"/>` +
+    `<g fill="${p.spark}" fill-opacity="0.7">${diamond(160, 118, 12)}</g>`,
+};
+
+/** A map sheet coming down off the network. */
+const downloadMaps: Drawing = {
+  pools: [
+    [160, 58, 122, 0.18],
+    [160, 138, 96, 0.1],
+  ],
+  paint: (p) => {
+    const sheet =
+      '<polygon points="76,26 140,44 204,26 268,44 268,102 204,84 140,102 76,84"/>';
+    const folds =
+      '<path d="M140 44 L140 102"/><path d="M204 26 L204 84"/>' +
+      '<path d="M76 56 L268 56"/><path d="M76 72 L268 72"/>';
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.18">${folds}</g>` +
+      `<g fill="none" stroke="${p.line}" stroke-width="1.8" stroke-opacity="0.42">${sheet}</g>` +
+      `<g fill="none" stroke="${p.spark}" stroke-width="2.5" stroke-opacity="0.55" stroke-linecap="round" stroke-linejoin="round">` +
+      '<path d="M160 104 L160 142"/>' +
+      '<path d="M144 126 L160 142 L176 126"/>' +
+      "</g>" +
+      `<circle cx="160" cy="64" r="4" fill="${p.spark}" fill-opacity="0.8"/>`
+    );
+  },
+};
+
+/** A game case coming down off the network. */
+const downloadGames: Drawing = {
+  pools: [
+    [160, 56, 118, 0.18],
+    [160, 138, 92, 0.1],
+  ],
+  paint: (p) =>
+    `<rect x="112" y="18" width="96" height="76" rx="6" fill="${p.line}" fill-opacity="0.22"/>` +
+    `<rect x="112" y="18" width="96" height="76" rx="6" fill="none" stroke="${p.line}" stroke-width="1.8" stroke-opacity="0.45"/>` +
+    `<path d="M126 18 L126 94" fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.4"/>` +
+    `<rect x="140" y="34" width="52" height="4" rx="2" fill="${p.faint}" fill-opacity="0.38"/>` +
+    `<rect x="140" y="46" width="34" height="4" rx="2" fill="${p.faint}" fill-opacity="0.26"/>` +
+    `<circle cx="176" cy="72" r="9" fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.34"/>` +
+    `<g fill="none" stroke="${p.spark}" stroke-width="2.5" stroke-opacity="0.55" stroke-linecap="round" stroke-linejoin="round">` +
+    '<path d="M160 104 L160 142"/>' +
+    '<path d="M144 126 L160 142 L176 126"/>' +
+    "</g>" +
+    `<rect x="96" y="150" width="128" height="4" rx="2" fill="${p.faint}" fill-opacity="0.3"/>`,
+};
+
+/** A mission graph with edit handles on it. Building the journey, not walking it. */
+const campaignBuilder: Drawing = {
+  pools: [
+    [160, 96, 132, 0.17],
+    [286, 52, 82, 0.09],
+  ],
+  paint: (p) => {
+    const nodes: readonly (readonly [number, number])[] = [
+      [46, 128],
+      [116, 92],
+      [116, 160],
+      [190, 126],
+      [262, 78],
+      [262, 152],
+    ];
+    const links: readonly (readonly [number, number])[] = [
+      [0, 1],
+      [0, 2],
+      [1, 3],
+      [2, 3],
+      [3, 4],
+      [3, 5],
+    ];
+    const edges = links
+      .map(
+        ([a, b]) =>
+          `<path d="M${nodes[a][0]} ${nodes[a][1]} L${nodes[b][0]} ${nodes[b][1]}"/>`,
+      )
+      .join("");
+    const handles = nodes
+      .map(
+        ([x, y]) =>
+          `<rect x="${x - 7}" y="${y - 7}" width="14" height="14" rx="2" fill="${p.line}" fill-opacity="0.34"/>`,
+      )
+      .join("");
+    const grips = [
+      [190 - 14, 126 - 14],
+      [190 + 14, 126 - 14],
+      [190 - 14, 126 + 14],
+      [190 + 14, 126 + 14],
+    ]
+      .map(
+        ([x, y]) =>
+          `<rect x="${x - 2.5}" y="${y - 2.5}" width="5" height="5" fill="${p.spark}" fill-opacity="0.8"/>`,
+      )
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.32">${edges}</g>` +
+      handles +
+      `<rect x="176" y="112" width="28" height="28" rx="2" fill="none" stroke="${p.spark}" stroke-width="1.5" stroke-opacity="0.5" stroke-dasharray="4 4"/>` +
+      grips
+    );
+  },
+};
+
+/** A plan view with placements dropped on it and one selected. */
+const scenarioBuilder: Drawing = {
+  pools: [
+    [188, 84, 118, 0.18],
+    [52, 40, 88, 0.09],
+  ],
+  paint: (p) => {
+    const grid =
+      [40, 80, 120, 160, 200, 240, 280]
+        .map((x) => `<path d="M${x} 14 L${x} 156"/>`)
+        .join("") +
+      [30, 66, 102, 138].map((y) => `<path d="M24 ${y} L296 ${y}"/>`).join("");
+    const pins = [
+      [80, 60],
+      [124, 118],
+      [208, 54],
+      [252, 122],
+      [166, 92],
+    ]
+      .map(
+        ([x, y]) =>
+          `<polygon points="${x},${y - 12} ${x + 8},${y} ${x},${y + 6} ${x - 8},${y}" fill="${p.line}" fill-opacity="0.5"/>`,
+      )
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.2">${grid}</g>` +
+      pins +
+      `<rect x="146" y="70" width="40" height="40" rx="2" fill="none" stroke="${p.spark}" stroke-width="1.5" stroke-opacity="0.55" stroke-dasharray="5 4"/>` +
+      `<circle cx="166" cy="92" r="4" fill="${p.spark}" fill-opacity="0.85"/>`
+    );
+  },
+};
+
+/** A finished machine, assembled from blocks. */
+const legoUnits: Drawing = {
+  pools: [
+    [160, 70, 116, 0.2],
+    [160, 150, 108, 0.08],
+  ],
+  paint: (p) => {
+    const block = (x: number, y: number, w: number, h: number, o: number) =>
+      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${p.line}" fill-opacity="${o}"/>` +
+      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.4"/>`;
+    return (
+      block(126, 24, 68, 30, 0.3) +
+      block(112, 58, 96, 42, 0.24) +
+      block(78, 64, 30, 26, 0.2) +
+      block(212, 64, 30, 26, 0.2) +
+      block(122, 104, 26, 34, 0.22) +
+      block(172, 104, 26, 34, 0.22) +
+      `<rect x="60" y="142" width="200" height="4" rx="2" fill="${p.faint}" fill-opacity="0.3"/>` +
+      `<circle cx="146" cy="38" r="4.5" fill="${p.spark}" fill-opacity="0.85"/>` +
+      `<circle cx="174" cy="38" r="4.5" fill="${p.spark}" fill-opacity="0.6"/>`
+    );
+  },
+};
+
+/** The same blocks laid out as a parts tray, before anything is built. */
+const legoParts: Drawing = {
+  pools: [
+    [160, 78, 142, 0.16],
+    [252, 34, 78, 0.09],
+  ],
+  paint: (p) => {
+    const shapes = [
+      `<rect x="44" y="30" width="42" height="22" rx="3"/>`,
+      `<rect x="104" y="26" width="24" height="34" rx="3"/>`,
+      `<polygon points="168,24 194,38 168,52 142,38"/>`,
+      `<circle cx="230" cy="38" r="14"/>`,
+      `<rect x="264" y="24" width="22" height="30" rx="3"/>`,
+      `<polygon points="58,124 84,124 84,98 58,98"/>`,
+      `<circle cx="126" cy="112" r="16"/>`,
+      `<rect x="158" y="98" width="46" height="18" rx="3"/>`,
+      `<polygon points="238,94 262,112 238,130 214,112"/>`,
+      `<rect x="272" y="96" width="18" height="34" rx="3"/>`,
+    ];
+    const cells = [80, 160, 240]
+      .map((x) => `<path d="M${x} 12 L${x} 146"/>`)
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.14">` +
+      cells +
+      '<path d="M24 74 L296 74"/>' +
+      "</g>" +
+      `<g fill="${p.line}" fill-opacity="0.28">${shapes.join("")}</g>` +
+      `<g fill="none" stroke="${p.spark}" stroke-width="1.5" stroke-opacity="0.45">` +
+      '<circle cx="126" cy="112" r="22"/>' +
+      "</g>"
+    );
+  },
+};
+
+/** A tray of map projects, one open. */
+const mapconvProjects: Drawing = {
+  pools: [
+    [160, 96, 138, 0.17],
+    [56, 166, 82, 0.09],
+  ],
+  paint: (p) => {
+    const tile = (x: number, y: number, spark: boolean) =>
+      `<rect x="${x}" y="${y}" width="72" height="52" rx="4" fill="${p.line}" fill-opacity="${spark ? 0.24 : 0.14}"/>` +
+      `<rect x="${x}" y="${y}" width="72" height="52" rx="4" fill="none" stroke="${spark ? p.spark : p.faint}" stroke-width="${spark ? 1.8 : 1.2}" stroke-opacity="${spark ? 0.55 : 0.32}"/>` +
+      `<path d="M${x + 12} ${y + 36} Q${x + 26} ${y + 14} ${x + 42} ${y + 26} T${x + 62} ${y + 18}" fill="none" stroke="${spark ? p.spark : p.faint}" stroke-width="1.2" stroke-opacity="0.42"/>`;
+    return (
+      tile(30, 44, false) +
+      tile(124, 44, true) +
+      tile(218, 44, false) +
+      tile(30, 116, false) +
+      tile(124, 116, false) +
+      tile(218, 116, false) +
+      `<circle cx="160" cy="70" r="4" fill="${p.spark}" fill-opacity="0.85"/>`
+    );
+  },
+};
+
+/** Separate layers pressed into one archive. */
+const mapconvCompile: Drawing = {
+  pools: [
+    [96, 100, 118, 0.18],
+    [244, 100, 92, 0.12],
+  ],
+  paint: (p) => {
+    const layer = (y: number, o: number) =>
+      `<polygon points="34,${y} 106,${y - 18} 154,${y + 4} 82,${y + 22}" fill="${p.line}" fill-opacity="${o}"/>` +
+      `<polygon points="34,${y} 106,${y - 18} 154,${y + 4} 82,${y + 22}" fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.36"/>`;
+    return (
+      layer(150, 0.14) +
+      layer(118, 0.18) +
+      layer(86, 0.22) +
+      `<g fill="none" stroke="${p.spark}" stroke-width="2" stroke-opacity="0.55" stroke-linecap="round" stroke-linejoin="round">` +
+      '<path d="M168 108 L214 108"/>' +
+      '<path d="M200 96 L214 108 L200 120"/>' +
+      "</g>" +
+      `<rect x="230" y="80" width="60" height="56" rx="6" fill="${p.line}" fill-opacity="0.26"/>` +
+      `<rect x="230" y="80" width="60" height="56" rx="6" fill="none" stroke="${p.spark}" stroke-width="1.8" stroke-opacity="0.5"/>` +
+      `<circle cx="260" cy="108" r="4" fill="${p.spark}" fill-opacity="0.85"/>`
+    );
+  },
+};
+
+/** One archive opened back out into its layers. */
+const mapconvDecompile: Drawing = {
+  pools: [
+    [78, 100, 92, 0.14],
+    [220, 100, 122, 0.18],
+  ],
+  paint: (p) => {
+    const layer = (y: number, o: number) =>
+      `<polygon points="176,${y} 248,${y - 18} 296,${y + 4} 224,${y + 22}" fill="${p.line}" fill-opacity="${o}"/>` +
+      `<polygon points="176,${y} 248,${y - 18} 296,${y + 4} 224,${y + 22}" fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.36"/>`;
+    return (
+      `<rect x="30" y="80" width="60" height="56" rx="6" fill="${p.line}" fill-opacity="0.2"/>` +
+      `<rect x="30" y="80" width="60" height="56" rx="6" fill="none" stroke="${p.faint}" stroke-width="1.8" stroke-opacity="0.4"/>` +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.4">` +
+      '<path d="M42 92 L78 92"/>' +
+      "</g>" +
+      `<g fill="none" stroke="${p.spark}" stroke-width="2" stroke-opacity="0.55" stroke-linecap="round" stroke-linejoin="round">` +
+      '<path d="M106 108 L152 108"/>' +
+      '<path d="M138 96 L152 108 L138 120"/>' +
+      "</g>" +
+      layer(158, 0.22) +
+      layer(118, 0.18) +
+      layer(78, 0.14) +
+      `<circle cx="236" cy="118" r="4" fill="${p.spark}" fill-opacity="0.85"/>`
+    );
+  },
+};
+
+/** One script turning into another. Two columns, an arrow between them. */
+const bos2lua: Drawing = {
+  pools: [
+    [88, 96, 108, 0.16],
+    [236, 104, 108, 0.16],
+  ],
+  paint: (p) => {
+    const column = (x: number, colour: string, o: number, widths: number[]) =>
+      widths
+        .map(
+          (w, i) =>
+            `<rect x="${x + (i % 3) * 7}" y="${52 + i * 14}" width="${w}" height="4" rx="2" fill="${colour}" fill-opacity="${o}"/>`,
+        )
+        .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.28">` +
+      '<rect x="26" y="38" width="106" height="126" rx="6"/>' +
+      '<rect x="188" y="38" width="106" height="126" rx="6"/>' +
+      "</g>" +
+      column(40, p.faint, 0.3, [56, 44, 62, 38, 50, 34, 58, 42]) +
+      column(202, p.line, 0.4, [48, 60, 36, 54, 44, 62, 40, 56]) +
+      `<g fill="none" stroke="${p.spark}" stroke-width="2" stroke-opacity="0.6" stroke-linecap="round" stroke-linejoin="round">` +
+      '<path d="M142 100 L178 100"/>' +
+      '<path d="M166 88 L178 100 L166 112"/>' +
+      "</g>"
+    );
+  },
+};
+
+/**
+ * A jointed limb turning about a pivot, with the pose it came from left behind.
+ *
+ * The protractor round the middle joint is doing the work. A rig without one is
+ * a line with dots on it, which is what the player-stats card already is, and at
+ * card size the two were hard to tell apart.
+ */
+const cobTools: Drawing = {
+  pools: [
+    [154, 74, 116, 0.22],
+    [250, 130, 78, 0.09],
+  ],
+  paint: (p) => {
+    const pivot = [154, 74] as const;
+    const dial = Array.from({ length: 9 }, (_, i) => {
+      const rad = ((-96 + i * 24) * Math.PI) / 180;
+      return `<path d="M${round(pivot[0] + Math.cos(rad) * 30)} ${round(pivot[1] + Math.sin(rad) * 30)} L${round(pivot[0] + Math.cos(rad) * 37)} ${round(pivot[1] + Math.sin(rad) * 37)}"/>`;
+    }).join("");
+    const joints = [
+      [56, 124],
+      [154, 74],
+      [252, 40],
+    ]
+      .map(
+        ([x, y]) =>
+          `<circle cx="${x}" cy="${y}" r="9" fill="none" stroke="${p.line}" stroke-width="2" stroke-opacity="0.55"/>`,
+      )
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="4" stroke-opacity="0.2" stroke-linecap="round">` +
+      '<path d="M154 74 L246 128"/>' +
+      "</g>" +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.3">` +
+      `<circle cx="154" cy="74" r="30"/>` +
+      "</g>" +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.34">${dial}</g>` +
+      `<g fill="none" stroke="${p.line}" stroke-width="5" stroke-opacity="0.42" stroke-linecap="round">` +
+      '<path d="M56 124 L154 74"/>' +
+      '<path d="M154 74 L252 40"/>' +
+      "</g>" +
+      joints +
+      `<g fill="none" stroke="${p.spark}" stroke-width="1.5" stroke-opacity="0.45" stroke-dasharray="4 5">` +
+      '<path d="M252 40 Q286 84 246 128"/>' +
+      "</g>" +
+      `<circle cx="154" cy="74" r="4" fill="${p.spark}" fill-opacity="0.9"/>`
+    );
+  },
+};
+
+/** A field packed with identical units, densest where it is about to break. */
+const uberstressRun: Drawing = {
+  pools: [
+    [232, 104, 108, 0.24],
+    [70, 96, 120, 0.1],
+  ],
+  paint: (p) => {
+    const rand = mulberry32(0xc0ffee);
+    const marks = Array.from({ length: 150 }, () => {
+      // Biased right: the load ramps across the field rather than filling it.
+      const x = round(20 + rand() ** 0.6 * 280);
+      const y = round(40 + rand() * 130);
+      const r = round(2 + rand() * 1.6);
+      const o = round(0.14 + (x / 320) * 0.3);
+      return `<polygon points="${x},${round(y - r)} ${round(x + r)},${y} ${x},${round(y + r)} ${round(x - r)},${y}" fill-opacity="${o}"/>`;
+    }).join("");
+    return (
+      `<g fill="${p.line}">${marks}</g>` +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.26" stroke-dasharray="6 7">` +
+      '<path d="M232 24 L232 180"/>' +
+      "</g>" +
+      `<g fill="none" stroke="${p.spark}" stroke-width="2" stroke-opacity="0.4">` +
+      '<circle cx="262" cy="104" r="22"/>' +
+      "</g>" +
+      `<circle cx="262" cy="104" r="6" fill="${p.spark}" fill-opacity="0.9"/>`
+    );
+  },
+};
+
+/** A dial with every previous reading still faintly on it. */
+const uberstressHistory: Drawing = {
+  pools: [
+    [160, 112, 108, 0.22],
+    [160, 112, 190, 0.08],
+  ],
+  paint: (p) => {
+    const needle = (angle: number, colour: string, o: number, w: number) => {
+      const rad = (angle * Math.PI) / 180;
+      const x = round(160 + Math.cos(rad) * 78);
+      const y = round(112 + Math.sin(rad) * 78);
+      return `<path d="M160 112 L${x} ${y}" stroke="${colour}" stroke-width="${w}" stroke-opacity="${o}"/>`;
+    };
+    const dial = [180, 157, 134, 111, 88]
+      .map((a) => {
+        const rad = (a * Math.PI) / 180;
+        return `<path d="M${round(160 + Math.cos(rad) * 84)} ${round(112 + Math.sin(rad) * 84)} L${round(160 + Math.cos(rad) * 94)} ${round(112 + Math.sin(rad) * 94)}"/>`;
+      })
+      .join("");
+    const ghosts = [174, 166, 152, 141, 126, 118]
+      .map((a, i) => needle(-a, p.faint, round(0.12 + i * 0.03), 1.5))
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.28">` +
+      '<path d="M76 112 Q160 10 244 112"/>' +
+      "</g>" +
+      `<g fill="none" stroke="${p.faint}" stroke-width="2" stroke-opacity="0.34">${dial}</g>` +
+      `<g fill="none" stroke-linecap="round">${ghosts}</g>` +
+      `<g fill="none" stroke-linecap="round">${needle(-104, p.spark, 0.7, 2.5)}</g>` +
+      `<circle cx="160" cy="112" r="6" fill="${p.spark}" fill-opacity="0.85"/>` +
+      `<rect x="96" y="140" width="128" height="4" rx="2" fill="${p.faint}" fill-opacity="0.28"/>`
+    );
+  },
+};
+
+/**
+ * Tool id to illustration.
+ *
+ * Coverage is now every tool that opens a Coilbox screen. The six items left out
+ * are the ones that open a web page in your browser (the mapping wiki, the
+ * Blender tools, the parts-pack format, the Skeletor guides, the Lua animation
+ * reference). They are the one case where the procedural field says the right
+ * thing: it marks them as not being a screen this app draws.
+ *
+ * The multiplayer and advanced-mode tools were left to the field by #990, on the
+ * grounds that a fixed picture would misreport live state and that the builders
+ * are not in a fresh-install screenshot. Both were revisited for issue #1036 and
+ * both gave way. A card is a door, not a status display, so a drawing of a
+ * doorway does not claim anyone is online. And the people who turn advanced mode
+ * on look at the same grid as everyone else.
  */
 const DRAWINGS: Record<string, Drawing> = {
   "play.skirmish": skirmish,
   "play.replays": replays,
+  "play.savegames": savegames,
   "campaign.list": campaigns,
+  "campaign.builder": campaignBuilder,
   "scenario.list": scenarios,
+  "scenario.builder": scenarioBuilder,
   "conquest.list": conquest,
   "runlite.list": warpath,
+  "multiplayer.lobby": lobbyLogin,
+  "multiplayer.chat": chat,
+  "multiplayer.battles": battles,
+  "multiplayer.battle": battleRoom,
+  "multiplayer.stats": stats,
   "content.maps": maps,
+  "content.games": games,
+  "content.archives": archives,
+  "content.setupPacks": setupPacks,
   "downloads.browse": downloads,
+  "downloads.maps": downloadMaps,
+  "downloads.games": downloadGames,
+  "lego.units": legoUnits,
+  "lego.parts": legoParts,
+  "mapconv.projects": mapconvProjects,
+  "mapconv.compile": mapconvCompile,
+  "mapconv.decompile": mapconvDecompile,
+  "animation.bos2lua": bos2lua,
+  "animation.cob": cobTools,
+  "uberstress.run": uberstressRun,
+  "uberstress.history": uberstressHistory,
 };
 
 /** Tool ids with a bundled illustration, for tests and for the preview page. */

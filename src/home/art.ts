@@ -115,6 +115,12 @@ export function resolveCardArt(
 let probed: { key: string; color: string } | undefined;
 
 /**
+ * A colour no theme would choose, painted on the probe's parent so the probe
+ * inherits it. Reading it back means the probe learned nothing.
+ */
+const SENTINEL = "rgb(1, 2, 3)";
+
+/**
  * The theme's primary colour, resolved to something parseable.
  *
  * Reading `--primary` directly does not work. picoframe's default scheme defines
@@ -124,27 +130,68 @@ let probed: { key: string; color: string } | undefined;
  * triple whatever form the theme used, including a distribution's `profile.theme`
  * override and a campaign's scoped accent.
  *
+ * ## Why the probe sits inside a sentinel
+ *
+ * When `hsl(var(--primary))` does not resolve to a colour, CSS does not drop the
+ * declaration and leave the previous one standing. The property is invalid at
+ * computed-value time, and for an inherited property that means inherit. So the
+ * naive probe silently returned whatever colour the page's text happened to be
+ * at that instant, which depends on how far the stylesheets had got. Two launches
+ * of the same build on the same install read two different hues (issue #1047).
+ *
+ * Putting the probe inside a parent painted {@link SENTINEL} turns that silent
+ * wrong answer into a detectable one: the inherited colour is now a value no
+ * theme uses, so reading it back means the theme said nothing and the fixed
+ * fallback is the honest answer. Fixed, so it is the same on every launch.
+ *
  * The result is memoised against the raw custom property, which does change when
  * the accent or the base hue changes. Switching theme in Appearance therefore
  * re-probes, while a page of cards does not force a style recalculation each.
+ *
+ * An empty `--primary` means the theme's stylesheet has not applied yet, and it
+ * is not memoised. Caching that probe would hold a guess for the rest of the
+ * session even after the real colours arrived (issue #1043).
  */
 export function readThemeColor(): string {
   if (typeof document === "undefined") return FALLBACK_THEME_COLOR;
   const root = document.documentElement;
   const key = getComputedStyle(root).getPropertyValue("--primary").trim();
+  if (!key) return FALLBACK_THEME_COLOR;
   if (probed?.key === key) return probed.color;
 
+  const holder = document.createElement("span");
+  holder.style.setProperty("position", "absolute");
+  holder.style.setProperty("width", "0");
+  holder.style.setProperty("height", "0");
+  holder.style.setProperty("overflow", "hidden");
+  holder.style.setProperty("color", SENTINEL);
   const probe = document.createElement("span");
-  probe.style.setProperty("position", "absolute");
-  probe.style.setProperty("width", "0");
-  probe.style.setProperty("height", "0");
   probe.style.setProperty("color", "hsl(var(--primary))");
-  root.appendChild(probe);
-  const color = getComputedStyle(probe).color || FALLBACK_THEME_COLOR;
-  probe.remove();
+  holder.appendChild(probe);
+  root.appendChild(holder);
+  const measured = getComputedStyle(probe).color;
+  holder.remove();
 
+  const color = themeColorFrom(measured);
   probed = { key, color };
   return color;
+}
+
+/**
+ * What to make of one probe reading.
+ *
+ * Pure, and exported, because the interesting part of the probe is the condition
+ * under which its answer is worthless rather than the answer itself, and that is
+ * not something a value assertion catches.
+ */
+export function themeColorFrom(measured: string): string {
+  // Compared with the spaces out, because engines differ on whether they
+  // serialise `rgb(1, 2, 3)` or `rgb(1,2,3)`, and this is the one value whose
+  // exact spelling decides the answer.
+  const bare = (colour: string) => colour.replace(/\s+/g, "");
+  const seen = measured.trim();
+  if (!seen || bare(seen) === bare(SENTINEL)) return FALLBACK_THEME_COLOR;
+  return seen;
 }
 
 /** Drop the memoised theme colour. For tests, and for a hard theme reload. */
