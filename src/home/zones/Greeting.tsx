@@ -1,5 +1,6 @@
 import { useFrame } from "@picoframe/frame";
 import { useMultiplayer } from "../../multiplayer/store";
+import { useResume } from "../continue";
 import { homeToolGroups } from "../nav";
 
 /** The heading and the line under it. */
@@ -62,13 +63,16 @@ function useLobbyName(): string | null {
 /**
  * Whether there is anything to resume.
  *
- * Hard-wired false until issue #992 lands the collector that ranks resume
- * candidates. Building half of that here would put a second, worse answer in the
- * codebase for #992 to unpick, so the seam is a hook and nothing more. Until it
- * is filled in, the tagline never takes its resume branch.
+ * The same shared collector the Continue zone and the resume rail read, so the
+ * greeting cannot promise a resume the page then fails to offer. Zones never
+ * read each other's state, and {@link useResume} is what makes that possible.
+ *
+ * The sources load from disk, so this is false on the first frame and turns true
+ * a beat later on an install with something waiting. One change, like the
+ * heading's.
  */
 function useHasResume(): boolean {
-  return false;
+  return useResume().candidates.length > 0;
 }
 
 /**
