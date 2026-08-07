@@ -1,27 +1,28 @@
 /**
- * The paths a group's orders draw on the editor's map.
+ * The paths an order draws on the editor's map.
  *
  * A move, a patrol or a fight order is a list of points and nothing else, so it
- * is drawn as a line from where the group stands through the points in turn,
+ * is drawn as a line from where the units are through the points in turn,
  * following the ground under it. A patrol is drawn as a loop, because that is
  * what the engine does with one: the first patrol point given to a standing unit
  * closes the circuit back to where it is standing, so a patrol runs between the
  * group's position and the points the author drew.
  *
- * Every group's paths are drawn, the selected group's brighter and with a knob
- * on each waypoint. Both the knobs and the lines carry a `placementKey`, so the
- * shared picking in `useMapEditing` sees them the way it sees units and zone
- * handles. A line is selected by a click but never grabbed, the way a zone's
- * sheet is: it is the easiest thing on a big map to hit, and what it means is
- * "work on this group" rather than "move this line" (#842).
+ * Every path is drawn, whether the orders belong to a group or to a trigger
+ * (`orderPaths.ts`), the one being worked on brighter and with a knob on each
+ * waypoint. Both the knobs and the lines carry a `placementKey`, so the shared
+ * picking in `useMapEditing` sees them the way it sees units and zone handles. A
+ * line is selected by a click but never grabbed, the way a zone's sheet is: it
+ * is the easiest thing on a big map to hit, and what it means is "work on this
+ * path" rather than "move this line" (#842).
  *
- * The arithmetic, what a drag does to a waypoint, is in `groups.ts`.
+ * The arithmetic, what a drag does to a waypoint, is in `orderPaths.ts`.
  */
 
 import * as THREE from "three";
 
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
-import type { Point, ScenarioGroup } from "../../model";
+import type { Point } from "../../model";
 import {
   drapePoints,
   orderWaypoints,
@@ -29,6 +30,7 @@ import {
   pathKey,
   pathLineKey,
 } from "./groups";
+import type { PathSource } from "./orderPaths";
 import { worldToScene } from "./scene";
 
 /** What a scenario's paths are drawn under, so the layer can be found and
@@ -48,8 +50,8 @@ const SAMPLE_ELMOS = 96;
  *  handle, so both are grabbable at the zoom the whole map is framed at. */
 const HANDLE_ELMOS = 88;
 
-/** What a path is drawn in: bright for the group being worked on, muted for the
- *  rest, so a map full of groups still reads. */
+/** What a path is drawn in: bright for the one being worked on, muted for the
+ *  rest, so a map full of paths still reads. */
 const PATH_COLOR = 0x86efac;
 const IDLE_COLOR = 0x94a3b8;
 const SELECTED_COLOR = 0xfacc15;
@@ -73,13 +75,13 @@ export interface PathsLayer {
    *  a line is a drawing of an order, so pressing it stays the camera's. */
   grabbable: (key: string) => boolean;
   /**
-   * Draw these groups' paths, replacing whatever was drawn before.
-   * `selectedGroupId` gets the brighter line and the waypoint knobs, and
-   * `selectedKey` is the one knob drawn as the selection.
+   * Draw these paths, replacing whatever was drawn before. `activeId` gets the
+   * brighter line and the waypoint knobs, and `selectedKey` is the one knob
+   * drawn as the selection.
    */
   draw: (
-    groups: ScenarioGroup[],
-    selectedGroupId: string | null,
+    sources: PathSource[],
+    activeId: string | null,
     selectedKey: string | null,
   ) => void;
   /** Show a drag in progress: the waypoint this key names, moved by `delta`,
@@ -96,8 +98,8 @@ export function createPathsLayer(deps: PathsLayerDeps): PathsLayer {
 
   /** What is on screen, so a drag can redraw one waypoint against what it
    *  started as rather than accumulating. */
-  let drawn: ScenarioGroup[] = [];
-  let selectedGroupId: string | null = null;
+  let drawn: PathSource[] = [];
+  let activeId: string | null = null;
   let selectedKey: string | null = null;
   const keys = new Set<string>();
   /** Everything one pass allocated, so the next pass can free it. */
@@ -118,10 +120,10 @@ export function createPathsLayer(deps: PathsLayerDeps): PathsLayer {
     );
   };
 
-  /** One order's path: the line, and a knob per waypoint when the group it
-   *  belongs to is the one being worked on. */
+  /** One order's path: the line, and a knob per waypoint when the orders it
+   *  belongs to are the ones being worked on. */
   const buildPath = (
-    group: ScenarioGroup,
+    source: PathSource,
     order: number,
     waypoints: Point[],
     loop: boolean,
@@ -133,12 +135,12 @@ export function createPathsLayer(deps: PathsLayerDeps): PathsLayer {
     // On the group rather than on the line, so a knob inside it that carries a
     // key of its own still answers with that one: the pointer layer walks up
     // from what it hit and stops at the first key it finds.
-    const lineKey = pathLineKey(group.id);
+    const lineKey = pathLineKey(source.id);
     out.userData = { placementKey: lineKey };
     keys.add(lineKey);
 
     const points = drapePoints(
-      [group.pos, ...waypoints],
+      source.from ? [source.from, ...waypoints] : waypoints,
       SAMPLE_ELMOS,
       loop,
     ).map(at);
@@ -174,7 +176,7 @@ export function createPathsLayer(deps: PathsLayerDeps): PathsLayer {
       });
       owned.push(knobGeometry, knobMaterial, pickedMaterial);
       waypoints.forEach((waypoint, index) => {
-        const key = pathKey(group.id, order, index);
+        const key = pathKey(source.id, order, index);
         const knob = new THREE.Mesh(
           knobGeometry,
           key === selectedKey ? pickedMaterial : knobMaterial,
@@ -190,21 +192,21 @@ export function createPathsLayer(deps: PathsLayerDeps): PathsLayer {
     return out;
   };
 
-  const render = (groups: ScenarioGroup[], selectedId: string | null) => {
+  const render = (sources: PathSource[], active: string | null) => {
     root.clear();
     for (const spent of owned) spent.dispose();
     owned = [];
     keys.clear();
-    for (const group of groups) {
-      group.orders.forEach((order, index) => {
+    for (const source of sources) {
+      source.orders.forEach((order, index) => {
         const waypoints = orderWaypoints(order);
         if (!waypoints) return;
         const path = buildPath(
-          group,
+          source,
           index,
           waypoints,
           order.kind === "patrol",
-          group.id === selectedId,
+          source.id === active,
         );
         if (path) root.add(path);
       });
@@ -216,30 +218,30 @@ export function createPathsLayer(deps: PathsLayerDeps): PathsLayer {
     root,
     has: (key: string) => keys.has(key),
     grabbable: (key: string) => !!parsePathKey(key),
-    draw: (groups, groupId, key) => {
-      drawn = groups;
-      selectedGroupId = groupId;
+    draw: (sources, active, key) => {
+      drawn = sources;
+      activeId = active;
       selectedKey = key;
-      render(groups, groupId);
+      render(sources, active);
     },
     drag: (key, delta) => {
       const ref = parsePathKey(key);
       if (!ref) return;
       render(
-        drawn.map((group) => {
-          if (group.id !== ref.groupId) return group;
-          const order = group.orders[ref.order];
-          if (!order || !("waypoints" in order)) return group;
+        drawn.map((source) => {
+          if (source.id !== ref.groupId) return source;
+          const order = source.orders[ref.order];
+          if (!order || !("waypoints" in order)) return source;
           const moved = order.waypoints.map((point, i) =>
             i === ref.waypoint
               ? { x: point.x + delta.x, z: point.z + delta.z }
               : point,
           );
-          const orders = group.orders.slice();
+          const orders = source.orders.slice();
           orders[ref.order] = { ...order, waypoints: moved };
-          return { ...group, orders };
+          return { ...source, orders };
         }),
-        selectedGroupId,
+        activeId,
       );
     },
     dispose: () => {

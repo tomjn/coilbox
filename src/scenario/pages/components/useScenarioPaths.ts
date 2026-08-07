@@ -2,7 +2,7 @@
  * Wiring a scenario's order paths into the map scene.
  *
  * The same lifecycle the zones have, for the same reason: the layer is built
- * once per scene and per map, and redrawn whenever the groups, the selection or
+ * once per scene and per map, and redrawn whenever the paths, the selection or
  * the map's relief change. A path is a handful of generated points, so redrawing
  * it costs nothing.
  */
@@ -10,16 +10,17 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
-import type { Point, ScenarioGroup } from "../../model";
+import type { Point } from "../../model";
+import type { PathSource } from "./orderPaths";
 import { createPathsLayer, type PathsLayer } from "./pathsLayer";
 
 export function useScenarioPaths(
   handle: MapScene3D | null,
-  groups: ScenarioGroup[],
+  sources: PathSource[],
   map: { worldWidth: number; worldHeight: number },
   groundAt: (pos: Point) => number,
-  /** The group being worked on, which is the one that gets waypoint knobs. */
-  selectedGroupId: string | null,
+  /** The path being worked on, which is the one that gets waypoint knobs. */
+  activeId: string | null,
   /** The one waypoint that is the selection, drawn as such. */
   selectedKey: string | null,
 ): PathsLayer | null {
@@ -48,8 +49,8 @@ export function useScenarioPaths(
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `groundAt` is not read here, it is the signal that the relief the lines follow has arrived
   useEffect(() => {
-    layer?.draw(groups, selectedGroupId, selectedKey);
-  }, [layer, groups, selectedGroupId, selectedKey, groundAt]);
+    layer?.draw(sources, activeId, selectedKey);
+  }, [layer, sources, activeId, selectedKey, groundAt]);
 
   return layer;
 }

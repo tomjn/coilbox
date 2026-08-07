@@ -57,16 +57,21 @@ import {
   addWaypoint,
   editGroup,
   groupLabel,
-  moveWaypoint,
   orderWaypoints,
   parsePathKey,
   parsePathLineKey,
+  pathLineKey,
   removeGroup,
-  removeWaypoint,
   targetOptions,
 } from "./groups";
 import { modKeyLabel } from "./history";
 import { EDITOR_MODES } from "./modes";
+import {
+  movePathWaypoint,
+  pathLabel,
+  removePathWaypoint,
+  scenarioPaths,
+} from "./orderPaths";
 import { PrefabControls } from "./PrefabControls";
 import { type Placement, placementKey } from "./placements";
 import { editPrefab, removePrefab, setOrigin, setQueue } from "./prefabs";
@@ -153,6 +158,9 @@ export function ScenarioMapScene({
     message: ReactNode;
     onPick: (pos: Point) => void;
     onDone: () => void;
+    /** The path the points are going into, when they are going into one, so it
+     *  is the path drawn with knobs while the author draws it (#847). */
+    pathId?: string;
   } | null;
 }) {
   const mapName = scenario.setup.mapName;
@@ -218,34 +226,56 @@ export function ScenarioMapScene({
   );
   useScenarioStarts(handle, starts, assets, units.groundAt);
 
+  const groups = scenario.groups;
   /**
    * What a click on the map selects.
    *
-   * A drawn path line stands for the group whose order drew it: the line is the
-   * easiest thing on a big map to hit and the group is what an author who hit it
-   * wants, so it selects the group rather than the line (#842).
+   * A drawn path line stands for the orders that drew it: the line is the
+   * easiest thing on a big map to hit and the orders are what an author who hit
+   * it wants (#842). A group's line means the group, because a group has units
+   * to select and controls to open. A trigger's line means itself, because it
+   * has neither, and selecting it is what puts knobs on its points.
    */
-  const select = useCallback((key: string | null) => {
-    const line = key ? parsePathLineKey(key) : null;
-    setSelected(line ? placementKey("group", line, 0) : key);
-  }, []);
+  const select = useCallback(
+    (key: string | null) => {
+      const line = key ? parsePathLineKey(key) : null;
+      if (!line) return setSelected(key);
+      const group = groups.some((one) => one.id === line);
+      setSelected(group ? placementKey("group", line, 0) : key);
+    },
+    [groups],
+  );
 
   const picked = units.placements.find((p) => p.key === selected) ?? null;
   // A group is what is being worked on whether one of its units or one of its
   // waypoints was clicked, so both answer the same question.
   const pathRef = selected ? parsePathKey(selected) : null;
   const pickedGroup =
-    scenario.groups.find(
+    groups.find(
       (group) =>
         group.id ===
         (pathRef?.groupId ?? (picked?.kind === "group" ? picked.id : null)),
     ) ?? null;
+
+  // Every path the document draws, a group's own and the ones its triggers hand
+  // out, so an author drawing either can see what they are drawing (#847).
+  const paths = useMemo(() => scenarioPaths(scenario), [scenario]);
+  const selectedLine = selected ? parsePathLineKey(selected) : null;
+  // Which of them is being worked on, and so gets knobs on its points: the one a
+  // panel is putting points into, failing that the one a point or a line of is
+  // selected, failing that the selected group's own.
+  const activePath =
+    picking?.pathId ??
+    pathRef?.groupId ??
+    selectedLine ??
+    pickedGroup?.id ??
+    null;
   const pathsLayer = useScenarioPaths(
     handle,
-    scenario.groups,
+    paths,
     assets,
     units.groundAt,
-    pickedGroup?.id ?? null,
+    activePath,
     pathRef ? selected : null,
   );
 
@@ -305,7 +335,7 @@ export function ScenarioMapScene({
     onMove: (key, delta) => {
       if (parseZoneKey(key)) return onChange(moveZone(scenario, key, delta));
       if (parsePathKey(key))
-        return onChange(moveWaypoint(scenario, key, delta));
+        return onChange(movePathWaypoint(scenario, key, delta));
       onChange(movePlacement(scenario, key, delta));
     },
   });
@@ -648,21 +678,32 @@ export function ScenarioMapScene({
         {picking && !drawingPath && !moving && (
           <ClickMapBar message={picking.message} onDone={picking.onDone} />
         )}
-        {pathRef && selected && pickedGroup && (
+        {pathRef && selected && (
           <PathBar
-            what={`${groupLabel(scenario.groups, pickedGroup.id)} · point ${
+            what={`${pathLabel(paths, pathRef.groupId)} · point ${
               pathRef.waypoint + 1
             }`}
-            // Back to the group the point belonged to rather than to nothing,
-            // so its other points keep their knobs and a path being drawn is
-            // still being drawn.
+            hint="drag it to move it"
+            // Back to the path the point belonged to rather than to nothing, so
+            // its other points keep their knobs and a path being drawn is still
+            // being drawn.
             onDelete={() => {
-              onChange(removeWaypoint(scenario, selected));
-              setSelected(placementKey("group", pathRef.groupId, 0));
+              onChange(removePathWaypoint(scenario, selected));
+              setSelected(
+                pickedGroup
+                  ? placementKey("group", pathRef.groupId, 0)
+                  : pathLineKey(pathRef.groupId),
+              );
             }}
           >
             {groupControls}
           </PathBar>
+        )}
+        {selectedLine && (
+          <PathBar
+            what={pathLabel(paths, selectedLine)}
+            hint="drag one of its points to move it"
+          />
         )}
         {pickedZone && (
           <ZoneBar
@@ -930,11 +971,15 @@ function ClickMapBar({
  */
 function PathBar({
   what,
+  hint,
   onDelete,
   children,
 }: {
   what: string;
-  onDelete: () => void;
+  hint: string;
+  /** Left out when a whole path is what is selected rather than one of its
+   *  points, because a path is deleted by deleting the order that holds it. */
+  onDelete?: () => void;
   /** The group's controls: its team, its units and its orders. */
   children?: ReactNode;
 }) {
@@ -942,17 +987,17 @@ function PathBar({
     <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card/85 p-1 pl-2 backdrop-blur">
       <span className="font-mono text-[11px]">{what}</span>
       {children}
-      <span className="text-[11px] text-muted-foreground">
-        drag it to move it
-      </span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
-        onClick={onDelete}
-      >
-        <Trash2 className="size-3.5" /> Delete point
-      </Button>
+      <span className="text-[11px] text-muted-foreground">{hint}</span>
+      {onDelete && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+          onClick={onDelete}
+        >
+          <Trash2 className="size-3.5" /> Delete point
+        </Button>
+      )}
     </div>
   );
 }
