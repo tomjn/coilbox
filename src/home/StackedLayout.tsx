@@ -52,7 +52,7 @@ export default function StackedLayout({
       {/* Positioned, so the zones paint over the backdrop without a z-index. */}
       <div className="relative p-8">
         <Slot id="home.top" />
-        {entries.map(renderEntry)}
+        {renderEntries(entries)}
         <Slot id="home.bottom" />
       </div>
     </div>
@@ -78,10 +78,106 @@ const ZONE_SPACING: Partial<Record<ZoneId, string>> = {
   // from the content plugin's `home.top` contribution, which is where these
   // cards used to live.
   onboarding: "mb-2 flex flex-col gap-4",
+  // The spacing the hero and the rail get when they are *not* side by side,
+  // which is a profile that separated them or listed only one. Adjacent, they
+  // share {@link RESUME_ROW} instead.
   continue: "mt-6 empty:hidden",
   resume: "mt-3 empty:hidden",
   featured: "mt-8 empty:hidden",
 };
+
+/**
+ * The row the continue hero and the resume rail share.
+ *
+ * They were two full-width bands, and the hero's band was mostly empty. One row
+ * reads as one thing: what you were last doing, then the couple of other things
+ * you could go back to.
+ *
+ * `flex-wrap`, so the rail drops under the hero when the line cannot hold both.
+ * That is the two-row page this replaced, which is still the right answer on a
+ * narrow window and with a rail three cards wide. The gap is the rail's own card
+ * gap, so the space between the hero and the first rail card is the same as the
+ * space between rail cards.
+ *
+ * A column below `sm`, because that is where the rail's own cards go full width
+ * (`RAIL_CARD_CLASS`). A row there would size the rail to its text instead, and
+ * the cards would come out narrower than the hero above them for no reason the
+ * page could explain. The window can be dragged to 600px, so this is reachable.
+ *
+ * `empty:hidden` on the row, with the two zones as its direct children and no
+ * wrapper each. That is what makes the block vanish on a fresh install: both
+ * zones render null, the row has no child nodes at all, and it takes its own top
+ * margin with it. Wrapping each zone would leave the row holding two empty divs,
+ * so it would keep the margin and the page would open with a gap in it.
+ */
+const RESUME_ROW =
+  "mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap";
+
+/**
+ * What the row tells the hero about its width: fill whatever the rail leaves,
+ * but take a line of its own rather than shrink below 32rem.
+ *
+ * The width is the layout's decision, not the zone's, which is why it arrives as
+ * a class instead of living in `Continue`. 32rem is where the hero stops looking
+ * like one: below it the action wraps under the title and the card is a tall
+ * column beside a row of small ones.
+ *
+ * Only from `sm`, where {@link RESUME_ROW} is a row at all. Below that the main
+ * axis is vertical and a basis would be a height.
+ *
+ * The rail is handed nothing, deliberately. A flex item's default is to size to
+ * its content and not grow, which is already the rail: as wide as the cards it
+ * has, and free to wrap them when the line it lands on is narrower than that.
+ */
+const RESUME_HERO = "min-w-0 sm:flex-[1_1_32rem]";
+
+/**
+ * The page's entries, with the hero and the rail composed into one row wherever
+ * they sit next to each other.
+ *
+ * The pairing belongs to the layout. Neither zone knows the other exists: each
+ * still renders nothing when it has nothing to say, and the row is built so that
+ * both silent means no row at all. That is what leaves a later layout free to
+ * put them somewhere else, or to leave them stacked.
+ *
+ * Only an adjacent `continue` then `resume` pairs. A profile that separated
+ * them, reversed them, or listed one without the other wrote the order it wanted,
+ * and each zone keeps the stacked spacing it had.
+ *
+ * An entry carrying `before` or `after` markup does not pair either. That markup
+ * renders whether or not its zone drew anything, so in the row it would be a
+ * third item sitting beside the hero, and it would hold the row open on a page
+ * with nothing to resume.
+ */
+function renderEntries(entries: readonly HomeEntry[]): ReactNode[] {
+  const out: ReactNode[] = [];
+  for (let i = 0; i < entries.length; i += 1) {
+    const entry = entries[i];
+    const next: HomeEntry | undefined = entries[i + 1];
+    if (bare(entry, "continue") && next && bare(next, "resume")) {
+      out.push(
+        <div key={i} className={RESUME_ROW}>
+          <Continue className={RESUME_HERO} />
+          <ResumeRail />
+        </div>,
+      );
+      i += 1;
+      continue;
+    }
+    out.push(renderEntry(entry, i));
+  }
+  return out;
+}
+
+/** A zone entry naming `zone` and carrying no markup of its own. */
+function bare(entry: HomeEntry, zone: ZoneId): boolean {
+  return (
+    entry.kind === "zone" &&
+    entry.zone === zone &&
+    zoneString(entry.entry, "before") === undefined &&
+    zoneString(entry.entry, "after") === undefined
+  );
+}
 
 /**
  * One entry of the page, with the layout's own spacing around it.

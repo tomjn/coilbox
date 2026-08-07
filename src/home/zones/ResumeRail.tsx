@@ -174,7 +174,9 @@ export const RAIL_CARD_CLASS =
  *
  * Layout-agnostic: no page-level spacing or width of its own, because the
  * `stacked` layout is a compatibility contract and a later layout has to be able
- * to put the rail somewhere else.
+ * to put the rail somewhere else. Beside the hero (#1041) it needs no width
+ * class at all: a flex item sizes to its content and does not grow by default,
+ * which is already what the rail wants.
  *
  * ## The log-in card
  *
@@ -207,8 +209,8 @@ export default function ResumeRail() {
   if (loading || cards.length === 0) return null;
 
   return (
-    // Labelled rather than headed: the rail is the small half of the hero
-    // directly above it, and a heading between the two would split one block in
+    // Labelled rather than headed: the rail is the small half of the hero it
+    // shares a row with, and a heading between the two would split one block in
     // half. The label gives assistive tech the grouping a sighted reader gets
     // from the layout.
     <section aria-label="More to pick up" className="flex flex-wrap gap-3">
