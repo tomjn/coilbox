@@ -17,6 +17,7 @@ import {
   nextDialogueId,
   nextObjectiveId,
   nextVarName,
+  portraitDrawable,
   removeBuildableUnit,
   removeCommand,
   removeDialogue,
@@ -162,6 +163,18 @@ describe("dialogue", () => {
   it("never stores an empty file name, which the parser reads as no file", () => {
     const next = editDialogue(document(), "warn", { portrait: "" });
     expect("portrait" in next.dialogue[0]).toBe(false);
+  });
+
+  /**
+   * Issue #942. The engine reads a DDS portrait and no webview does, so the
+   * preview says why rather than reporting a good file as unreadable.
+   */
+  it("knows a portrait the editor cannot draw from one it can", () => {
+    expect(portraitDrawable("hq.png")).toBe(true);
+    expect(portraitDrawable("hq.bmp")).toBe(true);
+    expect(portraitDrawable("hq.dds")).toBe(false);
+    expect(portraitDrawable("HQ.DDS")).toBe(false);
+    expect(portraitDrawable("dds.png")).toBe(true);
   });
 
   it("carries the actions that played it over on a rename", () => {

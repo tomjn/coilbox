@@ -227,6 +227,21 @@ export function dialogueMedia(line: ScenarioDialogue): string[] {
   return [line.portrait, line.audio].filter((f): f is string => !!f);
 }
 
+/**
+ * Whether the editor can draw a portrait, which is a different question from
+ * whether the engine can load one.
+ *
+ * DDS is the format a game's own art is usually shipped in, because it reaches
+ * the GPU still compressed, and the engine reads it. No webview decodes one, so
+ * an `img` pointed at a DDS fails and the panel reported that as a file it could
+ * not read back, which is a lie about a perfectly good portrait (issue #942).
+ * The file is stored and handed to the mission either way. Only the preview
+ * stands down, and it says why.
+ */
+export function portraitDrawable(file: string): boolean {
+  return !file.toLowerCase().endsWith(".dds");
+}
+
 /* -------------------------------------------------------------------------- *
  * Variables.
  *
