@@ -1,0 +1,37 @@
+import { GetStartedCard } from "../content/pages/components/GetStartedCard";
+import { SetupCard } from "../content/pages/components/SetupCard";
+import BrandedWelcome from "../profile/BrandedWelcome";
+import { getOnboardingPlacement } from "../profile/profile";
+
+/**
+ * The home page for a distribution that ships its own welcome markup: that
+ * welcome, plus the first-run onboarding (setup + get-started suggestion cards).
+ *
+ * The welcome is always rendered and never replaced. The `onboarding` placement
+ * only positions the cards above, below, or off (see
+ * {@link getOnboardingPlacement}).
+ *
+ * The root is a definite-height scroll container so the welcome sizes to its own
+ * content, rather than an ambiguous `h-full` that collapses to zero inside
+ * picoframe's overflow-auto content region.
+ *
+ * Moved here from `content/pages/SetupHome` when Coilbox took ownership of `/`
+ * (issue #985). Unchanged otherwise, so existing distributions render as before.
+ */
+export default function BrandedHome() {
+  const placement = getOnboardingPlacement();
+  const onboarding =
+    placement === "off" ? null : (
+      <>
+        <SetupCard dismissible />
+        <GetStartedCard />
+      </>
+    );
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-auto p-4">
+      {placement === "above" && onboarding}
+      <BrandedWelcome />
+      {placement === "below" && onboarding}
+    </div>
+  );
+}

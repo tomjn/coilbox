@@ -30,6 +30,9 @@ docs/mockups/
 # and dev cache do not). `dist` above already covers docs/.vitepress/dist.
 docs/.vitepress/cache/
 
+# Brainstorming mockups served by the superpowers visual companion.
+.superpowers/
+
 # Full logs from `bun run check` (scripts/check.sh), which mirrors the checks
 # CI runs. Written here instead of a path an agent invents at the filesystem
 # root.

@@ -6,14 +6,14 @@ import { resolveWelcomeAction } from "./welcomeActions";
 import { rewriteBrandedCss, rewriteBrandedHtml } from "./welcomeAssets";
 
 /**
- * The branded welcome landing page: replaces the default launcher home when the
- * profile supplies a `welcome`. Renders bundler-authored HTML plus its scoped CSS.
+ * The branded welcome landing page: takes the whole home when the profile supplies
+ * a `welcome`. Renders bundler-authored HTML plus its scoped CSS.
  *
  * The HTML is injected via `dangerouslySetInnerHTML`: it comes from a trusted,
  * bundler-controlled file shipped inside the distribution (same trust level as the
  * binary), and by design carries no `<script>` — declarative content only, so no
- * CSP relaxation is needed. Only used when `welcome` is present (main.tsx omits the
- * home override otherwise), so this component always has content to show.
+ * CSP relaxation is needed. Only rendered when `welcome` is present (CoilboxHome
+ * picks the other arm otherwise), so this component always has content to show.
  *
  * Because the HTML can't run JavaScript, the one interactive hook an author gets is
  * the `data-coilbox-action` attribute: a delegated click handler on the container reads
@@ -67,7 +67,7 @@ export default function BrandedWelcome() {
 
   if (!welcome) return null;
   return (
-    // Natural height (not `h-full`): the SetupHome scroll container sizes and scrolls
+    // Natural height (not `h-full`): the BrandedHome scroll container sizes and scrolls
     // this, so a short welcome can't collapse to zero the way `height:100%` does
     // against an auto-height parent inside picoframe's overflow-auto content region.
     <section className="w-full">
