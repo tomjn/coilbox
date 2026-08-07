@@ -14,6 +14,7 @@ function base(): HealthInputs {
     installedGames: ["Splinter Faction 1.3"],
     writeRootPath: "/pkg/game",
     campaignFailures: [],
+    scenarioFailures: [],
     writable: { writeRoot: { writable: true }, dataDir: { writable: true } },
     hide: [],
     hideableNavIds: ["content.games", "downloads.browse", "downloads.games"],
@@ -148,6 +149,40 @@ describe("deriveHealthChecks", () => {
     expect(c.label).toContain("2");
     expect(c.detail).toContain("First Contact [bundled]");
     expect(c.detail).toContain("does not match the campaign schema");
+  });
+
+  it("warns when a scenario failed to load, naming it and the error", () => {
+    const c = byId(
+      {
+        ...base(),
+        scenarioFailures: [
+          {
+            source: "bundled",
+            name: "Ambush",
+            error: "That scenario was made by a newer version of coilbox.",
+          },
+        ],
+      },
+      "scenarios",
+    );
+    expect(c.status).toBe("warn");
+    expect(c.label).toContain("1 scenario(s)");
+    expect(c.hint).toContain(".coilbox/scenarios/");
+    expect(c.detail).toContain("Ambush [bundled]");
+    expect(c.detail).toContain("newer version of coilbox");
+  });
+
+  it("says scenarios loaded, and does so separately from campaigns", () => {
+    const checks = deriveHealthChecks({
+      ...base(),
+      campaignFailures: [
+        { source: "bundled", name: "First Contact", error: "bad" },
+      ],
+    });
+    expect(checks.find((c) => c.id === "campaigns")?.status).toBe("warn");
+    const scenarios = checks.find((c) => c.id === "scenarios");
+    expect(scenarios?.status).toBe("ok");
+    expect(scenarios?.label).toBe("All scenarios loaded");
   });
 
   it("warns when the package has no engine or no games", () => {

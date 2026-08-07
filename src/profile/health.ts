@@ -12,14 +12,24 @@ export interface HealthCheck {
   detail?: string;
 }
 
-/** One campaign that failed to load, with enough to find and fix it. */
-export interface CampaignFailure {
+/**
+ * One bundled or local document that failed to load, with enough to find and fix
+ * it. Campaigns and scenarios both fail this way: the reader skips the file with
+ * a console warning, so it simply is not there and nobody sees why.
+ */
+export interface LoadFailure {
   source: "bundled" | "local";
-  /** The campaign's own `name`, or a placeholder when the JSON won't parse. */
+  /** The document's own `name`, or a placeholder when the JSON won't parse. */
   name: string;
   /** The parse or schema error explaining why it was rejected. */
   error: string;
 }
+
+/** One campaign that failed to load. */
+export type CampaignFailure = LoadFailure;
+
+/** One scenario that failed to load (issue #962). */
+export type ScenarioFailure = LoadFailure;
 
 /** A writability probe result for one folder (from `dlPathWritable`). */
 export interface WritableResult {
@@ -55,6 +65,8 @@ export interface HealthInputs {
   installedGames: string[] | null;
   writeRootPath: string | undefined;
   campaignFailures: CampaignFailure[];
+  /** Bundled and local scenarios the reader skipped, and why. */
+  scenarioFailures: ScenarioFailure[];
   writable: { writeRoot?: WritableResult; dataDir?: WritableResult };
   /** The profile's `hide` list (nav ids the bundler wants hidden). */
   hide: string[];
@@ -180,6 +192,34 @@ export function checkLinkIcons(
     hint: `${unknown
       .map((n) => `link icon '${n}' is unknown — falls back to a generic icon`)
       .join("; ")}.`,
+  };
+}
+
+/**
+ * The row for one kind of bundled content that can fail to load. Campaigns and
+ * scenarios read the same way and fail the same way, so they say the same thing
+ * about it: what did not load, where the file is, and the reader's own reason.
+ *
+ * `where` is written into the hint, so it names the folders in the words the
+ * person who built the package would search for.
+ */
+function loadFailureCheck(
+  id: string,
+  noun: string,
+  where: string,
+  failures: LoadFailure[],
+): HealthCheck {
+  if (failures.length === 0) {
+    return { id, status: "ok", label: `All ${noun}s loaded` };
+  }
+  return {
+    id,
+    status: "warn",
+    label: `${failures.length} ${noun}(s) failed to load`,
+    hint: `Fix the JSON in ${where}:`,
+    detail: failures
+      .map((f) => `${f.name} [${f.source}]: ${f.error}`)
+      .join("\n"),
   };
 }
 
@@ -334,23 +374,21 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     );
   }
 
-  // 6. Bundled campaign load errors
-  {
-    const failures = i.campaignFailures;
-    checks.push(
-      failures.length === 0
-        ? { id: "campaigns", status: "ok", label: "All campaigns loaded" }
-        : {
-            id: "campaigns",
-            status: "warn",
-            label: `${failures.length} campaign(s) failed to load`,
-            hint: "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):",
-            detail: failures
-              .map((f) => `${f.name} [${f.source}]: ${f.error}`)
-              .join("\n"),
-          },
-    );
-  }
+  // 6. Bundled campaign and scenario load errors
+  checks.push(
+    loadFailureCheck(
+      "campaigns",
+      "campaign",
+      ".coilbox/campaigns/ (bundled) or the app data campaigns folder (local)",
+      i.campaignFailures,
+    ),
+    loadFailureCheck(
+      "scenarios",
+      "scenario",
+      ".coilbox/scenarios/ (bundled) or the app data scenarios folder (local)",
+      i.scenarioFailures,
+    ),
+  );
 
   // 7. Playable content present
   {

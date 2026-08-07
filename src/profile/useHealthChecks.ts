@@ -7,12 +7,15 @@ import { useUnitsyncScan } from "../content/config";
 import { dlPathWritable } from "../downloads/bindings";
 import { useDownloadsConfig } from "../downloads/config";
 import { usePreferredTarget } from "../play/config";
+import { scenarioList } from "../scenario/bindings";
+import { parseStoredScenario } from "../scenario/storage";
 import { installedGameNames } from "./authoring";
 import {
   type CampaignFailure,
   deriveHealthChecks,
   type HealthCheck,
   type HealthInputs,
+  type ScenarioFailure,
 } from "./health";
 import { HIDEABLE_NAV_IDS } from "./hidden";
 import { describeJsonError } from "./jsonError";
@@ -24,6 +27,7 @@ import {
   getProfileRoot,
   getProfileSource,
 } from "./profile";
+import { describeScenarioFailure } from "./scenarioFailure";
 
 /** The campaign's own `name`, or a placeholder when the JSON can't be read. */
 function campaignName(json: string): string {
@@ -99,6 +103,23 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         })
         .catch(() => [] as CampaignFailure[]);
 
+      // The same check over bundled scenarios (issue #962). A scenario a package
+      // shipped that coilbox skipped is invisible otherwise: it does not appear
+      // in the list, and the only trace is a console warning nobody reads.
+      const scenarioFailures = await scenarioList({})
+        .then((r) => {
+          const out: ScenarioFailure[] = [];
+          for (const item of r.items) {
+            if (parseStoredScenario(item.json) !== null) continue;
+            out.push({
+              source: item.source,
+              ...describeScenarioFailure(item.json),
+            });
+          }
+          return out;
+        })
+        .catch(() => [] as ScenarioFailure[]);
+
       const probe = (path: string | undefined) =>
         path
           ? dlPathWritable({ path })
@@ -135,6 +156,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         installedGames,
         writeRootPath,
         campaignFailures,
+        scenarioFailures,
         writable: { writeRoot: writeRootProbe, dataDir: dataDirProbe },
         hide: profile.hide ?? [],
         hideableNavIds: HIDEABLE_NAV_IDS,
