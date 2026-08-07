@@ -43,7 +43,7 @@ export interface LoadedScenario {
  * are left alone: `ensureBundledScenarioMedia` puts them in the media store on
  * the launch path, the way a bundled campaign's are.
  */
-function parseStoredScenario(json: string): Scenario | null {
+export function parseStoredScenario(json: string): Scenario | null {
   const bare = parseScenarioJson(json);
   if (bare) return bare;
   const read = readScenarioExport(json);

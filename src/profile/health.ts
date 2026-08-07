@@ -12,14 +12,24 @@ export interface HealthCheck {
   detail?: string;
 }
 
-/** One campaign that failed to load, with enough to find and fix it. */
-export interface CampaignFailure {
+/**
+ * One bundled or local document that failed to load, with enough to find and fix
+ * it. Campaigns and scenarios both fail this way: the reader skips the file with
+ * a console warning, so it simply is not there and nobody sees why.
+ */
+export interface LoadFailure {
   source: "bundled" | "local";
-  /** The campaign's own `name`, or a placeholder when the JSON won't parse. */
+  /** The document's own `name`, or a placeholder when the JSON won't parse. */
   name: string;
   /** The parse or schema error explaining why it was rejected. */
   error: string;
 }
+
+/** One campaign that failed to load. */
+export type CampaignFailure = LoadFailure;
+
+/** One scenario that failed to load (issue #962). */
+export type ScenarioFailure = LoadFailure;
 
 /** A writability probe result for one folder (from `dlPathWritable`). */
 export interface WritableResult {
@@ -44,9 +54,19 @@ export interface HealthInputs {
   profileErrorSnippet: string | null;
   gameFilter: GameFilter | undefined;
   roots: RootInput[];
-  installedGames: string[];
+  /**
+   * The games a unitsync scan found, by the name a `gameFilter` matches, or null
+   * when no scan has answered yet: no engine to scan with, or one that failed.
+   *
+   * Null rather than an empty list, because "nothing is installed" and "nobody
+   * looked" are different answers and the panel exists to tell them apart
+   * (issue #959).
+   */
+  installedGames: string[] | null;
   writeRootPath: string | undefined;
   campaignFailures: CampaignFailure[];
+  /** Bundled and local scenarios the reader skipped, and why. */
+  scenarioFailures: ScenarioFailure[];
   writable: { writeRoot?: WritableResult; dataDir?: WritableResult };
   /** The profile's `hide` list (nav ids the bundler wants hidden). */
   hide: string[];
@@ -175,6 +195,34 @@ export function checkLinkIcons(
   };
 }
 
+/**
+ * The row for one kind of bundled content that can fail to load. Campaigns and
+ * scenarios read the same way and fail the same way, so they say the same thing
+ * about it: what did not load, where the file is, and the reader's own reason.
+ *
+ * `where` is written into the hint, so it names the folders in the words the
+ * person who built the package would search for.
+ */
+function loadFailureCheck(
+  id: string,
+  noun: string,
+  where: string,
+  failures: LoadFailure[],
+): HealthCheck {
+  if (failures.length === 0) {
+    return { id, status: "ok", label: `All ${noun}s loaded` };
+  }
+  return {
+    id,
+    status: "warn",
+    label: `${failures.length} ${noun}(s) failed to load`,
+    hint: `Fix the JSON in ${where}:`,
+    detail: failures
+      .map((f) => `${f.name} [${f.source}]: ${f.error}`)
+      .join("\n"),
+  };
+}
+
 export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
   const portable = i.portableRoot !== "";
   const checks: HealthCheck[] = [];
@@ -251,6 +299,13 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       status: "unknown",
       label: "No game filter set",
     });
+  } else if (i.installedGames === null) {
+    checks.push({
+      id: "gameFilter",
+      status: "unknown",
+      label: "Game filter not checked against anything",
+      hint: "Nothing has scanned the content folders for games yet, so there is nothing to match the filter against. Install an engine, or open Content > Games and let the scan finish, then re-run this.",
+    });
   } else {
     const { count, regexError } = countFilterMatches(
       i.gameFilter,
@@ -319,28 +374,26 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     );
   }
 
-  // 6. Bundled campaign load errors
-  {
-    const failures = i.campaignFailures;
-    checks.push(
-      failures.length === 0
-        ? { id: "campaigns", status: "ok", label: "All campaigns loaded" }
-        : {
-            id: "campaigns",
-            status: "warn",
-            label: `${failures.length} campaign(s) failed to load`,
-            hint: "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):",
-            detail: failures
-              .map((f) => `${f.name} [${f.source}]: ${f.error}`)
-              .join("\n"),
-          },
-    );
-  }
+  // 6. Bundled campaign and scenario load errors
+  checks.push(
+    loadFailureCheck(
+      "campaigns",
+      "campaign",
+      ".coilbox/campaigns/ (bundled) or the app data campaigns folder (local)",
+      i.campaignFailures,
+    ),
+    loadFailureCheck(
+      "scenarios",
+      "scenario",
+      ".coilbox/scenarios/ (bundled) or the app data scenarios folder (local)",
+      i.scenarioFailures,
+    ),
+  );
 
   // 7. Playable content present
   {
     const engines = i.roots.reduce((n, r) => n + r.engineCount, 0);
-    const games = i.installedGames.length;
+    const games = i.installedGames?.length ?? 0;
     const scanned = i.roots.length
       ? `Scanned ${i.roots.length} content folder(s): ${i.roots.map((r) => r.path).join(", ")}.`
       : "No content folders are configured to scan.";
@@ -350,6 +403,16 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
         status: "warn",
         label: "No engine found",
         hint: `Install or bundle an engine — the game can't launch without one. ${scanned}`,
+      });
+    } else if (i.installedGames === null) {
+      // An engine is there but no scan has answered. Counting the files in
+      // `games/` instead would be the wrong answer twice over: an archive
+      // unitsync refuses is not a game, and coilbox writes archives of its own.
+      checks.push({
+        id: "content",
+        status: "unknown",
+        label: `${engines} engine(s) found, games not scanned yet`,
+        hint: `Nothing has scanned for games yet. Open Content > Games and let the scan finish, then re-run this. ${scanned}`,
       });
     } else if (games === 0) {
       checks.push({

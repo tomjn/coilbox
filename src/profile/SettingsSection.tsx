@@ -8,8 +8,10 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useState } from "react";
+import { useUnitsyncScan } from "../content/config";
 import { useAdvancedModeSetting } from "../general/advanced";
 import { useFullscreenSetting } from "../general/fullscreen";
+import { usePreferredTarget } from "../play/config";
 import {
   buildScaffoldProfile,
   installedGameNames,
@@ -143,6 +145,11 @@ function ProfileAuthoring() {
   const { mode, accent } = useTheme();
   const [advanced] = useAdvancedModeSetting();
   const [fullscreen] = useFullscreenSetting();
+  // The games a seeded `gameFilter` may name, from the same unitsync scan every
+  // picker reads. A file name out of `games/` would seed a filter that matches
+  // nothing, because a filter matches the name unitsync reports (issue #959).
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ScaffoldResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +162,7 @@ function ProfileAuthoring() {
     setError(null);
     setResult(null);
     try {
-      const installedGames = await installedGameNames();
+      const installedGames = installedGameNames(scan.data?.games ?? []);
       const profile = buildScaffoldProfile({
         title: getProfile().title ?? "Coilbox",
         mode,

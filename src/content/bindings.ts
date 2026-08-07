@@ -460,6 +460,27 @@ export const contentDeleteReplay = defineCommand<
   { ok: boolean }
 >("coilbox-content", "content_delete_replay");
 
+/** What a gather moved out of the engine folders, or would move (issue #971). */
+export interface GatherSummary {
+  /** False for a preview, which moves nothing. */
+  applied: boolean;
+  /** The file names that landed in the root's `demos/`, or that would. */
+  moved: string[];
+  /** Their total size. */
+  bytes: number;
+  /** One sentence per replay left where it was, saying why. */
+  skipped: string[];
+}
+
+/**
+ * Move each installed engine's own replays into the root's `demos/`, so deleting
+ * an old engine folder does not take them. `apply` false previews.
+ */
+export const contentGatherReplays = defineCommand<
+  { root: string; apply: boolean },
+  { summary: GatherSummary }
+>("coilbox-content", "content_gather_replays");
+
 /* -------------------------------------------------------------------------- *
  * Savegames — singleplayer saves in a root's `Saves/` folder. Listing is cheap fs
  * metadata plus a best-effort map/game read from the save's embedded start-script.

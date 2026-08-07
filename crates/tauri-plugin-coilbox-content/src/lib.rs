@@ -1070,6 +1070,25 @@ async fn content_delete_replay(path: String) -> Result<CliResult, ()> {
     }
 }
 
+/// `content_gather_replays`: move the replays sitting inside each installed
+/// engine's own folder into the root's `demos/`, so deleting an old engine
+/// folder does not take them (issue #971). `apply` false previews without moving
+/// anything. `root` is a `ContentRoot.path`. See [`demo::gather_replays`].
+#[tauri::command]
+async fn content_gather_replays(root: String, apply: bool) -> Result<CliResult, ()> {
+    let p = PathBuf::from(&root);
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    match tauri::async_runtime::spawn_blocking(move || demo::gather_replays(&p, apply, now_ms))
+        .await
+    {
+        Ok(summary) => Ok(CliResult::ok(json!({ "summary": summary }))),
+        Err(e) => Ok(CliResult::err(format!("gather replays task failed: {e}"))),
+    }
+}
+
 /// `content_export_build_tree_html` — write a single self-contained build-tree
 /// export HTML file (built entirely by the frontend) to a caller-chosen path.
 /// Opaque: the frontend owns the markup and picks the destination via the save
@@ -1329,6 +1348,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_demo_chat,
             content_rewrite_demo,
             content_delete_replay,
+            content_gather_replays,
             content_list_saves,
             content_delete_save,
             content_config_profiles,

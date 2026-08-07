@@ -36,6 +36,7 @@ import {
   type MapScene3D,
 } from "@/mapconv/pages/components/MapPreview3D";
 import { usePreferredTarget } from "@/play/config";
+import type { ExtensionTypes } from "../../extensions";
 import type { Point, Scenario, ScenarioZone } from "../../model";
 import { ActorControls } from "./ActorControls";
 import { ContentsList } from "./ContentsList";
@@ -135,11 +136,16 @@ function SurfaceMessage({
 export function ScenarioMapScene({
   scenario,
   onChange,
+  extensions,
   picking,
   history,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
+  /** The condition and action types the scenario's game declares for itself, so
+   *  an action a game declared carrying orders draws its path too (issue #957).
+   *  Read once by the page and handed to every panel that needs it. */
+  extensions?: ExtensionTypes;
   /** The editor's undo history. Owned by the page, because it covers the panels
    *  too, and shown here because this is where the author's hands are. */
   history?: {
@@ -259,7 +265,10 @@ export function ScenarioMapScene({
 
   // Every path the document draws, a group's own and the ones its triggers hand
   // out, so an author drawing either can see what they are drawing (#847).
-  const paths = useMemo(() => scenarioPaths(scenario), [scenario]);
+  const paths = useMemo(
+    () => scenarioPaths(scenario, extensions),
+    [scenario, extensions],
+  );
   const selectedLine = selected ? parsePathLineKey(selected) : null;
   // Which of them is being worked on, and so gets knobs on its points: the one a
   // panel is putting points into, failing that the one a point or a line of is

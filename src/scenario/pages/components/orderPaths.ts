@@ -18,6 +18,7 @@
  * half is `pathsLayer.ts`.
  */
 
+import { type ExtensionTypes, NO_EXTENSIONS } from "../../extensions";
 import type {
   Point,
   Scenario,
@@ -86,10 +87,16 @@ export function parseOrderPathId(id: string): OrderPathRef | null {
 }
 
 /** The parameters of a step that hold one kind of thing, as the type table
- *  declares them. A type coilbox has no table for holds nothing this can find,
- *  which is the same thing the trigger panel says about it. */
-function paramsOfKind(type: string, list: StepList, kind: ParamKind): string[] {
-  const spec = stepTypes(list)[type];
+ *  declares them. A type neither coilbox nor the game has a table for holds
+ *  nothing this can find, which is the same thing the trigger panel says about
+ *  it. */
+function paramsOfKind(
+  type: string,
+  list: StepList,
+  kind: ParamKind,
+  extensions: ExtensionTypes,
+): string[] {
+  const spec = stepTypes(list, extensions)[type];
   if (!spec) return [];
   return Object.entries(spec)
     .filter(([, param]) => param.kind === kind)
@@ -102,8 +109,9 @@ function stepGroup(
   type: string,
   list: StepList,
   params: Record<string, ScenarioParam>,
+  extensions: ExtensionTypes,
 ): Point | undefined {
-  for (const name of paramsOfKind(type, list, "groupId")) {
+  for (const name of paramsOfKind(type, list, "groupId", extensions)) {
     const id = params[name];
     const group = scenario.groups.find((one) => one.id === id);
     if (group) return group.pos;
@@ -119,8 +127,16 @@ function stepGroup(
  * those units will be unless something else has moved them. That is a guess, but
  * it is the same guess a group's own path makes and it is the one that makes the
  * drawn line mean something.
+ *
+ * `extensions` is what the scenario's game declares for itself, so an action a
+ * game declared carrying orders draws a line like `give_orders` does (issue
+ * #957). Without them only coilbox's own tables are read, which is what a caller
+ * that has not resolved the game yet has.
  */
-export function scenarioPaths(scenario: Scenario): PathSource[] {
+export function scenarioPaths(
+  scenario: Scenario,
+  extensions: ExtensionTypes = NO_EXTENSIONS,
+): PathSource[] {
   const groups = scenario.groups
     .map<PathSource>((group, i) => ({
       id: group.id,
@@ -134,13 +150,18 @@ export function scenarioPaths(scenario: Scenario): PathSource[] {
   scenario.triggers.forEach((trigger, at) => {
     for (const list of ["conditions", "actions"] as StepList[]) {
       stepsOf(trigger, list).forEach((step, index) => {
-        for (const param of paramsOfKind(step.type, list, "orders")) {
+        for (const param of paramsOfKind(
+          step.type,
+          list,
+          "orders",
+          extensions,
+        )) {
           const orders = paramOrders(step.params[param]);
           if (orders.length === 0) continue;
           held.push({
             id: orderPathId({ trigger: at, list, step: index, param }),
-            label: `${trigger.id} · ${stepLabel(step.type)}`,
-            from: stepGroup(scenario, step.type, list, step.params),
+            label: `${trigger.id} · ${stepLabel(step.type, extensions)}`,
+            from: stepGroup(scenario, step.type, list, step.params, extensions),
             orders,
           });
         }

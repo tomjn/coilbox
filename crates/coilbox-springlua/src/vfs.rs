@@ -202,19 +202,48 @@ enum Kind {
 
 /// List files or subdirectories under `dir` (VFS-relative), optionally
 /// recursive, filtered by a simple `*`/`?` wildcard `pattern`. Returns
-/// VFS-relative, forward-slashed paths. Unreadable/escaping dirs yield `[]`.
+/// forward-slashed paths. Unreadable/escaping dirs yield `[]`.
+///
+/// The names come back the way the engine hands them back, not the way the
+/// filesystem spells them (issue #964). `CVFSHandler::AddArchive` lower-cases
+/// every path into its index (`StringToLower(ar->FileName(fid))`), so
+/// `GetFilesInDir` returns lower-cased names, and `CFileHandler::DirList`
+/// sorts and `std::unique`s what it collected. Two spellings of one name are
+/// one index key and so one entry, which is what a case-sensitive filesystem
+/// would otherwise list twice.
+///
+/// The `dir` the caller asked for is put back on the front verbatim, again as
+/// the engine does (`prefix + f` in `InsertVFSFiles`), so only the part below it
+/// is the index's to spell.
 fn list(root: &Path, dir: &str, pattern: Option<&str>, recursive: bool, kind: Kind) -> Vec<String> {
     let base = match resolve(root, dir) {
         Some(p) => p,
         None => return Vec::new(),
     };
     let mut out = Vec::new();
-    walk(root, &base, pattern, recursive, &kind, &mut out);
-    out
+    walk(&base, &base, pattern, recursive, &kind, &mut out);
+    for name in out.iter_mut() {
+        *name = name.to_lowercase();
+    }
+    out.sort();
+    out.dedup();
+    let prefix = dir_prefix(dir);
+    out.into_iter().map(|name| prefix.clone() + &name).collect()
+}
+
+/// The `dir` argument as a prefix for each listed name: forward-slashed, and
+/// ending in one slash unless it is empty. The engine's rule, from
+/// `CFileHandler::InsertVFSFiles`.
+fn dir_prefix(dir: &str) -> String {
+    let dir = dir.replace('\\', "/");
+    if dir.is_empty() || dir.ends_with('/') {
+        return dir;
+    }
+    dir + "/"
 }
 
 fn walk(
-    root: &Path,
+    base: &Path,
     dir: &Path,
     pattern: Option<&str>,
     recursive: bool,
@@ -235,19 +264,19 @@ fn walk(
             Kind::Dir => is_dir,
         };
         if want && matches {
-            if let Some(rel) = rel_str(root, &path) {
+            if let Some(rel) = rel_str(base, &path) {
                 out.push(rel);
             }
         }
         if recursive && is_dir {
-            walk(root, &path, pattern, recursive, kind, out);
+            walk(base, &path, pattern, recursive, kind, out);
         }
     }
 }
 
-/// Path relative to `root`, with forward slashes (the VFS convention).
-fn rel_str(root: &Path, path: &Path) -> Option<String> {
-    let rel = path.strip_prefix(root).ok()?;
+/// Path relative to `base`, with forward slashes (the VFS convention).
+fn rel_str(base: &Path, path: &Path) -> Option<String> {
+    let rel = path.strip_prefix(base).ok()?;
     Some(rel.to_string_lossy().replace('\\', "/"))
 }
 
@@ -310,5 +339,71 @@ mod tests {
     #[test]
     fn traversal_is_still_refused() {
         assert_eq!(resolve(&fixtures(), "withinclude/../mapinfo.lua"), None);
+    }
+
+    /// A listing is spelled by the caller down to the directory asked for, and
+    /// by the engine's index below it (issue #964).
+    #[test]
+    fn a_listing_keeps_the_asked_for_dir_and_lower_cases_the_rest() {
+        let root = fixtures();
+        assert_eq!(
+            list(&root, "WithInclude", None, false, Kind::File),
+            vec!["WithInclude/mapinfo.lua"]
+        );
+        assert_eq!(
+            list(&root, "WithInclude/", None, true, Kind::File),
+            vec!["WithInclude/mapinfo.lua", "WithInclude/sub/extra.lua"]
+        );
+        assert_eq!(
+            list(&root, "WithInclude", None, false, Kind::Dir),
+            vec!["WithInclude/sub"]
+        );
+    }
+
+    /// Listing the root itself names each entry bare, because there is no dir
+    /// to put back on the front.
+    #[test]
+    fn listing_the_root_names_entries_bare() {
+        assert_eq!(
+            list(&fixtures(), "", None, false, Kind::Dir),
+            vec!["mission", "modinfo", "selfcontained", "withinclude"]
+        );
+    }
+
+    /// Two spellings of one name are one entry, because they are one key in
+    /// the engine's index.
+    ///
+    /// Real only on a case-sensitive filesystem, where both directories exist.
+    /// On a case-insensitive one the second `create_dir_all` lands in the
+    /// first, and the same answer is expected for the simpler reason.
+    #[test]
+    fn two_spellings_of_one_folder_are_listed_once() {
+        let tmp = tempfile::tempdir().expect("temp dir");
+        let root = tmp.path();
+        for spelling in ["LuaRules/Gadgets", "luarules/gadgets"] {
+            std::fs::create_dir_all(root.join(spelling)).expect("mkdir");
+            std::fs::write(root.join(spelling).join("unit_ai.lua"), "").expect("write");
+        }
+        assert_eq!(
+            list(root, "", None, true, Kind::File),
+            vec!["luarules/gadgets/unit_ai.lua"]
+        );
+        assert_eq!(
+            list(root, "", None, true, Kind::Dir),
+            vec!["luarules", "luarules/gadgets"]
+        );
+    }
+
+    /// The wildcard still filters, and still filters on the name as written
+    /// rather than on the key, because it is matched case-insensitively either
+    /// way.
+    #[test]
+    fn a_pattern_still_filters() {
+        let root = fixtures();
+        assert_eq!(
+            list(&root, "withinclude", Some("*.LUA"), false, Kind::File),
+            vec!["withinclude/mapinfo.lua"]
+        );
+        assert!(list(&root, "withinclude", Some("*.txt"), false, Kind::File).is_empty());
     }
 }

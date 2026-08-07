@@ -1,15 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { plugins } from "../app.plugins";
 import { campaignList } from "../campaign/bindings";
 import { parseCampaignJson } from "../campaign/model";
 import { contentStateLoad } from "../content/bindings";
-import { dlInstalledContent, dlPathWritable } from "../downloads/bindings";
+import { useUnitsyncScan } from "../content/config";
+import { dlPathWritable } from "../downloads/bindings";
 import { useDownloadsConfig } from "../downloads/config";
+import { usePreferredTarget } from "../play/config";
+import { scenarioList } from "../scenario/bindings";
+import { parseStoredScenario } from "../scenario/storage";
+import { installedGameNames } from "./authoring";
 import {
   type CampaignFailure,
   deriveHealthChecks,
   type HealthCheck,
   type HealthInputs,
+  type ScenarioFailure,
 } from "./health";
 import { HIDEABLE_NAV_IDS } from "./hidden";
 import { describeJsonError } from "./jsonError";
@@ -21,6 +27,7 @@ import {
   getProfileRoot,
   getProfileSource,
 } from "./profile";
+import { describeScenarioFailure } from "./scenarioFailure";
 
 /** The campaign's own `name`, or a placeholder when the JSON can't be read. */
 function campaignName(json: string): string {
@@ -52,6 +59,16 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
   // Hook read at top level; feeds the effect (and re-runs it if the write root changes).
   const [cfg] = useDownloadsConfig();
   const writeRootId = cfg.writeRootId;
+  // Which games are installed is a unitsync question, not a file-listing one, so
+  // the panel asks the same scan every picker asks (issue #959). The result is
+  // cached for the session, so this is usually free by the time Settings opens.
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const scannedGames = scan.data?.games;
+  const installedGames = useMemo(
+    () => (scannedGames ? installedGameNames(scannedGames) : null),
+    [scannedGames],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -67,16 +84,9 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         portable: r.portable,
         engineCount: r.engines.length,
       }));
-      const rootPaths = roots.map((r) => r.path);
       const writeRootPath = writeRootId
         ? state?.roots.find((r) => r.id === writeRootId)?.path
         : undefined;
-
-      const installedGames = rootPaths.length
-        ? await dlInstalledContent({ paths: rootPaths })
-            .then((r) => r.games)
-            .catch(() => [] as string[])
-        : [];
 
       const campaignFailures = await campaignList({})
         .then((r) => {
@@ -92,6 +102,23 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
           return out;
         })
         .catch(() => [] as CampaignFailure[]);
+
+      // The same check over bundled scenarios (issue #962). A scenario a package
+      // shipped that coilbox skipped is invisible otherwise: it does not appear
+      // in the list, and the only trace is a console warning nobody reads.
+      const scenarioFailures = await scenarioList({})
+        .then((r) => {
+          const out: ScenarioFailure[] = [];
+          for (const item of r.items) {
+            if (parseStoredScenario(item.json) !== null) continue;
+            out.push({
+              source: item.source,
+              ...describeScenarioFailure(item.json),
+            });
+          }
+          return out;
+        })
+        .catch(() => [] as ScenarioFailure[]);
 
       const probe = (path: string | undefined) =>
         path
@@ -129,6 +156,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         installedGames,
         writeRootPath,
         campaignFailures,
+        scenarioFailures,
         writable: { writeRoot: writeRootProbe, dataDir: dataDirProbe },
         hide: profile.hide ?? [],
         hideableNavIds: HIDEABLE_NAV_IDS,
@@ -144,7 +172,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
     return () => {
       cancelled = true;
     };
-  }, [writeRootId]);
+  }, [writeRootId, installedGames]);
 
   return { checks, loading };
 }

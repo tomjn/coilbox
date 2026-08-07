@@ -630,6 +630,7 @@ dependencies = [
  "mlua",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

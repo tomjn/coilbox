@@ -164,6 +164,140 @@ pub fn demo_file_entries(root: &Path) -> Vec<DemoFileEntry> {
     out
 }
 
+// ---- gathering -------------------------------------------------------------
+
+/// Where a gather puts everything: the root's own `demos/`, which is where an
+/// engine that is not in Portable Mode already writes.
+const GATHER_DIR: &str = "demos";
+
+/// How recently a replay may have been written and still be left alone.
+///
+/// The engine appends to a demo for the whole match and there is no portable way
+/// to ask whether a file is still open, so recency stands in for it. A minute is
+/// long enough that a game running right now is never touched and short enough
+/// that nothing a player finished and came to tidy is held back.
+const GATHER_GRACE_MS: u64 = 60_000;
+
+/// What a gather moved, or would move.
+#[derive(Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GatherSummary {
+    /// Whether these were actually moved (`false` for a dry run).
+    pub applied: bool,
+    /// The file names moved into the root's `demos/`, or that would be.
+    pub moved: Vec<String>,
+    /// Total size of everything in `moved`.
+    pub bytes: u64,
+    /// One sentence per replay left where it was, saying why.
+    pub skipped: Vec<String>,
+}
+
+/// Move each engine directory's replays into the root's `demos/`, so deleting an
+/// old engine folder does not take a player's game history with it (issue #971).
+///
+/// A coilbox-installed Recoil release satisfies the engine's Portable Mode test,
+/// so that engine writes `demos/` inside its own version folder. Nothing in
+/// coilbox deletes an engine, so the folder is cleared in Finder by someone
+/// making space, which is exactly when losing replays would be a surprise.
+///
+/// Three things are left where they are rather than moved, because moving a
+/// player's files is only defensible when it cannot lose one:
+///
+/// - a replay written in the last [`GATHER_GRACE_MS`], which may be a match still
+///   recording,
+/// - one whose name is already taken in the destination, since two files of one
+///   name are one game recorded once and renaming either is worse than leaving
+///   both,
+/// - one the filesystem refuses to move, reported with the error.
+///
+/// `apply` false counts without moving, so the caller can show what would go
+/// before it goes. Mirrors `scenario_media_sweep`. `now_ms` is the wall clock the
+/// grace window is measured against, passed in so a test can set it.
+pub fn gather_replays(root: &Path, apply: bool, now_ms: u64) -> GatherSummary {
+    let mut out = GatherSummary {
+        applied: apply,
+        ..Default::default()
+    };
+    let dest = root.join(GATHER_DIR);
+    let mut taken: std::collections::HashSet<String> = std::fs::read_dir(&dest)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().to_lowercase())
+        .collect();
+
+    for (engine, _) in crate::scan::engine_dirs(root) {
+        if engine == root {
+            continue;
+        }
+        for entry in demo_files_in(&engine) {
+            let name = entry.filename;
+            if now_ms.saturating_sub(entry.modified_ms) < GATHER_GRACE_MS {
+                out.skipped.push(format!(
+                    "{name}: written just now, so it may still be recording"
+                ));
+                continue;
+            }
+            if !taken.insert(name.to_lowercase()) {
+                out.skipped
+                    .push(format!("{name}: a replay of that name is already in demos"));
+                continue;
+            }
+            if !apply {
+                out.moved.push(name);
+                out.bytes += entry.size_bytes;
+                continue;
+            }
+            if let Err(e) = std::fs::create_dir_all(&dest) {
+                out.skipped.push(format!("{name}: {e}"));
+                continue;
+            }
+            match std::fs::rename(&entry.path, dest.join(&name)) {
+                Ok(()) => {
+                    out.moved.push(name);
+                    out.bytes += entry.size_bytes;
+                }
+                Err(e) => out.skipped.push(format!("{name}: {e}")),
+            }
+        }
+    }
+    out.moved.sort();
+    out.skipped.sort();
+    out
+}
+
+/// The demo files directly under one write dir's `demos`/`replays` folders.
+fn demo_files_in(base: &Path) -> Vec<DemoFileEntry> {
+    let mut out = Vec::new();
+    for dir in DEMO_DIRS {
+        let Ok(rd) = std::fs::read_dir(base.join(dir)) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            let name = e.file_name().to_string_lossy().to_string();
+            if !DEMO_EXTS
+                .iter()
+                .any(|ext| name.to_lowercase().ends_with(ext))
+            {
+                continue;
+            }
+            let md = e.metadata().ok();
+            out.push(DemoFileEntry {
+                filename: name,
+                path: e.path(),
+                size_bytes: md.as_ref().map(|m| m.len()).unwrap_or(0),
+                modified_ms: md
+                    .as_ref()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0),
+            });
+        }
+    }
+    out
+}
+
 // ---- decoding --------------------------------------------------------------
 
 /// Decode one replay: native header + start-script, plus demotool's winners.
@@ -1355,6 +1489,131 @@ mod tests {
         assert_eq!(demo_search_dirs(&root), vec![root.clone()]);
         assert_eq!(list_replays(&root).len(), 1);
 
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A root with two engines that both recorded, plus one replay of the root's
+    /// own. Names are distinct unless a caller plants a clash.
+    fn gather_fixture(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(name);
+        let _ = std::fs::remove_dir_all(&root);
+        for (dir, file) in [
+            ("engine/1.0", "old.sdfz"),
+            ("engine/macos_arm64/2.0", "new.sdfz"),
+        ] {
+            let engine = root.join(dir);
+            std::fs::create_dir_all(engine.join("demos")).unwrap();
+            std::fs::write(engine.join("spring"), b"x").unwrap();
+            std::fs::write(engine.join("demos").join(file), b"replay").unwrap();
+        }
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        std::fs::write(root.join("demos").join("already.sdfz"), b"replay").unwrap();
+        root
+    }
+
+    /// A clock far enough ahead of the fixture's files that nothing is inside
+    /// the grace window.
+    fn later() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            + GATHER_GRACE_MS * 10
+    }
+
+    /// A dry run says what would move and moves nothing (issue #971).
+    #[test]
+    fn a_preview_moves_nothing() {
+        let root = gather_fixture("coilbox_gather_preview_test");
+        let summary = gather_replays(&root, false, later());
+        assert!(!summary.applied);
+        assert_eq!(summary.moved, vec!["new.sdfz", "old.sdfz"]);
+        assert!(summary.skipped.is_empty(), "{:?}", summary.skipped);
+        assert_eq!(summary.bytes, 12);
+        assert!(root.join("engine/1.0/demos/old.sdfz").is_file());
+        assert!(!root.join("demos/old.sdfz").exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Applying moves each engine's replays into the root, leaving the engine
+    /// folders with nothing to lose.
+    #[test]
+    fn applying_moves_each_engines_replays_into_the_root() {
+        let root = gather_fixture("coilbox_gather_apply_test");
+        let summary = gather_replays(&root, true, later());
+        assert!(summary.applied);
+        assert_eq!(summary.moved, vec!["new.sdfz", "old.sdfz"]);
+        assert!(root.join("demos/old.sdfz").is_file());
+        assert!(root.join("demos/new.sdfz").is_file());
+        assert!(!root.join("engine/1.0/demos/old.sdfz").exists());
+        // The root's own replay is untouched, and every replay is still listed.
+        assert!(root.join("demos/already.sdfz").is_file());
+        assert_eq!(list_replays(&root).len(), 3);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A name already taken in the destination is left alone rather than
+    /// overwritten, and the same name in two engines only moves once.
+    #[test]
+    fn a_name_already_taken_is_left_where_it_is() {
+        let root = gather_fixture("coilbox_gather_clash_test");
+        std::fs::write(root.join("demos").join("old.sdfz"), b"the original").unwrap();
+        std::fs::write(
+            root.join("engine/macos_arm64/2.0/demos/new.sdfz"),
+            b"replay",
+        )
+        .unwrap();
+        std::fs::write(root.join("engine/1.0/demos/new.sdfz"), b"replay").unwrap();
+
+        let summary = gather_replays(&root, true, later());
+        assert_eq!(summary.moved, vec!["new.sdfz"]);
+        assert_eq!(summary.skipped.len(), 2, "{:?}", summary.skipped);
+        assert!(summary
+            .skipped
+            .iter()
+            .all(|s| s.contains("already in demos")));
+        // Neither the original nor the one that could not move was lost.
+        assert_eq!(
+            std::fs::read(root.join("demos/old.sdfz")).unwrap(),
+            b"the original"
+        );
+        assert!(root.join("engine/1.0/demos/old.sdfz").is_file());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A replay written moments ago may be a match still recording, so it stays.
+    #[test]
+    fn a_replay_written_just_now_is_left_alone() {
+        let root = gather_fixture("coilbox_gather_recent_test");
+        let now = std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let summary = gather_replays(&root, true, now);
+        assert!(summary.moved.is_empty(), "{:?}", summary.moved);
+        assert_eq!(summary.skipped.len(), 2);
+        assert!(summary
+            .skipped
+            .iter()
+            .all(|s| s.contains("may still be recording")));
+        assert!(root.join("engine/1.0/demos/old.sdfz").is_file());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A single-folder portable install is its own root, so there is nothing to
+    /// gather out of it and nothing to move onto itself.
+    #[test]
+    fn a_single_folder_install_gathers_nothing() {
+        let root = std::env::temp_dir().join("coilbox_gather_portable_test");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        std::fs::write(root.join("spring"), b"x").unwrap();
+        std::fs::write(root.join("demos").join("only.sdfz"), b"replay").unwrap();
+
+        let summary = gather_replays(&root, true, later());
+        assert!(summary.moved.is_empty());
+        assert!(summary.skipped.is_empty());
+        assert!(root.join("demos/only.sdfz").is_file());
         let _ = std::fs::remove_dir_all(&root);
     }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newScenario } from "../../create";
+import { parseExtensions } from "../../extensions";
 import type { Scenario, ScenarioOrder } from "../../model";
 import { pathKey } from "./groups";
 import {
@@ -147,6 +148,75 @@ describe("scenarioPaths", () => {
         ],
       }).map((path) => path.id),
     ).toEqual(["g1"]);
+  });
+});
+
+/**
+ * A path drawn for an action the game declared rather than one coilbox knows.
+ * The declaration is parsed rather than written out as a table, so what is
+ * proved is the whole route a real game takes: `missions/extensions.lua` to the
+ * palette to the line on the map (issue #957).
+ */
+describe("scenarioPaths with a game's own action", () => {
+  const extensions = parseExtensions({
+    actions: [
+      {
+        type: "sf_convoy",
+        label: "Send convoy",
+        params: [
+          { name: "group", kind: "groupId" },
+          { name: "route", kind: "orders" },
+        ],
+      },
+    ],
+  });
+
+  /** The document with the trigger handing out its orders through the game's
+   *  own action instead of `give_orders`. */
+  function declared(): Scenario {
+    const scenario = document();
+    return {
+      ...scenario,
+      triggers: [
+        {
+          ...scenario.triggers[0],
+          actions: [
+            {
+              type: "sf_convoy",
+              params: { group: "g1", route: ordersParam([march]) },
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  const route = orderPathId({
+    trigger: 0,
+    list: "actions",
+    step: 0,
+    param: "route",
+  });
+
+  it("draws its orders, starting where the group it orders stands", () => {
+    const paths = scenarioPaths(declared(), extensions);
+    expect(paths.map((path) => path.id)).toEqual(["g1", route]);
+    expect(paths[1].orders).toEqual([march]);
+    expect(paths[1].from).toEqual({ x: 2000, z: 1000 });
+  });
+
+  it("calls it what the game's declaration calls it", () => {
+    const paths = scenarioPaths(declared(), extensions);
+    expect(paths[1].label).toBe("trigger-1 · Send convoy");
+  });
+
+  it("draws nothing for it when the game is not known", () => {
+    expect(scenarioPaths(declared()).map((path) => path.id)).toEqual(["g1"]);
+  });
+
+  it("still draws give_orders when a game declares types too", () => {
+    const paths = scenarioPaths(document(), extensions);
+    expect(paths.map((path) => path.id)).toEqual(["g1", held]);
   });
 });
 
