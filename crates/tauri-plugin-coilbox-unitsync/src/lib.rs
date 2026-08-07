@@ -15,8 +15,8 @@ use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
     build_config_args, build_config_set_args, build_faction_logos_args, build_game_args,
     build_game_headers_args, build_heightmap_args, build_lua_args, build_lua_repl_args,
-    build_map_info_args, build_map_skybox_args, build_metalmap_args, build_minimap_args,
-    build_map_meta_args, build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
+    build_map_info_args, build_map_meta_args, build_map_skybox_args, build_metalmap_args,
+    build_minimap_args, build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
     build_unit_dataset_args, build_unit_model_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
