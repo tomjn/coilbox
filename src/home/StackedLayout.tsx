@@ -1,4 +1,5 @@
-import { Slot, useFrame } from "@picoframe/frame";
+import { Slot } from "@picoframe/frame";
+import Greeting from "./zones/Greeting";
 import Onboarding from "./zones/Onboarding";
 import ToolCards from "./zones/ToolCards";
 
@@ -7,19 +8,13 @@ import ToolCards from "./zones/ToolCards";
  * column. Registered as `stacked` in {@link ./layout}, which explains why the
  * name matters.
  *
- * Today it reproduces picoframe's launcher exactly, so taking ownership of `/`
- * changes nothing a user can see. Later issues in milestone 16 insert the
- * Greeting, Continue, ResumeRail, Onboarding and FeaturedMap zones around the
- * tool grid.
+ * Later issues in milestone 16 insert the Continue, ResumeRail and FeaturedMap
+ * zones around the tool grid.
  *
  * `home.top` and `home.bottom` keep rendering because picoframe plugins inject
  * into them.
- *
- * The title heading is inline rather than a zone because the Greeting zone that
- * owns it (title, tagline, logged-in name) lands in issue #987.
  */
 export default function StackedLayout() {
-  const { title } = useFrame();
   return (
     <div className="p-8">
       {/* Onboarding sits where the content plugin's order-0 `home.top`
@@ -30,7 +25,7 @@ export default function StackedLayout() {
         <Onboarding />
       </div>
       <Slot id="home.top" />
-      <h1 className="text-2xl font-semibold">{title}</h1>
+      <Greeting />
       <ToolCards />
       <Slot id="home.bottom" />
     </div>

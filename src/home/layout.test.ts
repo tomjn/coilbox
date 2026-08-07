@@ -9,9 +9,11 @@ vi.mock("@picoframe/frame", () => ({
   useFrame: () => ({ title: "", nav: [] }),
 }));
 
-// Same reason for the Onboarding zone the stacked layout composes: its cards
-// reach the Tauri API and picoframe's plugin SDK, and nothing here renders them.
+// Same reason for the zones the stacked layout composes: the onboarding cards
+// reach the Tauri API and picoframe's plugin SDK, the greeting reaches the lobby
+// connection, and nothing here renders either of them.
 vi.mock("./zones/Onboarding", () => ({ default: () => null }));
+vi.mock("./zones/Greeting", () => ({ default: () => null }));
 
 import type { Profile } from "../profile/profile";
 import { DEFAULT_LAYOUT, homeMode, layoutNames, resolveLayout } from "./layout";

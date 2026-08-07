@@ -3,6 +3,7 @@ import type { NavItem } from "@picoframe/plugin-sdk";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ExternalLink } from "lucide-react";
 import { Link } from "react-router";
+import { homeToolGroups } from "../nav";
 
 /**
  * Every navigable route as a card, grouped exactly as the sidebar groups them.
@@ -13,53 +14,36 @@ import { Link } from "react-router";
  * Coilbox with no visible change, and later issues in milestone 16 add card art
  * on top of this.
  *
- * The "Choose a tool to get started." line lives here rather than in the layout
- * because picoframe swaps it for "No tools available yet." when there is nothing
- * to list. Keeping both in one component is what lets the layout stay ignorant
- * of whether the grid has anything in it. The Greeting zone takes the copy over
- * in issue #987.
+ * Both of picoframe's launcher sentences ("Choose a tool to get started." and
+ * the empty-grid "No tools available yet.") moved to the Greeting zone in issue
+ * #987, which owns the line under the heading. The grid now does what every zone
+ * does and renders nothing when it has nothing.
  */
 export default function ToolCards() {
   const { nav } = useFrame();
-  // Keep the composed group structure (already sorted by composeNav), dropping
-  // Home itself and any group left empty so the grid mirrors the sidebar.
-  const groups = nav
-    .map((g) => ({ ...g, items: g.items.filter((i) => i.to !== "/") }))
-    .filter((g) => g.items.length > 0);
-
-  if (groups.length === 0) {
-    return (
-      <p className="mt-2 max-w-prose text-muted-foreground">
-        No tools available yet.
-      </p>
-    );
-  }
+  // Groups as composeNav sorted them, minus Home and anything left empty, so the
+  // grid mirrors the sidebar. Shared with the Greeting, which needs the same
+  // answer to decide whether to say there are no tools.
+  const groups = homeToolGroups(nav);
+  if (groups.length === 0) return null;
 
   return (
-    <>
-      <p className="mt-1 text-muted-foreground">
-        Choose a tool to get started.
-      </p>
-      <div className="mt-6 space-y-8">
-        {groups.map((group) => (
-          <section
-            key={group.id}
-            className="hidden has-[[data-nav-item]]:block"
-          >
-            {group.label && (
-              <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {group.label}
-              </h2>
-            )}
-            <div className="flex flex-wrap gap-3">
-              {group.items.map((item) => (
-                <ToolCard key={item.id} item={item} />
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-    </>
+    <div className="mt-6 space-y-8">
+      {groups.map((group) => (
+        <section key={group.id} className="hidden has-[[data-nav-item]]:block">
+          {group.label && (
+            <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {group.label}
+            </h2>
+          )}
+          <div className="flex flex-wrap gap-3">
+            {group.items.map((item) => (
+              <ToolCard key={item.id} item={item} />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }
 
