@@ -86,11 +86,9 @@ vi.mock("./featuredMap", async (importOriginal) => {
 
 import type { SuggestedMap, SuggestedMapList } from "../content/branding";
 import type { EnqueueInput } from "../downloads/DownloadQueueProvider";
+import { ART_CARD_CLASS } from "./cardShell";
 import * as featured from "./featuredMap";
-import {
-  FEATURED_ART_CLASSES,
-  default as FeaturedMapZone,
-} from "./zones/FeaturedMap";
+import FeaturedMapZone from "./zones/FeaturedMap";
 
 const {
   battleFeaturedMap,
@@ -565,12 +563,12 @@ describe("the featured map card", () => {
     expect(html).toContain("Fallendell");
   });
 
-  it("declares the art card a dark island so its text stays light", () => {
+  it("takes the shared dark island rather than its own copy of it", () => {
+    // `cardShell.ts` owns why the text over a minimap stays light in both colour
+    // schemes, and measures it against a pure white pixel. This is the card
+    // claiming that guarantee.
     const html = render({ art: "https://example.test/thumb.jpg" });
-    expect(html).toContain("dark bg-[hsl(var(--background))]");
-    expect(FEATURED_ART_CLASSES.band).toContain(
-      "text-[hsl(var(--foreground))]",
-    );
+    expect(html).toContain(ART_CARD_CLASS);
   });
 
   it("gives the install button the card's own scheme, not the page's", () => {
@@ -655,110 +653,4 @@ describe("the featured map card", () => {
     });
     expect(html).not.toContain("Downloads settings");
   });
-});
-
-/**
- * The legibility guarantee for the title and blurb over a minimap.
- *
- * Stronger than the tool cards' version, and it has to be. Theirs bounds the
- * procedural field's brightest pixel, because that is the only art they generate.
- * A minimap is a picture of whatever the map looks like, and the mapper may have
- * made a snowfield, so the worst case here is pure white and nothing weaker will
- * do.
- *
- * The alphas come out of the shipped class strings, so weakening the band in the
- * component re-runs the measurement instead of leaving it stale.
- */
-
-type Rgb = [number, number, number];
-
-/** CSS `hsl()` to sRGB channels, all 0 to 1 except the hue. */
-function hsl(h: number, s: number, l: number): Rgb {
-  const c = (1 - Math.abs(2 * l - 1)) * Math.min(Math.max(s, 0), 1);
-  const sector = ((((h % 360) + 360) % 360) / 60) % 6;
-  const x = c * (1 - Math.abs((sector % 2) - 1));
-  const rgb: Rgb =
-    sector < 1
-      ? [c, x, 0]
-      : sector < 2
-        ? [x, c, 0]
-        : sector < 3
-          ? [0, c, x]
-          : sector < 4
-            ? [0, x, c]
-            : sector < 5
-              ? [x, 0, c]
-              : [c, 0, x];
-  const m = l - c / 2;
-  return rgb.map((v) => v + m) as Rgb;
-}
-
-/** Straight-alpha composite of `layer` over `base`. */
-function over(base: Rgb, layer: Rgb, alpha: number): Rgb {
-  return base.map((c, i) => c * (1 - alpha) + layer[i] * alpha) as Rgb;
-}
-
-/** WCAG 2.2 relative luminance. */
-function luminance([r, g, b]: Rgb): number {
-  const lin = (v: number) =>
-    v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-
-/** WCAG 2.2 contrast ratio between two colours. */
-function contrast(a: Rgb, b: Rgb): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-/** The alpha in a `hsl(var(--token)/N)` arbitrary value, or 1 if it has none. */
-function tokenAlpha(className: string, token: string): number {
-  const found = new RegExp(`hsl\\(var\\(--${token}\\)(?:/([0-9.]+))?\\)`).exec(
-    className,
-  );
-  if (!found) throw new Error(`no --${token} in ${className}`);
-  return found[1] ? Number(found[1]) : 1;
-}
-
-/** picoframe's `.dark` ramp, transcribed from `@picoframe/frame/src/theme.css`. */
-const BASE_HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
-/** Neutral through the subtle tier to the vivid one, which tops out around 11. */
-const BASE_SATS = [0, 1, 2.6, 6, 11];
-
-describe("text over a minimap", () => {
-  /** A snowfield, or a void map's blown-out sun. The worst art can do. */
-  const art: Rgb = [1, 1, 1];
-  const bandAlpha = tokenAlpha(FEATURED_ART_CLASSES.band, "background");
-  const textAlpha = tokenAlpha(FEATURED_ART_CLASSES.band, "foreground");
-  const dimAlpha = tokenAlpha(FEATURED_ART_CLASSES.dim, "foreground");
-
-  it("dims the art under the band", () => {
-    expect(bandAlpha).toBeGreaterThan(0);
-    expect(bandAlpha).toBeLessThan(1);
-  });
-
-  it("fades in from nothing above the band, so no text sits on the fade", () => {
-    expect(FEATURED_ART_CLASSES.fade).toContain("to-transparent");
-    expect(FEATURED_ART_CLASSES.fade).toContain("bottom-full");
-  });
-
-  for (const hue of BASE_HUES) {
-    for (const sat of BASE_SATS) {
-      // The dark ramp's --background, which is what the band is painted in.
-      const scrim = hsl(hue, (sat * 6) / 100, 0.07);
-      const band = over(art, scrim, bandAlpha);
-      // The dark ramp's --foreground is achromatic, so the base does not move it.
-      const ink = over(band, hsl(0, 0, 0.95), textAlpha);
-      const dim = over(band, hsl(0, 0, 0.95), dimAlpha);
-      const label = `base hue ${hue} sat ${sat}`;
-
-      it(`clears AA for the map name at ${label}`, () => {
-        expect(contrast(ink, band)).toBeGreaterThanOrEqual(4.5);
-      });
-
-      it(`clears AA for the blurb at ${label}`, () => {
-        expect(contrast(dim, band)).toBeGreaterThanOrEqual(4.5);
-      });
-    }
-  }
 });
