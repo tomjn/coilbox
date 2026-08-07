@@ -3,6 +3,7 @@ import { backdropStyle, resolveHomeBackground } from "./background";
 import Continue from "./zones/Continue";
 import Greeting from "./zones/Greeting";
 import Onboarding from "./zones/Onboarding";
+import ResumeRail from "./zones/ResumeRail";
 import ToolCards from "./zones/ToolCards";
 
 /**
@@ -57,6 +58,12 @@ export default function StackedLayout() {
             again on an install with nothing to resume. */}
         <div className="mt-6 empty:hidden">
           <Continue />
+        </div>
+        {/* Tighter than the gap above the hero, because the rail is the small
+            half of the same block and a full gap would read as a new section.
+            `empty:hidden` takes it back when there is nothing in the rail. */}
+        <div className="mt-3 empty:hidden">
+          <ResumeRail />
         </div>
         <ToolCards />
         <Slot id="home.bottom" />
