@@ -1,14 +1,6 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { open, save } from "@tauri-apps/plugin-dialog";
-import {
-  Download,
-  Loader2,
-  Pencil,
-  Plus,
-  RefreshCw,
-  Trash2,
-  Upload,
-} from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { Loader2, Pencil, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -24,19 +16,14 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
-import { scenarioExport, scenarioImport } from "../bindings";
+import { scenarioExport } from "../bindings";
 import { newScenario } from "../create";
 import { scenarioContents } from "../listing";
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
-import {
-  deleteScenario,
-  exportScenario,
-  importScenario,
-  saveScenario,
-} from "../storage";
-import { scenarioImportErrorMessage } from "../transfer";
+import { deleteScenario, exportScenario, saveScenario } from "../storage";
 import { ReclaimClipsButton } from "./components/ReclaimClipsButton";
+import { ScenarioImportButton } from "./components/ScenarioImportButton";
 
 /**
  * Scenario Builder landing: create a scenario, import a shared one, and list
@@ -52,7 +39,6 @@ export default function ScenarioBuilderPage() {
   const { campaigns } = useCampaigns();
   const navigate = useNavigate();
   const drawer = useDrawer();
-  const [busy, setBusy] = useState(false);
   const [rescanning, setRescanning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -76,34 +62,6 @@ export default function ScenarioBuilderPage() {
       await refresh();
     } finally {
       setRescanning(false);
-    }
-  };
-
-  // Import mints a fresh id and writes the dialogue clips carried in the file,
-  // so importing the scenario you exported gives you a second copy rather than
-  // overwriting the first.
-  const importFile = async () => {
-    setActionError(null);
-    try {
-      const src = await open({
-        title: "Import scenario",
-        multiple: false,
-        filters: [{ name: "Coilbox scenario", extensions: ["json"] }],
-      });
-      if (typeof src !== "string") return;
-      setBusy(true);
-      const { text } = await scenarioImport({ src });
-      const result = await importScenario(text);
-      if (!result.ok) {
-        setActionError(scenarioImportErrorMessage(result.error));
-        return;
-      }
-      await refreshScenarios();
-      navigate(`/scenario-builder/${result.payload.id}`);
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -169,14 +127,12 @@ export default function ScenarioBuilderPage() {
             Rescan
           </Button>
           <ReclaimClipsButton />
-          <Button
-            variant="outline"
-            className="gap-1.5"
-            onClick={importFile}
-            disabled={busy}
-          >
-            <Download className="size-4" /> Import
-          </Button>
+          <ScenarioImportButton
+            onImported={(scenario) =>
+              navigate(`/scenario-builder/${scenario.id}`)
+            }
+            onError={setActionError}
+          />
           <Button className="gap-1.5" onClick={openNew}>
             <Plus className="size-4" /> New scenario
           </Button>

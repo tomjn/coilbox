@@ -1,6 +1,7 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Play } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
@@ -10,9 +11,10 @@ import {
   SkeletonList,
 } from "../../content/pages/components/states";
 import { scenarioLaunchBlocker } from "../launch";
-import { playableScenarios, scenarioContents } from "../listing";
+import { isSetUp, playableScenarios, scenarioContents } from "../listing";
 import type { Scenario } from "../model";
 import { useScenarios } from "../scenarios";
+import { ScenarioImportButton } from "./components/ScenarioImportButton";
 import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
 
 /**
@@ -27,6 +29,10 @@ import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
  * Drafts with no game or map are left to the builder ({@link playableScenarios}).
  * A scenario that is set up but cannot be launched right now stays in the list
  * and says why, since "install that game" is something the player can act on.
+ *
+ * Import is here as well as on the builder (issue #861). A player handed a
+ * scenario file has nowhere else to take it, because the builder is
+ * advanced-only.
  */
 export default function ScenariosPage() {
   const { scenarios, loading, error } = useScenarios();
@@ -34,8 +40,19 @@ export default function ScenariosPage() {
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const play = usePlay();
   const drawer = useDrawer();
+  const [importError, setImportError] = useState<string | null>(null);
 
   const playable = useMemo(() => playableScenarios(scenarios), [scenarios]);
+
+  // An imported scenario lands in the list behind the toast. One that names no
+  // game and map is not listed here at all, so say that rather than leave the
+  // player looking for a row that never arrives.
+  const imported = (scenario: Scenario) =>
+    isSetUp(scenario)
+      ? toast.success(`${scenario.name} is ready to play.`)
+      : toast.warning(
+          `${scenario.name} was imported, but it names no game and map, so there is nothing to play yet.`,
+        );
 
   // The same refusal the drawer's button carries, shown a step earlier so the
   // player does not open a drawer to find out they cannot play anything.
@@ -58,20 +75,29 @@ export default function ScenariosPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Scenarios</h1>
-        <p className="text-sm text-muted-foreground">
-          Standalone missions: a map, a starting force and something to do. Play
-          one on its own, without a campaign around it.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-lg font-semibold">Scenarios</h1>
+          <p className="text-sm text-muted-foreground">
+            Standalone missions: a map, a starting force and something to do.
+            Play one on its own, without a campaign around it.
+          </p>
+        </div>
+        <div className="shrink-0">
+          <ScenarioImportButton
+            onImported={imported}
+            onError={setImportError}
+          />
+        </div>
       </header>
 
+      {importError && <ErrorBanner message={importError} />}
       {error && <ErrorBanner message={error} />}
 
       {loading ? (
         <SkeletonList />
       ) : playable.length === 0 ? (
-        <EmptyState label="No scenarios are ready to play yet." />
+        <EmptyState label="No scenarios are ready to play yet. Import one someone shared with you." />
       ) : (
         <ul className="flex flex-col gap-2">
           {playable.map((scenario) => (

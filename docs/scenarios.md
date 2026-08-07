@@ -245,13 +245,13 @@ The drawer also says which route the launch is taking and why, before you press 
 
 The button is disabled with a reason for the things you have to fix elsewhere: no engine installed, no game and map set, the game not installed, or a game already running.
 
-**Play > Scenarios** is the player-facing half. It lists every scenario that names a game and a map, with its contents, and gives each one a **Play** button that runs the same pipeline. The sidebar item is hidden until at least one scenario is ready to play.
+**Play > Scenarios** is the player-facing half. It lists every scenario that names a game and a map, with its contents, and gives each one a **Play** button that runs the same pipeline. It also has its own **Import**, so a scenario someone sent you can be brought in and played without Advanced mode or the editor. The sidebar item is hidden until at least one scenario is ready to play.
 
 ## Share a scenario
 
 **Export** writes a single `.json` file. It is a coilbox container, `"kind": "scenario"`, and it carries the document plus every portrait and voice clip the dialogue names, inlined as `data:` URIs beside the document.
 
-**Import** reads one back. It **always makes a new copy**: importing your own export gives you a second scenario with a new id, never an overwrite. A file that is not a coilbox scenario, is damaged, or was made by a newer coilbox is rejected with a reason rather than half-read. A clip an import cannot write, one over 16 MB for instance, is skipped and the line that named it loses it, rather than the whole scenario being refused.
+**Import** reads one back, from either **Play > Scenarios** or the builder. It **always makes a new copy**: importing your own export gives you a second scenario with a new id, never an overwrite. A file that is not a coilbox scenario, is damaged, or was made by a newer coilbox is rejected with a reason rather than half-read. A clip an import cannot write, one over 16 MB for instance, is skipped and the line that named it loses it, rather than the whole scenario being refused.
 
 Scenarios do not have a bundled form of their own. To ship one, attach it to a campaign mission and bundle the campaign, which carries the whole scenario document. **A bundled campaign's dialogue portraits and voice clips are not carried yet**, so its radio messages play silent: [issue #877](https://github.com/tomjn/coilbox/issues/877). Exporting and importing a campaign does carry them. See [Campaigns](campaigns.md#missions-that-play-a-scenario). Shipping a read-only scenario inside a distribution profile is [issue #786](https://github.com/tomjn/coilbox/issues/786) and is not built.
 
@@ -259,7 +259,7 @@ Scenarios do not have a bundled form of their own. To ship one, attach it to a c
 
 **Silence the Jericho** is the first mission authored end to end in the Scenario Builder, and you can download it as an export: [silence-the-jericho.json](/scenarios/silence-the-jericho.json).
 
-Importing it takes nothing but coilbox. Turn on Advanced mode in Settings > General, open **Scenario Builder > Builder**, press **Import** and pick the file. You get a new scenario you can read and edit like any other.
+Importing it takes nothing but coilbox. Open **Play > Scenarios**, press **Import** and pick the file. With Advanced mode on you can do the same from **Scenario Builder > Builder** and get a scenario you can read and edit like any other.
 
 Playing it needs the game it was written for. That machine also needs, in this order:
 
