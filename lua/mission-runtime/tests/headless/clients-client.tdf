@@ -1,0 +1,7 @@
+[game]
+{
+	ishost=0;
+	hostip=127.0.0.1;
+	hostport=@PORT@;
+	myplayername=@NAME@;
+}

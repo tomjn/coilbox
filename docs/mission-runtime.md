@@ -359,6 +359,16 @@ The probe's unsynced half checks the widget, because the engine's `Script.LuaUI`
 The probe also gives an order as the player rather than as the runtime, which is the only way a withheld command can be proved: everything synced Lua gives is `fromLua`, and the runtime lets all of that through. The engine lets a Lua handle put an order on the wire only when the local player controls that handle's team, and a gadget's is every team at once, so the harness turns god mode on to make the local player that controller. It changes who may order what and nothing about how an order is carried or judged.
 
 ```sh
+scripts/mission-clients.sh
+```
+
+Three real clients in one game, which is the only way to watch a client drop something. `camera_pan` and `map_marker` take a team, and every client is handed the same message: which of them acts on it is decided against `Spring.GetMyTeamID()`, so a one-client run can only read what arrived. This plays one ambush across three `spring-headless` processes, a host on the team the fixture names, a second player on the other team, and a spectator watching as the first, and each makes its own claim in its own log.
+
+What it counts is the engine calls the runtime's unsynced half made, because nothing else can be read back: a local map marker has no Lua getter, and the camera in a headless client drifts on its own. The probe replaces `Spring.SetCameraTarget` and `Spring.MarkerAddPoint` with wrappers that count and pass through, which it can do because it loads behind the runtime and both look the call up in the same table.
+
+The spectator is the case the format documents rather than decides: a spectator gets whatever the engine currently has them watching as, and this run has them on the team the mission named, so they see the camera move.
+
+```sh
 scripts/mission-sf-proof.sh
 ```
 

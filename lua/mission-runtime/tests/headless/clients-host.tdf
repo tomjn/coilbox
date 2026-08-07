@@ -1,0 +1,60 @@
+[game]
+{
+	ishost=1;
+	hostip=127.0.0.1;
+	hostport=@PORT@;
+	numallyteams=2;
+	numusers=3;
+	numteams=2;
+	numplayers=3;
+	startpostype=1;
+	gametype=@GAME@;
+	mapname=@MAP@;
+	myplayername=aimed;
+	[modoptions]
+	{
+@MODOPTIONS@
+	}
+	[player0]
+	{
+		team=0;
+		spectator=0;
+		name=aimed;
+	}
+	[player1]
+	{
+		team=1;
+		spectator=0;
+		name=other;
+	}
+	[player2]
+	{
+		team=0;
+		spectator=1;
+		name=watcher;
+	}
+	[team0]
+	{
+		allyteam=0;
+		teamleader=0;
+		rgbcolor=1 0 0;
+		side=ARM;
+		handicap=0;
+	}
+	[team1]
+	{
+		allyteam=1;
+		teamleader=1;
+		rgbcolor=0 0 1;
+		side=CORE;
+		handicap=0;
+	}
+	[allyteam0]
+	{
+		numallies=0;
+	}
+	[allyteam1]
+	{
+		numallies=0;
+	}
+}
