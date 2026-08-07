@@ -171,10 +171,13 @@ fn same_name_ignoring_case(dir: &Path, name: &OsStr) -> Option<OsString> {
 
 /// `root`'s `rel`, spelled the way `root` already spells it (issues #798, #951).
 ///
-/// The engine reads a path case-insensitively. `CDirArchive` lower-cases every
-/// path into its file index and `CVFSHandler` lower-cases again when it looks
-/// one up, so a game asking for `missions/runtime.lua` is handed the
-/// `Missions/runtime.lua` it shipped. A filesystem that keeps case, which is
+/// The engine reads a path case-insensitively. `CDirArchive` keeps the spelling
+/// on disk in `files[fid].fileName` and lower-cases only the `lcNameIndex` it
+/// looks names up in. `CVFSHandler` lower-cases both what it indexes
+/// (`StringToLower(ar->FileName(fid))` in `AddArchive`) and the path it is
+/// asked for (`GetNormalizedPath`). Either way, a game asking for
+/// `missions/runtime.lua` is handed the `Missions/runtime.lua` it shipped, and
+/// the spelling on disk is never what decides. A filesystem that keeps case, which is
 /// every Linux one, does not, and neither did this sandbox before #951. So Lua
 /// that a real engine runs would fail here, and a folder coilbox wrote into
 /// would be a second folder beside the game's own.
