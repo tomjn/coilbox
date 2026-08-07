@@ -11,8 +11,8 @@
 //! Only a loose game can be written to. A packaged `.sd7`/`.sdz` is read-only,
 //! and gets the test mutator instead (issue #754).
 
-use coilbox_springlua::SpringLua;
-use std::ffi::{OsStr, OsString};
+use coilbox_springlua::{resolve_case, SpringLua};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, Runtime};
 
@@ -56,61 +56,6 @@ pub fn runtime_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
             .filter(|dir| dir.is_dir());
     }
     None
-}
-
-/// The entry in `dir` that `name` names, ignoring case.
-///
-/// An exact match wins, so a filesystem already holding both spellings gets a
-/// stable answer and keeps using the one coilbox wrote rather than starting a
-/// second tree.
-fn same_name_ignoring_case(dir: &Path, name: &OsStr) -> Option<OsString> {
-    let wanted = name.to_string_lossy().to_lowercase();
-    let mut ignoring_case = None;
-    for found in std::fs::read_dir(dir)
-        .ok()?
-        .flatten()
-        .map(|e| e.file_name())
-    {
-        if found == name {
-            return Some(found);
-        }
-        if ignoring_case.is_none() && found.to_string_lossy().to_lowercase() == wanted {
-            ignoring_case = Some(found);
-        }
-    }
-    ignoring_case
-}
-
-/// `root`'s `rel`, spelled the way `root` already spells it (issue #798).
-///
-/// A game folder's casing is its own. Games ship `LuaRules/`, and on Windows and
-/// macOS that is the same folder as the `luarules/` coilbox writes, so this
-/// returns the path it was given and nothing changes. On a case-sensitive
-/// filesystem they are two folders, and writing the second one leaves a player
-/// with a `luarules/` beside their game's `LuaRules/`.
-///
-/// The engine would still load it: `CDirArchive` lower-cases every path into its
-/// index and `CVFSHandler` lower-cases again, so both spellings resolve. That is
-/// also the reason not to leave it. One lower-cased key can only hold one file,
-/// so the same file under two spellings is a collision the engine resolves in
-/// whatever order it read the directory, and a `VFS.DirList` returns the name
-/// twice. The prune has the plainer problem: it walks one spelling, so it can
-/// never clear a stale file out of the other.
-///
-/// Each component is looked up in the directory above it and kept as written
-/// when nothing is there, so a tree coilbox creates is spelled coilbox's way.
-/// The listing is read on every platform rather than only where case matters,
-/// which is what makes the result the same everywhere and so testable on a
-/// case-insensitive one.
-pub(crate) fn resolve_case(root: &Path, rel: &Path) -> PathBuf {
-    let mut out = root.to_path_buf();
-    for part in rel.iter() {
-        match same_name_ignoring_case(&out, part) {
-            Some(found) => out.push(found),
-            None => out.push(part),
-        }
-    }
-    out
 }
 
 /// Every file under `root`'s vendored trees, relative to `root` and sorted.
@@ -183,6 +128,10 @@ fn runtime_owned(key: &str) -> bool {
 /// Files are copied one by one rather than the trees replaced, because `dest`'s
 /// `luarules/` and `missions/` are shared with the game. Re-running is therefore
 /// safe: the same files are overwritten with the same contents.
+///
+/// Every destination is spelled the way `dest` already spells it, so a game's
+/// own `LuaRules/` takes the runtime rather than a second `luarules/` growing
+/// beside it on a case-sensitive filesystem (issue #798).
 pub fn install(src: &Path, dest: &Path) -> Result<Vec<String>, String> {
     let files = vendored_files(src);
     if files.is_empty() {
@@ -273,20 +222,16 @@ fn tidy_lua_error(raw: &str, chunk: &str) -> String {
 /// what comes back here is what the engine will read.
 fn read_data(root: &Path, rel: &str) -> Result<serde_json::Value, String> {
     let lua = SpringLua::new(root).map_err(|e| format!("could not start the Lua sandbox: {e}"))?;
-    // The engine's VFS is case-insensitive and the sandbox's is not, so a file
-    // installed into a game's own casing has to be asked for under that name.
-    let on_disk = resolve_case(root, Path::new(rel));
-    let name = on_disk
-        .strip_prefix(root)
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
-        .unwrap_or_else(|_| rel.to_string());
-    lua.include_value(&name).map_err(|e| {
+    // The path is handed over as the runtime writes it. The sandbox resolves it
+    // against the casing on disk, as the engine does (issue #951), so a game's
+    // own `Missions/` answers a read of `missions/`.
+    lua.include_value(rel).map_err(|e| {
         let raw = e.to_string();
         eprintln!(
             "coilbox-scenario: {} would not load: {raw}",
-            on_disk.display()
+            resolve_case(root, Path::new(rel)).display()
         );
-        format!("could not read {rel}: {}", tidy_lua_error(&raw, &name))
+        format!("could not read {rel}: {}", tidy_lua_error(&raw, rel))
     })
 }
 

@@ -27,6 +27,12 @@ mod env;
 pub mod unitscript;
 mod vfs;
 
+/// The path the engine would read for a VFS-relative one, spelled as the folder
+/// on disk spells it. Public because installing into a game folder has to write
+/// where the engine will look, which is the same question this crate's `VFS`
+/// answers for a read.
+pub use vfs::resolve_case;
+
 use std::path::{Path, PathBuf};
 
 use mlua::{Lua, LuaSerdeExt, Value};
