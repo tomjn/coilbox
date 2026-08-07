@@ -12,3 +12,8 @@ license = "MIT"
 mlua = { version = "0.11", features = ["lua51", "vendored", "serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[dev-dependencies]
+# A throwaway tree for the VFS listing tests, so the two spellings of one folder
+# a case-sensitive filesystem allows can be built and torn down.
+tempfile = "3"
