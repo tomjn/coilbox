@@ -43,8 +43,11 @@ describe("bundledCardArtSvg", () => {
   });
 
   it("draws a different picture for each tool it covers", () => {
+    // Compared with the id namespace removed. Gradient ids carry the tool id,
+    // so raw markup differs between two tools even when they share a drawing,
+    // and comparing it would let a copy-paste slip through.
     const drawn = BUNDLED_ART_TOOL_IDS.map((id) =>
-      bundledCardArtSvg(id, THEME),
+      anonymise(bundledCardArtSvg(id, THEME) ?? "", id),
     );
     expect(new Set(drawn).size).toBe(BUNDLED_ART_TOOL_IDS.length);
   });
@@ -452,4 +455,9 @@ function shoelace(points: [number, number][]): number {
 /** The markup with every colour removed, so two themes can be compared. */
 function strip(svg: string | undefined): string {
   return (svg ?? "").replace(/hsl\([^)]*\)/g, "colour");
+}
+
+/** The markup with its gradient id namespace removed, so two tools compare. */
+function anonymise(svg: string, toolId: string): string {
+  return svg.split(toolId.replace(/[^a-z0-9]+/gi, "-")).join("NS");
 }
