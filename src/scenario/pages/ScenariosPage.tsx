@@ -64,6 +64,7 @@ export default function ScenariosPage() {
           hasEngine: targetLoading || !!target,
           games: scan.data?.games ?? null,
           running: play.running,
+          reader: "player",
         });
 
   const openPlay = (scenario: Scenario) =>

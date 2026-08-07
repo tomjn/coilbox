@@ -30,7 +30,6 @@ import { scenarioRuntimeStatus, scenarioWriteMission } from "./bindings";
 import { compileScenario, missionPath } from "./compile";
 import type { Scenario } from "./model";
 import { writeTestMutator } from "./mutator";
-import { packagedArchiveReason } from "./offer";
 import {
   describeIssue,
   isBlocking,
@@ -38,6 +37,17 @@ import {
   type MissionIssue,
   validateCompiledMission,
 } from "./validate";
+import {
+  adoptedGameRoute,
+  coilboxTooOld,
+  gameNotInstalled,
+  missionProblems,
+  olderRuntimeRoute,
+  packagedGameRoute,
+  type ScenarioReader,
+  setupNotFound,
+  unadoptedGameRoute,
+} from "./wording";
 
 /**
  * The modoption that turns a game into a mission. Its value is the scenario id,
@@ -67,41 +77,43 @@ export interface RouteChoice {
  * A game whose runtime is older than the scenario needs would ignore the
  * triggers it does not know and play a quietly broken mission, so it is treated
  * the same as a game with no runtime at all.
+ *
+ * `reader` decides how much of that a sentence says: see `wording.ts`.
  */
 export function scenarioRoute(opts: {
   game: GameItem;
   installed: number | null;
   /** The lowest runtime version that can play the scenario. */
   required: number;
+  reader: ScenarioReader;
 }): RouteChoice {
-  const { game, installed, required } = opts;
+  const { game, installed, required, reader } = opts;
   const mutator = (reason: string): RouteChoice => ({
     route: "mutator",
     reason,
   });
 
   if (!isSdd(game.primaryArchive) || !game.primaryArchive.path) {
-    return mutator(packagedArchiveReason(game.name));
+    return mutator(packagedGameRoute(reader, game.name));
   }
   if (installed === null) {
-    return mutator(
-      `${game.name} has not adopted coilbox's mission runtime, so it cannot play a scenario itself. The scenario is played through the test mutator instead.`,
-    );
+    return mutator(unadoptedGameRoute(reader, game.name));
   }
   if (installed < required) {
-    return mutator(
-      `${game.name} vendors mission runtime version ${installed}, and this scenario needs version ${required}. The scenario is played through the test mutator instead.`,
-    );
+    return mutator(olderRuntimeRoute(reader, game.name, installed, required));
   }
   return {
     route: "adopted",
-    reason: `${game.name} vendors mission runtime version ${installed}, so it plays the scenario itself.`,
+    reason: adoptedGameRoute(reader, game.name, installed),
   };
 }
 
 /** The lead-in to a refusal: how much is wrong, and that nothing was played. */
-export function missionIssueSummary(issues: MissionIssue[]): string {
-  return `The compiled mission has ${issues.length} problem${issues.length === 1 ? "" : "s"}, so it was not launched.`;
+export function missionIssueSummary(
+  reader: ScenarioReader,
+  issues: MissionIssue[],
+): string {
+  return missionProblems(reader, issues.length);
 }
 
 /**
@@ -109,11 +121,14 @@ export function missionIssueSummary(issues: MissionIssue[]): string {
  * A caller with room for the whole list shows {@link missionIssueSummary} over
  * every issue instead.
  */
-export function missionIssueMessage(issues: MissionIssue[]): string {
+export function missionIssueMessage(
+  reader: ScenarioReader,
+  issues: MissionIssue[],
+): string {
   const [first] = issues;
   if (!first) return "";
   const more = issues.length - 1;
-  return `${missionIssueSummary(issues)} ${describeIssue(first)}${more > 0 ? ` (and ${more} more)` : ""}`;
+  return `${missionIssueSummary(reader, issues)} ${describeIssue(first)}${more > 0 ? ` (and ${more} more)` : ""}`;
 }
 
 /**
@@ -133,17 +148,20 @@ export function scenarioLaunchBlocker(opts: {
   hasEngine: boolean;
   games: GameItem[] | null;
   running: boolean;
+  reader: ScenarioReader;
 }): string | null {
-  const { scenario, hasEngine, games, running } = opts;
+  const { scenario, hasEngine, games, running, reader } = opts;
   const { gameName, mapName } = scenario.setup;
   if (!hasEngine) {
-    return "No engine is installed. Add one from Content before testing a scenario.";
+    return reader === "player"
+      ? "No engine is installed. Add one from Content before playing a scenario."
+      : "No engine is installed. Add one from Content before testing a scenario.";
   }
   if (!gameName || !mapName) {
     return "This scenario has no game and map yet. Set it up from a preset first.";
   }
   if (games && !games.some((g) => g.name === gameName)) {
-    return `${gameName} is not installed. Install it from Content, or set the scenario up on a game you have.`;
+    return gameNotInstalled(reader, gameName);
   }
   if (running) return "A game is already running.";
   return null;
@@ -151,6 +169,8 @@ export function scenarioLaunchBlocker(opts: {
 
 export interface ScenarioLaunchInput {
   scenario: Scenario;
+  /** Who is being told when this refuses. See `wording.ts`. */
+  reader: ScenarioReader;
   /** The content root the engine is run against. */
   dataDir: string;
   /** The installed games, from the current content scan. */
@@ -261,6 +281,7 @@ export async function launchScenario(
 ): Promise<ScenarioLaunchResult> {
   const {
     scenario,
+    reader,
     dataDir,
     games,
     rescan,
@@ -272,9 +293,7 @@ export async function launchScenario(
   const wanted = scenario.setup.gameName;
   const game = games.find((g) => g.name === wanted);
   if (!game) {
-    return refuse(
-      `This scenario is set in ${wanted || "no game"}, which is not installed. Install it from Content, or point the scenario at a game you have.`,
-    );
+    return refuse(gameNotInstalled(reader, wanted));
   }
 
   const root = game.primaryArchive.path;
@@ -284,6 +303,7 @@ export async function launchScenario(
     game,
     installed,
     required: scenario.runtimeVersion,
+    reader,
   });
 
   // Only the adopted route has a folder to write into, and `scenarioRoute` only
@@ -302,7 +322,7 @@ export async function launchScenario(
     written = { mission: missionPath(scenario.id), issues: mutator.issues };
     if (mutator.version < scenario.runtimeVersion) {
       return refuse(
-        `This scenario needs mission runtime version ${scenario.runtimeVersion}, and this build of coilbox ships version ${mutator.version}. Update coilbox to play it.`,
+        coilboxTooOld(reader, scenario.runtimeVersion, mutator.version),
       );
     }
   }
@@ -311,7 +331,7 @@ export async function launchScenario(
   // rides along with the result and is shown once the game has closed.
   const blocking = written.issues.filter(isBlocking);
   if (blocking.length > 0) {
-    return refuse(missionIssueMessage(blocking), blocking);
+    return refuse(missionIssueMessage(reader, blocking), blocking);
   }
   const warnings = written.issues.filter((issue) => !isBlocking(issue));
 
@@ -325,9 +345,7 @@ export async function launchScenario(
       isMutatorArchive(g.primaryArchive.name),
     );
     if (!found) {
-      return refuse(
-        `The engine did not pick up coilbox's test mutator. Check that ${game.name} is still installed.`,
-      );
+      return refuse(setupNotFound(reader, game.name));
     }
     gameType = found.name;
   }

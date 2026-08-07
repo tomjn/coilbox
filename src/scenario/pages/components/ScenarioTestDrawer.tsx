@@ -14,7 +14,10 @@
  * engine's answer to a bad id is silence.
  *
  * The Scenarios page opens this same drawer in `play` mode, because a player
- * pressing Play wants exactly the launch an author testing a change wants.
+ * pressing Play wants exactly the launch an author testing a change wants. The
+ * launch is the same and the words are not: the mode picks the reader every
+ * sentence is written for, and the parts that are only about coilbox's own
+ * plumbing are left out for a player (issue #862). See `wording.ts`.
  */
 
 import { Button } from "@picoframe/frame";
@@ -37,6 +40,7 @@ import {
 import type { Scenario } from "../../model";
 import { mutatorOffer } from "../../offer";
 import { describeIssue, type MissionIssue } from "../../validate";
+import { missionWarnings, type ScenarioReader } from "../../wording";
 import { useGameUnits } from "./useGameUnits";
 import { useScenarioGate } from "./useScenarioGate";
 
@@ -95,7 +99,8 @@ export function ScenarioTestDrawer({
   // it could not check rather than passing over.
   const gameUnits = useGameUnits(scenario.setup.gameName);
   const play = usePlay();
-  const { route, reason, available } = useScenarioGate(scenario);
+  const reader: ScenarioReader = testing ? "author" : "player";
+  const { route, reason, available } = useScenarioGate(scenario, reader);
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
 
   const busy =
@@ -115,12 +120,15 @@ export function ScenarioTestDrawer({
         hasEngine: targetLoading || !!target,
         games: scan.data?.games ?? null,
         running: play.running && !busy,
+        reader,
       });
 
   // The mutator writes a game folder the author should know about before it
-  // appears, and it is the same offer a packaged game's own page makes.
+  // appears, and it is the same offer a packaged game's own page makes. Author
+  // only: it is about a folder in the player's content root that they did not
+  // ask for and cannot act on, and it names coilbox's own plumbing throughout.
   const offer =
-    route === "mutator"
+    testing && route === "mutator"
       ? mutatorOffer(scenario.setup.gameName, available)
       : null;
 
@@ -130,6 +138,7 @@ export function ScenarioTestDrawer({
     try {
       const result = await launchScenario({
         scenario,
+        reader,
         dataDir: target.dataDir,
         games: scan.data?.games ?? [],
         map: mapExtent,
@@ -172,11 +181,16 @@ export function ScenarioTestDrawer({
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-xs text-muted-foreground">
-        The scenario is compiled and read back before the engine is started, so
-        a reference that does not resolve stops here rather than playing as a
-        trigger that never fires.
-      </p>
+      {/* Why a launch can stop before it starts. Author wording, and only an
+          author has anything to do about it: a player is told the same thing
+          in their own words if it actually happens. */}
+      {testing ? (
+        <p className="text-xs text-muted-foreground">
+          The scenario is compiled and read back before the engine is started,
+          so a reference that does not resolve stops here rather than playing as
+          a trigger that never fires.
+        </p>
+      ) : null}
 
       {reason ? <p className="text-sm">{reason}</p> : null}
 
@@ -212,7 +226,7 @@ export function ScenarioTestDrawer({
         <div className="flex flex-col gap-2 text-xs text-destructive">
           <p>
             {phase.issues.length > 0
-              ? missionIssueSummary(phase.issues)
+              ? missionIssueSummary(reader, phase.issues)
               : phase.message}
           </p>
           {phase.issues.length > 0 ? (
@@ -232,13 +246,7 @@ export function ScenarioTestDrawer({
           reason to refuse one. */}
       {phase.state === "done" && phase.result.warnings.length > 0 ? (
         <div className="flex flex-col gap-2 text-xs text-amber-300">
-          <p>
-            The mission played, but{" "}
-            {phase.result.warnings.length === 1
-              ? "one thing in it reads"
-              : `${phase.result.warnings.length} things in it read`}{" "}
-            to a player as a bug:
-          </p>
+          <p>{missionWarnings(reader, phase.result.warnings.length)}</p>
           <ul className="flex list-disc flex-col gap-1 pl-4">
             {phase.result.warnings.map((issue) => (
               <li key={`${issue.path}:${issue.message}`}>

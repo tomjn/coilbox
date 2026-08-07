@@ -7,22 +7,16 @@
  * it, depending on it and carrying the runtime plus the one scenario being
  * tested.
  *
- * The wording is the point. A player reading this has to come away knowing the
- * mutator tests a scenario and never ships one, or the read-only game looks like
- * a supported way to distribute a mission.
+ * The wording is the point. An author reading this has to come away knowing the
+ * mutator tests a scenario and never ships one, or the generated game looks like
+ * a supported way to distribute a mission. It is all author wording: this is
+ * shown on a game's page in Content and in the editor's test drawer, never to a
+ * player pressing Play (issue #862).
  */
 
 import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import type { RuntimeMarker } from "./bindings";
-
-/**
- * Why a packaged archive cannot be written into. Shared with `scenarioRoute` in
- * `launch.ts`, so a player is told the same thing on the game's page and at
- * launch.
- */
-export function packagedArchiveReason(gameName: string): string {
-  return `${gameName} is a packaged archive, which cannot be written into. The scenario is played through coilbox's test mutator instead.`;
-}
+import { packagedGameRoute } from "./wording";
 
 /** The packaged-game offer, in the order it is read. */
 export interface MutatorOffer {
@@ -54,7 +48,7 @@ export function mutatorOffer(
     };
   }
   return {
-    reason: packagedArchiveReason(gameName),
+    reason: packagedGameRoute("author", gameName),
     offer: `Coilbox writes a game of its own, ${MUTATOR_FOLDER}, beside this one. It depends on ${gameName} for units, sides and everything else, and carries mission runtime version ${available.version} plus the one scenario under test. Testing a scenario writes it, and deleting that folder undoes it.`,
     limit: `It is a test route and never a distribution one. For ${gameName} to play scenarios itself it has to vendor the runtime, and coilbox can only install that into a loose .sdd copy of the game.`,
   };

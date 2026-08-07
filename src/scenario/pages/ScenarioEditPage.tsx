@@ -68,7 +68,7 @@ export default function ScenarioEditPage() {
   // Read once for the page rather than in the trigger panel, because every
   // panel that renames a reference needs the game's own declared types to carry
   // that reference over (issue #913).
-  const { gate, extensions, note } = useScenarioGate(scenario);
+  const { gate, extensions, note } = useScenarioGate(scenario, "author");
   const [history, setHistory] = useState<EditHistory>(emptyHistory);
   // Both are also held in refs, because an edit and a step through the history
   // read them at the moment they happen rather than at the last render: two

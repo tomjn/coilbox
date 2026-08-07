@@ -72,28 +72,61 @@ const MUTATOR = game("Coilbox mission test test", MUTATOR_FOLDER, "/m");
 
 describe("scenarioRoute", () => {
   it("lets a game that vendors a new enough runtime play the scenario itself", () => {
-    const choice = scenarioRoute({ game: LOOSE, installed: 2, required: 1 });
+    const choice = scenarioRoute({
+      game: LOOSE,
+      installed: 2,
+      required: 1,
+      reader: "author",
+    });
 
     expect(choice.route).toBe("adopted");
     expect(choice.reason).toContain("version 2");
   });
 
   it("sends a packaged game to the mutator, because it cannot be written into", () => {
-    const choice = scenarioRoute({ game: PACKAGED, installed: 2, required: 1 });
+    const choice = scenarioRoute({
+      game: PACKAGED,
+      installed: 2,
+      required: 1,
+      reader: "author",
+    });
 
     expect(choice.route).toBe("mutator");
     expect(choice.reason).toContain("packaged archive");
   });
 
   it("sends a game with no runtime to the mutator", () => {
-    const choice = scenarioRoute({ game: LOOSE, installed: null, required: 1 });
+    const choice = scenarioRoute({
+      game: LOOSE,
+      installed: null,
+      required: 1,
+      reader: "author",
+    });
 
     expect(choice.route).toBe("mutator");
     expect(choice.reason).toContain("has not adopted");
   });
 
+  it("tells a player what coilbox does rather than how it does it", () => {
+    const choice = scenarioRoute({
+      game: PACKAGED,
+      installed: null,
+      required: 1,
+      reader: "player",
+    });
+
+    expect(choice.route).toBe("mutator");
+    expect(choice.reason).not.toContain("mutator");
+    expect(choice.reason).toContain("cannot play a scenario on its own");
+  });
+
   it("sends a game whose runtime is older than the scenario to the mutator", () => {
-    const choice = scenarioRoute({ game: LOOSE, installed: 1, required: 3 });
+    const choice = scenarioRoute({
+      game: LOOSE,
+      installed: 1,
+      required: 3,
+      reader: "author",
+    });
 
     expect(choice.route).toBe("mutator");
     expect(choice.reason).toContain("needs version 3");
@@ -107,6 +140,7 @@ describe("launchScenario", () => {
   function run(scenario: Scenario, games: GameItem[]) {
     return launchScenario({
       scenario,
+      reader: "author",
       dataDir: "/data",
       games,
       rescan,
@@ -205,6 +239,7 @@ describe("launchScenario", () => {
 
     const result = await launchScenario({
       scenario,
+      reader: "author",
       dataDir: "/data",
       games: [LOOSE],
       rescan,
@@ -281,6 +316,7 @@ describe("launchScenario", () => {
 
     const result = await launchScenario({
       scenario: build(),
+      reader: "author",
       dataDir: "/data",
       games: [LOOSE],
       rescan,
@@ -363,7 +399,7 @@ describe("launchScenario", () => {
 
 describe("missionIssueMessage", () => {
   it("leads with the first problem and counts the rest", () => {
-    const message = missionIssueMessage([
+    const message = missionIssueMessage("author", [
       { path: 'actors["boss"].team', message: 'no team called "x"' },
       { path: 'actors["mate"].team', message: 'no team called "y"' },
     ]);
@@ -383,6 +419,7 @@ describe("scenarioLaunchBlocker", () => {
       hasEngine: true,
       games: [LOOSE],
       running: false,
+      reader: "author",
       ...overrides,
     });
 
@@ -410,6 +447,13 @@ describe("scenarioLaunchBlocker", () => {
 
   it("stops a scenario set in a game that is not installed", () => {
     expect(blocker({ games: [] })).toContain("Splinter Faction test");
+  });
+
+  it("does not tell a player to set the scenario up on another game", () => {
+    const said = blocker({ games: [], reader: "player" });
+
+    expect(said).toContain("Install it from Content");
+    expect(said).not.toContain("set the scenario up");
   });
 
   it("waits rather than blocking while the scan has not answered", () => {

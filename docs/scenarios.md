@@ -247,6 +247,8 @@ The button is disabled with a reason for the things you have to fix elsewhere: n
 
 **Play > Scenarios** is the player-facing half. It lists every scenario that names a game and a map, with its contents, and gives each one a **Play** button that runs the same pipeline. It also has its own **Import**, so a scenario someone sent you can be brought in and played without Advanced mode or the editor. The sidebar item is hidden until at least one scenario is ready to play.
 
+A player is told the same facts as an author in different words. "Install it from Content" is something anyone can do, so it is said either way, while "set the scenario up on a game you have", the test mutator and mission runtime versions are the author's and are not shown on the Scenarios page at all. A player is told that coilbox sets up what the game needs and leaves their copy of it alone.
+
 ## Share a scenario
 
 **Export** writes a single `.json` file. It is a coilbox container, `"kind": "scenario"`, and it carries the document plus every portrait and voice clip the dialogue names, inlined as `data:` URIs beside the document.
