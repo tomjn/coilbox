@@ -3,9 +3,9 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { plugins } from "./app.plugins";
-import SetupHome from "./content/pages/SetupHome";
 import { ErrorBoundary } from "./general/ErrorBoundary";
 import { SPLASH_ENABLED_KEY } from "./general/splash";
+import CoilboxHome from "./home/CoilboxHome";
 import { applyProfilePages } from "./profile/CustomPage";
 import { applyProfileSettingsHiding } from "./profile/hidden";
 import { applyProfileSlots, buildLayoutConfig } from "./profile/layout";
@@ -115,14 +115,13 @@ if (profile.theme) {
   }
 }
 
-// Vanilla Coilbox uses picoframe's built-in launcher home; the content plugin
-// contributes the first-run setup card via the `home.top` slot, so it rides above
-// the launcher's tool grid. A branded build (profile.welcome present) instead
-// overrides `/` with SetupHome, letting its welcome take over the page (with the
-// setup card above it).
-const home: HomeOverride | undefined = profile.welcome
-  ? { Component: SetupHome }
-  : undefined;
+// Coilbox owns `/` for everyone, branded or not (issue #985). CoilboxHome picks
+// the arm: a profile with a `welcome` gets that welcome as the whole page, and
+// everything else gets Coilbox's own layout, which still renders the `home.top`
+// and `home.bottom` slots picoframe plugins inject into. Unconditional because
+// picoframe's launcher is a placeholder we've outgrown, and because leaving it
+// installed for vanilla builds would mean maintaining two homes.
+const home: HomeOverride = { Component: CoilboxHome };
 
 // Resolve the startup splash before first paint (so the image is ready and there's
 // no empty-overlay flash). Skipped when the profile has no splash or the user turned
