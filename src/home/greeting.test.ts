@@ -18,7 +18,7 @@ vi.mock("../multiplayer/store", () => ({ useMultiplayer: () => lobby() }));
 // The shared resume collector reads five stores off disk and the lobby snapshot.
 // The greeting only asks it whether the list is empty, so the list is what the
 // test supplies. What goes into that list is `continue.test.ts`'s subject.
-const resume = vi.fn<() => { candidates: unknown[] }>();
+const resume = vi.fn<() => { candidates: unknown[]; loading: boolean }>();
 vi.mock("./continue", () => ({ useResume: () => resume() }));
 
 import Greeting, { greetingCopy } from "./zones/Greeting";
@@ -58,7 +58,7 @@ function render() {
 beforeEach(() => {
   frame.mockReturnValue({ title: "Coilbox", nav: TOOLS });
   lobby.mockReturnValue(OFFLINE);
-  resume.mockReturnValue({ candidates: [] });
+  resume.mockReturnValue({ candidates: [], loading: false });
 });
 
 describe("greetingCopy", () => {
@@ -167,8 +167,22 @@ describe("Greeting zone", () => {
   });
 
   it("offers to resume when the collector found something", () => {
-    resume.mockReturnValue({ candidates: [{ id: "warpath:run-1" }] });
+    resume.mockReturnValue({
+      candidates: [{ id: "warpath:run-1" }],
+      loading: false,
+    });
     expect(render().tagline).toBe("Pick up where you left off.");
+  });
+
+  it("waits for the sources before promising a resume", () => {
+    // The hero and the rail both wait for `loading`, so a greeting that did not
+    // would promise "Pick up where you left off." over a page with nothing on it
+    // to pick up (#1002).
+    resume.mockReturnValue({
+      candidates: [{ id: "warpath:run-1" }],
+      loading: true,
+    });
+    expect(render().tagline).toBe("Choose a tool to get started.");
   });
 
   it("sends you to the tools when the collector found nothing", () => {

@@ -70,9 +70,16 @@ function useLobbyName(): string | null {
  * The sources load from disk, so this is false on the first frame and turns true
  * a beat later on an install with something waiting. One change, like the
  * heading's.
+ *
+ * It waits for `loading` for the same reason the Continue hero and the resume
+ * rail do, and so that it waits for exactly as long as they do. Without that the
+ * tagline promised "Pick up where you left off." over a page with nothing on it
+ * to pick up, because the greeting answered off a half-read set while the two
+ * zones that would show it were still waiting (#1002).
  */
 function useHasResume(): boolean {
-  return useResume().candidates.length > 0;
+  const { candidates, loading } = useResume();
+  return !loading && candidates.length > 0;
 }
 
 /**
