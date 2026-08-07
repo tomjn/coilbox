@@ -1,15 +1,15 @@
-import { GetStartedCard } from "../content/pages/components/GetStartedCard";
-import { SetupCard } from "../content/pages/components/SetupCard";
 import BrandedWelcome from "../profile/BrandedWelcome";
 import { getOnboardingPlacement } from "../profile/profile";
+import Onboarding from "./zones/Onboarding";
 
 /**
  * The home page for a distribution that ships its own welcome markup: that
- * welcome, plus the first-run onboarding (setup + get-started suggestion cards).
+ * welcome, plus the {@link Onboarding} zone.
  *
  * The welcome is always rendered and never replaced. The `onboarding` placement
  * only positions the cards above, below, or off (see
- * {@link getOnboardingPlacement}).
+ * {@link getOnboardingPlacement}); the zone itself is the same one the stacked
+ * layout renders.
  *
  * The root is a definite-height scroll container so the welcome sizes to its own
  * content, rather than an ambiguous `h-full` that collapses to zero inside
@@ -20,18 +20,11 @@ import { getOnboardingPlacement } from "../profile/profile";
  */
 export default function BrandedHome() {
   const placement = getOnboardingPlacement();
-  const onboarding =
-    placement === "off" ? null : (
-      <>
-        <SetupCard dismissible />
-        <GetStartedCard />
-      </>
-    );
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-auto p-4">
-      {placement === "above" && onboarding}
+      {placement === "above" && <Onboarding />}
       <BrandedWelcome />
-      {placement === "below" && onboarding}
+      {placement === "below" && <Onboarding />}
     </div>
   );
 }

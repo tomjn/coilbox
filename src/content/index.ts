@@ -12,7 +12,6 @@ import {
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import ContentStartupProvider from "./ContentStartupProvider";
-import { HomeSetupCard } from "./pages/components/SetupCard";
 import EngineSettingsSection from "./pages/EngineSettingsSection";
 import EnginesSection from "./pages/EnginesSection";
 import FoldersSection from "./pages/FoldersSection";
@@ -50,10 +49,6 @@ const contentPlugin: FramePlugin = {
   // Runs once at app launch (before any route opens) to warm the unitsync scan
   // and map thumbnails, so the Maps/Games pages show data instantly.
   Provider: ContentStartupProvider,
-  // The first-run setup card rides the home page's `home.top` slot, above the
-  // tool grid. It renders null once setup is complete, so a healthy install
-  // sees only the grid.
-  slots: [{ slot: "home.top", order: 0, Component: HomeSetupCard }],
   nav: [
     {
       id: "content",
