@@ -407,14 +407,14 @@ export function defsMissingFrom(
   return defs.filter((def) => !have.has(def.toLowerCase()));
 }
 
-/** One unit def the compiled mission names, and where it sits. */
-interface FoundDef {
+/** One unit def the mission names, and where it sits. */
+export interface FoundDef {
   path: string;
   def: string;
 }
 
 /**
- * Every unit def the compiled mission names.
+ * Every unit def the mission names.
  *
  * A named list rather than a walk like {@link pointsIn}, because a def is a bare
  * string and a walk would sweep up every other string in the file. The places
@@ -423,8 +423,15 @@ interface FoundDef {
  *
  * A game extension's parameters are left alone, exactly as {@link checkStep}
  * leaves them: an unknown type's defs are that game's business.
+ *
+ * Takes anything, because the setup panel's "changing the game" notice asks the
+ * same question of the document the author is editing (issue #940). The compiled
+ * file mirrors the document field for field, so one walk answers both, and the
+ * notice cannot say a game has everything the mission needs while the validator
+ * refuses the launch over a def in a factory queue.
  */
-function unitDefsIn(mission: Record<string, unknown>): FoundDef[] {
+export function unitDefsIn(document: unknown): FoundDef[] {
+  const mission = asRecord(document);
   const found: FoundDef[] = [];
   const add = (path: string, value: unknown) => {
     if (typeof value === "string" && value !== "")

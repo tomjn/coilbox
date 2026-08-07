@@ -9,11 +9,14 @@ vi.mock("./bindings", () => ({
   scenarioReadMission: (...args: unknown[]) => readMissionMock(...args),
 }));
 
+import { newScenario } from "./create";
+import type { Scenario } from "./model";
 import {
   defsMissingFrom,
   describeIssue,
   isBlocking,
   issueLocation,
+  unitDefsIn,
   validateCompiledMission,
   validateMission,
 } from "./validate";
@@ -461,6 +464,63 @@ describe("validateMission", () => {
           [{ name: "ARMCOM" }, { name: "corcom" }],
         ),
       ).toEqual(["corak"]);
+    });
+  });
+
+  /**
+   * Issue #940. The setup panel's "changing the game" notice runs this same
+   * walk over the document the author is editing, so the two cannot disagree
+   * about whether the new game has everything the mission needs. A factory's
+   * build queue and a trigger parameter naming a def are the two places the
+   * notice used to miss.
+   */
+  describe("the document the setup panel reads", () => {
+    it("finds a def wherever the document holds one", () => {
+      const document: Scenario = {
+        ...newScenario("Demo"),
+        teams: { player: { startUnits: ["armpw"] } },
+        actors: [
+          {
+            id: "boss",
+            unitDef: "armcom",
+            team: "player",
+            pos: { x: 1, z: 1 },
+            facing: 0,
+          },
+        ],
+        prefabs: [
+          {
+            id: "base",
+            team: "player",
+            origin: { x: 2, z: 2 },
+            buildings: [
+              {
+                def: "armlab",
+                offset: { x: 0, z: 0 },
+                facing: 0,
+                queue: ["armflash"],
+              },
+            ],
+          },
+        ],
+        triggers: [
+          {
+            id: "open",
+            enabled: true,
+            repeat: false,
+            conditions: { op: "all", conditions: [] },
+            actions: [{ type: "unlock_unit", params: { unitDef: "armzeus" } }],
+          },
+        ],
+      };
+
+      expect(unitDefsIn(document)).toEqual([
+        { path: 'teams["player"].startUnits[0]', def: "armpw" },
+        { path: 'actors["boss"].unitDef', def: "armcom" },
+        { path: 'prefabs["base"].buildings[0].def', def: "armlab" },
+        { path: 'prefabs["base"].buildings[0].queue[0]', def: "armflash" },
+        { path: 'triggers["open"].actions[0].params.unitDef', def: "armzeus" },
+      ]);
     });
   });
 

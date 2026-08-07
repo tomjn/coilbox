@@ -16,7 +16,6 @@ import {
   setTeamNoCommander,
   startsSummary,
   startsWarning,
-  startUnitDefs,
   startUnits,
   startUnitTotal,
   teamOf,
@@ -91,20 +90,6 @@ describe("start units", () => {
     expect(s.teams.player.startUnits).toEqual(["lifter"]);
     s = removeStartUnit(s, "player", "lifter");
     expect(s.teams).toEqual({});
-  });
-
-  /**
-   * A start unit has no position, so it is not a placement and nothing that
-   * reads defs off the map sees it. Changing the game has to.
-   */
-  it("reports every def any team starts with, once each", () => {
-    let s = base(["player", "enemy"]);
-    s = addStartUnit(s, "player", "ak");
-    s = addStartUnit(s, "player", "ak");
-    s = addStartUnit(s, "player", "lifter");
-    s = addStartUnit(s, "enemy", "ak");
-    expect(startUnitDefs(s).sort()).toEqual(["ak", "lifter"]);
-    expect(startUnitDefs(base(["player"]))).toEqual([]);
   });
 
   it("leaves the document alone for a def the team does not have", () => {
