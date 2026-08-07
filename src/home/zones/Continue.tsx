@@ -42,10 +42,10 @@ export default function Continue() {
   const Icon = RESUME_KIND_ICON[top.kind];
   return (
     // The accent border and the filled action mark this as the card to look at.
-    // A tinted fill would say the same thing, but `bg-primary/5` measured 4.15:1
-    // for the muted lines in the light scheme against 4.63:1 on the card
-    // surface, so the tint costs more contrast than the light ramp has to spare
-    // (see #997).
+    // A tinted fill would say the same thing three times. The tint was also
+    // unreadable when this was built, at 4.15:1 for the muted lines, but that was
+    // the token's fault and is fixed in `src/index.css` (#1016), so the surface
+    // stays `bg-card` on the design argument alone.
     <section
       aria-labelledby="home-continue-title"
       className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-primary/40 bg-card p-5 text-card-foreground"

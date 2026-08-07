@@ -2,6 +2,7 @@ import type { Accent, ThemeMode } from "@picoframe/frame";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { ConquestNames } from "../conquest/names";
 import type { MapExclusion, SuggestedMapList } from "../content/branding";
+import type { HomeConfig } from "../home/config";
 import type { GameAiConfig } from "../play/gameAi";
 import { describeJsonError } from "./jsonError";
 import { type OnboardingPlacement, onboardingPlacement } from "./onboarding";
@@ -209,6 +210,13 @@ export interface Profile {
   factionLogos?: Record<string, string>;
   /** Branded landing page shown in place of the default launcher. */
   welcome?: WelcomeConfig;
+  /**
+   * Coilbox's own home page: which layout, what backdrop, and which zones in
+   * what order (see `../home/config`). Omitted gives the stock home, so every
+   * profile written before this key existed is unaffected. Ignored when
+   * {@link Profile.welcome} is set, because that replaces the page wholesale.
+   */
+  home?: HomeConfig;
   /**
    * Where the first-run onboarding (the "Set up Coilbox" + get-started download
    * suggestion cards) sits on the branded home. The {@link welcome} is always
