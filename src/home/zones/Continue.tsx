@@ -1,23 +1,7 @@
 import { buttonVariants, cn } from "@picoframe/frame";
-import type { LucideIcon } from "lucide-react";
-import { Gamepad2, Milestone, Orbit, Play, Rocket, Swords } from "lucide-react";
+import { Play } from "lucide-react";
 import { Link } from "react-router";
-import { RESUME_KIND_COPY, type ResumeKind, useResume } from "../continue";
-
-/**
- * The icon for each kind, matching the sidebar item that kind lives under.
- *
- * Presentation rather than copy, so it stays in the zone while the wording stays
- * in the collector. Hardcoded rather than read off the nav, because a profile can
- * hide a nav item (`useVisible`) and the card still has to draw something.
- */
-const KIND_ICON: Record<ResumeKind, LucideIcon> = {
-  battle: Gamepad2,
-  warpath: Rocket,
-  conquest: Orbit,
-  campaign: Milestone,
-  skirmish: Swords,
-};
+import { RESUME_KIND_COPY, RESUME_KIND_ICON, useResume } from "../continue";
 
 /**
  * One large card for the single most relevant thing to pick up again, with the
@@ -55,7 +39,7 @@ export default function Continue() {
   if (loading || !top) return null;
 
   const { label, action } = RESUME_KIND_COPY[top.kind];
-  const Icon = KIND_ICON[top.kind];
+  const Icon = RESUME_KIND_ICON[top.kind];
   return (
     // The accent border and the filled action mark this as the card to look at.
     // A tinted fill would say the same thing, but `bg-primary/5` measured 4.15:1
