@@ -1,3 +1,5 @@
+import type { LucideIcon } from "lucide-react";
+import { Gamepad2, Milestone, Orbit, Rocket, Swords } from "lucide-react";
 import { useCampaignProgress, useCampaigns } from "../campaign/campaigns";
 import type { Campaign, ProgressFile } from "../campaign/model";
 import { resumeMissionId } from "../campaign/progress";
@@ -77,6 +79,23 @@ export const RESUME_KIND_COPY: Record<ResumeKind, ResumeKindCopy> = {
   conquest: { label: "Conquest", action: "Resume conquest" },
   campaign: { label: "Campaign", action: "Resume mission" },
   skirmish: { label: "Skirmish setup", action: "Open setup" },
+};
+
+/**
+ * The icon for each kind, matching the sidebar item that kind lives under.
+ *
+ * Beside {@link RESUME_KIND_COPY} for the same reason: the Continue hero (#993)
+ * and the resume rail (#994) both draw it, and the same run must not be a rocket
+ * in one and something else in the other. Hardcoded rather than read off the nav,
+ * because a profile can hide a nav item (`useVisible`) and the card still has to
+ * draw something.
+ */
+export const RESUME_KIND_ICON: Record<ResumeKind, LucideIcon> = {
+  battle: Gamepad2,
+  warpath: Rocket,
+  conquest: Orbit,
+  campaign: Milestone,
+  skirmish: Swords,
 };
 
 /** Whether the window is still open at `now`. `"soon"` has not closed yet. */
