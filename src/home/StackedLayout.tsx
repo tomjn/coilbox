@@ -2,6 +2,7 @@ import { Slot } from "@picoframe/frame";
 import { Fragment, type ReactNode } from "react";
 import { backdropStyle, resolveHomeBackground } from "./background";
 import { type HomeEntry, type ZoneId, zoneString } from "./config";
+import HomeMarkup from "./HomeMarkup";
 import type { HomeLayoutProps } from "./layout";
 import Continue from "./zones/Continue";
 import FeaturedMap from "./zones/FeaturedMap";
@@ -82,14 +83,40 @@ const ZONE_SPACING: Partial<Record<ZoneId, string>> = {
   featured: "mt-8 empty:hidden",
 };
 
-/** One entry of the page, with the layout's own spacing around it. */
+/**
+ * One entry of the page, with the layout's own spacing around it.
+ *
+ * A custom `html` entry gets no spacing at all. It is a section the layout knows
+ * nothing about, so any margin picked here would be one its author then has to
+ * fight, and their markup can carry its own.
+ *
+ * A zone's `before` and `after` markup sits inside that zone's spacing wrapper,
+ * so an intro sentence takes the gap that separated the zone from what came
+ * before it and the zone itself stays tight under the sentence. Two consequences
+ * worth knowing when authoring:
+ *
+ * - Markup renders whether or not the zone next to it drew anything. Whether
+ *   there is a battle to rejoin is the zone's own runtime state, and a `before`
+ *   that means "sometimes" is harder to write against than one that means
+ *   "always". It is also the only way to say "always", since a custom `html`
+ *   entry is unconditional by definition.
+ * - Because the wrapper is no longer empty, the `empty:hidden` that collapses a
+ *   silent zone's gap stops applying to that entry. Same rule, seen from the
+ *   layout's side.
+ */
 function renderEntry(entry: HomeEntry, index: number): ReactNode {
-  // Custom markup entries arrive with issue #999. Recognised by the schema
-  // already, so they hold their place in the order, and skipped here until
-  // there is something to render for them.
-  if (entry.kind !== "zone") return null;
+  if (entry.kind === "html")
+    return <HomeMarkup key={index} markup={entry.html} />;
+  const before = zoneString(entry.entry, "before");
+  const after = zoneString(entry.entry, "after");
   const spacing = ZONE_SPACING[entry.zone];
-  const node = zoneNode(entry);
+  const node = (
+    <>
+      {before !== undefined && <HomeMarkup markup={before} />}
+      {zoneNode(entry)}
+      {after !== undefined && <HomeMarkup markup={after} />}
+    </>
+  );
   // Zones with no spacing of their own are not wrapped at all, so the markup is
   // the same as before the zone list became configurable.
   return spacing ? (

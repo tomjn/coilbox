@@ -2,6 +2,15 @@ import { Button } from "@picoframe/frame";
 import { Check, Download, Loader2, Map as MapIcon } from "lucide-react";
 import { Link } from "react-router";
 import {
+  ART_BAND_CLASS,
+  ART_BUTTON_CLASS,
+  ART_DIM_CLASS,
+  ART_FADE_CLASS,
+  ART_CARD_CLASS as ART_SHELL_CLASS,
+  CARD_SHELL_CLASS,
+  CARD_STACK_CLASS,
+} from "../cardShell";
+import {
   type FeaturedState,
   springNameOf,
   useFeaturedMap,
@@ -189,7 +198,7 @@ function Action({
     <Button
       variant="outline"
       size="sm"
-      className={ACTION_BUTTON_CLASS}
+      className={`shrink-0 ${ART_BUTTON_CLASS}`}
       onClick={onDownload}
       disabled={!canDownload || state === "unavailable"}
       aria-label={
@@ -203,82 +212,22 @@ function Action({
 }
 
 /**
- * The install button's colours, restated as raw tokens.
- *
- * picoframe's `outline` variant is `border-input bg-background`, Tailwind
- * utilities both. Inside the dark island of the art card those resolve to the
- * *page's* scheme, not the card's, so on a light page the button would be white
- * with the band's light text on it and read as blank. Restating them as
- * `hsl(var(--token))` makes them substitute on the button itself, which is
- * inside `.dark` and so gets the dark ramp. `cn`'s tailwind-merge drops the
- * variant's versions, since both are background and border utilities.
- *
- * The same string is correct on the no-art card, where the tokens are the page's
- * because there is no `.dark` above it, which is exactly what the variant would
- * have given.
+ * How wide the card gets. Wide enough for a map to be worth looking at, capped so
+ * it does not stretch across a wide window, and full width below that.
  */
-const ACTION_BUTTON_CLASS =
-  "shrink-0 border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]";
+const CARD_WIDTH_CLASS = "max-w-[33rem]";
 
 /**
- * The card shell. One card wide enough for a map to be worth looking at, capped
- * so it does not stretch across a wide window, and full width below that.
+ * The art card: the shared dark island of `cardShell.ts`, which owns why the text
+ * over a minimap stays light in both colour schemes. A minimap is whatever colour
+ * the map is, including a snowfield, which is the case the shell's measurement
+ * bounds.
  */
-const CARD_CLASS =
-  "group relative flex w-full max-w-[33rem] flex-col overflow-hidden rounded-lg border border-border text-left";
-
-/**
- * The art card, following the tool cards of issue #991: art edge to edge, and a
- * band at the foot carrying the text over it.
- *
- * `dark` is the load-bearing class, for the reason `ToolCards.tsx` sets out at
- * length. A minimap is whatever colour the map is, including a snowfield, so the
- * text over it must be light in a light page too. Declaring the card a dark
- * island borrows the theme's own dark ramp instead of hardcoding white, and a
- * distribution that themes that ramp themes this card with it.
- *
- * The tokens are the raw picoframe triples rather than Tailwind's
- * `bg-background`, because Tailwind v4 substitutes `var(--background)` into
- * `--color-background` at `:root` and so drags the page's scheme in regardless of
- * `.dark` here.
- */
-const ART_CARD_CLASS = `${CARD_CLASS} dark bg-[hsl(var(--background))]`;
+const ART_CARD_CLASS = `${ART_SHELL_CLASS} ${CARD_WIDTH_CLASS}`;
 
 /** The no-art card: the ordinary card surface, with the map icon in place of art. */
-const PLAIN_CARD_CLASS = `${CARD_CLASS} bg-card text-card-foreground`;
+const PLAIN_CARD_CLASS = `${CARD_SHELL_CLASS} ${CARD_STACK_CLASS} ${CARD_WIDTH_CLASS} bg-card text-card-foreground`;
 
-/**
- * The band the title and action sit in, dimming the art under them enough for
- * the text to clear WCAG AA. `featuredMap.test.ts` reads the alpha out of this
- * string and measures the contrast it leaves against a pure white pixel, which is
- * the worst case a photographic minimap can produce. Changing the number re-runs
- * that measurement rather than quietly weakening it.
- */
-const ART_BAND_CLASS =
-  "relative flex items-center gap-3 bg-[hsl(var(--background)/0.78)] p-3 text-[hsl(var(--foreground))]";
-
-/** The same band on the no-art card, where the ordinary card colours apply. */
+/** The band on the no-art card, where the ordinary card colours apply. */
 const PLAIN_BAND_CLASS =
   "relative flex items-center gap-3 border-t border-border p-3";
-
-/**
- * A short fade above the band so it reads as art receding rather than as a bar
- * bolted across the card. Its top edge is transparent, so no text ever sits on
- * the fade and the measured contrast belongs to the band alone.
- */
-const ART_FADE_CLASS =
-  "pointer-events-none absolute inset-x-0 bottom-full h-10 bg-gradient-to-t from-[hsl(var(--background)/0.78)] to-transparent";
-
-/**
- * Secondary text on the art card. A step down in opacity from the foreground
- * rather than `--muted-foreground`, which is calibrated against a 7% background
- * and measures well under AA over this band.
- */
-const ART_DIM_CLASS = "text-[hsl(var(--foreground)/0.75)]";
-
-/** The class strings the contrast test measures. Not part of the card's API. */
-export const FEATURED_ART_CLASSES = {
-  band: ART_BAND_CLASS,
-  dim: ART_DIM_CLASS,
-  fade: ART_FADE_CLASS,
-};

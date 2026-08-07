@@ -15,6 +15,10 @@ vi.mock("./zones/Continue", () => ({ default: zone("continue") }));
 vi.mock("./zones/ResumeRail", () => ({ default: zone("resume") }));
 vi.mock("./zones/ToolCards", () => ({ default: zone("cards") }));
 vi.mock("./zones/FeaturedMap", () => ({ default: zone("featured") }));
+// Stubbed for the same reason, and because the real one parses HTML through
+// DOMParser, which the node test environment does not have. What it renders is
+// `HomeMarkup`'s business. What reaches it, and where, is this test's.
+vi.mock("./HomeMarkup", () => ({ default: zone("markup") }));
 
 // The backdrop's own resolution is `background.test.ts`'s subject. What matters
 // here is that the raw configured value reaches it untouched, so it is a spy.
@@ -104,16 +108,141 @@ describe("StackedLayout ordering", () => {
       "slot",
     ]);
   });
+});
 
-  it("renders nothing for a custom html entry yet", () => {
-    // Issue #999 fills these in. Until then the entry holds its place in the
-    // order and draws nothing, rather than being dropped by the schema.
-    const { entries } = resolveHome({
-      zones: [{ html: "<p>hi</p>" }, { zone: "cards" }],
-    });
-    expect(render(entries).map((r) => r.name)).toEqual([
+describe("StackedLayout distribution markup", () => {
+  /** What the layout rendered, as `name` or `markup:<what it was handed>`. */
+  const names = (entries: readonly HomeEntry[]) =>
+    render(entries).map((r) =>
+      r.name === "markup" ? `markup:${r.props.markup}` : r.name,
+    );
+
+  const page = (zones: unknown[]) => names(resolveHome({ zones }).entries);
+
+  it("renders a custom html entry in the position it was written", () => {
+    expect(page([{ html: "<p>A</p>" }, { zone: "cards" }])).toEqual([
+      "slot",
+      "markup:<p>A</p>",
+      "cards",
+      "slot",
+    ]);
+    expect(page([{ zone: "cards" }, { html: "<p>Z</p>" }])).toEqual([
       "slot",
       "cards",
+      "markup:<p>Z</p>",
+      "slot",
+    ]);
+    expect(
+      page([{ zone: "greeting" }, { html: "<p>M</p>" }, { zone: "cards" }]),
+    ).toEqual(["slot", "greeting", "markup:<p>M</p>", "cards", "slot"]);
+  });
+
+  it("puts before above the zone and after below it", () => {
+    expect(page([{ zone: "cards", before: "<p>B</p>" }])).toEqual([
+      "slot",
+      "markup:<p>B</p>",
+      "cards",
+      "slot",
+    ]);
+    expect(page([{ zone: "cards", after: "<p>A</p>" }])).toEqual([
+      "slot",
+      "cards",
+      "markup:<p>A</p>",
+      "slot",
+    ]);
+    expect(
+      page([{ zone: "cards", before: "<p>B</p>", after: "<p>A</p>" }]),
+    ).toEqual(["slot", "markup:<p>B</p>", "cards", "markup:<p>A</p>", "slot"]);
+  });
+
+  it("takes before and after on any zone, not just one", () => {
+    expect(
+      page([
+        { zone: "greeting", before: "<p>1</p>" },
+        { zone: "continue", after: "<p>2</p>" },
+        { zone: "featured", before: "<p>3</p>" },
+      ]),
+    ).toEqual([
+      "slot",
+      "markup:<p>1</p>",
+      "greeting",
+      "continue",
+      "markup:<p>2</p>",
+      "markup:<p>3</p>",
+      "featured",
+      "slot",
+    ]);
+  });
+
+  it("hands a file reference over unresolved, for HomeMarkup to look up", () => {
+    // The layout never reads a file. Resolution happened at startup, and this
+    // is the key it was filed under.
+    expect(page([{ html: "@.coilbox/community.html" }])).toEqual([
+      "slot",
+      "markup:@.coilbox/community.html",
+      "slot",
+    ]);
+  });
+
+  it("keeps a zone's markup inside that zone's spacing wrapper", () => {
+    // So an intro sentence takes the gap that separated the zone from what came
+    // before it, and the zone sits tight under the sentence.
+    const rendered = render(
+      resolveHome({
+        zones: [{ zone: "featured", before: "<p>B</p>", after: "<p>A</p>" }],
+      }).entries,
+    );
+    expect(rendered.map((r) => r.wrapper)).toEqual([
+      COLUMN,
+      "mt-8 empty:hidden",
+      "mt-8 empty:hidden",
+      "mt-8 empty:hidden",
+      COLUMN,
+    ]);
+  });
+
+  it("gives a custom html entry no spacing of the layout's own", () => {
+    // It is a section the layout knows nothing about, so its author owns the
+    // margins rather than fighting one picked here.
+    const rendered = render(
+      resolveHome({ zones: [{ html: "<p>x</p>" }] }).entries,
+    );
+    expect(rendered.map((r) => r.wrapper)).toEqual([COLUMN, COLUMN, COLUMN]);
+  });
+
+  it("renders a zone's markup whether or not the zone draws anything", () => {
+    // Continue renders nothing when there is nothing to resume, and the layout
+    // cannot know that. A `before` that means "sometimes" would be harder to
+    // author against than one that means "always".
+    expect(page([{ zone: "continue", before: "<p>Jump back in</p>" }])).toEqual(
+      ["slot", "markup:<p>Jump back in</p>", "continue", "slot"],
+    );
+  });
+
+  it("keeps an empty string, which the renderer draws as nothing", () => {
+    expect(page([{ zone: "cards", before: "" }])).toEqual([
+      "slot",
+      "markup:",
+      "cards",
+      "slot",
+    ]);
+  });
+
+  it("ignores markup that is not a string", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(page([{ zone: "cards", before: { text: "<p>x</p>" } }])).toEqual([
+      "slot",
+      "cards",
+      "slot",
+    ]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("ignores before and after on a custom entry, which is markup already", () => {
+    expect(page([{ html: "<p>x</p>", before: "<p>b</p>" }])).toEqual([
+      "slot",
+      "markup:<p>x</p>",
       "slot",
     ]);
   });
