@@ -164,6 +164,67 @@ pub fn demo_file_entries(root: &Path) -> Vec<DemoFileEntry> {
     out
 }
 
+// ---- deleting ---------------------------------------------------------------
+
+/// Whether `path` names a replay file. Both delete commands guard on this, so
+/// neither can be pointed at anything but a `.sdfz`/`.sdf`.
+pub fn is_replay_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("sdfz") || e.eq_ignore_ascii_case("sdf"))
+        .unwrap_or(false)
+}
+
+/// What a bulk delete removed, or would remove.
+#[derive(Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteSummary {
+    /// Whether the files were actually deleted (`false` for a dry run).
+    pub applied: bool,
+    pub deleted: u64,
+    pub bytes: u64,
+    /// One sentence per path left alone, saying why.
+    pub skipped: Vec<String>,
+}
+
+/// Delete a batch of replays, returning how many went and what they freed.
+///
+/// A path that is not a replay, is already gone, or that the filesystem refuses
+/// to remove is skipped with a reason rather than aborting the batch: a player
+/// clearing 200 files should not lose the other 199 to one bad path.
+///
+/// `apply` false sizes the batch without deleting, so the caller can show what
+/// would go before it goes.
+pub fn delete_replays(paths: &[PathBuf], apply: bool) -> DeleteSummary {
+    let mut out = DeleteSummary {
+        applied: apply,
+        ..Default::default()
+    };
+    for path in paths {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.to_string_lossy().into_owned());
+        if !is_replay_path(path) {
+            out.skipped.push(format!("{name}: not a replay file"));
+            continue;
+        }
+        let Ok(md) = std::fs::metadata(path) else {
+            out.skipped.push(format!("{name}: not found"));
+            continue;
+        };
+        if apply {
+            if let Err(e) = std::fs::remove_file(path) {
+                out.skipped.push(format!("{name}: {e}"));
+                continue;
+            }
+        }
+        out.deleted += 1;
+        out.bytes += md.len();
+    }
+    out
+}
+
 // ---- gathering -------------------------------------------------------------
 
 /// Where a gather puts everything: the root's own `demos/`, which is where an
@@ -1490,6 +1551,48 @@ mod tests {
         assert_eq!(list_replays(&root).len(), 1);
 
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A bulk delete preview sizes the batch and removes nothing.
+    #[test]
+    fn a_bulk_delete_preview_removes_nothing() {
+        let dir = std::env::temp_dir().join("coilbox_bulk_delete_preview_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let a = dir.join("a.sdfz");
+        let b = dir.join("b.sdf");
+        std::fs::write(&a, b"1234").unwrap();
+        std::fs::write(&b, b"123").unwrap();
+
+        let summary = delete_replays(&[a.clone(), b.clone()], false);
+        assert!(!summary.applied);
+        assert_eq!(summary.deleted, 2);
+        assert_eq!(summary.bytes, 7);
+        assert!(a.is_file() && b.is_file());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// One bad path is skipped with a reason, and the rest of the batch still goes.
+    #[test]
+    fn a_bulk_delete_skips_what_it_cannot_take() {
+        let dir = std::env::temp_dir().join("coilbox_bulk_delete_apply_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let replay = dir.join("keep-me-not.sdfz");
+        let other = dir.join("springsettings.cfg");
+        std::fs::write(&replay, b"12345").unwrap();
+        std::fs::write(&other, b"config").unwrap();
+
+        let summary = delete_replays(&[replay.clone(), other.clone(), dir.join("gone.sdf")], true);
+        assert!(summary.applied);
+        assert_eq!(summary.deleted, 1);
+        assert_eq!(summary.bytes, 5);
+        assert_eq!(summary.skipped.len(), 2, "{:?}", summary.skipped);
+        assert!(summary.skipped[0].contains("not a replay file"));
+        assert!(summary.skipped[1].contains("not found"));
+        assert!(!replay.exists());
+        assert!(other.is_file(), "a non-replay must survive");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A root with two engines that both recorded, plus one replay of the root's

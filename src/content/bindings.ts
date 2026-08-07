@@ -223,6 +223,60 @@ export const contentReclaimCaches = defineCommand<
 >("coilbox-content", "content_reclaim_caches");
 
 /* -------------------------------------------------------------------------- *
+ * Storage overview (issue #386): where one content root's disk has gone, and
+ * the engine removal the Storage settings section offers off the back of it.
+ * -------------------------------------------------------------------------- */
+
+/** One line of a root's breakdown. */
+export interface StorageCategory {
+  /** Stable id: `engines`, `games`, `maps`, `replays`, `saves`, `rapidPool`, `other`. */
+  id: string;
+  label: string;
+  bytes: number;
+  files: number;
+  /** The existing folders the figure covers, for the reveal button. */
+  paths: string[];
+}
+
+/** One installed engine's own folder. */
+export interface EngineUsage {
+  path: string;
+  version: string;
+  /** The whole folder, which is what deleting it frees. */
+  bytes: number;
+  /** What its own `demos`/`replays` folders hold, so the UI can warn first. */
+  replayBytes: number;
+}
+
+/** One content root's whole breakdown. The categories add up to `totalBytes`. */
+export interface StorageOverview {
+  root: string;
+  categories: StorageCategory[];
+  engines: EngineUsage[];
+  totalBytes: number;
+}
+
+/**
+ * Size one content root by category. Walks the whole tree, so it takes seconds on
+ * a large rapid pool. One root per call, so a multi-root breakdown renders as
+ * each arrives.
+ */
+export const contentStorageOverview = defineCommand<
+  { root: string },
+  { overview: StorageOverview }
+>("coilbox-content", "content_storage_overview");
+
+/**
+ * Delete one installed engine folder, returning the bytes freed. Rust only
+ * accepts a real directory inside a folder named `engine`, so this cannot be
+ * pointed at anything else.
+ */
+export const contentDeleteEngine = defineCommand<
+  { path: string },
+  { bytes: number }
+>("coilbox-content", "content_delete_engine");
+
+/* -------------------------------------------------------------------------- *
  * Replays — demo files in a root's `demos/`/`replays/` folder. Listing is cheap
  * fs metadata; decoding reads the demo's native header + start-script and shells
  * out to `demotool` (in the engine folder) for the winning ally-teams.
@@ -459,6 +513,26 @@ export const contentDeleteReplay = defineCommand<
   { path: string },
   { ok: boolean }
 >("coilbox-content", "content_delete_replay");
+
+/** What a bulk replay delete removed, or would remove. */
+export interface ReplayDeleteSummary {
+  /** False for a preview, which deletes nothing. */
+  applied: boolean;
+  deleted: number;
+  bytes: number;
+  /** One sentence per path left alone, saying why. */
+  skipped: string[];
+}
+
+/**
+ * Delete a batch of replays. Every path is guarded the same way
+ * `contentDeleteReplay` guards its one, and a path that fails is skipped with a
+ * reason instead of failing the batch. `apply` false sizes it without deleting.
+ */
+export const contentDeleteReplays = defineCommand<
+  { paths: string[]; apply: boolean },
+  { summary: ReplayDeleteSummary }
+>("coilbox-content", "content_delete_replays");
 
 /**
  * Delete a downloaded game or map archive, returning the bytes freed. The Rust
