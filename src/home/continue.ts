@@ -50,6 +50,35 @@ export interface ResumeCandidate {
   expiresAt?: number | "soon";
 }
 
+/** What a card calls a kind of thing, and what its action offers to do. */
+export interface ResumeKindCopy {
+  /** The line above the title, saying what sort of thing this is. */
+  label: string;
+  /** The action's own words. Says where it takes you, not just "go". */
+  action: string;
+}
+
+/**
+ * The words that depend on the kind rather than on the run.
+ *
+ * Here for the same reason `title` and `detail` are: the Continue hero (#993) and
+ * the resume rail (#994) must not each invent their own name for a Warpath run.
+ * The per-run wording is built by the candidate functions above. This is the
+ * per-kind wording, which is fixed, so it is a table rather than a function.
+ *
+ * The battle is the one that says "Rejoin", because a match already running is
+ * the only thing here you left mid-flight rather than saved. The skirmish says
+ * "Open setup" because {@link skirmishCandidate} points at the setup screen and
+ * does not load the preset for you.
+ */
+export const RESUME_KIND_COPY: Record<ResumeKind, ResumeKindCopy> = {
+  battle: { label: "Multiplayer battle", action: "Rejoin battle" },
+  warpath: { label: "Warpath run", action: "Resume run" },
+  conquest: { label: "Conquest", action: "Resume conquest" },
+  campaign: { label: "Campaign", action: "Resume mission" },
+  skirmish: { label: "Skirmish setup", action: "Open setup" },
+};
+
 /** Whether the window is still open at `now`. `"soon"` has not closed yet. */
 function stillOpen(c: ResumeCandidate, now: number): boolean {
   return typeof c.expiresAt !== "number" || c.expiresAt > now;
