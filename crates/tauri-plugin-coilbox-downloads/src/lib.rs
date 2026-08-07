@@ -525,7 +525,11 @@ async fn dl_springfiles_engines() -> CliResult {
         Ok(body) => match serde_json::from_str::<Vec<sources::SpringFile>>(&body) {
             Ok(all) => {
                 let engines = sources::engines_for_platform(all, category);
-                CliResult::ok(json!({ "engines": engines, "platform": std::env::consts::OS }))
+                CliResult::ok(json!({
+                    "engines": engines,
+                    "platform": std::env::consts::OS,
+                    "listsThisPlatform": sources::springfiles_lists_engines_here(),
+                }))
             }
             Err(e) => CliResult::err(format!("could not parse springfiles engines: {e}")),
         },

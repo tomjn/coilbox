@@ -95,6 +95,22 @@ pub fn springfiles_engine_category() -> &'static str {
     }
 }
 
+/// Whether springfiles publishes anything in `category`.
+///
+/// It has no entries at all in `engine_macosx_arm64`, `engine_linux_arm64` or
+/// `engine_windows_arm64` (checked against `json.php`, all three come back as an
+/// empty array), and it does have entries in the other two. So on an arm64
+/// machine an empty engine list is what springfiles holds rather than a fetch
+/// that came back short, and the screen can say so.
+pub fn lists_engines_for(category: &str) -> bool {
+    !category.ends_with("_arm64")
+}
+
+/// [`lists_engines_for`] for the category this machine searches.
+pub fn springfiles_lists_engines_here() -> bool {
+    lists_engines_for(springfiles_engine_category())
+}
+
 /// Filter springfiles engine results to `category` and dedupe to one per version
 /// (newest first). `--download-engine` takes only the version, so the per-file
 /// variants (minimal/full) collapse to a single row. The match is exact, because
@@ -465,6 +481,20 @@ mod tests {
         let all: Vec<SpringFile> = serde_json::from_str(json).unwrap();
         assert!(engines_for_platform(all.clone(), "engine_macosx_arm64").is_empty());
         assert!(engines_for_platform(all, "engine_linux_arm64").is_empty());
+    }
+
+    /// What springfiles actually holds in each of the five categories
+    /// pr-downloader searches, counted off `json.php` on 2026-08-07:
+    /// `engine_windows64` 10, `engine_macosx` 8, and 0 in all three arm64 ones.
+    /// An empty list on an arm64 machine is therefore permanent, which is what
+    /// the screen tells the player (issue #968).
+    #[test]
+    fn springfiles_holds_no_engines_for_an_arm64_machine() {
+        assert!(lists_engines_for("engine_windows64"));
+        assert!(lists_engines_for("engine_linux64"));
+        assert!(!lists_engines_for("engine_windows_arm64"));
+        assert!(!lists_engines_for("engine_linux_arm64"));
+        assert!(!lists_engines_for("engine_macosx_arm64"));
     }
 
     /// The category has to be one pr-downloader's own platform switch produces,
