@@ -38,6 +38,9 @@ import {
   packMapState,
   suggestedMapToInput,
 } from "../downloads/mapLists";
+import { occupancy } from "../multiplayer/battles/battleFilters";
+import type { Battle } from "../multiplayer/bindings";
+import { useMultiplayer } from "../multiplayer/store";
 import { usePreferredTarget } from "../play/config";
 import { getProfileMapLists } from "../profile/profile";
 
@@ -122,6 +125,102 @@ export function pickFeaturedMap(
 }
 
 /**
+ * The three fields of the lobby mirror the featured pick reads. A real
+ * `LobbyState` satisfies it, and a test writes a room rather than forty fields.
+ * Narrow on purpose: this module is allowed to know which maps are in play and
+ * nothing else about the lobby.
+ */
+export type FeaturedLobbySnapshot = {
+  battles: Record<string, Pick<Battle, "map" | "host" | "members">>;
+};
+
+/**
+ * Occupants a room needs before it counts as people playing.
+ *
+ * Lobby servers are full of autohosts sitting alone in an empty room, and the
+ * host is always counted, so a room of one is a bot waiting rather than a game.
+ * Featuring its map would make the card's claim false, and false is worse than
+ * the rotation.
+ */
+const PLAYING_MIN_OCCUPANCY = 2;
+
+/**
+ * Where the featured map came from, so the card can say which.
+ *
+ * The user cannot otherwise tell: both sources put one curated map on one card.
+ * Without this the feature would be invisible and so unfalsifiable.
+ */
+export type FeaturedSource = "battle" | "curated";
+
+/**
+ * The curated map most people are on right now, or null.
+ *
+ * Deliberately restricted to the pool. The pool is the set of maps this card can
+ * honestly offer: each has a verified spring name, a thumbnail, a blurb and a
+ * download that works. Synthesising an entry for any map a battle happens to name
+ * would drop the card to a bare name over a glyph for a map that may not be
+ * downloadable anywhere, which is a worse home page than the rotation. So a
+ * battle on an uncurated map is no answer, and the rotation stands.
+ *
+ * That makes this a re-ordering of the curated rotation rather than a new source
+ * of maps, which is what "prefer a map an open battle is using *over the curated
+ * rotation*" asks for.
+ *
+ * Ranked by heads, not rooms: three idle autohosts should not outrank one full
+ * team game. Ties go to pool order, so the answer is a function of the snapshot
+ * and never of the order the server happened to send the rooms in.
+ */
+export function battleFeaturedMap(
+  pool: SuggestedMap[],
+  lobby: FeaturedLobbySnapshot | null,
+): SuggestedMap | null {
+  if (!lobby) return null;
+  const players = new Map<string, number>();
+  for (const battle of Object.values(lobby.battles)) {
+    const heads = occupancy(battle);
+    if (heads < PLAYING_MIN_OCCUPANCY) continue;
+    const key = battle.map.toLowerCase();
+    players.set(key, (players.get(key) ?? 0) + heads);
+  }
+  if (players.size === 0) return null;
+
+  let best: SuggestedMap | null = null;
+  let bestHeads = 0;
+  for (const map of pool) {
+    const springName = springNameOf(map);
+    if (!springName) continue;
+    // Exact spring name, lowercased, the same identity `poolKey` uses. Not a
+    // fuzzy match on the version suffix: "Supreme Isthmus v2.1" and v2.2 are
+    // different archives, and offering the curated one because a battle is on
+    // the other would feature a map that still would not let you into it.
+    const heads = players.get(springName.toLowerCase()) ?? 0;
+    // Strictly greater, so the first in pool order wins a tie.
+    if (heads > bestHeads) {
+      best = map;
+      bestHeads = heads;
+    }
+  }
+  return best;
+}
+
+/**
+ * The map to feature, and why.
+ *
+ * A live lobby's answer beats the day's rotation, and everything else falls
+ * through to it. `lobby` is null whenever there is no connection, so a logged-out
+ * or offline player takes exactly the branch they took before this existed.
+ */
+export function featuredMapFor(
+  pool: SuggestedMap[],
+  lobby: FeaturedLobbySnapshot | null,
+  date: Date,
+): { map: SuggestedMap | null; source: FeaturedSource } {
+  const battle = battleFeaturedMap(pool, lobby);
+  if (battle) return { map: battle, source: "battle" };
+  return { map: pickFeaturedMap(pool, date), source: "curated" };
+}
+
+/**
  * What the card may offer for the featured map.
  *
  * The map-pack states plus `failed`, which the packs fold into `available`
@@ -175,31 +274,54 @@ export function springNameOf(map: SuggestedMap): string | undefined {
  * a session that spans one keeps yesterday's map until the page is revisited,
  * which is a boundary nobody is watching for.
  *
- * Issue #996 (prefer a map an open battle is using) belongs here and nowhere
- * else. It needs a `SuggestedMap` for a live battle's map, taken in preference
- * to the rotation's answer and returned from this one hook, so the card, the
- * zone and this module's tests all keep working unchanged.
+ * When a lobby connection happens to be live, a map people are on beats the
+ * rotation (issue #996). Reading it is passive: `useMultiplayer` is a plain
+ * `useContext` on a provider `app.plugins.ts` already mounts app-wide and two
+ * other home zones already read. Nothing here can open a connection, read a
+ * credential or raise a login prompt, and `mirror.state` is null until something
+ * else connects, so a logged-out or offline player gets the rotation and only the
+ * rotation.
+ *
+ * The battle answer is latched for the life of the mount. `mirror.state.battles`
+ * changes every time anyone anywhere joins or leaves a room, which on a busy
+ * server is several times a second, and an unlatched card would swap its picture,
+ * name and blurb under a reader who is looking at it. So the zone settles on the
+ * first answer the lobby gives and keeps it. The cost is that the pick can be a
+ * session old, which for rooms that live tens of minutes is a boundary worth
+ * trading for a card that holds still.
  */
 export function useFeaturedMap(): {
   map: SuggestedMap | null;
   loading: boolean;
+  source: FeaturedSource;
 } {
   const catalogLists = useSuggestedMapLists();
   const maps = useSuggestedMaps();
   const loaded = useCatalogLoaded();
+  const { mirror } = useMultiplayer();
   const today = useMemo(() => new Date(), []);
-  const map = useMemo(
+  const pool = useMemo(
     () =>
-      pickFeaturedMap(
-        featuredMapPool(
-          maps,
-          mergeMapLists(catalogLists, getProfileMapLists()),
-        ),
-        today,
-      ),
-    [maps, catalogLists, today],
+      featuredMapPool(maps, mergeMapLists(catalogLists, getProfileMapLists())),
+    [maps, catalogLists],
   );
-  return { map, loading: !loaded };
+  const answer = useMemo(
+    () => featuredMapFor(pool, mirror.state, today),
+    [pool, mirror.state, today],
+  );
+
+  const [latched, setLatched] = useState<SuggestedMap | null>(null);
+  useEffect(() => {
+    // `prev ?? map` keeps the first answer, and returning `prev` unchanged lets
+    // React bail out of the re-render for every later lobby delta.
+    if (answer.source === "battle") setLatched((prev) => prev ?? answer.map);
+  }, [answer]);
+
+  return {
+    map: latched ?? answer.map,
+    loading: !loaded,
+    source: latched ? "battle" : answer.source,
+  };
 }
 
 /**

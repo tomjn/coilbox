@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
@@ -50,6 +51,13 @@ vi.mock("@tauri-apps/api/core", () => ({
   Channel: class {},
   invoke: async () => ({}),
 }));
+// Reading the lobby pulls in `multiplayer/store`, whose cue modules touch
+// `window` at import time. Same stubs as continue.test.ts, which reads it too.
+vi.mock("../multiplayer/ringEffect", () => ({ triggerRing: () => {} }));
+vi.mock("../multiplayer/ingameCue", () => ({ triggerIngameCue: () => {} }));
+vi.mock("../multiplayer/chat/mentionCue", () => ({
+  triggerMentionCue: () => {},
+}));
 
 /**
  * What the zone's three hooks answer, swapped per case. The hooks themselves
@@ -57,9 +65,10 @@ vi.mock("@tauri-apps/api/core", () => ({
  * exist in node. Everything else in the module is the real thing.
  */
 const hooks = vi.hoisted(() => ({
-  featured: { map: null, loading: false } as {
+  featured: { map: null, loading: false, source: "curated" } as {
     map: unknown;
     loading: boolean;
+    source: string;
   },
   install: {} as Record<string, unknown>,
   art: undefined as string | undefined,
@@ -84,6 +93,8 @@ import {
 } from "./zones/FeaturedMap";
 
 const {
+  battleFeaturedMap,
+  featuredMapFor,
   featuredMapPool,
   featuredMapState,
   pickFeaturedMap,
@@ -311,6 +322,197 @@ describe("what the card may offer", () => {
   });
 });
 
+// --- preferring a map an open battle is using --------------------------------
+
+/** The curated pool the lobby cases pick from, in pool order. */
+const POOL = [
+  map("Fallendell", "Fallendell_V4"),
+  map("SpeedMetal", "SpeedMetal"),
+  map("DeltaSiege", "DeltaSiegeDry"),
+];
+
+/** One lobby room. `players` are occupants besides the host, as the server sends. */
+function room(mapName: string, players: string[] = ["a"]) {
+  return {
+    map: mapName,
+    host: "Autohost",
+    members: Object.fromEntries(players.map((p) => [p, {}])),
+  } as unknown as featured.FeaturedLobbySnapshot["battles"][string];
+}
+
+/** A live lobby holding the given rooms. */
+function lobby(
+  ...rooms: ReturnType<typeof room>[]
+): featured.FeaturedLobbySnapshot {
+  return {
+    battles: Object.fromEntries(rooms.map((r, i) => [String(i), r])),
+  };
+}
+
+const DAY = new Date("2026-08-07T09:00:00Z");
+
+describe("preferring a map an open battle is using", () => {
+  it("falls back to the rotation when no lobby connection is live", () => {
+    // `mirror.state` is null until something else connects, so this is the
+    // logged-out, offline and never-opened-multiplayer case.
+    expect(battleFeaturedMap(POOL, null)).toBeNull();
+    const answer = featuredMapFor(POOL, null, DAY);
+    expect(answer.source).toBe("curated");
+    expect(answer.map).toBe(pickFeaturedMap(POOL, DAY));
+  });
+
+  it("prefers a map people are on when a connection is live", () => {
+    const answer = featuredMapFor(POOL, lobby(room("SpeedMetal", ["a"])), DAY);
+    expect(answer.map?.id).toBe("SpeedMetal");
+    expect(answer.source).toBe("battle");
+    // Worth having only if it actually differs from what the day would give.
+    expect(answer.map).not.toBe(pickFeaturedMap(POOL, DAY));
+  });
+
+  it("falls back when a live connection has no rooms at all", () => {
+    expect(featuredMapFor(POOL, lobby(), DAY).source).toBe("curated");
+  });
+
+  it("falls back when the only room is on a map it cannot offer", () => {
+    // Nothing in the pool has a verified download for this, and inventing one
+    // would feature a map that may not be downloadable anywhere.
+    expect(
+      battleFeaturedMap(POOL, lobby(room("Some Random Map v9"))),
+    ).toBeNull();
+  });
+
+  it("will not follow a version the curated entry is not", () => {
+    // Offering Supreme Isthmus v2.1 because a room is on v2.2 would feature a
+    // map that still would not let the player into that room.
+    const pool = [map("Isthmus", "Supreme Isthmus v2.1")];
+    expect(
+      battleFeaturedMap(pool, lobby(room("Supreme Isthmus v2.2"))),
+    ).toBeNull();
+  });
+
+  it("matches the spring name whatever case the server sends it in", () => {
+    expect(battleFeaturedMap(POOL, lobby(room("fallendell_v4")))?.id).toBe(
+      "Fallendell",
+    );
+  });
+
+  it("ignores an autohost sitting alone in an empty room", () => {
+    // The host is always counted, so a room of one is a bot waiting rather than
+    // people playing, and the card would be claiming something untrue.
+    expect(battleFeaturedMap(POOL, lobby(room("SpeedMetal", [])))).toBeNull();
+  });
+
+  it("picks the map with the most people, not the most rooms", () => {
+    // Three idle pairs must not outrank one full team game.
+    const busy = lobby(
+      room("SpeedMetal", ["a"]),
+      room("SpeedMetal", ["a"]),
+      room("SpeedMetal", ["a"]),
+      room(
+        "DeltaSiegeDry",
+        Array.from({ length: 15 }, (_, i) => `p${i}`),
+      ),
+    );
+    expect(battleFeaturedMap(POOL, busy)?.id).toBe("DeltaSiege");
+  });
+
+  it("adds up the people across every room on the same map", () => {
+    const spread = lobby(
+      room("SpeedMetal", ["a", "b", "c"]),
+      room("SpeedMetal", ["a", "b", "c"]),
+      room("DeltaSiegeDry", ["a", "b", "c", "d", "e"]),
+    );
+    // 8 on SpeedMetal against 6 on DeltaSiege.
+    expect(battleFeaturedMap(POOL, spread)?.id).toBe("SpeedMetal");
+  });
+
+  it("breaks a tie by pool order rather than by what the server sent first", () => {
+    const tied = [room("DeltaSiegeDry", ["a"]), room("SpeedMetal", ["a"])];
+    const forwards = battleFeaturedMap(POOL, lobby(...tied))?.id;
+    const backwards = battleFeaturedMap(
+      POOL,
+      lobby(...[...tied].reverse()),
+    )?.id;
+    // Pool order is Fallendell, SpeedMetal, DeltaSiege, so SpeedMetal wins.
+    expect(forwards).toBe("SpeedMetal");
+    expect(backwards).toBe("SpeedMetal");
+  });
+
+  it("ignores a room whose map is uncurated while following one that is not", () => {
+    const mixed = lobby(
+      room(
+        "Some Random Map v9",
+        Array.from({ length: 20 }, (_, i) => `p${i}`),
+      ),
+      room("DeltaSiegeDry", ["a"]),
+    );
+    expect(battleFeaturedMap(POOL, mixed)?.id).toBe("DeltaSiege");
+  });
+
+  it("has nothing to prefer when nothing is curated", () => {
+    expect(battleFeaturedMap([], lobby(room("SpeedMetal", ["a"])))).toBeNull();
+  });
+});
+
+describe("the rotation, with the lobby out of the picture", () => {
+  // The guarantee #995 shipped, restated: a player with no lobby connection must
+  // get byte-identical answers to the ones they got before #996 existed.
+  it("is untouched over a full cycle when no connection is live", () => {
+    const start = Date.parse("2026-08-07T09:00:00Z");
+    for (let i = 0; i < POOL.length * 3; i++) {
+      const day = new Date(start + i * 86_400_000);
+      const answer = featuredMapFor(POOL, null, day);
+      expect(answer.map).toBe(pickFeaturedMap(POOL, day));
+      expect(answer.source).toBe("curated");
+    }
+  });
+
+  it("is untouched when a live connection has nothing worth featuring", () => {
+    // Connected, but every room is empty or on an uncurated map.
+    const quiet = lobby(
+      room("SpeedMetal", []),
+      room("Some Random Map v9", ["a"]),
+    );
+    expect(featuredMapFor(POOL, quiet, DAY).map).toBe(
+      pickFeaturedMap(POOL, DAY),
+    );
+  });
+});
+
+describe("the zone cannot reach for a connection", () => {
+  // The whole gate is "a connection happens to be live". Reading the mirror is a
+  // plain `useContext`, but nothing stops a later edit from calling `connect` or
+  // opening the login popover from this module, which would make the welcome
+  // screen demand an account. This asserts on the source so that edit fails here.
+  const source = readFileSync(
+    new URL("./featuredMap.ts", import.meta.url),
+    "utf8",
+  );
+
+  it("takes only the passive reader from the lobby store", () => {
+    const imported = /import \{([^}]*)\} from "\.\.\/multiplayer\/store"/.exec(
+      source,
+    );
+    expect(imported?.[1].trim()).toBe("useMultiplayer");
+  });
+
+  it("never calls anything that connects, logs in or reads a credential", () => {
+    for (const forbidden of [
+      "openLoginPopover",
+      "lsGetCredential",
+      "mpConnect",
+      "mpLogin",
+      "autoConnect",
+      "lobby-servers",
+      "keychain",
+    ]) {
+      expect(source).not.toContain(forbidden);
+    }
+    // `connect(`, but not the `connected`/`connection` the comments talk about.
+    expect(source).not.toMatch(/\bconnect\s*\(/);
+  });
+});
+
 // --- the card ---------------------------------------------------------------
 
 type Install = ReturnType<typeof featured.useFeaturedMapInstall>;
@@ -320,11 +522,13 @@ function render(args: {
   map?: SuggestedMap | null;
   loading?: boolean;
   art?: string;
+  source?: featured.FeaturedSource;
   install?: Partial<Install>;
 }): string {
   hooks.featured = {
     map: args.map === undefined ? map("Fallendell", "Fallendell_V4") : args.map,
     loading: args.loading ?? false,
+    source: args.source ?? "curated",
   };
   hooks.install = {
     state: "available",
@@ -421,6 +625,28 @@ describe("the featured map card", () => {
     const html = render({ install: { canDownload: false } });
     expect(html).toContain("Downloads settings");
     expect(html).toContain("disabled");
+  });
+
+  it("says why the map is here when it came from a live battle", () => {
+    // The only thing on screen that separates the two sources. Without it the
+    // feature cannot be confirmed by looking at the card.
+    const curated = {
+      ...map("Fallendell", "Fallendell_V4"),
+      blurb: "2-4 player",
+    };
+    expect(render({ map: curated, source: "curated" })).toContain("2-4 player");
+    const html = render({ map: curated, source: "battle" });
+    expect(html).toContain("Being played now");
+    expect(html).not.toContain("2-4 player");
+  });
+
+  it("still shows a download failure over the reason the map is here", () => {
+    const html = render({
+      source: "battle",
+      install: { state: "failed", error: "404 Not Found" },
+    });
+    expect(html).toContain("404 Not Found");
+    expect(html).not.toContain("Being played now");
   });
 
   it("does not nag about a write root for a map already installed", () => {
