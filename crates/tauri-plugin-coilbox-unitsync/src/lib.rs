@@ -15,8 +15,8 @@ use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
     build_config_args, build_config_set_args, build_faction_logos_args, build_game_args,
     build_game_headers_args, build_heightmap_args, build_lua_args, build_lua_repl_args,
-    build_map_info_args, build_map_skybox_args, build_metalmap_args, build_minimap_args,
-    build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
+    build_map_info_args, build_map_meta_args, build_map_skybox_args, build_metalmap_args,
+    build_minimap_args, build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
     build_unit_dataset_args, build_unit_model_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
@@ -441,6 +441,31 @@ async fn unitsync_thumbnails<R: Runtime>(
 
 /// `unitsync_game_info` — load one game's archives to read its sides (with start
 /// units) and unit count. `game_archive` is the game's primary archive name.
+/// `unitsync_map_meta`: read every map's mapinfo metadata in one session, for the
+/// map detail page and the singleplayer map card. Disk-cached per map, so after
+/// the first run only new or replaced archives cost anything.
+#[tauri::command]
+async fn unitsync_map_meta<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    op_id: Option<String>,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_map_meta_args(&libpath.to_string_lossy(), &data_dir, cache_dir.as_deref());
+    let envs = loader_envs(&engine_dir, &data_dir);
+    let cancel = op_id.as_deref().map(register_cancel);
+    let res = run_worker(bin, args, envs, SCAN_TIMEOUT, "map metadata", cancel).await;
+    if let Some(id) = op_id.as_deref() {
+        unregister_cancel(id);
+    }
+    Ok(res)
+}
+
 #[tauri::command]
 async fn unitsync_game_info<R: Runtime>(
     app: AppHandle<R>,
@@ -841,6 +866,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_heightmap,
             unitsync_metalmap,
             unitsync_thumbnails,
+            unitsync_map_meta,
             unitsync_game_info,
             unitsync_unit_buildpics,
             unitsync_faction_logos,

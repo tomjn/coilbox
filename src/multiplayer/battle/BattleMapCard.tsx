@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import type { MapItem } from "@/content/bindings";
 import {
   useUnitsyncMapInfo,
+  useUnitsyncMapMeta,
   useUnitsyncMinimap,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { mergeMapTiers } from "@/content/mapTiers";
 import { useBarMapPreview } from "@/downloads/config";
 import { MapCard } from "@/play/pages/components/MapCard";
 import {
@@ -69,6 +71,7 @@ export function BattleMapCard({
 }) {
   const minimap = useUnitsyncMinimap(enginePath, dataDir, battle.map);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
+  const { meta } = useUnitsyncMapMeta(enginePath, dataDir);
 
   // When the map isn't installed, unitsync can't render a minimap, so fall back to
   // BAR's remote preview thumbnail (keyed by the battle's springName) behind the
@@ -125,11 +128,14 @@ export function BattleMapCard({
 
   // Synthesize a bare map so the card still shows the battle's map name when it
   // isn't installed locally (the minimap then falls back to "No minimap").
-  const displayMap: MapItem = localMap ?? {
+  const bare: MapItem = localMap ?? {
     name: battle.map,
     archives: [],
     info: {},
   };
+  // Proportions and mapinfo come from the thumbnail and metadata passes rather
+  // than the scan, so fold in whichever has landed for this map.
+  const [displayMap] = mergeMapTiers([bare], thumbs, meta);
 
   return (
     <div className="space-y-2">

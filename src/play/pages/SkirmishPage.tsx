@@ -24,10 +24,12 @@ import {
 import {
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
+  useUnitsyncMapMeta,
   useUnitsyncMinimap,
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { mergeMapTiers } from "@/content/mapTiers";
 import { ResolveContentGate } from "@/content/pages/components/ResolveContentDrawer";
 import {
   exactGameRequirement,
@@ -130,6 +132,7 @@ export default function SkirmishPage() {
 
   const scan = useUnitsyncScan(enginePath, dataDir);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
+  const { meta } = useUnitsyncMapMeta(enginePath, dataDir);
   const { headers: gameHeaders } = useUnitsyncGameHeaders(enginePath, dataDir);
 
   // Seed from the persisted draft so the setup (game, map, opponents, options)
@@ -203,7 +206,7 @@ export default function SkirmishPage() {
     () => withoutGeneratedGames(scan.data?.games ?? [], gameName),
     [scan.data, gameName],
   );
-  const maps = scan.data?.maps ?? [];
+  const maps = mergeMapTiers(scan.data?.maps ?? [], thumbs, meta);
   const selectedGame = games.find((g) => g.name === gameName) ?? null;
   // Fall back to the first map so a map is shown the instant maps load, without
   // waiting for the auto-pick effect below to commit `mapName`.

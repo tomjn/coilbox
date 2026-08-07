@@ -68,7 +68,11 @@ pub fn render(
     let _ = us.drain_errors();
 
     let bounds = us.height_bounds(map_name);
-    let cache = cache_file(cache_dir, map_cache_key(&us, map_name).as_deref(), max_side);
+    let cache = cache_file(
+        cache_dir,
+        map_cache_key(&us, None, map_name).as_deref(),
+        max_side,
+    );
 
     let result = (|| -> Result<(RenderedImage, u32, u32), String> {
         let (w, h) = us

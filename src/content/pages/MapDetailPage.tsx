@@ -32,12 +32,15 @@ import {
   useUnitsyncArchiveTree,
   useUnitsyncHeightmap,
   useUnitsyncMapInfo,
+  useUnitsyncMapMeta,
   useUnitsyncMapSkybox,
   useUnitsyncMinimap,
   useUnitsyncScan,
+  useUnitsyncThumbnails,
 } from "../config";
 import { isDeletableArchive } from "../format";
 import { useMapEligibility } from "../mapEligibility";
+import { mergeMapTiers } from "../mapTiers";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, guessPrimaryPlayer, mapRecordFor } from "../stats";
 import { usePlayMap } from "../usePlayMap";
@@ -74,6 +77,11 @@ export default function MapDetailPage() {
     selected?.enginePath,
     selected?.rootPath,
   );
+  const { thumbs } = useUnitsyncThumbnails(
+    selected?.enginePath,
+    selected?.rootPath,
+  );
+  const { meta } = useUnitsyncMapMeta(selected?.enginePath, selected?.rootPath);
   const minimap = useUnitsyncMinimap(
     selected?.enginePath,
     selected?.rootPath,
@@ -152,8 +160,11 @@ export default function MapDetailPage() {
       />
     );
   if (!data || loading) return <DetailLoading backTo="/content/maps" />;
-  const map = data.maps.find((m) => m.name === decoded);
-  if (!map) return <NotFound backTo="/content/maps" label="map" />;
+  const scanned = data.maps.find((m) => m.name === decoded);
+  if (!scanned) return <NotFound backTo="/content/maps" label="map" />;
+  // Proportions and mapinfo arrive after the scan now, so fold in whichever of
+  // those tiers has landed.
+  const [map] = mergeMapTiers([scanned], thumbs, meta);
 
   const otherInfo = Object.entries(map.info).filter(
     ([k]) => !HEADLINE_KEYS.has(k),

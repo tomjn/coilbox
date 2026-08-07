@@ -7,9 +7,11 @@ import { useContentRootPaths, useWriteRootPath } from "../../downloads/config";
 import { filterUninstalledMaps, useSuggestedMaps } from "../branding";
 import {
   useScanTargetSelection,
+  useUnitsyncMapMeta,
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "../config";
+import { mergeMapTiers } from "../mapTiers";
 import { usePlayMap } from "../usePlayMap";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
@@ -50,17 +52,22 @@ export default function MapsPage() {
     selected?.enginePath,
     selected?.rootPath,
   );
+  const { meta } = useUnitsyncMapMeta(selected?.enginePath, selected?.rootPath);
   const playMap = usePlayMap();
 
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name-asc");
 
   // A map can appear in more than one archive; show each name once.
-  const maps = useMemo(
-    () =>
-      Array.from(new Map((data?.maps ?? []).map((m) => [m.name, m])).values()),
-    [data],
-  );
+  // Proportions come from the thumbnail pass, which reads them while it already
+  // has the archive open, so the size label and the area sorts fill in alongside
+  // the minimaps rather than holding up the list.
+  const maps = useMemo(() => {
+    const unique = Array.from(
+      new Map((data?.maps ?? []).map((m) => [m.name, m])).values(),
+    );
+    return mergeMapTiers(unique, thumbs, meta);
+  }, [data, thumbs, meta]);
   const busy = loading || (!!selected && !data && !error && !cancelled);
 
   // Curated download suggestions shown when this engine sees no maps.
