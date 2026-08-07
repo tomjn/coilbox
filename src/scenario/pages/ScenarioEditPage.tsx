@@ -38,6 +38,7 @@ import {
   stepLabel,
 } from "./components/triggers";
 import { useGameUnits } from "./components/useGameUnits";
+import { useScenarioGate } from "./components/useScenarioGate";
 import { VarPanel } from "./components/VarPanel";
 
 const BACK = "/scenario-builder";
@@ -64,6 +65,10 @@ export default function ScenarioEditPage() {
   // the panel that asked, because the map that answers it is a sibling.
   const [pick, setPick] = useState<PointTarget | null>(null);
   const gameUnits = useGameUnits(scenario?.setup.gameName ?? "");
+  // Read once for the page rather than in the trigger panel, because every
+  // panel that renames a reference needs the game's own declared types to carry
+  // that reference over (issue #913).
+  const { gate, extensions, note } = useScenarioGate(scenario);
   const [history, setHistory] = useState<EditHistory>(emptyHistory);
   // Both are also held in refs, because an edit and a step through the history
   // read them at the moment they happen rather than at the last render: two
@@ -266,18 +271,33 @@ export default function ScenarioEditPage() {
         onChange={(next) => apply(next)}
         units={gameUnits.units}
         unitsLoading={gameUnits.loading}
+        gate={gate}
+        extensions={extensions}
+        note={note}
         picking={pick}
         onPick={setPick}
       />
-      <ObjectivePanel scenario={scenario} onChange={(next) => apply(next)} />
-      <DialoguePanel scenario={scenario} onChange={(next) => apply(next)} />
+      <ObjectivePanel
+        scenario={scenario}
+        onChange={(next) => apply(next)}
+        extensions={extensions}
+      />
+      <DialoguePanel
+        scenario={scenario}
+        onChange={(next) => apply(next)}
+        extensions={extensions}
+      />
       <RestrictionPanel
         scenario={scenario}
         onChange={(next) => apply(next)}
         units={gameUnits.units}
         unitsLoading={gameUnits.loading}
       />
-      <VarPanel scenario={scenario} onChange={(next) => apply(next)} />
+      <VarPanel
+        scenario={scenario}
+        onChange={(next) => apply(next)}
+        extensions={extensions}
+      />
     </div>
   );
 }

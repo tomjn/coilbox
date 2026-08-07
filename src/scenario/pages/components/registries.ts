@@ -16,8 +16,15 @@
  * Renaming any of the four rewrites the triggers that named it, through
  * {@link rewriteRefs} and the reference kind, so an author can call an objective
  * what they mean without silently unhooking the trigger that completes it.
+ *
+ * Each rename takes what the scenario's game declares in its
+ * `missions/extensions.lua`, so a reference held by a parameter of the game's
+ * own is carried over with coilbox's (issue #913). Left out, only coilbox's own
+ * parameters are rewritten, which is what a caller with no game to read has.
  */
 
+import type { ExtensionTypes } from "../../extensions";
+import { NO_EXTENSIONS } from "../../extensions";
 import type {
   Scenario,
   ScenarioDialogue,
@@ -121,12 +128,19 @@ export function renameObjective(
   scenario: Scenario,
   from: string,
   to: string,
+  extensions: ExtensionTypes = NO_EXTENSIONS,
 ): Scenario {
   const wanted = to.trim();
   if (!wanted || wanted === from) return scenario;
   if (!scenario.objectives.some((o) => o.id === from)) return scenario;
   if (scenario.objectives.some((o) => o.id === wanted)) return scenario;
-  const rewritten = rewriteRefs(scenario, "objectiveId", from, wanted);
+  const rewritten = rewriteRefs(
+    scenario,
+    "objectiveId",
+    from,
+    wanted,
+    extensions,
+  );
   return {
     ...rewritten,
     objectives: rewritten.objectives.map((o) =>
@@ -187,12 +201,19 @@ export function renameDialogue(
   scenario: Scenario,
   from: string,
   to: string,
+  extensions: ExtensionTypes = NO_EXTENSIONS,
 ): Scenario {
   const wanted = to.trim();
   if (!wanted || wanted === from) return scenario;
   if (!scenario.dialogue.some((d) => d.id === from)) return scenario;
   if (scenario.dialogue.some((d) => d.id === wanted)) return scenario;
-  const rewritten = rewriteRefs(scenario, "dialogueId", from, wanted);
+  const rewritten = rewriteRefs(
+    scenario,
+    "dialogueId",
+    from,
+    wanted,
+    extensions,
+  );
   return {
     ...rewritten,
     dialogue: rewritten.dialogue.map((d) =>
@@ -254,6 +275,7 @@ export function renameVar(
   scenario: Scenario,
   from: string,
   to: string,
+  extensions: ExtensionTypes = NO_EXTENSIONS,
 ): Scenario {
   const wanted = to.trim();
   if (!wanted || wanted === from) return scenario;
@@ -262,7 +284,10 @@ export function renameVar(
   for (const [name, value] of Object.entries(scenario.vars)) {
     vars[name === from ? wanted : name] = value;
   }
-  return { ...rewriteRefs(scenario, "varName", from, wanted), vars };
+  return {
+    ...rewriteRefs(scenario, "varName", from, wanted, extensions),
+    vars,
+  };
 }
 
 /** The document without a variable. Triggers naming it are left alone, and read

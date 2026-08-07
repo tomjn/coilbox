@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newScenario } from "../../create";
+import { parseExtensions } from "../../extensions";
 import { parseScenario, type Scenario } from "../../model";
 import {
   addBuildableUnit,
@@ -251,6 +252,82 @@ describe("vars", () => {
     const next = removeVar(document(), "waves");
     expect(next.vars).toEqual({ alertLevel: 0 });
     expect(loads(next)).toBe(true);
+  });
+});
+
+/**
+ * Issue #913. A game's own condition or action holds references in parameters
+ * coilbox has never heard of, so a rename that does not know what the game
+ * declares leaves them pointing at a name nothing answers to. The `amount`
+ * parameter is the same question one level in: the var it reads sits inside the
+ * value rather than being it (#952).
+ */
+describe("a reference a game's own type holds", () => {
+  const declared = parseExtensions({
+    handler: "h.lua",
+    actions: [
+      {
+        type: "sf_report",
+        params: [
+          { name: "about", kind: "objectiveId" },
+          { name: "say", kind: "dialogueId" },
+          { name: "counter", kind: "varName" },
+          { name: "howMany", kind: "amount" },
+        ],
+      },
+    ],
+  });
+
+  /** The fixture with one of the game's own actions naming all four. */
+  function withDeclared(): Scenario {
+    const scenario = document();
+    const trigger = scenario.triggers[0];
+    return {
+      ...scenario,
+      triggers: [
+        {
+          ...trigger,
+          actions: [
+            ...trigger.actions,
+            {
+              type: "sf_report",
+              params: {
+                about: "hold",
+                say: "warn",
+                counter: "alertLevel",
+                howMany: { var: "alertLevel" },
+              },
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  const reported = (scenario: Scenario) => scenario.triggers[0].actions[3];
+
+  it("carries it over when an objective is renamed", () => {
+    const next = renameObjective(withDeclared(), "hold", "held", declared);
+    expect(reported(next).params.about).toBe("held");
+    expect(loads(next)).toBe(true);
+  });
+
+  it("carries it over when a dialogue line is renamed", () => {
+    const next = renameDialogue(withDeclared(), "warn", "warned", declared);
+    expect(reported(next).params.say).toBe("warned");
+    expect(loads(next)).toBe(true);
+  });
+
+  it("carries it over when a variable is renamed, inside an amount too", () => {
+    const next = renameVar(withDeclared(), "alertLevel", "alarm", declared);
+    expect(reported(next).params.counter).toBe("alarm");
+    expect(reported(next).params.howMany).toEqual({ var: "alarm" });
+    expect(loads(next)).toBe(true);
+  });
+
+  it("leaves it behind when the caller does not know what the game declares", () => {
+    const next = renameObjective(withDeclared(), "hold", "held");
+    expect(reported(next).params.about).toBe("hold");
   });
 });
 

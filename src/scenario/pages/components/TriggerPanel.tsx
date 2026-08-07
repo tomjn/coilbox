@@ -44,13 +44,15 @@ import {
   stepsOf,
   triggerSummary,
 } from "./triggers";
-import { useScenarioGate } from "./useScenarioGate";
 
 export function TriggerPanel({
   scenario,
   onChange,
   units,
   unitsLoading,
+  gate,
+  extensions,
+  note,
   picking,
   onPick,
 }: {
@@ -59,6 +61,12 @@ export function TriggerPanel({
   /** The scenario's game's units, for a parameter naming a unit type. */
   units: UnitDatasetEntry[];
   unitsLoading: boolean;
+  /** What the runtime that will play this scenario can and cannot run. Passed
+   *  in because the panels that rename a reference need the same read. */
+  gate: PaletteGate;
+  extensions: ExtensionTypes;
+  /** Which runtime the palette is measured against, when it stops anything. */
+  note: string | null;
   /** The point the map is waiting for, or null when it is not waiting. */
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
@@ -69,10 +77,6 @@ export function TriggerPanel({
     scenario.triggers[0] ??
     null;
   const unitDefs = useMemo(() => units.map((u) => u.name), [units]);
-  // What the runtime that will play this scenario can and cannot run. Read here
-  // rather than passed in, because the trigger lists are the only thing in the
-  // editor a runtime version gates.
-  const { gate, extensions, note } = useScenarioGate(scenario);
 
   const count = scenario.triggers.length;
   const create = () => {

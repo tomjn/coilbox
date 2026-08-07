@@ -19,6 +19,7 @@ import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import type { ExtensionTypes } from "../../extensions";
 import type { Scenario, ScenarioObjective } from "../../model";
 import { EditorPanel, NameField, TextField } from "./panels";
 import {
@@ -32,9 +33,13 @@ import {
 export function ObjectivePanel({
   scenario,
   onChange,
+  extensions,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
+  /** The types the scenario's game declares, so a rename carries over a
+   *  reference one of its own parameters holds (issue #913). */
+  extensions: ExtensionTypes;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
@@ -98,6 +103,7 @@ export function ObjectivePanel({
               key={selected.id}
               objective={selected}
               scenario={scenario}
+              extensions={extensions}
               onChange={onChange}
               onSelect={setSelectedId}
             />
@@ -149,11 +155,13 @@ function ObjectiveRow({
 function ObjectiveForm({
   objective,
   scenario,
+  extensions,
   onChange,
   onSelect,
 }: {
   objective: ScenarioObjective;
   scenario: Scenario;
+  extensions: ExtensionTypes;
   onChange: (next: Scenario) => void;
   onSelect: (id: string | null) => void;
 }) {
@@ -167,7 +175,12 @@ function ObjectiveForm({
           name={objective.id}
           label="Objective name"
           onRename={(wanted) => {
-            const next = renameObjective(scenario, objective.id, wanted);
+            const next = renameObjective(
+              scenario,
+              objective.id,
+              wanted,
+              extensions,
+            );
             if (next === scenario) return false;
             onChange(next);
             onSelect(wanted.trim());

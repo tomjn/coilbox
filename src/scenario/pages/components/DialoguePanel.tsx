@@ -32,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { loadedCampaigns } from "../../../campaign/campaigns";
 import { clipIsAttached } from "../../../campaign/scenarioMedia";
 import { scenarioMediaUrl } from "../../../lib/assetUrl";
+import type { ExtensionTypes } from "../../extensions";
 import type { Scenario, ScenarioDialogue } from "../../model";
 import { deleteScenarioMedia, importScenarioMedia } from "../../storage";
 import { EditorPanel, NameField, TextField } from "./panels";
@@ -75,9 +76,13 @@ async function dropClip(scenarioId: string, file: string): Promise<void> {
 export function DialoguePanel({
   scenario,
   onChange,
+  extensions,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
+  /** The types the scenario's game declares, so a rename carries over a
+   *  reference one of its own parameters holds (issue #913). */
+  extensions: ExtensionTypes;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
@@ -139,6 +144,7 @@ export function DialoguePanel({
               key={selected.id}
               line={selected}
               scenario={scenario}
+              extensions={extensions}
               onChange={onChange}
               onSelect={setSelectedId}
             />
@@ -191,11 +197,13 @@ function DialogueRow({
 function DialogueForm({
   line,
   scenario,
+  extensions,
   onChange,
   onSelect,
 }: {
   line: ScenarioDialogue;
   scenario: Scenario;
+  extensions: ExtensionTypes;
   onChange: (next: Scenario) => void;
   onSelect: (id: string | null) => void;
 }) {
@@ -243,7 +251,7 @@ function DialogueForm({
           name={line.id}
           label="Dialogue line name"
           onRename={(wanted) => {
-            const next = renameDialogue(scenario, line.id, wanted);
+            const next = renameDialogue(scenario, line.id, wanted, extensions);
             if (next === scenario) return false;
             onChange(next);
             onSelect(wanted.trim());
