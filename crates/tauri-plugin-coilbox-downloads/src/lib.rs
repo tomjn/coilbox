@@ -768,6 +768,82 @@ async fn dl_github_release_archives(repo: String) -> CliResult {
     }
 }
 
+/// The engine's own config file. A Recoil release ships it empty, because
+/// `DataDirLocater::IsPortableMode` needs to find it beside the binary.
+const ENGINE_SETTINGS: &str = "springsettings.cfg";
+
+/// Every directory one and two levels under `engine/`. Two levels because a
+/// springfiles install nests versions under a platform folder, which is the same
+/// shape the content scanner looks for. A directory that is not an engine simply
+/// has no settings file, so the caller ignores it.
+fn engine_dirs(engine_root: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut dirs = Vec::new();
+    let Ok(entries) = std::fs::read_dir(engine_root) else {
+        return dirs;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        if let Ok(inner) = std::fs::read_dir(&path) {
+            dirs.extend(inner.flatten().map(|e| e.path()).filter(|p| p.is_dir()));
+        }
+        dirs.push(path);
+    }
+    dirs
+}
+
+/// Carry a player's engine settings into a freshly installed engine, and return
+/// where they came from.
+///
+/// Portable Mode makes `engine/<version>/` the engine's write dir, so
+/// `springsettings.cfg` belongs to one version. A new version arrives with the
+/// empty file the archive ships, and everything the player had set is still on
+/// disk under the version they upgraded from, out of reach. Without this an
+/// upgrade resets every engine setting and says nothing.
+///
+/// The source is the most recently written non-empty settings file under another
+/// engine directory, which is the closest thing on disk to the one they were
+/// using. `dest`'s own settings win if it has any, so re-installing over a
+/// version the player has already run keeps that version's settings.
+///
+/// Failing to copy is not failing to install, so an error is reported and the
+/// install stands.
+fn carry_engine_settings(
+    engine_root: &std::path::Path,
+    dest: &std::path::Path,
+) -> Option<std::path::PathBuf> {
+    let into = dest.join(ENGINE_SETTINGS);
+    if std::fs::metadata(&into).is_ok_and(|m| m.len() > 0) {
+        return None;
+    }
+    let from = engine_dirs(engine_root)
+        .into_iter()
+        .filter(|dir| dir != dest)
+        .filter_map(|dir| {
+            let cfg = dir.join(ENGINE_SETTINGS);
+            let meta = std::fs::metadata(&cfg).ok()?;
+            if !meta.is_file() || meta.len() == 0 {
+                return None;
+            }
+            Some((meta.modified().ok()?, cfg))
+        })
+        .max_by_key(|(modified, _)| *modified)
+        .map(|(_, cfg)| cfg)?;
+    match std::fs::copy(&from, &into) {
+        Ok(_) => Some(from),
+        Err(e) => {
+            eprintln!(
+                "coilbox-downloads: could not carry {} into {}: {e}",
+                from.display(),
+                into.display()
+            );
+            None
+        }
+    }
+}
+
 /// Download a Recoil `.7z` release and extract it into `<write_path>/engine/<version>/`,
 /// emitting download progress then an indeterminate `extracting` phase. `cancel`
 /// (polled each chunk) and the idle read-timeout stop a stalled/cancelled fetch;
@@ -855,6 +931,7 @@ async fn install_recoil_engine(
     .map_err(|e| format!("extract task failed: {e}"))?;
     let _ = std::fs::remove_file(&tmp);
     extracted?;
+    carry_engine_settings(&engine_root, &dest);
 
     let _ = on_progress.send(DownloadProgress::done(downloaded, total));
     Ok(dest.display().to_string())
@@ -1097,5 +1174,103 @@ mod tests {
         // Standalone slots are not in the registry, so dl_cancel can't reach them.
         assert_eq!(before, cancel_registry().lock().unwrap().len());
         assert!(!flag.load(Ordering::Relaxed));
+    }
+}
+
+/// Carrying engine settings across an upgrade (issue #932).
+#[cfg(test)]
+mod engine_settings_tests {
+    use super::*;
+    use std::path::Path;
+
+    /// An installed engine: whatever `springsettings.cfg` it has, plus the base
+    /// content directory a release brings, so the fixture is the real shape.
+    fn engine(root: &Path, version: &str, settings: &str) -> std::path::PathBuf {
+        let dir = root.join(version);
+        std::fs::create_dir_all(dir.join("base")).expect("mkdir");
+        std::fs::write(dir.join(ENGINE_SETTINGS), settings).expect("write");
+        dir
+    }
+
+    /// The upgrade the issue describes: the player's settings follow them into
+    /// the new version instead of being left behind under the old one.
+    #[test]
+    fn an_upgrade_carries_the_settings_forward() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let old = engine(root.path(), "2026.01.1", "Fullscreen = 0\n");
+        // What the archive extracts: an empty file, there to trip Portable Mode.
+        let new = engine(root.path(), "2026.07.4", "");
+
+        let from = carry_engine_settings(root.path(), &new).expect("carried");
+
+        assert_eq!(from, old.join(ENGINE_SETTINGS));
+        assert_eq!(
+            std::fs::read_to_string(new.join(ENGINE_SETTINGS)).expect("read"),
+            "Fullscreen = 0\n"
+        );
+    }
+
+    /// Re-installing over a version the player has already run leaves that
+    /// version's own settings alone, rather than pulling an older set over them.
+    #[test]
+    fn a_reinstall_keeps_the_settings_already_there() {
+        let root = tempfile::tempdir().expect("tempdir");
+        engine(root.path(), "2026.01.1", "Fullscreen = 0\n");
+        let same = engine(root.path(), "2026.07.4", "Fullscreen = 1\n");
+
+        assert!(carry_engine_settings(root.path(), &same).is_none());
+        assert_eq!(
+            std::fs::read_to_string(same.join(ENGINE_SETTINGS)).expect("read"),
+            "Fullscreen = 1\n"
+        );
+    }
+
+    /// With several versions installed, the one the player was last running wins.
+    #[test]
+    fn the_most_recently_written_settings_win() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let stale = engine(root.path(), "2026.01.1", "Fullscreen = 0\n");
+        let recent = engine(root.path(), "2026.05.2", "Fullscreen = 2\n");
+        let new = engine(root.path(), "2026.07.4", "");
+        // mtime resolution is coarser than the gap between two writes above.
+        let hour_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        std::fs::File::options()
+            .write(true)
+            .open(stale.join(ENGINE_SETTINGS))
+            .expect("open")
+            .set_modified(hour_ago)
+            .expect("set mtime");
+
+        let from = carry_engine_settings(root.path(), &new).expect("carried");
+
+        assert_eq!(from, recent.join(ENGINE_SETTINGS));
+    }
+
+    /// A springfiles install nests versions under a platform folder, and those
+    /// settings are the player's too.
+    #[test]
+    fn a_nested_engine_directory_is_a_source() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let nested = root.path().join("macos_arm64");
+        let old = engine(&nested, "2026.01.1", "Fullscreen = 0\n");
+        let new = engine(root.path(), "2026.07.4", "");
+
+        let from = carry_engine_settings(root.path(), &new).expect("carried");
+
+        assert_eq!(from, old.join(ENGINE_SETTINGS));
+    }
+
+    /// A first install has nothing to carry, and must not be reported as a
+    /// failure.
+    #[test]
+    fn a_first_install_carries_nothing() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let new = engine(root.path(), "2026.07.4", "");
+
+        assert!(carry_engine_settings(root.path(), &new).is_none());
+        assert_eq!(
+            std::fs::read_to_string(new.join(ENGINE_SETTINGS)).expect("read"),
+            ""
+        );
     }
 }
