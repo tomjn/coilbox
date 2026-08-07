@@ -13,6 +13,36 @@
   --font-display: "Oxanium Variable", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Secondary text has to clear WCAG AA (4.5:1) at 12px, and picoframe's light ramp
+   does not (#1019, #1016). The token there is 46% lightness. On white that is 4.22:1
+   on the highest-luminance bases (lime, yellow, green, emerald, teal, amber). On
+   `bg-muted`, which is where most of the app's small badges live, sixteen of the 22
+   bases fail, worst 3.90:1. A `bg-primary/5` tint over a card, the treatment
+   RunListPage gives a resumable run, takes the worst to 3.86:1.
+
+   41% is the highest lightness that clears 4.5:1 on every base, on every surface
+   `text-muted-foreground` actually sits on, with every accent. 42% clears the plain
+   surfaces but lands on 4.499:1 under the tint, so it buys nothing. The cost is that
+   secondary text goes from 30% of body text's contrast ratio to 35% of it, which
+   still reads as clearly quieter. The gap on the card surface stays above 10:1.
+
+   Light only. The dark ramp is 4.73:1 at worst already, and darkening its foreground
+   would make it worse. Saturation is left alone, because the hue is what makes a base
+   preset recognisable in the first place and draining it would cost more than a shade
+   of lightness. Overriding a token in the consuming app is picoframe's documented
+   extension point, but the defect is in its ramp and the same change belongs
+   upstream. `src/theme/mutedForeground.test.ts` reads the value back out of this
+   file and re-measures it, so raising it re-runs the measurement.
+
+   `:not(.dark)` is load-bearing, not decoration. picoframe's `.dark` block and a
+   bare `:root` have the same specificity, so a bare `:root` here would win the
+   source-order tie and paint the light foreground into the dark scheme, taking it
+   from 4.73:1 to 2.63:1. Excluding dark is the same move picoframe makes for its
+   own accent blocks. */
+:root:not(.dark) {
+  --muted-foreground: var(--base-hue) calc(var(--base-sat-text) * 4%) 41%;
+}
+
 html,
 body,
 #root {
