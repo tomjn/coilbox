@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router";
-import { quitApp } from "../general/quit";
+import { useMemo } from "react";
 import { getProfile, getResolvedWelcome } from "./profile";
-import { resolveWelcomeAction } from "./welcomeActions";
+import { useWelcomeActionRef } from "./welcomeActionRef";
 import { rewriteBrandedCss, rewriteBrandedHtml } from "./welcomeAssets";
 
 /**
@@ -38,32 +36,9 @@ export default function BrandedWelcome() {
     () => (resolved?.css ? rewriteBrandedCss(resolved.css) : undefined),
     [resolved?.css],
   );
-  // Delegated listener attached to the injected-HTML container (not a JSX `onClick`,
-  // which would trip a11y lints on a static div): a bubbled click on any element
-  // carrying `data-coilbox-action` dispatches the resolved action (quit or navigate).
-  const ref = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const onClick = (e: Event) => {
-      const marker = (e.target as HTMLElement).closest("[data-coilbox-action]");
-      if (!marker) return;
-      const action = resolveWelcomeAction(
-        marker.getAttribute("data-coilbox-action"),
-        marker.getAttribute("data-coilbox-route") ??
-          marker.getAttribute("href"),
-      );
-      if (!action) return;
-      // Prevent the default so an `<a href="@route/...">` marker can't send the webview
-      // to a bogus URL; the resolved action drives the app instead.
-      e.preventDefault();
-      if (action.kind === "quit") quitApp();
-      else navigate(action.to);
-    };
-    el.addEventListener("click", onClick);
-    return () => el.removeEventListener("click", onClick);
-  }, [navigate]);
+  // Delegated `data-coilbox-action` handling, shared with the home page's
+  // distribution markup (see `./welcomeActionRef`).
+  const ref = useWelcomeActionRef();
 
   if (!welcome) return null;
   return (
