@@ -39,6 +39,7 @@ import {
 } from "../../launch";
 import type { Scenario } from "../../model";
 import { mutatorOffer } from "../../offer";
+import { ensureBundledScenarioMedia } from "../../storage";
 import { describeIssue, type MissionIssue } from "../../validate";
 import { missionWarnings, type ScenarioReader } from "../../wording";
 import { useGameUnits } from "./useGameUnits";
@@ -136,6 +137,11 @@ export function ScenarioTestDrawer({
     if (!target) return;
     setPhase({ state: "writing" });
     try {
+      // A bundled scenario's dialogue clips have never been written into the
+      // media store, and that store is where the compile step copies them from,
+      // so they are materialised before anything is compiled. A no-op for every
+      // scenario that came from anywhere else.
+      await ensureBundledScenarioMedia(scenario.id);
       const result = await launchScenario({
         scenario,
         reader,

@@ -15,6 +15,12 @@ vi.mock("../scenario/bindings", () => ({
   scenarioMediaWrite: (...args: unknown[]) => mediaWriteMock(...args),
   scenarioList: (...args: unknown[]) => scenarioListMock(...args),
   scenarioMediaSweep: (...args: unknown[]) => mediaSweepMock(...args),
+  // Unused here, but `scenario/storage.ts` imports them and a mocked module
+  // throws on an export it was never given.
+  scenarioSave: vi.fn(),
+  scenarioDelete: vi.fn(),
+  scenarioMediaImport: vi.fn(),
+  scenarioMediaDelete: vi.fn(),
 }));
 
 vi.mock("./bindings", () => ({
@@ -22,6 +28,8 @@ vi.mock("./bindings", () => ({
 }));
 
 import type { Scenario } from "../scenario/model";
+import { listScenarios } from "../scenario/storage";
+import { encodeScenarioExport } from "../scenario/transfer";
 import type { Campaign, CampaignMission } from "./model";
 import {
   clipIsAttached,
@@ -246,7 +254,10 @@ describe("collecting the clips nothing names", () => {
 
   it("hands the sweep every named clip and nothing else", async () => {
     scenarioListMock.mockResolvedValue({
-      items: [JSON.stringify(scenario("kept"))].map((json) => ({ json })),
+      items: [JSON.stringify(scenario("kept"))].map((json) => ({
+        json,
+        source: "local" as const,
+      })),
     });
     mediaSweepMock.mockResolvedValue({
       summary: { applied: true, folders: ["gone"], files: [], bytes: 12 },
@@ -260,6 +271,32 @@ describe("collecting the clips nothing names", () => {
       keep: { kept: ["a.png", "a.ogg"], held: ["a.png", "a.ogg"] },
       apply: true,
     });
+  });
+
+  /**
+   * Issue #786. A bundled scenario's clips are written into the same media
+   * store an imported one's are, and the only thing holding them is the
+   * scenario still being bundled. It is in the list the keep set is built from,
+   * so the sweep has to see it and leave its clips alone.
+   */
+  it("keeps a bundled scenario's clips, so the sweep cannot take them", async () => {
+    scenarioListMock.mockResolvedValue({
+      items: [
+        {
+          source: "bundled" as const,
+          json: encodeScenarioExport({
+            scenario: scenario("shipped"),
+            media: { "a.png": PORTRAIT, "a.ogg": VOICE },
+          }),
+        },
+      ],
+    });
+
+    const scenarios = (await listScenarios()).map((l) => l.scenario);
+
+    expect(namedScenarioClips(scenarios, [])).toEqual(
+      new Map([["shipped", new Set(["a.png", "a.ogg"])]]),
+    );
   });
 
   it("sweeps once a session", async () => {

@@ -42,7 +42,12 @@ export default function ScenariosPage() {
   const drawer = useDrawer();
   const [importError, setImportError] = useState<string | null>(null);
 
-  const playable = useMemo(() => playableScenarios(scenarios), [scenarios]);
+  // Documents only: a bundled scenario is played exactly as a local one is, and
+  // where it came from only matters where it can be edited.
+  const playable = useMemo(
+    () => playableScenarios(scenarios.map((l) => l.scenario)),
+    [scenarios],
+  );
 
   // An imported scenario lands in the list behind the toast. One that names no
   // game and map is not listed here at all, so say that rather than leave the

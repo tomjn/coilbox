@@ -57,7 +57,11 @@ export default function ScenarioEditPage() {
   const { scenarios, loading } = useScenarios();
   const drawer = useDrawer();
 
-  const stored = scenarios.find((s) => s.id === id);
+  const loaded = scenarios.find((l) => l.scenario.id === id);
+  // A bundled scenario is a distribution's own file in a folder coilbox does
+  // not write to, so it is never opened here. The whole editor saves on every
+  // keystroke, and there is nowhere for those saves to go (issue #786).
+  const stored = loaded?.source === "bundled" ? undefined : loaded?.scenario;
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +164,9 @@ export default function ScenarioEditPage() {
   }, [undo, redo]);
 
   if (loading && !scenario) return <DetailLoading backTo={BACK} />;
+  if (loaded?.source === "bundled") {
+    return <BundledScenario name={loaded.scenario.name} />;
+  }
   if (!scenario) return <NotFound backTo={BACK} label="scenario" />;
 
   const openTest = () =>
@@ -298,6 +305,31 @@ export default function ScenarioEditPage() {
         onChange={(next) => apply(next)}
         extensions={extensions}
       />
+    </div>
+  );
+}
+
+/**
+ * What a bundled scenario's route shows instead of the editor: it is there, it
+ * plays, and it is not yours to change. Export is the way to a copy that is.
+ */
+function BundledScenario({ name }: { name: string }) {
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <Link
+        to={BACK}
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+      >
+        <ArrowLeft className="size-3.5" /> Back to scenarios
+      </Link>
+      <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
+        <p className="text-sm font-medium">{name} can't be edited</p>
+        <p className="text-sm text-muted-foreground">
+          It came with this copy of coilbox, so it is read-only. Play it from
+          Scenarios, or Export it and import that file back to get a copy you
+          can edit.
+        </p>
+      </div>
     </div>
   );
 }

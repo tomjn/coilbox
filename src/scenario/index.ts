@@ -75,7 +75,8 @@ const scenarioPlugin: FramePlugin = {
       path: "scenario-builder/:id",
       lazy: gateAdvanced(() => import("./pages/ScenarioEditPage")),
       crumb: (c) =>
-        (c.params.id && getCachedScenario(c.params.id)?.name) || "Scenario",
+        (c.params.id && getCachedScenario(c.params.id)?.scenario.name) ||
+        "Scenario",
     },
   ],
 };

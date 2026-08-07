@@ -51,6 +51,7 @@ Inside each package's `.coilbox/`:
 .coilbox/
   profile.json    # REQUIRED — presence is what enables portable mode ({} is valid)
   campaigns/      # optional bundled campaigns
+  scenarios/      # optional bundled scenarios
   images/ ...     # optional media referenced by the profile/campaigns
 ```
 

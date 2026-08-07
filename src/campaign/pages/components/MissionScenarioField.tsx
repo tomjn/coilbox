@@ -48,7 +48,8 @@ export function MissionScenarioField({
   mission: CampaignMission;
   onChange: (mission: CampaignMission) => void;
 }) {
-  const { scenarios, loading } = useScenarios();
+  const { scenarios: loaded, loading } = useScenarios();
+  const scenarios = loaded.map((l) => l.scenario);
   const [open, setOpen] = useState(false);
   const attachment = scenarioAttachment(mission, scenarios);
 

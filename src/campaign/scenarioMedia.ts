@@ -219,7 +219,10 @@ export async function previewOrphanedScenarioMedia(
   campaigns: readonly Campaign[],
 ): Promise<MediaSweepSummary> {
   return sweepScenarioMedia(
-    namedScenarioClips(await listScenarios(), campaigns),
+    namedScenarioClips(
+      (await listScenarios()).map((l) => l.scenario),
+      campaigns,
+    ),
     false,
   );
 }
@@ -260,7 +263,10 @@ export async function sweepOrphanedScenarioMedia(
   swept = true;
   try {
     const summary = await sweepScenarioMedia(
-      namedScenarioClips(await listScenarios(), campaigns),
+      namedScenarioClips(
+        (await listScenarios()).map((l) => l.scenario),
+        campaigns,
+      ),
       true,
     );
     if (sweptCount(summary) > 0) {

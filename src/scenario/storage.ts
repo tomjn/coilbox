@@ -14,6 +14,7 @@ import { parseScenarioJson, type Scenario } from "./model";
 import {
   dropMissingDialogueMedia,
   encodeScenarioExport,
+  readScenarioExport,
   type ScenarioExport,
   scenarioMediaFiles,
 } from "./transfer";
@@ -25,23 +26,50 @@ import {
  * documents, never with JSON text or file names.
  */
 
+/** A parsed scenario plus where it came from. Bundled ones are read-only. */
+export interface LoadedScenario {
+  scenario: Scenario;
+  source: "local" | "bundled";
+}
+
 /**
- * Every stored scenario, newest edit first. A document that fails validation is
- * skipped with a warning rather than failing the whole read, so one bad file
- * cannot make the scenario list unusable. Mirrors how the campaign list loads.
+ * One stored file as a document, whether it is a bare scenario or the whole
+ * export file the builder writes.
+ *
+ * A local scenario is always the bare document, because that is what
+ * `saveScenario` writes. A bundled one is whatever the distribution dropped
+ * into `.coilbox/scenarios/`, and the thing they have to hand is an export, so
+ * that is unwrapped here. The dialogue clips travelling beside it in that file
+ * are left alone: `ensureBundledScenarioMedia` puts them in the media store on
+ * the launch path, the way a bundled campaign's are.
  */
-export async function listScenarios(): Promise<Scenario[]> {
+function parseStoredScenario(json: string): Scenario | null {
+  const bare = parseScenarioJson(json);
+  if (bare) return bare;
+  const read = readScenarioExport(json);
+  return read.ok ? read.payload.scenario : null;
+}
+
+/**
+ * Every scenario, newest edit first: the ones stored here, then any a
+ * distribution bundled. A document that fails validation is skipped with a
+ * warning rather than failing the whole read, so one bad file cannot make the
+ * scenario list unusable. Mirrors how the campaign list loads.
+ */
+export async function listScenarios(): Promise<LoadedScenario[]> {
   const { items } = await scenarioList({});
-  const loaded: Scenario[] = [];
+  const loaded: LoadedScenario[] = [];
   for (const item of items) {
-    const scenario = parseScenarioJson(item.json);
+    const scenario = parseStoredScenario(item.json);
     if (scenario) {
-      loaded.push(scenario);
+      loaded.push({ scenario, source: item.source });
     } else {
-      console.warn("skipping invalid scenario document");
+      console.warn("skipping invalid scenario document", item.source);
     }
   }
-  return loaded.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return loaded.sort((a, b) =>
+    b.scenario.updatedAt.localeCompare(a.scenario.updatedAt),
+  );
 }
 
 /**
@@ -80,6 +108,57 @@ export async function deleteScenario(
   opts: { keepMedia?: boolean } = {},
 ): Promise<void> {
   await scenarioDelete({ id, keepMedia: opts.keepMedia === true });
+}
+
+/** Bundled scenarios whose clips this session has already written. */
+const materialised = new Set<string>();
+
+/**
+ * Put a bundled scenario's dialogue clips in the media store, before it is
+ * launched (issue #786).
+ *
+ * An imported scenario wrote its clips at import time. A bundled one never went
+ * through import: it is read straight out of `.coilbox/scenarios/` as the file
+ * the builder exported, and {@link listScenarios} takes the document and leaves
+ * the clips beside it. So without this a distribution's mission plays its radio
+ * messages with no portrait and no voice.
+ *
+ * They go in the ordinary media store under the id the export carried, even
+ * though the scenario itself is read-only, because that store is the only place
+ * the compile step reads clips from. The sweep keeps them for as long as the
+ * scenario is bundled, since a bundled scenario is in the list the keep set is
+ * built from, and takes them once it is not.
+ *
+ * On the launch path rather than the list read, because this decodes and writes
+ * files and the list is read on every start for the sidebar's gate. A scenario
+ * that carries no clips costs one read.
+ */
+export async function ensureBundledScenarioMedia(
+  scenarioId: string,
+): Promise<void> {
+  if (materialised.has(scenarioId)) return;
+  materialised.add(scenarioId);
+  try {
+    const { items } = await scenarioList({});
+    for (const item of items) {
+      if (item.source !== "bundled") continue;
+      const read = readScenarioExport(item.json);
+      if (!read.ok || read.payload.scenario.id !== scenarioId) continue;
+      for (const [file, dataUri] of Object.entries(read.payload.media)) {
+        try {
+          await scenarioMediaWrite({ scenarioId, file, dataUri });
+        } catch {
+          console.warn("skipping unwritable dialogue clip", file);
+        }
+      }
+      return;
+    }
+  } catch (e) {
+    // Retry on the next launch. A clip that did not land only costs a line its
+    // picture, so this must never be the reason a scenario does not start.
+    materialised.delete(scenarioId);
+    console.warn("could not materialise bundled dialogue clips", e);
+  }
 }
 
 /**

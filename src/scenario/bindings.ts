@@ -7,12 +7,17 @@ import { defineCommand } from "@picoframe/plugin-sdk";
  * mission ships with.
  */
 
-/** One stored scenario document, still unparsed. */
+/**
+ * One scenario document, still unparsed, and where it was read from. A
+ * `bundled` one is a distribution's own file in the portable
+ * `.coilbox/scenarios/` folder, which is read-only (issue #786).
+ */
 export interface ScenarioListItem {
   json: string;
+  source: "local" | "bundled";
 }
 
-/** Every stored scenario document. */
+/** Every scenario document, local ones first and then bundled ones. */
 export const scenarioList = defineCommand<
   Record<string, never>,
   { items: ScenarioListItem[] }
