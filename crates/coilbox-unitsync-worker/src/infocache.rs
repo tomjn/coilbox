@@ -52,14 +52,26 @@ pub fn dataset_key(us: &Unitsync, game_archive: &str) -> Option<String> {
 /// `GetArchivePath` looks up file names ("acidicquarry_5.17.sd7"), so without it
 /// this returns `None` for most maps and the cache never engages.
 pub fn map_key(us: &Unitsync, map_name: &str) -> Option<String> {
+    map_identity(us, map_name, "map")
+}
+
+/// Cache identity for a map's `mapinfo` metadata blob, in the `mapmeta` namespace
+/// so it never collides with the `map` options blob for the same archive.
+pub fn map_meta_key(us: &Unitsync, map_name: &str) -> Option<String> {
+    map_identity(us, map_name, "mapmeta")
+}
+
+/// Shared map identity: archive file identity where the path resolves, otherwise
+/// the versioned name.
+fn map_identity(us: &Unitsync, map_name: &str, kind: &str) -> Option<String> {
     us.map_archives(map_name)
         .into_iter()
         .next()
         .and_then(|archive| {
             let dir = us.archive_path(&archive)?;
-            identity(&Path::new(&dir).join(&archive), "map")
+            identity(&Path::new(&dir).join(&archive), kind)
         })
-        .or_else(|| name_identity(us, map_name, "map"))
+        .or_else(|| name_identity(us, map_name, kind))
 }
 
 /// Cache identity from the map's versioned name plus the map file inside its

@@ -83,6 +83,23 @@ pub struct MapItem {
     pub height: Option<u32>,
 }
 
+/// One map's `mapinfo` metadata in the batch `map-meta` output.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MapMeta {
+    pub name: String,
+    /// mapinfo metadata (description, author, ...).
+    pub info: BTreeMap<String, String>,
+}
+
+/// Output of the batch `map-meta` mode: mapinfo metadata per map, one Init.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MapMetaOutput {
+    pub maps: Vec<MapMeta>,
+    pub errors: Vec<String>,
+}
+
 /// One map thumbnail in the batch `thumbnails` output.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

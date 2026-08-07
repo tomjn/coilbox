@@ -23,6 +23,7 @@ mod game;
 mod heightmap;
 mod infocache;
 mod lua;
+mod mapmeta;
 mod metalmap;
 mod minimap;
 mod model;
@@ -53,6 +54,8 @@ struct Args {
     metalmap: bool,
     /// `--map-info`: lazily read one map's options (combined with `--map`).
     map_info: bool,
+    /// `--map-meta`: batch-read every map's mapinfo metadata in one Init.
+    map_meta: bool,
     /// `--map-skybox`: read one map's `atmosphere.skyBox` DDS (combined with `--map`).
     map_skybox: bool,
     config: bool,
@@ -183,6 +186,25 @@ fn run() -> i32 {
             Err(_) => {
                 let out = model::ThumbnailsOutput {
                     errors: vec!["worker panicked while rendering thumbnails".into()],
+                    ..Default::default()
+                };
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                1
+            }
+        };
+    }
+
+    // Batch map metadata: every map's mapinfo in one Init, disk-cached per map.
+    // Checked before the --map modes because it takes no --map of its own.
+    if args.map_meta {
+        return match std::panic::catch_unwind(|| mapmeta::read_all(&args.lib, cache_dir)) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                let out = model::MapMetaOutput {
+                    errors: vec!["worker panicked while reading map metadata".into()],
                     ..Default::default()
                 };
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -527,6 +549,7 @@ fn parse_args() -> Result<Args, String> {
     let mut heightmap = false;
     let mut metalmap = false;
     let mut map_info = false;
+    let mut map_meta = false;
     let mut map_skybox = false;
     let mut config = false;
     let mut config_set = false;
@@ -561,6 +584,7 @@ fn parse_args() -> Result<Args, String> {
             "--heightmap" => heightmap = true,
             "--metalmap" => metalmap = true,
             "--map-info" => map_info = true,
+            "--map-meta" => map_meta = true,
             "--map-skybox" => map_skybox = true,
             "--max-side" => {
                 max_side = it
@@ -628,6 +652,7 @@ fn parse_args() -> Result<Args, String> {
         heightmap,
         metalmap,
         map_info,
+        map_meta,
         map_skybox,
         config,
         config_set,
