@@ -1,5 +1,11 @@
 import { Button, cn } from "@picoframe/frame";
-import { ChevronRight, Download, Loader2, Trash2 } from "lucide-react";
+import {
+  ChevronRight,
+  Download,
+  FolderSync,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -8,11 +14,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { isGeneratedGame } from "@/lib/generatedGames";
 import {
   type RuntimeMarker,
   scenarioDeleteMission,
   scenarioListMissions,
+  scenarioRuntimeConsolidate,
   scenarioRuntimeInstall,
   scenarioRuntimeStatus,
 } from "@/scenario/bindings";
@@ -311,6 +323,140 @@ function WrittenMissions({ root }: { root: string }) {
 }
 
 /**
+ * The offer to put a game holding two spellings of a runtime folder back
+ * together (issue #950).
+ *
+ * A Linux player who installed the runtime before coilbox followed the game's own
+ * casing has the game's `LuaRules/` and a `luarules/` beside it. The engine reads
+ * a path case-insensitively, so those are one folder to it and one of the two
+ * copies of a file is loaded and the other is invisible. An update only ever
+ * writes and prunes one of them, so the other keeps whatever it was left with.
+ *
+ * Shown only to a game that has them, because no game on Windows or macOS can.
+ * The preview is a fresh dry run rather than the list the status read carried, so
+ * what the confirm removes is what was counted a moment ago. Nothing goes without
+ * that confirm: this is the one path where coilbox removes a file from a folder
+ * the game may have written, so it says what it will take first, as the clip
+ * sweep does (issue #916).
+ */
+function DuplicateFolders({
+  root,
+  onDone,
+}: {
+  root: string;
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [preview, setPreview] = useState<string[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const onOpenChange = async (next: boolean) => {
+    setOpen(next);
+    if (!next) return;
+    setLoading(true);
+    setError(null);
+    setPreview(null);
+    try {
+      const result = await scenarioRuntimeConsolidate({ root, apply: false });
+      setPreview(result.files);
+    } catch (e) {
+      setError(msg(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const apply = async () => {
+    setApplying(true);
+    setError(null);
+    try {
+      const result = await scenarioRuntimeConsolidate({ root, apply: true });
+      toast.success(
+        `Merged the runtime folders, ${result.files.length} duplicate files removed.`,
+      );
+      setOpen(false);
+      onDone();
+    } catch (e) {
+      setError(msg(e));
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button type="button" size="sm" variant="outline" className="gap-1.5">
+          <FolderSync className="size-4" />
+          Merge the runtime folders
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80">
+        {loading ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Looking for duplicate runtime files...
+          </p>
+        ) : error ? (
+          <p className="break-words text-sm text-destructive">{error}</p>
+        ) : preview ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm">
+              {preview.length === 0
+                ? "Nothing to merge - this game has one of each runtime folder."
+                : `Removes ${preview.length} runtime ${preview.length === 1 ? "file" : "files"} from the folder coilbox no longer writes to, then installs again into the game's own.`}
+            </p>
+            {preview.length > 0 && (
+              <>
+                <ul className="max-h-40 overflow-auto text-xs text-muted-foreground">
+                  {preview.map((file) => (
+                    <li key={file} className="break-all">
+                      {file}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground">
+                  Only coilbox's own files. The game's gadgets, widgets and
+                  missions stay where they are. This can't be undone.
+                </p>
+              </>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setOpen(false)}
+              >
+                {preview.length === 0 ? "Close" : "Cancel"}
+              </Button>
+              {preview.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  disabled={applying}
+                  onClick={apply}
+                >
+                  {applying ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <FolderSync className="size-4" />
+                  )}
+                  Merge
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
  * What a packaged `.sd7`/`.sdz` gets in place of the install action: why the
  * runtime cannot go into it, and the test mutator coilbox generates instead.
  *
@@ -370,6 +516,7 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
   const [installed, setInstalled] = useState<RuntimeMarker | null>(null);
   const [installedError, setInstalledError] = useState<string | null>(null);
   const [available, setAvailable] = useState<RuntimeMarker | null>(null);
+  const [duplicates, setDuplicates] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -380,6 +527,7 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
       setInstalled(status.installed);
       setInstalledError(status.installedError);
       setAvailable(status.available);
+      setDuplicates(status.duplicates);
     } catch (e) {
       setError(msg(e));
     }
@@ -405,6 +553,9 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
       toast.success(
         `Mission runtime version ${result.installed.version} installed, ${result.files.length} files.`,
       );
+      // An install can leave the game with a second spelling of a tree it did
+      // not write to, so what is duplicated is asked again rather than assumed.
+      refresh();
     } catch (e) {
       setError(msg(e));
     } finally {
@@ -441,6 +592,18 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
             </Button>
           )}
         </div>
+        {duplicates.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/50 p-2">
+            <p className="max-w-prose text-sm text-muted-foreground">
+              This game has {duplicates.length} runtime{" "}
+              {duplicates.length === 1 ? "file" : "files"} under a second
+              spelling of a runtime folder. The engine reads both folders as
+              one, so it may load the older copy of a file rather than the one
+              coilbox wrote.
+            </p>
+            <DuplicateFolders root={root} onDone={refresh} />
+          </div>
+        )}
         <CapabilityPanel
           headline={capabilityHeadline(installed, conditions, actions)}
           conditions={conditions}

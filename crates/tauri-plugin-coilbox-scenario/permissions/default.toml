@@ -15,6 +15,7 @@ permissions = [
   "allow-scenario-import",
   "allow-scenario-read-mission",
   "allow-scenario-runtime-install",
+  "allow-scenario-runtime-consolidate",
   "allow-scenario-runtime-status",
   "allow-scenario-list-missions",
   "allow-scenario-delete-mission",

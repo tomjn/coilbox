@@ -41,6 +41,8 @@ Only `.sdd` games can be installed into. A packaged `.sd7` or `.sdz` cannot be w
 
 An update removes stale runtime files, and only those. A file is coilbox's to remove if it sits under `luarules/mission_runtime/` or its name starts with `coilbox_`, and the new runtime did not just write it. Your own gadgets and any compiled `missions/<id>/mission.lua` are never touched. The path comparison is case-insensitive, so a game that spells the folder `LuaRules/Gadgets/` survives.
 
+On Linux a game can end up with two spellings of one of these folders: the `LuaRules/` your game ships and a `luarules/` an older coilbox wrote beside it. The engine reads a path case-insensitively, so those are one folder to it and it loads one copy of any file that is in both. Coilbox offers to merge them in the same section: it previews the runtime files under the folder it no longer writes to, and only removes them on an explicit confirm, then installs again into your own. Nothing of yours is listed or removed.
+
 Coilbox never reports what it meant to write. After installing it evaluates `missions/runtime.lua` back out of the folder, through the same sandboxed Spring Lua reader the rest of the app uses, and shows you what that file actually says.
 
 The tests under `lua/mission-runtime/tests/` are deliberately outside the three vendored folders, and are never installed.

@@ -12,7 +12,7 @@
 //! and gets the test mutator instead (issue #754).
 
 use coilbox_springlua::{resolve_case, SpringLua};
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, Runtime};
 
@@ -160,6 +160,158 @@ pub fn install(src: &Path, dest: &Path) -> Result<Vec<String>, String> {
         }
     }
     Ok(written)
+}
+
+/// Every directory in `root` that is a spelling of the vendored tree `tree`,
+/// sorted.
+///
+/// Usually one, and on Windows and macOS never more than one. A Linux game that
+/// coilbox installed into before issue #798 has two: the `LuaRules/` the game
+/// ships and the `luarules/` coilbox made beside it.
+fn spellings_of(root: &Path, tree: &str) -> Vec<OsString> {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return Vec::new();
+    };
+    let mut found: Vec<OsString> = entries
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .map(|e| e.file_name())
+        .filter(|name| name.to_string_lossy().to_lowercase() == tree)
+        .collect();
+    found.sort();
+    found
+}
+
+/// The spelling of `tree` the runtime should live under, given every spelling
+/// `root` holds.
+///
+/// The game's own, wherever that can be told apart: a tree carrying a file that
+/// is neither the runtime's nor one it used to ship is a tree the game keeps its
+/// own content in, and that is the one a maintainer commits and a coilbox update
+/// should land in. Where that says nothing, or says both, the answer is the one
+/// an install already writes to, so nothing moves for no reason.
+fn tree_to_keep(root: &Path, tree: &str, spellings: &[OsString], shipped: &[String]) -> OsString {
+    let games: Vec<&OsString> = spellings
+        .iter()
+        .filter(|spelling| {
+            let mut files = Vec::new();
+            walk(&root.join(spelling), Path::new(spelling), &mut files);
+            files.iter().any(|rel| {
+                let key = key(rel);
+                !runtime_owned(&key) && !shipped.contains(&key)
+            })
+        })
+        .collect();
+    if let [only] = games[..] {
+        return only.clone();
+    }
+    let exact = OsString::from(tree);
+    if spellings.contains(&exact) {
+        return exact;
+    }
+    spellings
+        .first()
+        .cloned()
+        .unwrap_or_else(|| OsString::from(tree))
+}
+
+/// The runtime files a game holds under a spelling of a vendored tree other than
+/// the one it keeps, relative to `root` and sorted (issue #950).
+///
+/// A Linux game with both `LuaRules/` and `luarules/` has the runtime in one and
+/// whatever an older coilbox left in the other. The engine lower-cases every path
+/// into one index, so the two trees are one folder to it and the same file under
+/// both spellings loads exactly once, from whichever the archive was read in
+/// first. A stale copy is therefore not untidiness: it is a file the engine may
+/// load in place of the one coilbox just wrote, and the install's own prune walks
+/// one spelling so it can never reach it.
+///
+/// Only files coilbox put there are listed: what this runtime ships, and what an
+/// older one shipped ([`runtime_owned`]). The game's own gadgets, widgets and
+/// missions are never in the list, whichever tree they sit in.
+pub fn duplicates(src: &Path, root: &Path) -> Vec<PathBuf> {
+    let shipped: Vec<String> = vendored_files(src).iter().map(|rel| key(rel)).collect();
+    let mut out = Vec::new();
+    for spelling in losing_trees(root, &shipped) {
+        let mut files = Vec::new();
+        walk(&root.join(&spelling), Path::new(&spelling), &mut files);
+        for rel in files {
+            let key = key(&rel);
+            if shipped.contains(&key) || runtime_owned(&key) {
+                out.push(rel);
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// The spellings of a vendored tree that `root` is not keeping the runtime in.
+/// Empty for a game with one spelling of each, which is every game on Windows
+/// and macOS and every Linux game coilbox has not installed into twice.
+fn losing_trees(root: &Path, shipped: &[String]) -> Vec<OsString> {
+    let mut out = Vec::new();
+    for tree in VENDORED {
+        let spellings = spellings_of(root, tree);
+        if spellings.len() < 2 {
+            continue;
+        }
+        let keep = tree_to_keep(root, tree, &spellings, shipped);
+        out.extend(spellings.into_iter().filter(|s| *s != keep));
+    }
+    out
+}
+
+/// Remove `dir` and everything under it that is now empty, deepest first.
+///
+/// `remove_dir` refuses a directory with anything in it, so a tree still holding
+/// the game's own files stays and only the folders coilbox emptied go.
+fn prune_empty_dirs(dir: &Path) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                prune_empty_dirs(&path);
+            }
+        }
+    }
+    let _ = std::fs::remove_dir(dir);
+}
+
+/// Put a game holding two spellings of a vendored tree back together, and say
+/// what went (issue #950).
+///
+/// `apply` false lists [`duplicates`] and touches nothing, so a player sees the
+/// files before they go. `apply` true removes them, drops the folders that
+/// leaves empty, and installs again, because the tree that is left may be the
+/// one holding the older copy.
+///
+/// This is the one place coilbox removes a file from a folder it did not
+/// necessarily write, which is why it is an explicit act rather than something
+/// an install does on its way past.
+pub fn consolidate(src: &Path, root: &Path, apply: bool) -> Result<Vec<String>, String> {
+    let found = duplicates(src, root);
+    let removed: Vec<String> = found
+        .iter()
+        .map(|rel| rel.to_string_lossy().replace('\\', "/"))
+        .collect();
+    if !apply || found.is_empty() {
+        return Ok(removed);
+    }
+    // Read before anything is removed, because emptying a tree is what changes
+    // the answer, and the folders to drop are the ones that lost the file.
+    let shipped: Vec<String> = vendored_files(src).iter().map(|rel| key(rel)).collect();
+    let losers = losing_trees(root, &shipped);
+    for rel in &found {
+        let path = root.join(rel);
+        std::fs::remove_file(&path)
+            .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
+    }
+    for spelling in losers {
+        prune_empty_dirs(&root.join(spelling));
+    }
+    install(src, root)?;
+    Ok(removed)
 }
 
 /// Unwrap Lua's `[string "name"]:` chunk markers.
@@ -568,6 +720,158 @@ mod tests {
             resolve_case(dir.path(), Path::new("LuaRules")),
             dir.path().join("LuaRules")
         );
+    }
+
+    /// A game holding both spellings of a tree, as a Linux player who installed
+    /// the runtime before issue #798 has it: the game's own `LuaRules/` and
+    /// `Missions/`, and beside them the `luarules/` and `missions/` an older
+    /// coilbox wrote.
+    ///
+    /// `None` on a filesystem that cannot hold two spellings at once, which is
+    /// every Windows and macOS one and where this situation cannot arise.
+    /// Skipped rather than made to pass for the wrong reason, so proving it takes
+    /// a case-sensitive volume.
+    fn game_with_two_spellings() -> Option<tempfile::TempDir> {
+        let game = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(game.path().join("LuaRules/Gadgets")).expect("mkdir");
+        if std::fs::create_dir(game.path().join("luarules")).is_err() {
+            return None;
+        }
+        for (rel, body) in [
+            // The game's own, in the game's own spelling.
+            ("LuaRules/Gadgets/game_end.lua", "-- the game's"),
+            ("Missions/first/mission.lua", "return {}"),
+            // A file an older runtime shipped and this one does not, left in the
+            // tree the install no longer writes to. This is the one issue #950
+            // measured surviving an update.
+            ("LuaRules/mission_runtime/coilbox_old_thing.lua", "-- old"),
+            // And what an older coilbox wrote beside the game's trees.
+            ("luarules/gadgets/coilbox_mission_runtime.lua", "-- old"),
+            ("luarules/mission_runtime/coilbox_start.lua", "-- old"),
+            ("missions/runtime.lua", "return { version = 0 }"),
+        ] {
+            let path = game.path().join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).expect("mkdir");
+            std::fs::write(path, body).expect("write");
+        }
+        Some(game)
+    }
+
+    /// A game with one spelling of each tree has nothing to put back together,
+    /// which is every game on Windows and macOS and every Linux game coilbox has
+    /// not installed into twice.
+    #[test]
+    fn a_game_with_one_spelling_of_each_tree_has_no_duplicates() {
+        let src = source_tree();
+        let game = tempfile::tempdir().expect("tempdir");
+        install(src.path(), game.path()).expect("install");
+
+        assert!(duplicates(src.path(), game.path()).is_empty());
+        assert!(consolidate(src.path(), game.path(), true)
+            .expect("consolidate")
+            .is_empty());
+        assert_eq!(read_marker(game.path()).expect("marker")["version"], 1);
+    }
+
+    /// What a preview shows: the runtime's files under the spelling the game
+    /// does not keep, and nothing of the game's own.
+    #[test]
+    fn a_preview_names_the_runtime_files_under_the_other_spelling() {
+        let Some(game) = game_with_two_spellings() else {
+            return;
+        };
+        let src = source_tree();
+
+        let found: Vec<String> = duplicates(src.path(), game.path())
+            .iter()
+            .map(|rel| rel.to_string_lossy().into_owned())
+            .collect();
+
+        assert_eq!(
+            found,
+            vec![
+                "luarules/gadgets/coilbox_mission_runtime.lua",
+                "luarules/mission_runtime/coilbox_start.lua",
+                "missions/runtime.lua",
+            ]
+        );
+        // A dry run is exactly that.
+        assert_eq!(
+            consolidate(src.path(), game.path(), false).expect("dry run"),
+            found
+        );
+        assert!(game
+            .path()
+            .join("luarules/gadgets/coilbox_mission_runtime.lua")
+            .is_file());
+    }
+
+    /// Consolidating leaves the runtime in the game's own trees, takes the
+    /// folders an older coilbox made beside them, and leaves the game's own files
+    /// where they were.
+    #[test]
+    fn consolidating_puts_the_runtime_in_the_games_own_trees() {
+        let Some(game) = game_with_two_spellings() else {
+            return;
+        };
+        let src = source_tree();
+
+        let removed = consolidate(src.path(), game.path(), true).expect("consolidate");
+
+        assert_eq!(removed.len(), 3);
+        assert!(!game.path().join("luarules").exists());
+        assert!(!game.path().join("missions").exists());
+        assert!(game
+            .path()
+            .join("LuaRules/Gadgets/coilbox_mission_runtime.lua")
+            .is_file());
+        assert!(game.path().join("Missions/runtime.lua").is_file());
+        // The game's own, untouched.
+        assert!(game.path().join("LuaRules/Gadgets/game_end.lua").is_file());
+        assert!(game.path().join("Missions/first/mission.lua").is_file());
+        // And what the engine will read out of the game afterwards.
+        assert_eq!(read_marker(game.path()).expect("marker")["version"], 1);
+    }
+
+    /// The measurement issue #950 was filed on: a stale runtime file in the tree
+    /// the install does not write to survives every update, because the prune
+    /// walks one spelling and can never reach the other. It goes here.
+    #[test]
+    fn a_stale_file_the_install_cannot_reach_is_taken() {
+        let Some(game) = game_with_two_spellings() else {
+            return;
+        };
+        let src = source_tree();
+        let stale = game
+            .path()
+            .join("LuaRules/mission_runtime/coilbox_old_thing.lua");
+
+        install(src.path(), game.path()).expect("update");
+        assert!(stale.is_file(), "an update cannot reach it");
+
+        consolidate(src.path(), game.path(), true).expect("consolidate");
+
+        assert!(!stale.exists());
+        // Nothing is left under either spelling twice.
+        assert!(duplicates(src.path(), game.path()).is_empty());
+    }
+
+    /// Consolidating twice is the same as consolidating once: the tree the
+    /// runtime landed in is the one the next install writes to.
+    #[test]
+    fn consolidating_twice_changes_nothing_the_second_time() {
+        let Some(game) = game_with_two_spellings() else {
+            return;
+        };
+        let src = source_tree();
+
+        consolidate(src.path(), game.path(), true).expect("first");
+        let files = vendored_files(game.path());
+        assert!(consolidate(src.path(), game.path(), true)
+            .expect("second")
+            .is_empty());
+
+        assert_eq!(files, vendored_files(game.path()));
     }
 
     /// The version marker reads back out of the game's own `missions/` spelling,

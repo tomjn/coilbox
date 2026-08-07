@@ -136,6 +136,10 @@ export const scenarioRuntimeInstall = defineCommand<
  * `extensions` is whatever that file evaluated to, unread. The editor's half of
  * it is `parseExtensions` in `extensions.ts`, which is where a hand-written
  * declaration is checked.
+ *
+ * `duplicates` is the runtime files the game holds under a second spelling of a
+ * vendored tree, and is empty for every game that has one of each. See
+ * {@link scenarioRuntimeConsolidate}.
  */
 export const scenarioRuntimeStatus = defineCommand<
   { root: string },
@@ -144,8 +148,27 @@ export const scenarioRuntimeStatus = defineCommand<
     installedError: string | null;
     available: RuntimeMarker | null;
     extensions: unknown;
+    duplicates: string[];
   }
 >("coilbox-scenario", "scenario_runtime_status");
+
+/**
+ * Put a game holding two spellings of a vendored tree back together, and say
+ * which files went.
+ *
+ * A Linux player who installed the runtime before coilbox resolved a destination
+ * against the game's own casing has the game's `LuaRules/` and a `luarules/`
+ * beside it. The engine reads both as one folder, so a file under the spelling
+ * coilbox no longer writes to is one it may load in place of the current copy,
+ * and an update can never clear it.
+ *
+ * `apply` false lists what would go and removes nothing, which is what the
+ * control previews. Only the runtime's own files are ever listed.
+ */
+export const scenarioRuntimeConsolidate = defineCommand<
+  { root: string; apply: boolean },
+  { files: string[]; applied: boolean }
+>("coilbox-scenario", "scenario_runtime_consolidate");
 
 /**
  * Generate the test mutator under `dataDir`'s `games/`: coilbox's own `.sdd`
