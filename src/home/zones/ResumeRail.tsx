@@ -140,28 +140,23 @@ export function railCards(
 /**
  * Secondary text on a rail card.
  *
- * Not `text-muted-foreground`, which is what the hero and the tool cards use.
- * That token is 46% lightness in the light ramp, and on the six bases whose hue
- * carries the most luminance (amber, green, teal, lime, emerald, yellow) it
- * measures 4.22:1 to 4.31:1 on the card surface, under the 4.5:1 AA threshold for
- * text below 18.66px. Both of this card's secondary lines are 12px, so the rail
- * is where that bites hardest. Stepping the card's own foreground down in alpha
- * keeps the same hierarchy and holds 4.98:1 on the worst light base and 6.96:1
- * on the worst dark one. `resumeRail.test.ts` reads the alpha out of this string
- * and re-measures it, so weakening the number re-runs the measurement.
- *
- * The token defect is app-wide rather than this zone's, and is filed separately.
+ * The same token the hero and the tool cards use. This was
+ * `hsl(var(--card-foreground)/0.65)` while the token itself failed AA in the light
+ * ramp (#1019), which put a bespoke ink on the rail and the shared one on the
+ * hero directly above it, at nearly the same colour. The token is fixed in
+ * `src/index.css` and now measures 5.11:1 at worst on a card surface, better than
+ * the workaround's 4.98:1, so the rail goes back to it.
  */
-export const RAIL_DIM_CLASS = "text-[hsl(var(--card-foreground)/0.65)]";
+export const RAIL_DIM_CLASS = "text-muted-foreground";
 
 /**
- * The card surface. `bg-card`, with no `hover:bg-*`: {@link RAIL_DIM_CLASS} is a
- * translucent ink, so it composites over whatever is behind it, and a surface
- * that changed on hover would make the measured contrast true only at rest. The
- * hover cue is the accent-coloured border and a lift instead.
+ * The card surface. `bg-card`, with no `hover:bg-*`, so the contrast
+ * `resumeRail.test.ts` measures is true in every state rather than only at rest.
+ * The hover cue is the accent-coloured border and a lift instead.
  *
- * No `bg-primary/5` either. That tint is what `RunListPage` gives a resumable
- * run, and it costs 0.5:1 the light ramp does not have to spare (#1016).
+ * No `bg-primary/5` either. The tint is legible now the token is fixed, but the
+ * rail is the quiet half of the hero above it and a tint would compete with the
+ * hero's own accent border for the same "look here" job.
  *
  * Width matches the tool cards below, so the page has one card width rather than
  * two, and the rail wraps and shrinks to whatever exists instead of stretching

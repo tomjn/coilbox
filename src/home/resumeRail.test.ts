@@ -289,13 +289,15 @@ describe("the rail on the page", () => {
 });
 
 /**
- * The legibility guarantee for the card's two secondary lines, measured rather
- * than eyeballed.
+ * The legibility guarantee for the card's four lines, measured rather than
+ * eyeballed.
  *
- * What this proves: both 12px lines clear WCAG AA (4.5:1) on the card surface in
- * every base ramp picoframe ships, in both colour schemes. The alpha comes out of
- * the shipped class string, so weakening it re-runs the measurement instead of
- * leaving it stale.
+ * What this proves: the title and the action, which are the card's own
+ * foreground, clear WCAG AA (4.5:1) on the card surface in every base ramp
+ * picoframe ships, in both colour schemes. It also proves the two 12px secondary
+ * lines use the shared muted token rather than a bespoke ink, which is what makes
+ * them somebody else's measurement: `theme/mutedForeground.test.ts` covers the
+ * token itself, app-wide, on every surface including this one.
  *
  * What it does not prove: anything about the page backdrop showing through, which
  * it cannot, because `bg-card` is opaque.
@@ -328,11 +330,6 @@ function hsl(h: number, s: number, l: number): Rgb {
   return rgb.map((v) => v + m) as Rgb;
 }
 
-/** Straight-alpha composite of `layer` over `base`. */
-function over(base: Rgb, layer: Rgb, alpha: number): Rgb {
-  return base.map((c, i) => c * (1 - alpha) + layer[i] * alpha) as Rgb;
-}
-
 /** WCAG 2.2 relative luminance. */
 function luminance([r, g, b]: Rgb): number {
   const lin = (v: number) =>
@@ -344,15 +341,6 @@ function luminance([r, g, b]: Rgb): number {
 function contrast(a: Rgb, b: Rgb): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
-}
-
-/** The alpha in a `hsl(var(--token)/N)` arbitrary value, or 1 if it has none. */
-function tokenAlpha(className: string, token: string): number {
-  const found = new RegExp(`hsl\\(var\\(--${token}\\)(?:/([0-9.]+))?\\)`).exec(
-    className,
-  );
-  if (!found) throw new Error(`no --${token} in ${className}`);
-  return found[1] ? Number(found[1]) : 1;
 }
 
 /**
@@ -398,31 +386,26 @@ function cardTokens(
 }
 
 describe("secondary text on a rail card", () => {
-  const dimAlpha = tokenAlpha(RAIL_DIM_CLASS, "card-foreground");
-
-  it("dims the card's own ink rather than tinting the surface", () => {
-    expect(dimAlpha).toBeGreaterThan(0);
-    expect(dimAlpha).toBeLessThan(1);
-    // The tint of #1016, which costs more contrast than the light ramp has.
-    expect(RAIL_CARD_CLASS).toContain("bg-card");
-    expect(RAIL_CARD_CLASS).not.toContain("bg-primary");
+  it("uses the shared muted token, not an ink of its own", () => {
+    // The rail carried `hsl(var(--card-foreground)/0.65)` while the token failed
+    // AA. Now that it does not, a second ink here would only make the rail and
+    // the hero above it disagree about what secondary text looks like.
+    expect(RAIL_DIM_CLASS).toBe("text-muted-foreground");
   });
 
-  it("keeps the surface fixed on hover, so the measurement holds in every state", () => {
-    // The dim ink is translucent, so a surface that changed under it would make
-    // the numbers below true only at rest.
+  it("keeps the card surface plain, so the token's measurement applies", () => {
+    // `theme/mutedForeground.test.ts` measures the token on `--card`, `--muted`
+    // and a `bg-primary/5` tint. A surface outside that set, or one that changed
+    // on hover, would be unmeasured.
+    expect(RAIL_CARD_CLASS).toContain("bg-card");
+    expect(RAIL_CARD_CLASS).not.toContain("bg-primary");
     expect(RAIL_CARD_CLASS).not.toContain("hover:bg-");
   });
 
   for (const dark of [false, true]) {
     for (const [name, hue, sat, satText] of BASES) {
       const { card, ink } = cardTokens(hue, sat, satText ?? sat, dark);
-      const dim = over(card, ink, dimAlpha);
       const scheme = dark ? "dark" : "light";
-
-      it(`clears AA for the label and detail on ${name} in ${scheme}`, () => {
-        expect(contrast(dim, card)).toBeGreaterThanOrEqual(4.5);
-      });
 
       it(`clears AA for the title and action on ${name} in ${scheme}`, () => {
         expect(contrast(ink, card)).toBeGreaterThanOrEqual(4.5);
