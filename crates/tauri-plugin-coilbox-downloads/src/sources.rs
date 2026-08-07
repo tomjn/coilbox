@@ -78,25 +78,33 @@ pub struct SpringfilesEngine {
     pub size: u64,
 }
 
-/// The springfiles engine `category` token for the current platform, e.g.
-/// `linux64` (matches `engine_linux64`). Engines are listed per-OS so we filter
-/// to the running one.
-pub fn springfiles_engine_token() -> &'static str {
-    match std::env::consts::OS {
-        "windows" => "windows64",
-        "macos" => "macosx",
-        _ => "linux64",
+/// The springfiles engine `category` for the current platform, e.g.
+/// `engine_linux64`. This has to be the category pr-downloader itself will
+/// search, because `--download-engine` resolves the build from springfiles by
+/// its own OS *and architecture*, so listing a category it will not look in
+/// offers a download that can only fail. Mirrors `getPlatformEngineCat` in
+/// pr-downloader's `src/pr-downloader.cpp`. macOS is arm64 only because that is
+/// the only Apple platform pr-downloader builds for.
+pub fn springfiles_engine_category() -> &'static str {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("windows", "aarch64") => "engine_windows_arm64",
+        ("windows", _) => "engine_windows64",
+        ("macos", _) => "engine_macosx_arm64",
+        (_, "aarch64") => "engine_linux_arm64",
+        _ => "engine_linux64",
     }
 }
 
-/// Filter springfiles engine results to `token`'s platform and dedupe to one per
-/// version (newest first). `--download-engine` takes only the version, so the
-/// per-file variants (minimal/full) collapse to a single row.
-pub fn engines_for_platform(all: Vec<SpringFile>, token: &str) -> Vec<SpringfilesEngine> {
+/// Filter springfiles engine results to `category` and dedupe to one per version
+/// (newest first). `--download-engine` takes only the version, so the per-file
+/// variants (minimal/full) collapse to a single row. The match is exact, because
+/// `engine_macosx` and `engine_macosx_arm64` are different builds for different
+/// machines and only one of them is the one pr-downloader will fetch.
+pub fn engines_for_platform(all: Vec<SpringFile>, category: &str) -> Vec<SpringfilesEngine> {
     let mut seen = std::collections::HashSet::new();
     let mut out: Vec<SpringfilesEngine> = all
         .into_iter()
-        .filter(|f| f.category.contains(token) && !f.version.is_empty())
+        .filter(|f| f.category == category && !f.version.is_empty())
         .filter(|f| seen.insert(f.version.clone()))
         .map(|f| SpringfilesEngine {
             name: f.name,
@@ -437,11 +445,40 @@ mod tests {
             {"name":"spring","filename":"b_linux.7z","category":"engine_linux64","version":"2024.12.1","size":12}
         ]"#;
         let all: Vec<SpringFile> = serde_json::from_str(json).unwrap();
-        let engines = engines_for_platform(all, "linux64");
+        let engines = engines_for_platform(all, "engine_linux64");
         // One per version, windows excluded, newest first.
         assert_eq!(engines.len(), 2);
         assert_eq!(engines[0].version, "2025.01.6");
         assert_eq!(engines[1].version, "2024.12.1");
+    }
+
+    /// springfiles' only macOS engines are 2013 Intel builds under
+    /// `engine_macosx`. pr-downloader on an Apple Silicon machine searches
+    /// `engine_macosx_arm64` and nothing else, so offering the Intel ones would
+    /// be offering a download that cannot resolve.
+    #[test]
+    fn an_arm64_platform_does_not_pick_up_the_x86_category() {
+        let json = r#"[
+            {"name":"spring","filename":"spring_95.0_MacOSX.zip","category":"engine_macosx","version":"95.0","size":10},
+            {"name":"spring","filename":"a_linux.7z","category":"engine_linux64","version":"2025.01.6","size":10}
+        ]"#;
+        let all: Vec<SpringFile> = serde_json::from_str(json).unwrap();
+        assert!(engines_for_platform(all.clone(), "engine_macosx_arm64").is_empty());
+        assert!(engines_for_platform(all, "engine_linux_arm64").is_empty());
+    }
+
+    /// The category has to be one pr-downloader's own platform switch produces,
+    /// or the list and the download disagree about which build is wanted.
+    #[test]
+    fn the_category_is_one_pr_downloader_searches() {
+        assert!([
+            "engine_windows64",
+            "engine_windows_arm64",
+            "engine_linux64",
+            "engine_linux_arm64",
+            "engine_macosx_arm64",
+        ]
+        .contains(&springfiles_engine_category()));
     }
 
     #[test]

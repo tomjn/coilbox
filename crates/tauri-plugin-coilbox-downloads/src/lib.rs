@@ -519,12 +519,12 @@ async fn dl_springfiles_list(category: String) -> CliResult {
 /// deduped to one row per version (the download id `--download-engine` wants).
 #[tauri::command]
 async fn dl_springfiles_engines() -> CliResult {
-    let token = sources::springfiles_engine_token();
+    let category = sources::springfiles_engine_category();
     let url = sources::springfiles_list_url("engine");
     match fetch_text(url).await {
         Ok(body) => match serde_json::from_str::<Vec<sources::SpringFile>>(&body) {
             Ok(all) => {
-                let engines = sources::engines_for_platform(all, token);
+                let engines = sources::engines_for_platform(all, category);
                 CliResult::ok(json!({ "engines": engines, "platform": std::env::consts::OS }))
             }
             Err(e) => CliResult::err(format!("could not parse springfiles engines: {e}")),
