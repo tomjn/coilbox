@@ -245,6 +245,17 @@ describe("what a link chip is", () => {
     expect(html).toContain("lucide-external-link");
   });
 
+  it("marks itself external even when the profile picked its own icon", () => {
+    // The mark is the only thing that says the chip leaves the app: a profile
+    // can pick `book` or `calendar` for something that is still a jump to the
+    // browser, and then the leading icon says nothing about where it goes.
+    const html = profileGrid([
+      { label: "Discord", href: "https://discord.gg/x", icon: "discord" },
+    ]);
+    expect(html).toContain("lucide-messages-square");
+    expect(html).toContain("lucide-external-link");
+  });
+
   it("opens through the OS opener", async () => {
     openExternal("https://docs.example");
     await Promise.resolve();
