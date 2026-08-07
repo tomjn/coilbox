@@ -155,3 +155,7 @@ export function forgetThemeColor(): void {
 import { bundledCardArt } from "./bundledArt";
 
 registerCardArtSource("bundled", bundledCardArt);
+
+import { contentCardArt } from "./contentArt";
+
+registerCardArtSource("content", contentCardArt);

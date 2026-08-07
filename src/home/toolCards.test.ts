@@ -271,22 +271,12 @@ const BASE_HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
 /** Neutral through the subtle tier to the vivid one, which tops out around 11. */
 const BASE_SATS = [0, 1, 2.6, 6, 11];
 
-describe("text on card art", () => {
-  const art = brightestProceduralPixel();
-  const bandAlpha = tokenAlpha(ART_CLASSES.band, "background");
-  const textAlpha = tokenAlpha(ART_CLASSES.band, "foreground");
-  const dimAlpha = tokenAlpha(ART_CLASSES.dim, "foreground");
+const bandAlpha = tokenAlpha(ART_CLASSES.band, "background");
+const textAlpha = tokenAlpha(ART_CLASSES.band, "foreground");
+const dimAlpha = tokenAlpha(ART_CLASSES.dim, "foreground");
 
-  it("dims the art under the band", () => {
-    expect(bandAlpha).toBeGreaterThan(0);
-    expect(bandAlpha).toBeLessThan(1);
-  });
-
-  it("fades in from nothing above the band, so no text sits on the fade", () => {
-    expect(ART_CLASSES.fade).toContain("to-transparent");
-    expect(ART_CLASSES.fade).toContain("bottom-full");
-  });
-
+/** Measure both text colours over `art`, in every base ramp picoframe ships. */
+function measureBandOver(art: Rgb) {
   for (const hue of BASE_HUES) {
     for (const sat of BASE_SATS) {
       // The dark ramp's --background, which is what the band is painted in.
@@ -306,4 +296,33 @@ describe("text on card art", () => {
       });
     }
   }
+}
+
+describe("text on card art", () => {
+  it("dims the art under the band", () => {
+    expect(bandAlpha).toBeGreaterThan(0);
+    expect(bandAlpha).toBeLessThan(1);
+  });
+
+  it("fades in from nothing above the band, so no text sits on the fade", () => {
+    expect(ART_CLASSES.fade).toContain("to-transparent");
+    expect(ART_CLASSES.fade).toContain("bottom-full");
+  });
+
+  measureBandOver(brightestProceduralPixel());
+});
+
+/**
+ * The same measurement against a white pixel, which closes the gap this file
+ * named above.
+ *
+ * Issue #989 puts real minimaps and loading-screen art on these cards, and issue
+ * #1000 lets a distribution supply any image file at all. Coilbox draws none of
+ * them and cannot promise any of them is dark, so the dark contract cannot be
+ * what holds the text legible. White is the ceiling for an image, so proving the
+ * band clears AA over white proves it over every picture a source can ever hand
+ * back, and means no source has to darken its own output to be safe here.
+ */
+describe("text on art Coilbox did not draw", () => {
+  measureBandOver([1, 1, 1]);
 });
