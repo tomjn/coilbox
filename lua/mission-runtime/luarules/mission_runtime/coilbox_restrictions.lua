@@ -18,6 +18,13 @@
 -- The runtime's own spawns are untouched. AllowUnitCreation is consulted for
 -- builders and factories only, never for Spring.CreateUnit, so a mission may
 -- place a unit its teams are forbidden to build.
+--
+-- AllowUnitCreation is also the last possible moment to say no. It is what
+-- actually holds, and it stays: a player can reach a build order by other means
+-- than the menu. But on its own it leaves the icon in the menu, so the player
+-- clicks it, the builder walks to the site, and nothing happens. `paint` is the
+-- sign on the door in front of that: it greys the build icons for the defs a
+-- team may not build, on every builder that team owns.
 
 local M = {}
 
@@ -72,6 +79,19 @@ function M.register(engine, state)
 	-- Engine team -> def id -> true, for the defs `unlock_unit` has freed.
 	local unlocked = {}
 
+	-- The def ids that have a build menu at all, worked out once. Reading
+	-- UnitDefs[id].buildOptions builds a fresh table every time it is asked, so
+	-- asking per unit created would allocate one per unit for an answer that never
+	-- changes. A mission with nothing to grey out asks nothing.
+	local hasBuildMenu = {}
+	if buildable then
+		for id, def in pairs(UnitDefs) do
+			if #def.buildOptions > 0 then
+				hasBuildMenu[id] = true
+			end
+		end
+	end
+
 	local handle = {}
 
 	--- Whether the scenario's own list forbids this def to this team, before any
@@ -99,6 +119,65 @@ function M.register(engine, state)
 	--- Whether a team may be given this command.
 	function handle.allowsCommand(cmdID, team)
 		return not (withheld[cmdID] and missionTeam[team])
+	end
+
+	-- Unit -> the build commands this module greyed out on it. Only what is in
+	-- here is ever ungreyed again, so an icon the game itself had already greyed
+	-- for its own reasons is left exactly as the game left it.
+	local greyed = {}
+
+	--- Bring one unit's build menu into line with what its team may build.
+	--
+	-- The icons are edited rather than removed and put back. A removed one has to
+	-- be reinserted at the index it came from or the player's menu quietly
+	-- reorders itself, and `disabled` is what the engine draws greyed anyway, so
+	-- editing says the same thing without ever moving anything. It is also what a
+	-- game's own build gating uses: Splinter Faction's tech tree greys a locked
+	-- build icon exactly this way.
+	--
+	-- Called for every unit that arrives on a team and for every unit of a team
+	-- an `unlock_unit` just freed a def for, so the cost is paid once per unit
+	-- rather than once per order. A def that builds nothing pays one table lookup
+	-- and stops.
+	function handle.paint(unitID, unitDefID, team)
+		if not hasBuildMenu[unitDefID] then
+			return
+		end
+
+		local mine = greyed[unitID]
+		-- The index is read fresh every time. It is a position in the unit's own
+		-- list, and anything that removes a command description shifts every index
+		-- behind it, so one held from an earlier frame points at the wrong icon.
+		for index, desc in ipairs(Spring.GetUnitCmdDescs(unitID) or {}) do
+			-- A build command's id is the negative of the unit def it builds, which
+			-- is the whole of what makes one a build command.
+			local id = desc.id
+			if id < 0 then
+				if handle.allowsBuild(-id, team) then
+					if mine and mine[id] then
+						Spring.EditUnitCmdDesc(unitID, index, { disabled = false })
+						mine[id] = nil
+					end
+				elseif not desc.disabled then
+					Spring.EditUnitCmdDesc(unitID, index, { disabled = true })
+					mine = mine or {}
+					mine[id] = true
+					greyed[unitID] = mine
+				end
+			end
+		end
+	end
+
+	--- Every unit a team owns, brought into line at once. What an unlock is for.
+	local function repaint(team)
+		for _, unitID in ipairs(Spring.GetTeamUnits(team) or {}) do
+			handle.paint(unitID, Spring.GetUnitDefID(unitID), team)
+		end
+	end
+
+	--- A unit has left the game, so what was greyed on it is nobody's business.
+	function handle.removed(unitID)
+		greyed[unitID] = nil
 	end
 
 	--- Lift the buildable restriction on one def for one participant. No
@@ -137,6 +216,10 @@ function M.register(engine, state)
 
 		unlocked[team] = unlocked[team] or {}
 		unlocked[team][def.id] = true
+		-- The reward is not the def alone, it is the def and the icon for it. A
+		-- team that has just been handed something it could not build before has
+		-- to be able to see that, so every builder it owns is repainted here.
+		repaint(team)
 		return true
 	end
 
