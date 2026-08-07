@@ -281,6 +281,9 @@ Enough to be worth knowing before you adopt it:
   Add the guard and nothing else happens. Skip it and the runtime falls back to removing what your game spawned, from load until the end of game frame 1, touching only creations with no builder. That window is no use to a game that spawns later than frame 1: Splinter Faction spawns on frame 1800, and its commanders arrived despite `noCommander` until it took the guard ([issue #884](https://github.com/tomjn/coilbox/issues/884)).
 - **Game over**, through your guard and the anchor unit.
 - **`AllowUnitCreation` and `AllowCommand`, only when a mission restricts something.** Both callins are hot, and a mission that restricts nothing defines neither. A build order the mission forbids is dropped rather than kept, so a factory queue moves on to the order behind it and a builder does not stand at the site retrying. A command the mission withholds never reaches the unit, and the orders the runtime gives its own groups are not held to it.
+- **The build icons for defs a mission forbids, greyed out.** A mission with a `buildable` restriction sets `disabled` on those command descriptions, on every builder as it arrives on a team and on every unit of a team an `unlock_unit` frees a def for. The icons are edited in place, never removed, so your build menu keeps its order.
+
+  If your game greys build icons of its own, say a tech tree or a supply limit, the two do not arbitrate and the last writer holds the icon. The runtime never un-greys an icon it did not grey itself, so a lock of yours survives a mission finishing with the def beside it. Going the other way, a repaint of yours after the runtime's leaves a forbidden def looking available, and the build is still refused. `AllowUnitCreation` is what actually holds, and the icon is only the sign in front of it.
 
 Everything else your game does carries on. The runtime does not touch your economy, your unit definitions or your own gadgets.
 
@@ -345,7 +348,9 @@ Every `tests/*_test.lua` file, each in its own `luajit`, against a stub of the s
 scripts/mission-headless.sh
 ```
 
-A real engine. It builds a scratch game out of the runtime plus the compiled fixtures and plays each one in `spring-headless`, which simulates with no OpenGL context. A probe gadget stands in for the player: it walks a unit into a zone, kills an actor, hands one over, tells a factory and a builder to make something the mission forbids, waits for the mission to unlock one of those, and checks what the runtime did about it. Nothing in CI runs this, because a runner has no engine, no game and no map. The script's header lists the environment variables that point it at them.
+A real engine. It builds a scratch game out of the runtime plus the compiled fixtures and plays each one in `spring-headless`, which simulates with no OpenGL context. A probe gadget stands in for the player: it walks a unit into a zone, kills an actor, hands one over, tells a factory and a builder to make something the mission forbids, waits for the mission to unlock one of those, reads the build menus back off both, and checks what the runtime did about it. Nothing in CI runs this, because a runner has no engine, no game and no map. The script's header lists the environment variables that point it at them.
+
+A build menu is read through `Spring.GetUnitCmdDescs`, which is the list the engine draws one from, so what a run settles is that the engine no longer offers the command on that unit. Nothing here can settle what a player sees. The machine has no OpenGL context, and a game that replaces the engine's build menu with its own LuaUI is free to draw a disabled icon however it likes.
 
 The probe's unsynced half checks the widget, because the engine's `Script.LuaUI` is unsynced and a widget's registered global is the only thing about it a gadget can see. That needs the game's LuaUI to load, and a game's entry point includes `LuaUI/*.lua` files a current engine no longer ships, so the script links the data directory's own `LuaUI/` into the run. Without one it says so and skips the widget checks.
 

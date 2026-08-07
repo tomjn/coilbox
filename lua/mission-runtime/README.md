@@ -259,7 +259,7 @@ The engine has its own `[RESTRICT]` block and the runtime does not use it, becau
 A restriction binds every team the scenario declares, which is the reach `[RESTRICT]` has. The format names no team, so binding the human player alone would be a rule the mission never stated, and it would leave an author no way to restrict an enemy at all. `unlock_unit` is the other end: an author who wants a rule for the player only writes the restriction and unlocks the def for everyone else. A team the scenario says nothing about, Gaia included, is not the mission's to restrict.
 
 - A refused build drops the order that asked for it. Otherwise a factory queue jams on a unit it will never be allowed to build and a builder stands at the site retrying for the rest of the mission.
-- The build icon is still in the menu, so a player clicking one gets a builder that walks over and does nothing ([#832](https://github.com/tomjn/coilbox/issues/832)).
+- The build icon is greyed out before any of that. `AllowUnitCreation` is the last possible moment to say no and it tells the player nothing, so the menu is painted as well.
 - What the runtime itself places is unaffected. `AllowUnitCreation` is consulted for builders and factories only, never for `Spring.CreateUnit`, so a mission may hand a team a unit that team is forbidden to build.
 - A command synced Lua gave is let through. A restriction is what the player may not do, and a mission that withheld `attack` and then could not order its own raiders to attack would be restricting its author.
 - A command is named the way the engine names it, so `selfd` is `CMD.SELFD`. A name the engine has no command for is reported.
@@ -272,6 +272,19 @@ GG.CoilboxMission.restrictions.allowsBuild(unitDefID, team)   -- team is an engi
 GG.CoilboxMission.restrictions.allowsCommand(cmdID, team)
 GG.CoilboxMission.restrictions.unlock("armestor", "player")
 ```
+
+### The build menu
+
+The engine draws a command description with `disabled` set greyed, refuses a click on it and refuses a keybind for it, so setting that flag on the build icons a team may not use is the whole of what the player sees. `Spring.EditUnitCmdDesc` sets it, starting from a copy of the description already there, which is why nothing else about the icon has to be reproduced.
+
+Edited rather than removed and put back. `Spring.RemoveUnitCmdDesc` shifts every index behind the one it took out, so putting an icon back means getting its old position exactly right, and getting it wrong quietly reorders the player's build menu. A run of the headless harness that removed and reappended one moved `armestor` from sixth to last in a thirty icon menu. Editing moves nothing.
+
+- Every builder is painted at the moment it arrives on a team: created, gifted, captured, placed by the scenario itself inside the start window, and whatever is already on the map when the gadget loads. A restriction that only reached the units present at the first frame would be worse than none, because it would look like it worked.
+- `unlock_unit` repaints every unit of the team it freed the def for, so the reward is the def and the icon for it.
+- Only what the runtime greyed is ever ungreyed. A game with its own reason to lock a build icon, a tech tree or a supply limit, is still holding it afterwards.
+- The cost is one read of a unit's command descriptions per builder that arrives, plus one edit per icon that changed, and one pass over every team unit per `unlock_unit`. A unit whose def builds nothing is not asked at all, from a list of which defs have a build menu worked out once at load. A mission with no `buildable` restriction does none of this and does not even build the list.
+- The flag is display and input only. Nothing in the simulation refuses an order for a disabled description, so `AllowUnitCreation` is what actually holds and stays exactly where it was.
+- A game that writes its own `disabled` on the same icon after the runtime has painted it wins the icon, because there is no arbitration and the last writer holds. The runtime is at layer 1000 and so is behind the game inside any one callin, but a game repainting on its own schedule is not something the runtime sees. Splinter Faction's `game_sticky_tech_progression.lua` is the case in hand: it greys tech-locked build icons exactly this way, on `UnitCreated`, `UnitFinished`, `UnitGiven` and every tech grant. If it un-greys a def the mission forbids, the icon is wrong and the build is still refused.
 
 ## Objectives
 
@@ -414,7 +427,8 @@ What it has settled:
 - A reveal. A capture lights a zone with one spotter, no other ally team can see it, and it comes off the map when its 30 seconds are up.
 - `gift_units` across ally lines. The garrison mission hands the player's squad to an enemy team, and both units arrive.
 - The restrictions. The siege mission denies two unit defs and withholds one command. A factory and a builder both drop a build order for a denied def rather than keeping it, and both build the order behind it. A withheld command given as the player's never reaches the unit, and the same command from the runtime does.
-- `unlock_unit`, the other end of the same mechanism. The garrison mission denies a def from the start and its `unlock` trigger frees it for the player part way through. One builder given one order at one site is refused before that trigger fires and builds after it.
+- The build menu those restrictions paint, read back off a real builder and a real factory. The icon for a denied def is greyed and the one beside it is not, on a builder the player made, on a builder the scenario placed itself, and on a factory belonging to a team no human is playing.
+- `unlock_unit`, the other end of the same mechanism. The garrison mission denies a def from the start and its `unlock` trigger frees it for the player part way through. One builder given one order at one site is refused before that trigger fires and builds after it, its icon is greyed before and not after, the other twenty nine icons in the menu are in the order they were in, and the team the unlock did not name still has its own icon greyed.
 - The widget, as far as a run with no screen can take it. A real game's own widget handler finds `coilbox_mission_ui.lua` in the vendored `luaui/widgets/`, and it initialises: the panel model and the compiled mission both come out of the archive, and it registers `CoilboxMissionDialogue`. `Script.LuaUI` is how the probe reads that, because the global a widget registers is the one thing about it a gadget can see, and it is what the runtime's own dialogue call reaches. The widget is still registered when the mission ends, having drawn every frame in between: the objectives panel and the debrief run through `gl.Text` and `gl.Rect` for real, and a widget that raised in any callin would have been thrown out with its global. A game with no mission is left with no widget, because the widget takes itself back off.
 
 What it has caught:

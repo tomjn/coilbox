@@ -613,6 +613,13 @@ if gadgetHandler:IsSyncedCode() then
 		-- from, because that is the team an unlock_unit naming none is about.
 		restrictions = RESTRICTIONS.register(triggers, published)
 		published.restrictions = restrictions
+		-- Whatever is already on the map. In a normal game that is nothing, since
+		-- the gadget loads before anything is placed, but a runtime reloaded into a
+		-- running mission finds a map full of builders whose menus nobody has
+		-- painted.
+		for _, unitID in ipairs(Spring.GetAllUnits() or {}) do
+			restrictions.paint(unitID, Spring.GetUnitDefID(unitID), Spring.GetUnitTeam(unitID))
+		end
 		-- Saying a line and playing a sound are things the player sees and hears
 		-- rather than things that happen in the game, so synced Lua decides only
 		-- that they happened and the unsynced half takes it from there.
@@ -763,10 +770,15 @@ if gadgetHandler:IsSyncedCode() then
 	-- the start window is open, only a unit with no builder, so nothing anyone
 	-- has begun building is ever touched.
 	function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
+		if suppressing and not spawning and not builderID and suppressesStart(unitTeam) then
+			Spring.DestroyUnit(unitID, false, true)
+			return
+		end
+		-- Every builder gets its menu painted, including the ones the mission
+		-- places itself inside the start window: a builder a scenario hands a team
+		-- has the same build menu as one that team made.
+		restrictions.paint(unitID, unitDefID, unitTeam)
 		if suppressing then
-			if not spawning and not builderID and suppressesStart(unitTeam) then
-				Spring.DestroyUnit(unitID, false, true)
-			end
 			return
 		end
 		raise("unit_created", { unitID = unitID, unitDefID = unitDefID, team = unitTeam })
@@ -786,6 +798,9 @@ if gadgetHandler:IsSyncedCode() then
 	--- A unit changed hands. UnitGiven rather than UnitTaken, because only by
 	-- then is the unit on the team that took it.
 	function gadget:UnitGiven(unitID, unitDefID, newTeam, oldTeam)
+		-- Gifted or captured, the unit is on another team now and that team's
+		-- restrictions are the ones its menu answers to.
+		restrictions.paint(unitID, unitDefID, newTeam)
 		local actor = actorOfUnit[unitID]
 		if actor then
 			unitHooks.captured(actor, newTeam)
@@ -817,6 +832,7 @@ if gadgetHandler:IsSyncedCode() then
 		groups.removed(unitID)
 		gameOver.removed(unitID)
 		reveal.removed(unitID)
+		restrictions.removed(unitID)
 		local actor = actorOfUnit[unitID]
 		if actor then
 			actorOfUnit[unitID] = nil

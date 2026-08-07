@@ -286,6 +286,49 @@ local function buildOrder(unitID, defName, x, y, z)
 	Spring.GiveOrderToUnit(unitID, -UnitDefNames[defName].id, { x, y, z, 0 }, 0)
 end
 
+--- A unit's build menu as the engine holds it, one entry per build command in
+-- the engine's own order, with a `!` on any the player would see greyed. A build
+-- command's id is the negative of the def it builds.
+--
+-- Read through Spring.GetUnitCmdDescs, which is what the engine's own build menu
+-- is drawn from, so this is the same list a player would be looking at.
+local function buildMenu(unitID)
+	local entries = {}
+	for _, desc in ipairs(Spring.GetUnitCmdDescs(unitID) or {}) do
+		if desc.id < 0 and UnitDefs[-desc.id] then
+			entries[#entries + 1] = UnitDefs[-desc.id].name .. (desc.disabled and "!" or "")
+		end
+	end
+	return table.concat(entries, ",")
+end
+
+--- The same list with nothing said about what is greyed, which is what an icon
+-- taken out and put back in the wrong place would change.
+local function menuOrder(unitID)
+	return (buildMenu(unitID):gsub("!", ""))
+end
+
+--- Whether one def's icon is greyed on a unit, or nil when the unit has no icon
+-- for that def at all. Nil rather than false on purpose: a check that wanted a
+-- greyed icon and found no icon is not a check that passed.
+local function iconGreyed(unitID, defName)
+	local id = -UnitDefNames[defName].id
+	for _, desc in ipairs(Spring.GetUnitCmdDescs(unitID) or {}) do
+		if desc.id == id then
+			return desc.disabled == true
+		end
+	end
+end
+
+--- A unit of a def a team owns, or nil.
+local function unitOf(team, defName)
+	for _, unitID in ipairs(Spring.GetTeamUnits(team) or {}) do
+		if defOf(unitID) == defName then
+			return unitID
+		end
+	end
+end
+
 --- A command queue as something a failed check can print. A negative command id
 -- is a def id, which is what a build order is.
 local function queueText(queue)
@@ -543,12 +586,20 @@ plans.ambush = {
 -- thing between them is the unlock.
 local UNLOCKED_BUILDING = "armestor"
 
+-- Something the same builder builds that the mission says nothing about. Without
+-- it a menu that is greyed all over reads as the restriction working.
+local GARRISON_ALLOWED = "armsolar"
+
 -- Where the probe builds. Well clear of the depot zone on (2000, 2000) and of
 -- everything else the mission and the steps below put on the map. The site is a
 -- search, so its reach is what keeps it out of them.
 local GARRISON_X, GARRISON_Z, GARRISON_AREA = 1200, 1200, 400
 
 local garrisonBuilder, garrisonX, garrisonY, garrisonZ
+
+-- The builder's menu before anything unlocked anything, so the menu after the
+-- unlock can be held against it icon for icon.
+local garrisonMenu
 
 -- The units the mission gifts away, read off the group before it lets go of
 -- them, so the release below can be told from the group being wiped.
@@ -585,6 +636,13 @@ plans.garrison = {
 			local buildable = (state().mission.restrictions or {}).buildable
 			check("the scenario forbids the def its unlock trigger frees",
 				buildable ~= nil and buildable.units[1] == UNLOCKED_BUILDING)
+			-- The builder the scenario placed for the garrison itself, inside the
+			-- start window. A restriction that only reached what a player built
+			-- afterwards would leave this one's menu untouched.
+			local theirs = unitOf(1, "armck")
+			check("a builder the scenario placed itself has the locked icon greyed",
+				theirs ~= nil and iconGreyed(theirs, UNLOCKED_BUILDING) == true,
+				tostring(theirs) .. " " .. buildMenu(theirs or 0))
 		end },
 		-- The locked def, ordered before anything has unlocked it. The site is found
 		-- rather than named, because the harness runs on whatever map the machine has
@@ -604,6 +662,16 @@ plans.garrison = {
 			garrisonBuilder = Spring.CreateUnit("armck", garrisonX + 64,
 				Spring.GetGroundHeight(garrisonX + 64, garrisonZ), garrisonZ, 0, 0)
 			buildOrder(garrisonBuilder, UNLOCKED_BUILDING, garrisonX, garrisonY, garrisonZ)
+			-- What issue #832 is about. The order above is dropped by
+			-- AllowUnitCreation, which is the last possible moment and tells the
+			-- player nothing. The icon is what tells them before they click.
+			garrisonMenu = menuOrder(garrisonBuilder)
+			check("the icon for a def the mission locks is greyed on a builder",
+				iconGreyed(garrisonBuilder, UNLOCKED_BUILDING) == true,
+				buildMenu(garrisonBuilder))
+			check("while the icon for one it says nothing about is not",
+				iconGreyed(garrisonBuilder, GARRISON_ALLOWED) == false,
+				tostring(iconGreyed(garrisonBuilder, GARRISON_ALLOWED)))
 		end },
 		{ frame = 25, run = function()
 			local orders = Spring.GetUnitCommands(garrisonBuilder, -1)
@@ -648,6 +716,24 @@ plans.garrison = {
 		-- the engine does with it next is what the unlock did.
 		{ frame = 65, run = function()
 			buildOrder(garrisonBuilder, UNLOCKED_BUILDING, garrisonX, garrisonY, garrisonZ)
+		end },
+		-- And the icon the unlock freed, on a builder that was already on the map
+		-- when it fired. The whole menu is read back beside it: an icon taken out
+		-- and put back in the wrong place would quietly reorder a player's build
+		-- menu, which is its own kind of broken.
+		{ frame = 66, run = function()
+			check("unlock_unit ungreys the icon on a builder already on the map",
+				iconGreyed(garrisonBuilder, UNLOCKED_BUILDING) == false,
+				buildMenu(garrisonBuilder))
+			check("and leaves the menu the same icons in the same order it had before",
+				menuOrder(garrisonBuilder) == garrisonMenu,
+				menuOrder(garrisonBuilder) .. " from " .. tostring(garrisonMenu))
+			-- The unlock names the player, so the garrison's own builder is still
+			-- looking at a locked icon.
+			local theirs = unitOf(1, "armck")
+			check("while the team the unlock did not name keeps its icon greyed",
+				theirs ~= nil and iconGreyed(theirs, UNLOCKED_BUILDING) == true,
+				tostring(theirs) .. " " .. buildMenu(theirs or 0))
 		end },
 		{ frame = 90, run = function()
 			Spring.CreateUnit("armestor", 400, Spring.GetGroundHeight(400, 400), 400, 0, 1)
@@ -845,6 +931,15 @@ plans.siege = {
 			check("and one in the builder's reach for the building it forbids", fx ~= nil)
 			buildOrder(siegeBuilder, FORBIDDEN_BUILDING, fx, fy, fz)
 			buildOrder(siegeBuilder, ALLOWED_BUILDING, ax, ay, az)
+			-- And the sign in front of the refusal, on the same builder. The order
+			-- above is what actually holds; the icon is what stops the player giving
+			-- it in the first place (issue #832).
+			check("the icon for a building the mission forbids is greyed on a builder",
+				iconGreyed(siegeBuilder, FORBIDDEN_BUILDING) == true,
+				buildMenu(siegeBuilder))
+			check("and the one for the building beside it is not",
+				iconGreyed(siegeBuilder, ALLOWED_BUILDING) == false,
+				tostring(iconGreyed(siegeBuilder, ALLOWED_BUILDING)))
 		end },
 		{ frame = 400, run = function()
 			local orders = Spring.GetUnitCommands(siegeBuilder, -1)
@@ -878,6 +973,13 @@ plans.siege = {
 			local lab = keepLab()
 			local queue = Spring.GetFactoryCommands(lab, -1)
 			check("the probe emptied the keep factory's queue", #queue == 0, queueText(queue))
+			-- The keep is the garrison's, not the player's, so this is also the one
+			-- place a run reads a greyed icon on a team no human is playing.
+			check("a factory's icon for a unit the mission forbids is greyed too",
+				iconGreyed(lab, FORBIDDEN_UNIT) == true, buildMenu(lab))
+			check("and the one beside it is not",
+				iconGreyed(lab, ALLOWED_UNIT) == false,
+				tostring(iconGreyed(lab, ALLOWED_UNIT)))
 			-- The forbidden def first, and the queue read straight back: a factory
 			-- keeps an order it may not build yet, so one it has dropped is gone by
 			-- the time the order behind it is given.

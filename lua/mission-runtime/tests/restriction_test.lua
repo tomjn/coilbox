@@ -17,11 +17,13 @@ local TEAMS = { player = { team = 0 }, enemy = { team = 1 } }
 local PLAYERS = { [0] = { team = 0 } }
 
 -- A game whose first def does nothing at all, because that is what the runtime
--- anchors a human's team with.
+-- anchors a human's team with. The builder builds all three, in that order, so a
+-- test can say which icon moved and which did not.
 local DEFS = {
 	{ name = "marker", speed = 0, weapons = {} },
 	{ name = "grunt" },
 	{ name = "nuke", speed = 0 },
+	{ name = "builder", builds = { "marker", "grunt", "nuke" } },
 }
 
 -- A team no participant in these missions is on.
@@ -205,6 +207,114 @@ check("an unlock that lifted nothing says so", handle.unlock("grunt", "enemy") =
 check("as does one for a participant the mission does not have",
 	handle.unlock("nuke", "nobody") == false)
 check("and one for a def this game does not have", handle.unlock("phantom", "enemy") == false)
+
+--------------------------------------------------------------------------------
+-- The build menu. AllowUnitCreation is what holds; this is the sign in front of
+-- it, so a player is told before they click rather than after the builder has
+-- walked to the site.
+--------------------------------------------------------------------------------
+
+--- What a unit's build menu looks like: one entry per build command, in the
+-- engine's own order, as `defName` or `defName!` for a greyed one.
+local function menu(engine, unitID)
+	local entries = {}
+	for _, desc in ipairs(engine.env.Spring.GetUnitCmdDescs(unitID)) do
+		if desc.id < 0 then
+			entries[#entries + 1] =
+				engine.env.UnitDefs[-desc.id].name .. (desc.disabled and "!" or "")
+		end
+	end
+	return table.concat(entries, ",")
+end
+
+--- Put a builder on the map for a team, the way the engine does.
+local function builderFor(engine, team)
+	return engine.spawn("builder", team)
+end
+
+engine = playing({
+	restrictions = { buildable = { mode = "deny", units = { "nuke" } } },
+})
+
+local builder = builderFor(engine, 0)
+-- The whole menu in the engine's own order, so an icon taken out and put back at
+-- the wrong place would read here as the wrong string rather than as the right
+-- one somewhere else.
+check("a builder a mission team gets is greyed out for what the mission denies",
+	menu(engine, builder) == "marker,grunt,nuke!", menu(engine, builder))
+check("and the command standing beside them is left alone",
+	engine.cmdDescs[builder][1].disabled == false,
+	tostring(engine.cmdDescs[builder][1].disabled))
+check("a builder on a team the scenario never declared keeps its whole menu",
+	menu(engine, builderFor(engine, OUTSIDER)) == "marker,grunt,nuke",
+	menu(engine, builderFor(engine, OUTSIDER)))
+
+local reads = engine.cmdDescReads
+engine.spawn("grunt", 0)
+check("and a unit that builds nothing is never asked for a menu at all",
+	engine.cmdDescReads == reads, engine.cmdDescReads - reads)
+
+-- Only what the mission greyed is ever ungreyed. A game with its own reason to
+-- lock a build icon -- a tech tree, a supply limit -- has to still be holding it
+-- after the mission has finished with the def beside it.
+engine = playing({
+	restrictions = { buildable = { mode = "deny", units = { "nuke" } } },
+	triggers = { once("free", { unlocks({ unitDef = "nuke", team = "player" }) }) },
+})
+builder = builderFor(engine, 0)
+local descs = engine.cmdDescs[builder]
+for _, desc in ipairs(descs) do
+	if desc.id == -defID(engine, "grunt") then
+		desc.disabled = true
+	end
+end
+check("the mission greys the def it denies and leaves the rest alone",
+	menu(engine, builder) == "marker,grunt!,nuke!", menu(engine, builder))
+engine.env:GameFrame(15)
+check("unlock_unit ungreys the def it freed, on a builder already on the map",
+	menu(engine, builder) == "marker,grunt!,nuke", menu(engine, builder))
+check("and leaves the icon the game itself had greyed exactly as the game left it",
+	menu(engine, builder) == "marker,grunt!,nuke", menu(engine, builder))
+
+-- An allow list is the same question from the other end, so the menu is greyed
+-- from the other end too.
+engine = playing({
+	restrictions = { buildable = { mode = "allow", units = { "grunt" } } },
+})
+check("under an allow list everything unlisted is greyed",
+	menu(engine, builderFor(engine, 0)) == "marker!,grunt,nuke!",
+	menu(engine, builderFor(engine, 0)))
+
+-- A builder that changes hands answers to the team holding it.
+engine = playing({
+	restrictions = { buildable = { mode = "deny", units = { "nuke" } } },
+	teams = { player = { team = 0 }, enemy = { team = 1 } },
+})
+builder = builderFor(engine, 0)
+engine.give(builder, OUTSIDER)
+check("a builder given to a team the scenario never declared gets its menu back",
+	menu(engine, builder) == "marker,grunt,nuke", menu(engine, builder))
+engine.give(builder, 1)
+check("and captured back onto a mission team is greyed again",
+	menu(engine, builder) == "marker,grunt,nuke!", menu(engine, builder))
+
+-- Painting the same unit twice writes nothing the second time, which is what
+-- keeps a repaint per unlock from being a repaint per icon per unlock.
+engine = playing({
+	restrictions = { buildable = { mode = "deny", units = { "nuke" } } },
+})
+builder = builderFor(engine, 0)
+local edits = #engine.edits
+check("greying a builder is one edit, for the one icon that changed", edits == 1, edits)
+engine.GG.CoilboxMission.restrictions.paint(builder, defID(engine, "builder"), 0)
+check("and painting it again writes nothing", #engine.edits == edits, #engine.edits)
+
+-- A mission that restricts nothing buildable never reads a command description.
+engine = playing({ restrictions = { commands = { "selfd" } } })
+builderFor(engine, 0)
+check("a mission with no buildable restriction never even reads a build menu",
+	#engine.edits == 0 and engine.cmdDescReads == 0,
+	#engine.edits .. "/" .. engine.cmdDescReads)
 
 --------------------------------------------------------------------------------
 -- Withheld commands.

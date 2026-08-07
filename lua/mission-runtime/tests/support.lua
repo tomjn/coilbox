@@ -129,7 +129,8 @@ end
 -- `options.defList` is an array of `{ name = , <def fields> }` created in that
 -- order before anything else, for a test that cares which def id came first or
 -- what a def does. Every other def moves and shoots, which is what nearly every
--- def in a game does.
+-- def in a game does. An entry's `builds` names the defs it can build, which is
+-- what gives a unit of it a build menu.
 --
 -- `options.players` is keyed by player id and says which team each one is on,
 -- `options.allyTeams` is keyed by engine team number, and `options.allyTeamList`
@@ -186,6 +187,17 @@ function M.newEngine(modOptions, files, options)
 		markers = {},
 		-- Every call the unsynced half made into LuaUI, as { name, ... }.
 		luaUI = {},
+		-- unitID -> the unit's command descriptions, in the order the engine hands
+		-- them to a player's build menu. A build command's id is the negative of
+		-- the def it builds, which is what makes one a build command.
+		cmdDescs = {},
+		-- Every Spring.EditUnitCmdDesc call, as { unitID, index, changes }, so a
+		-- test can say how many the runtime made rather than only what they left
+		-- behind.
+		edits = {},
+		-- How many units have had their command descriptions read, so a test can
+		-- say which units the runtime never asked about at all.
+		cmdDescReads = 0,
 	}
 
 	--- Engine team -> ally team. A team nothing says otherwise about is in an ally
@@ -208,6 +220,9 @@ function M.newEngine(modOptions, files, options)
 				id = engine.nextDefID,
 				name = name,
 				isBuilding = (options.buildings or {})[name] == true,
+				-- The def ids this one can build. A defList entry says which by
+				-- name, in `builds`, and they are resolved once every def exists.
+				buildOptions = {},
 				speed = 30,
 				weapons = { { weaponDef = 1 } },
 				buildSpeed = 0,
@@ -229,6 +244,22 @@ function M.newEngine(modOptions, files, options)
 			engine.env.UnitDefs[def.id] = def
 		end
 		return def
+	end
+
+	--- The command descriptions the engine gives a unit of this def: the orders
+	-- every unit takes, then one build command per thing it builds, in the def's
+	-- own order. The engine command comes first so an index is never the same as
+	-- the position of a build option, and nothing here may touch it.
+	local function commandDescs(def)
+		local descs = { { id = engine.env.CMD.MOVE, name = "Move", disabled = false } }
+		for _, defID in ipairs(def.buildOptions) do
+			descs[#descs + 1] = {
+				id = -defID,
+				name = engine.env.UnitDefs[defID].name,
+				disabled = false,
+			}
+		end
+		return descs
 	end
 
 	--- Every order a unit was given, in the order it was given them.
@@ -278,6 +309,7 @@ function M.newEngine(modOptions, files, options)
 		}
 		engine.units[unitID] = unit
 		engine.order[#engine.order + 1] = unitID
+		engine.cmdDescs[unitID] = commandDescs(unitDef(def))
 
 		fire("UnitCreated", unitID, unit.defID, unit.team, builderID)
 		-- A unit created outright is finished inside CreateUnit itself. One with
@@ -410,6 +442,47 @@ function M.newEngine(modOptions, files, options)
 			end,
 			GetUnitDefID = function(unitID)
 				return engine.units[unitID].defID
+			end,
+			-- A fresh table every call, the way the engine's own does. The runtime
+			-- reading it cannot write back through it, so an icon only changes
+			-- through EditUnitCmdDesc.
+			GetUnitCmdDescs = function(unitID)
+				engine.cmdDescReads = engine.cmdDescReads + 1
+				local copy = {}
+				for index, desc in ipairs(engine.cmdDescs[unitID] or {}) do
+					copy[index] = { id = desc.id, name = desc.name, disabled = desc.disabled }
+				end
+				return copy
+			end,
+			-- The index is a position in that same list, one-based.
+			EditUnitCmdDesc = function(unitID, index, changes)
+				local desc = (engine.cmdDescs[unitID] or {})[index]
+				if not desc then
+					return
+				end
+				table.insert(engine.edits, { unitID, index, changes })
+				for key, value in pairs(changes) do
+					desc[key] = value
+				end
+			end,
+			GetAllUnits = function()
+				local ids = {}
+				for _, unitID in ipairs(engine.order) do
+					if engine.units[unitID].alive then
+						ids[#ids + 1] = unitID
+					end
+				end
+				return ids
+			end,
+			GetTeamUnits = function(team)
+				local ids = {}
+				for _, unitID in ipairs(engine.order) do
+					local unit = engine.units[unitID]
+					if unit.alive and unit.team == team then
+						ids[#ids + 1] = unitID
+					end
+				end
+				return ids
 			end,
 			GetUnitTeam = function(unitID)
 				local unit = engine.units[unitID]
@@ -653,6 +726,15 @@ function M.newEngine(modOptions, files, options)
 	for _, set in ipairs({ options.buildings or {}, options.defs or {} }) do
 		for name in pairs(set) do
 			unitDef(name)
+		end
+	end
+	-- What each def builds, once every def has an id. A second pass, because a
+	-- def's build options are other defs and one may build something declared
+	-- after it.
+	for _, entry in ipairs(options.defList or {}) do
+		local def = env.UnitDefNames[entry.name]
+		for _, name in ipairs(entry.builds or {}) do
+			def.buildOptions[#def.buildOptions + 1] = unitDef(name).id
 		end
 	end
 
