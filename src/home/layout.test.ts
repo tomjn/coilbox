@@ -10,10 +10,12 @@ vi.mock("@picoframe/frame", () => ({
 }));
 
 // Same reason for the zones the stacked layout composes: the onboarding cards
-// reach the Tauri API and picoframe's plugin SDK, the greeting reaches the lobby
-// connection, and nothing here renders either of them.
+// reach the Tauri API and picoframe's plugin SDK, the greeting and the continue
+// hero reach the lobby connection through the shared resume collector, and
+// nothing here renders any of them.
 vi.mock("./zones/Onboarding", () => ({ default: () => null }));
 vi.mock("./zones/Greeting", () => ({ default: () => null }));
+vi.mock("./zones/Continue", () => ({ default: () => null }));
 
 // The stacked layout also resolves the page backdrop, which reaches the
 // profile's `@`-reference parser and through it @picoframe/plugin-sdk. Same
