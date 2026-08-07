@@ -927,13 +927,16 @@ fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
             .into_iter()
             .map(|a| archive(us, a))
             .collect();
-        let dims = us.map_dimensions(&name);
         maps.push(MapItem {
             file_name: us.map_file_name(i),
             archives,
-            info: us.map_info(i),
-            width: dims.map(|(w, _)| w),
-            height: dims.map(|(_, h)| h),
+            // Proportions come from the thumbnail batch, which already reads them
+            // while it has the archive open, and mapinfo from `--map-meta`. Both
+            // open every archive at about 86ms a map, so reading them here made
+            // the maps list wait on the whole library before showing a name.
+            info: Default::default(),
+            width: None,
+            height: None,
             name: name.clone(),
         });
     }
