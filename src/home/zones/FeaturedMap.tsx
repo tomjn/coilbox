@@ -34,7 +34,7 @@ import {
  *   one map and a silent failure reads as a dead button.
  */
 export default function FeaturedMap() {
-  const { map, loading } = useFeaturedMap();
+  const { map, loading, source } = useFeaturedMap();
   const { state, error, canDownload, download } = useFeaturedMapInstall(map);
   const art = useFeaturedMapArt(map, state === "installed");
 
@@ -70,7 +70,8 @@ export default function FeaturedMap() {
           <span
             className={`block truncate text-xs ${art ? ART_DIM_CLASS : "text-muted-foreground"}`}
           >
-            {error ?? map.blurb ?? "Curated map"}
+            {error ??
+              (source === "battle" ? BATTLE_BLURB : (map.blurb ?? "Curated map"))}
           </span>
         </span>
         <Action
@@ -113,6 +114,17 @@ export default function FeaturedMap() {
     </section>
   );
 }
+
+/**
+ * The subtitle when the map came from a live battle rather than the rotation.
+ *
+ * It replaces the catalog blurb rather than joining it, because the band gives
+ * the subtitle one truncated line and the reason this map is here outranks its
+ * description. It is also the only thing that distinguishes the two sources on
+ * screen: the card is otherwise identical either way, so without this line the
+ * feature could not be confirmed by looking at it.
+ */
+const BATTLE_BLURB = "Being played now";
 
 /** The label above the card, matching the tool grid's group labels. */
 function Heading() {
