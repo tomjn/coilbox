@@ -15,9 +15,25 @@
 -- a trigger can name one (issue #878). Version 1 ignores a building's id, and
 -- `unit_dead` on a name it has never heard of holds from the first frame, so a
 -- scenario that names one has to be refused rather than half played.
+--
+-- 3 is four format changes at once, because each of them on its own would have
+-- wanted a version of its own and a game chasing four floors for one release is
+-- worse than a game chasing one:
+--
+--   * a var condition and the two var actions take a number or the name of
+--     another var, so a mission can compare a counter against a quota
+--     (issue #808)
+--   * camera_pan and map_marker name a team, so a co-op mission does not yank
+--     every player's camera (issue #827)
+--   * zone_held_for can ask for an uncontested hold (issue #802)
+--   * release_group stops the mission ordering a squad it handed over
+--     (issue #812)
+--
+-- Each raises a scenario's requiredRuntimeVersion only when the scenario uses
+-- it, so nothing already authored asks for 3.
 
 return {
-	version = 2,
+	version = 3,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,
