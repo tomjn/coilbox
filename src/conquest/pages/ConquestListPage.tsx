@@ -404,7 +404,7 @@ function GalaxyCard({
                 ? "text-emerald-400"
                 : state?.status === "lost"
                   ? "text-red-400"
-                  : "text-muted-foreground/80"
+                  : "text-muted-foreground"
             }`}
           >
             {statusLabel}

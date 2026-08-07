@@ -173,7 +173,7 @@ export default function ScenarioBuilderPage() {
                     {scenario.setup.gameName || "No game"} ·{" "}
                     {scenario.setup.mapName || "No map"}
                   </span>
-                  <span className="truncate text-xs text-muted-foreground/80">
+                  <span className="truncate text-xs text-muted-foreground">
                     {scenarioContents(scenario)}
                   </span>
                 </div>

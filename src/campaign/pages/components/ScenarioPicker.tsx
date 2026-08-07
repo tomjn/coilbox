@@ -91,7 +91,7 @@ export function ScenarioPickerList({
               <span className="truncate text-xs text-muted-foreground">
                 {s.setup.gameName} · {s.setup.mapName}
               </span>
-              <span className="truncate text-xs text-muted-foreground/80">
+              <span className="truncate text-xs text-muted-foreground">
                 {scenarioContents(s)}
               </span>
             </button>

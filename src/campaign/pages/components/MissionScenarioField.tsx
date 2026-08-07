@@ -69,9 +69,7 @@ export function MissionScenarioField({
       </p>
 
       {attachment.state === "none" ? (
-        <p className="text-xs text-muted-foreground/80">
-          No scenario attached.
-        </p>
+        <p className="text-xs text-muted-foreground">No scenario attached.</p>
       ) : (
         <div className="flex flex-col gap-1 rounded-md border border-border/50 bg-muted/20 p-3">
           <span className="truncate text-sm font-medium">
@@ -88,12 +86,12 @@ export function MissionScenarioField({
               {editedAt(attachment.live.updatedAt) || "a later date"}.
             </p>
           ) : attachment.state === "orphaned" ? (
-            <p className="text-xs text-muted-foreground/80">
+            <p className="text-xs text-muted-foreground">
               No stored scenario has this id any more, so there is nothing to
               compare against. The mission plays its own copy.
             </p>
           ) : (
-            <p className="text-xs text-muted-foreground/80">
+            <p className="text-xs text-muted-foreground">
               Matches the stored scenario.
             </p>
           )}

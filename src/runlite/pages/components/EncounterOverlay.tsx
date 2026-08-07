@@ -170,7 +170,7 @@ export function EncounterOverlay({
                 : "You retreat, hull scarred."}
             </p>
             {enc.autoDetected && (
-              <p className="text-xs text-muted-foreground/70">
+              <p className="text-xs text-muted-foreground">
                 Result detected from the replay.
               </p>
             )}

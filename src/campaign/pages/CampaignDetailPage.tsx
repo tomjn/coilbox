@@ -116,7 +116,7 @@ export default function CampaignDetailPage() {
             )}
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted-foreground/80">
+              <span className="text-xs text-muted-foreground">
                 {completed}/{total} mission{total === 1 ? "" : "s"} complete
               </span>
               <div className="h-1.5 overflow-hidden rounded-full bg-muted">

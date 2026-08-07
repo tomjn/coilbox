@@ -267,7 +267,7 @@ export default function CampaignBuilderPage() {
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-muted-foreground/80">
+                  <span className="text-xs text-muted-foreground">
                     {campaign.missions.length} mission
                     {campaign.missions.length === 1 ? "" : "s"}
                   </span>
