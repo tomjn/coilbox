@@ -124,23 +124,6 @@ export function startUnitTotal(team: ScenarioTeam): number {
   return team.startUnits?.length ?? 0;
 }
 
-/**
- * Every unit def any team starts with, once each.
- *
- * A start unit is a unit the scenario places, but it has no position, so it is
- * not a {@link scenarioPlacements} placement and nothing that reads defs off the
- * map can see it. Changing the game has to, or an author swapping games is told
- * their scenario places nothing while a team still starts with three units the
- * new game has never heard of.
- */
-export function startUnitDefs(scenario: Scenario): string[] {
-  const defs = new Set<string>();
-  for (const team of Object.values(scenario.teams)) {
-    for (const def of team.startUnits ?? []) defs.add(def);
-  }
-  return [...defs];
-}
-
 /** A count held to something a start position has room for. */
 export function clampStartCount(count: number): number {
   if (!Number.isFinite(count)) return 1;

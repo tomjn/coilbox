@@ -266,7 +266,9 @@ export function addZone(scenario: Scenario, zone: ScenarioZone): Scenario {
 }
 
 /** The document with a zone renamed. An empty name is refused: a zone is picked
- *  by name in the trigger panel, and one with no name cannot be. */
+ *  by name in the trigger panel, and one with no name cannot be. No trigger is
+ *  rewritten, because a `zoneId` parameter holds the zone's minted id and this
+ *  changes only what the author reads (issue #913). */
 export function renameZone(
   scenario: Scenario,
   id: string,

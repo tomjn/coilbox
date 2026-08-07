@@ -32,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { loadedCampaigns } from "../../../campaign/campaigns";
 import { clipIsAttached } from "../../../campaign/scenarioMedia";
 import { scenarioMediaUrl } from "../../../lib/assetUrl";
+import type { ExtensionTypes } from "../../extensions";
 import type { Scenario, ScenarioDialogue } from "../../model";
 import { deleteScenarioMedia, importScenarioMedia } from "../../storage";
 import { EditorPanel, NameField, TextField } from "./panels";
@@ -40,12 +41,15 @@ import {
   dialogueMedia,
   editDialogue,
   nextDialogueId,
+  portraitDrawable,
   removeDialogue,
   renameDialogue,
 } from "./registries";
 
 /** What the file dialog offers for each of the two clips. The engine reads more
- *  image formats than these, but these are the ones a portrait is drawn in. */
+ *  image formats than these, but these are the ones a portrait is drawn in.
+ *  `dds` stays on the list because it is what a game's own art is shipped as,
+ *  even though the preview cannot show one: see {@link portraitDrawable}. */
 const FILTERS = {
   portrait: { name: "Image", extensions: ["png", "jpg", "jpeg", "dds", "bmp"] },
   audio: { name: "Audio", extensions: ["ogg", "wav", "mp3"] },
@@ -75,9 +79,13 @@ async function dropClip(scenarioId: string, file: string): Promise<void> {
 export function DialoguePanel({
   scenario,
   onChange,
+  extensions,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
+  /** The types the scenario's game declares, so a rename carries over a
+   *  reference one of its own parameters holds (issue #913). */
+  extensions: ExtensionTypes;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
@@ -139,6 +147,7 @@ export function DialoguePanel({
               key={selected.id}
               line={selected}
               scenario={scenario}
+              extensions={extensions}
               onChange={onChange}
               onSelect={setSelectedId}
             />
@@ -191,11 +200,13 @@ function DialogueRow({
 function DialogueForm({
   line,
   scenario,
+  extensions,
   onChange,
   onSelect,
 }: {
   line: ScenarioDialogue;
   scenario: Scenario;
+  extensions: ExtensionTypes;
   onChange: (next: Scenario) => void;
   onSelect: (id: string | null) => void;
 }) {
@@ -243,7 +254,7 @@ function DialogueForm({
           name={line.id}
           label="Dialogue line name"
           onRename={(wanted) => {
-            const next = renameDialogue(scenario, line.id, wanted);
+            const next = renameDialogue(scenario, line.id, wanted, extensions);
             if (next === scenario) return false;
             onChange(next);
             onSelect(wanted.trim());
@@ -365,6 +376,11 @@ function MediaField({
             <p className="text-[11px] text-amber-300">
               The file is in the document but could not be read back, so it will
               be missing from the mission too.
+            </p>
+          ) : field === "portrait" && !portraitDrawable(file) ? (
+            <p className="text-[11px] text-muted-foreground">
+              DDS is a format the engine reads and no browser engine does, so
+              coilbox cannot show it here. The mission still gets it.
             </p>
           ) : field === "portrait" ? (
             <img

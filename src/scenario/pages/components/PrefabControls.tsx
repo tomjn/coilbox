@@ -17,7 +17,15 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { Blocks, Hammer, Move, Trash2, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Blocks,
+  Hammer,
+  Move,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -29,7 +37,13 @@ import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import type { Participant } from "@/play/config";
 import type { ScenarioPrefab } from "../../model";
-import { buildableBy, plusQueued, strayDefs, withoutQueued } from "./prefabs";
+import {
+  buildableBy,
+  movedQueued,
+  plusQueued,
+  strayDefs,
+  withoutQueued,
+} from "./prefabs";
 import { TeamSelect } from "./TeamSelect";
 
 export function PrefabControls({
@@ -127,6 +141,30 @@ export function PrefabControls({
                       <span className="min-w-0 flex-1 truncate font-mono text-xs">
                         {def}
                       </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="size-7 p-0"
+                        aria-label={`Move ${def} up`}
+                        disabled={at === 0}
+                        onClick={() =>
+                          onQueue(movedQueued(queue, at, -1), repeat)
+                        }
+                      >
+                        <ArrowUp className="size-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="size-7 p-0"
+                        aria-label={`Move ${def} down`}
+                        disabled={at === queue.length - 1}
+                        onClick={() =>
+                          onQueue(movedQueued(queue, at, 1), repeat)
+                        }
+                      >
+                        <ArrowDown className="size-3.5" />
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"

@@ -14,6 +14,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Trash2, Variable } from "lucide-react";
 import { useState } from "react";
+import type { ExtensionTypes } from "../../extensions";
 import type { Scenario } from "../../model";
 import { EditorPanel, NameField } from "./panels";
 import {
@@ -27,9 +28,13 @@ import {
 export function VarPanel({
   scenario,
   onChange,
+  extensions,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
+  /** The types the scenario's game declares, so a rename carries over a
+   *  reference one of its own parameters holds (issue #913). */
+  extensions: ExtensionTypes;
 }) {
   const names = Object.keys(scenario.vars);
 
@@ -60,7 +65,7 @@ export function VarPanel({
                   label={`Name of ${name}`}
                   className="h-7 flex-1 font-mono text-xs"
                   onRename={(wanted) => {
-                    const next = renameVar(scenario, name, wanted);
+                    const next = renameVar(scenario, name, wanted, extensions);
                     if (next === scenario) return false;
                     onChange(next);
                     return true;

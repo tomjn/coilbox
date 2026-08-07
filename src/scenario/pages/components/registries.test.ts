@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newScenario } from "../../create";
+import { parseExtensions } from "../../extensions";
 import { parseScenario, type Scenario } from "../../model";
 import {
   addBuildableUnit,
@@ -16,6 +17,7 @@ import {
   nextDialogueId,
   nextObjectiveId,
   nextVarName,
+  portraitDrawable,
   removeBuildableUnit,
   removeCommand,
   removeDialogue,
@@ -163,6 +165,18 @@ describe("dialogue", () => {
     expect("portrait" in next.dialogue[0]).toBe(false);
   });
 
+  /**
+   * Issue #942. The engine reads a DDS portrait and no webview does, so the
+   * preview says why rather than reporting a good file as unreadable.
+   */
+  it("knows a portrait the editor cannot draw from one it can", () => {
+    expect(portraitDrawable("hq.png")).toBe(true);
+    expect(portraitDrawable("hq.bmp")).toBe(true);
+    expect(portraitDrawable("hq.dds")).toBe(false);
+    expect(portraitDrawable("HQ.DDS")).toBe(false);
+    expect(portraitDrawable("dds.png")).toBe(true);
+  });
+
   it("carries the actions that played it over on a rename", () => {
     const next = renameDialogue(document(), "warn", "hq-warning");
     expect(next.dialogue[0].id).toBe("hq-warning");
@@ -251,6 +265,82 @@ describe("vars", () => {
     const next = removeVar(document(), "waves");
     expect(next.vars).toEqual({ alertLevel: 0 });
     expect(loads(next)).toBe(true);
+  });
+});
+
+/**
+ * Issue #913. A game's own condition or action holds references in parameters
+ * coilbox has never heard of, so a rename that does not know what the game
+ * declares leaves them pointing at a name nothing answers to. The `amount`
+ * parameter is the same question one level in: the var it reads sits inside the
+ * value rather than being it (#952).
+ */
+describe("a reference a game's own type holds", () => {
+  const declared = parseExtensions({
+    handler: "h.lua",
+    actions: [
+      {
+        type: "sf_report",
+        params: [
+          { name: "about", kind: "objectiveId" },
+          { name: "say", kind: "dialogueId" },
+          { name: "counter", kind: "varName" },
+          { name: "howMany", kind: "amount" },
+        ],
+      },
+    ],
+  });
+
+  /** The fixture with one of the game's own actions naming all four. */
+  function withDeclared(): Scenario {
+    const scenario = document();
+    const trigger = scenario.triggers[0];
+    return {
+      ...scenario,
+      triggers: [
+        {
+          ...trigger,
+          actions: [
+            ...trigger.actions,
+            {
+              type: "sf_report",
+              params: {
+                about: "hold",
+                say: "warn",
+                counter: "alertLevel",
+                howMany: { var: "alertLevel" },
+              },
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  const reported = (scenario: Scenario) => scenario.triggers[0].actions[3];
+
+  it("carries it over when an objective is renamed", () => {
+    const next = renameObjective(withDeclared(), "hold", "held", declared);
+    expect(reported(next).params.about).toBe("held");
+    expect(loads(next)).toBe(true);
+  });
+
+  it("carries it over when a dialogue line is renamed", () => {
+    const next = renameDialogue(withDeclared(), "warn", "warned", declared);
+    expect(reported(next).params.say).toBe("warned");
+    expect(loads(next)).toBe(true);
+  });
+
+  it("carries it over when a variable is renamed, inside an amount too", () => {
+    const next = renameVar(withDeclared(), "alertLevel", "alarm", declared);
+    expect(reported(next).params.counter).toBe("alarm");
+    expect(reported(next).params.howMany).toEqual({ var: "alarm" });
+    expect(loads(next)).toBe(true);
+  });
+
+  it("leaves it behind when the caller does not know what the game declares", () => {
+    const next = renameObjective(withDeclared(), "hold", "held");
+    expect(reported(next).params.about).toBe("hold");
   });
 });
 

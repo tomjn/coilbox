@@ -158,11 +158,6 @@ export function facingToYaw(facing: Facing): number {
   return (facing * Math.PI) / 2;
 }
 
-/** The distinct unit def names a placement list needs models for. */
-export function placementDefs(placements: Placement[]): string[] {
-  return [...new Set(placements.map((p) => p.def))];
-}
-
 /** What a unit belonging to nobody is drawn in: a neutral grey. */
 export const UNOWNED_COLOR: Rgb = [0.62, 0.65, 0.7];
 

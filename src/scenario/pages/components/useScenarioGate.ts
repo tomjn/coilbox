@@ -9,7 +9,8 @@
  *
  * A game that is not installed, or a scan that has not answered yet, gates
  * nothing: an editor that greys the whole palette because a read is in flight is
- * worse than one that greys nothing.
+ * worse than one that greys nothing. A document that has not loaded yet is the
+ * same answer, because the page reads this before it has one.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -72,11 +73,12 @@ const NOTHING: RuntimeStatus = {
   extensions: null,
 };
 
-export function useScenarioGate(scenario: Scenario): ScenarioGate {
+export function useScenarioGate(scenario: Scenario | null): ScenarioGate {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const game =
-    scan.data?.games.find((g) => g.name === scenario.setup.gameName) ?? null;
+  const game = scenario
+    ? (scan.data?.games.find((g) => g.name === scenario.setup.gameName) ?? null)
+    : null;
   const root = game?.primaryArchive.path;
   const [status, setStatus] = useState<RuntimeStatus>(NOTHING);
 
@@ -98,7 +100,9 @@ export function useScenarioGate(scenario: Scenario): ScenarioGate {
     };
   }, [root]);
 
-  const required = requiredRuntimeVersion(scenario);
+  // Only read past the `!game` guard below, which a document that has not
+  // loaded yet never gets past.
+  const required = scenario ? requiredRuntimeVersion(scenario) : 0;
   return useMemo(() => {
     const available = status.available;
     if (!game) {

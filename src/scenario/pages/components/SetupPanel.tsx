@@ -62,9 +62,8 @@ import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
 import { getProfile } from "@/profile/profile";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario } from "../../model";
-import { defsMissingFrom } from "../../validate";
+import { defsMissingFrom, unitDefsIn } from "../../validate";
 import { EditorPanel } from "./panels";
-import { placementDefs, scenarioPlacements } from "./placements";
 import { StartConditions } from "./StartConditions";
 import {
   applyPresetSetup,
@@ -78,7 +77,7 @@ import {
   setScenarioGame,
   setScenarioMap,
 } from "./setup";
-import { startsSummary, startUnitDefs } from "./teams";
+import { startsSummary } from "./teams";
 import { useGameUnits } from "./useGameUnits";
 
 /**
@@ -237,15 +236,13 @@ export function SetupPanel({
 
   /* ---- The three changes that cost something. ---- */
 
-  // A team's start units have no position, so they are not placements, but they
-  // are still unit defs the new game has to have.
-  const placedDefs = useMemo(
-    () => [
-      ...new Set([
-        ...placementDefs(scenarioPlacements(scenario)),
-        ...startUnitDefs(scenario),
-      ]),
-    ],
+  // The validator's own walk, so the notice and the launch answer the same
+  // question. Reading defs off the map alone missed a team's start units, a
+  // factory's build queue and every trigger parameter naming a def, which is a
+  // notice saying the new game has everything and a launch refused seconds later
+  // (issue #940).
+  const namedDefs = useMemo(
+    () => [...new Set(unitDefsIn(scenario).map((found) => found.def))],
     [scenario],
   );
   const carriesCoordinates =
@@ -264,7 +261,7 @@ export function SetupPanel({
   const askGame = (gameName: string) => {
     if (gameName === setup.gameName) return;
     const set = Object.keys(setup.modOptionValues).length;
-    if (placedDefs.length === 0 && set === 0)
+    if (namedDefs.length === 0 && set === 0)
       return onChange(setScenarioGame(scenario, gameName));
     setPending({ kind: "game", gameName });
   };
@@ -283,7 +280,7 @@ export function SetupPanel({
         <PresetPickerDrawer
           presets={presets}
           onPick={(preset) => {
-            if (!carriesCoordinates && placedDefs.length === 0)
+            if (!carriesCoordinates && namedDefs.length === 0)
               return onChange(applyPresetSetup(latest.current, preset));
             setPending({ kind: "preset", preset });
           }}
@@ -363,7 +360,7 @@ export function SetupPanel({
           <GameChangeNotice
             gameName={pending.gameName}
             oldGameName={setup.gameName}
-            defs={placedDefs}
+            defs={namedDefs}
             optionCount={Object.keys(setup.modOptionValues).length}
             onCancel={() => setPending(null)}
             onConfirm={() => {
@@ -618,14 +615,14 @@ function GameChangeNotice({
     >
       <span>
         {defs.length === 0
-          ? `This scenario places no units, so changing to ${gameName} costs nothing on the map.`
+          ? `This scenario names no units, so changing to ${gameName} costs nothing on the map.`
           : units.loading
             ? `Reading ${gameName}'s units…`
             : units.gameMissing
-              ? `${gameName} is not installed, so coilbox cannot say which of the ${count(defs.length, "unit type")} this scenario places it has.`
+              ? `${gameName} is not installed, so coilbox cannot say which of the ${count(defs.length, "unit type")} this scenario names it has.`
               : missing.length === 0
-                ? `${gameName} has all ${count(defs.length, "unit type")} this scenario places.`
-                : `${count(missing.length, "unit type")} this scenario places ${missing.length === 1 ? "is" : "are"} not in ${gameName}: ${list(missing)}. They stay in the document until you change them, and the ones standing on the map draw as boxes.`}
+                ? `${gameName} has all ${count(defs.length, "unit type")} this scenario names.`
+                : `${count(missing.length, "unit type")} this scenario names ${missing.length === 1 ? "is" : "are"} not in ${gameName}: ${list(missing)}. They stay in the document until you change them, and the ones standing on the map draw as boxes.`}
         {optionCount > 0 &&
           ` The ${count(optionCount, "mod option")} set for ${oldGameName || "the old game"} ${optionCount === 1 ? "is" : "are"} dropped, because ${gameName} declares its own.`}
       </span>

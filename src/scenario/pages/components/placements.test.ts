@@ -4,7 +4,6 @@ import type { Scenario } from "../../model";
 import {
   facingToYaw,
   groupFormationOffset,
-  placementDefs,
   placementKey,
   scenarioPlacements,
   teamColor,
@@ -208,28 +207,6 @@ describe("facingToYaw", () => {
     expect(facingToYaw(1)).toBeCloseTo(Math.PI / 2);
     expect(facingToYaw(2)).toBeCloseTo(Math.PI);
     expect(facingToYaw(3)).toBeCloseTo((3 * Math.PI) / 2);
-  });
-});
-
-describe("placementDefs", () => {
-  it("lists each unit type once", () => {
-    const out = scenarioPlacements({
-      ...empty,
-      groups: [
-        {
-          id: "g1",
-          team: "p0",
-          units: [
-            { def: "armpw", count: 5 },
-            { def: "armflash", count: 2 },
-          ],
-          pos: { x: 0, z: 0 },
-          orders: [],
-          dormant: false,
-        },
-      ],
-    });
-    expect(placementDefs(out)).toEqual(["armpw", "armflash"]);
   });
 });
 
