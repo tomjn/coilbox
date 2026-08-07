@@ -185,13 +185,12 @@ export function readThemeColor(): string {
  * not something a value assertion catches.
  */
 export function themeColorFrom(measured: string): string {
+  // Compared with the spaces out, because engines differ on whether they
+  // serialise `rgb(1, 2, 3)` or `rgb(1,2,3)`, and this is the one value whose
+  // exact spelling decides the answer.
+  const bare = (colour: string) => colour.replace(/\s+/g, "");
   const seen = measured.trim();
-  if (!seen || seen === SENTINEL) return FALLBACK_THEME_COLOR;
-  // Written without spaces by some engines, and the sentinel is the one value
-  // whose exact spelling matters here.
-  if (seen.replace(/\s+/g, "") === SENTINEL.replace(/\s+/g, "")) {
-    return FALLBACK_THEME_COLOR;
-  }
+  if (!seen || bare(seen) === bare(SENTINEL)) return FALLBACK_THEME_COLOR;
   return seen;
 }
 

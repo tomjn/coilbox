@@ -89,6 +89,17 @@ function progressFile(campaigns: ProgressFile["campaigns"] = {}): ProgressFile {
 /** An install with nothing scanned, for the picks that do not read a collection. */
 const noCollections = { maps: [], games: [] };
 
+/** Every ordering of a list, for asserting a result does not depend on one. */
+function permutations<T>(items: readonly T[]): T[][] {
+  if (items.length <= 1) return [[...items]];
+  return items.flatMap((item, i) =>
+    permutations([...items.slice(0, i), ...items.slice(i + 1)]).map((rest) => [
+      item,
+      ...rest,
+    ]),
+  );
+}
+
 /* -------------------------------------------------------------------------- *
  * Which content each tool shows.
  * -------------------------------------------------------------------------- */
@@ -253,18 +264,18 @@ describe("scenarioPick", () => {
 });
 
 describe("collectionPicks", () => {
+  // Four rather than three, because with three every ordering of a set is a
+  // rotation of every other, so dropping the sort left the rotation unchanged
+  // and a three-item case could not see it.
   const shelf = [
     { name: "Tabula-v6" },
     { name: "AcidicQuarry 5.17" },
     { name: "Isthmus v3" },
+    { name: "Comet Catcher Redux 1.5" },
   ];
 
   it("offers every member of the collection", () => {
-    expect(collectionPicks(shelf, "map").map((p) => p.kind)).toEqual([
-      "map",
-      "map",
-      "map",
-    ]);
+    expect(collectionPicks(shelf, "map")).toHaveLength(shelf.length);
     expect(
       new Set(
         collectionPicks(shelf, "map").map((p) =>
@@ -286,14 +297,17 @@ describe("collectionPicks", () => {
   });
 
   it("ignores the order the scan happened to list things in", () => {
-    const shuffled = [shelf[2], shelf[0], shelf[1]];
-    expect(collectionPicks(shuffled, "map")).toEqual(
-      collectionPicks(shelf, "map"),
-    );
+    // Every permutation, so this cannot pass on one that happens to be a
+    // rotation of the sorted order and therefore already agrees with it.
+    for (const order of permutations(shelf)) {
+      expect(collectionPicks(order, "map")).toEqual(
+        collectionPicks(shelf, "map"),
+      );
+    }
   });
 
   it("moves when the collection changes", () => {
-    const grown = [...shelf, { name: "Comet Catcher Redux 1.5" }];
+    const grown = [...shelf, { name: "Nuclear Winter 1.2" }];
     expect(collectionPicks(grown, "map")[0]).not.toEqual(
       collectionPicks(shelf, "map")[0],
     );
