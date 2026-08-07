@@ -11,8 +11,9 @@ import {
   ART_CARD_CLASS as ART_SHELL_CLASS,
   CARD_SHELL_CLASS,
 } from "../cardShell";
-import { homeToolGroups } from "../nav";
+import { homeToolGroups, splitGroupItems } from "../nav";
 import { openExternal, useResolvedNavItem } from "../navItem";
+import LinkCard from "./LinkCard";
 
 /**
  * Every navigable route as a card, grouped exactly as the sidebar groups them.
@@ -24,6 +25,10 @@ import { openExternal, useResolvedNavItem } from "../navItem";
  * the empty-grid "No tools available yet.") moved to the Greeting zone in issue
  * #987, which owns the line under the heading. The grid now does what every zone
  * does and renders nothing when it has nothing.
+ *
+ * A group's external links do not each get a card. They share one, at the end of
+ * their own group - see {@link LinkCard} for why there and not somewhere of its
+ * own.
  */
 export default function ToolCards() {
   const { nav } = useFrame();
@@ -35,20 +40,24 @@ export default function ToolCards() {
 
   return (
     <div className="mt-6 space-y-8">
-      {groups.map((group) => (
-        <section key={group.id} className="hidden has-[[data-nav-item]]:block">
-          {group.label && (
-            <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {group.label}
-            </h2>
-          )}
-          <div className="flex flex-wrap gap-3">
-            {group.items.map((item) => (
-              <ToolCard key={item.id} item={item} />
-            ))}
-          </div>
-        </section>
-      ))}
+      {groups.map((group) => {
+        const { tools, links } = splitGroupItems(group.items);
+        return (
+          <section key={group.id} className="hidden has-[[data-nav-item]]:block">
+            {group.label && (
+              <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {group.label}
+              </h2>
+            )}
+            <div className="flex flex-wrap gap-3">
+              {tools.map((item) => (
+                <ToolCard key={item.id} item={item} />
+              ))}
+              {links.length > 0 && <LinkCard items={links} />}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
