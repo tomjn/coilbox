@@ -268,9 +268,10 @@ describe("secondary text in the dark scheme, which is untouched", () => {
     const t = darkTokens(hue, sat, satText ?? sat);
     it(`still clears AA on ${name}`, () => {
       for (const [surface, colour] of Object.entries(t.surfaces)) {
-        expect(contrast(t.muted, colour), `${name}/${surface}`).toBeGreaterThanOrEqual(
-          AA_SMALL,
-        );
+        expect(
+          contrast(t.muted, colour),
+          `${name}/${surface}`,
+        ).toBeGreaterThanOrEqual(AA_SMALL);
       }
       const tinted = over(t.surfaces.card, t.neutralPrimary, 0.05);
       expect(contrast(t.muted, tinted), `${name}/tint`).toBeGreaterThanOrEqual(
