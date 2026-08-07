@@ -585,7 +585,7 @@ function Defeat({ run }: { run: ReturnType<typeof useMissionRun> }) {
  * result came from the replay rather than a manual report. */
 function AutoDetectedNote() {
   return (
-    <p className="text-xs text-muted-foreground/80">
+    <p className="text-xs text-muted-foreground">
       Result detected from the replay.
     </p>
   );

@@ -435,7 +435,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
           <TurnRecap galaxy={galaxy} events={state.lastRound} />
         )}
 
-      <p className="pointer-events-none absolute bottom-2 left-3 z-10 text-[11px] text-muted-foreground/70">
+      <p className="pointer-events-none absolute bottom-2 left-3 z-10 text-[11px] text-muted-foreground">
         drag to pan · scroll to zoom · right-drag to tilt
       </p>
     </div>
@@ -629,7 +629,7 @@ function SelectionPanel({
             {node.kind === "capital" && " · Capital"}
           </span>
           {galaxy.theme?.skin !== "theatre" && (
-            <span className="text-xs capitalize text-muted-foreground/70">
+            <span className="text-xs capitalize text-muted-foreground">
               {nodeBodyLabel(
                 node.id,
                 node.kind === "capital",
@@ -946,7 +946,7 @@ function EndScreen({
             <Button variant="outline">Back to Conquest</Button>
           </Link>
         </div>
-        <p className="text-xs text-muted-foreground/70">
+        <p className="text-xs text-muted-foreground">
           Starting again resets {galaxy.title} with a new seed.
         </p>
       </BracketFrame>

@@ -143,7 +143,7 @@ function ScenarioCard({
         <span className="truncate text-xs text-muted-foreground">
           {scenario.setup.gameName} · {scenario.setup.mapName}
         </span>
-        <span className="truncate text-xs text-muted-foreground/80">
+        <span className="truncate text-xs text-muted-foreground">
           {scenarioContents(scenario)}
         </span>
         {blocker && <p className="text-xs text-destructive">{blocker}</p>}

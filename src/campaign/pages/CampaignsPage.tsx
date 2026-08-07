@@ -141,7 +141,7 @@ function CampaignCard({
               {campaign.description}
             </p>
           )}
-          <span className="text-xs text-muted-foreground/80">
+          <span className="text-xs text-muted-foreground">
             {completed}/{total} mission{total === 1 ? "" : "s"}
           </span>
         </div>

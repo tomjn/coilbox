@@ -110,7 +110,7 @@ export function UnitRestrictions({
           </Button>
         </div>
         {disabledUnits.length === 0 ? (
-          <p className="text-xs text-muted-foreground/80">No restrictions.</p>
+          <p className="text-xs text-muted-foreground">No restrictions.</p>
         ) : (
           <ul className="flex flex-wrap gap-1.5">
             {disabledUnits.map((name) => (

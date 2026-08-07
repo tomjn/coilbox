@@ -352,7 +352,7 @@ export default function CampaignEditPage() {
                         className="h-20 rounded-none"
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center bg-muted text-xs text-muted-foreground/60">
+                      <div className="flex h-full items-center justify-center bg-muted text-xs text-muted-foreground">
                         No panorama
                       </div>
                     )}

@@ -30,9 +30,7 @@ function AchievementRow({ a }: { a: AchievementResult }) {
     <li className="flex items-center gap-3 py-2">
       <span
         className={
-          a.earned
-            ? "shrink-0 text-primary"
-            : "shrink-0 text-muted-foreground/60"
+          a.earned ? "shrink-0 text-primary" : "shrink-0 text-muted-foreground"
         }
       >
         {a.earned ? (

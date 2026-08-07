@@ -121,7 +121,7 @@ export function RewardOverlay({
               </span>
               <span className="font-semibold">{t.name}</span>
               <span className="text-xs text-muted-foreground">{t.desc}</span>
-              <span className="mt-auto text-[10px] uppercase tracking-wider text-muted-foreground/80">
+              <span className="mt-auto text-[10px] uppercase tracking-wider text-muted-foreground">
                 {t.tag}
               </span>
             </button>
