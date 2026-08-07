@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { playableScenarios } from "./listing";
-import type { Scenario } from "./model";
-import { listScenarios } from "./storage";
+import { type LoadedScenario, listScenarios } from "./storage";
 
 /**
  * Session cache of the parsed scenario list, so navigating back to the Scenario
@@ -9,11 +8,11 @@ import { listScenarios } from "./storage";
  * module-cache-plus-listeners shape the campaign list uses, so a save or delete
  * in the editor updates every mounted consumer, including the list behind it.
  */
-let cache: Scenario[] | null = null;
-const listeners = new Set<(scenarios: Scenario[]) => void>();
+let cache: LoadedScenario[] | null = null;
+const listeners = new Set<(scenarios: LoadedScenario[]) => void>();
 
 /** Re-read every stored scenario and push the result to every consumer. */
-export async function refreshScenarios(): Promise<Scenario[]> {
+export async function refreshScenarios(): Promise<LoadedScenario[]> {
   const loaded = await listScenarios();
   cache = loaded;
   for (const listener of listeners) listener(loaded);
@@ -21,17 +20,17 @@ export async function refreshScenarios(): Promise<Scenario[]> {
 }
 
 /**
- * Every stored scenario, newest edit first. Serves the session cache on mount,
- * else reads once. Invalid documents are skipped by {@link listScenarios}, so
- * one bad file cannot make the list unusable.
+ * Every scenario, newest edit first, each with where it came from. Serves the
+ * session cache on mount, else reads once. Invalid documents are skipped by
+ * {@link listScenarios}, so one bad file cannot make the list unusable.
  */
 export function useScenarios() {
-  const [scenarios, setScenarios] = useState<Scenario[]>(cache ?? []);
+  const [scenarios, setScenarios] = useState<LoadedScenario[]>(cache ?? []);
   const [loading, setLoading] = useState(cache === null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const listener = (loaded: Scenario[]) => setScenarios(loaded);
+    const listener = (loaded: LoadedScenario[]) => setScenarios(loaded);
     listeners.add(listener);
     return () => {
       listeners.delete(listener);
@@ -85,7 +84,9 @@ export function useScenarios() {
  */
 export function useHasScenarios(): boolean {
   const { scenarios, loading } = useScenarios();
-  return !loading && playableScenarios(scenarios).length > 0;
+  return (
+    !loading && playableScenarios(scenarios.map((l) => l.scenario)).length > 0
+  );
 }
 
 /**
@@ -93,6 +94,6 @@ export function useHasScenarios(): boolean {
  * list has not loaded yet. For non-React callers that need a best-effort name
  * now, chiefly the breadcrumb resolver, which only has the route's id.
  */
-export function getCachedScenario(id: string): Scenario | undefined {
-  return cache?.find((s) => s.id === id);
+export function getCachedScenario(id: string): LoadedScenario | undefined {
+  return cache?.find((l) => l.scenario.id === id);
 }

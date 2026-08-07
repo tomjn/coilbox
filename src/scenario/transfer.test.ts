@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { encodeContainerJson, identify } from "../container/container";
+import { computeMissingRequirements } from "../content/resolveContent";
 import { parseScenario, type Scenario } from "./model";
 import {
   dropMissingDialogueMedia,
   encodeScenarioExport,
   readScenarioExport,
+  scenarioContentRequirements,
   scenarioImportErrorMessage,
   scenarioMediaFiles,
 } from "./transfer";
@@ -54,6 +56,52 @@ describe("scenarioMediaFiles", () => {
 
   it("is empty for a scenario with no dialogue media", () => {
     expect(scenarioMediaFiles(scenario({ dialogue: [] }))).toEqual([]);
+  });
+});
+
+describe("scenarioContentRequirements", () => {
+  /** What the shared gate measures a requirement against. */
+  const installed = (games: string[], maps: string[]) => ({
+    games: games.map((name) => ({ name })),
+    maps,
+    engineVersions: [],
+  });
+
+  it("asks for the game and the map the setup names", () => {
+    const reqs = scenarioContentRequirements(scenario());
+
+    expect(reqs.map((r) => [r.kind, r.label])).toEqual([
+      ["game", "BAR"],
+      ["map", "Comet Catcher"],
+    ]);
+  });
+
+  it("is satisfied by an install that has both", () => {
+    const missing = computeMissingRequirements(
+      scenarioContentRequirements(scenario()),
+      installed(["BAR"], ["Comet Catcher"]),
+    );
+
+    expect(missing).toEqual([]);
+  });
+
+  it("reports whichever of the two is not installed", () => {
+    const missing = computeMissingRequirements(
+      scenarioContentRequirements(scenario()),
+      installed(["Some Other Game"], ["Comet Catcher"]),
+    );
+
+    expect(missing.map((r) => r.label)).toEqual(["BAR"]);
+  });
+
+  it("asks for nothing when the scenario names no game or map", () => {
+    const draft = scenario({
+      setup: { ...scenario().setup, gameName: "", mapName: "" },
+    });
+
+    // A requirement for a game called "" could never be satisfied or
+    // downloaded, so the gate would hold a draft import open forever.
+    expect(scenarioContentRequirements(draft)).toEqual([]);
   });
 });
 

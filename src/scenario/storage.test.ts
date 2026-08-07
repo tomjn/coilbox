@@ -26,17 +26,19 @@ import { parseScenarioJson, type Scenario } from "./model";
 import {
   deleteScenario,
   deleteScenarioMedia,
+  ensureBundledScenarioMedia,
   exportScenario,
-  importScenario,
   importScenarioMedia,
   listScenarios,
   saveScenario,
+  storeScenario,
 } from "./storage";
 import { encodeScenarioExport, readScenarioExport } from "./transfer";
 
-/** A stored document as the plugin hands it back. */
-function stored(id: string, updatedAt: string): { json: string } {
+/** A local document as the plugin hands it back. */
+function stored(id: string, updatedAt: string) {
   return {
+    source: "local" as const,
     json: JSON.stringify({
       id,
       name: id,
@@ -74,6 +76,20 @@ beforeEach(() => {
   mediaWriteMock.mockResolvedValue({});
 });
 
+/**
+ * A bundled scenario as it sits in `.coilbox/scenarios/`: the file the builder
+ * exported, document and clips together (issue #786).
+ */
+function bundled(id: string, media: Record<string, string> = {}) {
+  return {
+    source: "bundled" as const,
+    json: encodeScenarioExport({
+      scenario: scenario({ id, name: id, dialogue: [] }),
+      media,
+    }),
+  };
+}
+
 describe("listScenarios", () => {
   it("parses stored documents and orders them by most recent edit", async () => {
     listMock.mockResolvedValue({
@@ -85,20 +101,77 @@ describe("listScenarios", () => {
 
     const list = await listScenarios();
 
-    expect(list.map((s) => s.id)).toEqual(["newer", "older"]);
+    expect(list.map((l) => l.scenario.id)).toEqual(["newer", "older"]);
+    expect(list.map((l) => l.source)).toEqual(["local", "local"]);
   });
 
   it("skips a document that fails validation", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     listMock.mockResolvedValue({
-      items: [{ json: "{ not json" }, stored("good", "")],
+      items: [
+        { source: "local" as const, json: "{ not json" },
+        stored("good", ""),
+      ],
     });
 
     const list = await listScenarios();
 
-    expect(list.map((s) => s.id)).toEqual(["good"]);
+    expect(list.map((l) => l.scenario.id)).toEqual(["good"]);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  /**
+   * A distribution drops the export file in as-is, so the document has to be
+   * unwrapped out of the container. Getting this wrong would drop every bundled
+   * scenario from the list, and with it from the media sweep's keep set.
+   */
+  it("unwraps a bundled export file and says where it came from", async () => {
+    listMock.mockResolvedValue({
+      items: [stored("mine", ""), bundled("shipped")],
+    });
+
+    const list = await listScenarios();
+
+    expect(list.map((l) => [l.scenario.id, l.source])).toEqual([
+      ["mine", "local"],
+      ["shipped", "bundled"],
+    ]);
+  });
+});
+
+describe("ensureBundledScenarioMedia", () => {
+  it("writes a bundled scenario's clips into the media store", async () => {
+    listMock.mockResolvedValue({
+      items: [bundled("b1", { "abc.png": PORTRAIT })],
+    });
+
+    await ensureBundledScenarioMedia("b1");
+
+    expect(mediaWriteMock).toHaveBeenCalledWith({
+      scenarioId: "b1",
+      file: "abc.png",
+      dataUri: PORTRAIT,
+    });
+  });
+
+  it("writes them once, however many times the scenario is played", async () => {
+    listMock.mockResolvedValue({
+      items: [bundled("b2", { "abc.png": PORTRAIT })],
+    });
+
+    await ensureBundledScenarioMedia("b2");
+    await ensureBundledScenarioMedia("b2");
+
+    expect(mediaWriteMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes nothing for a scenario that is not bundled", async () => {
+    listMock.mockResolvedValue({ items: [stored("local-one", "")] });
+
+    await ensureBundledScenarioMedia("local-one");
+
+    expect(mediaWriteMock).not.toHaveBeenCalled();
   });
 });
 
@@ -216,50 +289,31 @@ describe("exportScenario", () => {
   });
 });
 
-describe("importScenario", () => {
+describe("storeScenario", () => {
   it("stores the document under a fresh id and writes its clips", async () => {
-    const text = encodeScenarioExport({
+    const saved = await storeScenario({
       scenario: withPortrait(),
       media: { "abc.png": PORTRAIT },
     });
 
-    const result = await importScenario(text);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.payload.id).not.toBe("s1");
-    expect(result.payload.dialogue[0].portrait).toBe("abc.png");
+    expect(saved.id).not.toBe("s1");
+    expect(saved.dialogue[0].portrait).toBe("abc.png");
     expect(mediaWriteMock).toHaveBeenCalledWith({
-      scenarioId: result.payload.id,
+      scenarioId: saved.id,
       file: "abc.png",
       dataUri: PORTRAIT,
     });
     const [{ id, json }] = saveMock.mock.calls[0] as [
       { id: string; json: string },
     ];
-    expect(id).toBe(result.payload.id);
+    expect(id).toBe(saved.id);
     expect(parseScenarioJson(json)?.name).toBe("s1");
   });
 
   it("drops a dialogue reference whose clip did not arrive", async () => {
-    const text = encodeScenarioExport({
-      scenario: withPortrait(),
-      media: {},
-    });
+    const saved = await storeScenario({ scenario: withPortrait(), media: {} });
 
-    const result = await importScenario(text);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.payload.dialogue[0].portrait).toBeUndefined();
-    expect(mediaWriteMock).not.toHaveBeenCalled();
-  });
-
-  it("writes nothing when the file is not a scenario", async () => {
-    const result = await importScenario("not a scenario");
-
-    expect(result).toEqual({ ok: false, error: "unknown-format" });
-    expect(saveMock).not.toHaveBeenCalled();
+    expect(saved.dialogue[0].portrait).toBeUndefined();
     expect(mediaWriteMock).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,11 @@
 //!   - `scenarios/<id>.json`              one document per scenario
 //!   - `media/<scenarioId>/<uuid>.<ext>`  dialogue portraits and voice clips
 //!
+//! A distribution profile can additionally ship *read-only* scenarios as export
+//! files in the portable `.coilbox/scenarios/` folder. [`scenario_list`] merges
+//! those in as `"bundled"`, the way `campaign_list` does, so a distribution can
+//! hand out a playable mission without the player importing anything.
+//!
 //! Media is copied verbatim, with no re-encode. These files are written into the
 //! game's VFS beside the compiled mission, so the engine has to load them as they
 //! were authored: an alpha portrait, or an `.ogg` the engine's sound code accepts.
@@ -41,10 +46,12 @@ use tauri::{
     AppHandle, Runtime,
 };
 
-/// One stored scenario document. The frontend parses and validates the JSON.
+/// A scenario document plus where it was read from. The frontend parses and
+/// validates the JSON. `source` is what marks a bundled scenario read-only.
 #[derive(Serialize)]
 struct ScenarioItem {
     json: String,
+    source: &'static str, // "local" | "bundled"
 }
 
 /// Base storage directory: `<data_dir>/scenario`.
@@ -60,10 +67,11 @@ fn media_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(scenario_dir(app)?.join("media"))
 }
 
-/// Read every `*.json` file in `dir` (non-recursive) into `items`. A missing
-/// directory or an unreadable file is skipped rather than an error, because a
-/// fresh install simply has no scenarios yet.
-fn read_json_dir(dir: &Path, items: &mut Vec<ScenarioItem>) {
+/// Read every `*.json` file in `dir` (non-recursive) into `items` with the given
+/// source. A missing directory or an unreadable file is skipped rather than an
+/// error, because a fresh install simply has no scenarios yet and a
+/// non-portable one has no bundled ones.
+fn read_json_dir(dir: &Path, source: &'static str, items: &mut Vec<ScenarioItem>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
@@ -73,7 +81,7 @@ fn read_json_dir(dir: &Path, items: &mut Vec<ScenarioItem>) {
             continue;
         }
         if let Ok(json) = std::fs::read_to_string(&path) {
-            items.push(ScenarioItem { json });
+            items.push(ScenarioItem { json, source });
         }
     }
 }
@@ -93,12 +101,18 @@ fn safe_ext(raw: &str) -> String {
     }
 }
 
-/// `scenario_list`, every stored scenario document.
+/// `scenario_list`, every scenario document: the local ones under app data
+/// first, then any read-only scenarios a distribution bundled in the portable
+/// `.coilbox/scenarios/` folder (issue #786). A non-portable install simply
+/// contributes no bundled entries. Mirrors `campaign_list`.
 #[tauri::command]
 async fn scenario_list<R: Runtime>(app: AppHandle<R>) -> CliResult {
     let mut items = Vec::new();
     if let Ok(dir) = scenarios_dir(&app) {
-        read_json_dir(&dir, &mut items);
+        read_json_dir(&dir, "local", &mut items);
+    }
+    if let Some(root) = coilbox_portable::portable_root() {
+        read_json_dir(&root.join("scenarios"), "bundled", &mut items);
     }
     CliResult::ok(json!({ "items": items }))
 }
@@ -749,7 +763,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn read_json_dir_reads_only_json() {
+    fn read_json_dir_reads_only_json_and_tags_source() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("a.json"), r#"{"id":"a"}"#).unwrap();
         std::fs::write(tmp.path().join("b.json"), r#"{"id":"b"}"#).unwrap();
@@ -757,17 +771,36 @@ mod tests {
         std::fs::create_dir(tmp.path().join("media")).unwrap();
 
         let mut items = Vec::new();
-        read_json_dir(tmp.path(), &mut items);
+        read_json_dir(tmp.path(), "local", &mut items);
 
+        assert!(items.iter().all(|i| i.source == "local"));
         let mut jsons: Vec<&str> = items.iter().map(|i| i.json.as_str()).collect();
         jsons.sort();
         assert_eq!(jsons, vec![r#"{"id":"a"}"#, r#"{"id":"b"}"#]);
     }
 
+    /// What `scenario_list` does: app data first, then the portable folder, with
+    /// each entry saying which it came from (issue #786).
+    #[test]
+    fn read_json_dir_merges_local_then_bundled() {
+        let local = tempfile::tempdir().unwrap();
+        let bundled = tempfile::tempdir().unwrap();
+        std::fs::write(local.path().join("mine.json"), r#"{"n":1}"#).unwrap();
+        std::fs::write(bundled.path().join("shipped.json"), r#"{"n":2}"#).unwrap();
+
+        let mut items = Vec::new();
+        read_json_dir(local.path(), "local", &mut items);
+        read_json_dir(bundled.path(), "bundled", &mut items);
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].source, "local");
+        assert_eq!(items[1].source, "bundled");
+    }
+
     #[test]
     fn read_json_dir_missing_dir_is_empty() {
         let mut items = Vec::new();
-        read_json_dir(Path::new("/no/such/scenario/dir"), &mut items);
+        read_json_dir(Path::new("/no/such/scenario/dir"), "local", &mut items);
         assert!(items.is_empty());
     }
 

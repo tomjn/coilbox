@@ -82,7 +82,7 @@ export function ReclaimClipsButton() {
       const campaigns = await loadedCampaigns();
       const summary = await sweepScenarioMedia(
         namedScenarioClips(
-          await listScenarios(),
+          (await listScenarios()).map((l) => l.scenario),
           campaigns.map((c) => c.campaign),
         ),
         true,

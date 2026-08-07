@@ -37,6 +37,8 @@ Once portable mode is on, Coilbox writes **its own** data and caches inside `.co
   cache/             # created by Coilbox: thumbnails, unitsync caches, etc.
   campaigns/         # you add these (optional) — bundled campaigns
     my-campaign.json
+  scenarios/         # you add these (optional) — bundled scenarios
+    my-mission.json
   images/            # you add these (optional) — media referenced by profile/campaigns
   briefings/
   fonts/
@@ -45,7 +47,7 @@ Once portable mode is on, Coilbox writes **its own** data and caches inside `.co
 ```
 
 - **`data/` and `cache/`** are Coilbox's business. It creates and manages them on first run. You never edit them by hand. Deleting `cache/` is always safe (it's rebuilt); deleting `data/` resets Coilbox's settings for that package.
-- **Everything else** in `.coilbox/` is content *you* put there: `profile.json`, `campaigns/`, and any media (`images/`, `briefings/`, `fonts/`, or whatever folder names you reference). These are read-only from Coilbox's point of view.
+- **Everything else** in `.coilbox/` is content *you* put there: `profile.json`, `campaigns/`, `scenarios/`, and any media (`images/`, `briefings/`, `fonts/`, or whatever folder names you reference). These are read-only from Coilbox's point of view.
 
 **Important distinction:** this covers Coilbox's *own* files. It does **not** automatically include the game itself — the engine, the `.sdz`/`.sd7` game archive, and maps. Those are **content**, and where they live is a separate choice covered in [Bundling the game content](#bundling-the-game-content) below.
 
@@ -126,7 +128,7 @@ To ship a branded, self-contained Coilbox for your game:
 2. **Add `.coilbox/`** next to the binary.
 3. **Add `profile.json`** in `.coilbox/` to brand and narrow the app — title, theme, hidden nav, a welcome screen, links. See [distribution-profile.md](distribution-profile.md), and [routes.md](routes.md) for the exact route/nav ids those fields use.
 4. **Bundle the game content** as a Portable root (above), *or* configure `release` to download it, *or* leave downloads on for the player to fetch. Bundling plus `release` together gives an offline-ready package that still self-updates.
-5. **Bundle any campaigns** by dropping their exported `.json` into `.coilbox/campaigns/` and their media alongside — see [campaigns.md](campaigns.md).
+5. **Bundle any campaigns** by dropping their exported `.json` into `.coilbox/campaigns/` and their media alongside — see [campaigns.md](campaigns.md). Standalone missions go in `.coilbox/scenarios/` the same way — see [scenarios.md](scenarios.md#ship-a-scenario-in-a-distribution).
 6. **Test the package** by moving/renaming the whole folder and launching — a correctly-portable package keeps working after it's moved. Confirm **Settings > Distribution profile** shows your profile loaded, and that bundled content and campaigns appear.
 7. **Zip the folder** and distribute. Players unzip and run the binary directly.
 

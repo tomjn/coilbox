@@ -32,6 +32,7 @@ import {
 } from "../../gating";
 import { type ScenarioRoute, scenarioRoute } from "../../launch";
 import type { Scenario } from "../../model";
+import type { ScenarioReader } from "../../wording";
 
 export interface ScenarioGate {
   /** Why each condition and action type cannot be used, keyed by type name. */
@@ -73,7 +74,11 @@ const NOTHING: RuntimeStatus = {
   extensions: null,
 };
 
-export function useScenarioGate(scenario: Scenario | null): ScenarioGate {
+export function useScenarioGate(
+  scenario: Scenario | null,
+  /** Who reads the route sentence this hands back. See `wording.ts`. */
+  reader: ScenarioReader,
+): ScenarioGate {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const game = scenario
@@ -119,6 +124,7 @@ export function useScenarioGate(scenario: Scenario | null): ScenarioGate {
       game,
       installed: status.installed?.version ?? null,
       required,
+      reader,
     });
     const gate = paletteGate(
       gateTarget(route, status.installed, status.available),
@@ -138,5 +144,5 @@ export function useScenarioGate(scenario: Scenario | null): ScenarioGate {
       reason,
       available,
     };
-  }, [game, status, required]);
+  }, [game, status, required, reader]);
 }

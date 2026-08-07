@@ -61,7 +61,10 @@ export default function CampaignEditPage() {
   const { id } = useParams();
   const { campaigns, loading } = useCampaigns();
   const { presets } = useSkirmishPresets();
-  const { scenarios } = useScenarios();
+  const { scenarios: loadedScenarios } = useScenarios();
+  // The documents alone: a campaign mission attaches a copy of one, and where
+  // it came from makes no difference to that.
+  const scenarios = loadedScenarios.map((l) => l.scenario);
   const drawer = useDrawer();
   // Map minimaps for the mission-row thumbnails, keyed by map name.
   const { target } = usePreferredTarget();

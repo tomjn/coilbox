@@ -240,7 +240,8 @@ function MissionRow({
  * button: they are the game's content, and coilbox did not put them there.
  */
 function WrittenMissions({ root }: { root: string }) {
-  const { scenarios } = useScenarios();
+  const { scenarios: loaded } = useScenarios();
+  const scenarios = loaded.map((l) => l.scenario);
   const [folders, setFolders] = useState<string[]>([]);
   const [removing, setRemoving] = useState<string | null>(null);
 

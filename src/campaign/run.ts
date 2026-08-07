@@ -219,6 +219,9 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         // ran, so it is shown and no result is looked for.
         const result = await launchScenario({
           scenario: mission.scenario,
+          // Whoever is playing a campaign is a player, whether or not they also
+          // wrote it: a refusal here is read on the briefing screen.
+          reader: "player",
           dataDir: target.dataDir,
           games,
           disabledUnits: mission.disabledUnits,

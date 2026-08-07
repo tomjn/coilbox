@@ -14,7 +14,7 @@ import type { GameItem } from "../content/bindings";
 import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import type { RuntimeMarker } from "./bindings";
 import { scenarioRoute } from "./launch";
-import { mutatorOffer, packagedArchiveReason } from "./offer";
+import { mutatorOffer } from "./offer";
 
 const marker = (version: number): RuntimeMarker => ({
   version,
@@ -35,7 +35,12 @@ describe("mutatorOffer", () => {
     const { reason } = mutatorOffer("Balanced Annihilation", marker(2));
 
     expect(reason).toBe(
-      scenarioRoute({ game: PACKAGED, installed: null, required: 1 }).reason,
+      scenarioRoute({
+        game: PACKAGED,
+        installed: null,
+        required: 1,
+        reader: "author",
+      }).reason,
     );
     expect(reason).toContain("packaged archive");
   });
@@ -65,13 +70,5 @@ describe("mutatorOffer", () => {
     expect(offer).toContain("no test mutator");
     expect(offer).not.toContain(MUTATOR_FOLDER);
     expect(limit).toBeNull();
-  });
-});
-
-describe("packagedArchiveReason", () => {
-  it("names the game it is about", () => {
-    expect(packagedArchiveReason("Splinter Faction")).toContain(
-      "Splinter Faction",
-    );
   });
 });

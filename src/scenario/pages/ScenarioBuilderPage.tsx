@@ -1,14 +1,6 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { open, save } from "@tauri-apps/plugin-dialog";
-import {
-  Download,
-  Loader2,
-  Pencil,
-  Plus,
-  RefreshCw,
-  Trash2,
-  Upload,
-} from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { Loader2, Pencil, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -24,19 +16,14 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
-import { scenarioExport, scenarioImport } from "../bindings";
+import { scenarioExport } from "../bindings";
 import { newScenario } from "../create";
 import { scenarioContents } from "../listing";
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
-import {
-  deleteScenario,
-  exportScenario,
-  importScenario,
-  saveScenario,
-} from "../storage";
-import { scenarioImportErrorMessage } from "../transfer";
+import { deleteScenario, exportScenario, saveScenario } from "../storage";
 import { ReclaimClipsButton } from "./components/ReclaimClipsButton";
+import { ScenarioImportButton } from "./components/ScenarioImportButton";
 
 /**
  * Scenario Builder landing: create a scenario, import a shared one, and list
@@ -52,7 +39,6 @@ export default function ScenarioBuilderPage() {
   const { campaigns } = useCampaigns();
   const navigate = useNavigate();
   const drawer = useDrawer();
-  const [busy, setBusy] = useState(false);
   const [rescanning, setRescanning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -76,34 +62,6 @@ export default function ScenarioBuilderPage() {
       await refresh();
     } finally {
       setRescanning(false);
-    }
-  };
-
-  // Import mints a fresh id and writes the dialogue clips carried in the file,
-  // so importing the scenario you exported gives you a second copy rather than
-  // overwriting the first.
-  const importFile = async () => {
-    setActionError(null);
-    try {
-      const src = await open({
-        title: "Import scenario",
-        multiple: false,
-        filters: [{ name: "Coilbox scenario", extensions: ["json"] }],
-      });
-      if (typeof src !== "string") return;
-      setBusy(true);
-      const { text } = await scenarioImport({ src });
-      const result = await importScenario(text);
-      if (!result.ok) {
-        setActionError(scenarioImportErrorMessage(result.error));
-        return;
-      }
-      await refreshScenarios();
-      navigate(`/scenario-builder/${result.payload.id}`);
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -169,14 +127,12 @@ export default function ScenarioBuilderPage() {
             Rescan
           </Button>
           <ReclaimClipsButton />
-          <Button
-            variant="outline"
-            className="gap-1.5"
-            onClick={importFile}
-            disabled={busy}
-          >
-            <Download className="size-4" /> Import
-          </Button>
+          <ScenarioImportButton
+            onImported={(scenario) =>
+              navigate(`/scenario-builder/${scenario.id}`)
+            }
+            onError={setActionError}
+          />
           <Button className="gap-1.5" onClick={openNew}>
             <Plus className="size-4" /> New scenario
           </Button>
@@ -192,70 +148,89 @@ export default function ScenarioBuilderPage() {
         <EmptyState label="No scenarios yet. Start one with New scenario, or import a shared one." />
       ) : (
         <ul className="flex flex-col gap-2">
-          {scenarios.map((scenario) => (
-            <li
-              key={scenario.id}
-              className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3"
-            >
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="truncate text-sm font-medium">
-                  {scenario.name}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {scenario.setup.gameName || "No game"} ·{" "}
-                  {scenario.setup.mapName || "No map"}
-                </span>
-                <span className="truncate text-xs text-muted-foreground/80">
-                  {scenarioContents(scenario)}
-                </span>
-              </div>
-              <div className="ml-auto flex shrink-0 items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => navigate(`/scenario-builder/${scenario.id}`)}
-                >
-                  <Pencil className="size-4" /> Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => void exportFile(scenario)}
-                >
-                  <Upload className="size-4" /> Export
-                </Button>
-                <Popover>
-                  <PopoverTrigger asChild>
+          {scenarios.map(({ scenario, source }) => {
+            // A bundled scenario is a distribution's own file, so it is listed
+            // and exportable but not editable or deletable. Same treatment as a
+            // bundled campaign.
+            const bundled = source === "bundled";
+            return (
+              <li
+                key={scenario.id}
+                className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3"
+              >
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium">
+                      {scenario.name}
+                    </span>
+                    {bundled && (
+                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                        Bundled
+                      </span>
+                    )}
+                  </div>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {scenario.setup.gameName || "No game"} ·{" "}
+                    {scenario.setup.mapName || "No map"}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground/80">
+                    {scenarioContents(scenario)}
+                  </span>
+                </div>
+                <div className="ml-auto flex shrink-0 items-center gap-2">
+                  {!bundled && (
                     <Button
                       size="sm"
-                      variant="ghost"
-                      aria-label={`Delete ${scenario.name}`}
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() =>
+                        navigate(`/scenario-builder/${scenario.id}`)
+                      }
                     >
-                      <Trash2 className="size-4" />
+                      <Pencil className="size-4" /> Edit
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="flex w-56 flex-col gap-2">
-                    <p className="text-sm">
-                      Delete{" "}
-                      <span className="font-medium">{scenario.name}</span>
-                      {attached(scenario.id)
-                        ? "? A campaign mission uses it, so its dialogue clips stay behind for that mission. This can't be undone."
-                        : " and its dialogue clips? This can't be undone."}
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => remove(scenario.id)}
-                    >
-                      Delete
-                    </Button>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </li>
-          ))}
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => void exportFile(scenario)}
+                  >
+                    <Upload className="size-4" /> Export
+                  </Button>
+                  {!bundled && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`Delete ${scenario.name}`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="flex w-56 flex-col gap-2">
+                        <p className="text-sm">
+                          Delete{" "}
+                          <span className="font-medium">{scenario.name}</span>
+                          {attached(scenario.id)
+                            ? "? A campaign mission uses it, so its dialogue clips stay behind for that mission. This can't be undone."
+                            : " and its dialogue clips? This can't be undone."}
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => remove(scenario.id)}
+                        >
+                          Delete
+                        </Button>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
