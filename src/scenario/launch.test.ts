@@ -16,6 +16,7 @@ vi.mock("./bindings", () => ({
 }));
 
 import type { GameItem } from "../content/bindings";
+import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import type { Participant } from "../play/participants";
 import {
   launchScenario,
@@ -25,7 +26,6 @@ import {
   scenarioRoute,
 } from "./launch";
 import { parseScenario, type Scenario } from "./model";
-import { MUTATOR_FOLDER } from "./mutator";
 
 const you: Participant = {
   id: "you",

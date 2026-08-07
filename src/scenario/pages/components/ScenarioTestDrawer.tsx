@@ -27,6 +27,7 @@ import {
 } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
+import { MUTATOR_FOLDER } from "../../../lib/generatedGames";
 import {
   launchScenario,
   missionIssueSummary,
@@ -34,7 +35,6 @@ import {
   scenarioLaunchBlocker,
 } from "../../launch";
 import type { Scenario } from "../../model";
-import { MUTATOR_FOLDER } from "../../mutator";
 import { mutatorOffer } from "../../offer";
 import { describeIssue, type MissionIssue } from "../../validate";
 import { useGameUnits } from "./useGameUnits";

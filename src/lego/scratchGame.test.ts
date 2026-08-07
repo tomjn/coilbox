@@ -4,8 +4,6 @@ import {
   buildModInfo,
   buildSideData,
   buildStartUnitGadget,
-  isScratchArchive,
-  SCRATCH_FOLDER,
   SCRATCH_SIDE,
 } from "./scratchGame";
 
@@ -121,17 +119,5 @@ describe("buildStartUnitGadget", () => {
 
     expect(lua.endsWith("\n")).toBe(true);
     expect(lua.endsWith("\n\n")).toBe(false);
-  });
-});
-
-describe("isScratchArchive", () => {
-  it("matches the scratch folder whatever its case on disk", () => {
-    expect(isScratchArchive(SCRATCH_FOLDER)).toBe(true);
-    expect(isScratchArchive(SCRATCH_FOLDER.toUpperCase())).toBe(true);
-  });
-
-  it("does not match a real game archive", () => {
-    expect(isScratchArchive("ba1211.sdz")).toBe(false);
-    expect(isScratchArchive("mygame.sdd")).toBe(false);
   });
 });

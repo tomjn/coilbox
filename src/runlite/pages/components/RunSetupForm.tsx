@@ -5,6 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogos } from "@/factions/logos";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { resolveBranding, useBrandingCatalog } from "../../../content/branding";
 import {
   useUnitsyncGameHeaders,
@@ -59,11 +60,13 @@ export function RunSetupForm({
 
   // In a distribution profile filtered to a game, only that game is offered.
   const matcher = getGameMatcher();
-  const allGames = scan.data?.games ?? [];
-  const games = useMemo(
-    () => (matcher ? allGames.filter((g) => matcher(g.name)) : allGames),
-    [allGames, matcher],
-  );
+  const scanned = scan.data?.games;
+  const games = useMemo(() => {
+    // Coilbox's own generated games go first: a warpath run in one is never
+    // what a player meant, unless the caller asked for that one by name.
+    const all = withoutGeneratedGames(scanned ?? [], initialGameName);
+    return matcher ? all.filter((g) => matcher(g.name)) : all;
+  }, [scanned, matcher, initialGameName]);
   // A profile pinned to a single game hides the picker entirely.
   const forcedSingleGame = !!matcher && games.length === 1;
   const maps = scan.data?.maps ?? [];

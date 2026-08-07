@@ -23,12 +23,13 @@
 
 import type { GameItem } from "../content/bindings";
 import { isSdd } from "../content/format";
+import { isMutatorArchive } from "../lib/generatedGames";
 import type { BattleConfig } from "../play/bindings";
 import { applyRestrictions, toBattleConfig } from "../play/participants";
 import { scenarioRuntimeStatus, scenarioWriteMission } from "./bindings";
 import { compileScenario, missionPath } from "./compile";
 import type { Scenario } from "./model";
-import { isMutatorArchive, writeTestMutator } from "./mutator";
+import { writeTestMutator } from "./mutator";
 import { packagedArchiveReason } from "./offer";
 import {
   describeIssue,

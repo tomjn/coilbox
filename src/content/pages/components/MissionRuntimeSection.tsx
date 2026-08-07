@@ -8,6 +8,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { isGeneratedGame } from "@/lib/generatedGames";
 import {
   type RuntimeMarker,
   scenarioDeleteMission,
@@ -354,10 +355,16 @@ function PackagedOffer({
  * Only a loose `.sdd` can be installed into: adoption means the game vendors
  * `luarules/`, `luaui/` and `missions/`, which coilbox cannot write into a
  * packaged `.sd7`/`.sdz`. A packaged game gets {@link PackagedOffer} instead.
+ *
+ * Coilbox's own generated games get neither (issue #817). They are loose
+ * `.sdd`s, so this used to offer to install a runtime into one, but coilbox
+ * rewrites the whole folder on the next test launch and puts the runtime it
+ * ships there itself. Nothing here is a player's to maintain.
  */
 export function MissionRuntimeSection({ game }: { game: GameItem }) {
   const archive = game.primaryArchive;
   const root = archive.path;
+  const generated = isGeneratedGame(archive.name);
   const loose = isSdd(archive) && !!root;
   const [installed, setInstalled] = useState<RuntimeMarker | null>(null);
   const [installedError, setInstalledError] = useState<string | null>(null);
@@ -366,7 +373,7 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!root) return;
+    if (!root || generated) return;
     try {
       const status = await scenarioRuntimeStatus({ root });
       setInstalled(status.installed);
@@ -375,13 +382,13 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
     } catch (e) {
       setError(msg(e));
     }
-  }, [root]);
+  }, [root, generated]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  if (!root) return null;
+  if (generated || !root) return null;
   if (!loose)
     return <PackagedOffer gameName={game.name} available={available} />;
 

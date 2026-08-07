@@ -12,8 +12,8 @@
  * a supported way to distribute a mission.
  */
 
+import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import type { RuntimeMarker } from "./bindings";
-import { MUTATOR_FOLDER } from "./mutator";
 
 /**
  * Why a packaged archive cannot be written into. Shared with `scenarioRoute` in

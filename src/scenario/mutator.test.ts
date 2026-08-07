@@ -11,13 +11,9 @@ vi.mock("./bindings", () => ({
   scenarioReadMission: (...args: unknown[]) => readMissionMock(...args),
 }));
 
+import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import { parseScenario, type Scenario } from "./model";
-import {
-  buildMutatorModInfo,
-  isMutatorArchive,
-  MUTATOR_FOLDER,
-  writeTestMutator,
-} from "./mutator";
+import { buildMutatorModInfo, writeTestMutator } from "./mutator";
 
 function build(overrides: Record<string, unknown> = {}): Scenario {
   const scenario = parseScenario({
@@ -48,18 +44,6 @@ describe("buildMutatorModInfo", () => {
     expect(modinfo).toContain('"a \\"game\\""');
     expect(modinfo).not.toContain('a "game"');
     expect(modinfo).toContain('Testing b\\\\\\" on top of a \\"game\\".');
-  });
-});
-
-describe("isMutatorArchive", () => {
-  it("recognises coilbox's own generated game, whatever its casing", () => {
-    expect(isMutatorArchive(MUTATOR_FOLDER)).toBe(true);
-    expect(isMutatorArchive("Coilbox-Mission-Test.sdd")).toBe(true);
-  });
-
-  it("never mistakes a real game for it", () => {
-    expect(isMutatorArchive("ba1211.sdz")).toBe(false);
-    expect(isMutatorArchive("coilbox-lego-test.sdd")).toBe(false);
   });
 });
 

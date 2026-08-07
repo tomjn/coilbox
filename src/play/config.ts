@@ -11,6 +11,7 @@ import {
   useUnitsyncScan,
 } from "../content/config";
 import { compareEngineVersions } from "../content/engineVersion";
+import { withoutGeneratedGames } from "../lib/generatedGames";
 
 export type { Participant, Rgb } from "./participants";
 // The pure participant model lives in ./participants (no hooks, no frame
@@ -116,7 +117,10 @@ export function usePlayReadiness(): {
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const scanResolved = scan.data != null;
-  const hasGames = (scan.data?.games.length ?? 0) > 0;
+  // Coilbox's own generated games do not count. A player whose only game is the
+  // one the unit builder wrote has nothing to play, and every empty state that
+  // reads this says so.
+  const hasGames = withoutGeneratedGames(scan.data?.games ?? []).length > 0;
   const needsGame = !target || (scanResolved && !hasGames);
   const loading = targetLoading || (!!target && !scanResolved);
   return { ready: !needsGame, loading, target, hasGames };

@@ -12,6 +12,7 @@ import {
   useUnitsyncMapInfo,
   useUnitsyncScan,
 } from "@/content/config";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { usePreferredTarget } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { hexToI32 } from "../battle/config";
@@ -65,12 +66,20 @@ export function HostBattlePopover({
   // and its decompiled `.sdd`); collapse by name so each Select has one option
   // per name. The option value/key is the name, so duplicates would both violate
   // the unique-key rule and give the Select two indistinguishable entries.
+  // Coilbox's own generated games are dropped first: nobody else could join a
+  // battle hosted on a game only this machine has, and only until the next test
+  // rewrites it. One the caller already named stays, so the Select is not left
+  // showing a value it has no option for.
   const games = useMemo(
     () =>
       Array.from(
-        new Map((scan.data?.games ?? []).map((g) => [g.name, g])).values(),
+        new Map(
+          withoutGeneratedGames(scan.data?.games ?? [], initialGame).map(
+            (g) => [g.name, g],
+          ),
+        ).values(),
       ),
-    [scan.data],
+    [scan.data, initialGame],
   );
   const maps = useMemo(
     () =>

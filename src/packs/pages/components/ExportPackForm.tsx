@@ -3,6 +3,7 @@ import { Package } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { ChallengeCodeView } from "../../../challenge/ChallengeCodeView";
 import { useUnitsyncScan } from "../../../content/config";
 import { ErrorBanner } from "../../../content/pages/components/states";
@@ -65,7 +66,11 @@ export function ExportPackForm({ target }: { target: PlayTarget }) {
   const { presets } = useSkirmishPresets();
   const [draft] = useSkirmishDraft();
 
-  const games = scan.data?.games ?? [];
+  // Coilbox's own generated games are never a pack's game: the machine that
+  // imports the pack rewrites its own on the next test, and has no way to get
+  // this one. One the draft already names stays, so the picker below is not
+  // left showing a value it has no option for.
+  const games = withoutGeneratedGames(scan.data?.games ?? [], draft.gameName);
   // A scan can list the same map name from more than one archive. Mirrors
   // `MapsPage`'s dedup, since the pack only needs the name once.
   const maps = useMemo(

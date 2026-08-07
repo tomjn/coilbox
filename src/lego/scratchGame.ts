@@ -8,7 +8,9 @@
  * and everything else. The scratch archive adds only what the builder exported.
  *
  * It is a plain folder under the content root's `games/`, so deleting that
- * folder undoes everything this flow ever wrote.
+ * folder undoes everything this flow ever wrote. Its name, and the fact that a
+ * game list should not offer it, live in `src/lib/generatedGames.ts` alongside
+ * the scenario editor's equivalent.
  *
  * Three files make the unit reachable without cheats. The `modinfo.lua` names
  * the base game to build on. The `gamedata/sidedata.lua` declares one side
@@ -20,13 +22,6 @@
  */
 
 import { luaString } from "./unitDef";
-
-/**
- * The scratch archive's folder name. Fixed, so repeated tests reuse one folder
- * rather than leaving a trail of them, and so the Rust side can refuse any name
- * that is not this shape.
- */
-export const SCRATCH_FOLDER = "coilbox-lego-test.sdd";
 
 /** What the archive calls itself. The engine appends the version to this. */
 const SCRATCH_NAME = "Coilbox unit test";
@@ -159,9 +154,4 @@ export function buildStartUnitGadget(unitName: string): string {
     "end",
   ];
   return `${lines.join("\n")}\n`;
-}
-
-/** Whether a scanned archive is the scratch game, by its archive file name. */
-export function isScratchArchive(archiveName: string): boolean {
-  return archiveName.toLowerCase() === SCRATCH_FOLDER;
 }

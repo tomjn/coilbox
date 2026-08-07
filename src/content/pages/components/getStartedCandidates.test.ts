@@ -21,10 +21,24 @@ const map = (id: string): SuggestedMap => ({
   download: { kind: "map", springName: id },
 });
 
+// A scanned game always carries the archive it came out of, and the archive
+// name is what says whether coilbox generated the game itself.
 const scanned = (games: string[], maps: string[]) =>
   ({
-    games: games.map((name) => ({ name, info: {} })),
+    games: games.map((name) => ({
+      name,
+      info: {},
+      primaryArchive: { name: `${name}.sdz` },
+    })),
     maps: maps.map((name) => ({ name })),
+  }) as never;
+
+const generated = (folder: string) =>
+  ({
+    games: [
+      { name: "Coilbox test", info: {}, primaryArchive: { name: folder } },
+    ],
+    maps: [],
   }) as never;
 
 const empty = { games: new Set<string>(), maps: new Set<string>() };
@@ -76,6 +90,22 @@ describe("getStartedCandidates (issue #534)", () => {
     });
     expect(result?.games.map((g) => g.id)).toEqual(["bar"]);
     expect(result?.maps.map((m) => m.id)).toEqual(["a", "b"]);
+  });
+
+  // Issue #810: coilbox writes these itself, so an install that has nothing but
+  // one of them is still a first run and is still owed the offer.
+  it.each([
+    ["the unit builder's scratch game", "coilbox-lego-test.sdd"],
+    ["the scenario test mutator", "coilbox-mission-test.sdd"],
+  ])("does not count %s as a game the user has", (_label, folder) => {
+    const result = getStartedCandidates({
+      installed: { games: new Set([folder]), maps: new Set() },
+      scanned: generated(folder),
+      scopedGames: [game("bar")],
+      entries: [],
+      suggestedMaps: [],
+    });
+    expect(result?.games.map((g) => g.id)).toEqual(["bar"]);
   });
 });
 

@@ -2,8 +2,10 @@ import { Button, useSetting } from "@picoframe/frame";
 import { FolderOpen, Trophy } from "lucide-react";
 import { useMemo } from "react";
 import { useParams } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFactionLogos } from "@/factions/logos";
+import { generatedGameNote } from "@/lib/generatedGames";
 import { isProfileHidden } from "@/profile/hidden";
 import { type Archive, contentOpenPath } from "../bindings";
 import { useBrandingEntry } from "../branding";
@@ -146,6 +148,11 @@ export default function GameDetailPage() {
     ([k]) => !HEADLINE_KEYS.has(k),
   );
 
+  // Coilbox's own generated games are hidden from every picker, so this page is
+  // the one place they are shown. Saying what wrote it is what keeps a folder in
+  // `games/` that appears in no picker from reading as a bug (issue #810).
+  const generated = generatedGameNote(game.primaryArchive.name);
+
   const openFolder = (a: Archive) => {
     if (!a.path) return;
     // A .sdd path is the folder itself; otherwise open the containing folder.
@@ -161,6 +168,16 @@ export default function GameDetailPage() {
         dataDir={selected?.rootPath}
         onPlay={() => playGame(game.name)}
       />
+
+      {generated && (
+        <Alert>
+          <AlertDescription className="max-w-prose">
+            {generated} It is not offered anywhere a game is picked, which is
+            why you will not find it in Singleplayer or in a scenario&apos;s
+            setup.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex flex-col gap-1">
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
