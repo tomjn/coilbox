@@ -82,7 +82,7 @@ beforeEach(() => {
 describe("Continue zone", () => {
   it("shows the best candidate's kind, title and detail", () => {
     resume.mockReturnValue({ candidates: [WARPATH, CONQUEST], loading: false });
-    expect(text(Continue())).toEqual([
+    expect(text(Continue({}))).toEqual([
       "Warpath run",
       "Kestrel",
       "BAR · health 8/10",
@@ -92,19 +92,19 @@ describe("Continue zone", () => {
 
   it("takes only the head of the list, leaving the rest to the rail", () => {
     resume.mockReturnValue({ candidates: [WARPATH, CONQUEST], loading: false });
-    expect(text(Continue())).not.toContain("Orion Reach");
+    expect(text(Continue({}))).not.toContain("Orion Reach");
   });
 
   it("sends its action where the candidate says", () => {
     resume.mockReturnValue({ candidates: [WARPATH], loading: false });
-    expect(action(Continue())?.to).toBe("/warpath/run-1");
+    expect(action(Continue({}))?.to).toBe("/warpath/run-1");
   });
 
   it("words its action for the kind it is offering", () => {
     resume.mockReturnValue({ candidates: [CONQUEST], loading: false });
     // The wording comes from the collector, so the rail describes the same run
     // the same way.
-    expect(text(Continue())).toContain("Resume conquest");
+    expect(text(Continue({}))).toContain("Resume conquest");
   });
 
   it("offers to rejoin a battle rather than resume it", () => {
@@ -122,19 +122,19 @@ describe("Continue zone", () => {
       ],
       loading: false,
     });
-    expect(text(Continue())).toContain("Rejoin battle");
+    expect(text(Continue({}))).toContain("Rejoin battle");
   });
 
   it("renders nothing when there is nothing to resume", () => {
     // A fresh install. The Onboarding zone owns the one call to action there,
     // and a second one would have the page asking twice.
-    expect(Continue()).toBeNull();
+    expect(Continue({})).toBeNull();
   });
 
   it("renders nothing while the sources are still loading", () => {
     // Sources answer at different times, so the best of a half-read set can be
     // the wrong card. Waiting costs a beat, swapping the hero costs trust.
     resume.mockReturnValue({ candidates: [CONQUEST], loading: true });
-    expect(Continue()).toBeNull();
+    expect(Continue({})).toBeNull();
   });
 });
