@@ -9,9 +9,11 @@
  * group's position and the points the author drew.
  *
  * Every group's paths are drawn, the selected group's brighter and with a knob
- * on each waypoint. Only those knobs carry a `placementKey`, so a line an author
- * is not working on cannot be grabbed by accident, and the shared picking in
- * `useMapEditing` sees the knobs the same way it sees units and zone handles.
+ * on each waypoint. Both the knobs and the lines carry a `placementKey`, so the
+ * shared picking in `useMapEditing` sees them the way it sees units and zone
+ * handles. A line is selected by a click but never grabbed, the way a zone's
+ * sheet is: it is the easiest thing on a big map to hit, and what it means is
+ * "work on this group" rather than "move this line" (#842).
  *
  * The arithmetic, what a drag does to a waypoint, is in `groups.ts`.
  */
@@ -20,7 +22,13 @@ import * as THREE from "three";
 
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import type { Point, ScenarioGroup } from "../../model";
-import { drapePoints, orderWaypoints, parsePathKey, pathKey } from "./groups";
+import {
+  drapePoints,
+  orderWaypoints,
+  parsePathKey,
+  pathKey,
+  pathLineKey,
+} from "./groups";
 import { worldToScene } from "./scene";
 
 /** What a scenario's paths are drawn under, so the layer can be found and
@@ -59,8 +67,11 @@ export interface PathsLayer {
   /** The group every drawn path hangs off, for raycasting against. */
   root: THREE.Group;
   /** Whether this layer owns a picked key, which is what tells the pointer layer
-   *  that a hit was a waypoint rather than a unit. */
+   *  that a hit was a waypoint or a path rather than a unit. */
   has: (key: string) => boolean;
+  /** Whether a press on a key picks that object up. Only a waypoint knob does:
+   *  a line is a drawing of an order, so pressing it stays the camera's. */
+  grabbable: (key: string) => boolean;
   /**
    * Draw these groups' paths, replacing whatever was drawn before.
    * `selectedGroupId` gets the brighter line and the waypoint knobs, and
@@ -119,6 +130,12 @@ export function createPathsLayer(deps: PathsLayerDeps): PathsLayer {
     if (waypoints.length === 0) return null;
     const out = new THREE.Group();
     const colour = selected ? PATH_COLOR : IDLE_COLOR;
+    // On the group rather than on the line, so a knob inside it that carries a
+    // key of its own still answers with that one: the pointer layer walks up
+    // from what it hit and stops at the first key it finds.
+    const lineKey = pathLineKey(group.id);
+    out.userData = { placementKey: lineKey };
+    keys.add(lineKey);
 
     const points = drapePoints(
       [group.pos, ...waypoints],
@@ -198,6 +215,7 @@ export function createPathsLayer(deps: PathsLayerDeps): PathsLayer {
   return {
     root,
     has: (key: string) => keys.has(key),
+    grabbable: (key: string) => !!parsePathKey(key),
     draw: (groups, groupId, key) => {
       drawn = groups;
       selectedGroupId = groupId;

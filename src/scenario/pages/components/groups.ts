@@ -229,6 +229,27 @@ export function pathKey(
   return `path:${groupId}#${order}@${waypoint}`;
 }
 
+/**
+ * The key a drawn path line is picked by: what the path belongs to, and nothing
+ * more.
+ *
+ * A group's units are a few pixels across on a big map while its path is a line
+ * across half of it, so the line is the way back to the group (#842). It is the
+ * same `path:` namespace as a waypoint's key and cannot be mistaken for one:
+ * this carries no order and no point, so `parsePathKey` reads nothing from it.
+ */
+export function pathLineKey(holderId: string): string {
+  return `path:${holderId}`;
+}
+
+/** What a drawn path line belongs to, or `null` when the key names something
+ *  else. */
+export function parsePathLineKey(key: string): string | null {
+  if (!key.startsWith("path:")) return null;
+  const rest = key.slice("path:".length);
+  return rest && !rest.includes("#") ? rest : null;
+}
+
 export interface PathRef {
   groupId: string;
   order: number;

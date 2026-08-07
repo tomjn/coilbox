@@ -14,7 +14,7 @@
 
 import type { Point, Scenario } from "../../model";
 import { parsePlacementKey } from "./editing";
-import { groupSize, uniqueLabels } from "./groups";
+import { groupSize, parsePathKey, uniqueLabels } from "./groups";
 import { placementKey } from "./placements";
 
 /** The kinds of thing the list holds, in the order it lists them. */
@@ -102,8 +102,9 @@ export function sceneContents(
  * The entry the current selection belongs to, or null when the selection is
  * nothing this list holds.
  *
- * A group's fifth unit and its first are the same entry, so clicking a unit on
- * the map lights the list up the same way picking from the list does.
+ * A group's fifth unit and its first are the same entry, and so is a point on
+ * one of its paths, so working on a group any of the three ways lights the list
+ * up the same way picking from the list does.
  */
 export function contentsSelection(
   entries: ContentEntry[],
@@ -111,9 +112,17 @@ export function contentsSelection(
 ): string | null {
   if (!selected) return null;
   const ref = parsePlacementKey(selected);
-  if (!ref) return null;
-  return (
-    entries.find((entry) => entry.kind === ref.kind && entry.id === ref.id)
-      ?.key ?? null
-  );
+  if (ref)
+    return (
+      entries.find((entry) => entry.kind === ref.kind && entry.id === ref.id)
+        ?.key ?? null
+    );
+  const path = parsePathKey(selected);
+  if (path)
+    return (
+      entries.find(
+        (entry) => entry.kind === "group" && entry.id === path.groupId,
+      )?.key ?? null
+    );
+  return null;
 }

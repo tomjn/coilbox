@@ -60,6 +60,7 @@ import {
   moveWaypoint,
   orderWaypoints,
   parsePathKey,
+  parsePathLineKey,
   removeGroup,
   removeWaypoint,
   targetOptions,
@@ -217,6 +218,18 @@ export function ScenarioMapScene({
   );
   useScenarioStarts(handle, starts, assets, units.groundAt);
 
+  /**
+   * What a click on the map selects.
+   *
+   * A drawn path line stands for the group whose order drew it: the line is the
+   * easiest thing on a big map to hit and the group is what an author who hit it
+   * wants, so it selects the group rather than the line (#842).
+   */
+  const select = useCallback((key: string | null) => {
+    const line = key ? parsePathLineKey(key) : null;
+    setSelected(line ? placementKey("group", line, 0) : key);
+  }, []);
+
   const picked = units.placements.find((p) => p.key === selected) ?? null;
   // A group is what is being worked on whether one of its units or one of its
   // waypoints was clicked, so both answer the same question.
@@ -286,7 +299,7 @@ export function ScenarioMapScene({
     // map would be a corner of the map nothing could be placed on. A waypoint
     // is a knob rather than a sheet, so it covers nothing and stays pickable.
     overlays: [onPlace ? null : zonesLayer, pathsLayer],
-    onSelect: setSelected,
+    onSelect: select,
     onPlace,
     onDragGround: behaviour.draw ?? null,
     onMove: (key, delta) => {
@@ -308,6 +321,37 @@ export function ScenarioMapScene({
       scenario.prefabs.find((p) => p.id === picked.id)) ||
     null;
   const gameUnits = useGameUnits(scenario.setup.gameName);
+
+  /**
+   * A group's own controls, wherever the group was reached from.
+   *
+   * Built once here rather than inside the bar for a selected unit, because a
+   * waypoint is as much a way of working on a group as one of its units is, and
+   * an author who picked a point off a path should not have to find a unit
+   * again to change the order that point belongs to (#842).
+   */
+  const groupControls = pickedGroup ? (
+    <GroupControls
+      key={pickedGroup.id}
+      group={pickedGroup}
+      participants={scenario.setup.participants}
+      units={gameUnits.units}
+      unitsLoading={gameUnits.loading}
+      targets={targetOptions(scenario, pickedGroup.id)}
+      onEdit={(patch) => {
+        onChange(editGroup(scenario, pickedGroup.id, patch));
+        if (patch.units?.length === 0) setSelected(null);
+      }}
+      onDelete={() => {
+        onChange(removeGroup(scenario, pickedGroup.id));
+        setSelected(null);
+      }}
+      drawing={drawing?.groupId === pickedGroup.id ? drawing.order : null}
+      onDraw={(order) =>
+        setDrawing(order === null ? null : { groupId: pickedGroup.id, order })
+      }
+    />
+  ) : null;
 
   const status = mapSceneStatus({
     mapName,
@@ -548,32 +592,7 @@ export function ScenarioMapScene({
                 }
               />
             )}
-            {picked.kind === "group" && pickedGroup && (
-              <GroupControls
-                key={pickedGroup.id}
-                group={pickedGroup}
-                participants={scenario.setup.participants}
-                units={gameUnits.units}
-                unitsLoading={gameUnits.loading}
-                targets={targetOptions(scenario, pickedGroup.id)}
-                onEdit={(patch) => {
-                  onChange(editGroup(scenario, pickedGroup.id, patch));
-                  if (patch.units?.length === 0) setSelected(null);
-                }}
-                onDelete={() => {
-                  onChange(removeGroup(scenario, pickedGroup.id));
-                  setSelected(null);
-                }}
-                drawing={
-                  drawing?.groupId === pickedGroup.id ? drawing.order : null
-                }
-                onDraw={(order) =>
-                  setDrawing(
-                    order === null ? null : { groupId: pickedGroup.id, order },
-                  )
-                }
-              />
-            )}
+            {picked.kind === "group" && groupControls}
             {picked.kind === "prefab" && pickedPrefab && (
               <PrefabControls
                 key={`${pickedPrefab.id}#${picked.index}`}
@@ -641,7 +660,9 @@ export function ScenarioMapScene({
               onChange(removeWaypoint(scenario, selected));
               setSelected(placementKey("group", pathRef.groupId, 0));
             }}
-          />
+          >
+            {groupControls}
+          </PathBar>
         )}
         {pickedZone && (
           <ZoneBar
@@ -898,12 +919,29 @@ function ClickMapBar({
   );
 }
 
-/** The selected waypoint: which order's path it belongs to, and the way to take
- *  it out. Dragging it is what moves it, so there is nothing else here. */
-function PathBar({ what, onDelete }: { what: string; onDelete: () => void }) {
+/**
+ * The selected waypoint: which order's path it belongs to, the group's own
+ * controls, and the way to take the point out. Dragging it is what moves it, so
+ * there is nothing else here.
+ *
+ * The group's controls are here because a point on a path is one of the two ways
+ * of working on a group, and the other one used to be the only one that reached
+ * them (#842).
+ */
+function PathBar({
+  what,
+  onDelete,
+  children,
+}: {
+  what: string;
+  onDelete: () => void;
+  /** The group's controls: its team, its units and its orders. */
+  children?: ReactNode;
+}) {
   return (
     <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card/85 p-1 pl-2 backdrop-blur">
       <span className="font-mono text-[11px]">{what}</span>
+      {children}
       <span className="text-[11px] text-muted-foreground">
         drag it to move it
       </span>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Scenario } from "../../model";
 import { contentsSelection, sceneContents } from "./contents";
+import { pathKey } from "./groups";
 import { placementKey } from "./placements";
 
 type Registries = Pick<Scenario, "actors" | "groups" | "prefabs">;
@@ -148,6 +149,12 @@ describe("contentsSelection", () => {
   it("reads a base's second building as the base", () => {
     expect(contentsSelection(entries, placementKey("prefab", "p1", 1))).toBe(
       placementKey("prefab", "p1", 0),
+    );
+  });
+
+  it("reads a point on a group's path as the group", () => {
+    expect(contentsSelection(entries, pathKey("g1", 0, 0))).toBe(
+      placementKey("group", "g1", 0),
     );
   });
 

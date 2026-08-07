@@ -15,7 +15,9 @@ import {
   orderOfKind,
   orderWaypoints,
   parsePathKey,
+  parsePathLineKey,
   pathKey,
+  pathLineKey,
   plusUnit,
   removeGroup,
   removeWaypoint,
@@ -204,6 +206,25 @@ describe("waypoint keys", () => {
     expect(parsePathKey("path:#0@1")).toBeNull();
     expect(parsePathKey("path:g1#a@1")).toBeNull();
     expect(parsePathKey("path:g1#0@-1")).toBeNull();
+  });
+});
+
+describe("path line keys", () => {
+  it("round-trips", () => {
+    const key = pathLineKey("g1");
+    expect(key).toBe("path:g1");
+    expect(parsePathLineKey(key)).toBe("g1");
+  });
+
+  it("is not read as a waypoint, and a waypoint is not read as one", () => {
+    expect(parsePathKey(pathLineKey("g1"))).toBeNull();
+    expect(parsePathLineKey(pathKey("g1", 2, 3))).toBeNull();
+  });
+
+  it("reads nothing that is not a path", () => {
+    expect(parsePathLineKey("group:g1#0")).toBeNull();
+    expect(parsePathLineKey("zone:z1")).toBeNull();
+    expect(parsePathLineKey("path:")).toBeNull();
   });
 });
 
