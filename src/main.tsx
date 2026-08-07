@@ -6,6 +6,7 @@ import { plugins } from "./app.plugins";
 import { ErrorBoundary } from "./general/ErrorBoundary";
 import { SPLASH_ENABLED_KEY } from "./general/splash";
 import CoilboxHome from "./home/CoilboxHome";
+import { loadHomeMarkup } from "./home/markup";
 import { applyProfilePages } from "./profile/CustomPage";
 import { applyProfileSettingsHiding } from "./profile/hidden";
 import { applyProfileSlots, buildLayoutConfig } from "./profile/layout";
@@ -70,6 +71,12 @@ await loadProfilePages();
 // so BrandedWelcome has its content ready (like the splash/logo resolves above). No-op
 // when the profile has no welcome; inline fragments resolve to themselves.
 await resolveWelcome();
+
+// Read the `@.coilbox/...` markup the profile's `home` zones reference, for the
+// same reason and by the same route: rendering is synchronous, so a distribution's
+// intro sentence has to be in memory before the home page draws. A no-op (no file
+// IO at all) for a profile with no `home` key.
+await loadHomeMarkup(profile.home);
 
 // Hide any settings sections the profile lists (uses SettingsSection.useVisible,
 // injected centrally so no plugin needs to opt in). No-op without a profile.

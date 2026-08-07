@@ -18,10 +18,6 @@
  * build has no use for are neither validated nor stripped, deliberately, so the
  * issues that add them are additions rather than rewrites:
  *
- * - `before` and `after` markup on a built-in zone, and custom `html` entries
- *   between zones, are issue #999. Custom entries are already recognised here
- *   and classified as `kind: "html"`, and the layout renders nothing for them
- *   yet.
  * - The per-tool `art` map on the cards zone is issue #1000.
  */
 
@@ -50,11 +46,14 @@ export interface HomeConfig {
 export interface HomeZoneConfig {
   /** A built-in zone id (see {@link DEFAULT_ZONES}). */
   zone?: string;
-  /** Custom markup, inline or an `@.coilbox/<path>.html` reference. Issue #999. */
+  /**
+   * A custom entry's own markup, inline or an `@.coilbox/<path>` reference. An
+   * entry naming a `zone` is a built-in zone and ignores this. See `./markup`.
+   */
   html?: string;
-  /** Markup above the zone. Issue #999. */
+  /** Markup at the head of the zone, same two forms as {@link html}. */
   before?: string;
-  /** Markup below the zone. Issue #999. */
+  /** Markup at the foot of the zone, same two forms as {@link html}. */
   after?: string;
   /** Greeting only: the heading, replacing the greeting Coilbox would choose. */
   title?: string;
@@ -97,8 +96,12 @@ export type RawEntry = Readonly<Record<string, unknown>>;
 export type HomeEntry =
   /** A built-in zone the layout knows how to render. */
   | { readonly kind: "zone"; readonly zone: ZoneId; readonly entry: RawEntry }
-  /** A distribution's own markup. Rendered from issue #999. */
-  | { readonly kind: "html"; readonly entry: RawEntry };
+  /**
+   * A distribution's own markup, sitting between zones. `html` is lifted out of
+   * the entry because the schema has already checked it is a string, so the
+   * layout does not repeat the check.
+   */
+  | { readonly kind: "html"; readonly html: string; readonly entry: RawEntry };
 
 /** What the layout needs from the profile, all of it already validated. */
 export interface ResolvedHome {
@@ -205,7 +208,7 @@ function resolveEntries(zones: unknown): HomeEntry[] {
       continue;
     }
     if (typeof entry.html === "string") {
-      entries.push({ kind: "html", entry });
+      entries.push({ kind: "html", html: entry.html, entry });
       continue;
     }
     console.warn(
@@ -225,10 +228,10 @@ function resolveEntries(zones: unknown): HomeEntry[] {
 /**
  * A string option off a zone entry, or undefined when the author left it out.
  *
- * The one reader of per-entry config this build has, used for the greeting's
- * `title` and `tagline`. A non-string is a distribution bug, so it warns and
- * falls back to what Coilbox would have said rather than rendering an object
- * into the heading.
+ * The reader of per-entry config this build has, used for the greeting's `title`
+ * and `tagline` and for a zone's `before` and `after` markup. A non-string is a
+ * distribution bug, so it warns and falls back to what Coilbox would have said
+ * rather than rendering an object into the heading.
  */
 export function zoneString(entry: RawEntry, key: string): string | undefined {
   const value = entry[key];
