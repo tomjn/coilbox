@@ -98,7 +98,7 @@ describe("tool card rendering modes", () => {
     register("bundled", "/art/skirmish.svg");
     // Both halves matter: the class that re-declares the ramp, and text that
     // reads the raw token rather than Tailwind's root-resolved one.
-    expect(render(SKIRMISH)).toContain("dark flex-col");
+    expect(render(SKIRMISH)).toContain("dark relative flex-col");
     expect(ART_CLASSES.band).toContain("text-[hsl(var(--foreground))]");
   });
 });

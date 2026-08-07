@@ -71,7 +71,7 @@ function useResolvedNavItem(item: NavItem) {
  * stretching to fill a grid cell.
  */
 const CARD_CLASS =
-  "group relative flex w-full rounded-lg border border-border text-left transition-colors hover:border-ring sm:w-64";
+  "group flex w-full rounded-lg border border-border text-left transition-colors hover:border-ring sm:w-64";
 
 /**
  * The icon-only card: an icon beside a label, on the card surface. What every
@@ -108,7 +108,7 @@ const ICON_CARD_CLASS = `${CARD_CLASS} items-center gap-3 bg-card p-4 text-card-
  * card's `hover:bg-accent` is invisible under a full-bleed image. The shadow
  * matches the game and map cards elsewhere in the app.
  */
-const ART_CARD_CLASS = `${CARD_CLASS} dark flex-col overflow-hidden bg-[hsl(var(--background))] hover:shadow-md`;
+const ART_CARD_CLASS = `${CARD_CLASS} dark relative flex-col overflow-hidden bg-[hsl(var(--background))] hover:shadow-md`;
 
 /**
  * The band the icon and name sit in, dimming the art under them enough for the
