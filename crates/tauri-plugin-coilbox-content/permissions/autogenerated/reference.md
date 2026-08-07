@@ -24,6 +24,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-demo-chat`
 - `allow-content-rewrite-demo`
 - `allow-content-delete-replay`
+- `allow-content-gather-replays`
 - `allow-content-list-saves`
 - `allow-content-delete-save`
 - `allow-content-config-profiles`
@@ -461,6 +462,32 @@ Enables the content_export_challenge command without any pre-configured scope.
 <td>
 
 Denies the content_export_challenge command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-gather-replays`
+
+</td>
+<td>
+
+Enables the content_gather_replays command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-gather-replays`
+
+</td>
+<td>
+
+Denies the content_gather_replays command without any pre-configured scope.
 
 </td>
 </tr>

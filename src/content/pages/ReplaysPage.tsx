@@ -39,6 +39,7 @@ import {
 import { useReplayUserState } from "../replayUserState";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
+import { GatherReplaysButton } from "./components/GatherReplaysButton";
 import { MapThumb } from "./components/MapThumb";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
@@ -292,13 +293,24 @@ export default function ReplaysPage() {
           </p>
         </header>
 
-        <BrowserToolbar
-          targets={targets}
-          selectedKey={selectedKey}
-          onSelect={setSelectedKey}
-          onRescan={refresh}
-          scanning={loading}
-        />
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <BrowserToolbar
+              targets={targets}
+              selectedKey={selectedKey}
+              onSelect={setSelectedKey}
+              onRescan={refresh}
+              scanning={loading}
+            />
+          </div>
+          {/* Some engines record into their own folder, so a player clearing an
+              old engine in Finder loses those games. This puts them all in one
+              place first (issue #971). */}
+          <GatherReplaysButton
+            rootPath={selected?.rootPath}
+            onGathered={refresh}
+          />
+        </div>
 
         {!busy && replays.length > 0 && (
           <FilterBar
