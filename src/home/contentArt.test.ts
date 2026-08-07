@@ -23,15 +23,19 @@ vi.mock("../multiplayer/chat/mentionCue", () => ({
   triggerMentionCue: () => {},
 }));
 
-import type { Campaign, CampaignMission, ProgressFile } from "../campaign/model";
+import type {
+  Campaign,
+  CampaignMission,
+  ProgressFile,
+} from "../campaign/model";
 import { unitsyncMinimap } from "../content/bindings";
 import type { RogueliteRun } from "../runlite/model";
 import { resolveCardArt } from "./art";
-import { warpathCandidate } from "./continue";
 import {
-  campaignPick,
-  contentCardArt,
   type ContentPick,
+  campaignPick,
+  contentArtVersion,
+  contentCardArt,
   contentPicks,
   gamePick,
   picksKey,
@@ -41,8 +45,10 @@ import {
   resumeRunId,
   scenarioPick,
   skirmishPick,
+  subscribeContentArt,
   warpathPick,
 } from "./contentArt";
+import { warpathCandidate } from "./continue";
 import { resetResolvedMinimaps, resolvePicks } from "./useContentCardArt";
 
 /* -------------------------------------------------------------------------- *
@@ -76,9 +82,7 @@ function campaign(over: Partial<Campaign> = {}): Campaign {
   } as Campaign;
 }
 
-function progressFile(
-  campaigns: ProgressFile["campaigns"] = {},
-): ProgressFile {
+function progressFile(campaigns: ProgressFile["campaigns"] = {}): ProgressFile {
   return { schemaVersion: 1, campaigns };
 }
 
@@ -97,23 +101,37 @@ function run(over: Partial<RogueliteRun> = {}): RogueliteRun {
       factionId: "f",
       skin: "galaxy",
     },
+    // A deeper battle comes first in the array, so "the battle an edge leads to"
+    // and "the first battle in the list" give different answers. With them in
+    // graph order the edge rule would be untestable, because both rules would be
+    // right for the same reason.
     nodes: [
+      {
+        id: "c2n0",
+        type: "battle",
+        col: 2,
+        row: 0,
+        battle: {
+          mapName: "Mithril Mountain v2.0.1",
+          enemyAiCount: 1,
+          handicap: 0,
+          techTier: 1,
+        },
+      },
       { id: "start", type: "start", col: 0, row: 0 },
       {
         id: "c1n0",
         type: "battle",
         col: 1,
         row: 0,
-        battle: { mapName: "Altair_Crossing_V4.1", enemyAiCount: 1, handicap: 0, techTier: 1 },
+        battle: {
+          mapName: "Altair_Crossing_V4.1",
+          enemyAiCount: 1,
+          handicap: 0,
+          techTier: 1,
+        },
       },
       { id: "c1n1", type: "shop", col: 1, row: 1 },
-      {
-        id: "c2n0",
-        type: "battle",
-        col: 2,
-        row: 0,
-        battle: { mapName: "Mithril Mountain v2.0.1", enemyAiCount: 1, handicap: 0, techTier: 1 },
-      },
     ],
     edges: [
       ["start", "c1n0"],
@@ -145,7 +163,10 @@ function run(over: Partial<RogueliteRun> = {}): RogueliteRun {
 describe("skirmishPick", () => {
   it("shows the map your saved setup is pointed at", () => {
     expect(
-      skirmishPick({ gameName: "Metal Factions v2.58", mapName: "Valles Marineris 2.6.1" }),
+      skirmishPick({
+        gameName: "Metal Factions v2.58",
+        mapName: "Valles Marineris 2.6.1",
+      }),
     ).toEqual({ kind: "map", mapName: "Valles Marineris 2.6.1" });
   });
 
@@ -157,7 +178,10 @@ describe("skirmishPick", () => {
 describe("gamePick", () => {
   it("shows the game your saved setup is pointed at", () => {
     expect(
-      gamePick({ gameName: "Metal Factions v2.58", mapName: "Valles Marineris 2.6.1" }),
+      gamePick({
+        gameName: "Metal Factions v2.58",
+        mapName: "Valles Marineris 2.6.1",
+      }),
     ).toEqual({ kind: "game", gameName: "Metal Factions v2.58" });
   });
 
@@ -217,19 +241,39 @@ describe("campaignPick", () => {
     expect(campaignPick([{ campaign: campaign() }], finished)).toBeDefined();
   });
 
-  it("prefers the campaign touched most recently", () => {
+  it("prefers the campaign touched most recently, whichever order it is in", () => {
+    // Asserted both ways round. With only one order, a pick that ignored the
+    // timestamps entirely and took the last campaign in the list would still
+    // give the right answer, and the test would pass with the rule gone.
     const older = campaign({
       id: "c0",
-      missions: [mission({ id: "m0", snapshot: { ...mission().snapshot, mapName: "Old Map" } })],
+      missions: [
+        mission({
+          id: "m0",
+          snapshot: { ...mission().snapshot, mapName: "Old Map" },
+        }),
+      ],
     });
+    const recent = campaign();
     const progress = progressFile({
-      c0: { completedMissionIds: [], lastPlayedMissionId: "m0", updatedAt: "2026-01-01T00:00:00Z" },
-      c1: { completedMissionIds: [], lastPlayedMissionId: "m1", updatedAt: "2026-08-01T00:00:00Z" },
+      c0: {
+        completedMissionIds: [],
+        lastPlayedMissionId: "m0",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      c1: {
+        completedMissionIds: [],
+        lastPlayedMissionId: "m1",
+        updatedAt: "2026-08-01T00:00:00Z",
+      },
     });
-    expect(campaignPick([{ campaign: older }, { campaign: campaign() }], progress)).toEqual({
-      kind: "map",
-      mapName: "Bismuth Valley v2.4.1",
-    });
+    const expected = { kind: "map", mapName: "Bismuth Valley v2.4.1" };
+    expect(
+      campaignPick([{ campaign: older }, { campaign: recent }], progress),
+    ).toEqual(expected);
+    expect(
+      campaignPick([{ campaign: recent }, { campaign: older }], progress),
+    ).toEqual(expected);
   });
 
   it("drops a campaign with an unreadable timestamp", () => {
@@ -240,7 +284,9 @@ describe("campaignPick", () => {
   });
 
   it("answers nothing for a campaign you have never opened", () => {
-    expect(campaignPick([{ campaign: campaign() }], progressFile())).toBeUndefined();
+    expect(
+      campaignPick([{ campaign: campaign() }], progressFile()),
+    ).toBeUndefined();
   });
 
   it("answers nothing when the played mission names no map", () => {
@@ -248,7 +294,11 @@ describe("campaignPick", () => {
       missions: [mission({ snapshot: { ...mission().snapshot, mapName: "" } })],
     });
     const progress = progressFile({
-      c1: { completedMissionIds: [], lastPlayedMissionId: "m1", updatedAt: "2026-08-01T00:00:00Z" },
+      c1: {
+        completedMissionIds: [],
+        lastPlayedMissionId: "m1",
+        updatedAt: "2026-08-01T00:00:00Z",
+      },
     });
     expect(campaignPick([{ campaign: noMap }], progress)).toBeUndefined();
   });
@@ -274,16 +324,37 @@ describe("warpathPick", () => {
     const r = run();
     // The real install's every active run sits on `start`, which has no map, so
     // a current-node rule would leave this card artless for the whole run.
-    expect(r.nodes[0].battle).toBeUndefined();
+    expect(r.nodes.find((n) => n.id === "start")?.battle).toBeUndefined();
+    // And not simply the first battle in the list, which is a deeper one here.
+    expect(r.nodes[0].battle?.mapName).toBe("Mithril Mountain v2.0.1");
     expect(warpathPick({ "run-1": r }, "run-1")).toEqual({
       kind: "map",
       mapName: "Altair_Crossing_V4.1",
     });
   });
 
-  it("looks ahead when every exit is a shop", () => {
+  it("falls back to an unvisited battle when every exit is a shop", () => {
     const r = run({
-      progress: { ...run().progress, currentNodeId: "c1n1", visited: ["start", "c1n1"] },
+      progress: {
+        ...run().progress,
+        currentNodeId: "c1n1",
+        visited: ["start", "c1n1"],
+      },
+      edges: [["c1n1", "c1n1"]],
+    });
+    expect(warpathPick({ "run-1": r }, "run-1")).toEqual({
+      kind: "map",
+      mapName: "Mithril Mountain v2.0.1",
+    });
+  });
+
+  it("skips a battle already fought when it falls back", () => {
+    const r = run({
+      progress: {
+        ...run().progress,
+        currentNodeId: "c1n1",
+        visited: ["start", "c2n0", "c1n1"],
+      },
       edges: [["c1n1", "c1n1"]],
     });
     expect(warpathPick({ "run-1": r }, "run-1")).toEqual({
@@ -315,7 +386,9 @@ describe("resumeRunId", () => {
   });
 
   it("answers nothing when there is no Warpath candidate", () => {
-    expect(resumeRunId([{ kind: "campaign", id: "campaign:c1" }])).toBeUndefined();
+    expect(
+      resumeRunId([{ kind: "campaign", id: "campaign:c1" }]),
+    ).toBeUndefined();
   });
 });
 
@@ -330,7 +403,10 @@ function runSummary() {
 
 describe("contentPicks", () => {
   const populated = {
-    draft: { gameName: "Metal Factions v2.58", mapName: "Valles Marineris 2.6.1" },
+    draft: {
+      gameName: "Metal Factions v2.58",
+      mapName: "Valles Marineris 2.6.1",
+    },
     replays: [{ mapName: "Valles Marineris 2.6.1" }],
     campaigns: [{ campaign: campaign() }],
     progress: progressFile({
@@ -420,16 +496,22 @@ describe("picksKey", () => {
 describe("contentCardArt", () => {
   it("answers nothing before the cache is warm", () => {
     resetContentArt();
-    expect(contentCardArt({ toolId: "play.skirmish", themeColor: "#fff" })).toBeUndefined();
+    expect(
+      contentCardArt({ toolId: "play.skirmish", themeColor: "#fff" }),
+    ).toBeUndefined();
   });
 
   it("answers the published URL once warm, and only for tools it has", () => {
     resetContentArt();
-    publishContentArt(new Map([["play.skirmish", "coilbox://localhost/unitsyncthumb/a-3.png"]]));
-    expect(contentCardArt({ toolId: "play.skirmish", themeColor: "#fff" })).toBe(
-      "coilbox://localhost/unitsyncthumb/a-3.png",
+    publishContentArt(
+      new Map([["play.skirmish", "coilbox://localhost/unitsyncthumb/a-3.png"]]),
     );
-    expect(contentCardArt({ toolId: "conquest.list", themeColor: "#fff" })).toBeUndefined();
+    expect(
+      contentCardArt({ toolId: "play.skirmish", themeColor: "#fff" }),
+    ).toBe("coilbox://localhost/unitsyncthumb/a-3.png");
+    expect(
+      contentCardArt({ toolId: "conquest.list", themeColor: "#fff" }),
+    ).toBeUndefined();
   });
 
   it("falls through to a lower step while cold, and wins once warm", () => {
@@ -437,7 +519,9 @@ describe("contentCardArt", () => {
     const cold = resolveCardArt("play.skirmish", "#3b82f6");
     expect(cold.source).not.toBe("content");
 
-    publishContentArt(new Map([["play.skirmish", "coilbox://localhost/unitsyncthumb/a-3.png"]]));
+    publishContentArt(
+      new Map([["play.skirmish", "coilbox://localhost/unitsyncthumb/a-3.png"]]),
+    );
     expect(resolveCardArt("play.skirmish", "#3b82f6")).toEqual({
       kind: "art",
       url: "coilbox://localhost/unitsyncthumb/a-3.png",
@@ -450,13 +534,27 @@ describe("contentCardArt", () => {
 describe("publishContentArt", () => {
   it("does not wake subscribers when the answer has not changed", () => {
     // The effect that publishes runs after the render it caused, so republishing
-    // the same map has to be a no-op or the home page loops.
+    // an equal-but-new Map has to be a no-op or the home page loops forever.
+    // Counted through a real subscriber, because the cached value looking right
+    // afterwards is true whether or not the subscribers were woken.
     resetContentArt();
-    const first = new Map([["play.skirmish", "coilbox://x"]]);
-    publishContentArt(first);
-    const before = contentCardArt({ toolId: "play.skirmish", themeColor: "#fff" });
+    const woken = vi.fn();
+    const unsubscribe = subscribeContentArt(woken);
     publishContentArt(new Map([["play.skirmish", "coilbox://x"]]));
-    expect(contentCardArt({ toolId: "play.skirmish", themeColor: "#fff" })).toBe(before);
+    expect(woken).toHaveBeenCalledTimes(1);
+    publishContentArt(new Map([["play.skirmish", "coilbox://x"]]));
+    expect(woken).toHaveBeenCalledTimes(1);
+    publishContentArt(new Map([["play.skirmish", "coilbox://y"]]));
+    expect(woken).toHaveBeenCalledTimes(2);
+    unsubscribe();
+    resetContentArt();
+  });
+
+  it("counts a version up so useSyncExternalStore sees a new snapshot", () => {
+    resetContentArt();
+    const before = contentArtVersion();
+    publishContentArt(new Map([["play.skirmish", "coilbox://x"]]));
+    expect(contentArtVersion()).toBeGreaterThan(before);
     resetContentArt();
   });
 });
@@ -576,7 +674,10 @@ describe("resolvePicks", () => {
   });
 
   it("leaves a map that will not render out of the result", async () => {
-    minimap.mockResolvedValue({ startPositions: [], errors: ["archive missing"] });
+    minimap.mockResolvedValue({
+      startPositions: [],
+      errors: ["archive missing"],
+    });
     const out = await resolvePicks(
       mapPicks([["play.skirmish", "Not Installed"]]),
       "/engine",
@@ -588,7 +689,12 @@ describe("resolvePicks", () => {
 
   it("leaves a map out when the worker throws, and does not retry it", async () => {
     minimap.mockRejectedValue(new Error("worker died"));
-    const args = [mapPicks([["play.skirmish", "Broken"]]), "/engine", "/root", new Map()] as const;
+    const args = [
+      mapPicks([["play.skirmish", "Broken"]]),
+      "/engine",
+      "/root",
+      new Map(),
+    ] as const;
     expect((await resolvePicks(...args)).has("play.skirmish")).toBe(false);
     expect((await resolvePicks(...args)).has("play.skirmish")).toBe(false);
     expect(minimap).toHaveBeenCalledTimes(1);
@@ -596,12 +702,18 @@ describe("resolvePicks", () => {
 
   it("takes a game's header art from the batch the Games grid already fetched", async () => {
     const out = await resolvePicks(
-      new Map([["content.games", { kind: "game", gameName: "Metal Factions v2.58" }]]),
+      new Map([
+        ["content.games", { kind: "game", gameName: "Metal Factions v2.58" }],
+      ]),
       "/engine",
       "/root",
-      new Map([["Metal Factions v2.58", "coilbox://localhost/unitsyncheader/h-1.jpg"]]),
+      new Map([
+        ["Metal Factions v2.58", "coilbox://localhost/unitsyncheader/h-1.jpg"],
+      ]),
     );
-    expect(out.get("content.games")).toBe("coilbox://localhost/unitsyncheader/h-1.jpg");
+    expect(out.get("content.games")).toBe(
+      "coilbox://localhost/unitsyncheader/h-1.jpg",
+    );
   });
 
   it("leaves a game with no header art out of the result", async () => {

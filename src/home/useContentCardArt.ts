@@ -91,7 +91,9 @@ async function minimapUrl(
  * Maps are resolved one at a time rather than in parallel. Each one launches a
  * unitsync worker process that mounts an archive, and three of those at once on
  * a page the user is trying to read is worse than the art arriving a beat later.
- * Distinct maps only, so two cards on the same map share one render.
+ * Being sequential is also what makes {@link minimapUrl}'s memo enough to stop
+ * two cards on the same map rendering it twice, so there is no second cache here
+ * that could disagree with it.
  *
  * A pick that resolves to nothing is left out of the result rather than mapped
  * to an empty string, because the chain reads an empty string as an answer and a
@@ -104,20 +106,11 @@ export async function resolvePicks(
   headers: ReadonlyMap<string, string>,
 ): Promise<Map<string, string>> {
   const resolved = new Map<string, string>();
-  const maps = new Map<string, string | null>();
   for (const [toolId, pick] of picks) {
-    if (pick.kind === "game") {
-      const url = headers.get(pick.gameName);
-      if (url) resolved.set(toolId, url);
-      continue;
-    }
-    if (!maps.has(pick.mapName)) {
-      maps.set(
-        pick.mapName,
-        await minimapUrl(enginePath, dataDir, pick.mapName),
-      );
-    }
-    const url = maps.get(pick.mapName);
+    const url =
+      pick.kind === "game"
+        ? headers.get(pick.gameName)
+        : await minimapUrl(enginePath, dataDir, pick.mapName);
     if (url) resolved.set(toolId, url);
   }
   return resolved;
