@@ -1,5 +1,6 @@
 import { getProfile } from "../profile/profile";
 import BrandedHome from "./BrandedHome";
+import { resolveHome } from "./config";
 import { homeMode, resolveLayout } from "./layout";
 import { useContentCardArt } from "./useContentCardArt";
 
@@ -15,8 +16,14 @@ import { useContentCardArt } from "./useContentCardArt";
  *
  * - A profile with a `welcome` gets {@link BrandedHome}, which is what it got
  *   before. Wholesale replacement stays the escape hatch for distributions.
- * - Everything else gets the configured layout, which currently reproduces
- *   picoframe's launcher exactly.
+ * - Everything else gets the layout `profile.home` selects, assembled from the
+ *   zones it lists (see `./config`).
+ *
+ * The branded arm reads no `home` key, and deliberately gets no backdrop. A
+ * distribution that replaced the page wholesale already sets its own background
+ * in `welcome.css`, at full strength, where `home.background` is capped at 6% so
+ * that Coilbox's own zones stay legible over it. Honouring it here would be a
+ * second, weaker way to do something the arm can already do.
  */
 export default function CoilboxHome() {
   if (homeMode(getProfile()) === "welcome") return <BrandedHome />;
@@ -35,8 +42,7 @@ export default function CoilboxHome() {
  */
 function LayoutHome() {
   useContentCardArt();
-  // Layout selection from `profile.home` arrives with the schema in issue #998.
-  // Until then every install resolves to the default.
-  const Layout = resolveLayout();
-  return <Layout />;
+  const { layout, background, entries } = resolveHome(getProfile().home);
+  const Layout = resolveLayout(layout);
+  return <Layout entries={entries} background={background} />;
 }

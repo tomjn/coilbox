@@ -19,27 +19,43 @@ export type GreetingState = {
 };
 
 /**
+ * What a distribution's `{ "zone": "greeting" }` entry may say instead.
+ *
+ * Either replaces its line outright, whatever the state would have produced. A
+ * distribution that sets `title` is naming its own front door, so keeping
+ * "Welcome back, <user>" over the top of it would be ignoring the instruction.
+ */
+export interface GreetingOverrides {
+  /** The heading. */
+  title?: string;
+  /** The line under it. */
+  tagline?: string;
+}
+
+/**
  * Choose what the greeting says.
  *
  * Pure, and the only place the wording is decided, so the distribution overrides
- * in issue #998 layer over one function rather than over a component's markup.
+ * layer over one function rather than over a component's markup.
  *
  * The heading greets by name once the lobby has accepted a login, and otherwise
  * falls back to the app title. The tagline says the most useful true thing:
  * point at what you were doing if there is anything, otherwise send you to the
  * tools, and admit it when there are none.
  */
-export function greetingCopy({
-  title,
-  username,
-  hasResume,
-  hasTools,
-}: GreetingState): GreetingCopy {
+export function greetingCopy(
+  { title, username, hasResume, hasTools }: GreetingState,
+  overrides: GreetingOverrides = {},
+): GreetingCopy {
   let tagline: string;
   if (hasResume) tagline = "Pick up where you left off.";
   else if (hasTools) tagline = "Choose a tool to get started.";
   else tagline = "No tools available yet.";
-  return { heading: username ? `Welcome back, ${username}` : title, tagline };
+  return {
+    heading:
+      overrides.title ?? (username ? `Welcome back, ${username}` : title),
+    tagline: overrides.tagline ?? tagline,
+  };
 }
 
 /**
@@ -88,17 +104,24 @@ function useHasResume(): boolean {
  * Owns the copy the tool grid used to carry, including the empty-grid line, so
  * that the one sentence under the heading is decided in one place. It never
  * renders nothing: an app always has a title, so there is always a greeting.
+ *
+ * The props are a distribution's own wording, passed in by the layout from the
+ * zone's entry rather than read from the profile here, so the zone stays a pure
+ * function of what it is given.
  */
-export default function Greeting() {
+export default function Greeting(overrides: GreetingOverrides = {}) {
   const { title, nav } = useFrame();
   const username = useLobbyName();
   const hasResume = useHasResume();
-  const { heading, tagline } = greetingCopy({
-    title,
-    username,
-    hasResume,
-    hasTools: homeToolGroups(nav).length > 0,
-  });
+  const { heading, tagline } = greetingCopy(
+    {
+      title,
+      username,
+      hasResume,
+      hasTools: homeToolGroups(nav).length > 0,
+    },
+    overrides,
+  );
   return (
     <>
       <h1 className="text-2xl font-semibold">{heading}</h1>
