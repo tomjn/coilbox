@@ -525,7 +525,11 @@ async fn dl_springfiles_engines() -> CliResult {
         Ok(body) => match serde_json::from_str::<Vec<sources::SpringFile>>(&body) {
             Ok(all) => {
                 let engines = sources::engines_for_platform(all, category);
-                CliResult::ok(json!({ "engines": engines, "platform": std::env::consts::OS }))
+                CliResult::ok(json!({
+                    "engines": engines,
+                    "platform": std::env::consts::OS,
+                    "listsThisPlatform": sources::springfiles_lists_engines_here(),
+                }))
             }
             Err(e) => CliResult::err(format!("could not parse springfiles engines: {e}")),
         },
@@ -1065,6 +1069,51 @@ async fn dl_download_engine_recoil(
     }
 }
 
+/// Names of the regular files sitting directly in `dir`. Directories are left
+/// out, so the extracted engine folders never appear.
+fn loose_file_names(dir: &std::path::Path) -> std::collections::HashSet<std::ffi::OsString> {
+    match std::fs::read_dir(dir) {
+        Ok(rd) => rd
+            .flatten()
+            .filter(|e| e.path().is_file())
+            .map(|e| e.file_name())
+            .collect(),
+        Err(_) => std::collections::HashSet::new(),
+    }
+}
+
+/// Delete what a springfiles install left loose in `engine/`.
+///
+/// pr-downloader downloads the release archive to `<writepath>/engine/<filename>`,
+/// extracts it into `<writepath>/engine/<platform>/<version>/`, and leaves the
+/// archive behind. That is 17 MB for the smallest build springfiles lists and 56
+/// MB for the largest, plus the `.md5.gz` it writes beside it, per install.
+///
+/// Nothing reads either again. `CFileSystem::extractEngine` works from the
+/// archive it has just fetched, and the md5 file is only ever written. What does
+/// go is the `.etag` skip on re-fetching the same version, and coilbox does not
+/// offer a version it already has, so that costs nothing in practice.
+///
+/// Only files that appeared while this install ran are removed, so an archive
+/// that was already there is left where it is.
+fn sweep_engine_downloads(
+    engine_root: &std::path::Path,
+    before: &std::collections::HashSet<std::ffi::OsString>,
+) {
+    for name in loose_file_names(engine_root) {
+        if before.contains(&name) {
+            continue;
+        }
+        let path = engine_root.join(&name);
+        if let Err(e) = std::fs::remove_file(&path) {
+            eprintln!(
+                "coilbox-downloads: could not remove {}: {e}",
+                path.display()
+            );
+        }
+    }
+}
+
 /// `dl_download_engine_spring` — download a classic Spring engine via the sidecar's
 /// `--download-engine`, which resolves the per-platform build and extracts it.
 /// `op_id` (optional) makes it user-cancellable.
@@ -1079,10 +1128,14 @@ async fn dl_download_engine_spring(
         return CliResult::err("version is required");
     }
     let mut args = vec!["--download-engine".to_string(), version.clone()];
-    if let Some(wp) = write_path.filter(|s| !s.trim().is_empty()) {
+    // Without a write path pr-downloader picks its own spring dir, which coilbox
+    // does not know, so there is nothing to sweep afterwards.
+    let engine_root = write_path.filter(|s| !s.trim().is_empty()).map(|wp| {
         args.push("--filesystem-writepath".to_string());
-        args.push(wp);
-    }
+        args.push(wp.clone());
+        std::path::Path::new(&wp).join("engine")
+    });
+    let before = engine_root.as_deref().map(loose_file_names);
     let (cancel, child_slot) = cancel_slots(&op_id);
     let res = run_sidecar_streaming(args, Vec::new(), on_progress, cancel, child_slot).await;
     if let Some(id) = &op_id {
@@ -1096,6 +1149,12 @@ async fn dl_download_engine_spring(
             }
             let outcome = sidecar::parse_download(&run.stdout, &run.stderr, run.code);
             if outcome.success {
+                // Only after a success. A cancelled or failed run may have left a
+                // part-written archive, and pr-downloader has no resume, so the
+                // next attempt overwrites it anyway.
+                if let (Some(root), Some(before)) = (&engine_root, &before) {
+                    sweep_engine_downloads(root, before);
+                }
                 CliResult::ok(
                     json!({ "message": format!("Installed engine {version}"), "version": version }),
                 )
@@ -1521,5 +1580,69 @@ mod engine_settings_tests {
             std::fs::read_to_string(new.join("LuaUI/Config").join("BA.lua")).expect("read"),
             "return { order = {} }\n"
         );
+    }
+}
+
+/// Clearing up after a springfiles engine install (issue #967).
+#[cfg(test)]
+mod engine_sweep_tests {
+    use super::*;
+    use std::path::Path;
+
+    /// What pr-downloader leaves in `engine/` after installing one build,
+    /// measured on a real run against a scratch write path: the archive it
+    /// fetched, the md5 file it wrote beside it, and the extracted engine under
+    /// `<platform>/<version>/`.
+    fn install(engine_root: &Path, archive: &str) {
+        std::fs::write(engine_root.join(archive), vec![0u8; 64]).expect("write");
+        std::fs::write(engine_root.join(format!("{archive}.md5.gz")), b"hash").expect("write");
+        let extracted = engine_root.join("macos_arm64").join("105.1.1-1757");
+        std::fs::create_dir_all(&extracted).expect("mkdir");
+        std::fs::write(extracted.join("spring"), b"engine").expect("write");
+    }
+
+    #[test]
+    fn an_install_leaves_no_archive_behind() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let engine_root = root.path().join("engine");
+        std::fs::create_dir_all(&engine_root).expect("mkdir");
+
+        let before = loose_file_names(&engine_root);
+        install(
+            &engine_root,
+            "spring_bar_.BAR105.105.1.1-1757_windows-64-minimal-portable.7z",
+        );
+        sweep_engine_downloads(&engine_root, &before);
+
+        assert!(
+            loose_file_names(&engine_root).is_empty(),
+            "left {:?}",
+            loose_file_names(&engine_root)
+        );
+        // The extracted engine is what the install was for.
+        assert!(engine_root
+            .join("macos_arm64")
+            .join("105.1.1-1757")
+            .join("spring")
+            .is_file());
+    }
+
+    /// A file that was already there is not this install's to delete.
+    #[test]
+    fn a_file_that_was_already_there_is_left_alone() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let engine_root = root.path().join("engine");
+        std::fs::create_dir_all(&engine_root).expect("mkdir");
+        std::fs::write(engine_root.join("someone-elses.7z"), b"not mine").expect("write");
+
+        let before = loose_file_names(&engine_root);
+        install(&engine_root, "spring_105.7z");
+        sweep_engine_downloads(&engine_root, &before);
+
+        assert_eq!(
+            std::fs::read_to_string(engine_root.join("someone-elses.7z")).expect("read"),
+            "not mine"
+        );
+        assert!(!engine_root.join("spring_105.7z").exists());
     }
 }

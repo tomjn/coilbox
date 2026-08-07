@@ -118,10 +118,18 @@ export interface SpringfilesEngine {
   size: number;
 }
 
-/** springfiles engines for the current platform, deduped to one per version. */
+/**
+ * springfiles engines for the current platform, deduped to one per version.
+ * `listsThisPlatform` is false when springfiles publishes nothing for this kind
+ * of machine, which tells an empty list from a permanently empty one.
+ */
 export const dlSpringfilesEngines = defineCommand<
   undefined,
-  { engines: SpringfilesEngine[]; platform: string }
+  {
+    engines: SpringfilesEngine[];
+    platform: string;
+    listsThisPlatform: boolean;
+  }
 >("coilbox-downloads", "dl_springfiles_engines");
 
 /** The Beyond All Reason validated maps list (with thumbnails). */

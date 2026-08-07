@@ -10,6 +10,10 @@ import {
   identityOf,
   useDownloadQueue,
 } from "../../DownloadQueueProvider";
+import {
+  type EngineSource,
+  emptyEngineListMessage,
+} from "../../emptyEngineList";
 import { OptionSelect } from "./OptionSelect";
 import { errMessage } from "./states";
 
@@ -20,7 +24,7 @@ function fmtSize(bytes: number): string {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(0)} MB`;
 }
 
-type Source = "recoil" | "springfiles";
+type Source = EngineSource;
 
 /** A normalised engine row, regardless of source. */
 interface EngineItem {
@@ -49,6 +53,10 @@ export function EngineInstaller() {
   const [source, setSource] = useState<Source>("recoil");
   const [items, setItems] = useState<EngineItem[] | null>(null);
   const [platform, setPlatform] = useState("");
+  // Whether springfiles publishes engines for this machine at all. Assumed true
+  // until a springfiles load says otherwise, so an empty list never claims a
+  // permanent gap it has not been told about.
+  const [listsThisPlatform, setListsThisPlatform] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,9 +78,11 @@ export function EngineInstaller() {
           })),
         );
       } else {
-        const { engines } = await dlSpringfilesEngines(undefined);
+        const res = await dlSpringfilesEngines(undefined);
+        setPlatform(res.platform);
+        setListsThisPlatform(res.listsThisPlatform);
         setItems(
-          engines.map((e) => ({
+          res.engines.map((e) => ({
             key: e.version,
             title: `${e.name} ${e.version}`.trim(),
             subtitle: fmtSize(e.size),
@@ -165,9 +175,7 @@ export function EngineInstaller() {
       )}
       {items && items.length === 0 && (
         <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-          {source === "recoil"
-            ? `No Recoil builds for this platform (${platform}). On macOS, add an engine manually.`
-            : "No engines found on springfiles."}
+          {emptyEngineListMessage({ source, platform, listsThisPlatform })}
         </p>
       )}
       {items && items.length > 0 && (

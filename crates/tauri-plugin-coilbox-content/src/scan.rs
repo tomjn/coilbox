@@ -136,10 +136,15 @@ fn make_engine(
     }
 }
 
-/// Discover engines under `root`: the `engine/<platform>/<version>/` (and the
-/// flatter `engine/<version>/`) layout, plus a single-folder/portable install
-/// where the binary sits directly in the root.
-pub fn discover_engines(root: &Path) -> Vec<Engine> {
+/// Every installed engine's own directory under `root`, paired with the platform
+/// folder it sits in (`None` when it doesn't sit in one): the
+/// `engine/<platform>/<version>/` and flatter `engine/<version>/` layouts, plus a
+/// single-folder/portable install where the binary sits directly in the root.
+///
+/// Separate from [`discover_engines`] because these directories matter beyond the
+/// engine list: an engine directory is its own write dir under Portable Mode, so
+/// it holds the files the engine writes (`demo.rs` reads replays out of them).
+pub fn engine_dirs(root: &Path) -> Vec<(PathBuf, Option<String>)> {
     let mut out = Vec::new();
     let engine = root.join("engine");
     if let Ok(rd) = std::fs::read_dir(&engine) {
@@ -148,9 +153,9 @@ pub fn discover_engines(root: &Path) -> Vec<Engine> {
             if !p.is_dir() {
                 continue;
             }
-            if let Some(bin) = spring_binary_in(&p) {
+            if spring_binary_in(&p).is_some() {
                 // engine/<version>/
-                out.push(make_engine(root, &p, &bin, None, file_name(&p)));
+                out.push((p, None));
                 continue;
             }
             // engine/<platform>/<version>/
@@ -158,26 +163,32 @@ pub fn discover_engines(root: &Path) -> Vec<Engine> {
             if let Ok(inner) = std::fs::read_dir(&p) {
                 for sub in inner.flatten() {
                     let sp = sub.path();
-                    if sp.is_dir() {
-                        if let Some(bin) = spring_binary_in(&sp) {
-                            out.push(make_engine(
-                                root,
-                                &sp,
-                                &bin,
-                                Some(platform.clone()),
-                                file_name(&sp),
-                            ));
-                        }
+                    if sp.is_dir() && spring_binary_in(&sp).is_some() {
+                        out.push((sp, Some(platform.clone())));
                     }
                 }
             }
         }
     }
     // Portable single-folder install: binary in the root itself.
-    if let Some(bin) = spring_binary_in(root) {
-        out.push(make_engine(root, root, &bin, None, file_name(root)));
+    if spring_binary_in(root).is_some() {
+        out.push((root.to_path_buf(), None));
     }
     out
+}
+
+/// Discover engines under `root`: the `engine/<platform>/<version>/` (and the
+/// flatter `engine/<version>/`) layout, plus a single-folder/portable install
+/// where the binary sits directly in the root.
+pub fn discover_engines(root: &Path) -> Vec<Engine> {
+    engine_dirs(root)
+        .into_iter()
+        .filter_map(|(dir, platform)| {
+            let bin = spring_binary_in(&dir)?;
+            let version = file_name(&dir);
+            Some(make_engine(root, &dir, &bin, platform, version))
+        })
+        .collect()
 }
 
 #[cfg(test)]

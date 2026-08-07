@@ -32,7 +32,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tauri::{AppHandle, Emitter, Runtime};
 
-use crate::demo::DEMO_DIRS;
+use crate::demo::{self, DEMO_DIRS};
 use crate::stats;
 
 /// The event emitted to every window once a watcher-triggered ingest pass has
@@ -134,11 +134,16 @@ pub fn stop() {
 
 /// Start watching `roots`' demos/replays folders, replacing any watcher
 /// already running. A root's demos/replays folder that doesn't exist yet is
-/// skipped for now, but the root itself is still watched non-recursively so a
-/// folder later created there is picked up and watched in turn (no restart
-/// needed). Returns an error only if the underlying OS watch can't be
-/// constructed at all, which the caller should treat as "no live watcher this
-/// session", not fatal: scan-on-open still ingests independently.
+/// skipped for now, but the directory it would sit in is still watched
+/// non-recursively so a folder later created there is picked up and watched in
+/// turn (no restart needed). Returns an error only if the underlying OS watch
+/// can't be constructed at all, which the caller should treat as "no live
+/// watcher this session", not fatal: scan-on-open still ingests independently.
+///
+/// The watched set is each root's [`demo::demo_search_dirs`], so a replay an
+/// engine writes into its own directory under Portable Mode reaches the stats
+/// database as it lands, the same as one written to the root. An engine
+/// installed after the watcher started is only picked up on the next start.
 pub fn start<R: Runtime>(
     app: AppHandle<R>,
     roots: Vec<PathBuf>,
@@ -151,11 +156,15 @@ pub fn start<R: Runtime>(
     let mut watcher = notify::recommended_watcher(tx)
         .map_err(|e| format!("could not start replay watcher: {e}"))?;
 
-    for root in &roots {
-        // Best-effort: a root that has since vanished simply isn't watched.
-        let _ = watcher.watch(root, RecursiveMode::NonRecursive);
+    let watched: Vec<PathBuf> = roots
+        .iter()
+        .flat_map(|r| demo::demo_search_dirs(r))
+        .collect();
+    for base in &watched {
+        // Best-effort: a directory that has since vanished simply isn't watched.
+        let _ = watcher.watch(base, RecursiveMode::NonRecursive);
         for dir in DEMO_DIRS {
-            let sub = root.join(dir);
+            let sub = base.join(dir);
             if sub.is_dir() {
                 let _ = watcher.watch(&sub, RecursiveMode::NonRecursive);
             }
@@ -164,13 +173,27 @@ pub fn start<R: Runtime>(
 
     let stop_flag = Arc::new(AtomicBool::new(false));
     let thread_stop = stop_flag.clone();
-    let thread = std::thread::spawn(move || {
-        run_loop(app, rx, watcher, thread_stop, roots, engine_dir, stats_path)
-    });
+    let target = IngestTarget {
+        roots,
+        engine_dir,
+        stats_path,
+    };
+    let thread =
+        std::thread::spawn(move || run_loop(app, rx, watcher, thread_stop, watched, target));
 
     *registry().lock().unwrap_or_else(|p| p.into_inner()) =
         Some(RunningWatcher { stop_flag, thread });
     Ok(())
+}
+
+/// What an ingest pass needs: the content roots to scan, the engine folder
+/// holding `demotool`, and where the stats store lives. Separate from the
+/// watched directory list, which is derived from the roots and is only about
+/// where filesystem events come from.
+struct IngestTarget {
+    roots: Vec<PathBuf>,
+    engine_dir: PathBuf,
+    stats_path: PathBuf,
 }
 
 /// The watcher thread body: drain fs events (dynamically watching a
@@ -181,20 +204,19 @@ fn run_loop<R: Runtime>(
     rx: mpsc::Receiver<notify::Result<Event>>,
     mut watcher: RecommendedWatcher,
     stop_flag: Arc<AtomicBool>,
-    roots: Vec<PathBuf>,
-    engine_dir: PathBuf,
-    stats_path: PathBuf,
+    watched: Vec<PathBuf>,
+    target: IngestTarget,
 ) {
     let mut coalescer = EventCoalescer::new(QUIET_PERIOD_MS);
     while !stop_flag.load(Ordering::Relaxed) {
         match rx.recv_timeout(POLL_INTERVAL) {
-            Ok(Ok(event)) => handle_event(&event, &mut watcher, &roots, &mut coalescer),
+            Ok(Ok(event)) => handle_event(&event, &mut watcher, &watched, &mut coalescer),
             Ok(Err(_)) => {} // a single watch error, keep running
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
         if coalescer.try_flush(now_ms()) {
-            run_ingest(&app, &roots, &engine_dir, &stats_path);
+            run_ingest(&app, &target);
         }
     }
 }
@@ -205,7 +227,7 @@ fn run_loop<R: Runtime>(
 fn handle_event(
     event: &Event,
     watcher: &mut RecommendedWatcher,
-    roots: &[PathBuf],
+    watched: &[PathBuf],
     coalescer: &mut EventCoalescer,
 ) {
     for path in &event.paths {
@@ -213,7 +235,7 @@ fn handle_event(
             coalescer.note_event(now_ms());
             continue;
         }
-        if matches!(event.kind, EventKind::Create(_)) && is_new_demo_dir(path, roots) {
+        if matches!(event.kind, EventKind::Create(_)) && is_new_demo_dir(path, watched) {
             let _ = watcher.watch(path, RecursiveMode::NonRecursive);
         }
     }
@@ -238,20 +260,15 @@ fn is_new_demo_dir(path: &Path, roots: &[PathBuf]) -> bool {
 /// the store and notify the frontend. A skipped/unreadable pass (store
 /// missing, ingest touching nothing new) leaves the watcher running silently.
 /// Scan-on-open remains the fallback of record.
-fn run_ingest<R: Runtime>(
-    app: &AppHandle<R>,
-    roots: &[PathBuf],
-    engine_dir: &Path,
-    stats_path: &Path,
-) {
-    let Ok(mut store) = stats::load(stats_path) else {
+fn run_ingest<R: Runtime>(app: &AppHandle<R>, target: &IngestTarget) {
+    let Ok(mut store) = stats::load(&target.stats_path) else {
         return;
     };
-    let summary = stats::ingest(roots, engine_dir, &mut store);
+    let summary = stats::ingest(&target.roots, &target.engine_dir, &mut store);
     if summary.added == 0 && summary.updated == 0 {
         return;
     }
-    if stats::save(stats_path, &store).is_err() {
+    if stats::save(&target.stats_path, &store).is_err() {
         return;
     }
     let _ = app.emit(STATS_UPDATED_EVENT, &summary);
