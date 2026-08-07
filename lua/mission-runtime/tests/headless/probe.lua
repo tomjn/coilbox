@@ -70,6 +70,15 @@ if not gadgetHandler:IsSyncedCode() then
 	-- handed it, and it is the frame the runtime passes that line to LuaUI.
 	local DIALOGUE_MESSAGE = "coilbox_mission_dialogue"
 
+	-- And the two that point the player at a place. Both carry the engine team
+	-- they are for, or -1 for everyone (issue #827), and reading them here is the
+	-- only way a run can see what the synced half resolved a participant into.
+	local CAMERA_MESSAGE = "coilbox_mission_camera"
+	local MARKER_MESSAGE = "coilbox_mission_marker"
+
+	-- The team each camera move and marker was aimed at, in order.
+	local aimedAt = { camera = {}, marker = {} }
+
 	--- Whether LuaUI is running at all. `Script.LuaUI` answers nothing when it is
 	-- not, which is what a game whose own LuaUI died at its entry point looks like
 	-- from here.
@@ -133,6 +142,24 @@ if not gadgetHandler:IsSyncedCode() then
 		end
 	end
 
+	--- What the ambush's camera moves and markers were aimed at.
+	--
+	-- Which client acts on one is decided inside the runtime's own unsynced half,
+	-- which runs before this gadget does, so a run cannot watch it drop a message
+	-- that is not this client's. What a run can settle is the half only a real
+	-- engine has: that a participant id in the document arrives here as this
+	-- client's engine team number, and that an action naming no participant
+	-- arrives as everyone. The drop itself is proved in view_test.lua.
+	local function checkAimed()
+		local mine = Spring.GetMyTeamID()
+		check("a camera move the scenario aimed at a participant carries that team",
+			#aimedAt.camera == 1 and aimedAt.camera[1] == mine,
+			table.concat(aimedAt.camera, ",") .. " wanted " .. tostring(mine))
+		check("and its markers carry one aimed at that team and one aimed at everyone",
+			#aimedAt.marker == 2 and aimedAt.marker[1] == mine and aimedAt.marker[2] == -1,
+			table.concat(aimedAt.marker, ","))
+	end
+
 	function gadget:RecvFromSynced(message, ...)
 		if message == "coilbox_harness_done" then
 			-- Last of all, because a widget the handler threw out over an error in
@@ -141,9 +168,18 @@ if not gadgetHandler:IsSyncedCode() then
 			if proving and MISSION_ID then
 				check("and it is still loaded at the end of the mission", widgetLoaded())
 			end
+			if MISSION_ID == "ambush" then
+				checkAimed()
+			end
 			Spring.Quit()
 		elseif message == "coilbox_harness_player_order" then
 			playerOrder(...)
+		elseif message == CAMERA_MESSAGE then
+			local _, _, _, team = ...
+			aimedAt.camera[#aimedAt.camera + 1] = team
+		elseif message == MARKER_MESSAGE then
+			local _, _, _, team = ...
+			aimedAt.marker[#aimedAt.marker + 1] = team
 		elseif message == DIALOGUE_MESSAGE and proving and not heardLine then
 			heardLine = true
 			check("a line the mission says has the widget's global to arrive at", widgetLoaded())

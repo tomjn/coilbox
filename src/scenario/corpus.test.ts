@@ -156,6 +156,23 @@ describe("scenario fixture corpus", () => {
           Object.values(step.params).some((value) => amountVar(value) !== null),
         ),
       ),
+      // Issue #827. Both sides of the choice, because a corpus that only ever
+      // named a team would stop covering the "everyone" path every scenario
+      // written before runtime 3 takes.
+      "a camera move or marker aimed at one team": allTriggers.some((t) =>
+        t.actions.some(
+          (a) =>
+            (a.type === "camera_pan" || a.type === "map_marker") &&
+            a.params.team !== undefined,
+        ),
+      ),
+      "a camera move or marker aimed at everyone": allTriggers.some((t) =>
+        t.actions.some(
+          (a) =>
+            (a.type === "camera_pan" || a.type === "map_marker") &&
+            a.params.team === undefined,
+        ),
+      ),
       "a group that starts on the map (not dormant)": allGroups.some(
         (g) => g.dormant === false,
       ),

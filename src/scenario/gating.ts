@@ -72,6 +72,26 @@ function readsVarAsAmount(scenario: Scenario): boolean {
   );
 }
 
+/**
+ * The runtime that first sent a camera move and a map marker to one team
+ * (issue #827). A runtime behind this reads past the team and does both for
+ * everyone, so a co-op mission yanks the other player's camera to the ambush
+ * that was meant for one of them.
+ */
+const VIEW_TEAM_VERSION = 3;
+
+/** The actions that reach one player's screen rather than the game. */
+const VIEW_ACTIONS = new Set(["camera_pan", "map_marker"]);
+
+/** Whether any camera move or map marker names a team. */
+function pointsAtOneTeam(scenario: Scenario): boolean {
+  return scenario.triggers.some((trigger) =>
+    trigger.actions.some(
+      (step) => VIEW_ACTIONS.has(step.type) && step.params.team !== undefined,
+    ),
+  );
+}
+
 /** Every string a value carries, however deeply nested. */
 function stringsIn(value: unknown, out: Set<string>): void {
   if (typeof value === "string") out.add(value);
@@ -136,6 +156,9 @@ export function requiredRuntimeVersion(
   }
   if (readsVarAsAmount(scenario)) {
     version = Math.max(version, VAR_AMOUNT_VERSION);
+  }
+  if (pointsAtOneTeam(scenario)) {
+    version = Math.max(version, VIEW_TEAM_VERSION);
   }
   return version;
 }

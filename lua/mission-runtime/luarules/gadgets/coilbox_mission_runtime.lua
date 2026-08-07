@@ -626,12 +626,14 @@ if gadgetHandler:IsSyncedCode() then
 		})
 		-- Pointing the camera and putting a label on the map are the same kind of
 		-- thing: the player's screen rather than the game.
+		-- The engine team each one is for rides along, because every client runs
+		-- the unsynced half and only a client knows which team it is watching.
 		published.view = VIEW.register(triggers, published, {
-			pan = function(x, z, seconds)
-				SendToUnsynced(CAMERA_MESSAGE, x, z, seconds)
+			pan = function(x, z, seconds, team)
+				SendToUnsynced(CAMERA_MESSAGE, x, z, seconds, team)
 			end,
-			mark = function(x, z, text)
-				SendToUnsynced(MARKER_MESSAGE, x, z, text)
+			mark = function(x, z, text, team)
+				SendToUnsynced(MARKER_MESSAGE, x, z, text, team)
 			end,
 		})
 		published.triggers = triggers
@@ -874,11 +876,24 @@ else
 		end
 	end
 
+	--- Whether an action the mission aimed at one team is this client's to do.
+	--
+	-- Every client runs this half, so a camera move or a marker for one
+	-- participant has to be dropped by everyone else (issue #827). The engine
+	-- team this client is on is its answer, which for a spectator is the team
+	-- the engine has them watching as.
+	local function forMe(team)
+		return VIEW.isFor(team, Spring.GetMyTeamID())
+	end
+
 	--- Move the camera to a place on the map, over `seconds`.
 	--
 	-- A scenario carries no height, so the ground is read here, the way it is for
 	-- everything else the runtime puts somewhere.
-	local function panCamera(x, z, seconds)
+	local function panCamera(x, z, seconds, team)
+		if not forMe(team) then
+			return
+		end
 		Spring.SetCameraTarget(x, Spring.GetGroundHeight(x, z), z, seconds)
 	end
 
@@ -887,21 +902,24 @@ else
 	-- Local on purpose. Every client runs this half, so a marker sent the way a
 	-- player's own click sends one would be broadcast once per player and land on
 	-- the map that many times over.
-	local function addMarker(x, z, text)
+	local function addMarker(x, z, text, team)
+		if not forMe(team) then
+			return
+		end
 		Spring.MarkerAddPoint(x, Spring.GetGroundHeight(x, z), z, text, true)
 	end
 
 	--- Returns nothing: a true return would stop the message reaching the gadgets
 	-- behind this one, and their messages are not ours to swallow.
-	function gadget:RecvFromSynced(message, first, second, third)
+	function gadget:RecvFromSynced(message, first, second, third, fourth)
 		if message == ACTOR_MESSAGE then
 			actorBecame(first, second)
 		elseif message == HIDDEN_MESSAGE then
 			hide(first)
 		elseif message == CAMERA_MESSAGE then
-			panCamera(first, second, third)
+			panCamera(first, second, third, fourth)
 		elseif message == MARKER_MESSAGE then
-			addMarker(first, second, third)
+			addMarker(first, second, third, fourth)
 		elseif message == DIALOGUE_MESSAGE then
 			-- The panel is a widget, so the line goes on to LuaUI, which draws it
 			-- and plays its clip in step with the text. A game with no LuaUI, or a

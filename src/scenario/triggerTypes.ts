@@ -167,13 +167,17 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
     unitDef: { kind: "string" },
     team: { kind: "teamId", optional: true },
   },
+  /** Whose camera moves, and whose map gets the label. Absent means everyone,
+   *  which is what a single player scenario wants (issue #827). */
   camera_pan: {
     pos: { kind: "point" },
     seconds: { kind: "number", optional: true },
+    team: { kind: "teamId", optional: true },
   },
   map_marker: {
     pos: { kind: "point" },
     text: { kind: "string", optional: true },
+    team: { kind: "teamId", optional: true },
   },
   /** Ends the mission. Absent team means the human player's team. */
   victory: { team: { kind: "teamId", optional: true } },

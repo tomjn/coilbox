@@ -493,6 +493,12 @@ function M.newEngine(modOptions, files, options)
 				-- Two teams unless a test says otherwise, matching the two sides.
 				return options.teamList or { 0, 1 }
 			end,
+			-- The engine team this client is watching, which is what tells one
+			-- client's unsynced half from another's. Team 0 unless a test says
+			-- otherwise, which is the team a single player mission's human is on.
+			GetMyTeamID = function()
+				return options.myTeam or 0
+			end,
 			-- Nothing, the way the engine answers when the game has no Gaia team.
 			GetGaiaTeamID = function()
 				return options.gaiaTeam

@@ -166,6 +166,8 @@ Both are the player's screen rather than the game, so, like a line of dialogue, 
 
 A marker is added locally. Every client runs that half, so a marker sent the way a player's own click sends one would be broadcast once per player and land on the map that many times over.
 
+Both take an optional `team`, a participant id, and mean everyone when the author names none ([issue #827](https://github.com/tomjn/coilbox/issues/827)). The synced half resolves the participant into an engine team, because only the mission knows the mapping, and sends it along. Each client's unsynced half then compares it against `Spring.GetMyTeamID()` and drops the ones that are not its own. A spectator is whichever team the engine currently has them watching as. A participant the mission has no engine team for is reported and done for everyone: a camera move that reaches too many people is one the author can see going wrong, and one that never happens looks like a trigger that never fired. That is what runtime 3 added, and a scenario that names a team says `runtimeVersion = 3` so a runtime 2 game refuses it rather than moving every camera.
+
 A scenario carries no height, so the ground under the position is read by the unsynced half at the moment the camera moves or the marker lands.
 
 Neither action names a team. In a mission more than one person is playing, every player's camera moves and every player gets the marker ([#827](https://github.com/tomjn/coilbox/issues/827)).

@@ -90,6 +90,57 @@ describe("requiredRuntimeVersion", () => {
    * name it has never heard of holds from the first frame, so a scenario naming
    * a building has to be refused by an older game rather than half played.
    */
+  /**
+   * Issue #827. Runtime 2 reads past the team and moves every player's camera,
+   * so a co-op mission shows one side the ambush laid for the other.
+   */
+  describe("a scenario aiming a camera move or a marker at a team", () => {
+    const withAction = (
+      type: string,
+      params: Record<string, unknown>,
+    ): Scenario => {
+      const scenario = withTrigger([], []);
+      return {
+        ...scenario,
+        triggers: [
+          {
+            ...scenario.triggers[0],
+            actions: [{ type, params: params as never }],
+          },
+        ],
+      };
+    };
+
+    it("needs the runtime that reads the team", () => {
+      expect(
+        requiredRuntimeVersion(
+          withAction("camera_pan", { pos: { x: 1, z: 1 }, team: "player" }),
+        ),
+      ).toBe(3);
+      expect(
+        requiredRuntimeVersion(
+          withAction("map_marker", { pos: { x: 1, z: 1 }, team: "player" }),
+        ),
+      ).toBe(3);
+    });
+
+    it("is left on the first runtime when it names none", () => {
+      expect(
+        requiredRuntimeVersion(
+          withAction("camera_pan", { pos: { x: 1, z: 1 }, seconds: 2 }),
+        ),
+      ).toBe(1);
+    });
+
+    it("is not raised by another action that happens to name a team", () => {
+      expect(
+        requiredRuntimeVersion(
+          withAction("reveal_area", { zone: "gate", team: "player" }),
+        ),
+      ).toBe(1);
+    });
+  });
+
   describe("a scenario that names a prefab building", () => {
     const withBase = (target: string): Scenario => {
       const scenario = withTrigger([], []);

@@ -161,15 +161,18 @@ check("a mission that restricts nothing enforces nothing",
 local scout = state.units.scout
 
 --- What the mission has staged for the player so far: every camera move and
--- every marker, in the order they went out. Read off the messages the synced
--- half sent, because that is the whole of what those two actions do.
+-- every marker, in the order they went out, and the engine team each was aimed
+-- at. Read off the messages the synced half sent, because that is the whole of
+-- what those two actions do.
 local function staged()
 	local out = {}
 	for _, entry in ipairs(engine.sent) do
 		if entry[1] == "coilbox_mission_camera" then
-			out[#out + 1] = "pan " .. entry[2] .. "/" .. entry[3] .. " over " .. entry[4]
+			out[#out + 1] = "pan " .. entry[2] .. "/" .. entry[3]
+				.. " over " .. entry[4] .. " for " .. entry[5]
 		elseif entry[1] == "coilbox_mission_marker" then
-			out[#out + 1] = "mark " .. entry[2] .. "/" .. entry[3] .. " " .. entry[4]
+			out[#out + 1] = "mark " .. entry[2] .. "/" .. entry[3]
+				.. " " .. entry[4] .. " for " .. entry[5]
 		end
 	end
 	return table.concat(out, ", ")
@@ -214,9 +217,12 @@ check("a dormant group is not on the map before it is spawned",
 engine.move(patrol, 1900, 1900)
 engine.env:GameFrame(60)
 check("walking into the pass springs it", state.triggers:isEnabled("spring-ambush") == false)
-check("and the whole trigger ran, in the order the mission wrote it",
+-- The pan and the first marker name the player participant, which is engine
+-- team 0, and the second marker names none, which is everyone (issue #827).
+check("and the whole trigger ran, in the order the mission wrote it, each for the team it names",
 	said() == "warn,warn,warn"
-	and staged() == "pan 2000/2000 over 2, mark 2000/2000 Ambush!"
+	and staged() == "pan 2000/2000 over 2 for 0, mark 2000/2000 Ambush! for 0, "
+		.. "mark 1800/1800 They came. for -1"
 	and table.concat(sent(engine, "coilbox_mission_sound"), ",") == "alarm.wav",
 	said() .. " / " .. staged())
 

@@ -167,10 +167,12 @@ The names below are the ones in the compiled mission. The editor shows them with
 | `play_sound` | Play a sound by name, either an entry in the game's own `sounds.lua` or a file in the game. |
 | `reveal_area` | Lift the fog over a zone for a participant, for a number of seconds or the rest of the mission. See the [limits](#what-a-scenario-cannot-do-yet). |
 | `unlock_unit` | Lift the scenario's build restriction on one unit type for one participant. |
-| `camera_pan` | Move the camera to a point over a number of seconds, one second by default. |
-| `map_marker` | Drop one of the map's own labelled points, with your label or none. |
+| `camera_pan` | Move the camera to a point over a number of seconds, one second by default. Optionally one participant's camera. |
+| `map_marker` | Drop one of the map's own labelled points, with your label or none. Optionally on one participant's map. |
 | `victory` | End the mission with the named participant's ally team as the winner. |
 | `defeat` | End the mission with every other ally team as the winner. |
+
+`camera_pan` and `map_marker` with no participant named reach everyone, which is what a single player scenario wants. Naming one is for a co-op or head-to-head mission, where yanking both players' cameras to one side's ambush shows the other player what is coming. A scenario that names one needs mission runtime 3.
 
 `victory` and `defeat` with no participant named mean the team a human is playing. **Name one only when you mean it.** The result the campaign records comes out of the replay, and the reader asks whether the player's ally team is among the winners. A `victory` naming a participant the human is not playing therefore records a **defeat** for the player. See [Win and loss](#win-and-loss).
 
@@ -282,7 +284,6 @@ Honest limits, all of them things you can hit while authoring:
 - **`reveal_area` reveals a circle.** No engine call grants sight over a region, so a reveal is implemented as a short-lived invisible unit with sight. A box zone is covered by the circle around its corners, so a reveal spills past them. Under-revealing would leave the thing you drew the box around in the dark.
 - **Terrain occludes a reveal.** Sight is cast from the spotter, so a ridge inside the zone shadows its far side, exactly as it would for a scout standing there. Air sight is not occluded, so aircraft over the zone are always seen.
 - **The player's unit count is one too high.** The runtime keeps one invisible anchor unit on each mission team a human plays, so the engine's own "this ally team has no units" rule cannot end the mission early when the player legitimately reaches zero units. The anchor is a real unit and shows in the game's own unit count. The runtime's own counting leaves it out, so `unit_count` and `units_in_zone` are unaffected: [issue #820](https://github.com/tomjn/coilbox/issues/820).
-- **`camera_pan` and `map_marker` name no team.** In a mission more than one person is playing, every player's camera moves and every player gets the marker: [issue #827](https://github.com/tomjn/coilbox/issues/827).
 - **A restricted unit's build icon is still in the menu.** A player who clicks one gets a builder that walks over and does nothing: [issue #832](https://github.com/tomjn/coilbox/issues/832).
 - **A mission coilbox wrote into a game stays there.** There is no in-app way to remove one: [issue #814](https://github.com/tomjn/coilbox/issues/814).
 - **A scenario cannot be set up without a preset:** [issue #821](https://github.com/tomjn/coilbox/issues/821).
