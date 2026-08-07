@@ -4,14 +4,16 @@
  * Picking an entry does the two things a click on the map does when it lands:
  * it selects the thing, so the bar for it opens, and it takes the camera to it,
  * so the thing is on screen. That is what makes this an answer to a placement
- * being a few pixels across (#830) rather than another place to read a name.
+ * being a few pixels across (#830), and to a zone that no click can reach
+ * because another zone's sheet answers first (#911), rather than another place
+ * to read a name.
  *
  * What the list holds is `contents.ts`, which is tested. This is the picture of
  * it.
  */
 
 import { Button, cn } from "@picoframe/frame";
-import { Factory, type LucideIcon, User, Users } from "lucide-react";
+import { Factory, type LucideIcon, Square, User, Users } from "lucide-react";
 import { type Participant, rgbToHex } from "@/play/config";
 import type { ContentEntry, ContentKind } from "./contents";
 import { teamColor } from "./placements";
@@ -22,6 +24,7 @@ const ICONS: Record<ContentKind, LucideIcon> = {
   actor: User,
   group: Users,
   prefab: Factory,
+  zone: Square,
 };
 
 export function ContentsList({
@@ -62,13 +65,15 @@ export function ContentsList({
               onClick={() => onPick(entry)}
             >
               <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-              <span
-                aria-hidden
-                className="size-2 shrink-0 rounded-full ring-1 ring-black/30"
-                style={{
-                  background: rgbToHex(teamColor(participants, entry.team)),
-                }}
-              />
+              {entry.team !== null && (
+                <span
+                  aria-hidden
+                  className="size-2 shrink-0 rounded-full ring-1 ring-black/30"
+                  style={{
+                    background: rgbToHex(teamColor(participants, entry.team)),
+                  }}
+                />
+              )}
               <span className="min-w-0 flex-1 truncate text-left text-xs">
                 {entry.label}
               </span>

@@ -15,10 +15,11 @@
 import type { Point, Scenario } from "../../model";
 import { parsePlacementKey } from "./editing";
 import { groupSize, parsePathKey, uniqueLabels } from "./groups";
-import { placementKey } from "./placements";
+import { GROUP_SPACING, placementKey } from "./placements";
+import { parseZoneKey, zoneCenter, zoneExtent, zoneKey } from "./zones";
 
 /** The kinds of thing the list holds, in the order it lists them. */
-export type ContentKind = "actor" | "group" | "prefab";
+export type ContentKind = "actor" | "group" | "prefab" | "zone";
 
 /** One thing the document put on the map. */
 export interface ContentEntry {
@@ -36,8 +37,12 @@ export interface ContentEntry {
   detail: string;
   /** Where the camera goes to look at it, in elmos. */
   pos: Point;
-  /** The participant it belongs to. */
-  team: string;
+  /** How far it reaches from `pos`, in elmos, so the camera can stand back far
+   *  enough to show all of it. A zone is kilometres across. */
+  span: number;
+  /** The participant it belongs to, or null for a zone, which is a piece of
+   *  ground and belongs to nobody. */
+  team: string | null;
 }
 
 /** What a group is made of, and whether it has anywhere to go. The orders are
@@ -52,16 +57,38 @@ function groupDetail(group: Scenario["groups"][number]): string {
     : `${units} · ${orders} order${orders === 1 ? "" : "s"}`;
 }
 
+/** How far a group's formation reaches from its point, in elmos. The runtime
+ *  lays its counts out in a square-ish grid, which is what the editor draws. */
+function groupSpan(group: Scenario["groups"][number]): number {
+  const side = Math.ceil(Math.sqrt(Math.max(1, groupSize(group))));
+  return ((side - 1) / 2) * GROUP_SPACING;
+}
+
+/** How far a base's buildings reach from its origin, in elmos. */
+function prefabSpan(prefab: Scenario["prefabs"][number]): number {
+  return prefab.buildings.reduce(
+    (far, building) =>
+      Math.max(far, Math.abs(building.offset.x), Math.abs(building.offset.z)),
+    0,
+  );
+}
+
 /**
- * Everything the document places, in the order the map draws it: actors, then
- * groups, then bases.
+ * Everything the document puts on the map, in the order the map draws it:
+ * actors, then groups, then bases, then zones.
  *
  * An actor goes by its display name when it has one, the way every other picker
  * in the editor offers one, and a group and a base by their place in the
- * document, which is the only thing telling two of the same apart.
+ * document, which is the only thing telling two of the same apart. A zone goes
+ * by the name it was given, which is what a trigger names it by.
+ *
+ * Zones are here for a reason of their own. A click picks whichever zone's sheet
+ * the ray reaches first, which is decided by how the sheets drape, so a zone
+ * drawn inside another can be impossible to select by clicking at all (#911).
+ * Picking it out of a list does not depend on hitting the right pixel.
  */
 export function sceneContents(
-  scenario: Pick<Scenario, "actors" | "groups" | "prefabs">,
+  scenario: Pick<Scenario, "actors" | "groups" | "prefabs" | "zones">,
 ): ContentEntry[] {
   const actorLabels = uniqueLabels(
     scenario.actors.map((actor) => actor.state?.name?.trim() || actor.unitDef),
@@ -73,6 +100,7 @@ export function sceneContents(
     label: actorLabels[i],
     detail: actor.unitDef,
     pos: actor.pos,
+    span: 0,
     team: actor.team,
   }));
   const groups = scenario.groups.map<ContentEntry>((group, i) => ({
@@ -82,6 +110,7 @@ export function sceneContents(
     label: `Group ${i + 1}`,
     detail: groupDetail(group),
     pos: group.pos,
+    span: groupSpan(group),
     team: group.team,
   }));
   const prefabs = scenario.prefabs.map<ContentEntry>((prefab, i) => ({
@@ -93,9 +122,21 @@ export function sceneContents(
       prefab.buildings.length === 1 ? "" : "s"
     }`,
     pos: prefab.origin,
+    span: prefabSpan(prefab),
     team: prefab.team,
   }));
-  return [...actors, ...groups, ...prefabs];
+  const zoneLabels = uniqueLabels(scenario.zones.map((zone) => zone.name));
+  const zones = scenario.zones.map<ContentEntry>((zone, i) => ({
+    key: zoneKey(zone.id),
+    kind: "zone",
+    id: zone.id,
+    label: zoneLabels[i],
+    detail: zone.shape,
+    pos: zoneCenter(zone),
+    span: Math.max(...Object.values(zoneExtent(zone))),
+    team: null,
+  }));
+  return [...actors, ...groups, ...prefabs, ...zones];
 }
 
 /**
@@ -123,6 +164,14 @@ export function contentsSelection(
       entries.find(
         (entry) => entry.kind === "group" && entry.id === path.groupId,
       )?.key ?? null
+    );
+  // A zone key names either the zone or one of its handles, and both mean the
+  // same zone is what is being worked on.
+  const zone = parseZoneKey(selected);
+  if (zone)
+    return (
+      entries.find((entry) => entry.kind === "zone" && entry.id === zone.id)
+        ?.key ?? null
     );
   return null;
 }

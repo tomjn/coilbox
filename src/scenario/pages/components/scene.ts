@@ -121,6 +121,19 @@ export function authoringCamera(
 export const FOCUS_ELMOS = 1600;
 
 /**
+ * How far back the camera stands to look at something `span` elmos across from
+ * the middle, in elmos.
+ *
+ * A unit is a point and a zone is a piece of ground kilometres wide, and being
+ * taken to either should show the whole of it. Three times the half-extent fits
+ * it inside a 45 degree field with room to spare, which the pitch needs: the
+ * view is tilted, so the far half is foreshortened.
+ */
+export function focusDistance(span: number): number {
+  return Math.max(FOCUS_ELMOS, span * 3);
+}
+
+/**
  * Where the camera stands to look closely at one point on the map, from the
  * south at the authoring pitch, so being taken to something looks like the view
  * the author already had rather than a new one.

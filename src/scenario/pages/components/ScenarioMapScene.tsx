@@ -78,8 +78,8 @@ import { editPrefab, removePrefab, setOrigin, setQueue } from "./prefabs";
 import {
   authoringCamera,
   clampToPlane,
-  FOCUS_ELMOS,
   focusCamera,
+  focusDistance,
   mapSceneStatus,
   worldToScene,
 } from "./scene";
@@ -403,7 +403,7 @@ export function ScenarioMapScene({
    * and a scene this heavy is not one to animate a flight across.
    */
   const focusOn = useCallback(
-    (pos: Point) => {
+    (pos: Point, span: number) => {
       const handle = sceneRef.current;
       if (!handle) return;
       const { camera, controls, render, scale } = handle;
@@ -415,7 +415,7 @@ export function ScenarioMapScene({
       );
       const distance = Math.min(
         controls.maxDistance,
-        Math.max(controls.minDistance, FOCUS_ELMOS * scale),
+        Math.max(controls.minDistance, focusDistance(span) * scale),
       );
       // Looked at where it stands rather than at sea level, or a thing on a
       // ridge would arrive at the top of the view and one in a valley below it.
@@ -434,7 +434,7 @@ export function ScenarioMapScene({
   const pickEntry = useCallback(
     (entry: ContentEntry) => {
       setSelected(entry.key);
-      focusOn(entry.pos);
+      focusOn(entry.pos, entry.span);
     },
     [focusOn],
   );

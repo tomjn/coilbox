@@ -3,7 +3,9 @@ import {
   AUTHORING_PITCH,
   authoringCamera,
   clampToPlane,
+  FOCUS_ELMOS,
   focusCamera,
+  focusDistance,
   framingDistance,
   mapSceneStatus,
   sceneToWorld,
@@ -83,6 +85,20 @@ describe("authoringCamera", () => {
     const d = Math.hypot(cam.y, cam.z);
     expect(d).toBeCloseTo(300);
     expect(Math.atan2(cam.y, cam.z)).toBeCloseTo(AUTHORING_PITCH);
+  });
+});
+
+describe("focusDistance", () => {
+  it("stands at the near distance for something with no size", () => {
+    expect(focusDistance(0)).toBe(FOCUS_ELMOS);
+  });
+
+  it("stands back far enough to show a zone kilometres across", () => {
+    expect(focusDistance(3000)).toBe(9000);
+  });
+
+  it("never goes closer than the near distance for a small zone", () => {
+    expect(focusDistance(100)).toBe(FOCUS_ELMOS);
   });
 });
 
