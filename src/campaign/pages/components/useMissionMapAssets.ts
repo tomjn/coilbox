@@ -22,8 +22,8 @@ export function useMissionMapAssets(mapName: string) {
   const heightmap = useUnitsyncHeightmap(enginePath, dataDir, mapName);
   const skybox = useUnitsyncMapSkybox(enginePath, dataDir, mapName);
 
-  const heightUrl = heightmap.data?.dataUrl ?? undefined;
-  const textureUrl = minimap.dataUrl ?? undefined;
+  const heightUrl = heightmap.url ?? undefined;
+  const textureUrl = minimap.url ?? undefined;
   // The heightmap alone is enough for a wireframe relief; a textured render also
   // needs the minimap diffuse.
   const width = heightmap.data?.width;

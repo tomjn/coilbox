@@ -72,7 +72,7 @@ fn unregister_cancel(op_id: &str) {
 /// Subdirectory of the app cache dir holding rendered minimap/thumbnail PNGs.
 const THUMB_CACHE_SUBDIR: &str = "coilbox-unitsync-thumbs";
 
-/// Subdirectory of the app cache dir holding resolved game-header `data:` URLs.
+/// Subdirectory of the app cache dir holding resolved game-header JPEGs.
 const HEADER_CACHE_SUBDIR: &str = "coilbox-unitsync-headers";
 
 /// Subdirectory of the app cache dir holding resolved unit build-icon `data:` URLs.
@@ -86,16 +86,18 @@ const MODEL_TEXTURE_SUBDIR: &str = "coilbox-unitsync-model-textures";
 
 /// The on-disk PNG cache directory for minimaps/thumbnails, under the app cache
 /// dir. `None` when the platform can't resolve a cache dir — caching is then
-/// simply skipped (same pattern as the mapconv plugin's thumbnail cache).
-fn thumb_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+/// simply skipped (same pattern as the mapconv plugin's thumbnail cache). Public
+/// because the asset protocol serves this folder as its `unitsyncthumb` root.
+pub fn thumb_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(THUMB_CACHE_SUBDIR))
 }
 
 /// The on-disk header cache directory, under the app cache dir. `None` when the
-/// platform can't resolve a cache dir (caching is then skipped).
-fn header_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+/// platform can't resolve a cache dir (caching is then skipped). Public because
+/// the asset protocol serves this folder as its `unitsyncheader` root.
+pub fn header_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(HEADER_CACHE_SUBDIR))

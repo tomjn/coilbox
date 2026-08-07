@@ -26,6 +26,16 @@
 //!     (the meshes of a unit imported from somebody else's `.s3o`)
 //!   - `coilbox://localhost/legotex/<file>`   → `<data_dir>/lego/textures/<file>`
 //!     (the textures those units draw with, keyed by content)
+//!   - `coilbox://localhost/unitmodel/<file>` → the unitsync model-texture cache
+//!     (raw archive textures for the unit-model viewer)
+//!   - `coilbox://localhost/unitsyncthumb/<file>` → the unitsync thumb cache
+//!     (rendered minimaps, heightmaps and metalmaps)
+//!   - `coilbox://localhost/unitsyncheader/<file>` → the unitsync header cache
+//!     (a game's loading-screen art)
+//!
+//! The last two hold content-keyed names, so the same URL always means the same
+//! bytes and they are served `immutable`. Everything else is editable media and
+//! stays `no-cache`.
 //!
 //! Every segment is percent-decoded and rejected if it contains path syntax, so a
 //! request can never escape its root. Any miss (no root, unsafe path, absent file)
@@ -91,14 +101,15 @@ fn safe_segments(path: &str) -> Option<Vec<String>> {
 /// the root is unavailable / the shape is wrong. The bases are injected so this is
 /// unit-testable without the real filesystem or app handle. `data_dir` covers every
 /// root that lives under the app-data dir (campaign, scenario, and the three lego
-/// folders), the plugin-owned ones take their own closure.
+/// folders), the plugin-owned ones take their own closure. `unitsync_dir` is asked
+/// for one of the unitsync plugin's cache folders by root name.
 fn resolve_path(
     segments: &[String],
     portable: Option<PathBuf>,
     data_dir: impl FnOnce() -> Option<PathBuf>,
     legopack_base: impl FnOnce() -> Option<PathBuf>,
     extra_packs_base: impl FnOnce() -> Option<PathBuf>,
-    unit_model_base: impl FnOnce() -> Option<PathBuf>,
+    unitsync_dir: impl FnOnce(&str) -> Option<PathBuf>,
 ) -> Option<PathBuf> {
     let (root, rest) = segments.split_first()?;
     match root.as_str() {
@@ -149,15 +160,16 @@ fn resolve_path(
             };
             Some(data_dir()?.join("lego").join(folder).join(file))
         }
-        "unitmodel" => {
-            // unitmodel/<file>: textures copied out of a game archive for the
-            // unit-model viewer, one flat folder. Raw archive bytes rather than
-            // anything decoded, because the shared atlases are compressed DDS
-            // measured in tens of megabytes and the webview uploads them as-is.
+        // The unitsync plugin's three flat cache folders, all `<root>/<file>`:
+        // textures copied raw out of a game archive for the unit-model viewer
+        // (the shared atlases are compressed DDS measured in tens of megabytes,
+        // and the webview uploads them as-is), rendered minimap/heightmap/
+        // metalmap PNGs, and a game's loading-screen art.
+        "unitmodel" | "unitsyncthumb" | "unitsyncheader" => {
             let [file] = rest else {
                 return None;
             };
-            Some(unit_model_base()?.join(file))
+            Some(unitsync_dir(root)?.join(file))
         }
         _ => None,
     }
@@ -210,7 +222,14 @@ fn not_found() -> Response<Cow<'static, [u8]>> {
 /// `<video>` uses never needed but `fetch()` does. Without it WKWebView rejects
 /// a custom-scheme fetch before it ever reaches a status code. The scheme only
 /// ever serves files under its own roots, and the webview is its only client.
-fn serve_file(full: &PathBuf, range: Option<&str>) -> Response<Cow<'static, [u8]>> {
+///
+/// `cache_control` is the caller's, because only it knows whether the root's
+/// names are content-keyed and therefore safe to cache forever.
+fn serve_file(
+    full: &PathBuf,
+    range: Option<&str>,
+    cache_control: &'static str,
+) -> Response<Cow<'static, [u8]>> {
     let Ok(meta) = std::fs::metadata(full) else {
         return not_found();
     };
@@ -240,7 +259,7 @@ fn serve_file(full: &PathBuf, range: Option<&str>) -> Response<Cow<'static, [u8]
                 .header(header::ACCEPT_RANGES, "bytes")
                 .header(header::CONTENT_RANGE, format!("bytes {start}-{end}/{len}"))
                 .header(header::CONTENT_LENGTH, count.to_string())
-                .header(header::CACHE_CONTROL, "no-cache")
+                .header(header::CACHE_CONTROL, cache_control)
                 .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .body(Cow::Owned(buf))
                 .expect("range response builder inputs are valid")
@@ -251,7 +270,7 @@ fn serve_file(full: &PathBuf, range: Option<&str>) -> Response<Cow<'static, [u8]
                 .header(header::CONTENT_TYPE, mime)
                 .header(header::ACCEPT_RANGES, "bytes")
                 .header(header::CONTENT_LENGTH, len.to_string())
-                .header(header::CACHE_CONTROL, "no-cache")
+                .header(header::CACHE_CONTROL, cache_control)
                 .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .body(Cow::Owned(bytes))
                 .expect("full response builder inputs are valid"),
@@ -275,7 +294,11 @@ pub fn handle<R: Runtime>(
         || coilbox_portable::data_dir(app).ok(),
         || tauri_plugin_coilbox_lego::legopack_dir(app),
         || tauri_plugin_coilbox_lego::extra_packs_dir(app),
-        || tauri_plugin_coilbox_unitsync::model_texture_dir(app),
+        |root| match root {
+            "unitsyncthumb" => tauri_plugin_coilbox_unitsync::thumb_cache_dir(app),
+            "unitsyncheader" => tauri_plugin_coilbox_unitsync::header_cache_dir(app),
+            _ => tauri_plugin_coilbox_unitsync::model_texture_dir(app),
+        },
     );
     let Some(full) = full else {
         return not_found();
@@ -284,7 +307,18 @@ pub fn handle<R: Runtime>(
         .headers()
         .get(header::RANGE)
         .and_then(|v| v.to_str().ok());
-    serve_file(&full, range)
+    serve_file(&full, range, cache_control(&segments[0]))
+}
+
+/// The `Cache-Control` for a root. The unitsync caches name their files after a
+/// hash of the source archive's path, size and mtime, so a URL there can never
+/// come to mean different bytes and the webview may keep it. Every other root
+/// serves media the user can edit in place under a stable name.
+fn cache_control(root: &str) -> &'static str {
+    match root {
+        "unitsyncthumb" | "unitsyncheader" => "max-age=31536000, immutable",
+        _ => "no-cache",
+    }
 }
 
 #[cfg(test)]
@@ -322,7 +356,7 @@ mod tests {
             || Some(PathBuf::from("/data")),
             || None,
             || None,
-            || None,
+            |_| None,
         )
     }
 
@@ -339,7 +373,7 @@ mod tests {
             || None,
             || None,
             || None,
-            || None,
+            |_| None,
         );
         assert_eq!(got, Some(PathBuf::from("/pkg/.coilbox/images/x.jpg")));
     }
@@ -348,7 +382,7 @@ mod tests {
     fn resolve_portable_none_without_root() {
         let s = segs(&["portable", "x.jpg"]);
         assert_eq!(
-            resolve_path(&s, None, || None, || None, || None, || None),
+            resolve_path(&s, None, || None, || None, || None, |_| None),
             None
         );
     }
@@ -378,7 +412,7 @@ mod tests {
         // and nothing resolves without an app-data dir
         let s = segs(&["scenario", "sc-1", "abc.ogg"]);
         assert_eq!(
-            resolve_path(&s, None, || None, || None, || None, || None),
+            resolve_path(&s, None, || None, || None, || None, |_| None),
             None
         );
     }
@@ -388,17 +422,17 @@ mod tests {
         let base = || Some(PathBuf::from("/res/legoparts"));
         let s = segs(&["legopack", "parts.bin.gz"]);
         assert_eq!(
-            resolve_path(&s, None, || None, base, || None, || None),
+            resolve_path(&s, None, || None, base, || None, |_| None),
             Some(PathBuf::from("/res/legoparts/parts.bin.gz"))
         );
         // no file segment, and no pack installed
         let bare = segs(&["legopack"]);
         assert_eq!(
-            resolve_path(&bare, None, || None, base, || None, || None),
+            resolve_path(&bare, None, || None, base, || None, |_| None),
             None
         );
         assert_eq!(
-            resolve_path(&s, None, || None, || None, || None, || None),
+            resolve_path(&s, None, || None, || None, || None, |_| None),
             None
         );
     }
@@ -431,26 +465,66 @@ mod tests {
                 || Some(PathBuf::from("/data")),
                 || None,
                 || None,
-                || None
+                |_| None
             ),
             None
         );
     }
 
+    /// The unitsync caches, keyed by the root the request asked for.
+    fn under_unitsync(segments: &[String]) -> Option<PathBuf> {
+        resolve_path(
+            segments,
+            None,
+            || None,
+            || None,
+            || None,
+            |root| Some(PathBuf::from("/cache").join(root)),
+        )
+    }
+
     #[test]
-    fn resolve_unitmodel_serves_one_flat_folder() {
-        let base = || Some(PathBuf::from("/cache/model-textures"));
-        let s = segs(&["unitmodel", "abc_atlas_dds.dds"]);
+    fn resolve_unitsync_roots_each_serve_one_flat_folder() {
         assert_eq!(
-            resolve_path(&s, None, || None, || None, || None, base),
-            Some(PathBuf::from("/cache/model-textures/abc_atlas_dds.dds"))
+            under_unitsync(&segs(&["unitmodel", "abc_atlas_dds.dds"])),
+            Some(PathBuf::from("/cache/unitmodel/abc_atlas_dds.dds"))
         );
-        // The cache is flat, so a nested path is not one of its files.
-        let nested = segs(&["unitmodel", "sub", "abc.dds"]);
         assert_eq!(
-            resolve_path(&nested, None, || None, || None, || None, base),
+            under_unitsync(&segs(&["unitsyncthumb", "abc-0.png"])),
+            Some(PathBuf::from("/cache/unitsyncthumb/abc-0.png"))
+        );
+        assert_eq!(
+            under_unitsync(&segs(&["unitsyncheader", "abc.jpg"])),
+            Some(PathBuf::from("/cache/unitsyncheader/abc.jpg"))
+        );
+        // Each cache is flat, so a nested path is not one of its files.
+        assert_eq!(under_unitsync(&segs(&["unitmodel", "sub", "a.dds"])), None);
+        assert_eq!(
+            under_unitsync(&segs(&["unitsyncthumb", "s", "a.png"])),
             None
         );
+        // And nothing resolves without the plugin's cache dir.
+        let s = segs(&["unitsyncthumb", "abc-0.png"]);
+        assert_eq!(
+            resolve_path(&s, None, || None, || None, || None, |_| None),
+            None
+        );
+    }
+
+    #[test]
+    fn content_keyed_roots_are_cached_forever() {
+        assert_eq!(
+            cache_control("unitsyncthumb"),
+            "max-age=31536000, immutable"
+        );
+        assert_eq!(
+            cache_control("unitsyncheader"),
+            "max-age=31536000, immutable"
+        );
+        // Editable media keeps revalidating, including the raw model textures,
+        // which are named after the archive member rather than its bytes.
+        assert_eq!(cache_control("unitmodel"), "no-cache");
+        assert_eq!(cache_control("campaign"), "no-cache");
     }
 
     #[test]

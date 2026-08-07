@@ -1,12 +1,12 @@
 //! Heightmap rendering: read a map's full-resolution 16-bit height infomap via
 //! unitsync (`GetInfoMap "height"`, pure static SMF parsing) and turn it into a
-//! downscaled grayscale PNG `data:` URL for the 3D terrain preview. Cached on disk
-//! (under `cache_dir`, keyed by a cheap file identity of the map's archive +
-//! max-side) like minimaps, so the heavy read + encode only runs on a cache
-//! miss.
+//! downscaled grayscale PNG for the 3D terrain preview. Cached on disk (under
+//! `cache_dir`, keyed by a cheap file identity of the map's archive + max-side)
+//! like minimaps, so the heavy read + encode only runs on a cache miss, and
+//! reported by cache file name so the preview loads it over the asset protocol.
 
 use crate::ffi::Unitsync;
-use crate::minimap::{map_cache_key, png_to_data_url};
+use crate::minimap::{map_cache_key, rendered_image, RenderedImage};
 use crate::model::HeightmapOutput;
 use image::{DynamicImage, ImageBuffer, ImageFormat, Luma};
 use std::io::Cursor;
@@ -70,26 +70,27 @@ pub fn render(
     let bounds = us.height_bounds(map_name);
     let cache = cache_file(cache_dir, map_cache_key(&us, map_name).as_deref(), max_side);
 
-    let result = (|| -> Result<(String, u32, u32), String> {
+    let result = (|| -> Result<(RenderedImage, u32, u32), String> {
         let (w, h) = us
             .heightmap_size(map_name)
             .ok_or_else(|| "no heightmap available".to_string())?;
         // Only the cache miss pays for the full GetInfoMap read + encode.
-        let png = coilbox_thumb_cache::cached(cache, || {
+        let (png, on_disk) = coilbox_thumb_cache::cached_at(cache, || {
             let raw = us
                 .heightmap_data(map_name, w, h)
                 .ok_or_else(|| "failed to read heightmap".to_string())?;
             heightmap_png(&raw, w, h, max_side)
         })?;
-        Ok((png_to_data_url(&png), w, h))
+        Ok((rendered_image(&png, on_disk), w, h))
     })();
 
     let errors = us.drain_errors();
     us.uninit();
 
     match result {
-        Ok((data_url, w, h)) => HeightmapOutput {
-            data_url: Some(data_url),
+        Ok((image, w, h)) => HeightmapOutput {
+            file: image.file,
+            data_url: image.data_url,
             width: Some(w),
             height: Some(h),
             min_height: bounds.map(|(lo, _)| lo),

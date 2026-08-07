@@ -88,7 +88,13 @@ pub struct MapItem {
 #[serde(rename_all = "camelCase")]
 pub struct Thumbnail {
     pub name: String,
-    pub data_url: String,
+    /// Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
+    /// render reached disk, and preferred by callers over `dataUrl`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// Only set when there was no cache dir, or the write failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_url: Option<String>,
     /// Map proportions (for undistorted minimap display); ratio = aspect ratio.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub width: Option<u32>,
@@ -108,7 +114,11 @@ pub struct ThumbnailsOutput {
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct MinimapOutput {
-    /// PNG `data:` URL, ready to drop into an `<img src>`.
+    /// Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
+    /// render reached disk, and preferred by callers over `dataUrl`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// PNG `data:` URL, only set when there was no cache dir or the write failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data_url: Option<String>,
     /// Side length in pixels.
@@ -191,6 +201,11 @@ pub struct MapSkyboxOutput {
 pub struct GameHeaderItem {
     /// The game's display name (matches `GameItem.name`), for keying in the UI.
     pub name: String,
+    /// Cache file name, served over `coilbox://unitsyncheader/`. Set whenever the
+    /// resolved art reached disk, and preferred by callers over `dataUrl`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// Only set when there was no cache dir, or the write failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data_url: Option<String>,
 }
@@ -209,7 +224,12 @@ pub struct GameHeadersOutput {
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct HeightmapOutput {
-    /// Grayscale PNG `data:` URL of the (downscaled) heightmap, for a displacement map.
+    /// Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
+    /// render reached disk, and preferred by callers over `dataUrl`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// Grayscale PNG `data:` URL of the (downscaled) heightmap, only set when
+    /// there was no cache dir or the write failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data_url: Option<String>,
     /// Full heightmap dimensions `(mapx+1, mapy+1)` before downscaling (its ratio
@@ -233,7 +253,12 @@ pub struct HeightmapOutput {
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct MetalmapOutput {
-    /// RGBA PNG `data:` URL of the (downscaled) metal infomap, ready for an `<img>`.
+    /// Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
+    /// render reached disk, and preferred by callers over `dataUrl`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// RGBA PNG `data:` URL of the (downscaled) metal infomap, only set when there
+    /// was no cache dir or the write failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data_url: Option<String>,
     /// Metal infomap dimensions before downscaling (its ratio is the map's aspect).

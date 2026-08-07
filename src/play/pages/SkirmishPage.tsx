@@ -231,7 +231,7 @@ export default function SkirmishPage() {
   const minimap = useUnitsyncMinimap(enginePath, dataDir, selectedMap?.name);
   const overlay = useMapOverlayLayer(enginePath, dataDir, selectedMap?.name);
   // Overlays only make sense once a map is selected and its minimap resolves.
-  const canOverlay = !!selectedMap && !!minimap.dataUrl;
+  const canOverlay = !!selectedMap && !!minimap.url;
   const sides = gameInfo.info?.sides ?? [];
   const factionLogos = useFactionLogos({
     game: selectedGame ?? undefined,
@@ -897,7 +897,7 @@ export default function SkirmishPage() {
             map={selectedMap}
             maps={maps}
             thumbs={thumbs}
-            minimapDataUrl={minimap.dataUrl}
+            minimapUrl={minimap.url}
             startPositions={minimap.startPositions}
             minimapLoading={minimap.loading}
             markerColors={activeColors}

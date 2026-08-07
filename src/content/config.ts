@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { unitsyncHeaderUrl, unitsyncThumbUrl } from "../lib/assetUrl";
 import type { MapAppearance } from "../mapconv/bindings";
 import {
   type Archive,
@@ -396,9 +397,23 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
   return { data, loading, error, cancelled, run, cancel };
 }
 
+/**
+ * A URL for one of the worker's rendered images. The worker reports the cache
+ * file name whenever the render reached disk, which the webview fetches over the
+ * asset protocol instead of paying for base64 on the bridge, and only inlines a
+ * `data:` URL when nothing was cached. Either way callers get one URL string.
+ */
+function renderedUrl(
+  res: { file?: string; dataUrl?: string },
+  toUrl: (file: string) => string,
+): string | null {
+  if (res.file) return toUrl(res.file);
+  return res.dataUrl ?? null;
+}
+
 /** A rendered map thumbnail plus its true proportions (for undistorted display). */
 export interface MapThumbData {
-  dataUrl: string;
+  url: string;
   width?: number;
   height?: number;
 }
@@ -421,12 +436,11 @@ export async function primeThumbnails(
   const cached = thumbnailsCache.get(key);
   if (cached) return cached;
   const res = await unitsyncThumbnails({ enginePath, dataDir, mip: 3 });
-  const map = new Map(
-    res.thumbnails.map((t) => [
-      t.name,
-      { dataUrl: t.dataUrl, width: t.width, height: t.height },
-    ]),
-  );
+  const map = new Map<string, MapThumbData>();
+  for (const t of res.thumbnails) {
+    const url = renderedUrl(t, unitsyncThumbUrl);
+    if (url) map.set(t.name, { url, width: t.width, height: t.height });
+  }
   thumbnailsCache.set(key, map);
   return map;
 }
@@ -1117,7 +1131,7 @@ const gameHeadersCache = new Map<string, Map<string, string>>();
 
 /**
  * Render (or read from cache) header art for every game of a target, populating
- * `gameHeadersCache` (game name -> data URL). Games with no usable art are
+ * `gameHeadersCache` (game name -> URL). Games with no usable art are
  * omitted. The images are cached on disk by the worker (keyed on cheap file
  * identity), so this is fast after the first run even across restarts.
  */
@@ -1131,12 +1145,15 @@ export async function primeGameHeaders(
   if (cached) return cached;
   const res = await unitsyncGameHeaders({ enginePath, dataDir });
   const map = new Map<string, string>();
-  for (const h of res.headers) if (h.dataUrl) map.set(h.name, h.dataUrl);
+  for (const h of res.headers) {
+    const url = renderedUrl(h, unitsyncHeaderUrl);
+    if (url) map.set(h.name, url);
+  }
   gameHeadersCache.set(key, map);
   return map;
 }
 
-/** Lazily render and cache header art for every game (name -> data URL). */
+/** Lazily render and cache header art for every game (name -> URL). */
 export function useUnitsyncGameHeaders(enginePath?: string, dataDir?: string) {
   const epoch = useScanEpoch(enginePath, dataDir);
   const [headers, setHeaders] = useState<Map<string, string>>(new Map());
@@ -1176,7 +1193,7 @@ export function useUnitsyncMinimap(
   dataDir?: string,
   mapName?: string,
 ) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
   const [startPositions, setStartPositions] = useState<StartPos[]>([]);
   const [env, setEnv] = useState<{
     minWind?: number;
@@ -1192,7 +1209,7 @@ export function useUnitsyncMinimap(
 
   useEffect(() => {
     if (!enginePath || !dataDir || !mapName) {
-      setDataUrl(null);
+      setUrl(null);
       setStartPositions([]);
       setEnv({});
       setAppearance(null);
@@ -1200,7 +1217,8 @@ export function useUnitsyncMinimap(
     }
     const key = `${dataDir}::${enginePath}::${mapName}`;
     const apply = (res: MinimapResult) => {
-      setDataUrl(res.dataUrl ?? null);
+      const url = renderedUrl(res, unitsyncThumbUrl);
+      setUrl(url);
       setStartPositions(res.startPositions ?? []);
       setEnv({
         minWind: res.minWind,
@@ -1233,7 +1251,7 @@ export function useUnitsyncMinimap(
       // Bank it in the opportunistic cache so conquest (and future features)
       // can read a map's appearance without mounting its archive themselves.
       if (mapName) recordAppearance(mapName, appearance);
-      if (!res.dataUrl && res.errors?.length) setError(res.errors.join("; "));
+      if (!url && res.errors?.length) setError(res.errors.join("; "));
     };
     const cached = minimapCache.get(key);
     if (cached) {
@@ -1262,7 +1280,7 @@ export function useUnitsyncMinimap(
     };
   }, [enginePath, dataDir, mapName, recordAppearance]);
 
-  return { dataUrl, startPositions, env, appearance, loading, error };
+  return { url, startPositions, env, appearance, loading, error };
 }
 
 /** Session cache of heightmap results, keyed by `dataDir::enginePath::mapName`. */
@@ -1287,25 +1305,29 @@ export function invalidateMapPreview(
   metalmapCache.delete(key);
 }
 
-/** Lazily render and cache a map's heightmap (PNG data URL + world-height bounds). */
+/** Lazily render and cache a map's heightmap (PNG URL + world-height bounds). */
 export function useUnitsyncHeightmap(
   enginePath?: string,
   dataDir?: string,
   mapName?: string,
 ) {
   const [data, setData] = useState<HeightmapResult | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enginePath || !dataDir || !mapName) {
       setData(null);
+      setUrl(null);
       return;
     }
     const key = `${dataDir}::${enginePath}::${mapName}`;
     const apply = (res: HeightmapResult) => {
       setData(res);
-      if (!res.dataUrl && res.errors?.length) setError(res.errors.join("; "));
+      const url = renderedUrl(res, unitsyncThumbUrl);
+      setUrl(url);
+      if (!url && res.errors?.length) setError(res.errors.join("; "));
     };
     const cached = heightmapCache.get(key);
     if (cached) {
@@ -1332,7 +1354,7 @@ export function useUnitsyncHeightmap(
     };
   }, [enginePath, dataDir, mapName]);
 
-  return { data, loading, error };
+  return { data, url, loading, error };
 }
 
 /** Lazily render and cache a map's metal infomap (green-on-transparent PNG overlay). */
@@ -1342,18 +1364,22 @@ export function useUnitsyncMetalmap(
   mapName?: string,
 ) {
   const [data, setData] = useState<MetalmapResult | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enginePath || !dataDir || !mapName) {
       setData(null);
+      setUrl(null);
       return;
     }
     const key = `${dataDir}::${enginePath}::${mapName}`;
     const apply = (res: MetalmapResult) => {
       setData(res);
-      if (!res.dataUrl && res.errors?.length) setError(res.errors.join("; "));
+      const url = renderedUrl(res, unitsyncThumbUrl);
+      setUrl(url);
+      if (!url && res.errors?.length) setError(res.errors.join("; "));
     };
     const cached = metalmapCache.get(key);
     if (cached) {
@@ -1380,7 +1406,7 @@ export function useUnitsyncMetalmap(
     };
   }, [enginePath, dataDir, mapName]);
 
-  return { data, loading, error };
+  return { data, url, loading, error };
 }
 
 /** Session cache of skybox results, keyed by `dataDir::enginePath::mapName`. */

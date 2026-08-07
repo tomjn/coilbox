@@ -30,8 +30,8 @@ export function useMapOverlayLayer(
   );
   const overlayUrl = overlayUrlFor(
     layer,
-    heightmap.data?.dataUrl,
-    metalmap.data?.dataUrl,
+    heightmap.url ?? undefined,
+    metalmap.url ?? undefined,
   );
   return { layer, setLayer, overlayUrl };
 }

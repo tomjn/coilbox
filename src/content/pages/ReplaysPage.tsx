@@ -434,7 +434,7 @@ export default function ReplaysPage() {
                   >
                     <div className="size-16 shrink-0 overflow-hidden rounded-md">
                       <MapThumb
-                        dataUrl={thumb?.dataUrl}
+                        url={thumb?.url}
                         width={thumb?.width}
                         height={thumb?.height}
                         alt={

@@ -18,7 +18,7 @@ export function MapCard({
   map,
   maps,
   thumbs,
-  minimapDataUrl,
+  minimapUrl,
   startPositions,
   minimapLoading,
   markerColors,
@@ -35,7 +35,7 @@ export function MapCard({
   map: MapItem | null;
   maps: MapItem[];
   thumbs: Map<string, MapThumbData>;
-  minimapDataUrl?: string | null;
+  minimapUrl?: string | null;
   startPositions: StartPos[];
   minimapLoading?: boolean;
   markerColors: string[];
@@ -75,7 +75,7 @@ export function MapCard({
   return (
     <div className="rounded-lg border border-border/50 bg-card p-3">
       <MinimapPreview
-        dataUrl={minimapDataUrl}
+        url={minimapUrl}
         width={map?.width}
         height={map?.height}
         startPositions={startPositions}
