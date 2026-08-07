@@ -4887,6 +4887,7 @@ dependencies = [
  "sevenz-rust2",
  "tauri",
  "tauri-plugin",
+ "tempfile",
 ]
 
 [[package]]

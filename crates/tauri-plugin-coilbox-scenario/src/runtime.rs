@@ -12,6 +12,7 @@
 //! and gets the test mutator instead (issue #754).
 
 use coilbox_springlua::SpringLua;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, Runtime};
 
@@ -57,14 +58,75 @@ pub fn runtime_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     None
 }
 
+/// The entry in `dir` that `name` names, ignoring case.
+///
+/// An exact match wins, so a filesystem already holding both spellings gets a
+/// stable answer and keeps using the one coilbox wrote rather than starting a
+/// second tree.
+fn same_name_ignoring_case(dir: &Path, name: &OsStr) -> Option<OsString> {
+    let wanted = name.to_string_lossy().to_lowercase();
+    let mut ignoring_case = None;
+    for found in std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|e| e.file_name())
+    {
+        if found == name {
+            return Some(found);
+        }
+        if ignoring_case.is_none() && found.to_string_lossy().to_lowercase() == wanted {
+            ignoring_case = Some(found);
+        }
+    }
+    ignoring_case
+}
+
+/// `root`'s `rel`, spelled the way `root` already spells it (issue #798).
+///
+/// A game folder's casing is its own. Games ship `LuaRules/`, and on Windows and
+/// macOS that is the same folder as the `luarules/` coilbox writes, so this
+/// returns the path it was given and nothing changes. On a case-sensitive
+/// filesystem they are two folders, and writing the second one leaves a player
+/// with a `luarules/` beside their game's `LuaRules/`.
+///
+/// The engine would still load it: `CDirArchive` lower-cases every path into its
+/// index and `CVFSHandler` lower-cases again, so both spellings resolve. That is
+/// also the reason not to leave it. One lower-cased key can only hold one file,
+/// so the same file under two spellings is a collision the engine resolves in
+/// whatever order it read the directory, and a `VFS.DirList` returns the name
+/// twice. The prune has the plainer problem: it walks one spelling, so it can
+/// never clear a stale file out of the other.
+///
+/// Each component is looked up in the directory above it and kept as written
+/// when nothing is there, so a tree coilbox creates is spelled coilbox's way.
+/// The listing is read on every platform rather than only where case matters,
+/// which is what makes the result the same everywhere and so testable on a
+/// case-insensitive one.
+pub(crate) fn resolve_case(root: &Path, rel: &Path) -> PathBuf {
+    let mut out = root.to_path_buf();
+    for part in rel.iter() {
+        match same_name_ignoring_case(&out, part) {
+            Some(found) => out.push(found),
+            None => out.push(part),
+        }
+    }
+    out
+}
+
 /// Every file under `root`'s vendored trees, relative to `root` and sorted.
+///
+/// The trees are found under the casing `root` spells them with, so a game's own
+/// `LuaRules/` is walked rather than missed, and the paths that come back are
+/// the ones to read and remove.
 ///
 /// Dot-files are skipped: the source tree is a working copy, and a `.DS_Store`
 /// is not part of what a game vendors.
 fn vendored_files(root: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     for tree in VENDORED {
-        walk(&root.join(tree), Path::new(tree), &mut files);
+        let dir = resolve_case(root, Path::new(tree));
+        let name = dir.file_name().unwrap_or_else(|| OsStr::new(tree));
+        walk(&dir, Path::new(name), &mut files);
     }
     files.sort();
     files
@@ -91,10 +153,10 @@ fn walk(dir: &Path, rel: &Path, files: &mut Vec<PathBuf>) {
 
 /// One relative path as a comparable key: forward slashes, lower case.
 ///
-/// Case is dropped because a game folder's casing is its own. Real games ship
-/// `LuaRules/Gadgets/`, and on Windows and macOS that is the same folder as the
-/// `luarules/gadgets/` written into it. The engine agrees: an archive's file
-/// index is keyed lower case, so both spellings load the same file.
+/// Case is dropped because a game folder's casing is its own: an install writes
+/// into the game's `LuaRules/Gadgets/` (see [`resolve_case`]) and has to
+/// recognise the file it just wrote when it walks back over the tree. The engine
+/// agrees, keying an archive's file index lower case.
 fn key(rel: &Path) -> String {
     rel.to_string_lossy().replace('\\', "/").to_lowercase()
 }
@@ -131,7 +193,7 @@ pub fn install(src: &Path, dest: &Path) -> Result<Vec<String>, String> {
     }
     let mut written = Vec::new();
     for rel in &files {
-        let to = dest.join(rel);
+        let to = resolve_case(dest, rel);
         if let Some(parent) = to.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("could not create {}: {e}", parent.display()))?;
@@ -211,13 +273,20 @@ fn tidy_lua_error(raw: &str, chunk: &str) -> String {
 /// what comes back here is what the engine will read.
 fn read_data(root: &Path, rel: &str) -> Result<serde_json::Value, String> {
     let lua = SpringLua::new(root).map_err(|e| format!("could not start the Lua sandbox: {e}"))?;
-    lua.include_value(rel).map_err(|e| {
+    // The engine's VFS is case-insensitive and the sandbox's is not, so a file
+    // installed into a game's own casing has to be asked for under that name.
+    let on_disk = resolve_case(root, Path::new(rel));
+    let name = on_disk
+        .strip_prefix(root)
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| rel.to_string());
+    lua.include_value(&name).map_err(|e| {
         let raw = e.to_string();
         eprintln!(
             "coilbox-scenario: {} would not load: {raw}",
-            root.join(rel).display()
+            on_disk.display()
         );
-        format!("could not read {rel}: {}", tidy_lua_error(&raw, rel))
+        format!("could not read {rel}: {}", tidy_lua_error(&raw, &name))
     })
 }
 
@@ -231,11 +300,10 @@ pub fn read_marker(root: &Path) -> Result<serde_json::Value, String> {
 /// Whether the game has a marker file at all, so a marker that will not load
 /// can be told from a game that never adopted the runtime.
 ///
-/// The path is the one an install writes, which is the only way a marker gets
-/// there. A hand-vendored marker under some other spelling reads as absent, the
-/// same as it did before this check existed.
+/// The path is the one an install writes, resolved against the game's own
+/// casing, which is the only way a marker gets there.
 pub fn marker_present(root: &Path) -> bool {
-    root.join(MARKER).is_file()
+    resolve_case(root, Path::new(MARKER)).is_file()
 }
 
 /// Read the condition and action types a game declares for itself. An error
@@ -477,9 +545,8 @@ mod tests {
         );
     }
 
-    /// Games spell it `LuaRules/Gadgets/`. On Windows and macOS that is the same
-    /// folder the install writes into, so the file lands under the game's
-    /// spelling and the prune has to recognise it as the one just written.
+    /// Games spell it `LuaRules/Gadgets/`. The install writes into the game's own
+    /// spelling, and the prune has to recognise the file it just wrote.
     #[test]
     fn an_install_into_a_games_own_luarules_casing_survives_the_prune() {
         let src = source_tree();
@@ -494,5 +561,82 @@ mod tests {
             .map(|rel| key(rel))
             .collect();
         assert!(installed.contains(&"luarules/gadgets/coilbox_mission_runtime.lua".to_string()));
+    }
+
+    /// Every destination follows the casing already on disk (issue #798). On a
+    /// case-sensitive filesystem that is what keeps the install out of a second
+    /// `luarules/` beside the game's own `LuaRules/`. Here the two are one
+    /// folder, so what is asserted is the path rather than the outcome of
+    /// writing to it.
+    #[test]
+    fn a_destination_follows_the_casing_already_on_disk() {
+        let game = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(game.path().join("LuaRules/Gadgets")).expect("mkdir");
+        std::fs::create_dir_all(game.path().join("Missions")).expect("mkdir");
+
+        assert_eq!(
+            resolve_case(
+                game.path(),
+                Path::new("luarules/gadgets/coilbox_mission_runtime.lua")
+            ),
+            game.path()
+                .join("LuaRules/Gadgets/coilbox_mission_runtime.lua")
+        );
+        assert_eq!(
+            resolve_case(game.path(), Path::new(MARKER)),
+            game.path().join("Missions/runtime.lua")
+        );
+        // A tree the game does not have is coilbox's to spell.
+        assert_eq!(
+            resolve_case(
+                game.path(),
+                Path::new("luaui/widgets/coilbox_objectives.lua")
+            ),
+            game.path().join("luaui/widgets/coilbox_objectives.lua")
+        );
+        // So is a folder inside one it does have.
+        assert_eq!(
+            resolve_case(game.path(), Path::new("luarules/mission_runtime/x.lua")),
+            game.path().join("LuaRules/mission_runtime/x.lua")
+        );
+    }
+
+    /// A filesystem already holding both spellings keeps the one coilbox wrote,
+    /// rather than starting a third tree beside the two already there.
+    #[test]
+    fn an_exact_match_wins_over_one_that_only_differs_in_case() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join("LuaRules")).expect("mkdir");
+        // A case-insensitive filesystem cannot hold the second one, and there
+        // this arm is unreachable, so the assertion is skipped rather than made
+        // to pass for the wrong reason.
+        if std::fs::create_dir(dir.path().join("luarules")).is_err() {
+            return;
+        }
+        // Both spellings, because the directory listing can hand them back in
+        // either order and only the exact match can satisfy both.
+        assert_eq!(
+            resolve_case(dir.path(), Path::new("luarules")),
+            dir.path().join("luarules")
+        );
+        assert_eq!(
+            resolve_case(dir.path(), Path::new("LuaRules")),
+            dir.path().join("LuaRules")
+        );
+    }
+
+    /// The version marker reads back out of the game's own `missions/` spelling,
+    /// because the sandbox resolves a path literally where the engine does not.
+    #[test]
+    fn the_marker_reads_back_from_the_games_own_casing() {
+        let src = source_tree();
+        let game = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(game.path().join("Missions")).expect("mkdir");
+
+        install(src.path(), game.path()).expect("install");
+
+        assert!(game.path().join("Missions/runtime.lua").is_file());
+        assert!(marker_present(game.path()));
+        assert_eq!(read_marker(game.path()).expect("marker")["version"], 1);
     }
 }

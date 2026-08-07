@@ -11,6 +11,7 @@
 //! trail, and deleting that folder undoes everything this flow ever wrote. It is
 //! the same shape as lego's scratch game (`src/lego/scratchGame.ts`).
 
+use crate::runtime::resolve_case;
 use std::path::{Path, PathBuf};
 
 /// The mutator's folder name. Fixed here rather than passed in, so this module
@@ -19,6 +20,13 @@ pub const FOLDER: &str = "coilbox-mission-test.sdd";
 
 /// Where the compiled missions live inside a game archive.
 const MISSIONS: &str = "missions";
+
+/// The game's own `missions/`, whatever it spells it. These paths go into the
+/// same folder an install writes the runtime's marker into, so they follow the
+/// same rule (issue #798). On Windows and macOS this is `dir.join(MISSIONS)`.
+fn missions_dir(dir: &Path) -> PathBuf {
+    resolve_case(dir, Path::new(MISSIONS))
+}
 
 /// The mutator folder under `data_dir`, which has to be a content root that
 /// already exists. The folder itself is created by the caller.
@@ -54,7 +62,7 @@ pub fn write_file(target: &Path, contents: &str) -> Result<(), String> {
 /// after the scenario it came from changed. Only directories are considered,
 /// which is what leaves the runtime's own `missions/runtime.lua` alone.
 pub fn prune_missions(dir: &Path, keep: &str) -> Result<(), String> {
-    let missions = dir.join(MISSIONS);
+    let missions = missions_dir(dir);
     let Ok(entries) = std::fs::read_dir(&missions) else {
         return Ok(());
     };
@@ -74,7 +82,7 @@ pub fn prune_missions(dir: &Path, keep: &str) -> Result<(), String> {
 
 /// Where a scenario's compiled mission and its dialogue media sit in the game.
 pub fn mission_dir(dir: &Path, scenario_id: &str) -> PathBuf {
-    dir.join(MISSIONS).join(scenario_id)
+    missions_dir(dir).join(scenario_id)
 }
 
 /// Every compiled mission folder in a game archive, sorted.
@@ -85,7 +93,7 @@ pub fn mission_dir(dir: &Path, scenario_id: &str) -> PathBuf {
 /// `missions/runtime.lua` and the game's `missions/extensions.lua` out: they are
 /// files, and neither is a mission.
 pub fn list_missions(dir: &Path) -> Vec<String> {
-    let Ok(entries) = std::fs::read_dir(dir.join(MISSIONS)) else {
+    let Ok(entries) = std::fs::read_dir(missions_dir(dir)) else {
         return Vec::new();
     };
     let mut found: Vec<String> = entries
@@ -287,5 +295,25 @@ mod tests {
     fn removing_a_mission_that_is_already_gone_is_fine() {
         let dir = tempfile::tempdir().expect("tempdir");
         remove_mission(dir.path(), "never-here").expect("remove");
+    }
+
+    /// A compiled mission goes into the same `missions/` the runtime install
+    /// wrote the marker into, whatever the game spells it (issue #798), and the
+    /// prune and the listing look there too.
+    #[test]
+    fn a_compiled_mission_follows_the_games_missions_casing() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir(dir.path().join("Missions")).expect("mkdir");
+
+        assert_eq!(
+            mission_dir(dir.path(), "demo"),
+            dir.path().join("Missions/demo")
+        );
+        write_file(&mission_dir(dir.path(), "demo").join("mission.lua"), "x").expect("write");
+        write_file(&mission_dir(dir.path(), "old").join("mission.lua"), "y").expect("write");
+
+        assert_eq!(list_missions(dir.path()), vec!["demo", "old"]);
+        prune_missions(dir.path(), "demo").expect("prune");
+        assert_eq!(list_missions(dir.path()), vec!["demo"]);
     }
 }
