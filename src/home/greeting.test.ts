@@ -21,7 +21,10 @@ vi.mock("../multiplayer/store", () => ({ useMultiplayer: () => lobby() }));
 const resume = vi.fn<() => { candidates: unknown[]; loading: boolean }>();
 vi.mock("./continue", () => ({ useResume: () => resume() }));
 
-import Greeting, { greetingCopy } from "./zones/Greeting";
+import Greeting, {
+  type GreetingOverrides,
+  greetingCopy,
+} from "./zones/Greeting";
 
 const TOOLS: NavGroup[] = [
   { id: "play", items: [{ id: "skirmish", label: "Skirmish", to: "/play" }] },
@@ -47,8 +50,8 @@ function online(name: string): Lobby {
 }
 
 /** The heading and tagline the rendered zone puts on the page. */
-function render() {
-  const node = Greeting() as unknown as {
+function render(overrides?: GreetingOverrides) {
+  const node = Greeting(overrides) as unknown as {
     props: { children: { props: { children: string } }[] };
   };
   const [heading, tagline] = node.props.children;
@@ -125,6 +128,38 @@ describe("greetingCopy", () => {
   });
 });
 
+describe("greetingCopy with a distribution's own wording", () => {
+  const state = {
+    title: "Coilbox",
+    username: "Zephyr",
+    hasResume: true,
+    hasTools: true,
+  };
+
+  it("replaces the heading even for a logged-in player", () => {
+    // A distribution that names its own front door means it, so the name
+    // greeting does not survive over the top of it.
+    expect(greetingCopy(state, { title: "Splinter Faction" }).heading).toBe(
+      "Splinter Faction",
+    );
+  });
+
+  it("replaces the tagline whatever the state would have said", () => {
+    expect(greetingCopy(state, { tagline: "Fight on." }).tagline).toBe(
+      "Fight on.",
+    );
+  });
+
+  it("overrides each line independently", () => {
+    const copy = greetingCopy(state, { tagline: "Fight on." });
+    expect(copy.heading).toBe("Welcome back, Zephyr");
+  });
+
+  it("keeps Coilbox's wording when the distribution supplies none", () => {
+    expect(greetingCopy(state, {})).toEqual(greetingCopy(state));
+  });
+});
+
 describe("Greeting zone", () => {
   it("shows the app title and the action line when logged out", () => {
     expect(render()).toEqual({
@@ -190,5 +225,14 @@ describe("Greeting zone", () => {
     // from disk, so an empty list is what the greeting sees until they answer.
     lobby.mockReturnValue(online("Zephyr"));
     expect(render().tagline).toBe("Choose a tool to get started.");
+  });
+
+  it("says what the zone entry told it to", () => {
+    // The layout hands these down from `{ "zone": "greeting", ... }`, so the
+    // zone stays a pure function of what it is given and never reads a profile.
+    lobby.mockReturnValue(online("Zephyr"));
+    expect(render({ title: "Splinter Faction", tagline: "Fight on." })).toEqual(
+      { heading: "Splinter Faction", tagline: "Fight on." },
+    );
   });
 });
