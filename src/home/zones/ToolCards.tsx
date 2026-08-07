@@ -43,7 +43,10 @@ export default function ToolCards() {
       {groups.map((group) => {
         const { tools, links } = splitGroupItems(group.items);
         return (
-          <section key={group.id} className="hidden has-[[data-nav-item]]:block">
+          <section
+            key={group.id}
+            className="hidden has-[[data-nav-item]]:block"
+          >
             {group.label && (
               <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {group.label}
