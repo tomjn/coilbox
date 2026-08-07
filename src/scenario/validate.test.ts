@@ -165,6 +165,38 @@ describe("validateMission", () => {
     });
   });
 
+  /**
+   * Issue #808. An amount is a number or the var to read one out of, and a var
+   * it names resolves against the same registry a `varName` parameter does.
+   */
+  describe("an amount", () => {
+    const withAmount = (value: unknown) =>
+      withStep({ type: "add_var", params: { name: "Alarm", value } });
+
+    it("passes a written number and a var the mission declares", () => {
+      expect(validateMission(withAmount(5))).toEqual([]);
+      expect(validateMission(withAmount({ var: "Alarm" }))).toEqual([]);
+    });
+
+    it("reports a var the mission never declared, at the name", () => {
+      expect(validateMission(withAmount({ var: "Alrm" }))).toEqual([
+        {
+          path: 'triggers["open"].actions[0].params.value.var',
+          message: 'no variable called "Alrm"',
+        },
+      ]);
+    });
+
+    it("reports a value that is neither a number nor a var", () => {
+      expect(validateMission(withAmount("5"))).toEqual([
+        {
+          path: 'triggers["open"].actions[0].params.value',
+          message: "no number or variable given",
+        },
+      ]);
+    });
+  });
+
   it("names the parameter that holds the unresolved id", () => {
     const issues = validateMission(
       withStep({ type: "spawn_group", params: { group: "wave2" } }),

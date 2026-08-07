@@ -191,6 +191,20 @@ export type ScenarioParam =
   | ScenarioParam[]
   | { [key: string]: ScenarioParam };
 
+/**
+ * The var an `amount` parameter reads its number out of, or null when it holds
+ * a plain number (issue #808).
+ *
+ * Takes an `unknown` because the same shape has to be read out of a compiled
+ * mission by the validator, where nothing is typed yet, as well as out of a
+ * document.
+ */
+export function amountVar(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  const name = value.var;
+  return typeof name === "string" && name !== "" ? name : null;
+}
+
 /** One condition or action: a type name plus its parameters. */
 export type TriggerStep = {
   type: string;
@@ -533,6 +547,14 @@ function parseParam(
   switch (spec.kind) {
     case "number":
       return num(value);
+    case "amount": {
+      // A number, or the var to read one out of. Neither shape is guessed at:
+      // anything else is a parameter the document does not have.
+      const plain = num(value);
+      if (plain !== undefined) return plain;
+      const named = amountVar(value);
+      return named === null ? undefined : { var: named };
+    }
     case "boolean":
       return bool(value);
     case "strings":

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { compileScenario, scenarioMissionValue } from "./compile";
 import { requiredRuntimeVersion } from "./gating";
-import { parseScenario, type Scenario } from "./model";
+import { amountVar, parseScenario, type Scenario } from "./model";
 import { ACTION_TYPES, CONDITION_TYPES } from "./triggerTypes";
 
 // validate.ts reaches the plugin through bindings.ts, whose plugin-sdk import
@@ -148,6 +148,14 @@ describe("scenario fixture corpus", () => {
           ),
         );
       }),
+      // Issue #808. An amount that names a var compiles to a table where a
+      // number would otherwise sit, so without one nothing checks that the
+      // emitter, the validator and the runtime agree on that shape.
+      "a trigger reading a number out of a var": allTriggers.some((t) =>
+        [...t.conditions.conditions, ...t.actions].some((step) =>
+          Object.values(step.params).some((value) => amountVar(value) !== null),
+        ),
+      ),
       "a group that starts on the map (not dormant)": allGroups.some(
         (g) => g.dormant === false,
       ),

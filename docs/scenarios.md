@@ -147,7 +147,7 @@ The names below are the ones in the compiled mission. The editor shows them with
 | `unit_built` | A team has finished building this many of a unit type. |
 | `unit_captured` | An actor has changed hands, optionally to a named team. |
 | `time_elapsed` | This many seconds since the mission started. |
-| `var` | A variable compared against a number with `eq`, `ne`, `lt`, `lte`, `gt` or `gte`. |
+| `var` | A variable compared against a number, or against another variable, with `eq`, `ne`, `lt`, `lte`, `gt` or `gte`. |
 | `zone_held_for` | A team has had a unit in a zone continuously for this many seconds. Leaving resets the clock. |
 
 `zone_held_for` is presence, not control. A team standing in a zone holds it whether or not anyone else is standing there too: [issue #802](https://github.com/tomjn/coilbox/issues/802).
@@ -160,7 +160,7 @@ The names below are the ones in the compiled mission. The editor shows them with
 | `wake_group` | Runs a group's orders, placing it first if it is not on the map. |
 | `give_orders` | Replaces a group's orders and wakes it. It does not place one. |
 | `gift_units` | Hands a group's units to another participant. The group keeps them, so the mission can go on ordering a squad it gave away. |
-| `set_var` / `add_var` | Write a variable, or move one by a delta. |
+| `set_var` / `add_var` | Write a variable, or move one by a delta. Either takes a number or another variable. |
 | `enable_trigger` / `disable_trigger` | Arm or disarm another trigger. |
 | `complete_objective` / `fail_objective` | Settle an objective. The first outcome sticks. |
 | `dialogue` | Say one of the scenario's declared lines. |
@@ -223,6 +223,8 @@ These are not the engine's `[RESTRICT]` block, which is global and permanent. `u
 A variable is a named number belonging to one scenario: a kill counter, a phase number, a flag saying which branch the player took. Numbers and nothing else, so `add_var` always has something to add to and the `var` condition is one comparison.
 
 Renaming one carries the triggers that read it over. Undeclaring one leaves them alone, and they then read it as 0 and say so in the infolog.
+
+Anywhere a `var` condition, `set_var` or `add_var` asks for a number you can name a variable instead, with the dropdown beside the box. So "kills reached the quota" is a `var` condition on `kills` reading `quota`, and "add the bonus to the score" is an `add_var` on `score` reading `bonus`. A scenario that does this needs mission runtime 3, which is what stops an older game reading the variable as nothing and comparing against zero.
 
 ## Test and play
 

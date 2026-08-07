@@ -308,6 +308,9 @@ describe("registryOptions", () => {
   it("has nothing to offer for a kind that is not a reference", () => {
     expect(registryOptions(document(), "number")).toBeNull();
     expect(registryOptions(document(), "point")).toBeNull();
+    // An amount is a number or a var, so it is drawn by its own control rather
+    // than by the registry dropdown (issue #808).
+    expect(registryOptions(document(), "amount")).toBeNull();
   });
 
   // Issue #878. A trigger that reads an actor reads a named prefab building the
@@ -370,6 +373,15 @@ describe("stepDefaults", () => {
     expect(
       stepDefaults(ACTION_TYPES.unlock_unit, ctx(document(), [])).needs,
     ).toBe("Needs the game's units");
+  });
+
+  // Issue #808. An amount takes a number or a var, and opening it on the
+  // document's first var would be a comparison the author never asked for.
+  it("opens an amount as a plain number", () => {
+    expect(stepDefaults(ACTION_TYPES.add_var, ctx(document())).params).toEqual({
+      name: "alertLevel",
+      value: 0,
+    });
   });
 
   it("starts an enum on its first value", () => {

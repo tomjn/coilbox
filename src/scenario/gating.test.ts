@@ -149,6 +149,72 @@ describe("requiredRuntimeVersion", () => {
       ).toBe(2);
     });
   });
+
+  /**
+   * Issue #808. Runtime 2 reads `{ var = "quota" }` as no number at all and
+   * compares against zero, so "kills reached the quota" holds from the first
+   * frame and "add the bonus" adds nothing.
+   */
+  describe("a scenario reading a number out of a var", () => {
+    const withValue = (value: unknown): Scenario => {
+      const scenario = withTrigger([], []);
+      return {
+        ...scenario,
+        triggers: [
+          {
+            ...scenario.triggers[0],
+            actions: [
+              {
+                type: "add_var",
+                params: { name: "score", value } as never,
+              },
+            ],
+          },
+        ],
+      };
+    };
+
+    it("needs the runtime that reads one", () => {
+      expect(requiredRuntimeVersion(withValue({ var: "bonus" }))).toBe(3);
+    });
+
+    it("is left on the first runtime when the number is written out", () => {
+      expect(requiredRuntimeVersion(withValue(5))).toBe(1);
+    });
+
+    it("finds one inside a condition too", () => {
+      const scenario = withTrigger([], []);
+      expect(
+        requiredRuntimeVersion({
+          ...scenario,
+          triggers: [
+            {
+              ...scenario.triggers[0],
+              conditions: {
+                op: "all",
+                conditions: [
+                  {
+                    type: "var",
+                    params: {
+                      name: "kills",
+                      op: "gte",
+                      value: { var: "quota" },
+                    } as never,
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      ).toBe(3);
+    });
+
+    it("finds one a game extension buried in a list", () => {
+      expect(
+        requiredRuntimeVersion(withValue([{ var: "bonus" }] as never)),
+      ).toBe(3);
+    });
+  });
 });
 
 describe("gateTarget", () => {

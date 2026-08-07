@@ -24,12 +24,17 @@
  * `dialogue`, `teamId` → a `setup.participants` id (and `Scenario.teams` key),
  * `varName` → a `Scenario.vars` key.
  *
+ * `amount` is a number the author may name a var for instead: it holds either
+ * the number or `{ var: name }`, and the runtime reads the var out of the same
+ * table `varName` names one in (issue #808).
+ *
  * A list rather than a bare union, because a game's `missions/extensions.lua`
  * names a kind as a string and `extensions.ts` has to check that it is one.
  */
 export const PARAM_KINDS = [
   "string",
   "number",
+  "amount",
   "boolean",
   "strings",
   "point",
@@ -113,7 +118,9 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
   var: {
     name: { kind: "varName" },
     op: { kind: "enum", values: VAR_OPS },
-    value: { kind: "number" },
+    /** A number, or another var to compare against: "kills reached the quota"
+     *  when the quota is itself a var (issue #808). */
+    value: { kind: "amount" },
   },
   zone_held_for: {
     zone: { kind: "zoneId" },
@@ -136,11 +143,13 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
   },
   set_var: {
     name: { kind: "varName" },
-    value: { kind: "number" },
+    value: { kind: "amount" },
   },
+  /** Move a var by a number, or by what another var holds: "add the bonus to
+   *  the score" (issue #808). */
   add_var: {
     name: { kind: "varName" },
-    value: { kind: "number" },
+    value: { kind: "amount" },
   },
   enable_trigger: { trigger: { kind: "triggerId" } },
   disable_trigger: { trigger: { kind: "triggerId" } },

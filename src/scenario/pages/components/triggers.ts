@@ -24,13 +24,14 @@ import {
   extensionSpecs,
   NO_EXTENSIONS,
 } from "../../extensions";
-import type {
-  Point,
-  Scenario,
-  ScenarioOrder,
-  ScenarioParam,
-  ScenarioTrigger,
-  TriggerStep,
+import {
+  amountVar,
+  type Point,
+  type Scenario,
+  type ScenarioOrder,
+  type ScenarioParam,
+  type ScenarioTrigger,
+  type TriggerStep,
 } from "../../model";
 import {
   ACTION_TYPES,
@@ -216,6 +217,17 @@ export function rewriteRefs(
     let params = step.params;
     for (const name of refParams(step, list, kind, extensions)) {
       if (params[name] === from) params = { ...params, [name]: to };
+    }
+    // An amount holds the var it reads inside a table rather than as the
+    // parameter itself, so renaming a var has to reach into one or a trigger
+    // comparing against it is left pointing at a name nothing declares any
+    // more (issue #808).
+    if (kind === "varName") {
+      for (const name of refParams(step, list, "amount", extensions)) {
+        if (amountVar(params[name]) === from) {
+          params = { ...params, [name]: { var: to } };
+        }
+      }
     }
     return params === step.params ? step : { ...step, params };
   };
@@ -543,7 +555,11 @@ function defaultParam(
   ctx: StepContext,
 ): ScenarioParam | null {
   switch (spec.kind) {
+    // An amount opens as a plain number, because a scenario with no vars yet
+    // still has to be able to add the step, and naming a var is the author
+    // saying so.
     case "number":
+    case "amount":
       return 0;
     case "boolean":
       return false;

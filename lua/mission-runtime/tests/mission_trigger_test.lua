@@ -97,8 +97,10 @@ check("a unit under construction has not been built yet",
 engine.finish(depot)
 check("a finished unit fires the trigger watching for it",
 	state.triggers:isEnabled("built-outpost") == false)
-check("its add_var ran on the event, not on the next tick", state.vars.get("garrisonBuilt") == 2,
-	tostring(state.vars.get("garrisonBuilt")))
+-- The fixture adds `{ var = "bonus" }` rather than a written number, so 1 plus
+-- 5 is what says the runtime read the var it was pointed at (issue #808).
+check("its add_var ran on the event, not on the next tick, and added what the bonus var holds",
+	state.vars.get("garrisonBuilt") == 6, tostring(state.vars.get("garrisonBuilt")))
 check("and its disable_trigger took effect", state.triggers:isEnabled("count-check") == false)
 
 engine.give(state.units.outpost, 0)

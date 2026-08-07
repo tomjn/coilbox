@@ -104,6 +104,32 @@ describe("table keys", () => {
     expect(emitted).toContain('def = "armsolar"');
   });
 
+  // Issue #808. An amount is a number or the var to read one out of, and the
+  // second reaches the runtime as a table where the first is a bare number.
+  it("emits an amount as a number or as the var it names", () => {
+    const emitted = compileScenario(
+      build({
+        vars: { score: 0, bonus: 5 },
+        triggers: [
+          {
+            id: "t1",
+            conditions: { op: "all", conditions: [] },
+            actions: [
+              { type: "add_var", params: { name: "score", value: 2 } },
+              {
+                type: "set_var",
+                params: { name: "score", value: { var: "bonus" } },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(emitted).toContain('params = { name = "score", value = 2 }');
+    expect(emitted).toContain('value = { var = "bonus" }');
+  });
+
   it("brackets author-chosen keys that are not bare identifiers", () => {
     const emitted = compileScenario(
       build({ vars: { alarm: 1, end: 2, "wave count": 3, "7": 4 } }),

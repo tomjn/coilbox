@@ -519,6 +519,14 @@ plans.garrison = {
 			check("a trigger the scenario disabled starts disabled", armed("unlock") == false)
 			check("a var starts at the number its author gave it",
 				rules("coilbox_mission_var_garrisonBuilt") == 0)
+			-- The two vars the steps below read through rather than around. A
+			-- fixture that stopped declaring them would leave every claim about
+			-- issue #808 passing on a pair of zeroes.
+			check("the vars a trigger reads its numbers out of are declared",
+				rules("coilbox_mission_var_quota") == 1
+					and rules("coilbox_mission_var_bonus") == 5,
+				tostring(rules("coilbox_mission_var_quota")) .. "/"
+					.. tostring(rules("coilbox_mission_var_bonus")))
 			check("an objective starts active",
 				rules("coilbox_mission_objective_defend-garrison") == ACTIVE)
 			check("a building actor is on the map", defOf(state().units.outpost) == "armestor",
@@ -558,6 +566,14 @@ plans.garrison = {
 				#orders == 0, queueText(orders))
 			check("so nothing goes up on a site the engine had no objection to",
 				owns(0, UNLOCKED_BUILDING) == 0, owns(0, UNLOCKED_BUILDING))
+			-- Issue #808, the falsifying half. The wave's condition compares
+			-- garrisonBuilt against the quota var, which is 1, and the trigger
+			-- engine has polled by now. A runtime that read the var as no number at
+			-- all would compare against 0, which garrisonBuilt already meets, and
+			-- the wave would be standing on the map here.
+			check("a var compared against another var is not met before the other var is",
+				#state().groups.units("reinforcements") == 0,
+				#state().groups.units("reinforcements"))
 		end },
 		-- Spread, because three units asked for on one spot is the pile-up the
 		-- placement check above exists to refuse.
@@ -594,8 +610,12 @@ plans.garrison = {
 		{ frame = 120, run = function()
 			check("a unit finished after the start window is one the team built",
 				armed("built-outpost") == false)
-			check("its add_var added to the var",
-				rules("coilbox_mission_var_garrisonBuilt") == 2,
+			-- The add is `{ var = "bonus" }` rather than a number, so 1 plus 5
+			-- rather than 1 plus 1 is what says the runtime read the var
+			-- (issue #808). A runtime that read the table as no number would leave
+			-- this at 1.
+			check("its add_var added what another var holds",
+				rules("coilbox_mission_var_garrisonBuilt") == 6,
 				rules("coilbox_mission_var_garrisonBuilt"))
 			check("its disable_trigger left the other one disarmed", armed("count-check") == false)
 		end },
