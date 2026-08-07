@@ -11,9 +11,9 @@ vi.mock("./bindings", () => ({
 }));
 
 import type { GameItem } from "../content/bindings";
+import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import type { RuntimeMarker } from "./bindings";
 import { scenarioRoute } from "./launch";
-import { MUTATOR_FOLDER } from "./mutator";
 import { mutatorOffer, packagedArchiveReason } from "./offer";
 
 const marker = (version: number): RuntimeMarker => ({

@@ -34,6 +34,7 @@ import {
   exactMapRequirement,
 } from "@/content/resolveContent";
 import { useFactionLogos } from "@/factions/logos";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { mostRecentOpen } from "@/lib/recency";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import { useMultiplayer } from "@/multiplayer/store";
@@ -194,7 +195,14 @@ export default function SkirmishPage() {
     setParticipants((ps) => sanitizeColors(ps, myColor));
   }, [myColor]);
 
-  const games = scan.data?.games ?? [];
+  // Coilbox's own generated games are scanned like any other, but a skirmish in
+  // one is never what a player meant, and the auto-pick below would otherwise
+  // land on one on an install that has little else. One a draft already names
+  // stays, so the draft is not silently moved off it.
+  const games = useMemo(
+    () => withoutGeneratedGames(scan.data?.games ?? [], gameName),
+    [scan.data, gameName],
+  );
   const maps = scan.data?.maps ?? [];
   const selectedGame = games.find((g) => g.name === gameName) ?? null;
   // Fall back to the first map so a map is shown the instant maps load, without

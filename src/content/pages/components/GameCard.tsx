@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Play } from "lucide-react";
 import { Link } from "react-router";
+import { generatedGameNote } from "@/lib/generatedGames";
 import type { GameItem } from "../../bindings";
 import { useBrandingEntry, useBrandingImage } from "../../branding";
 import { isSdd } from "../../format";
@@ -41,6 +42,7 @@ export function GameCard({
       alt={`${game.name} loading screen`}
       version={game.info.version}
       sdd={isSdd(game.primaryArchive)}
+      generated={generatedGameNote(game.primaryArchive.name)}
       warnings={game.warnings}
       loading={loading}
       action={

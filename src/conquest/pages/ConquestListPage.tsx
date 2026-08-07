@@ -16,6 +16,7 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { mostRecentOpen } from "@/lib/recency";
 import { challengeExport, challengeImport } from "../../challenge/bindings";
 import { ChallengeCodeInput } from "../../challenge/ChallengeCodeInput";
@@ -530,7 +531,9 @@ function GenerateGalaxyForm({
   // the game (battles always resolve "latest installed" at launch anyway).
   const gameChoices = useMemo(() => {
     const matcher = getGameMatcher();
-    const games = scan.data?.games ?? [];
+    // Never coilbox's own generated games: a campaign fought in the unit
+    // builder's scratch game is not a campaign.
+    const games = withoutGeneratedGames(scan.data?.games ?? []);
     const byShort = new Map<string, (typeof games)[number]>();
     for (const g of games) {
       if (matcher && !matcher(g.name)) continue;

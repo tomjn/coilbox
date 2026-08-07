@@ -43,9 +43,9 @@ import {
 import { UnitDefSelect } from "../../../content/pages/components/UnitDefSelect";
 import { unitLabel } from "../../../content/unitChoices";
 import { countTriangles } from "../../../content/unitModel";
+import { withoutGeneratedGames } from "../../../lib/generatedGames";
 import { usePreferredTarget } from "../../../play/config";
 import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
-import { isScratchArchive } from "../../scratchGame";
 
 /** What the viewport needs to stand a unit in the scene, and what to call it. */
 export interface GameReferenceChoice {
@@ -81,11 +81,7 @@ export function ReferencePicker({
 
   // Coilbox's own scratch game holds whatever was last tested, which is the
   // unit being built. Standing that beside itself measures nothing.
-  const games = uniqueByName(
-    (scan.data?.games ?? []).filter(
-      (game) => !isScratchArchive(game.primaryArchive.name),
-    ),
-  );
+  const games = uniqueByName(withoutGeneratedGames(scan.data?.games ?? []));
   const game = games.find((g) => g.name === gameName);
   const archive = game?.primaryArchive.name;
 

@@ -16,6 +16,11 @@ import { useState } from "react";
 
 import { primeScan, useUnitsyncScan } from "../../../content/config";
 import {
+  isScratchArchive,
+  SCRATCH_FOLDER,
+  withoutGeneratedGames,
+} from "../../../lib/generatedGames";
+import {
   initialParticipants,
   toBattleConfig,
   usePreferredTarget,
@@ -34,8 +39,6 @@ import {
   buildModInfo,
   buildSideData,
   buildStartUnitGadget,
-  isScratchArchive,
-  SCRATCH_FOLDER,
   SCRATCH_SIDE,
 } from "../../scratchGame";
 import { buildUnitDef } from "../../unitDef";
@@ -94,12 +97,9 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   const [scratchDir, setScratchDir] = useState<string | null>(null);
 
   // The scratch game is itself a game, so it comes back in every scan. Offering
-  // it as a base would nest it inside itself.
-  const games = uniqueByName(
-    (scan.data?.games ?? []).filter(
-      (game) => !isScratchArchive(game.primaryArchive.name),
-    ),
-  );
+  // it as a base would nest it inside itself, and the scenario editor's test
+  // mutator is no better a base than this one is.
+  const games = uniqueByName(withoutGeneratedGames(scan.data?.games ?? []));
   const maps = uniqueByName(scan.data?.maps ?? []);
   const game = games.find((g) => g.name === gameName) ?? games[0];
   const map = maps.find((m) => m.name === mapName) ?? maps[0];

@@ -41,6 +41,7 @@ import {
   useUnitsyncThumbnails,
 } from "@/content/config";
 import { useFactionLogos } from "@/factions/logos";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import {
   defaultAi,
   effectiveTeams,
@@ -135,7 +136,11 @@ export function SetupPanel({
   const { headers } = useUnitsyncGameHeaders(enginePath, dataDir);
 
   const { setup } = scenario;
-  const games = scan.data?.games ?? [];
+  // Not coilbox's own generated games: the test mutator is written from the
+  // scenario being edited, so setting it as that scenario's game would nest it
+  // inside itself. One the scenario already names stays, or the setup would
+  // call a game that is sitting in `games/` missing.
+  const games = withoutGeneratedGames(scan.data?.games ?? [], setup.gameName);
   const maps = scan.data?.maps ?? [];
   // Deliberately not defaulted to the first of either: a scenario with no game
   // is a scenario whose author has not chosen one, and choosing for them would

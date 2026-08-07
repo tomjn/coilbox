@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, versionLabel } from "@/lib/utils";
 import { GameArt } from "./GameArt";
+import { GeneratedBadge } from "./GeneratedBadge";
 import { SddBadge } from "./SddBadge";
 import { WarningIcon } from "./states";
 
@@ -25,6 +26,7 @@ export function GameCardShell({
   alt,
   version,
   sdd,
+  generated,
   warnings,
   loading,
   selected,
@@ -42,6 +44,8 @@ export function GameCardShell({
   alt: string;
   version?: string | null;
   sdd?: boolean;
+  /** Why coilbox generated this game, for the badge's tooltip. */
+  generated?: string | null;
   warnings?: string[] | null;
   loading?: boolean;
   /** Marks this as the current selection with a check badge (picker tiles). */
@@ -89,6 +93,7 @@ export function GameCardShell({
             <p className="truncate text-sm font-semibold" title={title}>
               {title}
             </p>
+            {generated && <GeneratedBadge note={generated} />}
             {sdd && <SddBadge />}
             {warnings?.length ? <WarningIcon warnings={warnings} /> : null}
           </div>

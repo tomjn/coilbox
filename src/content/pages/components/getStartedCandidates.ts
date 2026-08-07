@@ -1,4 +1,8 @@
 import {
+  isGeneratedGame,
+  withoutGeneratedGames,
+} from "../../../lib/generatedGames";
+import {
   filterUninstalledGames,
   filterUninstalledMaps,
   type SuggestedGame,
@@ -37,7 +41,14 @@ export function getStartedCandidates(input: {
 }): { games: SuggestedGame[]; maps: SuggestedMap[] } | null {
   const { installed, scanned, scopedGames, entries, suggestedMaps } = input;
   if (!installed || !scanned) return null;
-  const hasGames = scanned.games.length > 0 || installed.games.size > 0;
+  // Coilbox's own generated games are not the user's content. An install whose
+  // only game is the one the unit builder or the scenario editor wrote is still
+  // a first run, and is still owed the offer.
+  const scannedGames = withoutGeneratedGames(scanned.games);
+  const installedGames = new Set(
+    [...installed.games].filter((name) => !isGeneratedGame(name)),
+  );
+  const hasGames = scannedGames.length > 0 || installedGames.size > 0;
   const hasMaps = scanned.maps.length > 0 || installed.maps.size > 0;
   return {
     games: hasGames
@@ -45,8 +56,8 @@ export function getStartedCandidates(input: {
       : filterUninstalledGames(
           scopedGames,
           entries,
-          installed.games,
-          scanned.games,
+          installedGames,
+          scannedGames,
         ),
     maps: hasMaps
       ? []

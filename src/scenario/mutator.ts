@@ -11,9 +11,11 @@
  * It is a test route and never a distribution one. Nothing outside that one
  * folder is written, so deleting it undoes everything this flow ever did, which
  * is lego's scratch game arrangement (`src/lego/scratchGame.ts`) applied to
- * missions rather than units.
+ * missions rather than units. Its name, and the fact that a game list should not
+ * offer it, live in `src/lib/generatedGames.ts` alongside lego's.
  */
 
+import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import { scenarioTestMutator } from "./bindings";
 import { compileScenario, luaString } from "./compile";
 import type { Scenario } from "./model";
@@ -22,14 +24,6 @@ import {
   type MissionIssue,
   validateCompiledMission,
 } from "./validate";
-
-/**
- * The mutator's folder name, matching the constant the plugin writes to. Held
- * here as well because the frontend has to recognise the generated game in a
- * content scan: as a game it comes back in every scan, and offering it as a
- * base to test against would nest it inside itself.
- */
-export const MUTATOR_FOLDER = "coilbox-mission-test.sdd";
 
 /** What the archive calls itself. The engine appends the version to this. */
 const MUTATOR_NAME = "Coilbox mission test";
@@ -66,11 +60,6 @@ export function buildMutatorModInfo(
     "}",
   ];
   return `${lines.join("\n")}\n`;
-}
-
-/** Whether a scanned archive is the test mutator, by its archive file name. */
-export function isMutatorArchive(archiveName: string): boolean {
-  return archiveName.toLowerCase() === MUTATOR_FOLDER;
 }
 
 /** What was written, and whether the engine may be shown it. */
