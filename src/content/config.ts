@@ -51,6 +51,7 @@ import {
   unitsyncGameInfo,
   unitsyncHeightmap,
   unitsyncMapInfo,
+  unitsyncMapMeta,
   unitsyncMapSkybox,
   unitsyncMetalmap,
   unitsyncMinimap,
@@ -474,6 +475,65 @@ export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
   }, [enginePath, dataDir, epoch]);
 
   return { thumbs, loading };
+}
+
+/** Session cache of batch map metadata, keyed by `dataDir::enginePath::epoch`. */
+const mapMetaCache = new Map<string, Map<string, Record<string, string>>>();
+
+/**
+ * Read (or serve from cache) every map's mapinfo metadata for a target, as
+ * name -> info. The scan used to carry this, but `GetMapInfoEx` opens each map's
+ * archive at about 86ms a map, so the whole maps list waited on it. Only the map
+ * detail page and the singleplayer map card read it, and both tolerate it being
+ * empty until this lands. The worker caches each map on disk, so after the first
+ * run only new or replaced archives cost anything.
+ */
+export async function primeMapMeta(
+  enginePath: string,
+  dataDir: string,
+  epoch = 0,
+): Promise<Map<string, Record<string, string>>> {
+  const key = `${dataDir}::${enginePath}::${epoch}`;
+  const cached = mapMetaCache.get(key);
+  if (cached) return cached;
+  const res = await unitsyncMapMeta({ enginePath, dataDir });
+  const map = new Map<string, Record<string, string>>();
+  for (const m of res.maps) map.set(m.name, m.info);
+  mapMetaCache.set(key, map);
+  return map;
+}
+
+/** Lazily read and cache mapinfo metadata for every map (name -> info). */
+export function useUnitsyncMapMeta(enginePath?: string, dataDir?: string) {
+  const epoch = useScanEpoch(enginePath, dataDir);
+  const [meta, setMeta] = useState<Map<string, Record<string, string>>>(
+    new Map(),
+  );
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir) {
+      setMeta(new Map());
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    primeMapMeta(enginePath, dataDir, epoch)
+      .then((map) => {
+        if (!cancelled) setMeta(map);
+      })
+      .catch(() => {
+        if (!cancelled) setMeta(new Map());
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, epoch]);
+
+  return { meta, loading };
 }
 
 /**

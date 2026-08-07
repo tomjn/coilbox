@@ -1162,6 +1162,28 @@ export const unitsyncThumbnails = defineCommand<
   ThumbnailsResult
 >("coilbox-unitsync", "unitsync_thumbnails");
 
+/** One map's mapinfo metadata from the batch map-meta pass. */
+export interface MapMeta {
+  name: string;
+  /** mapinfo metadata (description, author, ...). */
+  info: Record<string, string>;
+}
+
+export interface MapMetaResult {
+  maps: MapMeta[];
+  errors: string[];
+}
+
+/**
+ * Read every map's mapinfo metadata in one session. Kept out of the scan because
+ * it opens each map's archive, and only the map detail page and the singleplayer
+ * map card read it. Disk-cached per map by the worker.
+ */
+export const unitsyncMapMeta = defineCommand<
+  { enginePath: string; dataDir: string; opId?: string },
+  MapMetaResult
+>("coilbox-unitsync", "unitsync_map_meta");
+
 /** One member of an archive's file tree. */
 export interface ArchiveFileEntry {
   /** Slash-separated path within the archive. */

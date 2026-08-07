@@ -235,6 +235,15 @@ pub fn build_thumbnails_args(
     args
 }
 
+/// Build args for batch map-metadata mode: scan args plus the info-blob cache
+/// directory the per-map results are stored in.
+pub fn build_map_meta_args(lib: &str, datadir: &str, cache_dir: Option<&str>) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--map-meta".into());
+    push_cache_dir(&mut args, cache_dir);
+    args
+}
+
 /// Build args for game-detail mode: scan args plus the game's archive name and
 /// the optional on-disk info-blob cache directory.
 pub fn build_game_args(

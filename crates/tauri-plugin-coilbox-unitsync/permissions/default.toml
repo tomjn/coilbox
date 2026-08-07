@@ -8,6 +8,7 @@ permissions = [
   "allow-unitsync-heightmap",
   "allow-unitsync-metalmap",
   "allow-unitsync-thumbnails",
+  "allow-unitsync-map-meta",
   "allow-unitsync-game-info",
   "allow-unitsync-unit-buildpics",
   "allow-unitsync-faction-logos",

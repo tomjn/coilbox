@@ -36,10 +36,12 @@ import { useBrandingEntry } from "@/content/branding";
 import {
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
+  useUnitsyncMapMeta,
   useUnitsyncMinimap,
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { mergeMapTiers } from "@/content/mapTiers";
 import { useFactionLogos } from "@/factions/logos";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import {
@@ -133,6 +135,7 @@ export function SetupPanel({
 
   const scan = useUnitsyncScan(enginePath, dataDir);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
+  const { meta } = useUnitsyncMapMeta(enginePath, dataDir);
   const { headers } = useUnitsyncGameHeaders(enginePath, dataDir);
 
   const { setup } = scenario;
@@ -141,7 +144,7 @@ export function SetupPanel({
   // inside itself. One the scenario already names stays, or the setup would
   // call a game that is sitting in `games/` missing.
   const games = withoutGeneratedGames(scan.data?.games ?? [], setup.gameName);
-  const maps = scan.data?.maps ?? [];
+  const maps = mergeMapTiers(scan.data?.maps ?? [], thumbs, meta);
   // Deliberately not defaulted to the first of either: a scenario with no game
   // is a scenario whose author has not chosen one, and choosing for them would
   // write a game into the document nobody picked.
