@@ -93,7 +93,8 @@ export function TriggerPanel({
     >
       {note && (
         <p className="mb-3 max-w-prose text-[11px] text-muted-foreground">
-          {note} Types it does not implement are listed but cannot be added.
+          {note} Types it does not implement are listed but cannot be added, and
+          a step already in a trigger that needs one is flagged.
         </p>
       )}
       {extensions.problems.length > 0 && (
@@ -499,6 +500,10 @@ function StepSection({
               at={{ triggerId: trigger.id, list, index }}
               scenario={scenario}
               extensions={extensions}
+              // A step already in the document is flagged rather than greyed:
+              // it cannot be un-added, and the launch route refuses it, so the
+              // panel says which step is the reason (issue #855).
+              unsupported={gate[step.type]}
               units={units}
               unitsLoading={unitsLoading}
               picking={picking}

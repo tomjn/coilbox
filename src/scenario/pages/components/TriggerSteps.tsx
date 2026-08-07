@@ -98,6 +98,7 @@ export function StepRow({
   at,
   scenario,
   extensions,
+  unsupported,
   units,
   unitsLoading,
   picking,
@@ -112,6 +113,9 @@ export function StepRow({
   scenario: Scenario;
   /** The types the scenario's game declares for itself. */
   extensions: ExtensionTypes;
+  /** Why the runtime that will play this scenario cannot run this step, or
+   *  undefined when it can. */
+  unsupported: string | undefined;
   units: UnitDatasetEntry[];
   unitsLoading: boolean;
   /** What the map is being asked for, or null when it is not waiting. */
@@ -137,6 +141,14 @@ export function StepRow({
             title="Coilbox has no form for this type, so its parameters are shown and kept as they are."
           >
             <TriangleAlert className="size-3.5" /> unknown type
+          </span>
+        )}
+        {unsupported && (
+          <span
+            className="flex items-center gap-1 text-[11px] text-amber-300"
+            title="The runtime that would play this scenario does not implement this type, so the mission is refused at launch until the game's runtime catches up or the step goes."
+          >
+            <TriangleAlert className="size-3.5" /> {unsupported.toLowerCase()}
           </span>
         )}
         {onMove && (
