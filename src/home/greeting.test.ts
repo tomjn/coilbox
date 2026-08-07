@@ -15,6 +15,12 @@ type Lobby = {
 const lobby = vi.fn<() => Lobby>();
 vi.mock("../multiplayer/store", () => ({ useMultiplayer: () => lobby() }));
 
+// The shared resume collector reads five stores off disk and the lobby snapshot.
+// The greeting only asks it whether the list is empty, so the list is what the
+// test supplies. What goes into that list is `continue.test.ts`'s subject.
+const resume = vi.fn<() => { candidates: unknown[] }>();
+vi.mock("./continue", () => ({ useResume: () => resume() }));
+
 import Greeting, { greetingCopy } from "./zones/Greeting";
 
 const TOOLS: NavGroup[] = [
@@ -52,6 +58,7 @@ function render() {
 beforeEach(() => {
   frame.mockReturnValue({ title: "Coilbox", nav: TOOLS });
   lobby.mockReturnValue(OFFLINE);
+  resume.mockReturnValue({ candidates: [] });
 });
 
 describe("greetingCopy", () => {
@@ -159,9 +166,14 @@ describe("Greeting zone", () => {
     expect(render().tagline).toBe("No tools available yet.");
   });
 
-  it("does not offer to resume until the collector lands (#992)", () => {
-    // Delete with the wiring in issue #992: today the seam returns false, so the
-    // resume branch is unreachable in the running app.
+  it("offers to resume when the collector found something", () => {
+    resume.mockReturnValue({ candidates: [{ id: "warpath:run-1" }] });
+    expect(render().tagline).toBe("Pick up where you left off.");
+  });
+
+  it("sends you to the tools when the collector found nothing", () => {
+    // A fresh install, and the first frame of every install: the sources load
+    // from disk, so an empty list is what the greeting sees until they answer.
     lobby.mockReturnValue(online("Zephyr"));
     expect(render().tagline).toBe("Choose a tool to get started.");
   });
