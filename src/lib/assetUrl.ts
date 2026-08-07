@@ -79,6 +79,21 @@ export function unitModelTextureUrl(file: string): string {
   return schemeUrl("unitmodel", file);
 }
 
+/**
+ * URL for a rendered minimap, heightmap or metalmap the unitsync worker cached,
+ * under `unitsyncthumb/<file>`. The worker hands back the cache file name rather
+ * than the PNG so a full-resolution minimap does not cross the bridge as base64,
+ * and the name is content-keyed so the webview may cache it indefinitely.
+ */
+export function unitsyncThumbUrl(file: string): string {
+  return schemeUrl("unitsyncthumb", file);
+}
+
+/** URL for a game's cached loading-screen art, under `unitsyncheader/<file>`. */
+export function unitsyncHeaderUrl(file: string): string {
+  return schemeUrl("unitsyncheader", file);
+}
+
 /** URL for a saved unit's overview thumbnail. */
 export function legoThumbUrl(projectId: string): string {
   return schemeUrl("lego", `${projectId}.png`);

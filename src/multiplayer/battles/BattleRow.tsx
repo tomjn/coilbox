@@ -57,11 +57,7 @@ export function BattleRow({
   const action = battleRowAction(battle, { canJoin, inProgress });
   const disabled = joined || action.disabled;
   const [pwOpen, setPwOpen] = useState(false);
-  const { dataUrl, loading } = useUnitsyncMinimap(
-    enginePath,
-    dataDir,
-    battle.map,
-  );
+  const { url, loading } = useUnitsyncMinimap(enginePath, dataDir, battle.map);
 
   // Clicking the minimap/title is a second path to the same action as the button:
   // passworded battles open the password popover, others act directly (join, or
@@ -76,7 +72,7 @@ export function BattleRow({
     <>
       <div className="w-14 shrink-0 overflow-hidden rounded-md border border-border">
         <MapThumb
-          dataUrl={dataUrl ?? undefined}
+          url={url ?? undefined}
           loading={loading}
           alt={`Minimap of ${battle.map}`}
         />

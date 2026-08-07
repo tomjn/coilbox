@@ -85,7 +85,7 @@ export function BattleMapCard({
     battle.map,
   );
   // Overlays only make sense once the map is installed and its minimap resolves.
-  const canOverlay = !!localMap && !mapMissing && !!minimap.dataUrl;
+  const canOverlay = !!localMap && !mapMissing && !!minimap.url;
 
   // As host, changing the map needs the new map's CRC for UPDATEBATTLEINFO so
   // joiners can sync. The checksum comes from the unitsync worker (a hook keyed
@@ -138,7 +138,7 @@ export function BattleMapCard({
         maps={maps}
         mapsLoading={mapsLoading}
         thumbs={thumbs}
-        minimapDataUrl={minimap.dataUrl}
+        minimapUrl={minimap.url}
         startPositions={startPositions}
         minimapLoading={minimap.loading}
         markerColors={markerColors}

@@ -29,9 +29,10 @@ const HEADER_MAX_H: u32 = 1080;
 /// JPEG quality for downscaled header art.
 const HEADER_JPEG_QUALITY: u8 = 90;
 /// Salts the header cache key. Bump when the header-art encoding changes so stale
-/// `.dataurl`/`.none` entries (e.g. games rejected before downscaling existed) are
-/// invalidated and re-resolved rather than served from an outdated cache.
-const HEADER_CACHE_VERSION: u32 = 2;
+/// entries (e.g. games rejected before downscaling existed) are invalidated and
+/// re-resolved rather than served from an outdated cache. Version 3 switched the
+/// hit file from base64 text to the raw JPEG the asset protocol serves.
+const HEADER_CACHE_VERSION: u32 = 3;
 
 /// List every member of `archive` as `(path, size)`, plus its on-disk path.
 pub fn tree(lib: &str, archive_name: &str) -> ArchiveTreeOutput {
@@ -423,16 +424,18 @@ pub fn game_headers(lib: &str, cache_dir: Option<&Path>) -> GameHeadersOutput {
 
         if let Some((dir, key)) = cache {
             match read_header_cache(dir, key) {
-                CacheState::Hit(url) => {
+                CacheState::Hit(file) => {
                     headers.push(GameHeaderItem {
                         name,
-                        data_url: Some(url),
+                        file: Some(file),
+                        data_url: None,
                     });
                     continue;
                 }
                 CacheState::Negative => {
                     headers.push(GameHeaderItem {
                         name,
+                        file: None,
                         data_url: None,
                     });
                     continue;
@@ -441,14 +444,14 @@ pub fn game_headers(lib: &str, cache_dir: Option<&Path>) -> GameHeadersOutput {
             }
         }
 
-        let data_url = match resolve_open_path(&us, &archive_name)
+        let jpeg = match resolve_open_path(&us, &archive_name)
             .as_deref()
             .and_then(|p| us.open_archive(p))
         {
             Some(handle) => {
-                let url = resolve_header_member(&us, handle, &loadpicture);
+                let art = resolve_header_member(&us, handle, &loadpicture);
                 us.close_archive(handle);
-                url
+                art
             }
             None => {
                 errors.push(format!("could not open archive {archive_name}"));
@@ -458,13 +461,24 @@ pub fn game_headers(lib: &str, cache_dir: Option<&Path>) -> GameHeadersOutput {
         // Archive-open/probe diagnostics are per-game noise, not scan errors.
         let _ = us.drain_errors();
 
+        // The webview fetches a cached header over `coilbox://unitsyncheader/`, so
+        // only art that never reached disk pays for base64 on the bridge.
+        let mut file = None;
         if let Some((dir, key)) = cache {
-            match &data_url {
-                Some(url) => write_header_hit(dir, key, url),
+            match &jpeg {
+                Some(bytes) => file = write_header_hit(dir, key, bytes),
                 None => write_header_negative(dir, key),
             }
         }
-        headers.push(GameHeaderItem { name, data_url });
+        let data_url = match (&file, &jpeg) {
+            (None, Some(bytes)) => Some(jpeg_to_data_url(bytes)),
+            _ => None,
+        };
+        headers.push(GameHeaderItem {
+            name,
+            file,
+            data_url,
+        });
     }
 
     errors.extend(us.drain_errors());
@@ -497,11 +511,11 @@ fn game_cache_key(us: &Unitsync, archive_name: &str) -> Option<String> {
 }
 
 /// Within an open archive, read the `loadpicture` member if given and decodable,
-/// else a random `bitmaps/loadpictures/` image. Returns the `data:` URL or `None`.
-fn resolve_header_member(us: &Unitsync, handle: i32, loadpicture: &str) -> Option<String> {
+/// else a random `bitmaps/loadpictures/` image. Returns the JPEG bytes or `None`.
+fn resolve_header_member(us: &Unitsync, handle: i32, loadpicture: &str) -> Option<Vec<u8>> {
     if !loadpicture.is_empty() {
-        if let Some(url) = read_image_member(us, handle, loadpicture) {
-            return Some(url);
+        if let Some(jpeg) = read_image_member(us, handle, loadpicture) {
+            return Some(jpeg);
         }
     }
     let mut candidates: Vec<String> = us
@@ -515,11 +529,11 @@ fn resolve_header_member(us: &Unitsync, handle: i32, loadpicture: &str) -> Optio
     read_image_member(us, handle, &candidates[idx])
 }
 
-/// Read one loadpicture member and return it as a downscaled JPEG `data:` URL, or
-/// `None` if it isn't a decodable image. Unlike the raw preview path, header art
-/// is read up to `HEADER_READ_CAP` and always re-encoded (see
-/// `encode_header_image`) so 4K art still renders and every header stays small.
-fn read_image_member(us: &Unitsync, handle: i32, inner: &str) -> Option<String> {
+/// Read one loadpicture member and return it as downscaled JPEG bytes, or `None`
+/// if it isn't a decodable image. Unlike the raw preview path, header art is read
+/// up to `HEADER_READ_CAP` and always re-encoded (see `encode_header_image`) so 4K
+/// art still renders and every header stays small.
+fn read_image_member(us: &Unitsync, handle: i32, inner: &str) -> Option<Vec<u8>> {
     let ext = inner.rsplit('.').next().unwrap_or("").to_lowercase();
     let (size, bytes) = us.read_archive_member(handle, inner, HEADER_READ_CAP)?;
     if size as usize > HEADER_READ_CAP {
@@ -529,12 +543,12 @@ fn read_image_member(us: &Unitsync, handle: i32, inner: &str) -> Option<String> 
 }
 
 /// Decode a loadpicture (by extension, since TGA has no magic bytes) and encode it
-/// as a JPEG `data:` URL downscaled to fit within `HEADER_MAX_W`x`HEADER_MAX_H`.
-/// Aspect ratio is preserved and smaller images keep their size (never upscaled).
-/// Alpha is dropped — loadpictures are opaque backgrounds — matching `tga_to_png`.
+/// as a JPEG downscaled to fit within `HEADER_MAX_W`x`HEADER_MAX_H`. Aspect ratio
+/// is preserved and smaller images keep their size (never upscaled). Alpha is
+/// dropped, as loadpictures are opaque backgrounds, matching `tga_to_png`.
 /// Re-encoding every header keeps oversized art (which overflows the raw preview
-/// cap) renderable and bounds the data URL cached in memory and on disk.
-fn encode_header_image(ext: &str, bytes: &[u8]) -> Option<String> {
+/// cap) renderable and bounds what the cache holds.
+fn encode_header_image(ext: &str, bytes: &[u8]) -> Option<Vec<u8>> {
     let format = match ext {
         "png" => image::ImageFormat::Png,
         "jpg" | "jpeg" => image::ImageFormat::Jpeg,
@@ -559,8 +573,14 @@ fn encode_header_image(ext: &str, bytes: &[u8]) -> Option<String> {
             image::ExtendedColorType::Rgb8,
         )
         .ok()?;
-    let b64 = base64::engine::general_purpose::STANDARD.encode(&jpeg);
-    Some(format!("data:image/jpeg;base64,{b64}"))
+    Some(jpeg)
+}
+
+/// Wrap header JPEG bytes in a base64 `data:` URL, the fallback for art the cache
+/// could not keep.
+fn jpeg_to_data_url(jpeg: &[u8]) -> String {
+    let b64 = base64::engine::general_purpose::STANDARD.encode(jpeg);
+    format!("data:image/jpeg;base64,{b64}")
 }
 
 /// Image extensions we can turn into a `data:` URL for the header (matches the
@@ -595,18 +615,20 @@ fn pick_index(len: usize) -> Option<usize> {
 /// State of the header disk cache for one checksum.
 #[derive(Debug)]
 enum CacheState {
-    /// `<checksum>.dataurl` exists; contains the resolved `data:` URL.
+    /// `<checksum>.jpg` exists, holding the resolved art. Carries its file name,
+    /// which is what the frontend appends to `coilbox://unitsyncheader/`.
     Hit(String),
-    /// `<checksum>.none` marker exists; the game has no usable art.
+    /// `<checksum>.none` marker exists, so the game has no usable art.
     Negative,
-    /// Neither file exists; the archive must be opened to resolve.
+    /// Neither file exists, so the archive must be opened to resolve.
     Miss,
 }
 
 /// Look up the header cache for `checksum` under `dir`.
 fn read_header_cache(dir: &Path, checksum: &str) -> CacheState {
-    if let Ok(url) = std::fs::read_to_string(dir.join(format!("{checksum}.dataurl"))) {
-        return CacheState::Hit(url);
+    let file = format!("{checksum}.jpg");
+    if dir.join(&file).is_file() {
+        return CacheState::Hit(file);
     }
     if dir.join(format!("{checksum}.none")).exists() {
         return CacheState::Negative;
@@ -614,10 +636,12 @@ fn read_header_cache(dir: &Path, checksum: &str) -> CacheState {
     CacheState::Miss
 }
 
-/// Best-effort write of a resolved `data:` URL to the header cache.
-fn write_header_hit(dir: &Path, checksum: &str, data_url: &str) {
+/// Best-effort write of resolved header art to the cache, returning the file name
+/// to serve it under. `None` when the write failed, so the caller inlines instead.
+fn write_header_hit(dir: &Path, checksum: &str, jpeg: &[u8]) -> Option<String> {
     let _ = std::fs::create_dir_all(dir);
-    let _ = std::fs::write(dir.join(format!("{checksum}.dataurl")), data_url);
+    let file = format!("{checksum}.jpg");
+    std::fs::write(dir.join(&file), jpeg).ok().map(|()| file)
 }
 
 /// Best-effort write of the "no art" negative marker.
@@ -773,12 +797,7 @@ mod header_tests {
     #[test]
     fn oversized_header_is_downscaled_to_jpeg() {
         // A 4K image (larger than the 1080p box) comes back as a JPEG that fits.
-        let url = encode_header_image("png", &png_bytes(3840, 2160)).unwrap();
-        assert!(url.starts_with("data:image/jpeg;base64,"), "got {url:.32}");
-
-        let raw = base64::engine::general_purpose::STANDARD
-            .decode(url.trim_start_matches("data:image/jpeg;base64,"))
-            .unwrap();
+        let raw = encode_header_image("png", &png_bytes(3840, 2160)).unwrap();
         let out = image::load_from_memory_with_format(&raw, image::ImageFormat::Jpeg).unwrap();
         assert!(out.width() <= HEADER_MAX_W && out.height() <= HEADER_MAX_H);
         // Aspect ratio (16:9) is preserved: downscaled to the box width.
@@ -787,12 +806,17 @@ mod header_tests {
 
     #[test]
     fn small_header_keeps_its_size() {
-        let url = encode_header_image("png", &png_bytes(320, 200)).unwrap();
-        let raw = base64::engine::general_purpose::STANDARD
-            .decode(url.trim_start_matches("data:image/jpeg;base64,"))
-            .unwrap();
+        let raw = encode_header_image("png", &png_bytes(320, 200)).unwrap();
         let out = image::load_from_memory_with_format(&raw, image::ImageFormat::Jpeg).unwrap();
         assert_eq!((out.width(), out.height()), (320, 200));
+    }
+
+    #[test]
+    fn header_data_url_is_the_fallback_for_uncached_art() {
+        assert_eq!(
+            jpeg_to_data_url(b"hello"),
+            "data:image/jpeg;base64,aGVsbG8="
+        );
     }
 
     #[test]
@@ -819,10 +843,10 @@ mod header_tests {
         // Miss when neither file exists.
         assert!(matches!(read_header_cache(&dir, "aaaa"), CacheState::Miss));
 
-        // Positive hit.
-        std::fs::write(dir.join("bbbb.dataurl"), "data:image/png;base64,ZZ").unwrap();
+        // Positive hit, reported by the file name the asset protocol serves.
+        std::fs::write(dir.join("bbbb.jpg"), b"jpeg bytes").unwrap();
         match read_header_cache(&dir, "bbbb") {
-            CacheState::Hit(url) => assert_eq!(url, "data:image/png;base64,ZZ"),
+            CacheState::Hit(file) => assert_eq!(file, "bbbb.jpg"),
             other => panic!("expected hit, got {other:?}"),
         }
 
@@ -841,11 +865,9 @@ mod header_tests {
         let dir = std::env::temp_dir().join("coilbox_header_write_test");
         let _ = std::fs::remove_dir_all(&dir);
 
-        write_header_hit(&dir, "dddd", "data:image/jpeg;base64,QQ");
-        assert_eq!(
-            std::fs::read_to_string(dir.join("dddd.dataurl")).unwrap(),
-            "data:image/jpeg;base64,QQ"
-        );
+        let file = write_header_hit(&dir, "dddd", b"jpeg bytes");
+        assert_eq!(file.as_deref(), Some("dddd.jpg"));
+        assert_eq!(std::fs::read(dir.join("dddd.jpg")).unwrap(), b"jpeg bytes");
 
         write_header_negative(&dir, "eeee");
         assert!(dir.join("eeee.none").exists());

@@ -108,7 +108,7 @@ export function MapPickerDrawer({
                       )}
                       {thumb ? (
                         <img
-                          src={thumb.dataUrl}
+                          src={thumb.url}
                           alt={`Minimap of ${m.name}`}
                           style={{
                             aspectRatio:

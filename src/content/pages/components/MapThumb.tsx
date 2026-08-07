@@ -9,13 +9,13 @@ import { Skeleton } from "@/components/ui/skeleton";
  * — undistorted — letterboxed inside a uniform square box.
  */
 export function MapThumb({
-  dataUrl,
+  url,
   width,
   height,
   alt,
   loading,
 }: {
-  dataUrl?: string;
+  url?: string;
   width?: number;
   height?: number;
   alt: string;
@@ -29,9 +29,9 @@ export function MapThumb({
     <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted">
       {loading ? (
         <Skeleton className="size-full rounded-none bg-muted-foreground/10" />
-      ) : dataUrl ? (
+      ) : url ? (
         <img
-          src={dataUrl}
+          src={url}
           alt={alt}
           loading="lazy"
           style={

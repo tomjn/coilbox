@@ -466,7 +466,7 @@ export function SetupPanel({
               map={selectedMap}
               maps={maps}
               thumbs={thumbs}
-              minimapDataUrl={minimap.dataUrl}
+              minimapUrl={minimap.url}
               startPositions={minimap.startPositions}
               minimapLoading={minimap.loading}
               markerColors={markerColors}

@@ -17,7 +17,7 @@ const MAX_HEIGHT_CLASSES =
  * Extracted from the content Map detail so the launcher and browser share it.
  */
 export function MinimapPreview({
-  dataUrl,
+  url,
   width,
   height,
   startPositions,
@@ -30,7 +30,7 @@ export function MinimapPreview({
   placeholder,
   dim,
 }: {
-  dataUrl?: string | null;
+  url?: string | null;
   width?: number;
   height?: number;
   startPositions: StartPos[];
@@ -75,7 +75,7 @@ export function MinimapPreview({
     <div className="flex aspect-square w-full items-center justify-center">
       <div className="size-32 animate-pulse rounded bg-muted" />
     </div>
-  ) : dataUrl ? (
+  ) : url ? (
     // Bound the size to the responsive max-height (`--mmh`) while preserving the
     // aspect ratio: width = min(100%, ratio * maxHeight), height derived. This caps
     // height without a height-clamp that would distort the (stretched) image.
@@ -87,7 +87,7 @@ export function MinimapPreview({
       }}
     >
       <img
-        src={dataUrl}
+        src={url}
         alt={alt}
         className={`absolute inset-0 size-full object-fill${
           dim ? " brightness-[0.55]" : ""
@@ -122,7 +122,7 @@ export function MinimapPreview({
 
   // A shown placeholder — or an interactive overlay — owns its own controls, so the
   // box mustn't also be a button.
-  const showingPlaceholder = !loading && !dataUrl && !!placeholder;
+  const showingPlaceholder = !loading && !url && !!placeholder;
 
   return onClick && !showingPlaceholder && !overlayInteractive ? (
     <button

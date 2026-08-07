@@ -336,7 +336,7 @@ export default function CampaignEditPage() {
         ) : (
           <ul className="flex flex-col gap-3">
             {campaign.missions.map((m, i) => {
-              const thumb = thumbs.get(m.snapshot.mapName)?.dataUrl;
+              const thumb = thumbs.get(m.snapshot.mapName)?.url;
               return (
                 <li
                   key={m.id}

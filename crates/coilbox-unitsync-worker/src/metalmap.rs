@@ -1,11 +1,12 @@
 //! Metal-map rendering: read a map's metal infomap via unitsync (`GetInfoMap
 //! "metal"`, 8-bit density per pixel) and turn it into a downscaled green-on-
-//! transparent RGBA PNG `data:` URL for overlaying on a minimap. Cached on disk
-//! (under `cache_dir`, keyed by the map's archive identity + max-side) like
-//! heightmaps, so the read + encode only runs on a cache miss.
+//! transparent RGBA PNG for overlaying on a minimap. Cached on disk (under
+//! `cache_dir`, keyed by the map's archive identity + max-side) like heightmaps,
+//! so the read + encode only runs on a cache miss, and reported by cache file
+//! name so the overlay loads it over the asset protocol.
 
 use crate::ffi::Unitsync;
-use crate::minimap::{map_cache_key, png_to_data_url};
+use crate::minimap::{map_cache_key, rendered_image, RenderedImage};
 use crate::model::MetalmapOutput;
 use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba};
 use std::io::Cursor;
@@ -78,26 +79,27 @@ pub fn render(
 
     let cache = cache_file(cache_dir, map_cache_key(&us, map_name).as_deref(), max_side);
 
-    let result = (|| -> Result<(String, u32, u32), String> {
+    let result = (|| -> Result<(RenderedImage, u32, u32), String> {
         let (w, h) = us
             .map_dimensions(map_name)
             .ok_or_else(|| "no metal infomap available".to_string())?;
         // Only the cache miss pays for the full GetInfoMap read + encode.
-        let png = coilbox_thumb_cache::cached(cache, || {
+        let (png, on_disk) = coilbox_thumb_cache::cached_at(cache, || {
             let raw = us
                 .metalmap_data(map_name, w, h)
                 .ok_or_else(|| "failed to read metal infomap".to_string())?;
             metalmap_png(&raw, w, h, max_side)
         })?;
-        Ok((png_to_data_url(&png), w, h))
+        Ok((rendered_image(&png, on_disk), w, h))
     })();
 
     let errors = us.drain_errors();
     us.uninit();
 
     match result {
-        Ok((data_url, w, h)) => MetalmapOutput {
-            data_url: Some(data_url),
+        Ok((image, w, h)) => MetalmapOutput {
+            file: image.file,
+            data_url: image.data_url,
             width: Some(w),
             height: Some(h),
             errors,

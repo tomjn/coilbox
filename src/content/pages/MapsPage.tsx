@@ -170,7 +170,7 @@ export default function MapsPage() {
                 className="group relative overflow-hidden rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/50 hover:shadow-md [contain-intrinsic-size:13rem] [content-visibility:auto]"
               >
                 <MapThumb
-                  dataUrl={thumb?.dataUrl}
+                  url={thumb?.url}
                   width={m.width}
                   height={m.height}
                   alt={`Minimap of ${m.name}`}

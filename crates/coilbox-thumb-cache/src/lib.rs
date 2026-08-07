@@ -21,19 +21,37 @@ pub fn cached<F>(cache_file: Option<PathBuf>, compute: F) -> Result<Vec<u8>, Str
 where
     F: FnOnce() -> Result<Vec<u8>, String>,
 {
+    cached_at(cache_file, compute).map(|(bytes, _)| bytes)
+}
+
+/// Like [`cached`], but also reports where the bytes ended up on disk.
+///
+/// The path is `Some` only when the file is readable afterwards, so a caller that
+/// wants to hand the file itself out (over the asset protocol, say) can tell a
+/// real cache entry from a disabled or failed write and fall back.
+pub fn cached_at<F>(
+    cache_file: Option<PathBuf>,
+    compute: F,
+) -> Result<(Vec<u8>, Option<PathBuf>), String>
+where
+    F: FnOnce() -> Result<Vec<u8>, String>,
+{
     if let Some(file) = &cache_file {
         if let Ok(bytes) = std::fs::read(file) {
-            return Ok(bytes);
+            return Ok((bytes, Some(file.clone())));
         }
     }
     let bytes = compute()?;
+    let mut written = None;
     if let Some(file) = &cache_file {
         if let Some(dir) = file.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
-        let _ = std::fs::write(file, &bytes);
+        if std::fs::write(file, &bytes).is_ok() {
+            written = Some(file.clone());
+        }
     }
-    Ok(bytes)
+    Ok((bytes, written))
 }
 
 #[cfg(test)]
@@ -87,6 +105,25 @@ mod tests {
             assert_eq!(out, b"x");
         }
         assert_eq!(calls.get(), 2);
+    }
+
+    #[test]
+    fn cached_at_reports_the_file_only_when_it_is_on_disk() {
+        let dir = temp_dir("path");
+        let file = dir.join("k.bin");
+
+        // Miss then hit both report the written file.
+        let (_, written) = cached_at(Some(file.clone()), || Ok(b"hello".to_vec())).unwrap();
+        assert_eq!(written, Some(file.clone()));
+        let (_, hit) = cached_at(Some(file.clone()), || Ok(b"other".to_vec())).unwrap();
+        assert_eq!(hit, Some(file.clone()));
+
+        // Caching off, so there is no file to hand out.
+        let (bytes, none) = cached_at(None, || Ok(b"hello".to_vec())).unwrap();
+        assert_eq!(bytes, b"hello");
+        assert_eq!(none, None);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

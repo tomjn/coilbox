@@ -236,7 +236,7 @@ function ReplayMapPreview({
     );
   }
 
-  if (minimap.dataUrl) {
+  if (minimap.url) {
     const aspect =
       heightmap.data?.width && heightmap.data?.height
         ? `${heightmap.data.width} / ${heightmap.data.height}`
@@ -248,7 +248,7 @@ function ReplayMapPreview({
           <div className="relative flex items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
             <div className="relative inline-flex max-h-full max-w-full">
               <img
-                src={minimap.dataUrl}
+                src={minimap.url}
                 alt={`Minimap of ${mapName}`}
                 style={{ aspectRatio: aspect }}
                 className="block max-h-full max-w-full object-fill"
@@ -293,11 +293,11 @@ function ReplayMapPreview({
             </p>
           )}
         </div>
-        {heightmap.data?.dataUrl && (
+        {heightmap.data && heightmap.url && (
           <MapPreview3D
             className="w-full min-w-0 lg:flex-1"
-            heightSrc={heightmap.data.dataUrl}
-            textureSrc={minimap.dataUrl}
+            heightSrc={heightmap.url}
+            textureSrc={minimap.url}
             appearance={minimap.appearance}
             skyboxSrc={skybox.dataUrl}
             minHeight={heightmap.data.minHeight ?? 0}

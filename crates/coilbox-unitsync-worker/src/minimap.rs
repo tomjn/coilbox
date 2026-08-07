@@ -1,11 +1,16 @@
-//! Minimap rendering: turn unitsync's RGB565 minimap buffers into PNG `data:`
-//! URLs. Used two ways — a single map's larger preview (`render`) and a batch of
-//! small thumbnails for the whole map list (`render_all`), each in one `Init`.
+//! Minimap rendering: turn unitsync's RGB565 minimap buffers into PNGs. Used two
+//! ways, a single map's larger preview (`render`) and a batch of small thumbnails
+//! for the whole map list (`render_all`), each in one `Init`.
 //!
 //! Rendered PNGs are cached on disk (under `cache_dir`, keyed by a cheap file
 //! identity of the map's archive + mip) via `coilbox-thumb-cache`, so a map's
-//! minimap is encoded once and reused across launches; the expensive
-//! `GetMinimap` + RGB565→PNG encode only runs on a cache miss.
+//! minimap is encoded once and reused across launches. The expensive `GetMinimap`
+//! plus RGB565 to PNG encode only runs on a cache miss.
+//!
+//! Output reports the cache file name rather than the bytes, because the frontend
+//! fetches it over `coilbox://unitsyncthumb/` instead of paying for base64 on the
+//! bridge. A `data:` URL is only the fallback for a render that never reached
+//! disk.
 
 use crate::ffi::Unitsync;
 use crate::model::{MinimapOutput, StartPos, Thumbnail, ThumbnailsOutput};
@@ -123,8 +128,9 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
         ..Default::default()
     };
     match result {
-        Ok((data_url, side)) => MinimapOutput {
-            data_url: Some(data_url),
+        Ok((image, side)) => MinimapOutput {
+            file: image.file,
+            data_url: image.data_url,
             side: Some(side),
             errors,
             ..base
@@ -157,11 +163,12 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
         };
         let file = cache_file(cache_dir, map_cache_key(&us, &name).as_deref(), mip);
         match render_one(&us, &name, mip, file) {
-            Ok((data_url, _)) => {
+            Ok((image, _)) => {
                 let dims = us.map_dimensions(&name);
                 thumbnails.push(Thumbnail {
                     name,
-                    data_url,
+                    file: image.file,
+                    data_url: image.data_url,
                     width: dims.map(|(w, _)| w),
                     height: dims.map(|(_, h)| h),
                 });
@@ -175,7 +182,7 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
     ThumbnailsOutput { thumbnails, errors }
 }
 
-/// Render one map's minimap to `(data_url, side)` using an already-initialised
+/// Render one map's minimap to `(image, side)` using an already-initialised
 /// session. The caller owns the `Init`/`UnInit` lifecycle. `cache_file`, when set,
 /// serves a previously-encoded PNG and skips the render entirely.
 fn render_one(
@@ -183,9 +190,9 @@ fn render_one(
     map_name: &str,
     mip: i32,
     cache_file: Option<PathBuf>,
-) -> Result<(String, u32), String> {
+) -> Result<(RenderedImage, u32), String> {
     let side = 1024u32 >> mip.clamp(0, 10) as u32;
-    let png = coilbox_thumb_cache::cached(cache_file, || {
+    let (png, on_disk) = coilbox_thumb_cache::cached_at(cache_file, || {
         let pixels = us
             .minimap(map_name, mip)
             .ok_or_else(|| "no minimap available".to_string())?;
@@ -198,7 +205,7 @@ fn render_one(
         }
         pixels_to_png(&pixels, side)
     })?;
-    Ok((png_to_data_url(&png), side))
+    Ok((rendered_image(&png, on_disk), side))
 }
 
 /// Convert an RGB565 square buffer to PNG bytes.
@@ -218,9 +225,33 @@ fn pixels_to_png(pixels: &[u16], side: u32) -> Result<Vec<u8>, String> {
 }
 
 /// Wrap PNG bytes in a base64 `data:` URL.
-pub(crate) fn png_to_data_url(png: &[u8]) -> String {
+fn png_to_data_url(png: &[u8]) -> String {
     let b64 = base64::engine::general_purpose::STANDARD.encode(png);
     format!("data:image/png;base64,{b64}")
+}
+
+/// How a rendered PNG reaches the frontend: the cache file name the webview
+/// fetches over `coilbox://unitsyncthumb/`, or the base64 fallback.
+#[derive(Default)]
+pub(crate) struct RenderedImage {
+    pub file: Option<String>,
+    pub data_url: Option<String>,
+}
+
+/// Describe a render by its cache file when the bytes are on disk, else inline
+/// them. Only one of the two is ever set, so the normal case puts a short name on
+/// the bridge instead of a megabyte of base64.
+pub(crate) fn rendered_image(png: &[u8], on_disk: Option<PathBuf>) -> RenderedImage {
+    match on_disk.as_deref().and_then(Path::file_name) {
+        Some(name) => RenderedImage {
+            file: Some(name.to_string_lossy().into_owned()),
+            data_url: None,
+        },
+        None => RenderedImage {
+            file: None,
+            data_url: Some(png_to_data_url(png)),
+        },
+    }
 }
 
 /// Print a minimap error envelope to stdout (used on panic).

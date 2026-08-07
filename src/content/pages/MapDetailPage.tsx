@@ -316,7 +316,7 @@ export default function MapDetailPage() {
               ? ` · ${minimap.startPositions.length} start positions`
               : ""}
           </h2>
-          {minimap.dataUrl && (
+          {minimap.url && (
             <MapLayerToggle layer={overlay.layer} onChange={overlay.setLayer} />
           )}
         </div>
@@ -326,7 +326,7 @@ export default function MapDetailPage() {
               <div className="flex size-64 max-w-full items-center justify-center">
                 <Skeleton className="size-32 rounded bg-muted" />
               </div>
-            ) : minimap.dataUrl ? (
+            ) : minimap.url ? (
               // Give the box a definite width derived from the 32rem height cap
               // (`width = ratio * 32rem` ⇒ `height = 32rem`), capped by `max-w-sm`
               // for wide maps (then `max-w` binds and the height shrinks instead —
@@ -342,7 +342,7 @@ export default function MapDetailPage() {
                 }}
               >
                 <img
-                  src={minimap.dataUrl}
+                  src={minimap.url}
                   alt={`Minimap of ${map.name}`}
                   className={`absolute inset-0 size-full object-fill${
                     overlay.overlayUrl ? " brightness-[0.55]" : ""
@@ -368,11 +368,11 @@ export default function MapDetailPage() {
             )}
           </div>
 
-          {heightmap.data?.dataUrl && minimap.dataUrl && (
+          {heightmap.data && heightmap.url && minimap.url && (
             <MapPreview3D
               className="w-full min-w-0 lg:flex-1"
-              heightSrc={heightmap.data.dataUrl}
-              textureSrc={minimap.dataUrl}
+              heightSrc={heightmap.url}
+              textureSrc={minimap.url}
               appearance={minimap.appearance}
               skyboxSrc={skybox.dataUrl}
               minHeight={heightmap.data.minHeight ?? 0}

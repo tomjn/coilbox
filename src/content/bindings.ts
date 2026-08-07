@@ -894,7 +894,10 @@ export interface StartPos {
 }
 
 export interface MinimapResult {
-  /** PNG `data:` URL ready for an `<img src>`, when the map has a minimap. */
+  /** Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
+   * render reached disk, and preferred over `dataUrl`. */
+  file?: string;
+  /** PNG `data:` URL, only when the render never reached the worker's cache. */
   dataUrl?: string;
   side?: number;
   /** Team start positions, for overlaying on the minimap. */
@@ -940,7 +943,10 @@ export const unitsyncMinimap = defineCommand<
 >("coilbox-unitsync", "unitsync_minimap");
 
 export interface HeightmapResult {
-  /** Grayscale PNG `data:` URL of the (downscaled) heightmap, for a displacement map. */
+  /** Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
+   * render reached disk, and preferred over `dataUrl`. */
+  file?: string;
+  /** Grayscale PNG `data:` URL, only when the render never reached the cache. */
   dataUrl?: string;
   /** Full heightmap dimensions `(mapx+1, mapy+1)`; the ratio is the map's aspect ratio. */
   width?: number;
@@ -964,7 +970,10 @@ export const unitsyncHeightmap = defineCommand<
 >("coilbox-unitsync", "unitsync_heightmap");
 
 export interface MetalmapResult {
-  /** Green-on-transparent RGBA PNG `data:` URL of the (downscaled) metal infomap. */
+  /** Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
+   * render reached disk, and preferred over `dataUrl`. */
+  file?: string;
+  /** Green-on-transparent RGBA PNG `data:` URL, only when it missed the cache. */
   dataUrl?: string;
   /** Metal infomap dimensions; the ratio is the map's aspect ratio. */
   width?: number;
@@ -1002,7 +1011,10 @@ export const unitsyncMapSkybox = defineCommand<
 export interface ThumbnailsResult {
   thumbnails: {
     name: string;
-    dataUrl: string;
+    /** Cache file name, served over `coilbox://unitsyncthumb/`. */
+    file?: string;
+    /** PNG `data:` URL, only when the render never reached the cache. */
+    dataUrl?: string;
     width?: number;
     height?: number;
   }[];
@@ -1118,16 +1130,18 @@ export const unitsyncArchiveFile = defineCommand<
 >("coilbox-unitsync", "unitsync_archive_file");
 
 export interface GameHeadersResult {
-  /** Header art per game (`dataUrl` absent when the game has no usable art). */
-  headers: { name: string; dataUrl?: string }[];
+  /** Header art per game. Both fields are absent when the game has no usable
+   * art. `file` is the cache file name, served over `coilbox://unitsyncheader/`,
+   * and `dataUrl` only appears when the art never reached the cache. */
+  headers: { name: string; file?: string; dataUrl?: string }[];
   errors: string[];
 }
 
 /**
  * Resolve loading-screen art for every game in one unitsync session (for the
  * Games grid). Keyed on cheap file identity and disk-cached by the worker, so it
- * stays cheap on later launches; games with no usable art come back without a
- * `dataUrl` (the UI shows a gradient placeholder).
+ * stays cheap on later launches. Games with no usable art come back with neither
+ * a `file` nor a `dataUrl`, and the UI shows a gradient placeholder.
  */
 export const unitsyncGameHeaders = defineCommand<
   { enginePath: string; dataDir: string },

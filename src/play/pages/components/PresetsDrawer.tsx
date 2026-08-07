@@ -190,7 +190,7 @@ export function PresetsDrawer({
                           <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/40">
                             {thumb ? (
                               <img
-                                src={thumb.dataUrl}
+                                src={thumb.url}
                                 alt={`Minimap of ${p.mapName}`}
                                 style={{
                                   // unitsync thumbnails are square; stretch back
