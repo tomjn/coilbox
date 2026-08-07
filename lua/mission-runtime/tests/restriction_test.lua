@@ -309,6 +309,27 @@ check("greying a builder is one edit, for the one icon that changed", edits == 1
 engine.GG.CoilboxMission.restrictions.paint(builder, defID(engine, "builder"), 0)
 check("and painting it again writes nothing", #engine.edits == edits, #engine.edits)
 
+-- And what a game's own build gating does to it. Splinter Faction's tech tree
+-- rewrites `disabled` on every tech-gated icon whenever a team's tech changes,
+-- deciding each from its tech alone, so it lifts the grey the mission put on a
+-- def it forbids (issue #955). The runtime puts it back on its own cadence.
+engine = playing({
+	restrictions = { buildable = { mode = "deny", units = { "nuke" } } },
+})
+builder = builderFor(engine, 0)
+check("the mission greys the def it denies", menu(engine, builder) == "marker,grunt,nuke!",
+	menu(engine, builder))
+for _, desc in ipairs(engine.cmdDescs[builder]) do
+	if desc.id == -defID(engine, "nuke") then
+		desc.disabled = false
+	end
+end
+check("and something else in the game can paint straight over it",
+	menu(engine, builder) == "marker,grunt,nuke", menu(engine, builder))
+engine.env:GameFrame(15)
+check("but the next repaint puts it back", menu(engine, builder) == "marker,grunt,nuke!",
+	menu(engine, builder))
+
 -- A mission that restricts nothing buildable never reads a command description.
 engine = playing({ restrictions = { commands = { "selfd" } } })
 builderFor(engine, 0)

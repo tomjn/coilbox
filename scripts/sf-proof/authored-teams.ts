@@ -54,7 +54,7 @@ function author(scenario: Scenario): Scenario {
   let s = scenario;
   // The player: one engineer on the start position, a bank to open on, and the
   // mission owning the start so the game spawns no commander.
-  s = addStartUnit(s, "player", "fedengineer");
+  s = addStartUnit(s, "player", "fedengineer_up1");
   s = setTeamAmount(s, "player", "resources", "metal", 750);
   s = setTeamAmount(s, "player", "resources", "energy", 750);
   s = setTeamNoCommander(s, "player", true);

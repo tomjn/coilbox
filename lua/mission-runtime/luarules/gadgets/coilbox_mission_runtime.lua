@@ -696,6 +696,9 @@ if gadgetHandler:IsSyncedCode() then
 			suppressing = false
 		end
 		addIncome()
+		-- The greyed build icons, put back over whatever a game's own build gating
+		-- has written on top of them since (issue #955).
+		restrictions.refresh(frame)
 		-- Last, so the world a trigger reads on this frame is the finished one.
 		-- The engine owns how often it actually evaluates. A mission that has
 		-- ended evaluates nothing: the result is already in the replay.

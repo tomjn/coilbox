@@ -20,6 +20,11 @@
 # missions/splinter/mission.lua, which is what coilbox's own launch path does.
 # Nothing else in the game is touched, and --keep-mission leaves it there.
 #
+# The mission forbids two unit defs, which is the one claim here no other harness
+# can make (issue #955). Splinter Faction's own tech tree writes the same
+# `disabled` flag on the same build icons, so this grants a tech mid-mission and
+# reads the icons back to see who holds them.
+#
 # The game also has to carry the three guards the adoption contract asks for, and
 # those are Splinter Faction's own change rather than coilbox's. They are not
 # upstream, so scripts/sf-proof/splinterfaction-guards.patch holds them. This
