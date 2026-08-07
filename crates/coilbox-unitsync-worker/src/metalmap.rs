@@ -77,7 +77,11 @@ pub fn render(
     us.init(false, 0);
     let _ = us.drain_errors();
 
-    let cache = cache_file(cache_dir, map_cache_key(&us, map_name).as_deref(), max_side);
+    let cache = cache_file(
+        cache_dir,
+        map_cache_key(&us, None, map_name).as_deref(),
+        max_side,
+    );
 
     let result = (|| -> Result<(RenderedImage, u32, u32), String> {
         let (w, h) = us

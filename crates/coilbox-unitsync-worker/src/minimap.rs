@@ -16,19 +16,30 @@ use crate::ffi::Unitsync;
 use crate::model::{MinimapOutput, StartPos, Thumbnail, ThumbnailsOutput};
 use base64::Engine;
 use image::{DynamicImage, ImageFormat, RgbImage};
+use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-/// A cheap, stable cache identity for a map's minimap: a hash of its own
-/// archive's path + size + mtime. Unlike the sync checksum this needs no
-/// whole-archive hashing, so building cache keys for the whole map list is
-/// effectively free. `None` (map has no resolvable archive, or stat fails)
-/// disables caching for that map — it simply re-renders.
+/// A cheap, stable cache identity for a map's rendered images: the archive's file
+/// identity where it resolves, otherwise the map's versioned name. Neither route
+/// hashes an archive, so building keys for the whole map list is effectively free.
+/// `None` disables caching for that map, and it simply re-renders.
 ///
-/// Note: for a `.sdd` directory map edited in place the dir mtime may not change,
-/// so a stale minimap can persist until a rescan — an acceptable trade for a
-/// cosmetic minimap that re-renders in ~80ms.
-pub(crate) fn map_cache_key(us: &Unitsync, map_name: &str) -> Option<String> {
+/// Note: a `.sdd` directory map edited in place may keep both its dir mtime and
+/// its name, so a stale image can persist until a rescan. That is an acceptable
+/// trade for a cosmetic minimap that re-renders in about 80ms.
+pub(crate) fn map_cache_key(us: &Unitsync, index: Option<i32>, map_name: &str) -> Option<String> {
+    archive_identity(us, map_name).or_else(|| name_identity(us, index, map_name))
+}
+
+/// File identity of the map's own archive: path + size + mtime.
+///
+/// Only resolves when `GetArchivePath` recognises the name `GetMapArchiveName`
+/// gave us, which is not the general case: a map's archives come back under their
+/// versioned *human* names ("AcidicQuarry 5.17") while `GetArchivePath` looks up
+/// *file* names ("acidicquarry_5.17.sd7"). Kept as the preferred route because
+/// where it does resolve it catches an in-place edit that the name route cannot.
+fn archive_identity(us: &Unitsync, map_name: &str) -> Option<String> {
     use std::hash::{Hash, Hasher};
     let archive = us.map_archives(map_name).into_iter().next()?;
     let dir = us.archive_path(&archive)?;
@@ -47,12 +58,79 @@ pub(crate) fn map_cache_key(us: &Unitsync, map_name: &str) -> Option<String> {
     Some(format!("{:016x}", h.finish()))
 }
 
+/// The map's versioned name plus the map file inside its archive.
+///
+/// Needs no path and no hashing, so it costs nothing on a cold library. It works
+/// because the versioned name carries the archive version: installing a new
+/// release of a map yields a new name, so the key changes with it. `GetMapChecksum`
+/// would be a stronger identity but hashes the whole archive, which on a 5.5 GB
+/// library takes minutes.
+fn name_identity(us: &Unitsync, index: Option<i32>, map_name: &str) -> Option<String> {
+    use std::hash::{Hash, Hasher};
+    let i = index.or_else(|| map_index(us, map_name))?;
+    let file = us.map_file_name(i)?;
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    map_name.hash(&mut h);
+    file.hash(&mut h);
+    Some(format!("n{:016x}", h.finish()))
+}
+
+/// A map's index, for callers that only have its name. `GetMapFileName` is
+/// index-only, and names come from the archive scanner's index that `Init` has
+/// already built, so this costs no archive reads.
+pub(crate) fn map_index(us: &Unitsync, map_name: &str) -> Option<i32> {
+    (0..us.map_count()).find(|&i| us.map_name(i).as_deref() == Some(map_name))
+}
+
 /// Cache file for a map's minimap: `<cache_dir>/<key>-<mip>.png`. `None` (no
 /// cache dir, or no cache key) disables caching for that map.
 fn cache_file(cache_dir: Option<&Path>, key: Option<&str>, mip: i32) -> Option<PathBuf> {
     let dir = cache_dir?;
     let key = key?;
     Some(dir.join(format!("{key}-{mip}.png")))
+}
+
+/// A map's proportions, cached beside its minimap PNG.
+#[derive(Serialize, Deserialize)]
+struct CachedDims {
+    width: u32,
+    height: u32,
+}
+
+/// Cache file for a map's proportions: `<cache_dir>/<key>-dims.json`. Unlike the
+/// PNG this is mip-independent, because proportions don't vary with mip level.
+fn dims_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
+    let dir = cache_dir?;
+    let key = key?;
+    Some(dir.join(format!("{key}-dims.json")))
+}
+
+/// A map's proportions, from cache when `file` holds them and from `compute`
+/// otherwise. `GetInfoMapSize` costs about 86ms per map, as much again as the
+/// minimap render this sits beside, and `render_one`'s cache hit skips its own
+/// work. Without this a warm thumbnail pass still pays for the whole library.
+///
+/// Caching is an optimization: an unwritable cache dir or an unparseable entry
+/// just means `compute` runs.
+fn cached_dims(
+    file: Option<PathBuf>,
+    compute: impl FnOnce() -> Option<(u32, u32)>,
+) -> Option<(u32, u32)> {
+    if let Some(raw) = file.as_deref().and_then(|f| std::fs::read(f).ok()) {
+        if let Ok(d) = serde_json::from_slice::<CachedDims>(&raw) {
+            return Some((d.width, d.height));
+        }
+    }
+    let (width, height) = compute()?;
+    if let Some(f) = file.as_deref() {
+        if let Some(dir) = f.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if let Ok(bytes) = serde_json::to_vec(&CachedDims { width, height }) {
+            let _ = std::fs::write(f, bytes);
+        }
+    }
+    Some((width, height))
 }
 
 /// Render `map_name`'s minimap at `mip` to a PNG data URL (standalone session).
@@ -72,7 +150,11 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
         &us,
         map_name,
         mip,
-        cache_file(cache_dir, map_cache_key(&us, map_name).as_deref(), mip),
+        cache_file(
+            cache_dir,
+            map_cache_key(&us, None, map_name).as_deref(),
+            mip,
+        ),
     );
 
     // Start positions, environment (wind/tidal) and appearance (water/sky/sun) all
@@ -161,10 +243,13 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
         let Some(name) = us.map_name(i) else {
             continue;
         };
-        let file = cache_file(cache_dir, map_cache_key(&us, &name).as_deref(), mip);
+        let key = map_cache_key(&us, Some(i), &name);
+        let file = cache_file(cache_dir, key.as_deref(), mip);
         match render_one(&us, &name, mip, file) {
             Ok((image, _)) => {
-                let dims = us.map_dimensions(&name);
+                let dims = cached_dims(dims_file(cache_dir, key.as_deref()), || {
+                    us.map_dimensions(&name)
+                });
                 thumbnails.push(Thumbnail {
                     name,
                     file: image.file,
@@ -261,4 +346,82 @@ pub fn emit_error(msg: String) {
         ..Default::default()
     };
     println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-minimap-test-{}-{tag}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir
+    }
+
+    #[test]
+    fn cached_dims_computes_once_then_serves_the_cache() {
+        let dir = temp_dir("dims-hit");
+        let file = dims_file(Some(dir.as_path()), Some("abc"));
+        let calls = Cell::new(0);
+        let compute = || {
+            calls.set(calls.get() + 1);
+            Some((384, 256))
+        };
+
+        assert_eq!(cached_dims(file.clone(), compute), Some((384, 256)));
+        assert_eq!(calls.get(), 1);
+
+        // Second read must not run the expensive call again.
+        assert_eq!(cached_dims(file, compute), Some((384, 256)));
+        assert_eq!(calls.get(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cached_dims_recomputes_when_there_is_no_cache_file() {
+        let calls = Cell::new(0);
+        let compute = || {
+            calls.set(calls.get() + 1);
+            Some((512, 512))
+        };
+        assert_eq!(cached_dims(None, compute), Some((512, 512)));
+        assert_eq!(cached_dims(None, compute), Some((512, 512)));
+        assert_eq!(calls.get(), 2);
+    }
+
+    #[test]
+    fn cached_dims_recomputes_when_the_entry_is_unreadable() {
+        let dir = temp_dir("dims-corrupt");
+        let file = dims_file(Some(dir.as_path()), Some("abc")).expect("cache file");
+        std::fs::create_dir_all(&dir).expect("create cache dir");
+        std::fs::write(&file, b"not json").expect("write corrupt entry");
+
+        let calls = Cell::new(0);
+        let got = cached_dims(Some(file), || {
+            calls.set(calls.get() + 1);
+            Some((128, 64))
+        });
+        assert_eq!(got, Some((128, 64)));
+        assert_eq!(calls.get(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_map_without_dimensions_is_not_cached() {
+        let dir = temp_dir("dims-none");
+        let file = dims_file(Some(dir.as_path()), Some("abc")).expect("cache file");
+        assert_eq!(cached_dims(Some(file.clone()), || None), None);
+        assert!(!file.exists(), "a failed read must not be cached");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn dims_and_png_cache_files_never_collide() {
+        let dir = temp_dir("dims-collide");
+        let png = cache_file(Some(dir.as_path()), Some("abc"), 3);
+        let dims = dims_file(Some(dir.as_path()), Some("abc"));
+        assert_ne!(png, dims);
+    }
 }
