@@ -347,6 +347,29 @@ export function useSuggestedMapLists(): SuggestedMapList[] {
   return lists;
 }
 
+/**
+ * Whether the one catalog load has settled, either way.
+ *
+ * The `useSuggested*` hooks above start empty and stay empty when the load
+ * fails, so on their own a caller cannot tell "not back yet" from "nothing
+ * curated". A zone that must show a placeholder for one and nothing for the
+ * other reads this alongside them. It shares the same module-level promise, so
+ * asking costs no extra fetch and no second cache.
+ */
+export function useCatalogLoaded(): boolean {
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    loadCatalog().then(() => {
+      if (!cancelled) setLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return loaded;
+}
+
 /** The catalog's map-exclusion rules, loaded once. Merged with the profile's and
  * the player's by `mapEligibility.ts` (empty on load failure, so a catalog that
  * cannot be fetched never hides a map). */
