@@ -2,6 +2,7 @@ import { Button, cn, Input } from "@picoframe/frame";
 import {
   Frame,
   Layers,
+  List,
   Loader2,
   MapPin,
   Maximize2,
@@ -24,6 +25,11 @@ import {
 import { Link } from "react-router";
 import * as THREE from "three";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   MapPreview3D,
@@ -32,6 +38,12 @@ import {
 import { usePreferredTarget } from "@/play/config";
 import type { Point, Scenario, ScenarioZone } from "../../model";
 import { ActorControls } from "./ActorControls";
+import { ContentsList } from "./ContentsList";
+import {
+  type ContentEntry,
+  contentsSelection,
+  sceneContents,
+} from "./contents";
 import {
   canTurn,
   editActor,
@@ -57,7 +69,14 @@ import { EDITOR_MODES } from "./modes";
 import { PrefabControls } from "./PrefabControls";
 import { type Placement, placementKey } from "./placements";
 import { editPrefab, removePrefab, setOrigin, setQueue } from "./prefabs";
-import { authoringCamera, clampToPlane, mapSceneStatus } from "./scene";
+import {
+  authoringCamera,
+  clampToPlane,
+  FOCUS_ELMOS,
+  focusCamera,
+  mapSceneStatus,
+  worldToScene,
+} from "./scene";
 import { startMarkers } from "./startPositions";
 import { useGameUnits } from "./useGameUnits";
 import { useMapEditing } from "./useMapEditing";
@@ -297,6 +316,54 @@ export function ScenarioMapScene({
     assetsLoading: assets.loading,
     ready: assets.ready,
   });
+
+  // What the document has put on the map, for the list that finds it again.
+  const entries = useMemo(() => sceneContents(scenario), [scenario]);
+  const listed = contentsSelection(entries, selected);
+
+  /**
+   * Look closely at a point on the map.
+   *
+   * The camera is put where it would be if the author had zoomed in on the
+   * place themselves, rather than moved along a path: what matters is arriving,
+   * and a scene this heavy is not one to animate a flight across.
+   */
+  const focusOn = useCallback(
+    (pos: Point) => {
+      const handle = sceneRef.current;
+      if (!handle) return;
+      const { camera, controls, render, scale } = handle;
+      const at = worldToScene(
+        pos,
+        assets.worldWidth,
+        assets.worldHeight,
+        scale,
+      );
+      const distance = Math.min(
+        controls.maxDistance,
+        Math.max(controls.minDistance, FOCUS_ELMOS * scale),
+      );
+      // Looked at where it stands rather than at sea level, or a thing on a
+      // ridge would arrive at the top of the view and one in a valley below it.
+      const height = units.groundAt(pos) * scale;
+      const stand = focusCamera(at, distance);
+      controls.target.set(at.x, height, at.z);
+      camera.position.set(stand.x, height + stand.y, stand.z);
+      controls.update();
+      render();
+    },
+    [assets.worldWidth, assets.worldHeight, units.groundAt],
+  );
+
+  /** Picking something out of the list is the same two things a click that
+   *  lands on it would be: it is selected, and it is on screen. */
+  const pickEntry = useCallback(
+    (entry: ContentEntry) => {
+      setSelected(entry.key);
+      focusOn(entry.pos);
+    },
+    [focusOn],
+  );
 
   /** Frame the whole map, looking down at its centre. Also the starting view. */
   const frameMap = useCallback((handle: MapScene3D) => {
@@ -618,6 +685,26 @@ export function ScenarioMapScene({
             </Button>
           </>
         )}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 bg-card/80 backdrop-blur"
+              title="Everything this scenario has put on the map"
+            >
+              <List className="size-3.5" /> Contents
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80 p-1">
+            <ContentsList
+              entries={entries}
+              selected={listed}
+              participants={scenario.setup.participants}
+              onPick={pickEntry}
+            />
+          </PopoverContent>
+        </Popover>
         <Button
           size="sm"
           variant="outline"

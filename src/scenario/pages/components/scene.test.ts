@@ -3,6 +3,7 @@ import {
   AUTHORING_PITCH,
   authoringCamera,
   clampToPlane,
+  focusCamera,
   framingDistance,
   mapSceneStatus,
   sceneToWorld,
@@ -81,6 +82,21 @@ describe("authoringCamera", () => {
     const cam = authoringCamera(10000, 10000, 1, 45, 300);
     const d = Math.hypot(cam.y, cam.z);
     expect(d).toBeCloseTo(300);
+    expect(Math.atan2(cam.y, cam.z)).toBeCloseTo(AUTHORING_PITCH);
+  });
+});
+
+describe("focusCamera", () => {
+  it("stands south of the point, at the distance asked for", () => {
+    const cam = focusCamera({ x: 12, z: -30 }, 20);
+    expect(cam.x).toBe(12);
+    expect(cam.y).toBeGreaterThan(0);
+    expect(cam.z).toBeGreaterThan(-30);
+    expect(Math.hypot(cam.y, cam.z - -30)).toBeCloseTo(20);
+  });
+
+  it("looks down at the same pitch the opening view does", () => {
+    const cam = focusCamera({ x: 0, z: 0 }, 20);
     expect(Math.atan2(cam.y, cam.z)).toBeCloseTo(AUTHORING_PITCH);
   });
 });

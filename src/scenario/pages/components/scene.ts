@@ -109,6 +109,37 @@ export function authoringCamera(
 }
 
 /**
+ * How close the camera stands to something it has been asked to look at, in
+ * elmos.
+ *
+ * Near enough that a single unit reads as a unit rather than a dot, which is the
+ * whole point of being taken to one, and far enough that what is around it is
+ * still on screen so the author knows where they have been put. Held to the
+ * range the preview's controls allow by the caller, which is what stops a small
+ * map being zoomed inside its own terrain.
+ */
+export const FOCUS_ELMOS = 1600;
+
+/**
+ * Where the camera stands to look closely at one point on the map, from the
+ * south at the authoring pitch, so being taken to something looks like the view
+ * the author already had rather than a new one.
+ *
+ * `y` is measured from the point being looked at, not from sea level, because
+ * what is worth looking at stands on the ground and the ground is not flat.
+ */
+export function focusCamera(
+  at: ScenePos,
+  distance: number,
+): { x: number; y: number; z: number } {
+  return {
+    x: at.x,
+    y: distance * Math.sin(AUTHORING_PITCH),
+    z: at.z + distance * Math.cos(AUTHORING_PITCH),
+  };
+}
+
+/**
  * The point the camera may look at, held over the map.
  *
  * Panning is the main gesture here, and nothing off the map is worth looking
