@@ -1,6 +1,5 @@
 import { useFrame } from "@picoframe/frame";
 import type { NavItem } from "@picoframe/plugin-sdk";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -12,7 +11,9 @@ import {
   ART_CARD_CLASS as ART_SHELL_CLASS,
   CARD_SHELL_CLASS,
 } from "../cardShell";
-import { homeToolGroups } from "../nav";
+import { homeToolGroups, splitGroupItems } from "../nav";
+import { openExternal, useResolvedNavItem } from "../navItem";
+import LinkCard from "./LinkCard";
 
 /**
  * Every navigable route as a card, grouped exactly as the sidebar groups them.
@@ -24,6 +25,10 @@ import { homeToolGroups } from "../nav";
  * the empty-grid "No tools available yet.") moved to the Greeting zone in issue
  * #987, which owns the line under the heading. The grid now does what every zone
  * does and renders nothing when it has nothing.
+ *
+ * A group's external links do not each get a card. They share one, at the end of
+ * their own group - see {@link LinkCard} for why there and not somewhere of its
+ * own.
  */
 export default function ToolCards() {
   const { nav } = useFrame();
@@ -35,41 +40,29 @@ export default function ToolCards() {
 
   return (
     <div className="mt-6 space-y-8">
-      {groups.map((group) => (
-        <section key={group.id} className="hidden has-[[data-nav-item]]:block">
-          {group.label && (
-            <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {group.label}
-            </h2>
-          )}
-          <div className="flex flex-wrap gap-3">
-            {group.items.map((item) => (
-              <ToolCard key={item.id} item={item} />
-            ))}
-          </div>
-        </section>
-      ))}
+      {groups.map((group) => {
+        const { tools, links } = splitGroupItems(group.items);
+        return (
+          <section
+            key={group.id}
+            className="hidden has-[[data-nav-item]]:block"
+          >
+            {group.label && (
+              <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {group.label}
+              </h2>
+            )}
+            <div className="flex flex-wrap gap-3">
+              {tools.map((item) => (
+                <ToolCard key={item.id} item={item} />
+              ))}
+              {links.length > 0 && <LinkCard items={links} />}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
-}
-
-/**
- * Resolve a nav item's live presentation, in one fixed hook-call order.
- *
- * picoframe's own `useResolvedNavItem` is internal to the package, so this is a
- * copy. Every hook runs even where the result is unused, because hooks must run
- * unconditionally per fiber. As picoframe requires, a given item id must
- * consistently define, or not define, each hook.
- */
-function useResolvedNavItem(item: NavItem) {
-  return {
-    // biome-ignore-start lint/correctness/useHookAtTopLevel: the hook call is guarded by whether the nav item defines it, which picoframe's contract requires to be stable for a given item id. The sidebar resolves items the same way.
-    visible: item.useVisible ? item.useVisible() : true,
-    label: item.useLabel ? item.useLabel() : item.label,
-    icon: item.useIcon ? item.useIcon() : item.icon,
-    description: item.useDescription ? item.useDescription() : item.description,
-    // biome-ignore-end lint/correctness/useHookAtTopLevel: end of the guarded resolver
-  };
 }
 
 /**
@@ -181,11 +174,7 @@ export function ToolCard({ item }: { item: NavItem }) {
       <button
         type="button"
         data-nav-item=""
-        onClick={() =>
-          openUrl(href).catch((err) =>
-            console.error(`home: could not open external url: ${href}`, err),
-          )
-        }
+        onClick={() => openExternal(href)}
         className={cardClass}
       >
         {inner}
