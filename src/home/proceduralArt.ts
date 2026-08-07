@@ -6,11 +6,18 @@
  *
  * Two properties matter and both are tested:
  *
- * - Deterministic. The same tool id and theme colour always produce the same
- *   markup, so a card does not shuffle on every render and React can treat the
- *   URL as a stable prop.
+ * - Deterministic. The same tool id always produces the same composition, so a
+ *   card does not shuffle on every render and React can treat the URL as a
+ *   stable prop.
  * - Free on first paint. The result is an SVG data URL, so there is no fetch, no
  *   large raster to decode, and nothing to cache.
+ *
+ * The composition is seeded from the tool id alone, and the theme colour only
+ * tints it. Seeding from both looked harmless and was not: any wobble in the
+ * probed colour, down to a rounded digit, reshuffled the whole pattern, so the
+ * cards visibly rearranged themselves between launches (issue #1047). A theme
+ * change should repaint a card, not redraw it, which is also how `bundledArt.ts`
+ * already works.
  *
  * The motif is a coil: concentric rings over a tinted field, lit by a couple of
  * soft pools. It borrows the brand's hexagonal-coil logo rather than inventing a
@@ -74,7 +81,7 @@ export function proceduralCardArtSvg(
   toolId: string,
   themeColor: string,
 ): string {
-  const seed = hashString(`${toolId}|${themeColor}`);
+  const seed = hashString(toolId);
   const rand = mulberry32(seed);
   const theme = parseColor(themeColor) ?? FALLBACK_HSL;
 
