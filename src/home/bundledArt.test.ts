@@ -10,8 +10,12 @@ import { proceduralCardArt, proceduralCardArtSvg } from "./proceduralArt";
 const THEME = "hsl(221.2 83.2% 53.3%)";
 /** picoframe's default zinc scheme, which resolves near-neutral. */
 const GREY = "rgb(113, 113, 122)";
-/** A tool with no bundled illustration, so the chain falls past this step. */
-const UNCOVERED = "multiplayer.chat";
+/**
+ * A tool with no bundled illustration, so the chain falls past this step. One of
+ * the external links, which are the only nav items left to the procedural field
+ * now that issue #1036 covered every tool that opens a Coilbox screen.
+ */
+const UNCOVERED = "mapconv.mapping-wiki";
 
 describe("bundledCardArtSvg", () => {
   it("draws every tool it claims to cover", () => {
@@ -133,11 +137,45 @@ describe("the chain with bundled art registered", () => {
     });
   });
 
+  it("leaves no group of the grid entirely on the procedural field", () => {
+    // Issue #1036: the field is meant to be the floor, not what most of the page
+    // shows. Every group the sidebar draws must have a drawing in it, and the
+    // two groups #990 skipped whole are the ones this is guarding.
+    const covered = new Set(BUNDLED_ART_TOOL_IDS);
+    for (const toolId of [
+      "play.savegames",
+      "multiplayer.lobby",
+      "multiplayer.chat",
+      "multiplayer.battles",
+      "multiplayer.battle",
+      "multiplayer.stats",
+      "content.games",
+      "content.archives",
+      "content.setupPacks",
+      "downloads.maps",
+      "downloads.games",
+      "campaign.builder",
+      "scenario.builder",
+      "lego.units",
+      "lego.parts",
+      "mapconv.projects",
+      "mapconv.compile",
+      "mapconv.decompile",
+      "animation.bos2lua",
+      "animation.cob",
+      "uberstress.run",
+      "uberstress.history",
+    ]) {
+      expect(covered, toolId).toContain(toolId);
+    }
+  });
+
   it("covers only tools the sidebar actually offers", () => {
-    // Nav ids are `plugin.item`. A typo here is silent: the tool just never
-    // gets its illustration and nobody notices until a screenshot.
+    // Nav ids are `plugin.item`, and an item may carry a digit (`bos2lua`). A
+    // typo here is silent: the tool just never gets its illustration and nobody
+    // notices until a screenshot.
     for (const id of BUNDLED_ART_TOOL_IDS) {
-      expect(id, id).toMatch(/^[a-z]+\.[a-zA-Z]+$/);
+      expect(id, id).toMatch(/^[a-z]+\.[a-zA-Z0-9]+$/);
     }
   });
 });

@@ -53,10 +53,7 @@ export function VotePanel({
           <span className="truncate text-sm text-muted-foreground">
             {vote.subject}
             {vote.caller && (
-              <span className="text-muted-foreground/70">
-                {" "}
-                · by {vote.caller}
-              </span>
+              <span className="text-muted-foreground"> · by {vote.caller}</span>
             )}
           </span>
         </div>

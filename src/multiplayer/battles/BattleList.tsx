@@ -135,7 +135,7 @@ function BattleGroup({
           }`}
         />
         {label}
-        <span className="text-muted-foreground/60">{battles.length}</span>
+        <span className="text-muted-foreground">{battles.length}</span>
       </button>
       {!collapsed && (
         <ul className="flex flex-col gap-2 px-4 pb-2">

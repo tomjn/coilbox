@@ -177,7 +177,7 @@ export function RunHud({
                 onClick={onInspectArsenal}
                 aria-label="View the arsenal tech tree"
                 title="View arsenal tree"
-                className="pointer-events-auto -m-1 flex size-5 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                className="pointer-events-auto -m-1 flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
               >
                 <ListTree className="size-3" aria-hidden />
               </button>
@@ -214,7 +214,7 @@ function HelpDot({ label, help }: { label: string; help: string }) {
         <button
           type="button"
           aria-label={`What is ${label}?`}
-          className="pointer-events-auto -m-1 flex size-5 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          className="pointer-events-auto -m-1 flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
         >
           <HelpCircle className="size-3" aria-hidden />
         </button>

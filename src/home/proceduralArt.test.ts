@@ -22,6 +22,11 @@ function colours(markup: string): { h: number; s: number; l: number }[] {
   );
 }
 
+/** The markup with every colour removed, so two themes compare on geometry. */
+function strip(svg: string): string {
+  return svg.replace(/hsl\([^)]*\)/g, "colour");
+}
+
 /** The field gradient only, which is what sits directly under a card's text. */
 function fieldColours(svg: string) {
   const field = /<linearGradient[^>]*>([\s\S]*?)<\/linearGradient>/.exec(svg);
@@ -46,6 +51,30 @@ describe("proceduralCardArtSvg", () => {
     expect(proceduralCardArtSvg("warpath", BLUE)).not.toBe(
       proceduralCardArtSvg("warpath", ORANGE),
     );
+  });
+
+  it("draws the same composition whatever the theme colour turns out to be", () => {
+    // The condition the determinism test above cannot see. The theme colour is
+    // probed off the live document, so it can arrive late, arrive rounded a
+    // digit differently, or fail to resolve at all. While the composition was
+    // seeded from it, any of those redrew the card rather than retinting it, and
+    // the cards visibly rearranged between launches (issue #1047).
+    //
+    // Compared with the colours stripped, so this fails on a change of geometry
+    // and stays quiet on a change of palette, which is the intended behaviour.
+    const themes = [BLUE, ORANGE, NEUTRAL, "#ff0000", "240 calc(1 * 6%) 16%"];
+    const shapes = themes.map((theme) =>
+      strip(proceduralCardArtSvg("warpath", theme)),
+    );
+    expect(new Set(shapes).size).toBe(1);
+  });
+
+  it("still draws a different composition for each tool", () => {
+    // The other half of the same property: geometry must depend on the tool id,
+    // or seeding off the id alone would give every card one picture.
+    const ids = ["warpath", "replays", "campaigns", "maps", "conquest"];
+    const shapes = ids.map((id) => strip(proceduralCardArtSvg(id, BLUE)));
+    expect(new Set(shapes).size).toBe(ids.length);
   });
 
   it("is one svg element with the canvas it was authored against", () => {

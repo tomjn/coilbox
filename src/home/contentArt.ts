@@ -3,10 +3,30 @@
  * played on this machine.
  *
  * A card for Singleplayer shows the minimap of the map sitting in your saved
- * setup. Replays shows the map of the last match you recorded. Campaigns shows
- * the map of the mission you last played. Nothing here is drawn: PR #982 already
- * renders minimaps and loading-screen art to a disk cache and serves them over
- * `coilbox://`, so this module picks the content and hands back that URL.
+ * setup. Maps shows one of the maps you have. Games shows one of your games.
+ * Nothing here is drawn: PR #982 already renders minimaps and loading-screen art
+ * to a disk cache and serves them over `coilbox://`, so this module picks the
+ * content and hands back that URL.
+ *
+ * ## When real content beats the illustration, and when it does not
+ *
+ * The illustration is the default. Real content has to earn its place by saying
+ * something the drawing cannot (issues #1036, #1039, #1040).
+ *
+ * A minimap on Singleplayer earns it: it tells you which map is loaded in your
+ * setup, which no drawing of two armies can. The same minimap on Campaigns,
+ * Scenarios and Replays earns nothing, because it is the same picture and so
+ * carries no information at all once repeated, while the drawings it displaced
+ * were six different pictures. That is why {@link PICK_PRIORITY} exists.
+ *
+ * Warpath earns nothing at any priority, so it offers no content: a run is a
+ * journey across a galaxy and one battle's map is a fact about a fight the card
+ * does not stand for. Its diamond lattice says more, and rendering the run
+ * itself is issue #1023 on another milestone.
+ *
+ * A card standing for a collection is the opposite case: the collection is
+ * nothing but its members, so any member is a fair picture of it. Maps and Games
+ * therefore offer every installed map and game, best first.
  *
  * ## Solving a synchronous source over asynchronous data
  *
@@ -30,22 +50,34 @@
  * makes step 3 work: the re-render has to happen above the cards, and a zone
  * cannot re-render its siblings.
  *
- * The hook lives in its own file so that this one imports nothing but types.
- * `art.ts` registers the source, so whatever this file pulls in lands in the
- * import graph of every test that touches the chain, and the chain is meant to
- * unit test without a DOM or a Tauri bridge.
+ * The hook lives in its own file so that this one imports nothing but types and
+ * pure helpers. `art.ts` registers the source, so whatever this file pulls in
+ * lands in the import graph of every test that touches the chain, and the chain
+ * is meant to unit test without a DOM or a Tauri bridge.
  *
  * Splitting it this way also keeps the interesting part testable. Which content
  * each tool shows is {@link contentPicks}, a pure function of plain data, so
  * "this install has no replays" is a unit test rather than a mocked IPC bridge.
  *
+ * ## Where a card learns what its siblings picked
+ *
+ * Here, in {@link contentPicks}. It is already the only function that sees the
+ * whole page at once, because the content step is published page-wide by one
+ * hook above the layout rather than resolved per zone, so making the picks aware
+ * of each other cost no new plumbing.
+ *
+ * That is a deliberate exception to the rule that a zone must not read another
+ * zone's state, and it is narrower than it sounds. No zone learns anything: a
+ * card still calls `resolveCardArt(id)` and gets one answer. What changed is
+ * that the answer is now computed for the page rather than for the card, which
+ * is what art is. Four cards each individually showing the right map is still a
+ * page showing one picture four times, and no card can see that from inside
+ * itself.
+ *
  * ## Where the picks come from, and where they deliberately differ
  *
- * `src/home/continue.ts` already ranks what you could resume, and the Warpath
- * pick goes through it so the Continue hero and the Warpath card cannot name
- * different runs.
- *
- * The campaign and skirmish picks answer a different question on purpose.
+ * The campaign and skirmish picks answer a different question from
+ * `src/home/continue.ts` on purpose.
  * "Resume" wants a mission left mid-attempt and a preset with a timestamp on it.
  * A picture wants the last thing you touched, finished or not. So the campaign
  * pick reads `lastPlayedMissionId`, which still has an answer once you have
@@ -72,7 +104,7 @@
  */
 
 import type { Campaign, ProgressFile } from "../campaign/model";
-import type { RogueliteRun } from "../runlite/model";
+import { hashString } from "../conquest/rng";
 import type { CardArtSource } from "./art";
 
 /* -------------------------------------------------------------------------- *
@@ -98,6 +130,9 @@ export type ReplaySummary = { mapName?: string };
 /** The fields of a scenario a pick reads. */
 export type ScenarioSummary = { setup: { mapName: string } };
 
+/** The one field of an installed map or game a collection pick reads. */
+export type NamedContent = { name: string };
+
 /** Everything {@link contentPicks} reads. */
 export interface ContentPickSources {
   draft: DraftSummary;
@@ -107,12 +142,10 @@ export interface ContentPickSources {
   progress: ProgressFile;
   /** Scenarios newest edit first, which is the order `useScenarios` returns. */
   scenarios: readonly { scenario: ScenarioSummary }[];
-  runs: Record<string, RogueliteRun>;
-  /**
-   * The Warpath run `continue.ts` chose, so the card and the Continue hero
-   * cannot name different runs. Absent when there is nothing to resume.
-   */
-  resumeRunId?: string;
+  /** Every installed map, as the unitsync scan lists them. */
+  maps: readonly NamedContent[];
+  /** Every installed game, as the unitsync scan lists them. */
+  games: readonly NamedContent[];
 }
 
 /** The map your saved Singleplayer setup is pointed at. */
@@ -181,48 +214,108 @@ export function scenarioPick(
 }
 
 /**
- * The map of the next fight in your Warpath run.
+ * Every member of a collection, in a deterministic order.
  *
- * Not the node you are standing on. A run starts on `start` and passes through
- * reward, shop and event nodes, none of which has a map, so the current node is
- * blank for most of a run. What a Warpath card should show is the ground ahead,
- * so this takes the battle nodes an edge leads to from where you are. Falling
- * back to the earliest unvisited battle covers the node whose every exit is a
- * shop, which would otherwise leave the card artless in the middle of a run.
+ * A collection card can honestly show any member, so it offers all of them and
+ * lets {@link assignPicks} take the first one no other card wanted. That is also
+ * why these cards can never be the ones left without art by a collision: there
+ * is always another map.
+ *
+ * The order is the sorted names rotated by a hash of the names themselves, so
+ * two installs with the same content agree, the answer does not move between
+ * renders or between launches, and installing something new does move it. The
+ * sort is what makes it independent of the order unitsync happened to scan in.
+ *
+ * Seeding off the day was the alternative. It varies more, but it changes the
+ * page under a session that is open across midnight, and it makes every test of
+ * this function need a clock.
  */
-export function warpathPick(
-  runs: Record<string, RogueliteRun>,
-  runId: string | undefined,
-): ContentPick | undefined {
-  const run = runId ? runs[runId] : undefined;
-  if (!run) return undefined;
-  const byId = new Map(run.nodes.map((n) => [n.id, n]));
-  const next = run.edges
-    .filter(([from]) => from === run.progress.currentNodeId)
-    .map(([, to]) => byId.get(to))
-    .find((n) => n?.battle?.mapName);
-  const visited = new Set(run.progress.visited);
-  const ahead =
-    next ?? run.nodes.find((n) => n.battle?.mapName && !visited.has(n.id));
-  const mapName = ahead?.battle?.mapName;
-  return mapName ? { kind: "map", mapName } : undefined;
+export function collectionPicks(
+  items: readonly NamedContent[],
+  kind: ContentPick["kind"],
+): readonly ContentPick[] {
+  const names = [...new Set(items.map((i) => i.name).filter(Boolean))].sort();
+  if (names.length === 0) return [];
+  const start = hashString(names.join("\n")) % names.length;
+  return names.map((_, i) => {
+    const name = names[(start + i) % names.length];
+    return kind === "map"
+      ? { kind: "map", mapName: name }
+      : { kind: "game", gameName: name };
+  });
 }
 
 /**
- * The run id `continue.ts` chose, recovered from its candidate id.
+ * The tools that offer content, in the order they get first refusal on it.
  *
- * The collector returns candidates rather than entities, so the id it builds is
- * the only handle onto the run it picked. Going through it rather than repeating
- * its "most recently updated active run" rule is what stops the Warpath card and
- * the Continue hero drifting apart. `contentArt.test.ts` pins the format against
- * `warpathCandidate` itself, so a change there fails a test rather than silently
- * blanking the card.
+ * A declared order rather than the order the cards render in, so the page does
+ * not depend on which zone painted first and a test can assert one answer.
+ *
+ * The ranking is how strongly the picture is about the card, following the rule
+ * at the head of this file. Your skirmish setup's map is the setup. Your newest
+ * replay's map is where that match was fought. A scenario's map is the ground it
+ * is set on. A campaign's is one stop on a journey the road drawing describes
+ * better, so it yields to all three. The two collection cards come last because
+ * they are the only ones that lose nothing by yielding: they have another
+ * member to offer.
  */
-export function resumeRunId(
-  candidates: readonly { kind: string; id: string }[],
-): string | undefined {
-  const found = candidates.find((c) => c.kind === "warpath");
-  return found?.id.slice("warpath:".length) || undefined;
+export const PICK_PRIORITY: readonly string[] = [
+  "play.skirmish",
+  "play.replays",
+  "scenario.list",
+  "campaign.list",
+  "content.games",
+  "content.maps",
+];
+
+/** What each tool would show, best first, before the collisions are settled. */
+export function contentOffers(
+  sources: ContentPickSources,
+): Map<string, readonly ContentPick[]> {
+  const offers = new Map<string, readonly ContentPick[]>();
+  const add = (toolId: string, picks: readonly ContentPick[]) => {
+    if (picks.length > 0) offers.set(toolId, picks);
+  };
+  const one = (pick: ContentPick | undefined) => (pick ? [pick] : []);
+  add("play.skirmish", one(skirmishPick(sources.draft)));
+  add("play.replays", one(replayPick(sources.replays)));
+  add("scenario.list", one(scenarioPick(sources.scenarios)));
+  add("campaign.list", one(campaignPick(sources.campaigns, sources.progress)));
+  // The game in your saved setup first, then the rest of the shelf. It is a
+  // member of the collection like any other, and it is the one you play.
+  add("content.games", [
+    ...one(gamePick(sources.draft)),
+    ...collectionPicks(sources.games, "game"),
+  ]);
+  add("content.maps", collectionPicks(sources.maps, "map"));
+  return offers;
+}
+
+/** A piece of content, as one string. Maps and games are separate namespaces. */
+function contentKey(pick: ContentPick): string {
+  return pick.kind === "map" ? `m:${pick.mapName}` : `g:${pick.gameName}`;
+}
+
+/**
+ * Give each tool the best picture no tool above it has already taken.
+ *
+ * A tool whose every candidate is taken gets nothing and falls through to its
+ * illustration, which is the right answer rather than a compromise: the second
+ * copy of a picture carries none of the information the first one did, and the
+ * drawing it displaced carried some.
+ */
+export function assignPicks(
+  offers: ReadonlyMap<string, readonly ContentPick[]>,
+): Map<string, ContentPick> {
+  const taken = new Set<string>();
+  const picks = new Map<string, ContentPick>();
+  for (const toolId of PICK_PRIORITY) {
+    const free = offers.get(toolId)?.find((p) => !taken.has(contentKey(p)));
+    if (!free) continue;
+    taken.add(contentKey(free));
+    picks.set(toolId, free);
+  }
+  return picks;
 }
 
 /**
@@ -230,29 +323,12 @@ export function resumeRunId(
  *
  * Coverage is deliberately partial, and a tool absent from the result falls
  * through to the bundled illustration and then to the procedural field, so a gap
- * here is a local decision with no chain consequences. Conquest and the maps
- * browser are absent for reasons that need new work rather than a new line here,
- * tracked as their own issues on milestone 16.
- *
- * The same map may be picked by more than one tool, and it is not deduplicated.
- * If your last skirmish and your last replay were on the same map then both
- * cards showing it is the truth, and picking a second-best map for one of them
- * to avoid the repetition would not be.
+ * here is a local decision with no chain consequences.
  */
 export function contentPicks(
   sources: ContentPickSources,
 ): Map<string, ContentPick> {
-  const picks = new Map<string, ContentPick>();
-  const add = (toolId: string, pick: ContentPick | undefined) => {
-    if (pick) picks.set(toolId, pick);
-  };
-  add("play.skirmish", skirmishPick(sources.draft));
-  add("play.replays", replayPick(sources.replays));
-  add("campaign.list", campaignPick(sources.campaigns, sources.progress));
-  add("scenario.list", scenarioPick(sources.scenarios));
-  add("runlite.list", warpathPick(sources.runs, sources.resumeRunId));
-  add("content.games", gamePick(sources.draft));
-  return picks;
+  return assignPicks(contentOffers(sources));
 }
 
 /** A stable string for a set of picks, so an effect can depend on their value. */

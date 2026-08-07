@@ -469,7 +469,7 @@ export default function ReplaysPage() {
                         {meta.join(" · ")}
                       </span>
                       {r.gameType && (
-                        <span className="truncate text-xs text-muted-foreground/80">
+                        <span className="truncate text-xs text-muted-foreground">
                           {r.gameType}
                         </span>
                       )}
@@ -524,7 +524,7 @@ export default function ReplaysPage() {
                       title={us.watched ? "Watched" : "Mark watched"}
                     >
                       <Eye
-                        className={`size-4 ${us.watched ? "text-primary" : "text-muted-foreground/50"}`}
+                        className={`size-4 ${us.watched ? "text-primary" : "text-muted-foreground"}`}
                       />
                     </Button>
                   </div>

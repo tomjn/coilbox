@@ -192,7 +192,7 @@ export default function SavegamesPage() {
                       {meta.join(" · ")}
                     </span>
                     {s.gameType && (
-                      <span className="truncate text-xs text-muted-foreground/80">
+                      <span className="truncate text-xs text-muted-foreground">
                         {s.gameType}
                       </span>
                     )}

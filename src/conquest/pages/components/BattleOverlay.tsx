@@ -510,7 +510,7 @@ function Outcome({
         </p>
       )}
       {autoDetected && (
-        <p className="text-xs text-muted-foreground/70">
+        <p className="text-xs text-muted-foreground">
           Result detected from the replay.
         </p>
       )}

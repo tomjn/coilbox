@@ -19,10 +19,10 @@ import {
   useReplays,
   useScanTargetSelection,
   useUnitsyncGameHeaders,
+  useUnitsyncScan,
 } from "../content/config";
 import { unitsyncThumbUrl } from "../lib/assetUrl";
 import { useSkirmishDraft } from "../play/drafts";
-import { useRuns } from "../runlite/runs";
 import { useScenarios } from "../scenario/scenarios";
 import {
   type ContentPick,
@@ -30,10 +30,8 @@ import {
   contentPicks,
   picksKey,
   publishContentArt,
-  resumeRunId,
   subscribeContentArt,
 } from "./contentArt";
-import { useResume } from "./continue";
 
 /** Session cache of resolved minimap URLs, keyed by root, engine and map. */
 const minimapUrls = new Map<string, string | null>();
@@ -141,9 +139,14 @@ export function useContentCardArt(): void {
   const { campaigns } = useCampaigns();
   const { progress } = useCampaignProgress();
   const { scenarios } = useScenarios();
-  const { runs } = useRuns();
-  const { candidates } = useResume();
   const { headers } = useUnitsyncGameHeaders(
+    selected?.enginePath,
+    selected?.rootPath,
+  );
+  // What is installed, for the Maps and Games cards. The Featured Map zone
+  // already mounts this same hook on the same target, and the scan is cached
+  // per target, so the collection picks cost the home page nothing new.
+  const { data: scan } = useUnitsyncScan(
     selected?.enginePath,
     selected?.rootPath,
   );
@@ -154,8 +157,8 @@ export function useContentCardArt(): void {
     campaigns,
     progress,
     scenarios,
-    runs,
-    resumeRunId: resumeRunId(candidates),
+    maps: scan?.maps ?? [],
+    games: scan?.games ?? [],
   });
 
   // The picks are rebuilt on every render, so the effect depends on their value
