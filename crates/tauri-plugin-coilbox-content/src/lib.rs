@@ -9,6 +9,7 @@
 //! explicit `content_verify_engine` (bounded by a timeout), never during listing.
 //! Results use the [`CliResult`] envelope, matching every other picoframe plugin.
 
+mod archives;
 mod branding;
 mod build_tree_export;
 mod caches;
@@ -1070,6 +1071,20 @@ async fn content_delete_replay(path: String) -> Result<CliResult, ()> {
     }
 }
 
+/// `content_delete_archive`: delete one downloaded game or map archive and
+/// report the bytes it freed. `path` is an on-disk archive path from a scan.
+/// Guarded by [`archives::classify`], which refuses anything outside a content
+/// root's `games`/`maps`/`packages` so the engine's base archives cannot go.
+#[tauri::command]
+async fn content_delete_archive(path: String) -> Result<CliResult, ()> {
+    let p = PathBuf::from(&path);
+    match tauri::async_runtime::spawn_blocking(move || archives::delete(&p)).await {
+        Ok(Ok(bytes)) => Ok(CliResult::ok(json!({ "bytes": bytes }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("delete archive task failed: {e}"))),
+    }
+}
+
 /// `content_gather_replays`: move the replays sitting inside each installed
 /// engine's own folder into the root's `demos/`, so deleting an old engine
 /// folder does not take them (issue #971). `apply` false previews without moving
@@ -1348,6 +1363,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_demo_chat,
             content_rewrite_demo,
             content_delete_replay,
+            content_delete_archive,
             content_gather_replays,
             content_list_saves,
             content_delete_save,

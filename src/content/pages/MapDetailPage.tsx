@@ -29,17 +29,20 @@ import {
   useContentState,
   useReplayStats,
   useScanTargetSelection,
+  useUnitsyncArchiveTree,
   useUnitsyncHeightmap,
   useUnitsyncMapInfo,
   useUnitsyncMapSkybox,
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
+import { isDeletableArchive } from "../format";
 import { useMapEligibility } from "../mapEligibility";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, guessPrimaryPlayer, mapRecordFor } from "../stats";
 import { usePlayMap } from "../usePlayMap";
 import { ArchiveRow } from "./components/ArchiveRow";
+import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
 import { mapSizeLabel } from "./components/MapThumb";
 import { OptionsList } from "./components/OptionsList";
 import { StatCard } from "./components/StatWidgets";
@@ -96,6 +99,18 @@ export default function MapDetailPage() {
     selected?.rootPath,
     decoded,
   );
+
+  // The scan reports map archives by a versioned display name and no path, so
+  // the backing `.sd7`/`.sdz`/`.sdd` file comes from the archive tree. The delete
+  // button needs it to know whether this map is a deletable download.
+  const archiveName = data?.maps.find((m) => m.name === decoded)?.archives[0]
+    ?.name;
+  const { tree: archiveTree } = useUnitsyncArchiveTree(
+    selected?.enginePath,
+    selected?.rootPath,
+    archiveName,
+  );
+  const archivePath = archiveTree?.archivePath;
 
   // Per-map record (#460): a distribution profile can hide stats entirely, in
   // which case the roots stay empty so `useReplayStats` never ingests.
@@ -167,7 +182,6 @@ export default function MapDetailPage() {
   // decompile. The scan reports map archives by a versioned display name (no path),
   // so ask the archive-tree command — it turns that name into the real `.sd7`/
   // `.sdz`/`.sdd` file the decompiler opens.
-  const archiveName = map.archives[0]?.name;
   const openInDecompile = async () => {
     if (!selected || !archiveName) return;
     setDecompiling(true);
@@ -215,7 +229,7 @@ export default function MapDetailPage() {
         )}
       </header>
 
-      <section className="flex flex-wrap gap-2">
+      <section className="flex flex-wrap items-center gap-2">
         <Button size="sm" className="gap-1.5" onClick={() => playMap(map.name)}>
           <Play className="size-4" /> Play this map
         </Button>
@@ -248,6 +262,13 @@ export default function MapDetailPage() {
             <PackageOpen className="size-4" />
             {decompiling ? "Opening…" : "Open in mapconv decompile"}
           </Button>
+        )}
+        {archivePath && isDeletableArchive(archivePath) && (
+          <DeleteArchiveButton
+            path={archivePath}
+            name={archiveName ?? map.name}
+            onDeleted={() => navigate("/content/maps")}
+          />
         )}
       </section>
 

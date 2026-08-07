@@ -56,7 +56,7 @@ pub(crate) struct ReclaimSummary {
 /// Recursively tally `(bytes, files)` under `dir`. Symlinks are counted as a single
 /// entry and never traversed, so the walk can't follow a link out of the cache dir.
 /// A missing/unreadable dir contributes nothing.
-fn dir_stats(dir: &Path) -> (u64, u64) {
+pub(crate) fn dir_stats(dir: &Path) -> (u64, u64) {
     let mut bytes = 0u64;
     let mut files = 0u64;
     let Ok(rd) = std::fs::read_dir(dir) else {

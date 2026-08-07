@@ -24,6 +24,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-demo-chat`
 - `allow-content-rewrite-demo`
 - `allow-content-delete-replay`
+- `allow-content-delete-archive`
 - `allow-content-gather-replays`
 - `allow-content-list-saves`
 - `allow-content-delete-save`
@@ -280,6 +281,32 @@ Enables the content_create_standard_root command without any pre-configured scop
 <td>
 
 Denies the content_create_standard_root command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-delete-archive`
+
+</td>
+<td>
+
+Enables the content_delete_archive command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-delete-archive`
+
+</td>
+<td>
+
+Denies the content_delete_archive command without any pre-configured scope.
 
 </td>
 </tr>

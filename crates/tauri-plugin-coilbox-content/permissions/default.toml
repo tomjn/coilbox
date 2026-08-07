@@ -23,6 +23,7 @@ permissions = [
   "allow-content-demo-chat",
   "allow-content-rewrite-demo",
   "allow-content-delete-replay",
+  "allow-content-delete-archive",
   "allow-content-gather-replays",
   "allow-content-list-saves",
   "allow-content-delete-save",

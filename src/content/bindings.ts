@@ -460,6 +460,16 @@ export const contentDeleteReplay = defineCommand<
   { ok: boolean }
 >("coilbox-content", "content_delete_replay");
 
+/**
+ * Delete a downloaded game or map archive, returning the bytes freed. The Rust
+ * side only accepts an archive sitting in a content root's `games`, `maps` or
+ * `packages` folder, so an engine's base archives can't be removed.
+ */
+export const contentDeleteArchive = defineCommand<
+  { path: string },
+  { bytes: number }
+>("coilbox-content", "content_delete_archive");
+
 /** What a gather moved out of the engine folders, or would move (issue #971). */
 export interface GatherSummary {
   /** False for a preview, which moves nothing. */
