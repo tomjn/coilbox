@@ -86,11 +86,6 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
-   * Issue #878. Runtime 1 ignores a prefab building's id, and `unit_dead` on a
-   * name it has never heard of holds from the first frame, so a scenario naming
-   * a building has to be refused by an older game rather than half played.
-   */
-  /**
    * Issue #827. Runtime 2 reads past the team and moves every player's camera,
    * so a co-op mission shows one side the ambush laid for the other.
    */
@@ -141,6 +136,49 @@ describe("requiredRuntimeVersion", () => {
     });
   });
 
+  /**
+   * Issue #802. Runtime 2 reads past `uncontested` and answers the presence
+   * question, so a hold an enemy army is standing in settles the objective.
+   */
+  describe("a scenario asking for an uncontested hold", () => {
+    const withHold = (params: Record<string, unknown>): Scenario => {
+      const scenario = withTrigger([], []);
+      return {
+        ...scenario,
+        triggers: [
+          {
+            ...scenario.triggers[0],
+            conditions: {
+              op: "all",
+              conditions: [{ type: "zone_held_for", params: params as never }],
+            },
+          },
+        ],
+      };
+    };
+
+    const hold = { zone: "keep", team: "player", seconds: 60 };
+
+    it("needs the runtime that reads the flag", () => {
+      expect(
+        requiredRuntimeVersion(withHold({ ...hold, uncontested: true })),
+      ).toBe(3);
+    });
+
+    it("is left on the first runtime when it asks for presence", () => {
+      expect(requiredRuntimeVersion(withHold(hold))).toBe(1);
+      // Written false is the question every runtime has always answered.
+      expect(
+        requiredRuntimeVersion(withHold({ ...hold, uncontested: false })),
+      ).toBe(1);
+    });
+  });
+
+  /**
+   * Issue #878. Runtime 1 ignores a prefab building's id, and `unit_dead` on a
+   * name it has never heard of holds from the first frame, so a scenario naming
+   * a building has to be refused by an older game rather than half played.
+   */
   describe("a scenario that names a prefab building", () => {
     const withBase = (target: string): Scenario => {
       const scenario = withTrigger([], []);

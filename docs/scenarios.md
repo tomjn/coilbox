@@ -148,9 +148,13 @@ The names below are the ones in the compiled mission. The editor shows them with
 | `unit_captured` | An actor has changed hands, optionally to a named team. |
 | `time_elapsed` | This many seconds since the mission started. |
 | `var` | A variable compared against a number, or against another variable, with `eq`, `ne`, `lt`, `lte`, `gt` or `gte`. |
-| `zone_held_for` | A team has had a unit in a zone continuously for this many seconds. Leaving resets the clock. |
+| `zone_held_for` | A team has had a unit in a zone continuously for this many seconds. Leaving resets the clock. **Uncontested** asks for control instead of presence. |
 
-`zone_held_for` is presence, not control. A team standing in a zone holds it whether or not anyone else is standing there too: [issue #802](https://github.com/tomjn/coilbox/issues/802).
+`zone_held_for` is presence by default: a team standing in a zone holds it whether or not anyone else is standing there too, so one scout parked in a keep an enemy army is also sitting in satisfies "hold the keep for 60 seconds". Tick **uncontested** and anyone the holding team is not allied with breaks the hold for as long as they are in the zone, and the clock starts again from nothing when they leave.
+
+Gaia does not contest. It owns the map's own furniture, critters and the units some maps place, which belongs to no side and fights for none, so a mission that told the player to clear the keep would otherwise be asking them to hunt down a deer. Allies do not contest either. A scenario that ticks the box needs mission runtime 3.
+
+You cannot build this out of `units_in_zone` with `max = 0`. That reads the moment the timer runs out rather than the whole minute leading up to it.
 
 ### Actions
 

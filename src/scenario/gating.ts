@@ -92,6 +92,26 @@ function pointsAtOneTeam(scenario: Scenario): boolean {
   );
 }
 
+/**
+ * The runtime that first held `zone_held_for` to an uncontested zone (issue
+ * #802). A runtime behind this reads past the flag and answers the presence
+ * question, so "hold the keep for a minute" is settled by a scout parked in a
+ * keep an enemy army is also sitting in.
+ */
+const UNCONTESTED_HOLD_VERSION = 3;
+
+/** Whether any hold asks to be uncontested. A flag written `false` is the
+ *  presence question every runtime has always answered, so it asks for
+ *  nothing. */
+function asksForAnUncontestedHold(scenario: Scenario): boolean {
+  return scenario.triggers.some((trigger) =>
+    trigger.conditions.conditions.some(
+      (step) =>
+        step.type === "zone_held_for" && step.params.uncontested === true,
+    ),
+  );
+}
+
 /** Every string a value carries, however deeply nested. */
 function stringsIn(value: unknown, out: Set<string>): void {
   if (typeof value === "string") out.add(value);
@@ -159,6 +179,9 @@ export function requiredRuntimeVersion(
   }
   if (pointsAtOneTeam(scenario)) {
     version = Math.max(version, VIEW_TEAM_VERSION);
+  }
+  if (asksForAnUncontestedHold(scenario)) {
+    version = Math.max(version, UNCONTESTED_HOLD_VERSION);
   }
   return version;
 }

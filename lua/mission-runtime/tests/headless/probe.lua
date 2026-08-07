@@ -228,10 +228,10 @@ local function owns(team, defName)
 	return Spring.GetTeamUnitDefCount(team, def.id)
 end
 
---- Put a unit on the map for the player, at the ground height, and make it
--- proof against anything the mission's own units do to it. A check about a zone
--- being held is about the runtime's clock, not about whether a scout survives
--- three raiders, nor about where they leave it.
+--- Put a unit on the map for a team, at the ground height, and make it proof
+-- against anything the mission's own units do to it. A check about a zone being
+-- held is about the runtime's clock, not about whether a scout survives three
+-- raiders, nor about where they leave it.
 --
 -- Armour stops the damage and nothing else. The engine scales damage by the
 -- armour multiple and impulse by nothing, and a ground unit answers impulse by
@@ -240,14 +240,19 @@ end
 -- outright and is never pushed, and dropping it out of solid-object collisions
 -- keeps a unit that is itself skidding from shoving it on the way past. What is
 -- left stands exactly where it was put for the whole run.
-local function playerUnit(defName, x, z)
-	local unitID = Spring.CreateUnit(defName, x, Spring.GetGroundHeight(x, z), z, 0, 0)
+local function pinnedUnit(defName, team, x, z)
+	local unitID = Spring.CreateUnit(defName, x, Spring.GetGroundHeight(x, z), z, 0, team)
 	if unitID then
 		Spring.SetUnitArmored(unitID, true, 0)
 		Spring.MoveCtrl.Enable(unitID)
 		Spring.SetUnitBlocking(unitID, false, false)
 	end
 	return unitID
+end
+
+--- The same, on the player's team, which is what most of the steps below want.
+local function playerUnit(defName, x, z)
+	return pinnedUnit(defName, 0, x, z)
 end
 
 --- A spot within `reach` of (x, z) that `defName` may be built on, or nil.
@@ -733,6 +738,14 @@ local BUILD_REACH = 110
 
 local siegeBuilder, siegeOrdered
 
+-- The yard, the second zone the siege scenario carries, and the only thing in
+-- the fixtures that asks for an uncontested hold (issue #802). Well east of the
+-- keep, so nothing the mission places and nothing the steps above put down is
+-- ever standing in it.
+local YARD_X, YARD_Z = 2700, 1900
+
+local yardUnit, yardIntruder
+
 -- The keep's factory, by the name the scenario gave that building. Every step
 -- below that talks to it goes through here, so what the runtime records about a
 -- prefab building is what the whole fixture is driven by rather than a def scan
@@ -907,6 +920,37 @@ plans.siege = {
 				keepLab() == nil, keepLab())
 			check("and the other building in the base is untouched",
 				defOf(state().units["keep-mex"]) == "cormex")
+		end },
+		-- Issue #802: the same zone clock, asked whether the team holding it is
+		-- the only one there. The player's unit walks into the yard and an enemy
+		-- walks in beside it, and the hold is ten seconds.
+		{ frame = 750, run = function()
+			check("nothing has held the yard yet", rules("coilbox_mission_var_yardHeld") == 0,
+				rules("coilbox_mission_var_yardHeld"))
+			yardUnit = playerUnit("armpeep", YARD_X, YARD_Z)
+			yardIntruder = pinnedUnit("corak", 1, YARD_X + 40, YARD_Z + 40)
+			check("both are standing in the yard",
+				yardUnit ~= nil and yardIntruder ~= nil)
+		end },
+		{ frame = 1150, run = function()
+			-- Four hundred frames in, on a ten second hold. A runtime that read
+			-- past `uncontested` would have settled this at frame 1050.
+			check("a hold an enemy is standing in is no hold at all",
+				rules("coilbox_mission_var_yardHeld") == 0,
+				rules("coilbox_mission_var_yardHeld"))
+			check("and the unit doing the holding has not wandered off",
+				Spring.GetUnitIsDead(yardUnit) == false)
+			Spring.DestroyUnit(yardIntruder, false, true)
+		end },
+		{ frame = 1300, run = function()
+			check("clearing them out does not hand the hold straight back",
+				rules("coilbox_mission_var_yardHeld") == 0,
+				rules("coilbox_mission_var_yardHeld"))
+		end },
+		{ frame = 1560, run = function()
+			check("holding it alone for the whole ten seconds does",
+				rules("coilbox_mission_var_yardHeld") == 1,
+				rules("coilbox_mission_var_yardHeld"))
 		end },
 		{ frame = 1500, run = function()
 			check("a hold short of the minute settles nothing",

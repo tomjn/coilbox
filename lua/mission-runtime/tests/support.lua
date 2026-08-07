@@ -411,6 +411,16 @@ function M.newEngine(modOptions, files, options)
 			GetUnitDefID = function(unitID)
 				return engine.units[unitID].defID
 			end,
+			GetUnitTeam = function(unitID)
+				local unit = engine.units[unitID]
+				return unit and unit.team
+			end,
+			-- Two teams in one ally team are allied, and so is a team with itself.
+			-- `options.allyTeams` is what decides, the way it does everywhere else
+			-- here.
+			AreTeamsAllied = function(a, b)
+				return allyTeamOf(a) == allyTeamOf(b)
+			end,
 			GetUnitHealth = function(unitID)
 				local unit = engine.units[unitID]
 				return unit.health, unit.maxHealth

@@ -126,6 +126,12 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
     zone: { kind: "zoneId" },
     team: { kind: "teamId" },
     seconds: { kind: "number" },
+    /**
+     * Break the hold while anyone the team is not allied with is standing in
+     * the zone, so "hold the keep" is not satisfied by a scout parked in a
+     * keep an enemy army is also sitting in (issue #802). Gaia is not anyone.
+     */
+    uncontested: { kind: "boolean", optional: true },
   },
 };
 

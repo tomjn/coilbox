@@ -173,6 +173,20 @@ describe("scenario fixture corpus", () => {
             a.params.team === undefined,
         ),
       ),
+      // Issue #802. Both sides again: the presence hold is what every scenario
+      // written before runtime 3 asks for, and the uncontested one is the new
+      // question.
+      "a hold that has to be uncontested": allTriggers.some((t) =>
+        t.conditions.conditions.some(
+          (c) => c.type === "zone_held_for" && c.params.uncontested === true,
+        ),
+      ),
+      "a hold that only asks for presence": allTriggers.some((t) =>
+        t.conditions.conditions.some(
+          (c) =>
+            c.type === "zone_held_for" && c.params.uncontested === undefined,
+        ),
+      ),
       "a group that starts on the map (not dormant)": allGroups.some(
         (g) => g.dormant === false,
       ),

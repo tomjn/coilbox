@@ -129,9 +129,11 @@ Membership is the engine's own spatial queries, `Spring.GetUnitsInRectangle` and
 - `units_in_zone` counts what is in a zone now, optionally narrowed to one `team` and to a list of `unitDefs`, and holds when the count sits between `min` and `max`. A condition stating neither means at least one, because asking about units in a zone with no number is asking whether anything is there. Stating only a maximum keeps its own meaning, so `max = 0` is how a mission asks whether a zone is clear.
 - `zone_held_for` holds once a `team` has had a unit in a `zone` continuously for `seconds`. Occupancy is one reading per polled tick, taken by a sampler rather than by the condition, so the clock does not depend on which triggers happened to be armed and asked. Leaving the zone drops the reading, so coming back starts the count again. The clock belongs to the world, not to the trigger: a hold that began before the trigger watching it was armed still counts.
 
-Only the zone and team pairs a mission's `zone_held_for` conditions actually name are sampled, so a mission that asks for no holds costs nothing per tick.
+Only the holds a mission's `zone_held_for` conditions actually name are sampled, so a mission that asks for no holds costs nothing per tick. One hold is a zone, a team and whether it has to be uncontested, so two triggers asking the same question of the same zone read one clock and two asking different questions do not.
 
-A hold is presence, not control. A team standing in a zone holds it whether or not anyone else is standing there too ([#802](https://github.com/tomjn/coilbox/issues/802)).
+A hold is presence unless the condition says `uncontested = true`, which makes it control ([#802](https://github.com/tomjn/coilbox/issues/802)). Then anyone the holding team is not allied with breaks it for as long as they are in the zone, and leaving starts the clock again from nothing rather than resuming it.
+
+Gaia does not contest a hold. It owns the map's own furniture, critters and the units some maps place, which belongs to no side and fights for none, so a mission that asked the player to clear a keep would otherwise be asking them to hunt down a deer. The runtime's own anchors and spotters are left out for the same reason every other count here leaves them out. That is what runtime 3 added, and a scenario that asks for an uncontested hold says `runtimeVersion = 3` so a runtime 2 game refuses it rather than answering the presence question instead.
 
 The zones are published as well as read, so anything else that has to work out where a zone is, `reveal_area` for one, reads the same corners the conditions do rather than parsing the shapes again.
 

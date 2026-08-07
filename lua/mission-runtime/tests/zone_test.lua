@@ -44,9 +44,17 @@ local function watching(id, params, kind)
 end
 
 --- Start a mission of the given triggers and run to the first playable frame.
-local function playing(triggers)
-	local mission = compiled({ zones = ZONES, teams = TEAMS, triggers = triggers })
-	local engine = load({ coilbox_mission = "demo" }, missionFiles(mission))
+--
+-- `options` is the stub engine's, plus `teams` for a mission that needs more
+-- participants than the two above.
+local function playing(triggers, options)
+	options = options or {}
+	local mission = compiled({
+		zones = ZONES,
+		teams = options.teams or TEAMS,
+		triggers = triggers,
+	})
+	local engine = load({ coilbox_mission = "demo" }, missionFiles(mission), options)
 	engine.env:Initialize()
 	engine.env:GameStart()
 
@@ -238,6 +246,64 @@ check("so half a second back in is still short", held == "held-now", held)
 
 held = tick(engine, 135)
 check("and the full time is served a second time", held == "held,held-now", held)
+
+--------------------------------------------------------------------------------
+-- An uncontested hold (issue #802).
+--
+-- The default hold is presence: a team in the zone holds it whoever else is
+-- there. `uncontested` makes it control, and then anyone the team is not allied
+-- with breaks it. Gaia is not anyone, because it owns the map's own furniture
+-- rather than a side.
+--
+-- Four teams: the player on 0, an ally of theirs on 2, an enemy on 1 and Gaia
+-- on 3.
+--------------------------------------------------------------------------------
+
+local CONTEST_OPTIONS = {
+	teams = { player = { team = 0 }, ally = { team = 2 }, enemy = { team = 1 } },
+	allyTeams = { [0] = 0, [1] = 1, [2] = 0, [3] = 3 },
+	allyTeamList = { 0, 1, 3 },
+	teamList = { 0, 1, 2, 3 },
+	gaiaTeam = 3,
+}
+
+engine = playing({
+	watching("held", { zone = "yard", team = "player", seconds = 1 }, "zone_held_for"),
+	watching("clear", { zone = "yard", team = "player", seconds = 1, uncontested = true },
+		"zone_held_for"),
+}, CONTEST_OPTIONS)
+
+holder = standing(engine, "armpw", 0, 100, 100)
+tick(engine, 15)
+held = tick(engine, 45)
+check("an uncontested hold of an empty zone is a hold like any other",
+	held == "held,clear", held)
+
+local intruder = standing(engine, "armpw", 1, 120, 120)
+held = tick(engine, 60)
+check("an enemy in the zone breaks the uncontested hold, and only that one, "
+	.. "because presence is all the other asks", held == "held", held)
+
+engine.move(intruder, 900, 900)
+held = tick(engine, 75)
+check("driving them out does not hand the hold straight back", held == "held", held)
+
+held = tick(engine, 90)
+check("it starts again from nothing, so the whole time has to be served again",
+	held == "held", "half a second clear")
+
+held = tick(engine, 105)
+check("and then it holds", held == "held,clear", held)
+
+standing(engine, "armpw", 2, 130, 130)
+held = tick(engine, 120)
+check("an ally standing in the zone is not someone to clear out",
+	held == "held,clear", held)
+
+standing(engine, "armpw", 3, 140, 140)
+held = tick(engine, 135)
+check("and neither is Gaia, which owns the map's furniture rather than a side",
+	held == "held,clear", held)
 
 --------------------------------------------------------------------------------
 -- The hold is sampled on the tick, not by the trigger being asked.

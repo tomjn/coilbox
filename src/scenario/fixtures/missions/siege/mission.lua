@@ -2,7 +2,7 @@
 -- Do not edit: change the scenario and compile again.
 return {
   schemaVersion = 1,
-  runtimeVersion = 2,
+  runtimeVersion = 3,
   id = "siege",
   name = "Siege",
   description = "The player must hold the keep before the clock runs out.",
@@ -19,6 +19,13 @@ return {
       shape = "box",
       min = { x = 1800, z = 1800 },
       max = { x = 2200, z = 2200 },
+    },
+    {
+      id = "yard",
+      name = "Yard",
+      shape = "box",
+      min = { x = 2600, z = 1800 },
+      max = { x = 2800, z = 2000 },
     },
   },
   actors = {
@@ -75,8 +82,33 @@ return {
     },
     commands = { "attack" },
   },
-  vars = { labDown = 0 },
+  vars = { labDown = 0, yardHeld = 0 },
   triggers = {
+    {
+      id = "yard-cleared",
+      enabled = true,
+      ["repeat"] = false,
+      conditions = {
+        op = "all",
+        conditions = {
+          {
+            type = "zone_held_for",
+            params = {
+              seconds = 10,
+              team = "player",
+              uncontested = true,
+              zone = "yard",
+            },
+          },
+        },
+      },
+      actions = {
+        {
+          type = "set_var",
+          params = { name = "yardHeld", value = 1 },
+        },
+      },
+    },
     {
       id = "lab-down",
       enabled = true,
