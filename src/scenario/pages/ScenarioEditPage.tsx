@@ -23,6 +23,7 @@ import {
   undoEdit,
 } from "./components/history";
 import { ObjectivePanel } from "./components/ObjectivePanel";
+import { orderPathId } from "./components/orderPaths";
 import { RestrictionPanel } from "./components/RestrictionPanel";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
 import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
@@ -173,6 +174,19 @@ export default function ScenarioEditPage() {
             pick.order === undefined
               ? `Click the map to put ${stepLabel(asked.type)}'s ${pick.param} there`
               : `Click the map to add points to ${stepLabel(asked.type)}`,
+          // Which path the points are going into, so the map draws that one with
+          // knobs while it is being drawn (#847).
+          pathId:
+            pick.order === undefined
+              ? undefined
+              : orderPathId({
+                  trigger: scenario.triggers.findIndex(
+                    (t) => t.id === pick.ref.triggerId,
+                  ),
+                  list: pick.ref.list,
+                  step: pick.ref.index,
+                  param: pick.param,
+                }),
           onPick: (pos: { x: number; z: number }) => {
             apply(applyPoint(scenario, pick, pos));
             if (!pointRepeats(pick)) setPick(null);

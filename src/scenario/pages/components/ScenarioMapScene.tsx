@@ -2,6 +2,7 @@ import { Button, cn, Input } from "@picoframe/frame";
 import {
   Frame,
   Layers,
+  List,
   Loader2,
   MapPin,
   Maximize2,
@@ -24,6 +25,11 @@ import {
 import { Link } from "react-router";
 import * as THREE from "three";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   MapPreview3D,
@@ -32,6 +38,12 @@ import {
 import { usePreferredTarget } from "@/play/config";
 import type { Point, Scenario, ScenarioZone } from "../../model";
 import { ActorControls } from "./ActorControls";
+import { ContentsList } from "./ContentsList";
+import {
+  type ContentEntry,
+  contentsSelection,
+  sceneContents,
+} from "./contents";
 import {
   canTurn,
   editActor,
@@ -45,19 +57,32 @@ import {
   addWaypoint,
   editGroup,
   groupLabel,
-  moveWaypoint,
   orderWaypoints,
   parsePathKey,
+  parsePathLineKey,
+  pathLineKey,
   removeGroup,
-  removeWaypoint,
   targetOptions,
 } from "./groups";
 import { modKeyLabel } from "./history";
 import { EDITOR_MODES } from "./modes";
+import {
+  movePathWaypoint,
+  pathLabel,
+  removePathWaypoint,
+  scenarioPaths,
+} from "./orderPaths";
 import { PrefabControls } from "./PrefabControls";
 import { type Placement, placementKey } from "./placements";
 import { editPrefab, removePrefab, setOrigin, setQueue } from "./prefabs";
-import { authoringCamera, clampToPlane, mapSceneStatus } from "./scene";
+import {
+  authoringCamera,
+  clampToPlane,
+  focusCamera,
+  focusDistance,
+  mapSceneStatus,
+  worldToScene,
+} from "./scene";
 import { startMarkers } from "./startPositions";
 import { useGameUnits } from "./useGameUnits";
 import { useMapEditing } from "./useMapEditing";
@@ -133,6 +158,9 @@ export function ScenarioMapScene({
     message: ReactNode;
     onPick: (pos: Point) => void;
     onDone: () => void;
+    /** The path the points are going into, when they are going into one, so it
+     *  is the path drawn with knobs while the author draws it (#847). */
+    pathId?: string;
   } | null;
 }) {
   const mapName = scenario.setup.mapName;
@@ -198,22 +226,56 @@ export function ScenarioMapScene({
   );
   useScenarioStarts(handle, starts, assets, units.groundAt);
 
+  const groups = scenario.groups;
+  /**
+   * What a click on the map selects.
+   *
+   * A drawn path line stands for the orders that drew it: the line is the
+   * easiest thing on a big map to hit and the orders are what an author who hit
+   * it wants (#842). A group's line means the group, because a group has units
+   * to select and controls to open. A trigger's line means itself, because it
+   * has neither, and selecting it is what puts knobs on its points.
+   */
+  const select = useCallback(
+    (key: string | null) => {
+      const line = key ? parsePathLineKey(key) : null;
+      if (!line) return setSelected(key);
+      const group = groups.some((one) => one.id === line);
+      setSelected(group ? placementKey("group", line, 0) : key);
+    },
+    [groups],
+  );
+
   const picked = units.placements.find((p) => p.key === selected) ?? null;
   // A group is what is being worked on whether one of its units or one of its
   // waypoints was clicked, so both answer the same question.
   const pathRef = selected ? parsePathKey(selected) : null;
   const pickedGroup =
-    scenario.groups.find(
+    groups.find(
       (group) =>
         group.id ===
         (pathRef?.groupId ?? (picked?.kind === "group" ? picked.id : null)),
     ) ?? null;
+
+  // Every path the document draws, a group's own and the ones its triggers hand
+  // out, so an author drawing either can see what they are drawing (#847).
+  const paths = useMemo(() => scenarioPaths(scenario), [scenario]);
+  const selectedLine = selected ? parsePathLineKey(selected) : null;
+  // Which of them is being worked on, and so gets knobs on its points: the one a
+  // panel is putting points into, failing that the one a point or a line of is
+  // selected, failing that the selected group's own.
+  const activePath =
+    picking?.pathId ??
+    pathRef?.groupId ??
+    selectedLine ??
+    pickedGroup?.id ??
+    null;
   const pathsLayer = useScenarioPaths(
     handle,
-    scenario.groups,
+    paths,
     assets,
     units.groundAt,
-    pickedGroup?.id ?? null,
+    activePath,
     pathRef ? selected : null,
   );
 
@@ -267,13 +329,13 @@ export function ScenarioMapScene({
     // map would be a corner of the map nothing could be placed on. A waypoint
     // is a knob rather than a sheet, so it covers nothing and stays pickable.
     overlays: [onPlace ? null : zonesLayer, pathsLayer],
-    onSelect: setSelected,
+    onSelect: select,
     onPlace,
     onDragGround: behaviour.draw ?? null,
     onMove: (key, delta) => {
       if (parseZoneKey(key)) return onChange(moveZone(scenario, key, delta));
       if (parsePathKey(key))
-        return onChange(moveWaypoint(scenario, key, delta));
+        return onChange(movePathWaypoint(scenario, key, delta));
       onChange(movePlacement(scenario, key, delta));
     },
   });
@@ -290,6 +352,37 @@ export function ScenarioMapScene({
     null;
   const gameUnits = useGameUnits(scenario.setup.gameName);
 
+  /**
+   * A group's own controls, wherever the group was reached from.
+   *
+   * Built once here rather than inside the bar for a selected unit, because a
+   * waypoint is as much a way of working on a group as one of its units is, and
+   * an author who picked a point off a path should not have to find a unit
+   * again to change the order that point belongs to (#842).
+   */
+  const groupControls = pickedGroup ? (
+    <GroupControls
+      key={pickedGroup.id}
+      group={pickedGroup}
+      participants={scenario.setup.participants}
+      units={gameUnits.units}
+      unitsLoading={gameUnits.loading}
+      targets={targetOptions(scenario, pickedGroup.id)}
+      onEdit={(patch) => {
+        onChange(editGroup(scenario, pickedGroup.id, patch));
+        if (patch.units?.length === 0) setSelected(null);
+      }}
+      onDelete={() => {
+        onChange(removeGroup(scenario, pickedGroup.id));
+        setSelected(null);
+      }}
+      drawing={drawing?.groupId === pickedGroup.id ? drawing.order : null}
+      onDraw={(order) =>
+        setDrawing(order === null ? null : { groupId: pickedGroup.id, order })
+      }
+    />
+  ) : null;
+
   const status = mapSceneStatus({
     mapName,
     hasEngine: !!assets.enginePath && !!assets.dataDir,
@@ -297,6 +390,54 @@ export function ScenarioMapScene({
     assetsLoading: assets.loading,
     ready: assets.ready,
   });
+
+  // What the document has put on the map, for the list that finds it again.
+  const entries = useMemo(() => sceneContents(scenario), [scenario]);
+  const listed = contentsSelection(entries, selected);
+
+  /**
+   * Look closely at a point on the map.
+   *
+   * The camera is put where it would be if the author had zoomed in on the
+   * place themselves, rather than moved along a path: what matters is arriving,
+   * and a scene this heavy is not one to animate a flight across.
+   */
+  const focusOn = useCallback(
+    (pos: Point, span: number) => {
+      const handle = sceneRef.current;
+      if (!handle) return;
+      const { camera, controls, render, scale } = handle;
+      const at = worldToScene(
+        pos,
+        assets.worldWidth,
+        assets.worldHeight,
+        scale,
+      );
+      const distance = Math.min(
+        controls.maxDistance,
+        Math.max(controls.minDistance, focusDistance(span) * scale),
+      );
+      // Looked at where it stands rather than at sea level, or a thing on a
+      // ridge would arrive at the top of the view and one in a valley below it.
+      const height = units.groundAt(pos) * scale;
+      const stand = focusCamera(at, distance);
+      controls.target.set(at.x, height, at.z);
+      camera.position.set(stand.x, height + stand.y, stand.z);
+      controls.update();
+      render();
+    },
+    [assets.worldWidth, assets.worldHeight, units.groundAt],
+  );
+
+  /** Picking something out of the list is the same two things a click that
+   *  lands on it would be: it is selected, and it is on screen. */
+  const pickEntry = useCallback(
+    (entry: ContentEntry) => {
+      setSelected(entry.key);
+      focusOn(entry.pos, entry.span);
+    },
+    [focusOn],
+  );
 
   /** Frame the whole map, looking down at its centre. Also the starting view. */
   const frameMap = useCallback((handle: MapScene3D) => {
@@ -481,32 +622,7 @@ export function ScenarioMapScene({
                 }
               />
             )}
-            {picked.kind === "group" && pickedGroup && (
-              <GroupControls
-                key={pickedGroup.id}
-                group={pickedGroup}
-                participants={scenario.setup.participants}
-                units={gameUnits.units}
-                unitsLoading={gameUnits.loading}
-                targets={targetOptions(scenario, pickedGroup.id)}
-                onEdit={(patch) => {
-                  onChange(editGroup(scenario, pickedGroup.id, patch));
-                  if (patch.units?.length === 0) setSelected(null);
-                }}
-                onDelete={() => {
-                  onChange(removeGroup(scenario, pickedGroup.id));
-                  setSelected(null);
-                }}
-                drawing={
-                  drawing?.groupId === pickedGroup.id ? drawing.order : null
-                }
-                onDraw={(order) =>
-                  setDrawing(
-                    order === null ? null : { groupId: pickedGroup.id, order },
-                  )
-                }
-              />
-            )}
+            {picked.kind === "group" && groupControls}
             {picked.kind === "prefab" && pickedPrefab && (
               <PrefabControls
                 key={`${pickedPrefab.id}#${picked.index}`}
@@ -562,18 +678,31 @@ export function ScenarioMapScene({
         {picking && !drawingPath && !moving && (
           <ClickMapBar message={picking.message} onDone={picking.onDone} />
         )}
-        {pathRef && selected && pickedGroup && (
+        {pathRef && selected && (
           <PathBar
-            what={`${groupLabel(scenario.groups, pickedGroup.id)} · point ${
+            what={`${pathLabel(paths, pathRef.groupId)} · point ${
               pathRef.waypoint + 1
             }`}
-            // Back to the group the point belonged to rather than to nothing,
-            // so its other points keep their knobs and a path being drawn is
-            // still being drawn.
+            hint="drag it to move it"
+            // Back to the path the point belonged to rather than to nothing, so
+            // its other points keep their knobs and a path being drawn is still
+            // being drawn.
             onDelete={() => {
-              onChange(removeWaypoint(scenario, selected));
-              setSelected(placementKey("group", pathRef.groupId, 0));
+              onChange(removePathWaypoint(scenario, selected));
+              setSelected(
+                pickedGroup
+                  ? placementKey("group", pathRef.groupId, 0)
+                  : pathLineKey(pathRef.groupId),
+              );
             }}
+          >
+            {groupControls}
+          </PathBar>
+        )}
+        {selectedLine && (
+          <PathBar
+            what={pathLabel(paths, selectedLine)}
+            hint="drag one of its points to move it"
           />
         )}
         {pickedZone && (
@@ -618,6 +747,26 @@ export function ScenarioMapScene({
             </Button>
           </>
         )}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 bg-card/80 backdrop-blur"
+              title="Everything this scenario has put on the map"
+            >
+              <List className="size-3.5" /> Contents
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80 p-1">
+            <ContentsList
+              entries={entries}
+              selected={listed}
+              participants={scenario.setup.participants}
+              onPick={pickEntry}
+            />
+          </PopoverContent>
+        </Popover>
         <Button
           size="sm"
           variant="outline"
@@ -811,23 +960,44 @@ function ClickMapBar({
   );
 }
 
-/** The selected waypoint: which order's path it belongs to, and the way to take
- *  it out. Dragging it is what moves it, so there is nothing else here. */
-function PathBar({ what, onDelete }: { what: string; onDelete: () => void }) {
+/**
+ * The selected waypoint: which order's path it belongs to, the group's own
+ * controls, and the way to take the point out. Dragging it is what moves it, so
+ * there is nothing else here.
+ *
+ * The group's controls are here because a point on a path is one of the two ways
+ * of working on a group, and the other one used to be the only one that reached
+ * them (#842).
+ */
+function PathBar({
+  what,
+  hint,
+  onDelete,
+  children,
+}: {
+  what: string;
+  hint: string;
+  /** Left out when a whole path is what is selected rather than one of its
+   *  points, because a path is deleted by deleting the order that holds it. */
+  onDelete?: () => void;
+  /** The group's controls: its team, its units and its orders. */
+  children?: ReactNode;
+}) {
   return (
     <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card/85 p-1 pl-2 backdrop-blur">
       <span className="font-mono text-[11px]">{what}</span>
-      <span className="text-[11px] text-muted-foreground">
-        drag it to move it
-      </span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
-        onClick={onDelete}
-      >
-        <Trash2 className="size-3.5" /> Delete point
-      </Button>
+      {children}
+      <span className="text-[11px] text-muted-foreground">{hint}</span>
+      {onDelete && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+          onClick={onDelete}
+        >
+          <Trash2 className="size-3.5" /> Delete point
+        </Button>
+      )}
     </div>
   );
 }
