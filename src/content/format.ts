@@ -18,3 +18,27 @@ export function formatBytes(n?: number): string | null {
 export function isSdd(archive?: Archive): boolean {
   return !!archive && archive.name.toLowerCase().endsWith(".sdd");
 }
+
+const DELETABLE_EXTS = ["sd7", "sdz", "sdd", "sdp"];
+const CONTENT_DIRS = ["games", "maps", "packages"];
+
+/**
+ * Whether a delete button should be offered for an on-disk archive path. Mirrors
+ * the guard in the Rust `archives` module so the UI hides the button instead of
+ * showing one that always fails: only archives in a content root's `games`,
+ * `maps` or `packages` folder can go, which is what protects the engine's base
+ * archives in `<engine>/base/`.
+ */
+export function isDeletableArchive(path: string | null | undefined): boolean {
+  if (!path) return false;
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  const file = parts.pop()?.toLowerCase();
+  const parent = parts.pop()?.toLowerCase();
+  if (!file || !parent) return false;
+  const dot = file.lastIndexOf(".");
+  if (dot <= 0) return false;
+  return (
+    DELETABLE_EXTS.includes(file.slice(dot + 1)) &&
+    CONTENT_DIRS.includes(parent)
+  );
+}

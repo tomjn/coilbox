@@ -1,7 +1,7 @@
 import { Button, useSetting } from "@picoframe/frame";
 import { FolderOpen, Trophy } from "lucide-react";
 import { useMemo } from "react";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFactionLogos } from "@/factions/logos";
@@ -19,13 +19,14 @@ import {
   useUnitsyncUnitBuildpics,
   useUnitsyncUnitDataset,
 } from "../config";
-import { isSdd } from "../format";
+import { isDeletableArchive, isSdd } from "../format";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, factionRecordsFor, guessPrimaryPlayer } from "../stats";
 import { usePlayGame } from "../usePlayGame";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { BrandingLinks } from "./components/BrandingLinks";
 import { BrandingScreenshots } from "./components/BrandingScreenshots";
+import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
 import { FactionBuildList } from "./components/FactionBuildList";
 import { GameHeader } from "./components/GameHeader";
 import { MissionRuntimeSection } from "./components/MissionRuntimeSection";
@@ -50,6 +51,7 @@ export default function GameDetailPage() {
   const { name } = useParams();
   const decoded = name ? decodeURIComponent(name) : "";
   const playGame = usePlayGame();
+  const navigate = useNavigate();
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
     selected?.enginePath,
@@ -296,16 +298,26 @@ export default function GameDetailPage() {
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-medium">Primary archive</h2>
-          {game.primaryArchive.path && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => openFolder(game.primaryArchive)}
-            >
-              <FolderOpen className="size-4" /> Open folder
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {game.primaryArchive.path && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => openFolder(game.primaryArchive)}
+              >
+                <FolderOpen className="size-4" /> Open folder
+              </Button>
+            )}
+            {game.primaryArchive.path &&
+              isDeletableArchive(game.primaryArchive.path) && (
+                <DeleteArchiveButton
+                  path={game.primaryArchive.path}
+                  name={game.primaryArchive.name}
+                  onDeleted={() => navigate("/content/games")}
+                />
+              )}
+          </div>
         </div>
         <ul>
           <ArchiveRow archive={game.primaryArchive} />

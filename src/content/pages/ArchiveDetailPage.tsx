@@ -15,10 +15,11 @@ import {
   useUnitsyncArchiveFile,
   useUnitsyncArchiveTree,
 } from "../config";
-import { formatBytes, isSdd } from "../format";
+import { formatBytes, isDeletableArchive, isSdd } from "../format";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { ArchiveTree } from "./components/ArchiveTree";
 import { ArchiveTypeBadge, PrimaryBadge } from "./components/ArchiveTypeBadge";
+import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
 import { FilePreview } from "./components/FilePreview";
 import { LuaConsoleDrawer } from "./components/LuaConsoleDrawer";
 import { SddBadge } from "./components/SddBadge";
@@ -175,6 +176,13 @@ export default function ArchiveDetailPage() {
               >
                 <FolderOpen className="size-4" /> Open folder
               </Button>
+            )}
+            {onDiskPath && isDeletableArchive(onDiskPath) && (
+              <DeleteArchiveButton
+                path={onDiskPath}
+                name={archive.name}
+                onDeleted={() => navigate("/content/archives")}
+              />
             )}
           </div>
         </div>
