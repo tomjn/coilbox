@@ -2,7 +2,7 @@
 -- Do not edit: change the scenario and compile again.
 return {
   schemaVersion = 1,
-  runtimeVersion = 1,
+  runtimeVersion = 3,
   id = "garrison",
   name = "Garrison",
   description = "The player builds up a garrison team, then unlocks and reinforces it.",
@@ -76,7 +76,7 @@ return {
       units = { "armestor" },
     },
   },
-  vars = { garrisonBuilt = 0 },
+  vars = { bonus = 5, garrisonBuilt = 0, quota = 1 },
   triggers = {
     {
       id = "count-check",
@@ -122,7 +122,10 @@ return {
       actions = {
         {
           type = "add_var",
-          params = { name = "garrisonBuilt", value = 1 },
+          params = {
+            name = "garrisonBuilt",
+            value = { var = "bonus" },
+          },
         },
         {
           type = "disable_trigger",
@@ -155,6 +158,26 @@ return {
       },
     },
     {
+      id = "hand-over",
+      enabled = true,
+      ["repeat"] = false,
+      conditions = {
+        op = "all",
+        conditions = {
+          {
+            type = "time_elapsed",
+            params = { seconds = 8 },
+          },
+        },
+      },
+      actions = {
+        {
+          type = "release_group",
+          params = { group = "reinforcements" },
+        },
+      },
+    },
+    {
       id = "reinforcement-wave",
       enabled = true,
       ["repeat"] = true,
@@ -164,7 +187,11 @@ return {
         conditions = {
           {
             type = "var",
-            params = { name = "garrisonBuilt", op = "gte", value = 1 },
+            params = {
+              name = "garrisonBuilt",
+              op = "gte",
+              value = { var = "quota" },
+            },
           },
         },
       },

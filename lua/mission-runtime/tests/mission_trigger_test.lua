@@ -97,13 +97,30 @@ check("a unit under construction has not been built yet",
 engine.finish(depot)
 check("a finished unit fires the trigger watching for it",
 	state.triggers:isEnabled("built-outpost") == false)
-check("its add_var ran on the event, not on the next tick", state.vars.get("garrisonBuilt") == 2,
-	tostring(state.vars.get("garrisonBuilt")))
+-- The fixture adds `{ var = "bonus" }` rather than a written number, so 1 plus
+-- 5 is what says the runtime read the var it was pointed at (issue #808).
+check("its add_var ran on the event, not on the next tick, and added what the bonus var holds",
+	state.vars.get("garrisonBuilt") == 6, tostring(state.vars.get("garrisonBuilt")))
 check("and its disable_trigger took effect", state.triggers:isEnabled("count-check") == false)
 
 engine.give(state.units.outpost, 0)
 check("an actor changing hands fires the trigger watching for it",
 	state.triggers:isEnabled("outpost-captured") == false)
+
+-- The capture's other action hands the wave's units to the garrison, and the
+-- group keeps them, so the mission can go on ordering the squad it gave away.
+-- Read here rather than after the loops below, because the mission releases the
+-- group at eight seconds and the roll is empty from then on (issue #812).
+--
+-- This is the ask, not the outcome. The stub always agrees; a real game may
+-- refuse a share between enemies, which is #857.
+local gifted = {}
+for index, unitID in ipairs(state.groups.units("reinforcements")) do
+	gifted[index] = unitID
+end
+check("gifting a group asks for its units on the team the trigger named",
+	#gifted == 2 and engine.units[gifted[1]].team == 1 and engine.units[gifted[2]].team == 1,
+	#gifted .. "/" .. tostring(gifted[1] and engine.units[gifted[1]].team))
 
 -- That trigger's own actions are a gift and a reveal, both proved below.
 --
@@ -137,15 +154,15 @@ end
 check("after which the fog comes back", state.reveal.spotterCount(0) == 0,
 	state.reveal.spotterCount(0))
 
--- The capture's other action hands the wave's units to the garrison, and the
--- group keeps them, so the mission can go on ordering the squad it gave away.
---
--- This is the ask, not the outcome. The stub always agrees; a real game may
--- refuse a share between enemies, which is #857.
-local gifted = state.groups.units("reinforcements")
-check("gifting a group asks for its units on the team the trigger named",
-	#gifted == 2 and engine.units[gifted[1]].team == 1 and engine.units[gifted[2]].team == 1,
-	#gifted .. "/" .. tostring(gifted[1] and engine.units[gifted[1]].team))
+-- The mission's release_group ran at eight seconds, long before this frame. The
+-- units it gave away are still standing on the team it gave them to, and the
+-- mission is holding none of them (issue #812).
+check("release_group left the mission holding none of the group's units",
+	#state.groups.units("reinforcements") == 0,
+	#state.groups.units("reinforcements"))
+check("while the units it gave away stand where they were, on the team it gave them to",
+	engine.units[gifted[1]].alive == true and engine.units[gifted[1]].team == 1
+	and engine.units[gifted[2]].alive == true and engine.units[gifted[2]].team == 1)
 
 --------------------------------------------------------------------------------
 -- Ambush: an actor's health and its death.
@@ -159,15 +176,18 @@ check("a mission that restricts nothing enforces nothing",
 local scout = state.units.scout
 
 --- What the mission has staged for the player so far: every camera move and
--- every marker, in the order they went out. Read off the messages the synced
--- half sent, because that is the whole of what those two actions do.
+-- every marker, in the order they went out, and the engine team each was aimed
+-- at. Read off the messages the synced half sent, because that is the whole of
+-- what those two actions do.
 local function staged()
 	local out = {}
 	for _, entry in ipairs(engine.sent) do
 		if entry[1] == "coilbox_mission_camera" then
-			out[#out + 1] = "pan " .. entry[2] .. "/" .. entry[3] .. " over " .. entry[4]
+			out[#out + 1] = "pan " .. entry[2] .. "/" .. entry[3]
+				.. " over " .. entry[4] .. " for " .. entry[5]
 		elseif entry[1] == "coilbox_mission_marker" then
-			out[#out + 1] = "mark " .. entry[2] .. "/" .. entry[3] .. " " .. entry[4]
+			out[#out + 1] = "mark " .. entry[2] .. "/" .. entry[3]
+				.. " " .. entry[4] .. " for " .. entry[5]
 		end
 	end
 	return table.concat(out, ", ")
@@ -212,9 +232,12 @@ check("a dormant group is not on the map before it is spawned",
 engine.move(patrol, 1900, 1900)
 engine.env:GameFrame(60)
 check("walking into the pass springs it", state.triggers:isEnabled("spring-ambush") == false)
-check("and the whole trigger ran, in the order the mission wrote it",
+-- The pan and the first marker name the player participant, which is engine
+-- team 0, and the second marker names none, which is everyone (issue #827).
+check("and the whole trigger ran, in the order the mission wrote it, each for the team it names",
 	said() == "warn,warn,warn"
-	and staged() == "pan 2000/2000 over 2, mark 2000/2000 Ambush!"
+	and staged() == "pan 2000/2000 over 2 for 0, mark 2000/2000 Ambush! for 0, "
+		.. "mark 1800/1800 They came. for -1"
 	and table.concat(sent(engine, "coilbox_mission_sound"), ",") == "alarm.wav",
 	said() .. " / " .. staged())
 

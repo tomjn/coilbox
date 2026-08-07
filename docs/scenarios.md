@@ -147,10 +147,14 @@ The names below are the ones in the compiled mission. The editor shows them with
 | `unit_built` | A team has finished building this many of a unit type. |
 | `unit_captured` | An actor has changed hands, optionally to a named team. |
 | `time_elapsed` | This many seconds since the mission started. |
-| `var` | A variable compared against a number with `eq`, `ne`, `lt`, `lte`, `gt` or `gte`. |
-| `zone_held_for` | A team has had a unit in a zone continuously for this many seconds. Leaving resets the clock. |
+| `var` | A variable compared against a number, or against another variable, with `eq`, `ne`, `lt`, `lte`, `gt` or `gte`. |
+| `zone_held_for` | A team has had a unit in a zone continuously for this many seconds. Leaving resets the clock. **Uncontested** asks for control instead of presence. |
 
-`zone_held_for` is presence, not control. A team standing in a zone holds it whether or not anyone else is standing there too: [issue #802](https://github.com/tomjn/coilbox/issues/802).
+`zone_held_for` is presence by default: a team standing in a zone holds it whether or not anyone else is standing there too, so one scout parked in a keep an enemy army is also sitting in satisfies "hold the keep for 60 seconds". Tick **uncontested** and anyone the holding team is not allied with breaks the hold for as long as they are in the zone, and the clock starts again from nothing when they leave.
+
+Gaia does not contest. It owns the map's own furniture, critters and the units some maps place, which belongs to no side and fights for none, so a mission that told the player to clear the keep would otherwise be asking them to hunt down a deer. Allies do not contest either. A scenario that ticks the box needs mission runtime 3.
+
+You cannot build this out of `units_in_zone` with `max = 0`. That reads the moment the timer runs out rather than the whole minute leading up to it.
 
 ### Actions
 
@@ -160,17 +164,22 @@ The names below are the ones in the compiled mission. The editor shows them with
 | `wake_group` | Runs a group's orders, placing it first if it is not on the map. |
 | `give_orders` | Replaces a group's orders and wakes it. It does not place one. |
 | `gift_units` | Hands a group's units to another participant. The group keeps them, so the mission can go on ordering a squad it gave away. |
-| `set_var` / `add_var` | Write a variable, or move one by a delta. |
+| `release_group` | Stops the mission ordering a group. The units stay on the map and stay whoever's they are. |
+| `set_var` / `add_var` | Write a variable, or move one by a delta. Either takes a number or another variable. |
 | `enable_trigger` / `disable_trigger` | Arm or disarm another trigger. |
 | `complete_objective` / `fail_objective` | Settle an objective. The first outcome sticks. |
 | `dialogue` | Say one of the scenario's declared lines. |
 | `play_sound` | Play a sound by name, either an entry in the game's own `sounds.lua` or a file in the game. |
 | `reveal_area` | Lift the fog over a zone for a participant, for a number of seconds or the rest of the mission. See the [limits](#what-a-scenario-cannot-do-yet). |
 | `unlock_unit` | Lift the scenario's build restriction on one unit type for one participant. |
-| `camera_pan` | Move the camera to a point over a number of seconds, one second by default. |
-| `map_marker` | Drop one of the map's own labelled points, with your label or none. |
+| `camera_pan` | Move the camera to a point over a number of seconds, one second by default. Optionally one participant's camera. |
+| `map_marker` | Drop one of the map's own labelled points, with your label or none. Optionally on one participant's map. |
 | `victory` | End the mission with the named participant's ally team as the winner. |
 | `defeat` | End the mission with every other ally team as the winner. |
+
+`gift_units` and `release_group` are separate on purpose. A mission that hands over a rescued convoy gifts it and releases it in the same trigger. One that lends an escort gifts it now and releases it when the loan ends, which one flag on the gift could not say. Releasing a group the mission still has orders for is the mission's own bug, and it is reported in the infolog rather than refused. A scenario using `release_group` needs mission runtime 3.
+
+`camera_pan` and `map_marker` with no participant named reach everyone, which is what a single player scenario wants. Naming one is for a co-op or head-to-head mission, where yanking both players' cameras to one side's ambush shows the other player what is coming. A scenario that names one needs mission runtime 3.
 
 `victory` and `defeat` with no participant named mean the team a human is playing. **Name one only when you mean it.** The result the campaign records comes out of the replay, and the reader asks whether the player's ally team is among the winners. A `victory` naming a participant the human is not playing therefore records a **defeat** for the player. See [Win and loss](#win-and-loss).
 
@@ -223,6 +232,8 @@ These are not the engine's `[RESTRICT]` block, which is global and permanent. `u
 A variable is a named number belonging to one scenario: a kill counter, a phase number, a flag saying which branch the player took. Numbers and nothing else, so `add_var` always has something to add to and the `var` condition is one comparison.
 
 Renaming one carries the triggers that read it over. Undeclaring one leaves them alone, and they then read it as 0 and say so in the infolog.
+
+Anywhere a `var` condition, `set_var` or `add_var` asks for a number you can name a variable instead, with the dropdown beside the box. So "kills reached the quota" is a `var` condition on `kills` reading `quota`, and "add the bonus to the score" is an `add_var` on `score` reading `bonus`. A scenario that does this needs mission runtime 3, which is what stops an older game reading the variable as nothing and comparing against zero.
 
 ## Test and play
 
@@ -280,7 +291,6 @@ Honest limits, all of them things you can hit while authoring:
 - **`reveal_area` reveals a circle.** No engine call grants sight over a region, so a reveal is implemented as a short-lived invisible unit with sight. A box zone is covered by the circle around its corners, so a reveal spills past them. Under-revealing would leave the thing you drew the box around in the dark.
 - **Terrain occludes a reveal.** Sight is cast from the spotter, so a ridge inside the zone shadows its far side, exactly as it would for a scout standing there. Air sight is not occluded, so aircraft over the zone are always seen.
 - **The player's unit count is one too high.** The runtime keeps one invisible anchor unit on each mission team a human plays, so the engine's own "this ally team has no units" rule cannot end the mission early when the player legitimately reaches zero units. The anchor is a real unit and shows in the game's own unit count. The runtime's own counting leaves it out, so `unit_count` and `units_in_zone` are unaffected: [issue #820](https://github.com/tomjn/coilbox/issues/820).
-- **`camera_pan` and `map_marker` name no team.** In a mission more than one person is playing, every player's camera moves and every player gets the marker: [issue #827](https://github.com/tomjn/coilbox/issues/827).
 - **A restricted unit's build icon is still in the menu.** A player who clicks one gets a builder that walks over and does nothing: [issue #832](https://github.com/tomjn/coilbox/issues/832).
 - **A mission coilbox wrote into a game stays there.** There is no in-app way to remove one: [issue #814](https://github.com/tomjn/coilbox/issues/814).
 - **A scenario cannot be set up without a preset:** [issue #821](https://github.com/tomjn/coilbox/issues/821).

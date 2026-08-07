@@ -10,6 +10,13 @@
 -- this module samples occupancy on the engine's polled tick and the condition
 -- reads what the sampler wrote.
 --
+-- A hold is presence by default: a team standing in a zone holds it whether or
+-- not anyone else is standing there too. `uncontested` makes it control instead
+-- (issue #802), and then anyone the holding team is not allied with breaks the
+-- hold for as long as they are in the zone. Composing that out of
+-- `units_in_zone` with `max = 0` does not work, because that reads the moment
+-- the timer runs out rather than the whole minute leading up to it.
+--
 -- Read-only. It counts and measures and changes nothing.
 
 local M = {}
@@ -185,14 +192,45 @@ function M.register(engine, state)
 		end,
 	})
 
-	-- Zone id -> team id -> the frame that team's occupancy began, or nil while
-	-- the zone holds nothing of theirs.
+	--- Whether anyone the holding team is not allied with is standing in a zone.
+	--
+	-- Gaia is not anyone. It owns the map's own furniture: critters, and in some
+	-- games the units a map places. None of that belongs to a side or fights for
+	-- one, so a Gaia unit wandering through a keep is scenery rather than an enemy
+	-- holding it, and a mission that told the player to clear the keep would be
+	-- asking them to hunt down a deer. The runtime's own anchors and spotters are
+	-- left out for the same reason every other count here leaves them out.
+	--
+	-- An ally does not contest either. A co-op partner standing in the zone with
+	-- you is not someone you have to clear out.
+	local function contested(zone, holder)
+		local gaia = Spring.GetGaiaTeamID()
+		for _, unitID in ipairs(unitsIn(zone, nil)) do
+			local team = Spring.GetUnitTeam(unitID)
+			if team ~= nil and team ~= gaia and not placed(unitID)
+				and not Spring.AreTeamsAllied(team, holder) then
+				return true
+			end
+		end
+		return false
+	end
+
+	--- The clock one zone_held_for reads. A zone, a team, and whether the hold
+	-- has to be uncontested, because a hold that breaks when an enemy walks in is
+	-- a different clock from one that does not and two triggers asking different
+	-- questions of the same zone must not share an answer.
+	local function holdKey(params)
+		return tostring(params.zone) .. "/" .. tostring(params.team)
+			.. (params.uncontested == true and "/uncontested" or "")
+	end
+
+	-- Hold key -> the frame that hold began, or false while it is not held.
 	local heldSince = {}
 
-	-- The zone and team of every zone_held_for a mission asks, found once. The
-	-- clock belongs to the world rather than to the trigger, so a hold is measured
-	-- from when it started whether or not the trigger watching it was armed at the
-	-- time, and two triggers watching the same zone read one clock.
+	-- Every zone_held_for a mission asks, found once. The clock belongs to the
+	-- world rather than to the trigger, so a hold is measured from when it started
+	-- whether or not the trigger watching it was armed at the time, and two
+	-- triggers asking the same question of the same zone read one clock.
 	local watched = {}
 	local function watch(params)
 		local zone = zoneOf(params)
@@ -206,12 +244,17 @@ function M.register(engine, state)
 			return
 		end
 
-		heldSince[zone.id] = heldSince[zone.id] or {}
-		if heldSince[zone.id][params.team] == nil then
+		local key = holdKey(params)
+		if heldSince[key] == nil then
 			-- Marked as watched by having a slot, which starts empty because a hold
 			-- has not begun until a sampling says it has.
-			heldSince[zone.id][params.team] = false
-			watched[#watched + 1] = { zone = zone, team = params.team, allegiance = team }
+			heldSince[key] = false
+			watched[#watched + 1] = {
+				key = key,
+				zone = zone,
+				allegiance = team,
+				uncontested = params.uncontested == true,
+			}
 		end
 	end
 
@@ -223,23 +266,23 @@ function M.register(engine, state)
 		end
 	end
 
-	-- One reading of every watched zone per polled tick. A team that is there
-	-- keeps the frame its stay began; a team that is not loses it, which is what
-	-- makes leaving and coming back start again rather than carry on.
+	-- One reading of every watched hold per polled tick. A hold that is standing
+	-- keeps the frame it began. One that is not loses it, which is what makes
+	-- leaving and coming back start again rather than carry on, and what makes an
+	-- enemy walking into an uncontested hold reset it rather than pause it.
 	engine:addTick(function(ctx)
 		for _, entry in ipairs(watched) do
-			local held = heldSince[entry.zone.id]
-			if countIn(entry.zone, entry.allegiance, nil, placed) > 0 then
-				held[entry.team] = held[entry.team] or ctx.frame
-			else
-				held[entry.team] = false
+			local holding = countIn(entry.zone, entry.allegiance, nil, placed) > 0
+			if holding and entry.uncontested and contested(entry.zone, entry.allegiance) then
+				holding = false
 			end
+			heldSince[entry.key] = holding and (heldSince[entry.key] or ctx.frame) or false
 		end
 	end)
 
 	engine:addCondition("zone_held_for", {
 		test = function(params, ctx)
-			local since = (heldSince[params.zone] or {})[params.team]
+			local since = heldSince[holdKey(params)]
 			if not since then
 				return false
 			end

@@ -310,7 +310,7 @@ Dialogue portraits and clips are copied into `missions/<id>/` beside the compile
 
 ```lua
 return {
-  version = 2,
+  version = 3,
   schemaVersion = 1,
   conditions = { ... },
   actions = { ... },
@@ -319,13 +319,15 @@ return {
 
 Coilbox reads two of these: the one in the game (`installed`) and the one this build ships (`available`). Every type is then in one of three states. `supported` means the installed runtime declares it. `added` means coilbox's does and the installed one does not, so installing or updating brings it. `extra` means the installed runtime declares it and coilbox does not, so the game is ahead of this build.
 
-A scenario records `runtimeVersion`, the lowest runtime that can play it, computed from the trigger types it uses and from the format features it uses. It is recomputed on every save, by the one function every write goes through, so a stored document always names the runtime it actually needs. Every launch-set type is version 1, and the one thing that asks for more is naming a prefab building, which needs 2.
+A scenario records `runtimeVersion`, the lowest runtime that can play it, computed from the trigger types it uses and from the format features it uses. It is recomputed on every save, by the one function every write goes through, so a stored document always names the runtime it actually needs. Every launch-set type is version 1. Naming a prefab building needs 2. Version 3 is four format changes released together: a var read where a number goes, a team on `camera_pan` and `map_marker`, an uncontested `zone_held_for`, and the `release_group` action.
 
-Two rules keep this honest, and both matter to anyone adding a type:
+Three rules keep this honest, and all three matter to anyone adding a type:
 
 - **Adding a condition or action means adding it to `missions/runtime.lua` and bumping `version` in the same change.** So does a format feature an older runtime would read past, because it would play the mission with a piece of it missing.
-- **A format feature that needs a newer runtime raises the floor in `requiredRuntimeVersion`, on the scenarios that actually use it.** Version 2 is not asked for by every scenario with a base, only by one that names a building.
+- **A format feature that needs a newer runtime raises the floor in `requiredRuntimeVersion`, on the scenarios that actually use it.** Version 2 is not asked for by every scenario with a base, only by one that names a building, and version 3 only by one that uses one of the four things it added.
 - **A type that has shipped is never removed.** A scenario asking for it would then silently do nothing, which is the failure the whole capability table exists to prevent.
+
+Features that land in one release share one bump. Four separate bumps would give a game four floors to chase and coilbox four gates to reason about, for work that arrives at a player's machine all at once.
 
 The editor greys types the target runtime cannot run, and a game vendoring a runtime older than a scenario needs is treated as a game with no runtime at all, so it falls to the mutator rather than playing a mission with silently dead triggers.
 

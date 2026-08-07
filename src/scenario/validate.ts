@@ -1,5 +1,6 @@
 import { scenarioReadMission } from "./bindings";
 import { missionPath } from "./compile";
+import { amountVar } from "./model";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
@@ -186,6 +187,27 @@ function checkOrders(
 }
 
 /**
+ * An `amount` parameter: a number, or `{ var = name }` naming the var to read
+ * one out of (issue #808). A named var resolves against the same registry a
+ * `varName` parameter does, because it is the same table the runtime reads.
+ */
+function checkAmount(
+  value: unknown,
+  path: string,
+  known: Registry,
+  issues: MissionIssue[],
+): void {
+  const name = amountVar(value);
+  if (name !== null) {
+    resolve("varName", name, `${path}.var`, known, issues);
+    return;
+  }
+  if (typeof value !== "number") {
+    issues.push({ path, message: "no number or variable given" });
+  }
+}
+
+/**
  * One condition or action. A type coilbox does not know belongs to a game's
  * `missions/extensions.lua`, and its parameters are that game's business, so it
  * passes through untouched exactly as the parser passes it through.
@@ -208,6 +230,11 @@ function checkStep(
     const value = params[name];
     if (param.kind === "orders") {
       checkOrders(value, where, known, issues);
+      continue;
+    }
+    if (param.kind === "amount") {
+      if (value === undefined && param.optional) continue;
+      checkAmount(value, where, known, issues);
       continue;
     }
     if (!isIdKind(param.kind)) continue;

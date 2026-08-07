@@ -6,6 +6,13 @@
 -- is one comparison. The scenario's `vars` table is the name and the number each
 -- one starts at.
 --
+-- Either side of a comparison or a sum may be a var rather than a written
+-- number. The three types below take their `value` as an amount, which is a
+-- number or `{ var = "quota" }`, so a mission can say "kills reached the quota"
+-- without the author fixing the quota when they write the trigger (issue #808).
+-- That is what runtime 3 added: a runtime behind it reads the table as no
+-- number at all and falls back to zero.
+--
 -- Every write is mirrored into a game rules param, because a var nothing outside
 -- synced Lua can read is no use to an objectives panel, a debrief or a debug
 -- view. Reading the mirror needs no line of sight and no channel: the engine
@@ -91,6 +98,19 @@ function M.register(engine, state)
 		vars.set(name, vars.get(name) + delta)
 	end
 
+	--- The number a parameter holds: the number itself, or the value of the var
+	-- it names. Published so a game's own action reads an amount the way these do
+	-- rather than inventing a second spelling of it.
+	--
+	-- Anything that is neither is zero, which is what an unset var reads as, so a
+	-- mission written by a newer editor loses the parameter rather than the run.
+	function vars.amount(value)
+		if type(value) == "table" and value.var ~= nil then
+			return vars.get(tostring(value.var))
+		end
+		return tonumber(value) or 0
+	end
+
 	for name, initial in pairs((state.mission or {}).vars or {}) do
 		declared[name] = true
 		vars.set(name, tonumber(initial) or 0)
@@ -109,16 +129,16 @@ function M.register(engine, state)
 					"no comparison named " .. tostring(params.op) .. ", treating the condition as false")
 				return false
 			end
-			return compare(vars.get(params.name), tonumber(params.value) or 0)
+			return compare(vars.get(params.name), vars.amount(params.value))
 		end,
 	})
 
 	engine:addAction("set_var", function(params)
-		vars.set(params.name, tonumber(params.value) or 0)
+		vars.set(params.name, vars.amount(params.value))
 	end)
 
 	engine:addAction("add_var", function(params)
-		vars.add(params.name, tonumber(params.value) or 0)
+		vars.add(params.name, vars.amount(params.value))
 	end)
 
 	return vars

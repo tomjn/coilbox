@@ -25,7 +25,7 @@ import {
   runtimeCapabilities,
 } from "./capabilities";
 import type { ScenarioRoute } from "./launch";
-import { SCENARIO_RUNTIME_VERSION, type Scenario } from "./model";
+import { amountVar, SCENARIO_RUNTIME_VERSION, type Scenario } from "./model";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
@@ -40,6 +40,77 @@ import {
  * silent half-play the version gate exists to refuse.
  */
 const PREFAB_BUILDING_VERSION = 2;
+
+/**
+ * The runtime that first read a var where a trigger wants a number (issue
+ * #808). A runtime behind this reads `{ var = "quota" }` as no number at all
+ * and falls back to zero, so "kills reached the quota" holds from the first
+ * frame and "add the bonus" adds nothing.
+ */
+const VAR_AMOUNT_VERSION = 3;
+
+/**
+ * Whether any trigger parameter names a var where a number goes.
+ *
+ * By the shape a stored value has rather than by the parameters the type table
+ * calls amounts, so a parameter a game's own extension declared as one counts
+ * too. The var it reads comes out of the runtime's own table, which is what
+ * version 3 added, so an extension's amount needs the same runtime.
+ */
+function readsVarAsAmount(scenario: Scenario): boolean {
+  const named = (value: unknown): boolean => {
+    if (amountVar(value) !== null) return true;
+    if (Array.isArray(value)) return value.some(named);
+    if (typeof value === "object" && value !== null)
+      return Object.values(value).some(named);
+    return false;
+  };
+  return scenario.triggers.some((trigger) =>
+    [...trigger.conditions.conditions, ...trigger.actions].some((step) =>
+      named(step.params),
+    ),
+  );
+}
+
+/**
+ * The runtime that first sent a camera move and a map marker to one team
+ * (issue #827). A runtime behind this reads past the team and does both for
+ * everyone, so a co-op mission yanks the other player's camera to the ambush
+ * that was meant for one of them.
+ */
+const VIEW_TEAM_VERSION = 3;
+
+/** The actions that reach one player's screen rather than the game. */
+const VIEW_ACTIONS = new Set(["camera_pan", "map_marker"]);
+
+/** Whether any camera move or map marker names a team. */
+function pointsAtOneTeam(scenario: Scenario): boolean {
+  return scenario.triggers.some((trigger) =>
+    trigger.actions.some(
+      (step) => VIEW_ACTIONS.has(step.type) && step.params.team !== undefined,
+    ),
+  );
+}
+
+/**
+ * The runtime that first held `zone_held_for` to an uncontested zone (issue
+ * #802). A runtime behind this reads past the flag and answers the presence
+ * question, so "hold the keep for a minute" is settled by a scout parked in a
+ * keep an enemy army is also sitting in.
+ */
+const UNCONTESTED_HOLD_VERSION = 3;
+
+/** Whether any hold asks to be uncontested. A flag written `false` is the
+ *  presence question every runtime has always answered, so it asks for
+ *  nothing. */
+function asksForAnUncontestedHold(scenario: Scenario): boolean {
+  return scenario.triggers.some((trigger) =>
+    trigger.conditions.conditions.some(
+      (step) =>
+        step.type === "zone_held_for" && step.params.uncontested === true,
+    ),
+  );
+}
 
 /** Every string a value carries, however deeply nested. */
 function stringsIn(value: unknown, out: Set<string>): void {
@@ -102,6 +173,15 @@ export function requiredRuntimeVersion(
   }
   if (namesPrefabBuilding(scenario)) {
     version = Math.max(version, PREFAB_BUILDING_VERSION);
+  }
+  if (readsVarAsAmount(scenario)) {
+    version = Math.max(version, VAR_AMOUNT_VERSION);
+  }
+  if (pointsAtOneTeam(scenario)) {
+    version = Math.max(version, VIEW_TEAM_VERSION);
+  }
+  if (asksForAnUncontestedHold(scenario)) {
+    version = Math.max(version, UNCONTESTED_HOLD_VERSION);
   }
   return version;
 }

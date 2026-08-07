@@ -2,7 +2,7 @@
   "id": "garrison",
   "name": "Garrison",
   "description": "The player builds up a garrison team, then unlocks and reinforces it.",
-  "runtimeVersion": 1,
+  "runtimeVersion": 3,
   "setup": {
     "gameName": "Test Game",
     "mapName": "Comet Catcher Redux",
@@ -79,7 +79,7 @@
   "restrictions": {
     "buildable": { "mode": "deny", "units": ["armestor"] }
   },
-  "vars": { "garrisonBuilt": 0 },
+  "vars": { "garrisonBuilt": 0, "quota": 1, "bonus": 5 },
   "triggers": [
     {
       "id": "count-check",
@@ -118,7 +118,7 @@
       "actions": [
         {
           "type": "add_var",
-          "params": { "name": "garrisonBuilt", "value": 1 }
+          "params": { "name": "garrisonBuilt", "value": { "var": "bonus" } }
         },
         { "type": "disable_trigger", "params": { "trigger": "count-check" } }
       ]
@@ -148,6 +148,18 @@
       ]
     },
     {
+      "id": "hand-over",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [{ "type": "time_elapsed", "params": { "seconds": 8 } }]
+      },
+      "actions": [
+        { "type": "release_group", "params": { "group": "reinforcements" } }
+      ]
+    },
+    {
       "id": "reinforcement-wave",
       "enabled": true,
       "repeat": true,
@@ -157,7 +169,11 @@
         "conditions": [
           {
             "type": "var",
-            "params": { "name": "garrisonBuilt", "op": "gte", "value": 1 }
+            "params": {
+              "name": "garrisonBuilt",
+              "op": "gte",
+              "value": { "var": "quota" }
+            }
           }
         ]
       },

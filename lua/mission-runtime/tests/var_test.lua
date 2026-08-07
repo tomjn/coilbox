@@ -192,6 +192,65 @@ check("adding to a var the mission never declared starts from nothing", held == 
 check("and says so once rather than on every tick", logged(engine, "no var named ghost"))
 
 --------------------------------------------------------------------------------
+-- A number read out of another var (issue #808). The value of a var condition,
+-- a set_var and an add_var is an amount: the number itself, or
+-- `{ var = "quota" }` naming the var to read it out of.
+--------------------------------------------------------------------------------
+
+engine = playing({ kills = 2, quota = 3, bonus = 5, score = 0 }, {
+	watching("met", { name = "kills", op = "gte", value = { var = "quota" } }),
+	watching("under", { name = "kills", op = "lt", value = { var = "quota" } }),
+})
+
+held = tick(engine, 15)
+check("a var compared against another var reads that var's number, not zero",
+	held == "under", held)
+
+engine.GG.CoilboxMission.vars.set("kills", 3)
+held = tick(engine, 30)
+check("and holds once it reaches it", held == "met", held)
+
+engine.GG.CoilboxMission.vars.set("quota", 9)
+held = tick(engine, 45)
+check("moving the quota moves the comparison, which is the whole point",
+	held == "under", held)
+
+engine = playing({ score = 1, bonus = 5, phase = 0, target = 7 }, {
+	once("award", { addVar("score", { var = "bonus" }) }),
+	once("advance", { setVar("phase", { var = "target" }) }),
+})
+
+tick(engine, 15)
+local vars = engine.GG.CoilboxMission.vars
+check("add_var adds what the var it names holds", vars.get("score") == 6,
+	tostring(vars.get("score")))
+check("set_var writes what the var it names holds", vars.get("phase") == 7,
+	tostring(vars.get("phase")))
+check("and both are mirrored the way a written number is",
+	mirrored(engine, "score") == 6 and mirrored(engine, "phase") == 7,
+	tostring(mirrored(engine, "score")) .. "/" .. tostring(mirrored(engine, "phase")))
+
+engine = playing({ score = 1 }, {
+	once("award", { addVar("score", { var = "ghost" }) }),
+})
+
+tick(engine, 15)
+check("an amount naming a var the mission never declared adds nothing",
+	engine.GG.CoilboxMission.vars.get("score") == 1,
+	tostring(engine.GG.CoilboxMission.vars.get("score")))
+check("and says so, because a silent zero is what an author cannot see",
+	logged(engine, "no var named ghost in this mission"))
+
+engine = playing({ score = 1 }, {})
+check("an amount that is a number is that number",
+	engine.GG.CoilboxMission.vars.amount(4) == 4)
+check("one naming a var is that var", engine.GG.CoilboxMission.vars.amount({ var = "score" }) == 1)
+check("and anything else at all is nothing",
+	engine.GG.CoilboxMission.vars.amount(nil) == 0
+		and engine.GG.CoilboxMission.vars.amount("four") == 0
+		and engine.GG.CoilboxMission.vars.amount({}) == 0)
+
+--------------------------------------------------------------------------------
 -- Vars against the trigger engine.
 --
 -- A var condition is polled rather than event-driven, so a trigger reading a var

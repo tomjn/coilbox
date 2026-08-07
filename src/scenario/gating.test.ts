@@ -8,7 +8,11 @@ import {
   requiredRuntimeVersion,
 } from "./gating";
 import type { Scenario, TriggerStep } from "./model";
-import { ACTION_TYPES, CONDITION_TYPES } from "./triggerTypes";
+import {
+  ACTION_TYPES,
+  CONDITION_TYPES,
+  typeRuntimeVersion,
+} from "./triggerTypes";
 
 const marker = (
   version: number,
@@ -43,12 +47,23 @@ describe("requiredRuntimeVersion", () => {
     expect(requiredRuntimeVersion(newScenario("empty"))).toBe(1);
   });
 
-  it("is the first runtime for every type coilbox ships today", () => {
+  it("is the first runtime for every type the launch set shipped", () => {
+    const launched = (types: Record<string, unknown>) =>
+      Object.keys(types).filter((type) => typeRuntimeVersion(type) === 1);
     const scenario = withTrigger(
-      Object.keys(CONDITION_TYPES),
-      Object.keys(ACTION_TYPES),
+      launched(CONDITION_TYPES),
+      launched(ACTION_TYPES),
     );
     expect(requiredRuntimeVersion(scenario)).toBe(1);
+  });
+
+  /**
+   * Issue #812. A runtime behind 3 has no `release_group`, ignores it, and goes
+   * on ordering the squad the mission handed the player.
+   */
+  it("is raised by an action a later runtime added", () => {
+    expect(requiredRuntimeVersion(withTrigger([], ["release_group"]))).toBe(3);
+    expect(typeRuntimeVersion("release_group")).toBe(3);
   });
 
   it("takes the highest version any type used needs", () => {
@@ -83,6 +98,95 @@ describe("requiredRuntimeVersion", () => {
 
   it("is not raised by a type a game extension declares", () => {
     expect(requiredRuntimeVersion(withTrigger(["sf_weather"], []))).toBe(1);
+  });
+
+  /**
+   * Issue #827. Runtime 2 reads past the team and moves every player's camera,
+   * so a co-op mission shows one side the ambush laid for the other.
+   */
+  describe("a scenario aiming a camera move or a marker at a team", () => {
+    const withAction = (
+      type: string,
+      params: Record<string, unknown>,
+    ): Scenario => {
+      const scenario = withTrigger([], []);
+      return {
+        ...scenario,
+        triggers: [
+          {
+            ...scenario.triggers[0],
+            actions: [{ type, params: params as never }],
+          },
+        ],
+      };
+    };
+
+    it("needs the runtime that reads the team", () => {
+      expect(
+        requiredRuntimeVersion(
+          withAction("camera_pan", { pos: { x: 1, z: 1 }, team: "player" }),
+        ),
+      ).toBe(3);
+      expect(
+        requiredRuntimeVersion(
+          withAction("map_marker", { pos: { x: 1, z: 1 }, team: "player" }),
+        ),
+      ).toBe(3);
+    });
+
+    it("is left on the first runtime when it names none", () => {
+      expect(
+        requiredRuntimeVersion(
+          withAction("camera_pan", { pos: { x: 1, z: 1 }, seconds: 2 }),
+        ),
+      ).toBe(1);
+    });
+
+    it("is not raised by another action that happens to name a team", () => {
+      expect(
+        requiredRuntimeVersion(
+          withAction("reveal_area", { zone: "gate", team: "player" }),
+        ),
+      ).toBe(1);
+    });
+  });
+
+  /**
+   * Issue #802. Runtime 2 reads past `uncontested` and answers the presence
+   * question, so a hold an enemy army is standing in settles the objective.
+   */
+  describe("a scenario asking for an uncontested hold", () => {
+    const withHold = (params: Record<string, unknown>): Scenario => {
+      const scenario = withTrigger([], []);
+      return {
+        ...scenario,
+        triggers: [
+          {
+            ...scenario.triggers[0],
+            conditions: {
+              op: "all",
+              conditions: [{ type: "zone_held_for", params: params as never }],
+            },
+          },
+        ],
+      };
+    };
+
+    const hold = { zone: "keep", team: "player", seconds: 60 };
+
+    it("needs the runtime that reads the flag", () => {
+      expect(
+        requiredRuntimeVersion(withHold({ ...hold, uncontested: true })),
+      ).toBe(3);
+    });
+
+    it("is left on the first runtime when it asks for presence", () => {
+      expect(requiredRuntimeVersion(withHold(hold))).toBe(1);
+      // Written false is the question every runtime has always answered.
+      expect(
+        requiredRuntimeVersion(withHold({ ...hold, uncontested: false })),
+      ).toBe(1);
+    });
   });
 
   /**
@@ -147,6 +251,72 @@ describe("requiredRuntimeVersion", () => {
           ],
         }),
       ).toBe(2);
+    });
+  });
+
+  /**
+   * Issue #808. Runtime 2 reads `{ var = "quota" }` as no number at all and
+   * compares against zero, so "kills reached the quota" holds from the first
+   * frame and "add the bonus" adds nothing.
+   */
+  describe("a scenario reading a number out of a var", () => {
+    const withValue = (value: unknown): Scenario => {
+      const scenario = withTrigger([], []);
+      return {
+        ...scenario,
+        triggers: [
+          {
+            ...scenario.triggers[0],
+            actions: [
+              {
+                type: "add_var",
+                params: { name: "score", value } as never,
+              },
+            ],
+          },
+        ],
+      };
+    };
+
+    it("needs the runtime that reads one", () => {
+      expect(requiredRuntimeVersion(withValue({ var: "bonus" }))).toBe(3);
+    });
+
+    it("is left on the first runtime when the number is written out", () => {
+      expect(requiredRuntimeVersion(withValue(5))).toBe(1);
+    });
+
+    it("finds one inside a condition too", () => {
+      const scenario = withTrigger([], []);
+      expect(
+        requiredRuntimeVersion({
+          ...scenario,
+          triggers: [
+            {
+              ...scenario.triggers[0],
+              conditions: {
+                op: "all",
+                conditions: [
+                  {
+                    type: "var",
+                    params: {
+                      name: "kills",
+                      op: "gte",
+                      value: { var: "quota" },
+                    } as never,
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      ).toBe(3);
+    });
+
+    it("finds one a game extension buried in a list", () => {
+      expect(
+        requiredRuntimeVersion(withValue([{ var: "bonus" }] as never)),
+      ).toBe(3);
     });
   });
 });

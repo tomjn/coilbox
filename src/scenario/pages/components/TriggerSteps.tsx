@@ -32,7 +32,13 @@ import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ExtensionTypes } from "../../extensions";
-import type { Point, Scenario, ScenarioParam, TriggerStep } from "../../model";
+import {
+  amountVar,
+  type Point,
+  type Scenario,
+  type ScenarioParam,
+  type TriggerStep,
+} from "../../model";
 import { isUnitDefParam, type ParamSpec } from "../../triggerTypes";
 import { OrderRow } from "./GroupControls";
 import { orderOfKind, targetOptions, withOrder, withoutOrder } from "./groups";
@@ -396,6 +402,16 @@ function ParamControl({
           onChange={onChange}
         />
       );
+    case "amount":
+      return (
+        <AmountField
+          label={label}
+          value={value}
+          optional={spec.optional === true}
+          vars={Object.keys(scenario.vars).sort()}
+          onChange={onChange}
+        />
+      );
     case "boolean":
       return (
         <Switch
@@ -509,6 +525,80 @@ function NumberField({
       }}
       className="h-7 w-28 text-xs"
     />
+  );
+}
+
+/** What an amount is picked as. The stored value says which without a flag,
+ *  but the control needs a name for each side of the choice. */
+const AMOUNT_SIDES = [
+  { value: "number", label: "a number" },
+  { value: "var", label: "a variable" },
+];
+
+/**
+ * A number, or the variable to read one out of (issue #808).
+ *
+ * Two controls rather than one list of numbers and names, because a var called
+ * `5` and the number 5 are different things and a single box could not tell an
+ * author which they had picked. Switching to a variable with none declared is
+ * offered and refused rather than hidden, so the choice says what the format
+ * allows.
+ */
+function AmountField({
+  label,
+  value,
+  optional,
+  vars,
+  onChange,
+}: {
+  label: string;
+  value: ScenarioParam | undefined;
+  optional: boolean;
+  /** The scenario's variable names, in the order the picker lists them. */
+  vars: string[];
+  onChange: (value: ScenarioParam | undefined) => void;
+}) {
+  const named = amountVar(value);
+
+  return (
+    <>
+      <OptionSelect
+        size="sm"
+        className="w-28 shrink-0"
+        value={named === null ? "number" : "var"}
+        options={AMOUNT_SIDES.map((side) => ({
+          ...side,
+          disabled: side.value === "var" && vars.length === 0,
+          trailing:
+            side.value === "var" && vars.length === 0
+              ? "Needs a variable"
+              : undefined,
+        }))}
+        onValueChange={(side) => {
+          if (side === "var") {
+            if (vars[0]) onChange({ var: vars[0] });
+          } else {
+            onChange(asNumber(value) ?? 0);
+          }
+        }}
+      />
+      {named === null ? (
+        <NumberField
+          label={label}
+          value={asNumber(value)}
+          optional={optional}
+          onChange={onChange}
+        />
+      ) : (
+        <OptionSelect
+          size="sm"
+          value={named}
+          options={vars.map((name) => ({ value: name, label: name }))}
+          onValueChange={(name) => onChange({ var: name })}
+          placeholder={`Pick a variable for ${label}`}
+        />
+      )}
+    </>
   );
 }
 

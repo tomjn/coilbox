@@ -2,7 +2,7 @@
   "id": "siege",
   "name": "Siege",
   "description": "The player must hold the keep before the clock runs out.",
-  "runtimeVersion": 2,
+  "runtimeVersion": 3,
   "setup": {
     "gameName": "Test Game",
     "mapName": "Comet Catcher Redux",
@@ -37,6 +37,13 @@
       "shape": "box",
       "min": { "x": 1800, "z": 1800 },
       "max": { "x": 2200, "z": 2200 }
+    },
+    {
+      "id": "yard",
+      "name": "Yard",
+      "shape": "box",
+      "min": { "x": 2600, "z": 1800 },
+      "max": { "x": 2800, "z": 2000 }
     }
   ],
   "actors": [
@@ -86,8 +93,30 @@
     "buildable": { "mode": "deny", "units": ["corthud", "armllt"] },
     "commands": ["attack"]
   },
-  "vars": { "labDown": 0 },
+  "vars": { "labDown": 0, "yardHeld": 0 },
   "triggers": [
+    {
+      "id": "yard-cleared",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "zone_held_for",
+            "params": {
+              "zone": "yard",
+              "team": "player",
+              "seconds": 10,
+              "uncontested": true
+            }
+          }
+        ]
+      },
+      "actions": [
+        { "type": "set_var", "params": { "name": "yardHeld", "value": 1 } }
+      ]
+    },
     {
       "id": "lab-down",
       "enabled": true,

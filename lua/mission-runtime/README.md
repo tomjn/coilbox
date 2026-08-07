@@ -129,9 +129,11 @@ Membership is the engine's own spatial queries, `Spring.GetUnitsInRectangle` and
 - `units_in_zone` counts what is in a zone now, optionally narrowed to one `team` and to a list of `unitDefs`, and holds when the count sits between `min` and `max`. A condition stating neither means at least one, because asking about units in a zone with no number is asking whether anything is there. Stating only a maximum keeps its own meaning, so `max = 0` is how a mission asks whether a zone is clear.
 - `zone_held_for` holds once a `team` has had a unit in a `zone` continuously for `seconds`. Occupancy is one reading per polled tick, taken by a sampler rather than by the condition, so the clock does not depend on which triggers happened to be armed and asked. Leaving the zone drops the reading, so coming back starts the count again. The clock belongs to the world, not to the trigger: a hold that began before the trigger watching it was armed still counts.
 
-Only the zone and team pairs a mission's `zone_held_for` conditions actually name are sampled, so a mission that asks for no holds costs nothing per tick.
+Only the holds a mission's `zone_held_for` conditions actually name are sampled, so a mission that asks for no holds costs nothing per tick. One hold is a zone, a team and whether it has to be uncontested, so two triggers asking the same question of the same zone read one clock and two asking different questions do not.
 
-A hold is presence, not control. A team standing in a zone holds it whether or not anyone else is standing there too ([#802](https://github.com/tomjn/coilbox/issues/802)).
+A hold is presence unless the condition says `uncontested = true`, which makes it control ([#802](https://github.com/tomjn/coilbox/issues/802)). Then anyone the holding team is not allied with breaks it for as long as they are in the zone, and leaving starts the clock again from nothing rather than resuming it.
+
+Gaia does not contest a hold. It owns the map's own furniture, critters and the units some maps place, which belongs to no side and fights for none, so a mission that asked the player to clear a keep would otherwise be asking them to hunt down a deer. The runtime's own anchors and spotters are left out for the same reason every other count here leaves them out. That is what runtime 3 added, and a scenario that asks for an uncontested hold says `runtimeVersion = 3` so a runtime 2 game refuses it rather than answering the presence question instead.
 
 The zones are published as well as read, so anything else that has to work out where a zone is, `reveal_area` for one, reads the same corners the conditions do rather than parsing the shapes again.
 
@@ -165,6 +167,8 @@ GG.CoilboxMission.reveal.hide("depot", "player")
 Both are the player's screen rather than the game, so, like a line of dialogue, synced Lua decides only that the mission asked and the unsynced half does it. They are the unsynced half's rather than the widget's because neither needs a panel and neither queues behind anything: a player who had the widget switched off would otherwise get no markers.
 
 A marker is added locally. Every client runs that half, so a marker sent the way a player's own click sends one would be broadcast once per player and land on the map that many times over.
+
+Both take an optional `team`, a participant id, and mean everyone when the author names none ([issue #827](https://github.com/tomjn/coilbox/issues/827)). The synced half resolves the participant into an engine team, because only the mission knows the mapping, and sends it along. Each client's unsynced half then compares it against `Spring.GetMyTeamID()` and drops the ones that are not its own. A spectator is whichever team the engine currently has them watching as. A participant the mission has no engine team for is reported and done for everyone: a camera move that reaches too many people is one the author can see going wrong, and one that never happens looks like a trigger that never fired. That is what runtime 3 added, and a scenario that names a team says `runtimeVersion = 3` so a runtime 2 game refuses it rather than moving every camera.
 
 A scenario carries no height, so the ground under the position is read by the unsynced half at the moment the camera moves or the marker lands.
 
@@ -208,7 +212,10 @@ So a dormant garrison is `spawn_group` when the mission wants it standing there 
 - `wake_group` runs the group's authored orders, placing it first if it is not on the map. "Wake the reinforcements" with nothing to wake would say nothing and do nothing.
 - `give_orders` replaces a group's orders and wakes it, because a group told to move that stands there holding position is a mission that looks broken and reports nothing. It does not place one: ordering units nothing asked for is not what the author wrote.
 - `gift_units` hands a group's units to another participant, as a capture rather than a gift. A give is the form a game refuses: the engine passes that flag straight to `AllowUnitTransfer`, and the usual anti-grief gadget says no to a share between teams that are not allied, which is most of what a mission gifts for. Everything else about the two is the same. The group keeps its units, so the mission can go on ordering a squad it gave the player, and a game that refuses the move outright is reported.
+- `release_group` is the mission letting go ([#812](https://github.com/tomjn/coilbox/issues/812)). It drops the group's roll, so nothing the mission does afterwards reaches those units, and touches the units themselves not at all. They are woken first, because handing the player a squad pinned on hold position where the mission left it is a worse handover than none. A released group spawned again is a fresh block, the same as a wiped one, because the runtime is left holding nothing that says otherwise. That is what runtime 3 added.
 - An action aimed at a group with nothing on the map is reported once. That is what a mission that forgot its `spawn_group` looks like.
+
+`gift_units` and `release_group` are separate actions rather than a flag on the gift, because the two decisions are not made at the same moment. A mission that hands over a rescued convoy does both in one trigger. One that lends an escort gifts it now and releases it when the loan ends. A mission that spawns a squad already on the player's team and drives it through a tutorial's opening releases it with no gift at all.
 
 A game's own actions, and the rest of the runtime, drive a group through that handle rather than around it, so the roll of who is still standing stays right:
 
@@ -219,6 +226,7 @@ GG.CoilboxMission.groups.spawn("raiders")
 GG.CoilboxMission.groups.wake("raiders")
 GG.CoilboxMission.groups.orders("raiders", { { kind = "move", waypoints = { { x = 0, z = 0 } } } })
 GG.CoilboxMission.groups.gift("raiders", "player")
+GG.CoilboxMission.groups.release("raiders")
 ```
 
 Sleep is the move state and nothing else. Each unit's own move state is read back before it is put on hold, so waking hands back the game's default for that unit type rather than guessing at one. Fire state is left alone: a garrison that will not defend itself is a stranger thing than one that will.

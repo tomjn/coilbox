@@ -543,6 +543,44 @@ describe("parseScenario — triggers", () => {
     });
   });
 
+  /**
+   * Issue #808. An `amount` parameter holds a number or the var to read one
+   * out of, so both shapes have to survive the round trip and anything else
+   * has to be refused the way a malformed number is.
+   */
+  describe("an amount", () => {
+    const withValue = (value: unknown) =>
+      doc({
+        triggers: [
+          trigger({
+            actions: [{ type: "add_var", params: { name: "score", value } }],
+          }),
+        ],
+      });
+
+    it("keeps a plain number", () => {
+      const s = parseScenario(withValue(5));
+      expect(s?.triggers[0].actions[0].params.value).toBe(5);
+    });
+
+    it("keeps the var it names", () => {
+      const s = parseScenario(withValue({ var: "bonus" }));
+      expect(s?.triggers[0].actions[0].params.value).toEqual({ var: "bonus" });
+    });
+
+    it("drops anything else the table carries", () => {
+      const s = parseScenario(withValue({ var: "bonus", junk: 1 }));
+      expect(s?.triggers[0].actions[0].params.value).toEqual({ var: "bonus" });
+    });
+
+    it("rejects a table that names no var, and a value that is neither", () => {
+      expect(parseScenario(withValue({}))).toBeNull();
+      expect(parseScenario(withValue({ var: "" }))).toBeNull();
+      expect(parseScenario(withValue("5"))).toBeNull();
+      expect(parseScenario(withValue(undefined))).toBeNull();
+    });
+  });
+
   it("parses orders carried as an action parameter", () => {
     const s = parseScenario(
       doc({

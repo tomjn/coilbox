@@ -215,6 +215,32 @@ describe("vars", () => {
     expect(loads(next)).toBe(true);
   });
 
+  // Issue #808. An amount holds the var it reads inside a table, so a rename
+  // that only rewrote the parameters named `varName` would leave a comparison
+  // pointing at a name nothing declares any more.
+  it("carries an amount that reads it over too", () => {
+    const scenario = document();
+    const withAmount: Scenario = {
+      ...scenario,
+      triggers: [
+        {
+          ...scenario.triggers[0],
+          actions: [
+            {
+              type: "add_var",
+              params: { name: "waves", value: { var: "alertLevel" } },
+            },
+          ],
+        },
+      ],
+    };
+
+    const next = renameVar(withAmount, "alertLevel", "alarm");
+    expect(next.triggers[0].actions[0].params.value).toEqual({ var: "alarm" });
+    expect(next.triggers[0].conditions.conditions[0].params.name).toBe("alarm");
+    expect(loads(next)).toBe(true);
+  });
+
   it("refuses a rename that would overwrite another variable", () => {
     const scenario = document();
     expect(renameVar(scenario, "waves", "alertLevel")).toBe(scenario);

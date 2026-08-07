@@ -70,6 +70,15 @@ if not gadgetHandler:IsSyncedCode() then
 	-- handed it, and it is the frame the runtime passes that line to LuaUI.
 	local DIALOGUE_MESSAGE = "coilbox_mission_dialogue"
 
+	-- And the two that point the player at a place. Both carry the engine team
+	-- they are for, or -1 for everyone (issue #827), and reading them here is the
+	-- only way a run can see what the synced half resolved a participant into.
+	local CAMERA_MESSAGE = "coilbox_mission_camera"
+	local MARKER_MESSAGE = "coilbox_mission_marker"
+
+	-- The team each camera move and marker was aimed at, in order.
+	local aimedAt = { camera = {}, marker = {} }
+
 	--- Whether LuaUI is running at all. `Script.LuaUI` answers nothing when it is
 	-- not, which is what a game whose own LuaUI died at its entry point looks like
 	-- from here.
@@ -133,6 +142,24 @@ if not gadgetHandler:IsSyncedCode() then
 		end
 	end
 
+	--- What the ambush's camera moves and markers were aimed at.
+	--
+	-- Which client acts on one is decided inside the runtime's own unsynced half,
+	-- which runs before this gadget does, so a run cannot watch it drop a message
+	-- that is not this client's. What a run can settle is the half only a real
+	-- engine has: that a participant id in the document arrives here as this
+	-- client's engine team number, and that an action naming no participant
+	-- arrives as everyone. The drop itself is proved in view_test.lua.
+	local function checkAimed()
+		local mine = Spring.GetMyTeamID()
+		check("a camera move the scenario aimed at a participant carries that team",
+			#aimedAt.camera == 1 and aimedAt.camera[1] == mine,
+			table.concat(aimedAt.camera, ",") .. " wanted " .. tostring(mine))
+		check("and its markers carry one aimed at that team and one aimed at everyone",
+			#aimedAt.marker == 2 and aimedAt.marker[1] == mine and aimedAt.marker[2] == -1,
+			table.concat(aimedAt.marker, ","))
+	end
+
 	function gadget:RecvFromSynced(message, ...)
 		if message == "coilbox_harness_done" then
 			-- Last of all, because a widget the handler threw out over an error in
@@ -141,9 +168,18 @@ if not gadgetHandler:IsSyncedCode() then
 			if proving and MISSION_ID then
 				check("and it is still loaded at the end of the mission", widgetLoaded())
 			end
+			if MISSION_ID == "ambush" then
+				checkAimed()
+			end
 			Spring.Quit()
 		elseif message == "coilbox_harness_player_order" then
 			playerOrder(...)
+		elseif message == CAMERA_MESSAGE then
+			local _, _, _, team = ...
+			aimedAt.camera[#aimedAt.camera + 1] = team
+		elseif message == MARKER_MESSAGE then
+			local _, _, _, team = ...
+			aimedAt.marker[#aimedAt.marker + 1] = team
 		elseif message == DIALOGUE_MESSAGE and proving and not heardLine then
 			heardLine = true
 			check("a line the mission says has the widget's global to arrive at", widgetLoaded())
@@ -192,10 +228,10 @@ local function owns(team, defName)
 	return Spring.GetTeamUnitDefCount(team, def.id)
 end
 
---- Put a unit on the map for the player, at the ground height, and make it
--- proof against anything the mission's own units do to it. A check about a zone
--- being held is about the runtime's clock, not about whether a scout survives
--- three raiders, nor about where they leave it.
+--- Put a unit on the map for a team, at the ground height, and make it proof
+-- against anything the mission's own units do to it. A check about a zone being
+-- held is about the runtime's clock, not about whether a scout survives three
+-- raiders, nor about where they leave it.
 --
 -- Armour stops the damage and nothing else. The engine scales damage by the
 -- armour multiple and impulse by nothing, and a ground unit answers impulse by
@@ -204,14 +240,19 @@ end
 -- outright and is never pushed, and dropping it out of solid-object collisions
 -- keeps a unit that is itself skidding from shoving it on the way past. What is
 -- left stands exactly where it was put for the whole run.
-local function playerUnit(defName, x, z)
-	local unitID = Spring.CreateUnit(defName, x, Spring.GetGroundHeight(x, z), z, 0, 0)
+local function pinnedUnit(defName, team, x, z)
+	local unitID = Spring.CreateUnit(defName, x, Spring.GetGroundHeight(x, z), z, 0, team)
 	if unitID then
 		Spring.SetUnitArmored(unitID, true, 0)
 		Spring.MoveCtrl.Enable(unitID)
 		Spring.SetUnitBlocking(unitID, false, false)
 	end
 	return unitID
+end
+
+--- The same, on the player's team, which is what most of the steps below want.
+local function playerUnit(defName, x, z)
+	return pinnedUnit(defName, 0, x, z)
 end
 
 --- A spot within `reach` of (x, z) that `defName` may be built on, or nil.
@@ -509,6 +550,10 @@ local GARRISON_X, GARRISON_Z, GARRISON_AREA = 1200, 1200, 400
 
 local garrisonBuilder, garrisonX, garrisonY, garrisonZ
 
+-- The units the mission gifts away, read off the group before it lets go of
+-- them, so the release below can be told from the group being wiped.
+local garrisonGifted = {}
+
 plans.garrison = {
 	-- The reveal the capture starts runs for 30 seconds, so the fog cannot come
 	-- back before frame 1050 or so.
@@ -519,6 +564,14 @@ plans.garrison = {
 			check("a trigger the scenario disabled starts disabled", armed("unlock") == false)
 			check("a var starts at the number its author gave it",
 				rules("coilbox_mission_var_garrisonBuilt") == 0)
+			-- The two vars the steps below read through rather than around. A
+			-- fixture that stopped declaring them would leave every claim about
+			-- issue #808 passing on a pair of zeroes.
+			check("the vars a trigger reads its numbers out of are declared",
+				rules("coilbox_mission_var_quota") == 1
+					and rules("coilbox_mission_var_bonus") == 5,
+				tostring(rules("coilbox_mission_var_quota")) .. "/"
+					.. tostring(rules("coilbox_mission_var_bonus")))
 			check("an objective starts active",
 				rules("coilbox_mission_objective_defend-garrison") == ACTIVE)
 			check("a building actor is on the map", defOf(state().units.outpost) == "armestor",
@@ -558,6 +611,14 @@ plans.garrison = {
 				#orders == 0, queueText(orders))
 			check("so nothing goes up on a site the engine had no objection to",
 				owns(0, UNLOCKED_BUILDING) == 0, owns(0, UNLOCKED_BUILDING))
+			-- Issue #808, the falsifying half. The wave's condition compares
+			-- garrisonBuilt against the quota var, which is 1, and the trigger
+			-- engine has polled by now. A runtime that read the var as no number at
+			-- all would compare against 0, which garrisonBuilt already meets, and
+			-- the wave would be standing on the map here.
+			check("a var compared against another var is not met before the other var is",
+				#state().groups.units("reinforcements") == 0,
+				#state().groups.units("reinforcements"))
 		end },
 		-- Spread, because three units asked for on one spot is the pile-up the
 		-- placement check above exists to refuse.
@@ -594,8 +655,12 @@ plans.garrison = {
 		{ frame = 120, run = function()
 			check("a unit finished after the start window is one the team built",
 				armed("built-outpost") == false)
-			check("its add_var added to the var",
-				rules("coilbox_mission_var_garrisonBuilt") == 2,
+			-- The add is `{ var = "bonus" }` rather than a number, so 1 plus 5
+			-- rather than 1 plus 1 is what says the runtime read the var
+			-- (issue #808). A runtime that read the table as no number would leave
+			-- this at 1.
+			check("its add_var added what another var holds",
+				rules("coilbox_mission_var_garrisonBuilt") == 6,
 				rules("coilbox_mission_var_garrisonBuilt"))
 			check("its disable_trigger left the other one disarmed", armed("count-check") == false)
 		end },
@@ -640,6 +705,24 @@ plans.garrison = {
 				end
 			end
 			check("and gift_units moved every one of them across ally lines", moved == 2, moved)
+			garrisonGifted = { gifted[1], gifted[2] }
+		end },
+		-- Issue #812. The mission gifted the squad at three seconds and releases
+		-- it at eight, which is the handover the two actions are separate for: the
+		-- units are the other team's, and now the mission has stopped ordering
+		-- them.
+		{ frame = 260, run = function()
+			check("release_group leaves the mission holding none of the group's units",
+				#state().groups.units("reinforcements") == 0,
+				#state().groups.units("reinforcements"))
+			local standing = 0
+			for _, unitID in ipairs(garrisonGifted) do
+				if Spring.GetUnitIsDead(unitID) == false and Spring.GetUnitTeam(unitID) == 1 then
+					standing = standing + 1
+				end
+			end
+			check("while the units it gave away are still on the map, on the team it gave them to",
+				standing == 2, standing)
 		end },
 		{ frame = 1250, run = function()
 			check("the reveal runs out and the spotter comes off the map",
@@ -676,6 +759,14 @@ local ORDERED_X, ORDERED_Z = 1000, 1000
 local BUILD_REACH = 110
 
 local siegeBuilder, siegeOrdered
+
+-- The yard, the second zone the siege scenario carries, and the only thing in
+-- the fixtures that asks for an uncontested hold (issue #802). Well east of the
+-- keep, so nothing the mission places and nothing the steps above put down is
+-- ever standing in it.
+local YARD_X, YARD_Z = 2700, 1900
+
+local yardUnit, yardIntruder
 
 -- The keep's factory, by the name the scenario gave that building. Every step
 -- below that talks to it goes through here, so what the runtime records about a
@@ -851,6 +942,37 @@ plans.siege = {
 				keepLab() == nil, keepLab())
 			check("and the other building in the base is untouched",
 				defOf(state().units["keep-mex"]) == "cormex")
+		end },
+		-- Issue #802: the same zone clock, asked whether the team holding it is
+		-- the only one there. The player's unit walks into the yard and an enemy
+		-- walks in beside it, and the hold is ten seconds.
+		{ frame = 750, run = function()
+			check("nothing has held the yard yet", rules("coilbox_mission_var_yardHeld") == 0,
+				rules("coilbox_mission_var_yardHeld"))
+			yardUnit = playerUnit("armpeep", YARD_X, YARD_Z)
+			yardIntruder = pinnedUnit("corak", 1, YARD_X + 40, YARD_Z + 40)
+			check("both are standing in the yard",
+				yardUnit ~= nil and yardIntruder ~= nil)
+		end },
+		{ frame = 1150, run = function()
+			-- Four hundred frames in, on a ten second hold. A runtime that read
+			-- past `uncontested` would have settled this at frame 1050.
+			check("a hold an enemy is standing in is no hold at all",
+				rules("coilbox_mission_var_yardHeld") == 0,
+				rules("coilbox_mission_var_yardHeld"))
+			check("and the unit doing the holding has not wandered off",
+				Spring.GetUnitIsDead(yardUnit) == false)
+			Spring.DestroyUnit(yardIntruder, false, true)
+		end },
+		{ frame = 1300, run = function()
+			check("clearing them out does not hand the hold straight back",
+				rules("coilbox_mission_var_yardHeld") == 0,
+				rules("coilbox_mission_var_yardHeld"))
+		end },
+		{ frame = 1560, run = function()
+			check("holding it alone for the whole ten seconds does",
+				rules("coilbox_mission_var_yardHeld") == 1,
+				rules("coilbox_mission_var_yardHeld"))
 		end },
 		{ frame = 1500, run = function()
 			check("a hold short of the minute settles nothing",

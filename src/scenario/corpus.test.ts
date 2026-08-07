@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { compileScenario, scenarioMissionValue } from "./compile";
 import { requiredRuntimeVersion } from "./gating";
-import { parseScenario, type Scenario } from "./model";
+import { amountVar, parseScenario, type Scenario } from "./model";
 import { ACTION_TYPES, CONDITION_TYPES } from "./triggerTypes";
 
 // validate.ts reaches the plugin through bindings.ts, whose plugin-sdk import
@@ -148,6 +148,45 @@ describe("scenario fixture corpus", () => {
           ),
         );
       }),
+      // Issue #808. An amount that names a var compiles to a table where a
+      // number would otherwise sit, so without one nothing checks that the
+      // emitter, the validator and the runtime agree on that shape.
+      "a trigger reading a number out of a var": allTriggers.some((t) =>
+        [...t.conditions.conditions, ...t.actions].some((step) =>
+          Object.values(step.params).some((value) => amountVar(value) !== null),
+        ),
+      ),
+      // Issue #827. Both sides of the choice, because a corpus that only ever
+      // named a team would stop covering the "everyone" path every scenario
+      // written before runtime 3 takes.
+      "a camera move or marker aimed at one team": allTriggers.some((t) =>
+        t.actions.some(
+          (a) =>
+            (a.type === "camera_pan" || a.type === "map_marker") &&
+            a.params.team !== undefined,
+        ),
+      ),
+      "a camera move or marker aimed at everyone": allTriggers.some((t) =>
+        t.actions.some(
+          (a) =>
+            (a.type === "camera_pan" || a.type === "map_marker") &&
+            a.params.team === undefined,
+        ),
+      ),
+      // Issue #802. Both sides again: the presence hold is what every scenario
+      // written before runtime 3 asks for, and the uncontested one is the new
+      // question.
+      "a hold that has to be uncontested": allTriggers.some((t) =>
+        t.conditions.conditions.some(
+          (c) => c.type === "zone_held_for" && c.params.uncontested === true,
+        ),
+      ),
+      "a hold that only asks for presence": allTriggers.some((t) =>
+        t.conditions.conditions.some(
+          (c) =>
+            c.type === "zone_held_for" && c.params.uncontested === undefined,
+        ),
+      ),
       "a group that starts on the map (not dormant)": allGroups.some(
         (g) => g.dormant === false,
       ),

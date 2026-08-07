@@ -24,12 +24,17 @@
  * `dialogue`, `teamId` → a `setup.participants` id (and `Scenario.teams` key),
  * `varName` → a `Scenario.vars` key.
  *
+ * `amount` is a number the author may name a var for instead: it holds either
+ * the number or `{ var: name }`, and the runtime reads the var out of the same
+ * table `varName` names one in (issue #808).
+ *
  * A list rather than a bare union, because a game's `missions/extensions.lua`
  * names a kind as a string and `extensions.ts` has to check that it is one.
  */
 export const PARAM_KINDS = [
   "string",
   "number",
+  "amount",
   "boolean",
   "strings",
   "point",
@@ -113,12 +118,20 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
   var: {
     name: { kind: "varName" },
     op: { kind: "enum", values: VAR_OPS },
-    value: { kind: "number" },
+    /** A number, or another var to compare against: "kills reached the quota"
+     *  when the quota is itself a var (issue #808). */
+    value: { kind: "amount" },
   },
   zone_held_for: {
     zone: { kind: "zoneId" },
     team: { kind: "teamId" },
     seconds: { kind: "number" },
+    /**
+     * Break the hold while anyone the team is not allied with is standing in
+     * the zone, so "hold the keep" is not satisfied by a scout parked in a
+     * keep an enemy army is also sitting in (issue #802). Gaia is not anyone.
+     */
+    uncontested: { kind: "boolean", optional: true },
   },
 };
 
@@ -134,13 +147,18 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
     group: { kind: "groupId" },
     team: { kind: "teamId" },
   },
+  /** Stop ordering a group. The units stay on the map and stay whoever's they
+   *  are: this is the mission letting go, not a transfer (issue #812). */
+  release_group: { group: { kind: "groupId" } },
   set_var: {
     name: { kind: "varName" },
-    value: { kind: "number" },
+    value: { kind: "amount" },
   },
+  /** Move a var by a number, or by what another var holds: "add the bonus to
+   *  the score" (issue #808). */
   add_var: {
     name: { kind: "varName" },
-    value: { kind: "number" },
+    value: { kind: "amount" },
   },
   enable_trigger: { trigger: { kind: "triggerId" } },
   disable_trigger: { trigger: { kind: "triggerId" } },
@@ -158,13 +176,17 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
     unitDef: { kind: "string" },
     team: { kind: "teamId", optional: true },
   },
+  /** Whose camera moves, and whose map gets the label. Absent means everyone,
+   *  which is what a single player scenario wants (issue #827). */
   camera_pan: {
     pos: { kind: "point" },
     seconds: { kind: "number", optional: true },
+    team: { kind: "teamId", optional: true },
   },
   map_marker: {
     pos: { kind: "point" },
     text: { kind: "string", optional: true },
+    team: { kind: "teamId", optional: true },
   },
   /** Ends the mission. Absent team means the human player's team. */
   victory: { team: { kind: "teamId", optional: true } },
@@ -175,15 +197,18 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
  * The runtime version that added a condition or action, for the types that did
  * not ship in version 1.
  *
- * Everything in the two tables above shipped in version 1, so this is empty
- * today. A type a later runtime adds goes here in the same change that adds it
- * to its table and bumps `missions/runtime.lua`, and that is what raises the
+ * A type a later runtime adds goes here in the same change that adds it to its
+ * table and bumps `missions/runtime.lua`, and that is what raises the
  * `runtimeVersion` of every scenario using it. Nothing is ever removed: a type
  * that has shipped keeps the version it shipped in.
  *
  * One map for both tables, because a condition and an action never share a name.
  */
-export const TYPE_RUNTIME_VERSION: Record<string, number> = {};
+export const TYPE_RUNTIME_VERSION: Record<string, number> = {
+  /** Issue #812. A runtime behind 3 ignores it and goes on ordering a squad the
+   *  mission handed the player. */
+  release_group: 3,
+};
 
 /**
  * The lowest runtime version that implements a condition or action.

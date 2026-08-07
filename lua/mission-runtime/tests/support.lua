@@ -411,6 +411,16 @@ function M.newEngine(modOptions, files, options)
 			GetUnitDefID = function(unitID)
 				return engine.units[unitID].defID
 			end,
+			GetUnitTeam = function(unitID)
+				local unit = engine.units[unitID]
+				return unit and unit.team
+			end,
+			-- Two teams in one ally team are allied, and so is a team with itself.
+			-- `options.allyTeams` is what decides, the way it does everywhere else
+			-- here.
+			AreTeamsAllied = function(a, b)
+				return allyTeamOf(a) == allyTeamOf(b)
+			end,
 			GetUnitHealth = function(unitID)
 				local unit = engine.units[unitID]
 				return unit.health, unit.maxHealth
@@ -492,6 +502,12 @@ function M.newEngine(modOptions, files, options)
 			GetTeamList = function()
 				-- Two teams unless a test says otherwise, matching the two sides.
 				return options.teamList or { 0, 1 }
+			end,
+			-- The engine team this client is watching, which is what tells one
+			-- client's unsynced half from another's. Team 0 unless a test says
+			-- otherwise, which is the team a single player mission's human is on.
+			GetMyTeamID = function()
+				return options.myTeam or 0
 			end,
 			-- Nothing, the way the engine answers when the game has no Gaia team.
 			GetGaiaTeamID = function()

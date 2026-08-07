@@ -2,7 +2,7 @@
 -- Do not edit: change the scenario and compile again.
 return {
   schemaVersion = 1,
-  runtimeVersion = 1,
+  runtimeVersion = 3,
   id = "ambush",
   name = "Ambush",
   description = "A raider group waits in the pass and springs on the player's approach.",
@@ -93,13 +93,22 @@ return {
           params = {
             pos = { x = 2000, z = 2000 },
             seconds = 2,
+            team = "player",
           },
         },
         {
           type = "map_marker",
           params = {
             pos = { x = 2000, z = 2000 },
+            team = "player",
             text = "Ambush!",
+          },
+        },
+        {
+          type = "map_marker",
+          params = {
+            pos = { x = 1800, z = 1800 },
+            text = "They came.",
           },
         },
         {
