@@ -9,7 +9,9 @@ function base(): HealthInputs {
     profileErrorSnippet: null,
     gameFilter: undefined,
     roots: [{ path: "/pkg/game", portable: true, engineCount: 1 }],
-    installedGames: ["splinter_1.3.sdz"],
+    // The name unitsync reports, which is what a `gameFilter` matches. Not the
+    // archive file name: they are different strings (issue #959).
+    installedGames: ["Splinter Faction 1.3"],
     writeRootPath: "/pkg/game",
     campaignFailures: [],
     writable: { writeRoot: { writable: true }, dataDir: { writable: true } },
@@ -66,7 +68,16 @@ describe("deriveHealthChecks", () => {
     expect(c.label).toContain("0");
     // the hint names the filter and lists the installed games to match against.
     expect(c.hint).toContain("^Nope");
-    expect(c.hint).toContain("splinter_1.3.sdz");
+    expect(c.hint).toContain("Splinter Faction 1.3");
+  });
+
+  it("matches a filter against the name unitsync reports", () => {
+    const c = byId(
+      { ...base(), gameFilter: { names: ["Splinter Faction 1.3"] } },
+      "gameFilter",
+    );
+    expect(c.status).toBe("ok");
+    expect(c.label).toContain("1 installed game");
   });
 
   it("errors on an invalid game filter regex", () => {
@@ -148,6 +159,40 @@ describe("deriveHealthChecks", () => {
       "content",
     );
     expect(c.status).toBe("warn");
+  });
+
+  describe("before a scan has answered", () => {
+    it("does not call an unscanned package one with no games", () => {
+      const c = byId({ ...base(), installedGames: null }, "content");
+      expect(c.status).toBe("unknown");
+      expect(c.label).toContain("not scanned");
+    });
+
+    it("still names the engine problem first, because it is the reason", () => {
+      const c = byId(
+        {
+          ...base(),
+          installedGames: null,
+          roots: [{ path: "/pkg/game", portable: true, engineCount: 0 }],
+        },
+        "content",
+      );
+      expect(c.status).toBe("warn");
+      expect(c.label).toBe("No engine found");
+    });
+
+    it("does not tell an author their filter matches nothing", () => {
+      const c = byId(
+        {
+          ...base(),
+          installedGames: null,
+          gameFilter: { names: ["Splinter Faction 1.3"] },
+        },
+        "gameFilter",
+      );
+      expect(c.status).toBe("unknown");
+      expect(c.label).not.toContain("0");
+    });
   });
 
   it("returns unknown for a check whose input is absent", () => {

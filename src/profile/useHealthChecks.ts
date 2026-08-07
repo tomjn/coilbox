@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { plugins } from "../app.plugins";
 import { campaignList } from "../campaign/bindings";
 import { parseCampaignJson } from "../campaign/model";
 import { contentStateLoad } from "../content/bindings";
-import { dlInstalledContent, dlPathWritable } from "../downloads/bindings";
+import { useUnitsyncScan } from "../content/config";
+import { dlPathWritable } from "../downloads/bindings";
 import { useDownloadsConfig } from "../downloads/config";
+import { usePreferredTarget } from "../play/config";
+import { installedGameNames } from "./authoring";
 import {
   type CampaignFailure,
   deriveHealthChecks,
@@ -52,6 +55,16 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
   // Hook read at top level; feeds the effect (and re-runs it if the write root changes).
   const [cfg] = useDownloadsConfig();
   const writeRootId = cfg.writeRootId;
+  // Which games are installed is a unitsync question, not a file-listing one, so
+  // the panel asks the same scan every picker asks (issue #959). The result is
+  // cached for the session, so this is usually free by the time Settings opens.
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const scannedGames = scan.data?.games;
+  const installedGames = useMemo(
+    () => (scannedGames ? installedGameNames(scannedGames) : null),
+    [scannedGames],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -67,16 +80,9 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         portable: r.portable,
         engineCount: r.engines.length,
       }));
-      const rootPaths = roots.map((r) => r.path);
       const writeRootPath = writeRootId
         ? state?.roots.find((r) => r.id === writeRootId)?.path
         : undefined;
-
-      const installedGames = rootPaths.length
-        ? await dlInstalledContent({ paths: rootPaths })
-            .then((r) => r.games)
-            .catch(() => [] as string[])
-        : [];
 
       const campaignFailures = await campaignList({})
         .then((r) => {
@@ -144,7 +150,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
     return () => {
       cancelled = true;
     };
-  }, [writeRootId]);
+  }, [writeRootId, installedGames]);
 
   return { checks, loading };
 }

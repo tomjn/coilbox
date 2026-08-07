@@ -44,7 +44,15 @@ export interface HealthInputs {
   profileErrorSnippet: string | null;
   gameFilter: GameFilter | undefined;
   roots: RootInput[];
-  installedGames: string[];
+  /**
+   * The games a unitsync scan found, by the name a `gameFilter` matches, or null
+   * when no scan has answered yet: no engine to scan with, or one that failed.
+   *
+   * Null rather than an empty list, because "nothing is installed" and "nobody
+   * looked" are different answers and the panel exists to tell them apart
+   * (issue #959).
+   */
+  installedGames: string[] | null;
   writeRootPath: string | undefined;
   campaignFailures: CampaignFailure[];
   writable: { writeRoot?: WritableResult; dataDir?: WritableResult };
@@ -251,6 +259,13 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       status: "unknown",
       label: "No game filter set",
     });
+  } else if (i.installedGames === null) {
+    checks.push({
+      id: "gameFilter",
+      status: "unknown",
+      label: "Game filter not checked against anything",
+      hint: "Nothing has scanned the content folders for games yet, so there is nothing to match the filter against. Install an engine, or open Content > Games and let the scan finish, then re-run this.",
+    });
   } else {
     const { count, regexError } = countFilterMatches(
       i.gameFilter,
@@ -340,7 +355,7 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
   // 7. Playable content present
   {
     const engines = i.roots.reduce((n, r) => n + r.engineCount, 0);
-    const games = i.installedGames.length;
+    const games = i.installedGames?.length ?? 0;
     const scanned = i.roots.length
       ? `Scanned ${i.roots.length} content folder(s): ${i.roots.map((r) => r.path).join(", ")}.`
       : "No content folders are configured to scan.";
@@ -350,6 +365,16 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
         status: "warn",
         label: "No engine found",
         hint: `Install or bundle an engine — the game can't launch without one. ${scanned}`,
+      });
+    } else if (i.installedGames === null) {
+      // An engine is there but no scan has answered. Counting the files in
+      // `games/` instead would be the wrong answer twice over: an archive
+      // unitsync refuses is not a game, and coilbox writes archives of its own.
+      checks.push({
+        id: "content",
+        status: "unknown",
+        label: `${engines} engine(s) found, games not scanned yet`,
+        hint: `Nothing has scanned for games yet. Open Content > Games and let the scan finish, then re-run this. ${scanned}`,
       });
     } else if (games === 0) {
       checks.push({

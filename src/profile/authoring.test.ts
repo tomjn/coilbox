@@ -7,9 +7,12 @@ vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
 }));
 
+import { MUTATOR_FOLDER, SCRATCH_FOLDER } from "../lib/generatedGames";
 import {
   buildScaffoldProfile,
+  installedGameNames,
   type ScaffoldInputs,
+  type ScannedGame,
   serializeProfile,
 } from "./authoring";
 import { getProfile, isProfileAuthoringEnabled } from "./profile";
@@ -58,6 +61,40 @@ describe("buildScaffoldProfile", () => {
     expect(p.hide).toEqual([]);
     expect(p.hideSettings).toEqual([]);
     expect(p.authoring).toBe(true);
+  });
+});
+
+describe("installedGameNames", () => {
+  const scanned = (name: string, archive: string): ScannedGame => ({
+    name,
+    primaryArchive: { name: archive },
+  });
+
+  it("names a game the way unitsync does, not the way the file is spelt", () => {
+    expect(
+      installedGameNames([
+        scanned("Splinter Faction 0.1.78", "SplinterFaction_0.1.78.sdz"),
+      ]),
+    ).toEqual(["Splinter Faction 0.1.78"]);
+  });
+
+  it("leaves out the games coilbox writes for its own tests", () => {
+    expect(
+      installedGameNames([
+        scanned("Coilbox Unit Test", SCRATCH_FOLDER),
+        scanned("Splinter Faction 0.1.78", "SplinterFaction_0.1.78.sdz"),
+        scanned("Coilbox Mission Test", MUTATOR_FOLDER),
+      ]),
+    ).toEqual(["Splinter Faction 0.1.78"]);
+  });
+
+  it("seeds no filter when the only game found is one of coilbox's own", () => {
+    const games = installedGameNames([
+      scanned("Coilbox Mission Test", MUTATOR_FOLDER),
+    ]);
+    expect(
+      buildScaffoldProfile(inputs({ installedGames: games })).gameFilter,
+    ).toBeUndefined();
   });
 });
 

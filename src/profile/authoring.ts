@@ -1,8 +1,13 @@
 import type { Accent, ThemeMode } from "@picoframe/frame";
 import { defineCommand } from "@picoframe/plugin-sdk";
-import { contentStateLoad } from "../content/bindings";
-import { dlInstalledContent } from "../downloads/bindings";
+import { withoutGeneratedGames } from "../lib/generatedGames";
 import type { Profile } from "./profile";
+
+/** One game from a unitsync scan, reduced to what naming it needs. */
+export interface ScannedGame {
+  name: string;
+  primaryArchive: { name: string };
+}
 
 /**
  * Profile authoring: the writer half of the distribution-profile feature (issue #406).
@@ -48,7 +53,7 @@ export interface ScaffoldInputs {
   advanced: boolean;
   /** Whether the window is set to open fullscreen. */
   fullscreen: boolean;
-  /** Games found in the configured content folders. */
+  /** Games the unitsync scan found, by the name a `gameFilter` would match. */
   installedGames: string[];
 }
 
@@ -83,18 +88,19 @@ export function serializeProfile(profile: Profile): string {
 }
 
 /**
- * Games present in the configured content folders, for {@link buildScaffoldProfile}'s
- * `gameFilter` seed. Fails soft to an empty list, which just means no filter is seeded.
+ * The installed games a `gameFilter` may name, from a unitsync scan.
+ *
+ * A scan rather than the `games/` file listing, because a filter matches the name
+ * unitsync reports and a file name is a different string: seeding
+ * `SplinterFaction_0.1.78.sdz` writes a filter that matches nothing anywhere the
+ * profile is applied. It is also the only answer to "is this game installed" the
+ * app trusts, since an archive on disk that unitsync refuses is not a game.
+ *
+ * Coilbox's own generated games are taken out (issue #959). They are rewritten on
+ * every test launch, so a profile pinned to one is pinned to a folder that moves.
  */
-export async function installedGameNames(): Promise<string[]> {
-  const state = await contentStateLoad(undefined)
-    .then((r) => r.state)
-    .catch(() => null);
-  const paths = (state?.roots ?? []).map((r) => r.path);
-  if (paths.length === 0) return [];
-  return dlInstalledContent({ paths })
-    .then((r) => r.games)
-    .catch(() => []);
+export function installedGameNames(games: readonly ScannedGame[]): string[] {
+  return withoutGeneratedGames(games).map((g) => g.name);
 }
 
 /** Where a scaffold attempt landed. `written` is false when a profile was already there. */
