@@ -61,12 +61,26 @@ describe("resolveLayout", () => {
 
   it("falls back to the default for an unknown name", () => {
     // A profile pinned to a layout from a newer Coilbox must still get a page.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(resolveLayout("mosaic")).toBe(resolveLayout(DEFAULT_LAYOUT));
+    // And it says so, because the page still renders: without the warning a
+    // typo in the pin is indistinguishable from the pin working.
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("does not resolve inherited Object properties as layouts", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(resolveLayout("toString")).toBe(resolveLayout(DEFAULT_LAYOUT));
     expect(resolveLayout("constructor")).toBe(resolveLayout(DEFAULT_LAYOUT));
+    warn.mockRestore();
+  });
+
+  it("says nothing when no layout is pinned", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    resolveLayout();
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 

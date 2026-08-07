@@ -1,6 +1,22 @@
 import type { ComponentType } from "react";
 import type { Profile } from "../profile/profile";
+import type { HomeEntry } from "./config";
 import StackedLayout from "./StackedLayout";
+
+/**
+ * What every layout is handed: the page the profile resolved to, and the raw
+ * backdrop value for it to paint.
+ *
+ * Layouts take the resolved config as props rather than reading the profile, so
+ * a layout renders the same way in a test as it does in the app, and so the
+ * schema is parsed once per page rather than once per layout.
+ */
+export interface HomeLayoutProps {
+  /** The zones to render, in order. See `./config`. */
+  entries: readonly HomeEntry[];
+  /** The profile's `home.background`, unvalidated. See `./background`. */
+  background: unknown;
+}
 
 /**
  * Which arm of the home page a profile selects.
@@ -36,7 +52,7 @@ export const DEFAULT_LAYOUT = "stacked";
  * A Map, not an object literal, so a profile naming "toString" or "constructor"
  * cannot resolve an inherited Object property as a layout.
  */
-const layouts = new Map<string, ComponentType>([
+const layouts = new Map<string, ComponentType<HomeLayoutProps>>([
   [DEFAULT_LAYOUT, StackedLayout],
 ]);
 
@@ -44,9 +60,20 @@ const layouts = new Map<string, ComponentType>([
  * Resolve a configured layout name to its component. An unset or unrecognised
  * name falls back to the default, so a profile naming a layout from a newer
  * Coilbox gets today's home rather than a blank page.
+ *
+ * An unrecognised name warns, because it is the one case a distribution author
+ * cannot see: the page still renders, so without the warning a typo looks like
+ * the pin working.
  */
-export function resolveLayout(name?: string): ComponentType {
-  return (name ? layouts.get(name) : undefined) ?? StackedLayout;
+export function resolveLayout(name?: string): ComponentType<HomeLayoutProps> {
+  if (name === undefined) return StackedLayout;
+  const layout = layouts.get(name);
+  if (layout) return layout;
+  console.warn(
+    `home: unknown layout "${name}", using "${DEFAULT_LAYOUT}". This build ships:`,
+    layoutNames(),
+  );
+  return StackedLayout;
 }
 
 /** Layout names this build knows about. Exported for tests and diagnostics. */
