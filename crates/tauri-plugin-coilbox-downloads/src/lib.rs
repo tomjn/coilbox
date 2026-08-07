@@ -519,12 +519,12 @@ async fn dl_springfiles_list(category: String) -> CliResult {
 /// deduped to one row per version (the download id `--download-engine` wants).
 #[tauri::command]
 async fn dl_springfiles_engines() -> CliResult {
-    let token = sources::springfiles_engine_token();
+    let category = sources::springfiles_engine_category();
     let url = sources::springfiles_list_url("engine");
     match fetch_text(url).await {
         Ok(body) => match serde_json::from_str::<Vec<sources::SpringFile>>(&body) {
             Ok(all) => {
-                let engines = sources::engines_for_platform(all, token);
+                let engines = sources::engines_for_platform(all, category);
                 CliResult::ok(json!({ "engines": engines, "platform": std::env::consts::OS }))
             }
             Err(e) => CliResult::err(format!("could not parse springfiles engines: {e}")),
@@ -772,6 +772,15 @@ async fn dl_github_release_archives(repo: String) -> CliResult {
 /// `DataDirLocater::IsPortableMode` needs to find it beside the binary.
 const ENGINE_SETTINGS: &str = "springsettings.cfg";
 
+/// The player's keybinds. `CGame::LoadInterface` reads it by bare name, which
+/// resolves against the write dir, and a release ships none.
+const ENGINE_KEYBINDS: &str = "uikeys.txt";
+
+/// Where the widget handler saves each widget's state, as `<game>.lua` plus
+/// whatever else a game's own LuaUI writes. A release ships the directory with
+/// a README in it and nothing else.
+const ENGINE_WIDGET_CONFIG: &str = "LuaUI/Config";
+
 /// Every directory one and two levels under `engine/`. Two levels because a
 /// springfiles install nests versions under a platform folder, which is the same
 /// shape the content scanner looks for. A directory that is not an engine simply
@@ -794,27 +803,34 @@ fn engine_dirs(engine_root: &std::path::Path) -> Vec<std::path::PathBuf> {
     dirs
 }
 
-/// Carry a player's engine settings into a freshly installed engine, and return
-/// where they came from.
+/// Report a carry that could not be made, without failing the install.
+fn carry_failed(from: &std::path::Path, into: &std::path::Path, e: &std::io::Error) {
+    eprintln!(
+        "coilbox-downloads: could not carry {} into {}: {e}",
+        from.display(),
+        into.display()
+    );
+}
+
+/// Carry one of the player's config files into a freshly installed engine, and
+/// return where it came from.
 ///
-/// Portable Mode makes `engine/<version>/` the engine's write dir, so
-/// `springsettings.cfg` belongs to one version. A new version arrives with the
-/// empty file the archive ships, and everything the player had set is still on
-/// disk under the version they upgraded from, out of reach. Without this an
-/// upgrade resets every engine setting and says nothing.
+/// Portable Mode makes `engine/<version>/` the engine's write dir, so each of
+/// these files belongs to one version. A new version arrives with whatever the
+/// archive ships, and everything the player had set is still on disk under the
+/// version they upgraded from, out of reach. Without this an upgrade resets
+/// their settings and keybinds and says nothing.
 ///
-/// The source is the most recently written non-empty settings file under another
-/// engine directory, which is the closest thing on disk to the one they were
-/// using. `dest`'s own settings win if it has any, so re-installing over a
-/// version the player has already run keeps that version's settings.
-///
-/// Failing to copy is not failing to install, so an error is reported and the
-/// install stands.
-fn carry_engine_settings(
+/// The source is the most recently written non-empty copy under another engine
+/// directory, which is the closest thing on disk to the one they were using.
+/// `dest`'s own copy wins if it has one with anything in it, so re-installing
+/// over a version the player has already run keeps that version's config.
+fn carry_engine_file(
     engine_root: &std::path::Path,
     dest: &std::path::Path,
+    rel: &str,
 ) -> Option<std::path::PathBuf> {
-    let into = dest.join(ENGINE_SETTINGS);
+    let into = dest.join(rel);
     if std::fs::metadata(&into).is_ok_and(|m| m.len() > 0) {
         return None;
     }
@@ -822,7 +838,7 @@ fn carry_engine_settings(
         .into_iter()
         .filter(|dir| dir != dest)
         .filter_map(|dir| {
-            let cfg = dir.join(ENGINE_SETTINGS);
+            let cfg = dir.join(rel);
             let meta = std::fs::metadata(&cfg).ok()?;
             if !meta.is_file() || meta.len() == 0 {
                 return None;
@@ -834,14 +850,99 @@ fn carry_engine_settings(
     match std::fs::copy(&from, &into) {
         Ok(_) => Some(from),
         Err(e) => {
-            eprintln!(
-                "coilbox-downloads: could not carry {} into {}: {e}",
-                from.display(),
-                into.display()
-            );
+            carry_failed(&from, &into, &e);
             None
         }
     }
+}
+
+/// Recursively copy `src` into `dst`, creating `dst`.
+fn copy_tree(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let from = entry.path();
+        let into = dst.join(entry.file_name());
+        if from.is_dir() {
+            copy_tree(&from, &into)?;
+        } else {
+            std::fs::copy(&from, &into)?;
+        }
+    }
+    Ok(())
+}
+
+/// The entries directly inside `dir` that `dest` has no copy of, newest first by
+/// the entry's own mtime. Empty when `dir` holds nothing `dest` is missing,
+/// which is how a donor carrying only the README the release ships is passed
+/// over in favour of one holding a real widget config.
+fn missing_entries(
+    dir: &std::path::Path,
+    dest: &std::path::Path,
+) -> Vec<(std::time::SystemTime, std::ffi::OsString)> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut out: Vec<_> = entries
+        .flatten()
+        .filter(|e| !dest.join(e.file_name()).exists())
+        .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.file_name())))
+        .collect();
+    out.sort_by_key(|(modified, _)| std::cmp::Reverse(*modified));
+    out
+}
+
+/// Carry the player's widget config into a freshly installed engine, and return
+/// which engine directory it came from.
+///
+/// Unlike the two files, `LuaUI/Config/` is never empty on a fresh install: the
+/// release ships a README in it. So "has the player set anything here" is
+/// instead "does another engine directory hold something this one does not",
+/// and only those entries are copied. Nothing already in `dest` is touched.
+fn carry_widget_config(
+    engine_root: &std::path::Path,
+    dest: &std::path::Path,
+) -> Option<std::path::PathBuf> {
+    let into = dest.join(ENGINE_WIDGET_CONFIG);
+    let from = engine_dirs(engine_root)
+        .into_iter()
+        .filter(|dir| dir != dest)
+        .map(|dir| dir.join(ENGINE_WIDGET_CONFIG))
+        .filter_map(|dir| {
+            let newest = missing_entries(&dir, &into).first()?.0;
+            Some((newest, dir))
+        })
+        .max_by_key(|(newest, _)| *newest)
+        .map(|(_, dir)| dir)?;
+
+    if let Err(e) = std::fs::create_dir_all(&into) {
+        carry_failed(&from, &into, &e);
+        return None;
+    }
+    let mut carried = false;
+    for (_, name) in missing_entries(&from, &into) {
+        let src = from.join(&name);
+        let dst = into.join(&name);
+        let res = if src.is_dir() {
+            copy_tree(&src, &dst)
+        } else {
+            std::fs::copy(&src, &dst).map(|_| ())
+        };
+        match res {
+            Ok(()) => carried = true,
+            Err(e) => carry_failed(&src, &dst, &e),
+        }
+    }
+    carried.then_some(from)
+}
+
+/// Carry every one of the player's config files forward onto a fresh install.
+/// Failing to copy is not failing to install, so an error is reported and the
+/// install stands.
+fn carry_engine_config(engine_root: &std::path::Path, dest: &std::path::Path) {
+    carry_engine_file(engine_root, dest, ENGINE_SETTINGS);
+    carry_engine_file(engine_root, dest, ENGINE_KEYBINDS);
+    carry_widget_config(engine_root, dest);
 }
 
 /// Download a Recoil `.7z` release and extract it into `<write_path>/engine/<version>/`,
@@ -931,7 +1032,7 @@ async fn install_recoil_engine(
     .map_err(|e| format!("extract task failed: {e}"))?;
     let _ = std::fs::remove_file(&tmp);
     extracted?;
-    carry_engine_settings(&engine_root, &dest);
+    carry_engine_config(&engine_root, &dest);
 
     let _ = on_progress.send(DownloadProgress::done(downloaded, total));
     Ok(dest.display().to_string())
@@ -1177,17 +1278,24 @@ mod tests {
     }
 }
 
-/// Carrying engine settings across an upgrade (issue #932).
+/// Carrying engine settings across an upgrade (issues #932 and #948).
 #[cfg(test)]
 mod engine_settings_tests {
     use super::*;
     use std::path::Path;
 
-    /// An installed engine: whatever `springsettings.cfg` it has, plus the base
-    /// content directory a release brings, so the fixture is the real shape.
+    /// An installed engine: whatever `springsettings.cfg` it has, the base
+    /// content directory a release brings, and the `LuaUI/Config` a release
+    /// ships holding only its README, so the fixture is the real shape.
     fn engine(root: &Path, version: &str, settings: &str) -> std::path::PathBuf {
         let dir = root.join(version);
         std::fs::create_dir_all(dir.join("base")).expect("mkdir");
+        std::fs::create_dir_all(dir.join(ENGINE_WIDGET_CONFIG)).expect("mkdir");
+        std::fs::write(
+            dir.join(ENGINE_WIDGET_CONFIG).join("README.txt"),
+            "widget config goes here\n",
+        )
+        .expect("write");
         std::fs::write(dir.join(ENGINE_SETTINGS), settings).expect("write");
         dir
     }
@@ -1201,7 +1309,7 @@ mod engine_settings_tests {
         // What the archive extracts: an empty file, there to trip Portable Mode.
         let new = engine(root.path(), "2026.07.4", "");
 
-        let from = carry_engine_settings(root.path(), &new).expect("carried");
+        let from = carry_engine_file(root.path(), &new, ENGINE_SETTINGS).expect("carried");
 
         assert_eq!(from, old.join(ENGINE_SETTINGS));
         assert_eq!(
@@ -1218,7 +1326,7 @@ mod engine_settings_tests {
         engine(root.path(), "2026.01.1", "Fullscreen = 0\n");
         let same = engine(root.path(), "2026.07.4", "Fullscreen = 1\n");
 
-        assert!(carry_engine_settings(root.path(), &same).is_none());
+        assert!(carry_engine_file(root.path(), &same, ENGINE_SETTINGS).is_none());
         assert_eq!(
             std::fs::read_to_string(same.join(ENGINE_SETTINGS)).expect("read"),
             "Fullscreen = 1\n"
@@ -1241,7 +1349,7 @@ mod engine_settings_tests {
             .set_modified(hour_ago)
             .expect("set mtime");
 
-        let from = carry_engine_settings(root.path(), &new).expect("carried");
+        let from = carry_engine_file(root.path(), &new, ENGINE_SETTINGS).expect("carried");
 
         assert_eq!(from, recent.join(ENGINE_SETTINGS));
     }
@@ -1255,7 +1363,7 @@ mod engine_settings_tests {
         let old = engine(&nested, "2026.01.1", "Fullscreen = 0\n");
         let new = engine(root.path(), "2026.07.4", "");
 
-        let from = carry_engine_settings(root.path(), &new).expect("carried");
+        let from = carry_engine_file(root.path(), &new, ENGINE_SETTINGS).expect("carried");
 
         assert_eq!(from, old.join(ENGINE_SETTINGS));
     }
@@ -1267,10 +1375,151 @@ mod engine_settings_tests {
         let root = tempfile::tempdir().expect("tempdir");
         let new = engine(root.path(), "2026.07.4", "");
 
-        assert!(carry_engine_settings(root.path(), &new).is_none());
+        assert!(carry_engine_file(root.path(), &new, ENGINE_SETTINGS).is_none());
         assert_eq!(
             std::fs::read_to_string(new.join(ENGINE_SETTINGS)).expect("read"),
             ""
+        );
+    }
+
+    /// Write one of the player's widget-config files into an engine directory.
+    fn widget_config(dir: &Path, name: &str, body: &str) -> std::path::PathBuf {
+        let file = dir.join(ENGINE_WIDGET_CONFIG).join(name);
+        std::fs::write(&file, body).expect("write");
+        file
+    }
+
+    /// The names are the engine's, not ours: it reads `uikeys.txt` by that name
+    /// and its widget handler writes `LuaUI/Config/<game>.lua`. Carrying a file
+    /// under any other name would carry nothing the engine goes on to read.
+    #[test]
+    fn the_names_are_the_ones_the_engine_uses() {
+        assert_eq!(ENGINE_SETTINGS, "springsettings.cfg");
+        assert_eq!(ENGINE_KEYBINDS, "uikeys.txt");
+        assert_eq!(ENGINE_WIDGET_CONFIG, "LuaUI/Config");
+    }
+
+    /// Keybinds are the same loss as the settings were: the archive ships none,
+    /// so a fresh install starts on the engine's defaults with the player's file
+    /// stranded under the version they upgraded from.
+    #[test]
+    fn an_upgrade_carries_the_keybinds_forward() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let old = engine(root.path(), "2026.01.1", "");
+        std::fs::write(old.join("uikeys.txt"), "bind q areaattack\n").expect("write");
+        let new = engine(root.path(), "2026.07.4", "");
+
+        let from = carry_engine_file(root.path(), &new, ENGINE_KEYBINDS).expect("carried");
+
+        assert_eq!(from, old.join("uikeys.txt"));
+        assert_eq!(
+            std::fs::read_to_string(new.join("uikeys.txt")).expect("read"),
+            "bind q areaattack\n"
+        );
+    }
+
+    /// Which widgets are on, and how each is set up, is the player's too. The
+    /// README the release ships is left as it is rather than pulled over.
+    #[test]
+    fn an_upgrade_carries_the_widget_config_forward() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let old = engine(root.path(), "2026.01.1", "");
+        widget_config(&old, "BA.lua", "return { order = {} }\n");
+        widget_config(&old, "README.txt", "a different README\n");
+        let new = engine(root.path(), "2026.07.4", "");
+
+        let from = carry_widget_config(root.path(), &new).expect("carried");
+
+        assert_eq!(from, old.join(ENGINE_WIDGET_CONFIG));
+        assert_eq!(
+            std::fs::read_to_string(new.join("LuaUI/Config").join("BA.lua")).expect("read"),
+            "return { order = {} }\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(new.join("LuaUI/Config").join("README.txt")).expect("read"),
+            "widget config goes here\n"
+        );
+    }
+
+    /// A donor holding only the README the release ships has nothing to give, so
+    /// an older one that does is used instead.
+    #[test]
+    fn a_donor_with_only_the_shipped_readme_is_passed_over() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let real = engine(root.path(), "2026.01.1", "");
+        widget_config(&real, "BA.lua", "return { order = {} }\n");
+        // Installed later, run never: it has only what the archive extracted.
+        engine(root.path(), "2026.05.2", "");
+        let new = engine(root.path(), "2026.07.4", "");
+
+        let from = carry_widget_config(root.path(), &new).expect("carried");
+
+        assert_eq!(from, real.join(ENGINE_WIDGET_CONFIG));
+    }
+
+    /// Re-installing over a version the player has run leaves its widget config
+    /// alone rather than mixing an older set into it.
+    #[test]
+    fn a_reinstall_keeps_the_widget_config_already_there() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let old = engine(root.path(), "2026.01.1", "");
+        widget_config(&old, "BA.lua", "return { order = {} }\n");
+        let same = engine(root.path(), "2026.07.4", "");
+        widget_config(&same, "BA.lua", "return { order = { Chili = 1 } }\n");
+
+        assert!(carry_widget_config(root.path(), &same).is_none());
+        assert_eq!(
+            std::fs::read_to_string(same.join("LuaUI/Config").join("BA.lua")).expect("read"),
+            "return { order = { Chili = 1 } }\n"
+        );
+    }
+
+    /// A game that keeps its widget config in a folder of its own is carried
+    /// whole, not flattened or skipped.
+    #[test]
+    fn a_widget_config_subdirectory_is_carried_whole() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let old = engine(root.path(), "2026.01.1", "");
+        let nested = old.join(ENGINE_WIDGET_CONFIG).join("BAR").join("layouts");
+        std::fs::create_dir_all(&nested).expect("mkdir");
+        std::fs::write(nested.join("default.lua"), "return {}\n").expect("write");
+        let new = engine(root.path(), "2026.07.4", "");
+
+        carry_widget_config(root.path(), &new).expect("carried");
+
+        assert_eq!(
+            std::fs::read_to_string(
+                new.join(ENGINE_WIDGET_CONFIG)
+                    .join("BAR/layouts/default.lua")
+            )
+            .expect("read"),
+            "return {}\n"
+        );
+    }
+
+    /// The install path carries all three together, so an upgrade keeps the
+    /// whole of what the player set rather than one file of it.
+    #[test]
+    fn an_install_carries_every_config_file() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let old = engine(root.path(), "2026.01.1", "Fullscreen = 0\n");
+        std::fs::write(old.join("uikeys.txt"), "bind q areaattack\n").expect("write");
+        widget_config(&old, "BA.lua", "return { order = {} }\n");
+        let new = engine(root.path(), "2026.07.4", "");
+
+        carry_engine_config(root.path(), &new);
+
+        assert_eq!(
+            std::fs::read_to_string(new.join(ENGINE_SETTINGS)).expect("read"),
+            "Fullscreen = 0\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(new.join("uikeys.txt")).expect("read"),
+            "bind q areaattack\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(new.join("LuaUI/Config").join("BA.lua")).expect("read"),
+            "return { order = {} }\n"
         );
     }
 }
