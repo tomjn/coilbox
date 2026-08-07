@@ -261,6 +261,7 @@ export default function ScenarioEditPage() {
       <ScenarioMapScene
         scenario={scenario}
         onChange={(next) => apply(next)}
+        extensions={extensions}
         picking={picking}
         history={{
           canUndo: history.past.length > 0,
