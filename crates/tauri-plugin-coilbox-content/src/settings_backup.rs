@@ -1,21 +1,26 @@
 //! Per-content-root backup/restore of a Spring/Recoil engine's user config:
 //! `springsettings.cfg` (engine settings), `LuaUI/Config/` (widget config) and
-//! `uikeys.txt` (keybinds). Each root has its own copy of these under its data
-//! dir, so a "profile" is a named snapshot of the three, letting a user swap
-//! settings sets. Snapshots live under the app data dir, keyed by a hash of the
-//! root path, so they travel with a portable install and never touch the root
-//! except on an explicit restore.
+//! `uikeys.txt` (keybinds). A "profile" is a named snapshot of the three,
+//! letting a user swap settings sets. Snapshots live under the app data dir,
+//! keyed by a hash of the root path, so they travel with a portable install and
+//! never touch the root except on an explicit restore.
+//!
+//! Where those three files sit depends on the engine. An engine installed into
+//! `engine/<version>/` satisfies Recoil's Portable Mode test, which makes that
+//! directory its write dir, so its config is in there rather than at the root.
+//! A snapshot therefore covers the root and every engine directory under it, and
+//! mirrors that layout so a restore puts each copy back where it came from.
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// The three config artifacts, each a path relative to a content root. `is_dir`
-/// selects a recursive copy (`LuaUI/Config`) vs a single-file copy.
+/// The three config artifacts, each a path relative to a config location.
+/// `is_dir` selects a recursive copy (`LuaUI/Config`) vs a single-file copy.
 struct Artifact {
     /// Stable id stored in the manifest + returned to the UI.
     id: &'static str,
-    /// Path relative to the content root (and mirrored inside a snapshot).
+    /// Path relative to a config location (and mirrored inside a snapshot).
     rel: &'static str,
     is_dir: bool,
 }
@@ -86,6 +91,41 @@ fn root_profiles_dir(profiles_root: &Path, root_path: &str) -> PathBuf {
     profiles_root.join(crate::hash_id(&[root_path]))
 }
 
+/// Every place under `base` an engine's config can be: `base` itself, plus each
+/// directory one and two levels under `engine/`. Two levels because a springfiles
+/// install nests versions under a platform folder. Paths are relative to `base`,
+/// so the same walk describes a content root and a snapshot of one.
+fn config_locations(base: &Path) -> Vec<PathBuf> {
+    let mut out = vec![PathBuf::new()];
+    let Ok(entries) = std::fs::read_dir(base.join("engine")) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        if !entry.path().is_dir() {
+            continue;
+        }
+        let dir = Path::new("engine").join(entry.file_name());
+        if let Ok(inner) = std::fs::read_dir(base.join(&dir)) {
+            for sub in inner.flatten() {
+                if sub.path().is_dir() {
+                    out.push(dir.join(sub.file_name()));
+                }
+            }
+        }
+        out.push(dir);
+    }
+    out
+}
+
+/// Every artifact actually present under `base`, as (location, artifact) pairs.
+fn artifacts_under(base: &Path) -> Vec<(PathBuf, &'static Artifact)> {
+    config_locations(base)
+        .into_iter()
+        .flat_map(|loc| ARTIFACTS.iter().map(move |a| (loc.clone(), a)))
+        .filter(|(loc, a)| base.join(loc).join(a.rel).exists())
+        .collect()
+}
+
 /// Recursively copy `src` into `dst` (creating `dst`). Used for `LuaUI/Config`.
 fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dst).map_err(|e| format!("create {}: {e}", dst.display()))?;
@@ -107,9 +147,11 @@ fn write_manifest(dir: &Path, info: &ProfileInfo) -> Result<(), String> {
     std::fs::write(dir.join("manifest.json"), json).map_err(|e| format!("write manifest: {e}"))
 }
 
-/// Save the three config artifacts present under `root_path` into a named snapshot.
-/// Only artifacts that exist are copied (a fresh root may have none). Re-saving the
-/// same name replaces that snapshot.
+/// Save the three config artifacts present under `root_path` into a named snapshot,
+/// from the root and from each engine directory under it. Only artifacts that exist
+/// are copied (a fresh root may have none). Re-saving the same name replaces that
+/// snapshot. The manifest names each *kind* captured, once, whatever it was found
+/// beside.
 pub fn backup(profiles_root: &Path, root_path: &str, name: &str) -> Result<ProfileInfo, String> {
     let slug = slug(name).ok_or("Profile name must contain a letter or number")?;
     let root = Path::new(root_path);
@@ -120,13 +162,10 @@ pub fn backup(profiles_root: &Path, root_path: &str, name: &str) -> Result<Profi
     }
     std::fs::create_dir_all(&dest).map_err(|e| format!("create snapshot dir: {e}"))?;
 
-    let mut captured = Vec::new();
-    for a in ARTIFACTS {
-        let src = root.join(a.rel);
-        if !src.exists() {
-            continue;
-        }
-        let to = dest.join(a.rel);
+    let found = artifacts_under(root);
+    for (loc, a) in &found {
+        let src = root.join(loc).join(a.rel);
+        let to = dest.join(loc).join(a.rel);
         if let Some(parent) = to.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("create {}: {e}", parent.display()))?;
@@ -136,8 +175,13 @@ pub fn backup(profiles_root: &Path, root_path: &str, name: &str) -> Result<Profi
         } else {
             std::fs::copy(&src, &to).map_err(|e| format!("copy {}: {e}", src.display()))?;
         }
-        captured.push(a.id.to_string());
     }
+
+    let captured = ARTIFACTS
+        .iter()
+        .filter(|a| found.iter().any(|(_, f)| f.id == a.id))
+        .map(|a| a.id.to_string())
+        .collect();
 
     let info = ProfileInfo {
         name: name.trim().to_string(),
@@ -176,9 +220,17 @@ pub struct RestoreOutcome {
     pub restored: u32,
 }
 
-/// Restore a named snapshot's artifacts back into `root_path`. When `overwrite` is
-/// false and any target artifact already exists, writes nothing and returns
-/// `needs_overwrite: true`. Otherwise each captured artifact replaces the live one.
+/// Restore a named snapshot's artifacts back into `root_path`, each to the
+/// location it was captured from. What the snapshot holds is read off its own
+/// tree rather than the manifest, so a snapshot taken before this covered the
+/// engine directories still restores to the root.
+///
+/// A location the root no longer has is skipped: writing config into an engine
+/// version that is not installed would only leave a stub directory behind.
+///
+/// When `overwrite` is false and any target artifact already exists, writes
+/// nothing and returns `needs_overwrite: true`. Otherwise each captured artifact
+/// replaces the live one.
 pub fn restore(
     profiles_root: &Path,
     root_path: &str,
@@ -186,18 +238,20 @@ pub fn restore(
     overwrite: bool,
 ) -> Result<RestoreOutcome, String> {
     let src_dir = root_profiles_dir(profiles_root, root_path).join(slug);
-    let manifest = std::fs::read_to_string(src_dir.join("manifest.json"))
-        .map_err(|_| "Profile not found".to_string())?;
-    let info: ProfileInfo = serde_json::from_str(&manifest).map_err(|e| e.to_string())?;
+    if !src_dir.join("manifest.json").is_file() {
+        return Err("Profile not found".to_string());
+    }
     let root = Path::new(root_path);
 
-    let present: Vec<&Artifact> = ARTIFACTS
-        .iter()
-        .filter(|a| info.artifacts.iter().any(|id| id == a.id))
+    let present: Vec<(PathBuf, &Artifact)> = artifacts_under(&src_dir)
+        .into_iter()
+        .filter(|(loc, _)| root.join(loc).is_dir())
         .collect();
 
     if !overwrite {
-        let clobbers = present.iter().any(|a| root.join(a.rel).exists());
+        let clobbers = present
+            .iter()
+            .any(|(loc, a)| root.join(loc).join(a.rel).exists());
         if clobbers {
             return Ok(RestoreOutcome {
                 needs_overwrite: true,
@@ -207,9 +261,9 @@ pub fn restore(
     }
 
     let mut restored = 0u32;
-    for a in present {
-        let from = src_dir.join(a.rel);
-        let to = root.join(a.rel);
+    for (loc, a) in present {
+        let from = src_dir.join(&loc).join(a.rel);
+        let to = root.join(&loc).join(a.rel);
         if let Some(parent) = to.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("create {}: {e}", parent.display()))?;
@@ -288,6 +342,99 @@ mod tests {
 
         delete(&profiles, &root_s, "test-one").unwrap();
         assert!(list(&profiles, &root_s).is_empty());
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// A scratch root with a Portable Mode engine in it: coilbox installs into
+    /// `engine/<version>/`, and that is where the engine then writes its config.
+    fn portable_root(tag: &str) -> (PathBuf, PathBuf, PathBuf) {
+        let tmp = std::env::temp_dir().join(format!("cbx-cfg-{tag}-{}", now_ms()));
+        let root = tmp.join("root");
+        let engine = root.join("engine").join("2026.07.4");
+        std::fs::create_dir_all(engine.join("LuaUI/Config")).unwrap();
+        std::fs::write(engine.join("springsettings.cfg"), b"Fullscreen=0\n").unwrap();
+        std::fs::write(engine.join("uikeys.txt"), b"bind x\n").unwrap();
+        std::fs::write(engine.join("LuaUI/Config/BA.lua"), b"return {}\n").unwrap();
+        (tmp.clone(), root, engine)
+    }
+
+    /// The root a coilbox install actually produces has nothing at the top level
+    /// and everything inside the engine directory, and a profile that only looked
+    /// at the root captured none of it.
+    #[test]
+    fn a_portable_engines_config_is_captured_and_put_back() {
+        let (tmp, root, engine) = portable_root("portable");
+        let profiles = tmp.join("profiles");
+        let root_s = root.to_string_lossy().to_string();
+
+        let info = backup(&profiles, &root_s, "Mine").unwrap();
+        assert_eq!(info.artifacts.len(), 3);
+
+        std::fs::write(engine.join("springsettings.cfg"), b"Fullscreen=1\n").unwrap();
+        std::fs::remove_file(engine.join("uikeys.txt")).unwrap();
+
+        let done = restore(&profiles, &root_s, "mine", true).unwrap();
+        assert_eq!(done.restored, 3);
+        assert_eq!(
+            std::fs::read_to_string(engine.join("springsettings.cfg")).unwrap(),
+            "Fullscreen=0\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(engine.join("uikeys.txt")).unwrap(),
+            "bind x\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(engine.join("LuaUI/Config/BA.lua")).unwrap(),
+            "return {}\n"
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// A springfiles install nests the version under a platform folder, so the
+    /// walk has to reach two levels down.
+    #[test]
+    fn a_nested_engine_directory_is_captured() {
+        let tmp = std::env::temp_dir().join(format!("cbx-cfg-nested-{}", now_ms()));
+        let root = tmp.join("root");
+        let profiles = tmp.join("profiles");
+        let engine = root.join("engine").join("macos_arm64").join("105.1.1");
+        std::fs::create_dir_all(&engine).unwrap();
+        std::fs::write(engine.join("uikeys.txt"), b"bind x\n").unwrap();
+
+        let root_s = root.to_string_lossy().to_string();
+        assert_eq!(
+            backup(&profiles, &root_s, "Mine").unwrap().artifacts,
+            vec!["uikeys.txt".to_string()]
+        );
+
+        std::fs::remove_file(engine.join("uikeys.txt")).unwrap();
+        assert_eq!(
+            restore(&profiles, &root_s, "mine", true).unwrap().restored,
+            1
+        );
+        assert_eq!(
+            std::fs::read_to_string(engine.join("uikeys.txt")).unwrap(),
+            "bind x\n"
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// Restoring a snapshot taken against an engine the player has since removed
+    /// must not put its config back as a stub directory.
+    #[test]
+    fn an_engine_that_is_gone_is_not_restored_into() {
+        let (tmp, root, engine) = portable_root("gone");
+        let profiles = tmp.join("profiles");
+        let root_s = root.to_string_lossy().to_string();
+
+        backup(&profiles, &root_s, "Mine").unwrap();
+        std::fs::remove_dir_all(&engine).unwrap();
+
+        assert_eq!(
+            restore(&profiles, &root_s, "mine", true).unwrap().restored,
+            0
+        );
+        assert!(!engine.exists());
         let _ = std::fs::remove_dir_all(&tmp);
     }
 }
