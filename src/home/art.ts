@@ -151,3 +151,7 @@ export function readThemeColor(): string {
 export function forgetThemeColor(): void {
   probed = undefined;
 }
+
+import { bundledCardArt } from "./bundledArt";
+
+registerCardArtSource("bundled", bundledCardArt);
