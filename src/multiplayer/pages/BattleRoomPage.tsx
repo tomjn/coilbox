@@ -1,5 +1,5 @@
 import { Button, NavGate } from "@picoframe/frame";
-import { Bookmark, Gamepad2 } from "lucide-react";
+import { Bookmark, Gamepad2, LogIn } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useBrandingEntry } from "@/content/branding";
@@ -25,6 +25,7 @@ import { battleOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
 import { MissingContentCard } from "../battle/MissingContentCard";
+import { canRejoinMatch } from "../battle/rejoin";
 import {
   StartBoxControls,
   useStartBoxAllies,
@@ -45,7 +46,8 @@ import { useMpRevealed } from "../store";
  * mirror via `useBattleRoom` and lays out a header + two columns: the roster with
  * the battle chat filling the remaining height on the left, and the map/game/
  * start-position/host-command panel on the right. The engine launches itself when
- * the autohost starts the match (host goes in-game) — there's no manual launch.
+ * the autohost starts the match (host goes in-game), so the only manual launch is
+ * the Rejoin button shown after our engine exits mid-match.
  */
 function BattleRoomPage() {
   const room = useBattleRoom();
@@ -238,16 +240,40 @@ function BattleRoomPage() {
   const launchedRef = useRef(false);
   const canRun = !!room.target && !room.mapMissing && !room.gameMissing;
   const { launch: doLaunch } = launch;
+  // Our launch for this match has finished, so the engine is no longer ours to
+  // be in. With the host still in-game that means we dropped out of a running
+  // match, which is what the manual Rejoin button offers to undo (issue #453).
+  const [launchSettled, setLaunchSettled] = useState(false);
   useEffect(() => {
     if (room.selfHost) return;
     if (!room.hostIngame) {
       launchedRef.current = false;
+      setLaunchSettled(false);
       return;
     }
     if (launchedRef.current || !canRun) return;
     launchedRef.current = true;
-    doLaunch();
+    doLaunch().finally(() => setLaunchSettled(true));
   }, [room.selfHost, room.hostIngame, canRun, doLaunch]);
+
+  // Never automatic: an engine that exited may have exited on purpose, so
+  // getting back in has to be a deliberate click.
+  const rejoinable = canRejoinMatch({
+    selfHost: room.selfHost,
+    hostIngame: room.hostIngame,
+    launchSettled,
+    running: launch.running,
+    canRun,
+  });
+
+  async function onRejoin() {
+    setLaunchSettled(false);
+    try {
+      await doLaunch();
+    } finally {
+      setLaunchSettled(true);
+    }
+  }
 
   // Host start: flip our in-game flag (so joiners' clients auto-launch and connect),
   // launch the engine in host mode, then clear the flag once it exits. A joined
@@ -329,6 +355,17 @@ function BattleRoomPage() {
         <p className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {hostSeedError}
         </p>
+      )}
+      {rejoinable && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
+          <span>
+            The match is still running and you've left it. Rejoin to return to
+            your slot.
+          </span>
+          <Button size="sm" onClick={onRejoin}>
+            <LogIn className="size-4" /> Rejoin
+          </Button>
+        </div>
       )}
       {room.hostIngame && !canRun && (
         <p className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
