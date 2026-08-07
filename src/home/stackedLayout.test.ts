@@ -44,6 +44,10 @@ type Rendered = {
 /** The class the layout puts on the column the zones sit in. */
 const COLUMN = "relative p-8";
 
+/** The class on the row the continue hero and the resume rail share. */
+const RESUME_ROW =
+  "mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap";
+
 /** Walk an element tree and list the stubbed zones it reached, in order. */
 function collect(node: unknown, wrapper: string | null, out: Rendered[]): void {
   if (Array.isArray(node)) {
@@ -269,7 +273,110 @@ describe("StackedLayout spacing", () => {
     expect(wrappers.greeting).toBe(COLUMN);
     expect(wrappers.cards).toBe(COLUMN);
     expect(wrappers.onboarding).toBe("mb-2 flex flex-col gap-4");
-    expect(wrappers.resume).toBe("mt-3 empty:hidden");
+  });
+});
+
+describe("StackedLayout resume row", () => {
+  /** The wrapper each zone was rendered inside, by zone name. */
+  const wrappers = (zones: unknown[]) =>
+    Object.fromEntries(
+      render(resolveHome({ zones }).entries).map((r) => [r.name, r.wrapper]),
+    );
+
+  it("puts the hero and the rail in one row on the default page", () => {
+    const w = Object.fromEntries(
+      renderDefault().map((r) => [r.name, r.wrapper]),
+    );
+    expect(w.continue).toBe(RESUME_ROW);
+    expect(w.resume).toBe(RESUME_ROW);
+  });
+
+  it("gives the row a top margin and nothing to either zone", () => {
+    // One wrapper, so the block has one gap above it rather than the hero's gap
+    // and then the rail's. `empty:hidden` on that one wrapper is what makes the
+    // whole block leave no gap when both zones stand down.
+    expect(RESUME_ROW).toContain("mt-6");
+    expect(RESUME_ROW).toContain("empty:hidden");
+  });
+
+  it("tells the hero how wide to be, and the rail nothing", () => {
+    // The width is the layout's decision. The rail's default as a flex item is
+    // already what it wants: size to the cards it has, do not grow.
+    const rendered = render(resolveHome(undefined).entries);
+    const hero = rendered.find((r) => r.name === "continue");
+    const rail = rendered.find((r) => r.name === "resume");
+    expect(hero?.props.className).toBe("min-w-0 sm:flex-[1_1_32rem]");
+    expect(rail?.props).toEqual({});
+  });
+
+  it("leaves them stacked when the profile separates them", () => {
+    const w = wrappers([
+      { zone: "continue" },
+      { zone: "cards" },
+      { zone: "resume" },
+    ]);
+    expect(w.continue).toBe("mt-6 empty:hidden");
+    expect(w.resume).toBe("mt-3 empty:hidden");
+  });
+
+  it("leaves them stacked when the profile reverses them", () => {
+    // The author wrote the rail first on purpose, and a row would silently undo
+    // the order they asked for.
+    const w = wrappers([{ zone: "resume" }, { zone: "continue" }]);
+    expect(w.resume).toBe("mt-3 empty:hidden");
+    expect(w.continue).toBe("mt-6 empty:hidden");
+  });
+
+  it("leaves a lone hero and a lone rail with their own spacing", () => {
+    expect(wrappers([{ zone: "continue" }]).continue).toBe("mt-6 empty:hidden");
+    expect(wrappers([{ zone: "resume" }]).resume).toBe("mt-3 empty:hidden");
+  });
+
+  it("does not pair a zone carrying markup of its own", () => {
+    // Markup renders whether or not its zone drew anything, so inside the row it
+    // would be a third item beside the hero and would hold the row open on a
+    // page with nothing to resume.
+    const before = wrappers([
+      { zone: "continue", before: "<p>Jump back in</p>" },
+      { zone: "resume" },
+    ]);
+    expect(before.continue).toBe("mt-6 empty:hidden");
+    expect(before.resume).toBe("mt-3 empty:hidden");
+
+    const after = wrappers([
+      { zone: "continue" },
+      { zone: "resume", after: "<p>More below</p>" },
+    ]);
+    expect(after.continue).toBe("mt-6 empty:hidden");
+    expect(after.resume).toBe("mt-3 empty:hidden");
+  });
+
+  it("still pairs when the markup was dropped as unusable", () => {
+    // A non-string `before` never reaches the page, so there is nothing to hold
+    // the row open and no reason to break the row up.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const w = wrappers([
+      { zone: "continue", before: { text: "<p>x</p>" } },
+      { zone: "resume" },
+    ]);
+    expect(w.continue).toBe(RESUME_ROW);
+    expect(w.resume).toBe(RESUME_ROW);
+    warn.mockRestore();
+  });
+
+  it("keeps the rest of the page in order around the row", () => {
+    expect(
+      render(
+        resolveHome({
+          zones: [
+            { zone: "greeting" },
+            { zone: "continue" },
+            { zone: "resume" },
+            { zone: "cards" },
+          ],
+        }).entries,
+      ).map((r) => r.name),
+    ).toEqual(["slot", "greeting", "continue", "resume", "cards", "slot"]);
   });
 });
 

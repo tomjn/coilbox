@@ -31,9 +31,11 @@ import { RESUME_KIND_COPY, RESUME_KIND_ICON, useResume } from "../continue";
  *
  * Layout-agnostic: no page-level spacing or width of its own, because the
  * `stacked` layout is a compatibility contract and a later layout has to be able
- * to put this card somewhere else.
+ * to put this card somewhere else. How wide the card is arrives as `className`
+ * from whichever layout placed it, which is how `stacked` sits it beside the
+ * resume rail (#1041) without either zone learning about the other.
  */
-export default function Continue() {
+export default function Continue({ className }: { className?: string }) {
   const { candidates, loading } = useResume();
   const top = candidates[0];
   if (loading || !top) return null;
@@ -48,7 +50,10 @@ export default function Continue() {
     // stays `bg-card` on the design argument alone.
     <section
       aria-labelledby="home-continue-title"
-      className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-primary/40 bg-card p-5 text-card-foreground"
+      className={cn(
+        "flex flex-wrap items-center justify-between gap-4 rounded-lg border border-primary/40 bg-card p-5 text-card-foreground",
+        className,
+      )}
     >
       <div className="flex min-w-0 items-center gap-4">
         <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
