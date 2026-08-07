@@ -44,12 +44,36 @@ pub fn dataset_key(us: &Unitsync, game_archive: &str) -> Option<String> {
     identity(&Path::new(&dir).join(game_archive), "unitdataset")
 }
 
-/// Cache identity for a map's info blob: its own archive's path + size + mtime.
-/// `None` (no resolvable archive or stat fails) disables caching.
+/// Cache identity for a map's info blob: its own archive's path + size + mtime,
+/// falling back to the map's versioned name when that path won't resolve.
+///
+/// The fallback is the usual case, not the exception. `GetMapArchiveName` reports
+/// a map's archives under versioned human names ("AcidicQuarry 5.17") while
+/// `GetArchivePath` looks up file names ("acidicquarry_5.17.sd7"), so without it
+/// this returns `None` for most maps and the cache never engages.
 pub fn map_key(us: &Unitsync, map_name: &str) -> Option<String> {
-    let archive = us.map_archives(map_name).into_iter().next()?;
-    let dir = us.archive_path(&archive)?;
-    identity(&Path::new(&dir).join(&archive), "map")
+    us.map_archives(map_name)
+        .into_iter()
+        .next()
+        .and_then(|archive| {
+            let dir = us.archive_path(&archive)?;
+            identity(&Path::new(&dir).join(&archive), "map")
+        })
+        .or_else(|| name_identity(us, map_name, "map"))
+}
+
+/// Cache identity from the map's versioned name plus the map file inside its
+/// archive. Costs no stat and no hash of the archive itself. A new release of a
+/// map carries a new versioned name, so the key changes with it.
+fn name_identity(us: &Unitsync, map_name: &str, kind: &str) -> Option<String> {
+    let index = crate::minimap::map_index(us, map_name)?;
+    let file = us.map_file_name(index)?;
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    INFO_CACHE_VERSION.hash(&mut h);
+    kind.hash(&mut h);
+    map_name.hash(&mut h);
+    file.hash(&mut h);
+    Some(format!("n{:016x}", h.finish()))
 }
 
 /// Hash a resolved archive path's file identity into a stable cache key. `kind`
@@ -106,5 +130,27 @@ mod tests {
         let back: MapInfoOutput = read(&dir, "k").expect("cache hit");
         assert_eq!(back.checksum.as_deref(), Some("deadbeef"));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn namespaces_keep_one_archive_from_colliding_across_kinds() {
+        let dir = std::env::temp_dir().join(format!("coilbox-infocache-ns-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create dir");
+        let path = dir.join("shared.sdz");
+        std::fs::write(&path, b"archive").expect("write archive");
+
+        let game = identity(&path, "game").expect("game key");
+        let map = identity(&path, "map").expect("map key");
+        let dataset = identity(&path, "unitdataset").expect("dataset key");
+        assert_ne!(game, map);
+        assert_ne!(game, dataset);
+        assert_ne!(map, dataset);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_missing_archive_has_no_identity() {
+        let missing = std::env::temp_dir().join("coilbox-infocache-does-not-exist.sdz");
+        assert!(identity(&missing, "map").is_none());
     }
 }
