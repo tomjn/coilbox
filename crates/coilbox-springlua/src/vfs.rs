@@ -11,6 +11,7 @@
 //! This is the boundary that keeps untrusted (downloaded) map Lua inside the
 //! working folder.
 
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 use mlua::{Lua, Value, Variadic};
@@ -129,17 +130,69 @@ fn escape_err(who: &str, name: &str) -> mlua::Error {
 
 /// Resolve a VFS-relative path under `root`, rejecting any `..` traversal. A
 /// leading `/` is treated as root-relative (Spring paths are VFS-relative, not
-/// absolute filesystem paths).
+/// absolute filesystem paths). Each segment is spelled the way the directory
+/// above it spells it, per [`resolve_case`].
 fn resolve(root: &Path, rel: &str) -> Option<PathBuf> {
     let mut p = root.to_path_buf();
     for seg in rel.split(['/', '\\']) {
         match seg {
             "" | "." => continue,
             ".." => return None,
-            _ => p.push(seg),
+            _ => {
+                let found = same_name_ignoring_case(&p, OsStr::new(seg));
+                p.push(found.unwrap_or_else(|| OsString::from(seg)));
+            }
         }
     }
     Some(p)
+}
+
+/// The entry in `dir` that `name` names, ignoring case.
+///
+/// An exact match wins, so a filesystem holding both spellings gets a stable
+/// answer rather than one that depends on the order the directory was read.
+fn same_name_ignoring_case(dir: &Path, name: &OsStr) -> Option<OsString> {
+    let wanted = name.to_string_lossy().to_lowercase();
+    let mut ignoring_case = None;
+    for found in std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|e| e.file_name())
+    {
+        if found == name {
+            return Some(found);
+        }
+        if ignoring_case.is_none() && found.to_string_lossy().to_lowercase() == wanted {
+            ignoring_case = Some(found);
+        }
+    }
+    ignoring_case
+}
+
+/// `root`'s `rel`, spelled the way `root` already spells it (issues #798, #951).
+///
+/// The engine reads a path case-insensitively. `CDirArchive` lower-cases every
+/// path into its file index and `CVFSHandler` lower-cases again when it looks
+/// one up, so a game asking for `missions/runtime.lua` is handed the
+/// `Missions/runtime.lua` it shipped. A filesystem that keeps case, which is
+/// every Linux one, does not, and neither did this sandbox before #951. So Lua
+/// that a real engine runs would fail here, and a folder coilbox wrote into
+/// would be a second folder beside the game's own.
+///
+/// Each component is looked up in the directory above it and kept as written
+/// when nothing is there, so a path into a tree that does not exist yet is
+/// spelled by the caller. The listing is read on every platform rather than only
+/// where case matters, which is what makes the result the same everywhere and so
+/// testable on a case-insensitive one.
+pub fn resolve_case(root: &Path, rel: &Path) -> PathBuf {
+    let mut out = root.to_path_buf();
+    for part in rel.iter() {
+        match same_name_ignoring_case(&out, part) {
+            Some(found) => out.push(found),
+            None => out.push(part),
+        }
+    }
+    out
 }
 
 enum Kind {
@@ -213,5 +266,49 @@ fn matches_at(p: &[char], n: &[char]) -> bool {
         Some('*') => matches_at(&p[1..], n) || (!n.is_empty() && matches_at(p, &n[1..])),
         Some('?') => !n.is_empty() && matches_at(&p[1..], &n[1..]),
         Some(&c) => n.first() == Some(&c) && matches_at(&p[1..], &n[1..]),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The fixture tree, which spells its folders and files in lower case.
+    fn fixtures() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
+    }
+
+    /// What the engine would have read. Asserted as the path rather than as a
+    /// successful read, because a case-insensitive filesystem would answer the
+    /// read either way and prove nothing.
+    #[test]
+    fn a_path_resolves_to_the_casing_on_disk() {
+        let root = fixtures();
+        assert_eq!(
+            resolve(&root, "WITHINCLUDE/MapInfo.lua"),
+            Some(root.join("withinclude/mapinfo.lua"))
+        );
+        assert_eq!(
+            resolve_case(&root, Path::new("WithInclude/MAPINFO.LUA")),
+            root.join("withinclude/mapinfo.lua")
+        );
+    }
+
+    /// A name nothing on disk answers is kept as the caller wrote it, so a read
+    /// fails as a missing file rather than as something else.
+    #[test]
+    fn a_path_to_nothing_is_kept_as_written() {
+        let root = fixtures();
+        assert_eq!(
+            resolve(&root, "withinclude/NoSuchFile.lua"),
+            Some(root.join("withinclude/NoSuchFile.lua"))
+        );
+    }
+
+    /// The root boundary is unchanged by the lookup: a segment is only ever
+    /// matched against what is in the directory above it.
+    #[test]
+    fn traversal_is_still_refused() {
+        assert_eq!(resolve(&fixtures(), "withinclude/../mapinfo.lua"), None);
     }
 }

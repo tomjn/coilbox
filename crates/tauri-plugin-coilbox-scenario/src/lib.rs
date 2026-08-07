@@ -391,6 +391,37 @@ async fn scenario_runtime_install<R: Runtime>(app: AppHandle<R>, root: String) -
     }
 }
 
+/// `scenario_runtime_consolidate`, putting a game holding two spellings of a
+/// vendored tree back together (issue #950).
+///
+/// A Linux player who installed the runtime before #798 has the game's own
+/// `LuaRules/` and a `luarules/` coilbox wrote beside it. The engine lower-cases
+/// both into one key, so a file under the spelling coilbox no longer writes to is
+/// one the engine may load in place of the one it does, and the install's prune
+/// walks a single spelling so it can never clear it.
+///
+/// `apply` false lists what would go and touches nothing, so a player sees the
+/// files first. Only then does anything get removed, because this is the one path
+/// where coilbox deletes from a folder the game may have written.
+#[tauri::command]
+async fn scenario_runtime_consolidate<R: Runtime>(
+    app: AppHandle<R>,
+    root: String,
+    apply: bool,
+) -> CliResult {
+    let dir = match writable_game_dir(&root) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let Some(src) = runtime::runtime_dir(&app) else {
+        return CliResult::err("could not find the bundled mission runtime".to_string());
+    };
+    match runtime::consolidate(&src, &dir, apply) {
+        Ok(files) => CliResult::ok(json!({ "files": files, "applied": apply })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `scenario_runtime_status`, the runtime a game has installed and the one
 /// coilbox ships, plus the condition and action types the game declares for
 /// itself. Each is null when it cannot be read: an unadopted game has no marker,
@@ -406,6 +437,11 @@ async fn scenario_runtime_install<R: Runtime>(app: AppHandle<R>, root: String) -
 /// folder, because they are the game's to declare. They are read here rather
 /// than through a command of their own so the editor learns what the game runs
 /// and what it supports in one round trip.
+///
+/// `duplicates` is the runtime files sitting under a second spelling of a
+/// vendored tree, empty for every game that has only one (issue #950). It rides
+/// along here so the offer to put them back together is only made to the games
+/// that need it.
 #[tauri::command]
 async fn scenario_runtime_status<R: Runtime>(app: AppHandle<R>, root: String) -> CliResult {
     let dir = writable_game_dir(&root).ok();
@@ -420,12 +456,23 @@ async fn scenario_runtime_status<R: Runtime>(app: AppHandle<R>, root: String) ->
     let extensions = dir
         .as_deref()
         .and_then(|dir| runtime::read_extensions(dir).ok());
-    let available = runtime::runtime_dir(&app).and_then(|dir| runtime::read_marker(&dir).ok());
+    let src = runtime::runtime_dir(&app);
+    let available = src
+        .as_deref()
+        .and_then(|dir| runtime::read_marker(dir).ok());
+    let duplicates: Vec<String> = match (src.as_deref(), dir.as_deref()) {
+        (Some(src), Some(dir)) => runtime::duplicates(src, dir)
+            .iter()
+            .map(|rel| rel.to_string_lossy().replace('\\', "/"))
+            .collect(),
+        _ => Vec::new(),
+    };
     CliResult::ok(json!({
         "installed": installed,
         "installedError": installed_error,
         "available": available,
         "extensions": extensions,
+        "duplicates": duplicates,
     }))
 }
 
@@ -749,6 +796,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_import,
             scenario_read_mission,
             scenario_runtime_install,
+            scenario_runtime_consolidate,
             scenario_runtime_status,
             scenario_list_missions,
             scenario_delete_mission,

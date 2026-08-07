@@ -11,7 +11,7 @@
 //! trail, and deleting that folder undoes everything this flow ever wrote. It is
 //! the same shape as lego's scratch game (`src/lego/scratchGame.ts`).
 
-use crate::runtime::resolve_case;
+use coilbox_springlua::resolve_case;
 use std::path::{Path, PathBuf};
 
 /// The mutator's folder name. Fixed here rather than passed in, so this module

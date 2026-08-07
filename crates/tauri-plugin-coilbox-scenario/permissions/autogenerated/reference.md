@@ -16,6 +16,7 @@ Allows the scenario plugin's storage, dialogue-media, file export and import, co
 - `allow-scenario-import`
 - `allow-scenario-read-mission`
 - `allow-scenario-runtime-install`
+- `allow-scenario-runtime-consolidate`
 - `allow-scenario-runtime-status`
 - `allow-scenario-list-missions`
 - `allow-scenario-delete-mission`
@@ -339,6 +340,32 @@ Enables the scenario_read_mission command without any pre-configured scope.
 <td>
 
 Denies the scenario_read_mission command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:allow-scenario-runtime-consolidate`
+
+</td>
+<td>
+
+Enables the scenario_runtime_consolidate command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-scenario:deny-scenario-runtime-consolidate`
+
+</td>
+<td>
+
+Denies the scenario_runtime_consolidate command without any pre-configured scope.
 
 </td>
 </tr>
