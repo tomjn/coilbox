@@ -1,6 +1,7 @@
 import { Slot } from "@picoframe/frame";
 import { backdropStyle, resolveHomeBackground } from "./background";
 import Continue from "./zones/Continue";
+import FeaturedMap from "./zones/FeaturedMap";
 import Greeting from "./zones/Greeting";
 import Onboarding from "./zones/Onboarding";
 import ToolCards from "./zones/ToolCards";
@@ -59,6 +60,13 @@ export default function StackedLayout() {
           <Continue />
         </div>
         <ToolCards />
+        {/* Under the tool grid, because it offers one thing to try rather than a
+            way to reach what you already have, and the grid is the page's main
+            business. The gap is the layout's, and `empty:hidden` takes it away
+            again when the zone stands down. */}
+        <div className="mt-8 empty:hidden">
+          <FeaturedMap />
+        </div>
         <Slot id="home.bottom" />
       </div>
     </div>
