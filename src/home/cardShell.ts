@@ -35,16 +35,17 @@
  * ## Fact three: `text-muted-foreground` is not safe over the band
  *
  * That token is calibrated against a 7% background, and on a vivid base it is a
- * saturated colour rather than a grey: over this band it measures 3.0:1, under
- * AA. {@link ART_DIM_CLASS} steps the foreground's alpha down instead, which
- * keeps the same hierarchy and holds 6.8:1.
+ * saturated colour rather than a grey: over this band it measures 2.1:1 against
+ * white art, well under AA. {@link ART_DIM_CLASS} steps the foreground's alpha
+ * down instead, which keeps the same hierarchy and holds 5.0:1.
  *
  * `cardShell.test.ts` measures the band's two text colours against a pure white
- * pixel in every base ramp picoframe ships. White is the ceiling for an image, so
- * that bound covers every picture any art source can ever hand back: a zone that
- * later shows a bundled illustration or content art inherits the guarantee rather
- * than deriving its own. The alphas come out of the shipped strings below, so
- * weakening one re-runs the measurement instead of leaving it stale.
+ * pixel in every base ramp picoframe ships, where the worst case is 7.4:1 for the
+ * name and 5.0:1 for the line under it. White is the ceiling for an image, so that
+ * bound covers every picture any art source can ever hand back: a zone that later
+ * shows a bundled illustration or content art inherits the guarantee rather than
+ * deriving its own. The alphas come out of the shipped strings below, so weakening
+ * one re-runs the measurement instead of leaving it stale.
  */
 
 /**
