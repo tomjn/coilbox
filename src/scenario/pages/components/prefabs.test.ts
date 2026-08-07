@@ -8,6 +8,7 @@ import {
   buildableBy,
   buildingUnits,
   editPrefab,
+  movedQueued,
   normaliseQueue,
   plusQueued,
   removePrefab,
@@ -165,6 +166,18 @@ describe("a building's queue", () => {
     expect(withoutQueued(["a", "b", "c"], 1)).toEqual(["a", "c"]);
     const queue = ["a"];
     expect(withoutQueued(queue, 3)).toBe(queue);
+  });
+
+  it("moves one entry up and down the queue", () => {
+    expect(movedQueued(["a", "b", "c"], 2, -1)).toEqual(["a", "c", "b"]);
+    expect(movedQueued(["a", "b", "c"], 0, 1)).toEqual(["b", "a", "c"]);
+  });
+
+  it("hands the queue back at either end and for an index it does not have", () => {
+    const queue = ["a", "b"];
+    expect(movedQueued(queue, 0, -1)).toBe(queue);
+    expect(movedQueued(queue, 1, 1)).toBe(queue);
+    expect(movedQueued(queue, 5, -1)).toBe(queue);
   });
 });
 

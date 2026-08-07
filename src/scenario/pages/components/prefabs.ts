@@ -191,6 +191,29 @@ export function withoutQueued(queue: string[], index: number): string[] {
   return queue.filter((_, i) => i !== index);
 }
 
+/**
+ * One unit moved `delta` places along a queue.
+ *
+ * The queue back when the move would go off either end, so the panel can compare
+ * identities and the ends are a no-op rather than a wrap around. Order is the
+ * opening build: a factory told to make a builder before a scout makes the
+ * builder first (issue #844).
+ */
+export function movedQueued(
+  queue: string[],
+  index: number,
+  delta: number,
+): string[] {
+  const to = index + delta;
+  if (index < 0 || index >= queue.length || to < 0 || to >= queue.length) {
+    return queue;
+  }
+  const out = queue.slice();
+  const [def] = out.splice(index, 1);
+  out.splice(to, 0, def);
+  return out;
+}
+
 /* -------------------------------------------------------------------------- *
  * The game's units, as a base can use them.
  * -------------------------------------------------------------------------- */
