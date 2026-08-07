@@ -218,9 +218,10 @@ export interface Profile {
    * - `"above"`: over the welcome.
    * - `"off"`: hidden entirely, leaving the welcome as the whole home.
    *
-   * Only meaningful when `welcome` is set (a vanilla build shows the onboarding via
-   * the launcher's `home.top` slot instead). An omitted/unknown value is treated as
-   * `"below"`.
+   * `"off"` also hides the cards on a build with no `welcome`, where they sit at the
+   * top of Coilbox's own home page. `"above"` and `"below"` have nothing to position
+   * against there, so both leave them where they are. An omitted/unknown value is
+   * treated as `"below"`.
    */
   onboarding?: OnboardingPlacement;
   /** External links added to the sidebar/launcher, e.g. a Discord invite. */

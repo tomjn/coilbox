@@ -362,7 +362,7 @@ Your `welcome` is **always** shown and is never replaced by the onboarding — t
 { "version": 1, "welcome": { "html": "…" }, "onboarding": "off" }
 ```
 
-Only meaningful alongside `welcome` (without it, a vanilla build shows the onboarding above the launcher tool grid). An omitted or unrecognized value is treated as `"below"`.
+Without a `welcome`, the cards sit at the top of Coilbox's own home page above the tool grid: `"off"` hides them there too, and `"above"` and `"below"` have no welcome to position against, so both leave them where they are. An omitted or unrecognized value is treated as `"below"`.
 
 ### `links` (object[])
 
