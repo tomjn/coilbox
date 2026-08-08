@@ -325,6 +325,72 @@ export interface PlayerStats {
   keyPresses: number;
 }
 
+/**
+ * One `TeamStatistics` sample from the replay's trailer: one team, one moment,
+ * every figure a running total for the match so far.
+ *
+ * This is also the metric vocabulary. A [`Metric`](#Metric)'s `key` is one of
+ * these field names, so the published registry and the samples it describes
+ * cannot name different things.
+ */
+export interface TeamStatSample {
+  /** Sim frame this was sampled at. 30 frames is one second. */
+  frame: number;
+  metalUsed: number;
+  energyUsed: number;
+  metalProduced: number;
+  energyProduced: number;
+  metalExcess: number;
+  energyExcess: number;
+  metalReceived: number;
+  energyReceived: number;
+  metalSent: number;
+  energySent: number;
+  damageDealt: number;
+  damageReceived: number;
+  unitsProduced: number;
+  unitsDied: number;
+  unitsReceived: number;
+  unitsSent: number;
+  unitsCaptured: number;
+  unitsOutCaptured: number;
+  unitsKilled: number;
+}
+
+/** A metric's identity: a sample field other than the frame it was taken at. */
+export type MetricKey = Exclude<keyof TeamStatSample, "frame">;
+
+/** Which question a metric answers. Charts and grids group by this. */
+export type MetricGroup = "economy" | "military" | "units";
+
+/** What a metric's numbers are, so a surface can format one without knowing
+ * which metric it is holding. */
+export type MetricUnit = "metal" | "energy" | "damage" | "count";
+
+/**
+ * One entry of the match-statistics metric registry, which lives in Rust beside
+ * the decoder (`crates/tauri-plugin-coilbox-content/src/metrics.rs`).
+ *
+ * The chart's dropdown, the sparkline grid, the roster columns and the headline
+ * tiles all build from `contentMetricRegistry`. None of them keeps a list of its
+ * own, so adding a metric is one line of Rust and no frontend edit at all.
+ */
+export interface Metric {
+  key: MetricKey;
+  /** What to call it in the interface. */
+  label: string;
+  group: MetricGroup;
+  unit: MetricUnit;
+  /** Show it as a column on the match's roster table. */
+  roster: boolean;
+  /** Show it as a headline tile above the chart, summed across teams. */
+  headline: boolean;
+  /** False for a metric that is decoded but offered nowhere: the gifting and
+   * capture counts, which are zero in almost every match. Filter these out
+   * before showing a list of metrics to anyone. */
+  surfaced: boolean;
+}
+
 /** One player/spectator from a demo, with side + ally-team resolved from their team. */
 export interface ReplayPlayer {
   name: string;
@@ -445,6 +511,19 @@ export const contentDemoInfo = defineCommand<
   { enginePath: string; replayPath: string },
   { info: DemoInfo }
 >("coilbox-content", "content_demo_info");
+
+/**
+ * The metric registry: every figure a replay's team statistics carry, named,
+ * grouped and placed. Static data, so it can be fetched once and shared.
+ *
+ * This is the only way to enumerate metrics. A surface that filters on `roster`,
+ * `headline` or `surfaced` and reads `sample[metric.key]` gains the next metric
+ * for free, and no surface has a list to keep in step with another one.
+ */
+export const contentMetricRegistry = defineCommand<
+  undefined,
+  { metrics: Metric[] }
+>("coilbox-content", "content_metric_registry");
 
 /** One player as recorded in a stats-database game (flattened from the demo). */
 export interface StatPlayer {
