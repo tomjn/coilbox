@@ -88,7 +88,10 @@ function playedAt(ms: number): string {
 
 /** Human-readable result line from the winning ally-teams. */
 function resultLabel(info: DemoInfo): string {
-  if (!info.winnersKnown) return "Unknown (the game never ended)";
+  // False either because the recording never reached a game over, or because
+  // its trailer is in a format coilbox doesn't read and there was no demotool
+  // fallback to ask, so this doesn't name a specific reason.
+  if (!info.winnersKnown) return "Unknown";
   if (info.winningAllyTeams.length === 0) return "Nobody won";
   const ids = info.winningAllyTeams.map((a) => `Ally ${a}`).join(", ");
   return `${ids} won`;
