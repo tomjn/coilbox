@@ -71,7 +71,8 @@ export function SuggestedMapCard({ heading }: { heading?: boolean }) {
   // layout, because the same map is claimed against the tool cards and two
   // resolutions could drift apart (issue #1077).
   const { map, loading, source } = useSuggestedMapAnswer();
-  const { state, error, canDownload, download } = useSuggestedMapInstall(map);
+  const { state, error, canDownload, noWriteRoot, download } =
+    useSuggestedMapInstall(map);
   // The URL that failed, not a flag, so a later answer gets its own chance
   // rather than inheriting the verdict on the URL it replaced.
   const [broken, setBroken] = useState<string | null>(null);
@@ -158,7 +159,12 @@ export function SuggestedMapCard({ heading }: { heading?: boolean }) {
       ) : (
         <div className={art ? ART_CARD_CLASS : PLAIN_CARD_CLASS}>{body}</div>
       )}
-      {!canDownload && state !== "installed" && (
+      {/* `noWriteRoot`, not `!canDownload`: the download folder takes a disk read
+          to resolve, so `canDownload` is false on every first render however the
+          user has it configured. Keying the line on that told a configured user
+          to set a folder they had set, on every launch, and took the Downloads
+          row to 239px until the read landed (issue #1099). */}
+      {noWriteRoot && state !== "installed" && (
         <p className="text-xs text-muted-foreground">
           Set a download folder in{" "}
           <Link

@@ -32,7 +32,7 @@ import {
 } from "../content/branding";
 import { useUnitsyncMinimap, useUnitsyncScan } from "../content/config";
 import { dlInstalledContent } from "../downloads/bindings";
-import { useContentRootPaths, useWriteRootPath } from "../downloads/config";
+import { useContentRootPaths, useWriteRoot } from "../downloads/config";
 import {
   type EnqueueInput,
   identityOf,
@@ -800,11 +800,21 @@ export function useSuggestedMapInstall(map: SuggestedMap | null): {
   state: SuggestedState;
   /** The queue's message for a failed download, when there is one. */
   error: string | null;
-  /** False when no write root is set, which is the one thing the user must fix. */
+  /** False when there is nowhere to download to, and while that is still unread. */
   canDownload: boolean;
+  /**
+   * True only once the download folder has been read and there is none.
+   *
+   * Separate from `!canDownload`, which is also false for the frame or two the
+   * read takes. That is the whole of issue #1099: the card told a configured
+   * user to set a folder they had already set, every launch, until the read
+   * landed.
+   */
+  noWriteRoot: boolean;
   download: () => void;
 } {
-  const writePath = useWriteRootPath();
+  const writeRoot = useWriteRoot();
+  const writePath = writeRoot.path;
   const rootPaths = useContentRootPaths();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -857,6 +867,7 @@ export function useSuggestedMapInstall(map: SuggestedMap | null): {
     state,
     error,
     canDownload: !!writePath,
+    noWriteRoot: !writeRoot.loading && !writePath,
     download: () => {
       if (input) enqueue(input);
     },

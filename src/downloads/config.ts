@@ -96,29 +96,49 @@ export function useRegisterEngineDirs(): void {
 }
 
 /**
+ * Where downloads go, and whether that has been read yet.
+ *
+ * The two travel together because resolving the path needs a disk read, so
+ * `path` is `undefined` on the first render of every caller whatever the user
+ * has configured. A caller that cannot tell that apart from "no folder is set"
+ * says so on screen, and tells a configured user they have not set something
+ * they have (issue #1099).
+ */
+export interface WriteRoot {
+  /** The chosen folder, or `undefined` when there is none. */
+  path?: string;
+  /** True until the read lands, while `path` says nothing either way. */
+  loading: boolean;
+}
+
+/**
  * Resolve the configured write-root id (Downloads settings) to its on-disk path,
  * via the content plugin's detected roots. Shared by every download screen so
  * they all write into the same chosen folder. `undefined` when none is set or
  * the root no longer exists.
+ *
+ * A read that fails is `loading: false` with no path: the content plugin could
+ * not name a single root, so there is nowhere to download to, which is the same
+ * thing the user has to fix.
  *
  * In portable mode this also self-heals: if the configured root resolves outside the
  * package (e.g. a stale absolute root copied in from another install), it falls back
  * to an in-package root and persists that correction, so downloads can't silently
  * land next to the wrong folder. See {@link healWriteRoot}.
  */
-export function useWriteRootPath(): string | undefined {
+export function useWriteRoot(): WriteRoot {
   const [cfg, setCfg] = useDownloadsConfig();
   // Latest config for the heal-persist below, without re-running the load every
   // render (the effect keys on the writeRootId primitive, not the cfg object).
   const cfgRef = useRef(cfg);
   cfgRef.current = cfg;
-  const [path, setPath] = useState<string | undefined>(undefined);
+  const [root, setRoot] = useState<WriteRoot>({ loading: true });
   useEffect(() => {
     contentStateLoad(undefined)
       .then(({ state }) => {
         const packageDir = packageDirOf(getProfileRoot());
         const chosen = healWriteRoot(state.roots, cfg.writeRootId, packageDir);
-        setPath(chosen?.path);
+        setRoot({ path: chosen?.path, loading: false });
         // Persist the correction so downstream readers of `writeRootId` agree and the
         // stale id doesn't linger. One-shot: once the id matches, this stops firing.
         // Spread the latest config (via ref) so a concurrent rapid-repo edit isn't lost.
@@ -126,9 +146,21 @@ export function useWriteRootPath(): string | undefined {
           setCfg({ ...cfgRef.current, writeRootId: chosen.id });
         }
       })
-      .catch(() => setPath(undefined));
+      .catch(() => setRoot({ loading: false }));
+    // A later re-read (the heal above, or a settings change) does not go back to
+    // loading. The previous answer stands until the new one lands, which is what
+    // every caller already saw and is a definite answer either way.
   }, [cfg.writeRootId, setCfg]);
-  return path;
+  return root;
+}
+
+/**
+ * Just the path, for the callers that only offer a download and have no line to
+ * put under it. They read `undefined` before the load lands exactly as they did
+ * before {@link useWriteRoot} existed.
+ */
+export function useWriteRootPath(): string | undefined {
+  return useWriteRoot().path;
 }
 
 // The BAR maps-metadata list keyed springName -> preview thumbnail URL, fetched
