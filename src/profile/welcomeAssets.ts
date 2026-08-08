@@ -59,6 +59,18 @@ const URL_ATTRS = ["src", "href", "poster"];
 /** Rewrite local `src`/`href`/`poster`, inline `style` url()s and `<style>` blocks. */
 export function rewriteBrandedHtml(html: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
+  // Only the body is returned, and the HTML parser puts a `<style>` written before
+  // any markup into `<head>`, so a zone styled the one way a zone can be styled
+  // lost its styling entirely (issue #1112). Move those styles back to the front
+  // of the body, in the order they were written.
+  //
+  // `<style>` and nothing else. A style already reaches the page when it is
+  // written after the markup, and a whole stylesheet does through the welcome's
+  // `css` key, so this changes where one may sit, not what may be on the page.
+  // Returning the rest of `<head>` would not: `<base>` re-points every relative
+  // URL in the app, `<meta http-equiv="refresh">` navigates the webview away, and
+  // `<link>` fetches. Those stay dropped.
+  doc.body.prepend(...doc.head.querySelectorAll("style"));
   for (const el of Array.from(doc.body.querySelectorAll<HTMLElement>("*"))) {
     for (const attr of URL_ATTRS) {
       const value = el.getAttribute(attr);
