@@ -5,7 +5,7 @@ import { type HomeEntry, type ZoneId, zoneString } from "./config";
 import HomeMarkup from "./HomeMarkup";
 import type { HomeLayoutProps } from "./layout";
 import Continue from "./zones/Continue";
-import FeaturedMap from "./zones/FeaturedMap";
+import FeaturedMap, { FeaturedMapCard } from "./zones/FeaturedMap";
 import Greeting from "./zones/Greeting";
 import Onboarding from "./zones/Onboarding";
 import ResumeRail from "./zones/ResumeRail";
@@ -132,22 +132,28 @@ const RESUME_ROW =
 const RESUME_HERO = "min-w-0 sm:flex-[1_1_32rem]";
 
 /**
- * The page's entries, with the hero and the rail composed into one row wherever
- * they sit next to each other.
+ * The page's entries, with two pairs of zones composed into one.
  *
- * The pairing belongs to the layout. Neither zone knows the other exists: each
- * still renders nothing when it has nothing to say, and the row is built so that
- * both silent means no row at all. That is what leaves a later layout free to
- * put them somewhere else, or to leave them stacked.
+ * - `continue` then `resume`: one row, the hero and the runners-up beside it.
+ * - `cards` then `featured`: the map card joins the tool grid's Downloads group
+ *   as a fourth card, because a map suggestion is a download and had been sitting
+ *   alone below every tool group at a size nothing around it shared (issue
+ *   #1037).
  *
- * Only an adjacent `continue` then `resume` pairs. A profile that separated
- * them, reversed them, or listed one without the other wrote the order it wanted,
- * and each zone keeps the stacked spacing it had.
+ * The pairing belongs to the layout. No zone knows the other exists: each still
+ * renders nothing when it has nothing to say, and the grid is handed the map card
+ * as a child rather than told to build one. That is what leaves a later layout
+ * free to put them somewhere else, or to leave them stacked.
+ *
+ * Only an adjacent pair, in that order, pairs. A profile that separated them,
+ * reversed them, or listed one without the other wrote the order it wanted, and
+ * each zone keeps the stacked spacing it had. The map card standing alone is why
+ * `FeaturedMap` still has a heading of its own.
  *
  * An entry carrying `before` or `after` markup does not pair either. That markup
- * renders whether or not its zone drew anything, so in the row it would be a
- * third item sitting beside the hero, and it would hold the row open on a page
- * with nothing to resume.
+ * renders whether or not its zone drew anything, so in the resume row it would be
+ * a third item sitting beside the hero and would hold the row open on a page with
+ * nothing to resume, and around the grid it would land inside a group.
  */
 function renderEntries(entries: readonly HomeEntry[]): ReactNode[] {
   const out: ReactNode[] = [];
@@ -161,6 +167,11 @@ function renderEntries(entries: readonly HomeEntry[]): ReactNode[] {
           <ResumeRail />
         </div>,
       );
+      i += 1;
+      continue;
+    }
+    if (bare(entry, "cards") && next && bare(next, "featured")) {
+      out.push(<ToolCards key={i} suggested={<FeaturedMapCard />} />);
       i += 1;
       continue;
     }

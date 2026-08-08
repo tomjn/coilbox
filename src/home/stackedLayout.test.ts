@@ -14,7 +14,12 @@ vi.mock("./zones/Greeting", () => ({ default: zone("greeting") }));
 vi.mock("./zones/Continue", () => ({ default: zone("continue") }));
 vi.mock("./zones/ResumeRail", () => ({ default: zone("resume") }));
 vi.mock("./zones/ToolCards", () => ({ default: zone("cards") }));
-vi.mock("./zones/FeaturedMap", () => ({ default: zone("featured") }));
+vi.mock("./zones/FeaturedMap", () => ({
+  default: zone("featured"),
+  // The same zone, as the grid renders it. Named apart so a test can tell which
+  // of the two forms the layout reached for.
+  FeaturedMapCard: zone("featured-card"),
+}));
 // Stubbed for the same reason, and because the real one parses HTML through
 // DOMParser, which the node test environment does not have. What it renders is
 // `HomeMarkup`'s business. What reaches it, and where, is this test's.
@@ -59,6 +64,9 @@ function collect(node: unknown, wrapper: string | null, out: Rendered[]): void {
   const props = el.props ?? {};
   if (typeof el.type === "function" && "zoneName" in el.type) {
     out.push({ name: String(el.type.zoneName), wrapper, props });
+    // The map card reaches the grid as a prop rather than a child, and the grid
+    // puts it in a group. Walking it keeps this list in the order the page reads.
+    collect(props.suggested, wrapper, out);
     return;
   }
   // Only host elements (a string type) carry the layout's own spacing classes.
@@ -81,9 +89,14 @@ const renderDefault = () => render(resolveHome(undefined).entries);
 
 describe("StackedLayout ordering", () => {
   it("renders every zone in the default order, between the two slots", () => {
+    // Every zone, in `DEFAULT_ZONES` order. The last of them arrives inside the
+    // grid rather than after it, which is the map card joining the Downloads
+    // group.
+    expect(DEFAULT_ZONES.at(-1)).toBe("featured");
     expect(renderDefault().map((r) => r.name)).toEqual([
       "slot",
-      ...DEFAULT_ZONES,
+      ...DEFAULT_ZONES.slice(0, -1),
+      "featured-card",
       "slot",
     ]);
   });
@@ -377,6 +390,64 @@ describe("StackedLayout resume row", () => {
         }).entries,
       ).map((r) => r.name),
     ).toEqual(["slot", "greeting", "continue", "resume", "cards", "slot"]);
+  });
+});
+
+describe("StackedLayout suggested map", () => {
+  /** What the layout rendered, by name. */
+  const page = (zones: unknown[]) =>
+    render(resolveHome({ zones }).entries).map((r) => r.name);
+
+  it("hands the map card to the grid when the two zones are adjacent", () => {
+    // A map suggestion is a download, so it joins the Downloads group rather
+    // than standing alone below every tool group (issue #1037).
+    expect(page([{ zone: "cards" }, { zone: "featured" }])).toEqual([
+      "slot",
+      "cards",
+      "featured-card",
+      "slot",
+    ]);
+  });
+
+  it("leaves the zone standing on its own when the profile separates them", () => {
+    // Its own section, with its own heading, which is why the zone still has
+    // one.
+    expect(
+      page([{ zone: "cards" }, { zone: "greeting" }, { zone: "featured" }]),
+    ).toEqual(["slot", "cards", "greeting", "featured", "slot"]);
+  });
+
+  it("leaves it standing on its own when the profile reverses them", () => {
+    expect(page([{ zone: "featured" }, { zone: "cards" }])).toEqual([
+      "slot",
+      "featured",
+      "cards",
+      "slot",
+    ]);
+  });
+
+  it("does not fold a zone carrying markup of its own into the grid", () => {
+    // The markup would land inside a group, between two cards.
+    expect(
+      page([{ zone: "cards" }, { zone: "featured", before: "<p>B</p>" }]),
+    ).toEqual(["slot", "cards", "markup", "featured", "slot"]);
+    expect(
+      page([{ zone: "cards", after: "<p>A</p>" }, { zone: "featured" }]),
+    ).toEqual(["slot", "cards", "markup", "featured", "slot"]);
+  });
+
+  it("gives a grid holding the card no spacing wrapper of its own", () => {
+    // The grid brought its own top margin before the card joined it, and the
+    // featured zone's `mt-8` would now be a gap inside a group.
+    const rendered = render(
+      resolveHome({ zones: [{ zone: "cards" }, { zone: "featured" }] }).entries,
+    );
+    expect(rendered.map((r) => r.wrapper)).toEqual([
+      COLUMN,
+      COLUMN,
+      COLUMN,
+      COLUMN,
+    ]);
   });
 });
 

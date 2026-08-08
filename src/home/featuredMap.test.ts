@@ -88,7 +88,7 @@ import type { SuggestedMap, SuggestedMapList } from "../content/branding";
 import type { EnqueueInput } from "../downloads/DownloadQueueProvider";
 import { ART_CARD_CLASS } from "./cardShell";
 import * as featured from "./featuredMap";
-import FeaturedMapZone from "./zones/FeaturedMap";
+import FeaturedMapZone, { FeaturedMapCard } from "./zones/FeaturedMap";
 
 const {
   battleFeaturedMap,
@@ -654,5 +654,78 @@ describe("the featured map card", () => {
       install: { state: "installed", canDownload: false },
     });
     expect(html).not.toContain("Downloads settings");
+  });
+});
+
+describe("the card in the Downloads group", () => {
+  /** The card as the grid renders it, with no heading of its own. */
+  function card(args: Parameters<typeof render>[0] = {}): string {
+    hooks.featured = {
+      map:
+        args.map === undefined ? map("Fallendell", "Fallendell_V4") : args.map,
+      loading: args.loading ?? false,
+      source: args.source ?? "curated",
+    };
+    hooks.install = {
+      state: "available",
+      error: null,
+      canDownload: true,
+      download: () => {},
+      ...args.install,
+    };
+    hooks.art = args.art;
+    return renderToStaticMarkup(
+      createElement(MemoryRouter, null, createElement(FeaturedMapCard, {})),
+    );
+  }
+
+  it("drops the heading and the section the group already provides", () => {
+    // A label inside a labelled group would read as a group within a group.
+    const html = card();
+    expect(html).not.toContain("Featured map");
+    expect(html).not.toContain("<section");
+    expect(html).toContain("Fallendell");
+  });
+
+  it("keeps them when it is standing on its own", () => {
+    const html = render({});
+    expect(html).toContain("Featured map");
+    expect(html).toContain('aria-labelledby="featured-map-heading"');
+  });
+
+  it("takes the tool card's width, so the row is four of one size", () => {
+    // It was `max-w-[33rem]`, which was right at the foot of the page and wrong
+    // beside three 16rem cards.
+    expect(card()).toContain("sm:w-64");
+    expect(card()).not.toContain("max-w-[33rem]");
+  });
+
+  it("takes the tool card's art window, so the row is one depth", () => {
+    expect(card({ art: "https://example.test/thumb.jpg" })).toContain(
+      "min-h-28",
+    );
+    // The no-art card too, or the icon card would be the short one in the row.
+    expect(card({ art: undefined })).toContain("min-h-28");
+  });
+
+  it("holds a card-sized footprint while the catalog loads", () => {
+    // Inside the group it is a gap in a row of cards, so it has to be the size
+    // of one rather than the depth the wide card used to be.
+    const html = card({ loading: true });
+    expect(html).toContain("animate-pulse");
+    expect(html).toContain("sm:w-64");
+    expect(html).not.toContain("min-h-52");
+  });
+
+  it("still renders nothing when the catalog curates no maps", () => {
+    expect(card({ map: null })).toBe("");
+  });
+
+  it("keeps the write-root line under the card, not beside it", () => {
+    // In the group the card is a flex item, so a sibling paragraph would be a
+    // fifth item in the row.
+    const html = card({ install: { canDownload: false } });
+    expect(html).toContain("Downloads settings");
+    expect(html).toContain("flex w-full flex-col gap-2 sm:w-64");
   });
 });
