@@ -783,6 +783,7 @@ function render(args: {
     state: "available",
     error: null,
     canDownload: true,
+    noWriteRoot: false,
     download: () => {},
     ...args.install,
   };
@@ -897,8 +898,23 @@ describe("the suggested map card", () => {
   });
 
   it("explains the one thing the user must fix when there is no write root", () => {
-    const html = render({ install: { canDownload: false } });
+    const html = render({
+      install: { canDownload: false, noWriteRoot: true },
+    });
     expect(html).toContain("Downloads settings");
+    expect(html).toContain("disabled");
+  });
+
+  it("says nothing about a download folder it has not read yet", () => {
+    // The folder takes a disk read, so `canDownload` is false on the first
+    // render of every launch, configured or not. Keyed on that, the card told a
+    // configured user to set a folder they had set, and stood 38px taller while
+    // it did (issue #1099). The button stays disabled, because there is
+    // genuinely nowhere to write to yet, but the card asserts nothing.
+    const html = render({
+      install: { canDownload: false, noWriteRoot: false },
+    });
+    expect(html).not.toContain("Downloads settings");
     expect(html).toContain("disabled");
   });
 
@@ -926,7 +942,7 @@ describe("the suggested map card", () => {
 
   it("does not nag about a write root for a map already installed", () => {
     const html = render({
-      install: { state: "installed", canDownload: false },
+      install: { state: "installed", canDownload: false, noWriteRoot: true },
     });
     expect(html).not.toContain("Downloads settings");
   });
@@ -1001,7 +1017,7 @@ describe("the card in the Downloads group", () => {
   it("keeps the write-root line under the card, not beside it", () => {
     // In the group the card is a flex item, so a sibling paragraph would be a
     // fifth item in the row.
-    const html = card({ install: { canDownload: false } });
+    const html = card({ install: { canDownload: false, noWriteRoot: true } });
     expect(html).toContain("Downloads settings");
     expect(html).toContain("flex w-full flex-col gap-2 sm:w-64");
   });
