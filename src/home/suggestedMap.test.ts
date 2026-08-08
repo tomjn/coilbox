@@ -92,6 +92,8 @@ import SuggestedMapZone, { SuggestedMapCard } from "./zones/SuggestedMap";
 
 const {
   battleSuggestedMap,
+  suggestedMapCandidates,
+  suggestedMapClaim,
   suggestedMapFor,
   suggestedMapPool,
   suggestedMapState,
@@ -112,6 +114,11 @@ function map(id: string, springName = id): SuggestedMap {
 
 function pack(id: string, maps: SuggestedMap[]): SuggestedMapList {
   return { id, title: id, maps };
+}
+
+/** The same map, with the catalog thumbnail the card would paint. */
+function pictured(id: string, springName = id): SuggestedMap {
+  return { ...map(id, springName), thumb: [`https://example.test/${id}.jpg`] };
 }
 
 describe("the curated pool", () => {
@@ -163,6 +170,159 @@ describe("the curated pool", () => {
       },
     };
     expect(suggestedMapPool([mirror], [])).toHaveLength(1);
+  });
+
+  it("passes over a map the catalog cannot picture", () => {
+    // Issue #1070. A card with no picture beside three that have one reads as a
+    // card that failed, and the next map in the rotation is a real map with a
+    // real picture, so nothing is lost by moving on.
+    const pool = suggestedMapPool(
+      [pictured("a"), map("b"), pictured("c")],
+      [pack("p", [map("d"), pictured("e")])],
+    );
+    expect(pool.map((m) => m.id)).toEqual(["a", "c", "e"]);
+  });
+
+  it("treats an empty thumb list as no picture at all", () => {
+    const empty: SuggestedMap = { ...map("a"), thumb: [] };
+    expect(
+      suggestedMapPool([empty, pictured("b")], []).map((m) => m.id),
+    ).toEqual(["b"]);
+  });
+
+  it("keeps every map when none of them has a picture", () => {
+    // A distribution's own `mapLists` join this pool. One that curated maps
+    // without thumbnails would otherwise lose the zone and never be told why, and
+    // a card with a glyph on it beats no card.
+    const pool = suggestedMapPool([map("a")], [pack("p", [map("b")])]);
+    expect(pool.map((m) => m.id)).toEqual(["a", "b"]);
+  });
+
+  it("counts the maps it passed over, so a test can hold the catalog to them", () => {
+    const candidates = suggestedMapCandidates([pictured("a"), map("b")], []);
+    expect(candidates.map((m) => m.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("the catalog this ships with", () => {
+  // The real file, not a fixture. Nothing stops an editor adding a map to a pack
+  // without a thumbnail, and until #1070 nothing would have said so: the card
+  // just came up without a picture on that map's day and no test failed in
+  // between. The rotation now passes such a map over, so the failure mode became
+  // a map that is never suggested, which is just as quiet. This is the guard.
+  const catalog = JSON.parse(
+    readFileSync(new URL("../../catalog.json", import.meta.url), "utf8"),
+  ) as {
+    suggested?: { maps?: SuggestedMap[]; mapLists?: SuggestedMapList[] };
+  };
+  const candidates = suggestedMapCandidates(
+    catalog.suggested?.maps ?? [],
+    catalog.suggested?.mapLists ?? [],
+  );
+  const thumbless = candidates.filter((m) => !m.thumb?.length);
+
+  /**
+   * Curated maps with no thumbnail, by catalog id, each with the issue that
+   * settles it. An entry here is one the rotation never reaches, so the list is
+   * a statement that we know and it is tracked, not a licence.
+   */
+  const NO_THUMBNAIL: Record<string, string> = {
+    // springfiles serves this spring name with a joke map, so there is no
+    // picture of Folsom Dam to point at until the entry is repointed or dropped.
+    "classic-folsom-dam": "https://github.com/tomjn/coilbox/issues/1067",
+  };
+
+  it("has a rotation at all", () => {
+    expect(
+      suggestedMapPool(
+        catalog.suggested?.maps ?? [],
+        catalog.suggested?.mapLists ?? [],
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("gives every curated map a thumbnail, or an issue that will", () => {
+    for (const m of thumbless) {
+      expect(NO_THUMBNAIL, `${m.id} has no thumb and no issue`).toHaveProperty(
+        m.id,
+      );
+    }
+  });
+
+  it("drops an exception once its map has a picture", () => {
+    // The half that keeps the list from going stale: an entry that has since
+    // been given a thumbnail, or removed from the catalog, fails here.
+    for (const id of Object.keys(NO_THUMBNAIL)) {
+      expect(
+        thumbless.map((m) => m.id),
+        `${id} no longer needs an exception`,
+      ).toContain(id);
+    }
+  });
+
+  it("never suggests a map it cannot picture", () => {
+    const pool = suggestedMapPool(
+      catalog.suggested?.maps ?? [],
+      catalog.suggested?.mapLists ?? [],
+    );
+    for (const id of Object.keys(NO_THUMBNAIL)) {
+      expect(pool.map((m) => m.id)).not.toContain(id);
+    }
+  });
+});
+
+describe("the map this card takes off the tool cards", () => {
+  it("claims the map it is showing", () => {
+    expect(suggestedMapClaim(map("fallendell", "Fallendell_V4"), true)).toEqual(
+      [{ kind: "map", mapName: "Fallendell_V4" }],
+    );
+  });
+
+  it("claims nothing when the page has no suggested map zone", () => {
+    // A profile that left the zone out has no card holding the map, so a claim
+    // would cost the Maps card a picture and give it to nobody.
+    expect(
+      suggestedMapClaim(map("fallendell", "Fallendell_V4"), false),
+    ).toEqual([]);
+  });
+
+  it("claims nothing when the catalog curates nothing", () => {
+    expect(suggestedMapClaim(null, true)).toEqual([]);
+  });
+
+  it("claims nothing for a map with no spring name", () => {
+    // A direct mirror download installs a file and names no map, so there is no
+    // name a tool card's pick could ever collide with.
+    const mirror: SuggestedMap = {
+      id: "u",
+      title: "u",
+      filename: "u.sd7",
+      download: {
+        kind: "url",
+        url: "https://example.test/u.sd7",
+        filename: "u.sd7",
+      },
+    };
+    expect(suggestedMapClaim(mirror, true)).toEqual([]);
+  });
+});
+
+describe("the page settles the cards around the suggested map", () => {
+  // The claim is a pure function and the wiring that carries it to the pick
+  // layer is one call in `CoilboxHome`. Dropping that call would leave every
+  // unit test green and put the duplicate picture straight back, so the call is
+  // asserted on the source. See issue #1055.
+  const source = readFileSync(
+    new URL("./CoilboxHome.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("hands the claim to the content picks from above the layout", () => {
+    expect(source).toMatch(/useContentCardArt\(suggestedMapClaim\([^)]*\)\)/);
+  });
+
+  it("claims only when the profile's zones include the suggested map", () => {
+    expect(source).toContain('e.zone === "suggested"');
   });
 });
 
