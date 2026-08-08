@@ -62,6 +62,10 @@ vi.mock("./suggestedMap", async (importOriginal) => {
 });
 
 import type { SuggestedMap, SuggestedMapList } from "../content/branding";
+import {
+  installedMapCount,
+  MAPS_ENOUGH,
+} from "../content/pages/components/getStartedCandidates";
 import type { EnqueueInput } from "../downloads/DownloadQueueProvider";
 import { ART_BAND_CLASS, ART_CARD_CLASS } from "./cardShell";
 import * as suggested from "./suggestedMap";
@@ -691,6 +695,25 @@ describe("where the card goes", () => {
     // Getting a first map installed outranks resuming a run, because without a
     // map nothing can be played.
     expect(suggestedMapPlacement({ ...settled, noMaps: true })).toBe("row");
+  });
+
+  it("stands down at the first map, while the get-started offer stands on", () => {
+    // Issue #1124: the two numbers, held apart on purpose. The offer measures
+    // the player's library and goes on until `MAPS_ENOUGH`. Promotion ranks a
+    // map against what the player was doing, and the first map is what gives
+    // them something to come back to. Written through `noMapsInstalled` rather
+    // than against a literal `false`, so widening that predicate to the
+    // library rule fails here rather than passing quietly.
+    const files = new Set(["a.sd7"]);
+    const oneMap = { files, names: new Set<string>(), known: true };
+    expect(
+      suggestedMapPlacement({ ...settled, noMaps: noMapsInstalled(oneMap) }),
+    ).toBe("cards");
+    // And at that same one map the offer is still standing, which is the whole
+    // of the question: the card gives up its rank and nobody gives up the offer.
+    expect(
+      installedMapCount({ installed: { maps: files }, scanned: { maps: [] } }),
+    ).toBeLessThan(MAPS_ENOUGH);
   });
 
   it("yields the top row while onboarding is offering maps", () => {

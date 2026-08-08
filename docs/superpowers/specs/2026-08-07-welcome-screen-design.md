@@ -109,6 +109,10 @@ The promotion yields while the Onboarding zone is offering maps. `GetStartedCard
 
 The question is "is onboarding offering maps", not "is the onboarding zone listed". The coarser one suppressed the promotion against an offer nobody was making (issue #1109). It is answered in two halves, joined in `CoilboxHome`: whether the zone is on the page comes from the layout's own zone list, and whether it is offering maps comes from `useGetStartedOffer`, the shared collector `GetStartedCard` itself draws from. Neither zone reads the other, and there is one predicate rather than two to keep in step.
 
+The promotion ends at the first map, and the get-started offer goes on to three (`MAPS_ENOUGH`). Two numbers, deliberately, and issue #1124 is the decision that neither is wrong. The offer is asking whether the player has a library yet, and its card is a band of its own that competes with nothing, so it can keep offering until one map has become a few. The promotion is asking whether a map offer outranks what the player was doing: it only exists inside the resume row, and all it does there is sit in front of the continue hero and the rail. A player with no maps has nothing to resume, so the promoted card takes a row that would be empty anyway. The first map is what gives them something to come back to, and past that the card would be pushing their own history aside rather than filling a gap.
+
+Standing down is not stopping. The card drops back to the Downloads group and goes on offering a map a day, and where the onboarding zone is on the page it picks the player up again under `MAPS_ENOUGH` as soon as setup is complete enough for it to speak. Only the card's rank ends at one map.
+
 Being promoted does not make the card able to install. Before there is a download folder the Install button is disabled and the card says where to set one, which is the same thing it says in the Downloads group.
 
 ## Card art
