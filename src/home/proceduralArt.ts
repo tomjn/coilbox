@@ -30,9 +30,11 @@
  *
  * Legibility contract: the field agrees with the card it fills. On a dark card
  * it is a dark field lit by low-opacity light marks, and on a light card it is
- * the same composition with every lightness mirrored, so the marks are dark on a
- * pale field. `cardShell.ts` owns the card, and `bundledArt.ts` mirrors by the
- * same rule so a bundled card and a procedural one beside it still match.
+ * the same composition with the field mirrored and the marks pushed a little
+ * past the mirror, so they are dark on a pale field and read as firmly as they
+ * do on a dark one. `schemeLightness` holds that rule. `cardShell.ts` owns the
+ * card, and `bundledArt.ts` calls the same rule so a bundled card and a
+ * procedural one beside it still match.
  */
 
 import { hashString, mulberry32, pick, type Rng } from "../conquest/rng";
@@ -68,20 +70,56 @@ export interface Hsl {
 const ACHROMATIC_SATURATION = 8;
 
 /**
+ * The brightest lightness the field is ever given on a dark card. Everything
+ * above it is a mark drawn over the field rather than the field itself.
+ */
+const FIELD_TOP = 25;
+
+/**
+ * How much darker than the exact mirror a mark goes on a light card, in
+ * lightness points, at its strongest. See {@link schemeLightness}.
+ */
+const MARK_PUSH = 20;
+
+/**
  * The lightness a mark takes in `scheme`, given the value it has on a dark card.
  *
- * The light scheme is the dark one mirrored in lightness and in nothing else.
- * Hue and saturation are untouched, so a drawing keeps its theme tint and keeps
- * its internal order (the marks that stood out still stand out) while the field
- * under them flips from near-black to near-white. One composition with two
- * ramps, rather than two sets of art that would drift apart.
+ * The light scheme moves lightness and nothing else. Hue and saturation are
+ * untouched, so a drawing keeps its theme tint and keeps its internal order (the
+ * marks that stood out still stand out) while the field under them flips from
+ * near-black to near-white. One composition with two ramps, rather than two sets
+ * of art that would drift apart.
  *
- * Exported because `bundledArt.ts` mirrors by the same rule, which is what keeps
- * a bundled card and a procedural card beside it reading as one family in both
- * schemes.
+ * The mirror is exact arithmetic and, on its own, the wrong perceptual result.
+ * A thin stroke is read against the field it sits on, and the same lightness
+ * step is a far bigger fraction of a near-black field than of a near-white one,
+ * so a mark that glows on a dark card merely recedes when inverted onto a light
+ * one. Rendered side by side an illustrated card and a procedural card stopped
+ * being tellable apart in the light scheme, which undoes #1054's rule that the
+ * drawing is the default and real content has to beat it (issue #1064).
+ *
+ * So the light ramp mirrors and then pushes the marks back down. The push
+ * starts where the field ends, at {@link FIELD_TOP}, and grows with how bright
+ * a mark is on the dark card, because the brighter a mark the more the mirror
+ * flatters it. Every field lightness sits below `FIELD_TOP`, so the field is
+ * the exact mirror it always was and the contrast floor `cardShell.ts`
+ * guarantees for the label is untouched. Only the marks drawn over it move.
+ *
+ * {@link MARK_PUSH} was settled by rendering every illustration beside the
+ * procedural field in both schemes and comparing, not by picking a number. At 20
+ * it moves background structure about 8 points and the brightest accent about
+ * 15, which is where the drawings read as drawings again while the pattern stays
+ * the soft wash it is meant to be. Past about 25 an accent lands as dark as the
+ * label's own ink and the patterns start gaining with the drawings, which is the
+ * distinction this exists to protect.
+ *
+ * Exported because `bundledArt.ts` calls it too, which is what keeps a bundled
+ * card and a procedural card beside it reading as one family in both schemes.
  */
 export function schemeLightness(scheme: CardScheme, dark: number): number {
-  return scheme === "dark" ? dark : 100 - dark;
+  if (scheme === "dark") return dark;
+  const push = (MARK_PUSH * Math.max(0, dark - FIELD_TOP)) / (100 - FIELD_TOP);
+  return clamp(100 - dark - push, 0, 100);
 }
 
 /** The four field directions. Never flat, so it reads as art not as a panel. */
@@ -104,7 +142,7 @@ export function proceduralCardArtSvg(
   const seed = hashString(toolId);
   const rand = mulberry32(seed);
   const theme = parseColor(themeColor) ?? FALLBACK_HSL;
-  /** Lightness on a dark card, mirrored when the card is light. */
+  /** Lightness on a dark card, put through the light ramp when the card is. */
   const tone = (dark: number) => schemeLightness(scheme, dark);
 
   // Ids are namespaced by the seed so two of these can share a document without

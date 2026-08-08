@@ -15,10 +15,12 @@
  * ## The scheme contract
  *
  * A card takes the page's ramp, so its art has to as well: a dark field under
- * light marks on a dark card, and the mirror of that on a light one. Every
- * lightness in {@link Palette} is written as its dark value and mirrored by
- * {@link schemeLightness}, which is the same rule the procedural field uses, so
- * the two sit beside each other in either scheme without a seam.
+ * light marks on a dark card, and the reverse of that on a light one. Every
+ * lightness in {@link Palette} is written as its dark value and converted by
+ * {@link schemeLightness}, which mirrors the field and pushes the marks a little
+ * past the mirror so they keep their presence on a pale card. It is the same
+ * rule the procedural field uses, so the two sit beside each other in either
+ * scheme without a seam.
  *
  * What the drawings themselves may do is unchanged and stated in dark terms:
  * marks are strokes and small shapes over the field, and nothing paints a flat
@@ -97,7 +99,8 @@ function paletteFor(themeColor: string, scheme: CardScheme): Palette {
   const sat = neutral ? clamp(theme.s, 0, 6) : clamp(theme.s, 24, 58);
   // A neutral theme has no hue worth rotating, so every offset collapses to 0.
   const hue = (offset: number) => (neutral ? theme.h : theme.h + offset);
-  // Lightnesses as they are on a dark card, mirrored when the card is light.
+  // Lightnesses as they are on a dark card, put through the light ramp when the
+  // card is light.
   const tone = (dark: number) => schemeLightness(scheme, dark);
   return {
     fieldTop: hsl(hue(14), sat, tone(17)),

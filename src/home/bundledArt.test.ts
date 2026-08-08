@@ -211,10 +211,11 @@ describe("the chain with bundled art registered", () => {
  * canvas.
  *
  * The two thresholds are one number seen from either end. Compositing lightness
- * is affine, so mirroring every colour mirrors the mean exactly, and 70 on a
- * light card is 30 on a dark one rather than a second number to keep in step.
- * Both are checked against the procedural floor as well, which already holds the
- * contract, so neither is tuned to make this file pass.
+ * is affine and the field mirrors exactly, so a light card's mean lands on the
+ * dark card's mirror give or take the push `schemeLightness` puts on the marks,
+ * and 70 on a light card is 30 on a dark one rather than a second number to keep
+ * in step. Both are checked against the procedural floor as well, which already
+ * holds the contract, so neither is tuned to make this file pass.
  */
 describe("the scheme contract", () => {
   /** How far the mean may travel from the card's own end of the ramp. */
@@ -222,6 +223,8 @@ describe("the scheme contract", () => {
   /** A flat fill this far the wrong way may not cover more than this. */
   const WRONG_WAY = 45;
   const MAX_WRONG_WAY_COVERAGE = 0.05;
+  /** How far the light mean may sit below the dark mean's exact mirror. */
+  const MAX_MIRROR_GAP = 4;
 
   /** Where the ramp starts for a scheme, which is what the art may not leave. */
   const floorOf = (scheme: CardScheme) => (scheme === "dark" ? 0 : 100);
@@ -290,18 +293,23 @@ describe("the scheme contract", () => {
     }
   });
 
-  it("is one drawing with a mirrored ramp, not two drawings", () => {
-    // What keeps the schemes a family rather than two unrelated sets. The
-    // geometry is identical and every lightness is reflected about the middle,
-    // which is also what makes the two thresholds above one number.
+  it("is one drawing in two ramps, not two drawings", () => {
+    // What keeps the schemes a family rather than two unrelated sets: the
+    // geometry is identical and both ramps come from the same dark value.
+    //
+    // The light mean lands a little below the mirror rather than on it, because
+    // `schemeLightness` pushes the marks past the mirror to keep them readable
+    // on a pale field (issue #1064). The field is untouched, and the marks are a
+    // small share of the canvas, so the gap is a point or two. A bigger one
+    // means a drawing has started painting marks over most of its canvas, which
+    // is the thing MAX_DRIFT above exists to catch.
     for (const toolId of BUNDLED_ART_TOOL_IDS) {
       const dark = bundledCardArtSvg(toolId, THEME, DARK) ?? "";
       const light = bundledCardArtSvg(toolId, THEME, LIGHT) ?? "";
       expect(strip(light), toolId).toBe(strip(dark));
-      expect(
-        meanLightness(light, 100) + meanLightness(dark, 0),
-        toolId,
-      ).toBeCloseTo(100, 6);
+      const gap = 100 - (meanLightness(light, 100) + meanLightness(dark, 0));
+      expect(gap, toolId).toBeGreaterThan(0);
+      expect(gap, toolId).toBeLessThan(MAX_MIRROR_GAP);
     }
   });
 });
