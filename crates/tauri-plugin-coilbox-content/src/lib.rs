@@ -898,6 +898,21 @@ async fn content_demo_info(engine_path: String, replay_path: String) -> Result<C
     }
 }
 
+/// `content_replay_trailer`: decode the records after a replay's demo stream,
+/// which are the winning ally-teams and every team's statistics samples. No
+/// engine folder and no `demotool`, so it answers for a replay whose game is not
+/// installed. `replayPath` is an absolute demo path from `content_list_replays`.
+/// Read on demand (it reads the whole file), not during listing.
+#[tauri::command]
+async fn content_replay_trailer(replay_path: String) -> Result<CliResult, ()> {
+    let demo_path = PathBuf::from(&replay_path);
+    match tauri::async_runtime::spawn_blocking(move || demo::read_trailer(&demo_path)).await {
+        Ok(Ok(trailer)) => Ok(CliResult::ok(json!({ "trailer": trailer }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("replay trailer task failed: {e}"))),
+    }
+}
+
 /// `content_stats_ingest` — incrementally parse every replay under `roots` into the
 /// local stats database, decoding only files new or changed since the last pass
 /// (idempotent, keyed by filename). `enginePath` locates `demotool` for the winner
@@ -1395,6 +1410,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_open_path,
             content_list_replays,
             content_demo_info,
+            content_replay_trailer,
             content_stats_ingest,
             content_stats_query,
             content_stats_watch_start,
