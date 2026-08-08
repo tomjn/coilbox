@@ -1,6 +1,6 @@
 # Distribution profiles
 
-A **distribution profile** lets you ship Coilbox alongside a game (or otherwise brand/narrow it) **without forking or rebuilding**. You drop a single `profile.json` file next to the app; Coilbox reads it once at startup and applies it: window title, hidden features, a preset game filter, a branded welcome screen, theme colours, hidden settings sections, extra sidebar links, custom Markdown pages, and a GitHub-releases update source for the game.
+A **distribution profile** lets you ship Coilbox alongside a game (or otherwise brand/narrow it) **without forking or rebuilding**. You drop a single `profile.json` file next to the app, Coilbox reads it once at startup and applies it: window title, hidden features, a preset game filter, a branded welcome screen, a rearranged [home page](#home-object), theme colours, hidden settings sections, extra sidebar links, custom Markdown pages, and a GitHub-releases update source for the game.
 
 If no profile is present, Coilbox behaves exactly as normal.
 
@@ -181,13 +181,15 @@ The `<game>` arg matches a game's name or shortname (case-insensitive); on a sin
 
 Open **Settings > Distribution profile**. It shows whether a profile is loaded, where it came from (`file` / `default`), and a summary of everything it's changing. If no profile is loaded it reads "No distribution profile loaded — standard Coilbox".
 
+The summary does not yet cover the [`home`](#home-object) key ([#1080](https://github.com/tomjn/coilbox/issues/1080)), so check that one on the page itself: the zones appear in the order you listed, and anything Coilbox could not read is a warning in the webview console.
+
 ## Writing and iterating on a profile
 
 Settings > Distribution profile carries two authoring controls. Which one you see depends on whether a profile is loaded.
 
 **No profile yet: Create profile.json.** Writes a starter profile into `.coilbox/` beside the app, filled in from how Coilbox is set up right now: the title, colour scheme, accent, advanced mode and fullscreen you can see on screen, plus a [`gameFilter`](#gamefilter-object) when exactly one game is installed. It never overwrites a profile that is already there. Coilbox has to restart to pick the new file up, because a `.coilbox` folder with no `profile.json` in it is not a portable install yet, so the button offers the restart.
 
-**Profile loaded: Reload profile.** Re-reads `profile.json` and applies it to the running app, so the edit loop is a reload rather than a restart. Everything applies, including the parts that otherwise only run at startup: theme, hidden nav, top bar, links, custom pages, welcome and splash. You stay on the page you were on, so you can sit on the screen you are styling and reload after each edit. Anything in progress elsewhere in the app resets, exactly as a restart would reset it.
+**Profile loaded: Reload profile.** Re-reads `profile.json` and applies it to the running app, so the edit loop is a reload rather than a restart. Everything applies, including the parts that otherwise only run at startup: theme, hidden nav, top bar, links, custom pages, welcome, home zones and splash. You stay on the page you were on, so you can sit on the screen you are styling and reload after each edit. Anything in progress elsewhere in the app resets, exactly as a restart would reset it.
 
 Both controls disappear when the profile sets [`"authoring": false`](#authoring-boolean), which is what you ship.
 
@@ -242,7 +244,11 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 | `downloads.browse`   | Downloads > Browse Rapid |
 | `downloads.games`    | Downloads > Games     |
 | `content.games`      | Content > Games       |
+| `content.setupPacks` | Content > Setup packs |
 | `multiplayer.stats`  | Multiplayer > Player stats |
+| `conquest.list`      | Play > Conquest       |
+| `runlite.list`       | Play > Warpath        |
+| `campaign.builder`   | Campaign Builder > Builder |
 
 ```json
 { "version": 1, "hide": ["downloads.games", "content.games"] }
@@ -338,7 +344,9 @@ Instead of inlining the markup, point `html`/`css` at a **file** in your `.coilb
 - **In-app links**: because Coilbox uses hash routing, an `<a href="#/play/skirmish">` navigates inside the app without a reload. Useful routes include `#/play/skirmish`, `#/content/maps`, `#/play/replays`, `#/battles`, `#/settings` — the full list is in **[routes.md](routes.md)**.
 - **Actions**: the welcome HTML can't run JavaScript, but any element carrying a `data-coilbox-action` attribute is wired to a built-in action when clicked — the interactive hook available without scripting.
   - `data-coilbox-action="quit"` closes Coilbox. Use it to add your own exit control to a branded landing page (handy for fullscreen builds). This works regardless of the [`quit`](#quit-boolean) flag.
-  - `data-coilbox-action="navigate"` goes to an in-app route named in a `data-coilbox-route` attribute (or the element's `href`), using the same `@route/<path>` / `.md` / `/path` scheme as [custom pages](#pages-array) — so `@route/singleplayer` and `/downloads/games` both resolve to the same route a page link would. A route that doesn't resolve is ignored (no crash). This makes a "Play now" button possible on the welcome screen from any element, not just an `<a href="#/…">`.
+  - `data-coilbox-action="navigate"` goes to an in-app route named in a `data-coilbox-route` attribute (or the element's `href`), using the same `@route/<path>` / `.md` / `/path` scheme as [custom pages](#pages-array) — so `@route/singleplayer` and `/downloads/games` both resolve to the same route a page link would. A route that doesn't resolve is ignored (no crash). This makes a "Play now" button possible on the welcome screen from any element, not just an `<a href="#/…">`. A `#/…` hash link is not one of those spellings and does not need to be: it navigates on its own, with or without the marker.
+
+  The same markers work in the [`home`](#home-object) key's markup, and mean the same thing there.
 
   ```json
   {
@@ -363,6 +371,273 @@ Your `welcome` is **always** shown and is never replaced by the onboarding — t
 ```
 
 Without a `welcome`, the cards sit at the top of Coilbox's own home page above the tool grid: `"off"` hides them there too, and `"above"` and `"below"` have no welcome to position against, so both leave them where they are. An omitted or unrecognized value is treated as `"below"`.
+
+Leaving `onboarding` out of a [`home.zones`](#home-object) list hides the cards as well, because omitting a zone hides it. See [Leaving out `onboarding`](#leaving-out-onboarding).
+
+### `home` (object)
+
+Rearranges Coilbox's own home page: which layout it uses, what it paints behind the page, and which zones it shows in what order.
+
+Leave `home` out and you get the home page as Coilbox ships it. A distribution with no `home` key renders the same page as an unbranded install, byte for byte. That has been checked three times on this feature by comparing the rendered markup, not reasoned about, so it is safe to add the other profile fields without thinking about the home page at all.
+
+`home` and [`welcome`](#welcome-object) are different tools:
+
+- `welcome` replaces the home page with your own markup. Nothing of Coilbox's page is left.
+- `home` keeps Coilbox's page, with its resume cards, tool grid and map suggestion, and lets you reorder it and slot your own markup into it.
+
+A profile with both gets the welcome, and `home` is ignored: a page that has been replaced has no zones left to arrange. Wholesale replacement is still the escape hatch when you want the page entirely to yourself.
+
+```json
+{
+  "version": 1,
+  "home": {
+    "layout": "stacked",
+    "background": "@.coilbox/art/backdrop.jpg",
+    "zones": [
+      { "zone": "greeting", "title": "Ironhold", "tagline": "Hold the line." },
+      { "zone": "continue" },
+      { "zone": "cards", "art": { "runlite.list": "@.coilbox/art/warpath.png" } },
+      { "html": "@.coilbox/home/community.html" }
+    ]
+  }
+}
+```
+
+| Field        | Meaning                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `layout`     | The named arrangement of the zones. Omit it to track the Coilbox default.                    |
+| `background` | A [`@.coilbox/<path>` reference](#file-references) to a backdrop image, or `false` for none. |
+| `zones`      | The page, in order. Omit it to track the Coilbox default.                                    |
+
+#### The zones
+
+Six zones make up the page. Each one is self-contained and draws nothing when it has nothing to say, so a page never has a hole in it.
+
+| Zone id      | Draws                                                                                                                     | Draws nothing when                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `onboarding` | The "Set up Coilbox" card (content folder and engine) and the get-started download suggestions.                            | Setup is done and content is installed, the player dismissed the card, or [`onboarding`](#onboarding-string) is `"off"`. |
+| `greeting`   | The page heading and the line under it. Greets by lobby name once logged in.                                              | Never. An app always has a title.                                                          |
+| `continue`   | One card for the thing you were last doing: a Warpath run, the next campaign mission, a conquest, a battle you can still rejoin, or your last skirmish setup. | There is nothing to resume, which includes every fresh install.                            |
+| `resume`     | Up to three runners-up the `continue` card did not take, plus a "log in as" card when you are logged out with a saved login. | There are no runners-up.                                                                   |
+| `cards`      | Every sidebar destination as a card, in the sidebar's own groups. A group's external links share one card at its end.      | The build has no navigation left outside Home.                                             |
+| `suggested`  | One curated map to download, rotated by date so every player sees the same map on the same day.                            | The catalog offers no curated map that can be installed.                                    |
+
+The ids in the first column are what you write in `zones`.
+
+Each entry is an object naming one zone, plus whatever that zone takes:
+
+| Entry key  | Applies to      | Meaning                                                                       |
+| ---------- | --------------- | ----------------------------------------------------------------------------- |
+| `zone`     | any entry       | The zone id from the table above.                                              |
+| `html`     | an entry with no `zone` | Your own markup, as a block between zones. See [Markup around and between zones](#markup-around-and-between-zones). |
+| `before`   | any entry       | Markup at the head of that entry.                                              |
+| `after`    | any entry       | Markup at the foot of that entry.                                              |
+| `title`    | `greeting`      | The heading, replacing the one Coilbox would have chosen.                      |
+| `tagline`  | `greeting`      | The line under the heading.                                                    |
+| `art`      | `cards`         | Per-tool card pictures. See [Card art for one tool](#card-art-for-one-tool).   |
+
+A key on a zone that does not take it is ignored, so `title` on `cards` does nothing.
+
+#### The zone list
+
+`zones` present means that list is the page, in that order:
+
+```json
+{
+  "version": 1,
+  "home": {
+    "zones": [
+      { "zone": "greeting" },
+      { "zone": "cards" },
+      { "zone": "onboarding" }
+    ]
+  }
+}
+```
+
+Two rules follow from that, and they are the whole contract:
+
+- Omitting a zone hides it. There is no separate on/off flag, and no way to say "everything except one". The example above shows three zones and hides `continue`, `resume` and `suggested`.
+- A zone Coilbox adds later will not appear on your page. Writing `zones` pins the page to the zones you knew about. Leaving `zones` out tracks Coilbox and picks up whatever comes next.
+
+That is the same pin-or-track trade `layout` makes, and you opt into it by writing the key. If all you want is one zone gone, you still have to write the other five out.
+
+#### Leaving out `onboarding`
+
+Leaving `onboarding` out of your `zones` list hides the "Set up Coilbox" and get-started cards, the same way leaving out any other zone hides it. Those cards are how a fresh install offers to create a content folder and download an engine, so a player on a machine with neither sees a home page that does not mention it.
+
+Coilbox does not make an exception for this, and here is the reasoning so you can judge it:
+
+- The player is still told. Singleplayer says "No engine found. Add a content folder with an engine in Settings > Content Folders first.", and Settings > Distribution profile reports the folders Coilbox can see. What omitting the zone costs is the offer on the home page, not the diagnosis.
+- The state is reachable three other ways already: [`"onboarding": "off"`](#onboarding-string), the card's own Dismiss button, and a `welcome` that replaces the page. An exception here would close one door of four.
+- "Omitting a zone hides it" is the one rule that makes the zone list explainable in a sentence. A zone that came back when Coilbox decided the install was unhealthy would make it "omitting a zone hides it, sometimes".
+
+So keep `onboarding` in your list unless you mean to remove the offer, and use `"onboarding": "off"` when you do, since that says what you meant and works whether or not you write `zones`.
+
+#### Markup around and between zones
+
+Every entry takes `before` and `after` markup, and an entry with `html` instead of `zone` is a block of your own markup sitting between zones. Together they cover a sentence at the head of a zone and a community feed at the foot of the page.
+
+```json
+{
+  "version": 1,
+  "home": {
+    "zones": [
+      { "zone": "greeting", "before": "<p class=\"kicker\">Ironhold Command</p>" },
+      { "zone": "cards", "after": "@.coilbox/home/roster.html" },
+      { "html": "@.coilbox/home/community.html" }
+    ]
+  }
+}
+```
+
+- Inline markup and file references are interchangeable, in all three keys. A value starting with `@` is a [file reference](#file-references), anything else is markup. Keep a one-line intro in `profile.json` and a long block in its own file.
+- Markup renders whether or not the zone beside it drew anything. A `before` on `continue` still shows on a fresh install with nothing to resume. Tying it to the zone would make it mean "sometimes", and would leave no way at all to say "always". So write markup that reads correctly next to an empty zone.
+- The markup goes through the same trusted path as [`welcome.html`](#welcome-object): relative asset URLs resolve against your `.coilbox/` folder, `<style>` blocks are rewritten the same way, `data-coilbox-action` markers work, and there is no JavaScript.
+- Coilbox puts your markup in a `div.coilbox-home-markup` and styles it in no other way. A custom `html` entry gets no margin at all, because the layout has no idea whether the block is a hairline or a feed. Bring your own spacing.
+- A reference that cannot be read renders a visible error in place, rather than blanking.
+
+One layout consequence worth knowing. Coilbox normally puts the `continue` card and the `resume` rail on one row, and folds the `suggested` map card into the tool grid's Downloads group. An entry carrying `before` or `after` markup stops pairing, so those two zones stack separately instead. Put your markup on a neighbouring entry, or on a custom `html` entry, if you want the pairing kept.
+
+#### Card art for one tool
+
+The `cards` entry takes an `art` map from tool id to a picture:
+
+```json
+{
+  "zone": "cards",
+  "art": {
+    "runlite.list": "@.coilbox/art/warpath.png",
+    "play.replays": false
+  }
+}
+```
+
+- A [file reference](#file-references) wins that card outright. Only `@.coilbox/` names a file, so a bare `art/warpath.png` is rejected.
+- `false` gives the icon-only card, an icon beside a label with no picture.
+- A tool you do not list is untouched and walks the rest of the resolution chain: art from the player's own install (a last-played minimap, a campaign panorama, a game's loading art), then a bundled illustration, then a pattern generated from the tool id and your accent colour. The last of those always succeeds, so no card is ever blank and you never have to fill the map in.
+
+Tool ids are the nav ids in [routes.md](routes.md), the same ids [`hide`](#hide-string) uses. Warpath is `runlite.list` and Singleplayer is `play.skirmish`, so check the table rather than guessing from the label.
+
+Any image is safe to put under a card: the label sits in a band measured to stay legible over a pure black picture and a pure white one, in both colour schemes.
+
+> Today `art` can only be written on a `zones` entry, so changing one tool's
+> picture means writing the whole page out and pinning it. That cost is filed as
+> [#1071](https://github.com/tomjn/coilbox/issues/1071).
+
+#### The backdrop
+
+`background` paints one image behind every zone:
+
+```json
+{ "version": 1, "home": { "background": "@.coilbox/art/backdrop.jpg" } }
+```
+
+It is a mood layer rather than a hero image. Coilbox composites it over the theme background at 6% strength, which is the strongest setting where the worst possible image still leaves every piece of text on the page readable. If you want art at full strength, use [`welcome`](#welcome-object), which replaces the page and lets your own CSS decide.
+
+`false` removes the backdrop entirely and leaves the flat theme background. Omitting it gives a soft wash built from your own `--primary` and `--foreground`, so a distribution that only sets [`accent`](#accent-string) already gets a backdrop in its colours.
+
+The backdrop applies to Coilbox's page only. A profile with a `welcome` is on the other arm and paints its own background in `welcome.css`.
+
+#### Pinning a layout
+
+`layout` names the arrangement of the zones. Coilbox ships one, `stacked`, which is a single column down the page.
+
+```json
+{ "version": 1, "home": { "layout": "stacked" } }
+```
+
+Naming it pins it. If a later Coilbox redesigns the home page, it ships as a new layout plus a change of default, and a distribution that pinned `stacked` keeps the screen it was built against. Leaving `layout` out tracks the default and moves with it. Neither is the right answer for everyone, which is why the name exists.
+
+#### When a `home` key is wrong
+
+You write this JSON by hand and nothing checks it before you ship. So a mistake never blanks the page: every bad value falls back to what Coilbox would have done, and says what it dropped and why on the webview console.
+
+A release build does not expose that console, and the profile summary has no readout for `home` yet ([#1080](https://github.com/tomjn/coilbox/issues/1080)), so today the reliable check is a dev build. Otherwise compare the page against your zone list by eye: a zone that is missing, or in the wrong place, is an entry that was dropped.
+
+| You wrote                                          | You get                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------ |
+| `home` as a string, number, boolean or array        | The stock page.                                              |
+| `layout` that is not a string, or a name this build does not ship | The default layout, and a list of the names it does ship. |
+| `zones` that is not an array, or is empty           | The stock page. An empty page is indistinguishable from a crash. |
+| A zone entry that is not an object                  | That entry dropped, the rest of the list kept.               |
+| An unknown zone name                                | That entry dropped, named in the warning.                    |
+| The same zone twice                                 | The first kept, the second dropped.                          |
+| An entry with neither `zone` nor `html`             | That entry dropped.                                          |
+| Every entry bad                                     | The stock page.                                              |
+| `title`, `tagline`, `before` or `after` that is not a string | That key ignored, the zone drawn as Coilbox would draw it. |
+| `art` that is not an object                         | The whole map ignored, every card walks the chain.           |
+| An `art` value that is neither a `@.coilbox/` reference nor `false` | That tool dropped from the map and walking the chain, the rest of the map kept. |
+| `background` that is neither a `@.coilbox/` reference nor `false` | The default wash.                                |
+| A `@.coilbox/` file that is not there               | A visible error block for markup, and a card that falls back to the icon for art. |
+
+The rule behind the table is that one mistake costs the thing it was written for and nothing else.
+
+#### A worked example
+
+A complete distribution using all of this lives in [`docs/examples/branded-home`](https://github.com/tomjn/coilbox/tree/main/docs/examples/branded-home). Copy its `.coilbox` folder next to the Coilbox executable and start the app.
+
+```
+branded-home/
+  .coilbox/
+    profile.json
+    home/
+      community.html     # the custom zone at the foot of the page
+    art/
+      backdrop.svg       # the page backdrop
+      warpath.svg        # the Warpath card's picture
+```
+
+```json
+{
+  "version": 1,
+  "title": "Ironhold",
+  "mode": "dark",
+  "accent": "amber",
+  "background": "hsl(28 18% 7%)",
+  "home": {
+    "layout": "stacked",
+    "background": "@.coilbox/art/backdrop.svg",
+    "zones": [
+      { "zone": "onboarding" },
+      {
+        "zone": "greeting",
+        "title": "Ironhold",
+        "tagline": "Hold the line.",
+        "before": "<p style=\"margin:0;font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;opacity:0.65\">Ironhold Command</p>"
+      },
+      { "zone": "continue" },
+      { "zone": "resume" },
+      {
+        "zone": "cards",
+        "art": {
+          "runlite.list": "@.coilbox/art/warpath.svg",
+          "play.replays": false
+        }
+      },
+      { "zone": "suggested" },
+      { "html": "@.coilbox/home/community.html" }
+    ]
+  },
+  "links": [
+    {
+      "label": "Discord",
+      "href": "https://discord.gg/example",
+      "icon": "discord"
+    }
+  ]
+}
+```
+
+What each part of it is doing:
+
+- The zone list is Coilbox's own order with a custom block added at the end, so nothing is hidden. Move `onboarding` down the list, or drop a zone, and the page follows.
+- `greeting` takes its own heading and line, and carries an inline `before` for the kicker above it.
+- `cards` gives Warpath its own picture and takes Replays back to the icon-only card. Every other tool is left to the resolution chain.
+- The `html` entry is a file reference, so the community block is a real HTML file you can edit without touching the JSON. It carries its own `<style>` block, an `<img src="art/warpath.svg">` that resolves against `.coilbox/`, and a `data-coilbox-action="navigate"` button that goes to `@route/warpath`.
+- `continue`, `resume`, `cards` and `suggested` are bare, so Coilbox keeps its pairings: the resume row is one row, and the map card sits in the Downloads group.
+
+`src/home/homeDocs.test.ts` resolves this exact file, and every JSON sample above, through the real schema on every test run. If the contract changes under them, the tests fail rather than the documentation quietly going stale.
 
 ### `links` (object[])
 
