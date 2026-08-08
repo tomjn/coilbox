@@ -109,9 +109,32 @@ const ZONE_SPACING: Partial<Record<ZoneId, string>> = {
  * zones render null, the row has no child nodes at all, and it takes its own top
  * margin with it. Wrapping each zone would leave the row holding two empty divs,
  * so it would keep the margin and the page would open with a gap in it.
+ *
+ * ## The rail keeps its own height
+ *
+ * `items-start`, so the row's bottom edge goes ragged rather than the rail
+ * carrying the hero's spare depth. A flex row stretches its items by default, and
+ * a hero whose title or action wrapped is a taller item: at 1512 with an 80
+ * character title the hero is 185px and the rail cards were stretched from their
+ * own 101px to match, so each one held 84px of nothing between its detail line
+ * and the action `mt-auto` pins to its foot (#1074).
+ *
+ * Aligned at the top the row keeps one straight edge, and it is the edge the page
+ * reads from: the greeting sits directly above it and both zones start on the
+ * same line. Centring or aligning at the foot each cost that edge to buy the
+ * other one, and left the rail floating against nothing.
+ *
+ * Only from `sm`, where the row is a row. Below that the main axis is vertical,
+ * `items-start` would be a width, and the rail's full-width cards would come out
+ * narrower than the hero above them.
+ *
+ * The rail's own cards still stretch to each other, because this aligns the two
+ * zones and the rail is a flex container of its own. One rail card wrapping its
+ * title still sets the height of its siblings, which is what keeps their actions
+ * on one line.
  */
 const RESUME_ROW =
-  "mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap";
+  "mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap sm:items-start";
 
 /**
  * What the layout tells the hero about its width: as wide as its contents, and
